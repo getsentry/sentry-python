@@ -427,6 +427,52 @@ def capture_events_forksafe(monkeypatch, capture_events, request):
     return inner
 
 
+@pytest.fixture
+def capture_items_forksafe(monkeypatch, capture_items, request):
+    def inner(*types):
+        capture_items(*types)
+
+        items_r, items_w = os.pipe()
+        items_r = os.fdopen(items_r, "rb", 0)
+        items_w = os.fdopen(items_w, "wb", 0)
+
+        test_client = sentry_sdk.get_client()
+        old_capture_envelope = test_client.transport.capture_envelope
+
+        telemetry = []
+
+        def append(envelope):
+            for item in envelope:
+                if types and item.type not in types:
+                    continue
+
+                if item.type in ("metric", "log", "span"):
+                    for i in item.payload.json["items"]:
+                        t = {k: v for k, v in i.items() if k != "attributes"}
+                        t["attributes"] = {
+                            k: v["value"] for k, v in i["attributes"].items()
+                        }
+                        telemetry.append({"type": item.type, "payload": t})
+                else:
+                    telemetry.append({"type": item.type, "payload": item.payload.json})
+
+            return old_capture_envelope(envelope)
+
+        real_flush = test_client.flush
+
+        def flush(timeout=None, callback=None):
+            real_flush(timeout=timeout, callback=callback)
+            items_w.write(json.dumps(telemetry).encode("utf-8"))
+            items_w.write(b"\n")
+
+        monkeypatch.setattr(test_client.transport, "capture_envelope", append)
+        monkeypatch.setattr(test_client, "flush", flush)
+
+        return EventStreamReader(items_r, items_w)
+
+    return inner
+
+
 class EventStreamReader:
     def __init__(self, read_file, write_file):
         self.read_file = read_file

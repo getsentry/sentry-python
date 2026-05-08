@@ -3,9 +3,13 @@ import pytest
 
 from concurrent import futures
 from typing import List, Optional, Tuple
+
+from unittest import mock
 from unittest.mock import Mock
 
+import sentry_sdk
 from sentry_sdk import start_span, start_transaction
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.grpc import GRPCIntegration
 from sentry_sdk.integrations.grpc.client import ClientInterceptor
@@ -51,35 +55,74 @@ def _tear_down(server: grpc.Server):
 
 
 @pytest.mark.forked
-def test_grpc_server_starts_transaction(sentry_init, capture_events_forksafe):
-    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
-    events = capture_events_forksafe()
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_grpc_server_starts_transaction(
+    sentry_init,
+    capture_events_forksafe,
+    capture_items_forksafe,
+    span_streaming,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[GRPCIntegration()],
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
 
     server, channel = _set_up()
 
     # Use the provided channel
     stub = gRPCTestServiceStub(channel)
-    stub.TestServe(gRPCTestMessage(text="test"))
 
-    _tear_down(server=server)
+    if span_streaming:
+        items = capture_items_forksafe("span")
 
-    events.write_file.close()
-    event = events.read_event()
-    span = event["spans"][0]
+        stub.TestServe(gRPCTestMessage(text="test"))
 
-    assert event["type"] == "transaction"
-    assert event["transaction_info"] == {
-        "source": "custom",
-    }
-    assert event["contexts"]["trace"]["op"] == OP.GRPC_SERVER
-    assert span["op"] == "test"
+        _tear_down(server=server)
+
+        sentry_sdk.flush()
+        items.write_file.close()
+        items = items.read_event()
+        spans = [item["payload"] for item in items if item["type"] == "span"]
+        span = spans[0]
+
+        assert spans[1]["attributes"]["sentry.span.source"] == "custom"
+        assert spans[1]["attributes"]["sentry.op"] == OP.GRPC_SERVER
+        assert span["attributes"]["sentry.op"] == "test"
+    else:
+        events = capture_events_forksafe()
+
+        stub.TestServe(gRPCTestMessage(text="test"))
+
+        _tear_down(server=server)
+
+        events.write_file.close()
+        event = events.read_event()
+        span = event["spans"][0]
+
+        assert event["type"] == "transaction"
+        assert event["transaction_info"] == {
+            "source": "custom",
+        }
+        assert event["contexts"]["trace"]["op"] == OP.GRPC_SERVER
+        assert span["op"] == "test"
 
 
 @pytest.mark.forked
-def test_grpc_server_other_interceptors(sentry_init, capture_events_forksafe):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_grpc_server_other_interceptors(
+    sentry_init,
+    capture_events_forksafe,
+    capture_items_forksafe,
+    span_streaming,
+):
     """Ensure compatibility with additional server interceptors."""
-    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
-    events = capture_events_forksafe()
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[GRPCIntegration()],
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
+
     mock_intercept = lambda continuation, handler_call_details: continuation(
         handler_call_details
     )
@@ -90,135 +133,302 @@ def test_grpc_server_other_interceptors(sentry_init, capture_events_forksafe):
 
     # Use the provided channel
     stub = gRPCTestServiceStub(channel)
-    stub.TestServe(gRPCTestMessage(text="test"))
 
-    _tear_down(server=server)
+    if span_streaming:
+        items = capture_items_forksafe("span")
 
-    mock_interceptor.intercept_service.assert_called_once()
-
-    events.write_file.close()
-    event = events.read_event()
-    span = event["spans"][0]
-
-    assert event["type"] == "transaction"
-    assert event["transaction_info"] == {
-        "source": "custom",
-    }
-    assert event["contexts"]["trace"]["op"] == OP.GRPC_SERVER
-    assert span["op"] == "test"
-
-
-@pytest.mark.forked
-def test_grpc_server_continues_transaction(sentry_init, capture_events_forksafe):
-    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
-    events = capture_events_forksafe()
-
-    server, channel = _set_up()
-
-    # Use the provided channel
-    stub = gRPCTestServiceStub(channel)
-
-    with start_transaction() as transaction:
-        metadata = (
-            (
-                "baggage",
-                "sentry-trace_id={trace_id},sentry-environment=test,"
-                "sentry-transaction=test-transaction,sentry-sample_rate=1.0".format(
-                    trace_id=transaction.trace_id
-                ),
-            ),
-            (
-                "sentry-trace",
-                "{trace_id}-{parent_span_id}-{sampled}".format(
-                    trace_id=transaction.trace_id,
-                    parent_span_id=transaction.span_id,
-                    sampled=1,
-                ),
-            ),
-        )
-        stub.TestServe(gRPCTestMessage(text="test"), metadata=metadata)
-
-    _tear_down(server=server)
-
-    events.write_file.close()
-    event = events.read_event()
-    span = event["spans"][0]
-
-    assert event["type"] == "transaction"
-    assert event["transaction_info"] == {
-        "source": "custom",
-    }
-    assert event["contexts"]["trace"]["op"] == OP.GRPC_SERVER
-    assert event["contexts"]["trace"]["trace_id"] == transaction.trace_id
-    assert span["op"] == "test"
-
-
-@pytest.mark.forked
-def test_grpc_client_starts_span(sentry_init, capture_events_forksafe):
-    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
-    events = capture_events_forksafe()
-
-    server, channel = _set_up()
-
-    # Use the provided channel
-    stub = gRPCTestServiceStub(channel)
-
-    with start_transaction():
         stub.TestServe(gRPCTestMessage(text="test"))
 
-    _tear_down(server=server)
+        _tear_down(server=server)
 
-    events.write_file.close()
-    events.read_event()
-    local_transaction = events.read_event()
-    span = local_transaction["spans"][0]
+        mock_interceptor.intercept_service.assert_called_once()
 
-    assert len(local_transaction["spans"]) == 1
-    assert span["op"] == OP.GRPC_CLIENT
-    assert (
-        span["description"]
-        == "unary unary call to /grpc_test_server.gRPCTestService/TestServe"
-    )
-    assert span["data"] == ApproxDict(
-        {
-            "type": "unary unary",
-            "method": "/grpc_test_server.gRPCTestService/TestServe",
-            "code": "OK",
+        sentry_sdk.flush()
+        items.write_file.close()
+        items = items.read_event()
+        spans = [item["payload"] for item in items if item["type"] == "span"]
+        span = spans[0]
+
+        assert spans[1]["attributes"]["sentry.span.source"] == "custom"
+        assert spans[1]["attributes"]["sentry.op"] == OP.GRPC_SERVER
+        assert span["attributes"]["sentry.op"] == "test"
+    else:
+        events = capture_events_forksafe()
+
+        stub.TestServe(gRPCTestMessage(text="test"))
+
+        _tear_down(server=server)
+
+        mock_interceptor.intercept_service.assert_called_once()
+
+        events.write_file.close()
+        event = events.read_event()
+        span = event["spans"][0]
+
+        assert event["type"] == "transaction"
+        assert event["transaction_info"] == {
+            "source": "custom",
         }
-    )
+        assert event["contexts"]["trace"]["op"] == OP.GRPC_SERVER
+        assert span["op"] == "test"
 
 
 @pytest.mark.forked
-def test_grpc_client_unary_stream_starts_span(sentry_init, capture_events_forksafe):
-    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
-    events = capture_events_forksafe()
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_grpc_server_continues_transaction(
+    sentry_init,
+    capture_events_forksafe,
+    capture_items_forksafe,
+    span_streaming,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[GRPCIntegration()],
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
 
     server, channel = _set_up()
 
     # Use the provided channel
     stub = gRPCTestServiceStub(channel)
 
-    with start_transaction():
-        [el for el in stub.TestUnaryStream(gRPCTestMessage(text="test"))]
+    if span_streaming:
+        items = capture_items_forksafe("span")
 
-    _tear_down(server=server)
+        with sentry_sdk.traces.start_span(name="custom parent") as segment_span:
+            metadata = (
+                (
+                    "baggage",
+                    "sentry-trace_id={trace_id},sentry-environment=test,"
+                    "sentry-transaction=test-transaction,sentry-sample_rate=1.0".format(
+                        trace_id=segment_span.trace_id
+                    ),
+                ),
+                (
+                    "sentry-trace",
+                    "{trace_id}-{parent_span_id}-{sampled}".format(
+                        trace_id=segment_span.trace_id,
+                        parent_span_id=segment_span.span_id,
+                        sampled=1,
+                    ),
+                ),
+            )
 
-    events.write_file.close()
-    local_transaction = events.read_event()
-    span = local_transaction["spans"][0]
+            stub.TestServe(gRPCTestMessage(text="test"), metadata=metadata)
 
-    assert len(local_transaction["spans"]) == 1
-    assert span["op"] == OP.GRPC_CLIENT
-    assert (
-        span["description"]
-        == "unary stream call to /grpc_test_server.gRPCTestService/TestUnaryStream"
-    )
-    assert span["data"] == ApproxDict(
-        {
-            "type": "unary stream",
-            "method": "/grpc_test_server.gRPCTestService/TestUnaryStream",
+        _tear_down(server=server)
+
+        sentry_sdk.flush()
+        items.write_file.close()
+        items = items.read_event()
+        spans = [item["payload"] for item in items if item["type"] == "span"]
+        span = spans[0]
+
+        assert spans[1]["attributes"]["sentry.span.source"] == "custom"
+        assert spans[1]["attributes"]["sentry.op"] == OP.GRPC_SERVER
+        assert spans[1]["trace_id"] == segment_span.trace_id
+        assert span["attributes"]["sentry.op"] == "test"
+    else:
+        events = capture_events_forksafe()
+
+        with start_transaction() as transaction:
+            metadata = (
+                (
+                    "baggage",
+                    "sentry-trace_id={trace_id},sentry-environment=test,"
+                    "sentry-transaction=test-transaction,sentry-sample_rate=1.0".format(
+                        trace_id=transaction.trace_id
+                    ),
+                ),
+                (
+                    "sentry-trace",
+                    "{trace_id}-{parent_span_id}-{sampled}".format(
+                        trace_id=transaction.trace_id,
+                        parent_span_id=transaction.span_id,
+                        sampled=1,
+                    ),
+                ),
+            )
+
+            stub.TestServe(gRPCTestMessage(text="test"), metadata=metadata)
+
+        _tear_down(server=server)
+
+        events.write_file.close()
+        event = events.read_event()
+        span = event["spans"][0]
+
+        assert event["type"] == "transaction"
+        assert event["transaction_info"] == {
+            "source": "custom",
         }
+        assert event["contexts"]["trace"]["op"] == OP.GRPC_SERVER
+        assert event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+        assert span["op"] == "test"
+
+
+@pytest.mark.forked
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_grpc_client_starts_span(
+    sentry_init,
+    capture_events_forksafe,
+    capture_items_forksafe,
+    span_streaming,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[GRPCIntegration()],
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
+
+    server, channel = _set_up()
+
+    # Use the provided channel
+    stub = gRPCTestServiceStub(channel)
+
+    if span_streaming:
+        items = capture_items_forksafe("span")
+
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            stub.TestServe(gRPCTestMessage(text="test"))
+
+        _tear_down(server=server)
+
+        sentry_sdk.flush()
+        items.write_file.close()
+        items = items.read_event()
+        spans = [item["payload"] for item in items if item["type"] == "span"]
+        span = spans[2]
+
+        assert len(spans) == 4
+        assert span["attributes"]["sentry.op"] == OP.GRPC_CLIENT
+        assert (
+            span["name"]
+            == "unary unary call to /grpc_test_server.gRPCTestService/TestServe"
+        )
+        assert span["attributes"] == ApproxDict(
+            {
+                "rpc.method": "/grpc_test_server.gRPCTestService/TestServe",
+                "sentry.environment": mock.ANY,
+                "sentry.op": "grpc.client",
+                "sentry.origin": "auto.grpc.grpc",
+                "sentry.release": mock.ANY,
+                "sentry.sdk.name": "sentry.python",
+                "sentry.sdk.version": mock.ANY,
+                "sentry.segment.id": mock.ANY,
+                "sentry.segment.name": "custom parent",
+                "server.address": mock.ANY,
+                "thread.id": mock.ANY,
+                "thread.name": mock.ANY,
+                "rpc.response.status_code": "OK",
+            }
+        )
+    else:
+        events = capture_events_forksafe()
+
+        with start_transaction():
+            stub.TestServe(gRPCTestMessage(text="test"))
+
+        _tear_down(server=server)
+
+        events.write_file.close()
+        events.read_event()
+        local_transaction = events.read_event()
+        span = local_transaction["spans"][0]
+
+        assert len(local_transaction["spans"]) == 1
+        assert span["op"] == OP.GRPC_CLIENT
+        assert (
+            span["description"]
+            == "unary unary call to /grpc_test_server.gRPCTestService/TestServe"
+        )
+        assert span["data"] == ApproxDict(
+            {
+                "type": "unary unary",
+                "method": "/grpc_test_server.gRPCTestService/TestServe",
+                "code": "OK",
+            }
+        )
+
+
+@pytest.mark.forked
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_grpc_client_unary_stream_starts_span(
+    sentry_init,
+    capture_events_forksafe,
+    capture_items_forksafe,
+    span_streaming,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[GRPCIntegration()],
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
+
+    server, channel = _set_up()
+
+    # Use the provided channel
+    stub = gRPCTestServiceStub(channel)
+
+    if span_streaming:
+        items = capture_items_forksafe("span")
+
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            [el for el in stub.TestUnaryStream(gRPCTestMessage(text="test"))]
+
+        _tear_down(server=server)
+
+        sentry_sdk.flush()
+        items.write_file.close()
+        items = items.read_event()
+        spans = [item["payload"] for item in items if item["type"] == "span"]
+        span = spans[0]
+
+        assert len(spans) == 2
+        assert span["attributes"]["sentry.op"] == OP.GRPC_CLIENT
+        assert (
+            span["name"]
+            == "unary stream call to /grpc_test_server.gRPCTestService/TestUnaryStream"
+        )
+        assert span["attributes"] == ApproxDict(
+            {
+                "rpc.method": "/grpc_test_server.gRPCTestService/TestUnaryStream",
+                "sentry.environment": mock.ANY,
+                "sentry.op": "grpc.client",
+                "sentry.origin": "auto.grpc.grpc",
+                "sentry.release": mock.ANY,
+                "sentry.sdk.name": "sentry.python",
+                "sentry.sdk.version": mock.ANY,
+                "sentry.segment.id": mock.ANY,
+                "sentry.segment.name": "custom parent",
+                "server.address": mock.ANY,
+                "thread.id": mock.ANY,
+                "thread.name": mock.ANY,
+            }
+        )
+    else:
+        events = capture_events_forksafe()
+        with start_transaction():
+            [el for el in stub.TestUnaryStream(gRPCTestMessage(text="test"))]
+
+        _tear_down(server=server)
+
+        events.write_file.close()
+        local_transaction = events.read_event()
+        span = local_transaction["spans"][0]
+
+        assert len(local_transaction["spans"]) == 1
+        assert span["op"] == OP.GRPC_CLIENT
+        assert (
+            span["description"]
+            == "unary stream call to /grpc_test_server.gRPCTestService/TestUnaryStream"
+        )
+        assert span["data"] == ApproxDict(
+            {
+                "type": "unary stream",
+                "method": "/grpc_test_server.gRPCTestService/TestUnaryStream",
+            }
+        )
 
 
 # using unittest.mock.Mock not possible because grpc verifies
@@ -232,10 +442,19 @@ class MockClientInterceptor(grpc.UnaryUnaryClientInterceptor):
 
 
 @pytest.mark.forked
-def test_grpc_client_other_interceptor(sentry_init, capture_events_forksafe):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_grpc_client_other_interceptor(
+    sentry_init,
+    capture_events_forksafe,
+    capture_items_forksafe,
+    span_streaming,
+):
     """Ensure compatibility with additional client interceptors."""
-    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
-    events = capture_events_forksafe()
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[GRPCIntegration()],
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
 
     server, channel = _set_up()
 
@@ -243,37 +462,88 @@ def test_grpc_client_other_interceptor(sentry_init, capture_events_forksafe):
     channel = grpc.intercept_channel(channel, MockClientInterceptor())
     stub = gRPCTestServiceStub(channel)
 
-    with start_transaction():
-        stub.TestServe(gRPCTestMessage(text="test"))
+    if span_streaming:
+        items = capture_items_forksafe("span")
 
-    _tear_down(server=server)
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            stub.TestServe(gRPCTestMessage(text="test"))
 
-    assert MockClientInterceptor.call_counter == 1
+        _tear_down(server=server)
 
-    events.write_file.close()
-    events.read_event()
-    local_transaction = events.read_event()
-    span = local_transaction["spans"][0]
+        assert MockClientInterceptor.call_counter == 1
 
-    assert len(local_transaction["spans"]) == 1
-    assert span["op"] == OP.GRPC_CLIENT
-    assert (
-        span["description"]
-        == "unary unary call to /grpc_test_server.gRPCTestService/TestServe"
-    )
-    assert span["data"] == ApproxDict(
-        {
-            "type": "unary unary",
-            "method": "/grpc_test_server.gRPCTestService/TestServe",
-            "code": "OK",
-        }
-    )
+        sentry_sdk.flush()
+        items.write_file.close()
+        items = items.read_event()
+        spans = [item["payload"] for item in items if item["type"] == "span"]
+        span = spans[2]
+
+        assert len(spans) == 4
+        assert span["attributes"]["sentry.op"] == OP.GRPC_CLIENT
+        assert (
+            span["name"]
+            == "unary unary call to /grpc_test_server.gRPCTestService/TestServe"
+        )
+        assert span["attributes"] == ApproxDict(
+            {
+                "rpc.method": "/grpc_test_server.gRPCTestService/TestServe",
+                "sentry.environment": mock.ANY,
+                "sentry.op": "grpc.client",
+                "sentry.origin": "auto.grpc.grpc",
+                "sentry.release": mock.ANY,
+                "sentry.sdk.name": "sentry.python",
+                "sentry.sdk.version": mock.ANY,
+                "sentry.segment.id": mock.ANY,
+                "sentry.segment.name": "custom parent",
+                "server.address": mock.ANY,
+                "thread.id": mock.ANY,
+                "thread.name": mock.ANY,
+                "rpc.response.status_code": "OK",
+            }
+        )
+    else:
+        events = capture_events_forksafe()
+
+        with start_transaction():
+            stub.TestServe(gRPCTestMessage(text="test"))
+
+        _tear_down(server=server)
+
+        assert MockClientInterceptor.call_counter == 1
+
+        events.write_file.close()
+        events.read_event()
+        local_transaction = events.read_event()
+        span = local_transaction["spans"][0]
+
+        assert len(local_transaction["spans"]) == 1
+        assert span["op"] == OP.GRPC_CLIENT
+        assert (
+            span["description"]
+            == "unary unary call to /grpc_test_server.gRPCTestService/TestServe"
+        )
+        assert span["data"] == ApproxDict(
+            {
+                "type": "unary unary",
+                "method": "/grpc_test_server.gRPCTestService/TestServe",
+                "code": "OK",
+            }
+        )
 
 
 @pytest.mark.forked
-def test_prevent_dual_client_interceptor(sentry_init, capture_events_forksafe):
-    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
-    events = capture_events_forksafe()
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_prevent_dual_client_interceptor(
+    sentry_init,
+    capture_events_forksafe,
+    capture_items_forksafe,
+    span_streaming,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[GRPCIntegration()],
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
 
     server, channel = _set_up()
 
@@ -281,56 +551,112 @@ def test_prevent_dual_client_interceptor(sentry_init, capture_events_forksafe):
     channel = grpc.intercept_channel(channel, ClientInterceptor())
     stub = gRPCTestServiceStub(channel)
 
-    with start_transaction():
-        stub.TestServe(gRPCTestMessage(text="test"))
+    if span_streaming:
+        items = capture_items_forksafe("span")
 
-    _tear_down(server=server)
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            stub.TestServe(gRPCTestMessage(text="test"))
 
-    events.write_file.close()
-    events.read_event()
-    local_transaction = events.read_event()
-    span = local_transaction["spans"][0]
+        _tear_down(server=server)
 
-    assert len(local_transaction["spans"]) == 1
-    assert span["op"] == OP.GRPC_CLIENT
-    assert (
-        span["description"]
-        == "unary unary call to /grpc_test_server.gRPCTestService/TestServe"
-    )
-    assert span["data"] == ApproxDict(
-        {
-            "type": "unary unary",
-            "method": "/grpc_test_server.gRPCTestService/TestServe",
-            "code": "OK",
-        }
-    )
+        sentry_sdk.flush()
+        items.write_file.close()
+        items = items.read_event()
+        spans = [item["payload"] for item in items if item["type"] == "span"]
+        span = spans[2]
+
+        assert len(spans) == 4
+        assert span["attributes"]["sentry.op"] == OP.GRPC_CLIENT
+        assert (
+            span["name"]
+            == "unary unary call to /grpc_test_server.gRPCTestService/TestServe"
+        )
+        assert span["attributes"] == ApproxDict(
+            {
+                "rpc.method": "/grpc_test_server.gRPCTestService/TestServe",
+                "rpc.response.status_code": "OK",
+            }
+        )
+    else:
+        events = capture_events_forksafe()
+
+        with start_transaction():
+            stub.TestServe(gRPCTestMessage(text="test"))
+
+        _tear_down(server=server)
+
+        events.write_file.close()
+        events.read_event()
+        local_transaction = events.read_event()
+        span = local_transaction["spans"][0]
+
+        assert len(local_transaction["spans"]) == 1
+        assert span["op"] == OP.GRPC_CLIENT
+        assert (
+            span["description"]
+            == "unary unary call to /grpc_test_server.gRPCTestService/TestServe"
+        )
+        assert span["data"] == ApproxDict(
+            {
+                "type": "unary unary",
+                "method": "/grpc_test_server.gRPCTestService/TestServe",
+                "code": "OK",
+            }
+        )
 
 
 @pytest.mark.forked
+@pytest.mark.parametrize("span_streaming", [True, False])
 def test_grpc_client_and_servers_interceptors_integration(
-    sentry_init, capture_events_forksafe
+    sentry_init,
+    capture_events_forksafe,
+    capture_items_forksafe,
+    span_streaming,
 ):
-    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
-    events = capture_events_forksafe()
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[GRPCIntegration()],
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
 
     server, channel = _set_up()
 
     # Use the provided channel
     stub = gRPCTestServiceStub(channel)
 
-    with start_transaction():
-        stub.TestServe(gRPCTestMessage(text="test"))
+    if span_streaming:
+        items = capture_items_forksafe("span")
 
-    _tear_down(server=server)
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            stub.TestServe(gRPCTestMessage(text="test"))
 
-    events.write_file.close()
-    server_transaction = events.read_event()
-    local_transaction = events.read_event()
+        _tear_down(server=server)
 
-    assert (
-        server_transaction["contexts"]["trace"]["trace_id"]
-        == local_transaction["contexts"]["trace"]["trace_id"]
-    )
+        sentry_sdk.flush()
+        items.write_file.close()
+        items = items.read_event()
+
+        spans = [item["payload"] for item in items if item["type"] == "span"]
+
+        assert spans[1]["is_segment"] is True
+        assert spans[3]["is_segment"] is True
+        assert spans[1]["trace_id"] == spans[3]["trace_id"]
+    else:
+        events = capture_events_forksafe()
+
+        with start_transaction():
+            stub.TestServe(gRPCTestMessage(text="test"))
+
+        _tear_down(server=server)
+
+        events.write_file.close()
+        server_transaction = events.read_event()
+        local_transaction = events.read_event()
+
+        assert (
+            server_transaction["contexts"]["trace"]["trace_id"]
+            == local_transaction["contexts"]["trace"]["trace_id"]
+        )
 
 
 @pytest.mark.forked
@@ -365,35 +691,69 @@ def test_stream_unary(sentry_init):
 
 
 @pytest.mark.forked
-def test_span_origin(sentry_init, capture_events_forksafe):
-    sentry_init(traces_sample_rate=1.0, integrations=[GRPCIntegration()])
-    events = capture_events_forksafe()
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_span_origin(
+    sentry_init,
+    capture_events_forksafe,
+    capture_items_forksafe,
+    span_streaming,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[GRPCIntegration()],
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
 
     server, channel = _set_up()
 
     # Use the provided channel
     stub = gRPCTestServiceStub(channel)
 
-    with start_transaction(name="custom_transaction"):
-        stub.TestServe(gRPCTestMessage(text="test"))
+    if span_streaming:
+        items = capture_items_forksafe("span")
 
-    _tear_down(server=server)
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            stub.TestServe(gRPCTestMessage(text="test"))
 
-    events.write_file.close()
+        _tear_down(server=server)
 
-    transaction_from_integration = events.read_event()
-    custom_transaction = events.read_event()
+        sentry_sdk.flush()
+        items.write_file.close()
+        items = items.read_event()
 
-    assert (
-        transaction_from_integration["contexts"]["trace"]["origin"] == "auto.grpc.grpc"
-    )
-    assert (
-        transaction_from_integration["spans"][0]["origin"]
-        == "auto.grpc.grpc.TestService"
-    )  # manually created in TestService, not the instrumentation
+        spans = [item["payload"] for item in items if item["type"] == "span"]
 
-    assert custom_transaction["contexts"]["trace"]["origin"] == "manual"
-    assert custom_transaction["spans"][0]["origin"] == "auto.grpc.grpc"
+        assert spans[1]["attributes"]["sentry.origin"] == "auto.grpc.grpc"
+        assert (
+            spans[0]["attributes"]["sentry.origin"] == "auto.grpc.grpc.TestService"
+        )  # manually created in TestService, not the instrumentation
+
+        assert spans[3]["attributes"]["sentry.origin"] == "manual"
+        assert spans[2]["attributes"]["sentry.origin"] == "auto.grpc.grpc"
+    else:
+        events = capture_events_forksafe()
+
+        with start_transaction(name="custom_transaction"):
+            stub.TestServe(gRPCTestMessage(text="test"))
+
+        _tear_down(server=server)
+
+        events.write_file.close()
+
+        transaction_from_integration = events.read_event()
+        custom_transaction = events.read_event()
+
+        assert (
+            transaction_from_integration["contexts"]["trace"]["origin"]
+            == "auto.grpc.grpc"
+        )
+        assert (
+            transaction_from_integration["spans"][0]["origin"]
+            == "auto.grpc.grpc.TestService"
+        )  # manually created in TestService, not the instrumentation
+
+        assert custom_transaction["contexts"]["trace"]["origin"] == "manual"
+        assert custom_transaction["spans"][0]["origin"] == "auto.grpc.grpc"
 
 
 class TestService(gRPCTestServiceServicer):
@@ -401,12 +761,25 @@ class TestService(gRPCTestServiceServicer):
 
     @staticmethod
     def TestServe(request, context):  # noqa: N802
-        with start_span(
-            op="test",
-            name="test",
-            origin="auto.grpc.grpc.TestService",
-        ):
-            pass
+        client = sentry_sdk.get_client()
+        span_streaming = has_span_streaming_enabled(client.options)
+
+        if span_streaming:
+            with sentry_sdk.traces.start_span(
+                name="test",
+                attributes={
+                    "sentry.op": "test",
+                    "sentry.origin": "auto.grpc.grpc.TestService",
+                },
+            ):
+                pass
+        else:
+            with start_span(
+                op="test",
+                name="test",
+                origin="auto.grpc.grpc.TestService",
+            ):
+                pass
 
         return gRPCTestMessage(text=request.text)
 
