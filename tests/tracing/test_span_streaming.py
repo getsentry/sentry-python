@@ -270,13 +270,14 @@ def test_custom_sampling_context_update_to_context_value_persists(sentry_init):
     with sentry_sdk.traces.start_span(name="span", attributes={"first": False}):
         ...
 
+
 def test_before_send_span(sentry_init, capture_items):
     def before_send_span(span, hint):
-        return None
+        span.set_attribute("", "")
 
     sentry_init(
         _experiments={
-            "before_send_span": before_send_span.
+            "before_send_span": before_send_span,
             "trace_lifecycle": "stream",
         },
     )
@@ -296,6 +297,7 @@ def test_before_send_span(sentry_init, capture_items):
 
     assert span["name"] == "retained"
     assert span["attributes"]["drop"] is False
+
 
 def test_before_send_span_invalid_return_value(sentry_init, capture_items):
     def before_send_span(span, hint):
@@ -304,7 +306,7 @@ def test_before_send_span_invalid_return_value(sentry_init, capture_items):
 
     sentry_init(
         _experiments={
-            "before_send_span": before_send_span.
+            "before_send_span": before_send_span,
             "trace_lifecycle": "stream",
         },
     )
@@ -324,6 +326,7 @@ def test_before_send_span_invalid_return_value(sentry_init, capture_items):
 
     assert span["name"] == "retained"
     assert span["attributes"]["drop"] is False
+
 
 def test_span_attributes(sentry_init, capture_items):
     sentry_init(
