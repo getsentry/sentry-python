@@ -3,6 +3,7 @@ import uuid
 import random
 import socket
 from collections.abc import Mapping
+from copy import deepcopy
 from datetime import datetime, timezone
 from importlib import import_module
 from typing import TYPE_CHECKING, List, Dict, cast, overload
@@ -25,10 +26,12 @@ from sentry_sdk.utils import (
     logger,
     get_before_send_log,
     get_before_send_metric,
+    get_before_send_span,
     has_logs_enabled,
     has_metrics_enabled,
 )
 from sentry_sdk.serializer import serialize
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import trace
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.transport import (
@@ -71,7 +74,6 @@ if TYPE_CHECKING:
     from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
     from sentry_sdk.spotlight import SpotlightClient
-    from sentry_sdk.traces import StreamedSpan
     from sentry_sdk.transport import Transport, Item
     from sentry_sdk._log_batcher import LogBatcher
     from sentry_sdk._metrics_batcher import MetricsBatcher
@@ -938,25 +940,54 @@ class _Client(BaseClient):
         ty: str,
         scope: "Scope",
     ) -> None:
-        # Capture attributes-based telemetry (logs, metrics, spansV2)
+        """
+        Capture attributes-based telemetry (logs, metrics, streamed spans).
+
+        Apply any attributes set on the scope to it, and run the user's
+        before_send_{telemetry} on it, if applicable.
+        """
         if telemetry is None:
             return
 
         scope.apply_to_telemetry(telemetry)
 
         before_send = None
+
         if ty == "log":
             before_send = get_before_send_log(self.options)
+            snapshot = telemetry
+
         elif ty == "metric":
             before_send = get_before_send_metric(self.options)
+            snapshot = telemetry
+
         elif ty == "span":
             before_send = get_before_send_span(self.options)
+            # We don't want to expose the actual underlying span in
+            # before_send_span to not allow arbitrary edits. Expose a copy
+            # instead.
+            snapshot = deepcopy(telemetry)
 
         if before_send is not None:
-            telemetry = before_send(telemetry, {})
+            result = before_send(snapshot, {})
 
-        if telemetry is None:
-            return
+            # Logs and metrics can be dropped in their respective
+            # before_send, so if we get None, don't queue them for sending.
+            if ty in ("log", "metric"):
+                if result is None:
+                    return
+
+            # Spans can't be dropped in before_send_span by design. They can
+            # be altered though (name and attributes can be changed, e.g. to
+            # sanitize).
+            #
+            # If we get anything but a StreamedSpan back from before_send_span,
+            # just ignore it. Otherwise, take the returned StreamedSpan and
+            # merge it with the original.
+            elif ty == "span":
+                if isinstance(result, StreamedSpan):
+                    telemetry._attributes = result._attributes
+                    telemetry._name = result._name
 
         batcher = None
         if ty == "log":

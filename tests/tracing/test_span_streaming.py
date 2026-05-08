@@ -271,11 +271,19 @@ def test_custom_sampling_context_update_to_context_value_persists(sentry_init):
         ...
 
 
-def test_before_send_span(sentry_init, capture_items):
+def test_before_send_span_basic(sentry_init, capture_items):
     def before_send_span(span, hint):
-        span.set_attribute("", "")
+        assert isinstance(span, StreamedSpan)
+
+        span.name = "Better span name"
+        span.remove_attribute("drop")
+        span.set_attribute("sanitize", "[Removed]")
+        span.set_attribute("add", "new")
+
+        return span
 
     sentry_init(
+        traces_sample_rate=1.0,
         _experiments={
             "before_send_span": before_send_span,
             "trace_lifecycle": "stream",
@@ -284,9 +292,13 @@ def test_before_send_span(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="dropped", attributes={"drop": True}):
-        ...
-    with sentry_sdk.traces.start_span(name="retained", attributes={"drop": False}):
+    with sentry_sdk.traces.start_span(
+        name="span",
+        attributes={
+            "drop": True,
+            "sanitize": "myamazingpassword",
+        },
+    ):
         ...
 
     sentry_sdk.get_client().flush()
@@ -295,16 +307,20 @@ def test_before_send_span(sentry_init, capture_items):
     assert len(spans) == 1
     (span,) = spans
 
-    assert span["name"] == "retained"
-    assert span["attributes"]["drop"] is False
+    assert span["name"] == "Better span name"
+    assert "drop" not in span["attributes"]
+    assert span["attributes"]["sanitize"] == "[Removed]"
+    assert span["attributes"]["add"] == "new"
 
 
 def test_before_send_span_invalid_return_value(sentry_init, capture_items):
     def before_send_span(span, hint):
-        # Spans can't be dropped in before_send_span
+        # Spans can't be dropped in before_send_span, so unsupported return
+        # values will be ignored
         return None
 
     sentry_init(
+        traces_sample_rate=1.0,
         _experiments={
             "before_send_span": before_send_span,
             "trace_lifecycle": "stream",
@@ -313,9 +329,7 @@ def test_before_send_span_invalid_return_value(sentry_init, capture_items):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="dropped", attributes={"drop": True}):
-        ...
-    with sentry_sdk.traces.start_span(name="retained", attributes={"drop": False}):
+    with sentry_sdk.traces.start_span(name="span"):
         ...
 
     sentry_sdk.get_client().flush()
@@ -324,8 +338,66 @@ def test_before_send_span_invalid_return_value(sentry_init, capture_items):
     assert len(spans) == 1
     (span,) = spans
 
-    assert span["name"] == "retained"
-    assert span["attributes"]["drop"] is False
+    assert span["name"] == "span"
+
+
+def test_before_send_span_unsupported_edit(sentry_init, capture_items):
+    def before_send_span(span, hint):
+        # Anything beyond attribute and name changes will be ignored
+        span._trace_id = "my-trace-id"
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={
+            "before_send_span": before_send_span,
+            "trace_lifecycle": "stream",
+        },
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="span"):
+        ...
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    assert len(spans) == 1
+    (span,) = spans
+
+    assert span["name"] == "span"
+    assert span["trace_id"] != "my-trace-id"
+
+
+def test_before_send_span_doesnt_receive_ignored_spans(sentry_init, capture_items):
+    before_send_span_called = False
+
+    def before_send_span(span, hint):
+        nonlocal before_send_span_called
+        before_send_span_called = True
+        return span
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={
+            "before_send_span": before_send_span,
+            "trace_lifecycle": "stream",
+            "ignore_spans": [
+                "ignored",
+            ],
+        },
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="ignored"):
+        ...
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    assert not spans
+    assert not before_send_span_called
 
 
 def test_span_attributes(sentry_init, capture_items):

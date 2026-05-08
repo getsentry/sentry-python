@@ -574,14 +574,6 @@ class StreamedSpan:
 
         self.set_attribute("process.command_args", sys.argv)
 
-        if self._timestamp:
-            res["end_timestamp"] = self._timestamp.timestamp()
-
-        if self._parent_span_id:
-            res["parent_span_id"] = self._parent_span_id
-
-        return res
-
 
 class NoOpStreamedSpan(StreamedSpan):
     __slots__ = (
