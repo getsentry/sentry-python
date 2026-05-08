@@ -1118,14 +1118,13 @@ async def test_query_source_execute(
         assert len(spans) == 3
 
         connect_span = spans[0]
-        insert_span = spans[1]
+        query_span = spans[1]
         segment = spans[2]
 
         assert connect_span["name"] == "connect"
-        assert insert_span["name"].startswith("INSERT INTO")
+        assert query_span["name"].startswith("INSERT INTO")
         assert segment["name"] == "test_transaction"
         assert segment["is_segment"] is True
-        query_span = spans[1]
     else:
         events = capture_events()
         with start_transaction(name="test_transaction", sampled=True):
@@ -1176,10 +1175,14 @@ async def test_query_source_executemany(
 
         spans = [item.payload for item in items]
         assert len(spans) == 3
-        assert spans[0]["name"] == "connect"
-        assert spans[1]["name"].startswith("INSERT INTO")
-        assert spans[2]["name"] == "test_transaction"
+
+        connect_span = spans[0]
         query_span = spans[1]
+        segment = spans[2]
+
+        assert connect_span["name"] == "connect"
+        assert query_span["name"].startswith("INSERT INTO")
+        assert segment["name"] == "test_transaction"
     else:
         events = capture_events()
         with start_transaction(name="test_transaction", sampled=True):
@@ -1225,10 +1228,13 @@ async def test_query_source_prepare(
 
         spans = [item.payload for item in items]
         assert len(spans) == 3
-        assert spans[0]["name"] == "connect"
-        assert spans[1]["name"] == "SELECT * FROM users WHERE name = $1"
-        assert spans[2]["name"] == "test_transaction"
+        connect_span = spans[0]
         query_span = spans[1]
+        segment = spans[2]
+
+        assert connect_span["name"] == "connect"
+        assert query_span["name"] == "SELECT * FROM users WHERE name = $1"
+        assert segment["name"] == "test_transaction"
     else:
         events = capture_events()
         with start_transaction(name="test_transaction", sampled=True):
@@ -1275,12 +1281,17 @@ async def test_query_source_cursor(
 
         spans = [item.payload for item in items]
         assert len(spans) == 5
-        assert spans[0]["name"] == "connect"
-        assert spans[1]["name"] == "BEGIN;"
-        assert spans[2]["name"] == "SELECT * FROM users WHERE dob > $1"
-        assert spans[3]["name"] == "COMMIT;"
-        assert spans[4]["name"] == "test_transaction"
+        connect_span = spans[0]
+        begin_span = spans[1]
         query_span = spans[2]
+        commit_span = spans[3]
+        segment = spans[4]
+
+        assert connect_span["name"] == "connect"
+        assert begin_span["name"] == "BEGIN;"
+        assert query_span["name"] == "SELECT * FROM users WHERE dob > $1"
+        assert commit_span["name"] == "COMMIT;"
+        assert segment["name"] == "test_transaction"
     else:
         events = capture_events()
         with start_transaction(name="test_transaction", sampled=True):
@@ -1295,10 +1306,15 @@ async def test_query_source_cursor(
         (event,) = events
         spans = event["spans"]
         assert len(spans) == 4
-        assert spans[0]["description"] == "connect"
-        assert spans[1]["description"] == "BEGIN;"
-        assert spans[2]["description"] == "SELECT * FROM users WHERE dob > $1"
-        assert spans[3]["description"] == "COMMIT;"
+
+        connect_span = spans[0]
+        begin_span = spans[1]
         query_span = spans[2]
+        commit_span = spans[3]
+
+        assert connect_span["description"] == "connect"
+        assert begin_span["description"] == "BEGIN;"
+        assert query_span["description"] == "SELECT * FROM users WHERE dob > $1"
+        assert commit_span["description"] == "COMMIT;"
 
     _assert_query_source(query_span, span_streaming, "test_query_source_cursor")
