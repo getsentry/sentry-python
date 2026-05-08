@@ -638,7 +638,9 @@ def test_grpc_client_and_servers_interceptors_integration(
 
         spans = [item["payload"] for item in items if item["type"] == "span"]
 
-        assert spans[0]["trace_id"] == spans[1]["trace_id"]
+        assert spans[1]["is_segment"] is True
+        assert spans[3]["is_segment"] is True
+        assert spans[1]["trace_id"] == spans[3]["trace_id"]
     else:
         events = capture_events_forksafe()
 
