@@ -69,6 +69,7 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
                                 "sentry.span.source": TransactionSource.CUSTOM,
                                 "sentry.origin": SPAN_ORIGIN,
                             },
+                            parent_span=None,
                         ):
                             try:
                                 return await handler.unary_unary(request, context)
