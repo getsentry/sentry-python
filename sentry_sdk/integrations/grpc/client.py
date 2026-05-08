@@ -1,7 +1,8 @@
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 from typing import TYPE_CHECKING
 
@@ -30,22 +31,47 @@ class ClientInterceptor(
     ) -> "_UnaryOutcome":
         method = client_call_details.method
 
-        with sentry_sdk.start_span(
-            op=OP.GRPC_CLIENT,
-            name="unary unary call to %s" % method,
-            origin=SPAN_ORIGIN,
-        ) as span:
-            span.set_data("type", "unary unary")
-            span.set_data("method", method)
+        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+        if span_streaming:
+            with sentry_sdk.traces.start_span(
+                name="unary unary call to %s" % method,
+                attributes={
+                    "sentry.op": OP.GRPC_CLIENT,
+                    "sentry.origin": SPAN_ORIGIN,
+                    SPANDATA.RPC_METHOD: method,
+                },
+            ) as span:
+                client_call_details = (
+                    self._update_client_call_details_metadata_from_scope(
+                        client_call_details
+                    )
+                )
 
-            client_call_details = self._update_client_call_details_metadata_from_scope(
-                client_call_details
-            )
+                response = continuation(client_call_details, request)
+                span.set_attribute(
+                    SPANDATA.RPC_RESPONSE_STATUS_CODE, response.code().name
+                )
 
-            response = continuation(client_call_details, request)
-            span.set_data("code", response.code().name)
+                return response
+        else:
+            with sentry_sdk.start_span(
+                op=OP.GRPC_CLIENT,
+                name="unary unary call to %s" % method,
+                origin=SPAN_ORIGIN,
+            ) as span:
+                span.set_data("type", "unary unary")
+                span.set_data("method", method)
 
-            return response
+                client_call_details = (
+                    self._update_client_call_details_metadata_from_scope(
+                        client_call_details
+                    )
+                )
+
+                response = continuation(client_call_details, request)
+                span.set_data("code", response.code().name)
+
+                return response
 
     def intercept_unary_stream(
         self: "ClientInterceptor",
@@ -55,23 +81,48 @@ class ClientInterceptor(
     ) -> "Union[Iterator[Message], Call]":
         method = client_call_details.method
 
-        with sentry_sdk.start_span(
-            op=OP.GRPC_CLIENT,
-            name="unary stream call to %s" % method,
-            origin=SPAN_ORIGIN,
-        ) as span:
-            span.set_data("type", "unary stream")
-            span.set_data("method", method)
+        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+        response: "UnaryStreamCall"
+        if span_streaming:
+            with sentry_sdk.traces.start_span(
+                name="unary stream call to %s" % method,
+                attributes={
+                    "sentry.op": OP.GRPC_CLIENT,
+                    "sentry.origin": SPAN_ORIGIN,
+                    SPANDATA.RPC_METHOD: method,
+                },
+            ) as span:
+                client_call_details = (
+                    self._update_client_call_details_metadata_from_scope(
+                        client_call_details
+                    )
+                )
 
-            client_call_details = self._update_client_call_details_metadata_from_scope(
-                client_call_details
-            )
+                response = continuation(client_call_details, request)
+                # Setting code on unary-stream leads to execution getting stuck
+                # span.set_data("code", response.code().name)
 
-            response: "UnaryStreamCall" = continuation(client_call_details, request)
-            # Setting code on unary-stream leads to execution getting stuck
-            # span.set_data("code", response.code().name)
+                return response
+        else:
+            with sentry_sdk.start_span(
+                op=OP.GRPC_CLIENT,
+                name="unary stream call to %s" % method,
+                origin=SPAN_ORIGIN,
+            ) as span:
+                span.set_data("type", "unary stream")
+                span.set_data("method", method)
 
-            return response
+                client_call_details = (
+                    self._update_client_call_details_metadata_from_scope(
+                        client_call_details
+                    )
+                )
+
+                response = continuation(client_call_details, request)
+                # Setting code on unary-stream leads to execution getting stuck
+                # span.set_data("code", response.code().name)
+
+                return response
 
     @staticmethod
     def _update_client_call_details_metadata_from_scope(
