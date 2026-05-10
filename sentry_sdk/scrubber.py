@@ -142,8 +142,8 @@ class EventScrubber:
             if "user" in event:
                 user = event["user"]
                 if (
-                    self.remove_user_ip_address
-                    and "ip_address" in self.denylist
+                    "ip_address" in self.denylist
+                    and self.remove_user_ip_address
                     and isinstance(user, dict)
                 ):
                     user.pop("ip_address", None)
