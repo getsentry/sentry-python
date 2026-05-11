@@ -185,8 +185,9 @@ class CommandTracer(monitoring.CommandListener):
                 data.update(db_data)
 
                 try:
-                    lsid_id = lsid["id"]
-                    data["operation_ids"]["session"] = str(lsid_id)
+                    if lsid:
+                        lsid_id = lsid["id"]
+                        data["operation_ids"]["session"] = str(lsid_id)
                 except KeyError:
                     pass
 
