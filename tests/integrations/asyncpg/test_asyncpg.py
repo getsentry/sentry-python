@@ -23,7 +23,7 @@ import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.asyncpg import AsyncPGIntegration
-from sentry_sdk.tracing_utils import record_sql_queries_supporting_streaming
+from sentry_sdk.tracing_utils import record_sql_queries
 from tests.conftest import ApproxDict
 
 PG_HOST = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost")
@@ -799,7 +799,7 @@ async def test_no_query_source_if_duration_too_short(
 
         @contextmanager
         def fake_record_sql_queries_streaming(*args, **kwargs):
-            with record_sql_queries_supporting_streaming(*args, **kwargs) as span:
+            with record_sql_queries(*args, **kwargs) as span:
                 pass
             span._start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
             if span_streaming:
@@ -812,7 +812,7 @@ async def test_no_query_source_if_duration_too_short(
             conn: Connection = await connect(PG_CONNECTION_URI)
 
             with mock.patch(
-                "sentry_sdk.integrations.asyncpg.record_sql_queries_supporting_streaming",
+                "sentry_sdk.integrations.asyncpg.record_sql_queries",
                 fake_record_sql_queries_streaming,
             ):
                 await conn.execute(
@@ -842,14 +842,14 @@ async def test_no_query_source_if_duration_too_short(
 
             @contextmanager
             def fake_record_sql_queries(*args, **kwargs):
-                with record_sql_queries_supporting_streaming(*args, **kwargs) as span:
+                with record_sql_queries(*args, **kwargs) as span:
                     pass
                 span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
                 span.timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
                 yield span
 
             with mock.patch(
-                "sentry_sdk.integrations.asyncpg.record_sql_queries_supporting_streaming",
+                "sentry_sdk.integrations.asyncpg.record_sql_queries",
                 fake_record_sql_queries,
             ):
                 await conn.execute(
@@ -886,14 +886,14 @@ async def test_query_source_if_duration_over_threshold(sentry_init, capture_even
 
         @contextmanager
         def fake_record_sql_queries(*args, **kwargs):
-            with record_sql_queries_supporting_streaming(*args, **kwargs) as span:
+            with record_sql_queries(*args, **kwargs) as span:
                 pass
             span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
             span.timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
             yield span
 
         with mock.patch(
-            "sentry_sdk.integrations.asyncpg.record_sql_queries_supporting_streaming",
+            "sentry_sdk.integrations.asyncpg.record_sql_queries",
             fake_record_sql_queries,
         ):
             await conn.execute(
