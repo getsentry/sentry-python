@@ -575,7 +575,7 @@ class StreamedSpan:
         self.set_attribute("process.command_args", sys.argv)
 
     def _to_json(self) -> "SpanJSON":
-        res = {
+        res: "SpanJSON" = {
             "trace_id": self.trace_id,
             "span_id": self.span_id,
             "name": self._name if self._name is not None else "<unlabeled span>",

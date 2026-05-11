@@ -962,10 +962,10 @@ class _Client(BaseClient):
 
         elif ty == "span":
             before_send = get_before_send_span(self.options)
-            serialized = telemetry._to_json()
+            serialized = telemetry._to_json()  # type: ignore[union-attr]
 
         if before_send is not None:
-            serialized = before_send(serialized, {})
+            serialized = before_send(serialized, {})  # type: ignore[arg-type]
 
             if ty in ("log", "metric"):
                 # Logs and metrics can be dropped in their respective
@@ -973,19 +973,15 @@ class _Client(BaseClient):
                 if serialized is None:
                     return
 
-            elif ty == "span":
+            elif ty == "span" and isinstance(telemetry, StreamedSpan):
                 # Spans can't be dropped in before_send_span by design. They can
                 # be altered though (e.g. to sanitize). Only allow changes to
                 # name and attributes.
-                if isinstance(serialized, dict) and serialized:
-                    if "name" not in serialized:
-                        logger.debug(
-                            "[Tracing] Invalid return value from before_send_span. Using original span."
-                        )
-                    telemetry.name = serialized["name"]
+                if isinstance(serialized, dict) and serialized and "name" in serialized:
+                    telemetry.name = serialized["name"]  # type: ignore[typeddict-item]
                     if serialized.get("attributes"):
                         telemetry._attributes = {}
-                        for k, v in serialized.get("attributes") or {}:
+                        for k, v in (serialized.get("attributes") or {}).items():
                             telemetry.set_attribute(k, v)
 
                 else:
@@ -1003,7 +999,7 @@ class _Client(BaseClient):
             batcher = self.metrics_batcher
 
         elif ty == "span":
-            serialized["_segment_span"] = telemetry._segment
+            serialized["_segment_span"] = telemetry._segment  # type: ignore
             batcher = self.span_batcher
 
         if batcher is not None:
