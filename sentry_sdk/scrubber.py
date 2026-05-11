@@ -66,7 +66,6 @@ class EventScrubber:
         recursive: bool = False,
         send_default_pii: bool = False,
         pii_denylist: "Optional[List[str]]" = None,
-        remove_user_ip_address: bool = False,
     ) -> None:
         """
         A scrubber that goes through the event payload and removes sensitive data configured through denylists.
@@ -75,7 +74,6 @@ class EventScrubber:
         :param recursive: Whether to scrub the event payload recursively, default False.
         :param send_default_pii: Whether pii is sending is on, pii fields are not scrubbed.
         :param pii_denylist: The denylist to use for scrubbing when pii is not sent, defaults to DEFAULT_PII_DENYLIST.
-        :param remove_user_ip_address: Whether to remove ``user.ip_address`` instead of replacing it with ``[Filtered]``.
         """
         self.denylist = DEFAULT_DENYLIST.copy() if denylist is None else denylist
 
@@ -87,7 +85,6 @@ class EventScrubber:
 
         self.denylist = [x.lower() for x in self.denylist]
         self.recursive = recursive
-        self.remove_user_ip_address = remove_user_ip_address
 
     def scrub_list(self, lst: object) -> None:
         """
@@ -141,11 +138,7 @@ class EventScrubber:
         with capture_internal_exceptions():
             if "user" in event:
                 user = event["user"]
-                if (
-                    "ip_address" in self.denylist
-                    and self.remove_user_ip_address
-                    and isinstance(user, dict)
-                ):
+                if "ip_address" in self.denylist and isinstance(user, dict):
                     user.pop("ip_address", None)
                 self.scrub_dict(user)
 

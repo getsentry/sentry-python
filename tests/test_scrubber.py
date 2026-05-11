@@ -89,7 +89,7 @@ def test_ip_address_not_scrubbed_when_pii_enabled(sentry_init, capture_events):
     }
 
 
-def test_user_ip_address_scrubbed_when_pii_disabled(sentry_init, capture_events):
+def test_user_ip_address_removed_when_pii_disabled(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
 
@@ -103,12 +103,12 @@ def test_user_ip_address_scrubbed_when_pii_disabled(sentry_init, capture_events)
 
     (event,) = events
 
-    assert event["user"] == {"id": "42", "ip_address": "[Filtered]"}
-    assert event["_meta"]["user"] == {"ip_address": {"": {"rem": [["!config", "s"]]}}}
+    assert event["user"] == {"id": "42"}
+    assert "user" not in event.get("_meta", {})
 
 
-def test_user_ip_address_removed_when_configured(sentry_init, capture_events):
-    sentry_init(event_scrubber=EventScrubber(remove_user_ip_address=True))
+def test_user_ip_address_not_removed_when_pii_enabled(sentry_init, capture_events):
+    sentry_init(send_default_pii=True)
     events = capture_events()
 
     try:
@@ -121,7 +121,7 @@ def test_user_ip_address_removed_when_configured(sentry_init, capture_events):
 
     (event,) = events
 
-    assert event["user"] == {"id": "42"}
+    assert event["user"] == {"id": "42", "ip_address": "127.0.0.1"}
     assert "user" not in event.get("_meta", {})
 
 
