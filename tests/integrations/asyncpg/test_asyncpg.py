@@ -657,6 +657,81 @@ async def test_query_source_enabled(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("span_streaming", [True, False])
+async def test_query_source(sentry_init, capture_events, capture_items, span_streaming):
+    sentry_init(
+        integrations=[AsyncPGIntegration()],
+        traces_sample_rate=1.0,
+        enable_db_query_source=True,
+        db_query_source_threshold_ms=0,
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
+
+    if span_streaming:
+        items = capture_items("span")
+        with sentry_sdk.traces.start_span(name="test_transaction"):
+            conn: Connection = await connect(PG_CONNECTION_URI)
+
+            await conn.execute(
+                "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
+            )
+
+            await conn.close()
+        sentry_sdk.flush()
+
+        spans = [item.payload for item in items]
+
+        assert len(spans) == 3
+
+        connect_span = spans[0]
+        insert_span = spans[1]
+        segment = spans[2]
+
+        assert segment["name"] == "test_transaction"
+        assert insert_span["name"].startswith("INSERT INTO")
+        assert connect_span["name"] == "connect"
+        data = insert_span.get("attributes", {})
+    else:
+        events = capture_events()
+
+        with start_transaction(name="test_transaction", sampled=True):
+            conn: Connection = await connect(PG_CONNECTION_URI)
+
+            await conn.execute(
+                "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
+            )
+
+            await conn.close()
+
+        (event,) = events
+        span = event["spans"][-1]
+        assert span["description"].startswith("INSERT INTO")
+        data = span.get("data", {})
+
+    lineno_key = "code.line.number" if span_streaming else SPANDATA.CODE_LINENO
+    filepath_key = "code.file.path" if span_streaming else SPANDATA.CODE_FILEPATH
+
+    assert lineno_key in data
+    assert filepath_key in data
+    assert SPANDATA.CODE_NAMESPACE in data
+    assert SPANDATA.CODE_FUNCTION in data
+
+    assert type(data.get(lineno_key)) == int
+    assert data.get(lineno_key) > 0
+    assert (
+        data.get(SPANDATA.CODE_NAMESPACE) == "tests.integrations.asyncpg.test_asyncpg"
+    )
+    assert data.get(filepath_key).endswith("tests/integrations/asyncpg/test_asyncpg.py")
+
+    is_relative_path = data.get(filepath_key)[0] != os.sep
+    assert is_relative_path
+
+    assert data.get(SPANDATA.CODE_FUNCTION) == "test_query_source"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [True, False])
 async def test_query_source_with_module_in_search_path(
     sentry_init, capture_events, capture_items, span_streaming
 ):
