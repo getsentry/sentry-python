@@ -148,7 +148,7 @@ class SpanBatcher(Batcher["SpanJSON"]):
         # 210 is the rough size of the payload without attributes, and then we
         # estimate the attributes separately.
         estimate = 210
-        for value in item["attributes"].values():
+        for value in (item.get("attributes") or {}).values():
             estimate += 50
 
             if isinstance(value, str):

@@ -967,23 +967,33 @@ class _Client(BaseClient):
         if before_send is not None:
             serialized = before_send(serialized, {})
 
-            # Logs and metrics can be dropped in their respective
-            # before_send, so if we get None, don't queue them for sending.
             if ty in ("log", "metric"):
+                # Logs and metrics can be dropped in their respective
+                # before_send, so if we get None, don't queue them for sending.
                 if serialized is None:
                     return
 
-            # Spans can't be dropped in before_send_span by design. They can
-            # be altered though (e.g. to sanitize).
             elif ty == "span":
+                # Spans can't be dropped in before_send_span by design. They can
+                # be altered though (e.g. to sanitize). Only allow changes to
+                # name and attributes.
                 if isinstance(serialized, dict) and serialized:
-                    # TODO[ivana]: Figure out the merging/validation here
-                    pass
+                    if "name" not in serialized:
+                        logger.debug(
+                            "[Tracing] Invalid return value from before_send_span. Using original span."
+                        )
+                    telemetry.name = serialized["name"]
+                    if serialized.get("attributes"):
+                        telemetry._attributes = {}
+                        for k, v in serialized.get("attributes") or {}:
+                            telemetry.set_attribute(k, v)
+
                 else:
-                    serialized = telemetry._to_json()
                     logger.debug(
                         "[Tracing] Invalid return value from before_send_span. Using original span."
                     )
+
+                serialized = telemetry._to_json()
 
         batcher = None
         if ty == "log":
