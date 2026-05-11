@@ -7,6 +7,7 @@ You can enable span streaming mode via
 sentry_sdk.init(_experiments={"trace_lifecycle": "stream"}).
 """
 
+import sys
 import uuid
 import warnings
 from datetime import datetime, timedelta, timezone
@@ -31,7 +32,17 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Iterator, Optional, ParamSpec, TypeVar, Union
+    from typing import (
+        Any,
+        Callable,
+        Iterator,
+        Optional,
+        overload,
+        ParamSpec,
+        TypeVar,
+        Union,
+    )
+
     from sentry_sdk._types import Attributes, AttributeValue
     from sentry_sdk.profiler.continuous_profiler import ContinuousProfile
 
@@ -49,6 +60,9 @@ class SpanStatus(str, Enum):
 
     def __str__(self) -> str:
         return self.value
+
+
+_VALID_SPAN_STATUSES = frozenset(e.value for e in SpanStatus)
 
 
 # Segment source, see
@@ -231,7 +245,7 @@ class StreamedSpan:
         "_parent_sampled",
         "_start_timestamp",
         "_start_timestamp_monotonic_ns",
-        "_timestamp",
+        "_end_timestamp",
         "_status",
         "_scope",
         "_previous_span_on_scope",
@@ -278,7 +292,7 @@ class StreamedSpan:
         self._sample_rate = sample_rate
 
         self._start_timestamp = datetime.now(timezone.utc)
-        self._timestamp: "Optional[datetime]" = None
+        self._end_timestamp: "Optional[datetime]" = None
 
         # profiling depends on this value and requires that
         # it is measured in nanoseconds
@@ -293,6 +307,8 @@ class StreamedSpan:
         self._continuous_profile: "Optional[ContinuousProfile]" = None
         self._start_profile()
         self._set_profile_id(get_profiler_id())
+
+        self._set_segment_attributes()
 
         self._start()
 
@@ -312,7 +328,7 @@ class StreamedSpan:
     def __exit__(
         self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
     ) -> None:
-        if self._timestamp is not None:
+        if self._end_timestamp is not None:
             # This span is already finished, ignore
             return
 
@@ -346,7 +362,7 @@ class StreamedSpan:
             self._previous_span_on_scope = old_span
 
     def _end(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
-        if self._timestamp is not None:
+        if self._end_timestamp is not None:
             # This span is already finished, ignore.
             return
 
@@ -377,15 +393,15 @@ class StreamedSpan:
                     pass
 
             if isinstance(end_timestamp, datetime):
-                self._timestamp = end_timestamp
+                self._end_timestamp = end_timestamp
             else:
                 logger.debug(
                     "[Tracing] Failed to set end_timestamp. Using current time instead."
                 )
 
-        if self._timestamp is None:
+        if self._end_timestamp is None:
             elapsed = nanosecond_time() - self._start_timestamp_monotonic_ns
-            self._timestamp = self._start_timestamp + timedelta(
+            self._end_timestamp = self._start_timestamp + timedelta(
                 microseconds=elapsed / 1000
             )
 
@@ -421,7 +437,7 @@ class StreamedSpan:
         if isinstance(status, Enum):
             status = status.value
 
-        if status not in {e.value for e in SpanStatus}:
+        if status not in _VALID_SPAN_STATUSES:
             logger.debug(
                 f'[Tracing] Unsupported span status {status}. Expected one of: "ok", "error"'
             )
@@ -464,8 +480,8 @@ class StreamedSpan:
         return self._start_timestamp
 
     @property
-    def timestamp(self) -> "Optional[datetime]":
-        return self._timestamp
+    def end_timestamp(self) -> "Optional[datetime]":
+        return self._end_timestamp
 
     def _is_segment(self) -> bool:
         return self._segment is self
@@ -551,6 +567,12 @@ class StreamedSpan:
         try_autostart_continuous_profiler()
 
         self._continuous_profile = try_profile_lifecycle_trace_start()
+
+    def _set_segment_attributes(self) -> None:
+        if not self._is_segment():
+            return
+
+        self.set_attribute("process.command_args", sys.argv)
 
 
 class NoOpStreamedSpan(StreamedSpan):
@@ -678,8 +700,25 @@ class NoOpStreamedSpan(StreamedSpan):
         return None
 
     @property
-    def timestamp(self) -> "Optional[datetime]":
+    def end_timestamp(self) -> "Optional[datetime]":
         return None
+
+
+if TYPE_CHECKING:
+
+    @overload
+    def trace(
+        func: "Callable[P, R]",
+    ) -> "Callable[P, R]": ...
+
+    @overload
+    def trace(
+        func: None = None,
+        *,
+        name: "Optional[str]" = None,
+        attributes: "Optional[dict[str, Any]]" = None,
+        active: bool = True,
+    ) -> "Callable[[Callable[P, R]], Callable[P, R]]": ...
 
 
 def trace(

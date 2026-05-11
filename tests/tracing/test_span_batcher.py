@@ -1,5 +1,9 @@
+import os
+import sys
 import time
 from unittest import mock
+
+import pytest
 
 import sentry_sdk
 from sentry_sdk._span_batcher import SpanBatcher
@@ -425,3 +429,67 @@ def test_transport_format(sentry_init, capture_envelopes):
         assert "value" in value
         assert "type" in value
         assert value["type"] in ("string", "boolean", "integer", "double", "array")
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32"
+    or not hasattr(os, "fork")
+    or not hasattr(os, "register_at_fork"),
+    reason="requires POSIX fork and os.register_at_fork (Python 3.7+)",
+)
+def test_span_batcher_lock_reset_in_child_after_fork(sentry_init):
+    """Regression test for the SpanBatcher fork-deadlock fix.
+
+    If os.fork() runs while another thread holds SpanBatcher._lock, the
+    child inherits the lock locked. The holding thread does not exist in
+    the child, so the lock can never be released and _ensure_thread
+    deadlocks forever. The after-fork hook must replace the lock with a
+    fresh one in the child and reset
+    _flusher / _flusher_pid / _span_buffer / _running_size / _active /
+    _flush_event.
+    """
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+    batcher = sentry_sdk.get_client().span_batcher
+    assert batcher is not None
+
+    original_lock = batcher._lock
+    original_lock.acquire()
+
+    batcher._span_buffer["test-trace-id"].append(object())
+    batcher._running_size["test-trace-id"] = 42
+    batcher._active.flag = True
+    batcher._flush_event.set()
+    batcher._running = False
+
+    pid = os.fork()
+    if pid == 0:
+        replaced = batcher._lock is not original_lock
+        unheld = batcher._lock.acquire(blocking=False)
+
+        flusher_reset = batcher._flusher is None and batcher._flusher_pid is None
+        span_buffer_reset = len(batcher._span_buffer) == 0
+        running_size_reset = len(batcher._running_size) == 0
+
+        active_reset = not getattr(batcher._active, "flag", False)
+        event_reset = not batcher._flush_event.is_set()
+        running_reset = batcher._running is True
+
+        os._exit(
+            0
+            if replaced
+            and unheld
+            and flusher_reset
+            and span_buffer_reset
+            and running_size_reset
+            and active_reset
+            and event_reset
+            and running_reset
+            else 1
+        )
+
+    original_lock.release()
+    _, status = os.waitpid(pid, 0)
+    assert os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0

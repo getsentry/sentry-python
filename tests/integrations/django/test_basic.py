@@ -723,15 +723,17 @@ def test_transaction_style(
 ):
     sentry_init(
         integrations=[DjangoIntegration(transaction_style=transaction_style)],
+        traces_sample_rate=1.0,
         send_default_pii=True,
     )
     events = capture_events()
     content, status, headers = unpack_werkzeug_response(client.get(client_url))
     assert content == expected_response
 
-    (event,) = events
-    assert event["transaction"] == expected_transaction
-    assert event["transaction_info"] == {"source": expected_source}
+    (error, transaction) = events
+    assert error["transaction"] == expected_transaction
+    assert transaction["transaction"] == expected_transaction
+    assert transaction["transaction_info"] == {"source": expected_source}
 
 
 def test_request_body(sentry_init, client, capture_events):
@@ -1212,30 +1214,33 @@ def test_custom_urlconf_middleware(
     )
     events = capture_events()
 
-    content, status, _headers = unpack_werkzeug_response(client.get("/custom/ok"))
-    assert status.lower() == "200 ok"
-    assert content == b"custom ok"
+    try:
+        content, status, _headers = unpack_werkzeug_response(client.get("/custom/ok"))
+        assert status.lower() == "200 ok"
+        assert content == b"custom ok"
 
-    event = events.pop(0)
-    assert event["transaction"] == "/custom/ok"
-    if middleware_spans:
-        assert "custom_urlconf_middleware" in render_span_tree(
-            event["spans"], event["contexts"]["trace"]
-        )
+        event = events.pop(0)
+        assert event["transaction"] == "/custom/ok"
+        if middleware_spans:
+            assert "custom_urlconf_middleware" in render_span_tree(
+                event["spans"], event["contexts"]["trace"]
+            )
 
-    _content, status, _headers = unpack_werkzeug_response(client.get("/custom/exc"))
-    assert status.lower() == "500 internal server error"
+        _content, status, _headers = unpack_werkzeug_response(client.get("/custom/exc"))
+        assert status.lower() == "500 internal server error"
 
-    error_event, transaction_event = events
-    assert error_event["transaction"] == "/custom/exc"
-    assert error_event["exception"]["values"][-1]["mechanism"]["type"] == "django"
-    assert transaction_event["transaction"] == "/custom/exc"
-    if middleware_spans:
-        assert "custom_urlconf_middleware" in render_span_tree(
-            transaction_event["spans"], transaction_event["contexts"]["trace"]
-        )
+        error_event, transaction_event = events
+        assert error_event["transaction"] == "/custom/exc"
+        assert error_event["exception"]["values"][-1]["mechanism"]["type"] == "django"
+        assert transaction_event["transaction"] == "/custom/exc"
+        if middleware_spans:
+            assert "custom_urlconf_middleware" in render_span_tree(
+                transaction_event["spans"], transaction_event["contexts"]["trace"]
+            )
 
-    settings.MIDDLEWARE.pop(0)
+    finally:
+        settings.MIDDLEWARE.pop(0)
+        client.application.load_middleware()
 
 
 def test_get_receiver_name():

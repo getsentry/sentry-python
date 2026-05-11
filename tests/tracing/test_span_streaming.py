@@ -1,10 +1,8 @@
 import asyncio
-import os
 import re
 import sys
 import time
 from unittest import mock
-from typing import Any
 
 import pytest
 
@@ -18,36 +16,13 @@ minimum_python_38 = pytest.mark.skipif(
 )
 
 
-def envelopes_to_spans(envelopes):
-    res: "list[dict[str, Any]]" = []
-    for envelope in envelopes:
-        for item in envelope.items:
-            if item.type == "span":
-                for span_json in item.payload.json["items"]:
-                    span = {
-                        "start_timestamp": span_json["start_timestamp"],
-                        "end_timestamp": span_json.get("end_timestamp"),
-                        "trace_id": span_json["trace_id"],
-                        "span_id": span_json["span_id"],
-                        "name": span_json["name"],
-                        "status": span_json["status"],
-                        "is_segment": span_json["is_segment"],
-                        "parent_span_id": span_json.get("parent_span_id"),
-                        "attributes": {
-                            k: v["value"] for (k, v) in span_json["attributes"].items()
-                        },
-                    }
-                    res.append(span)
-    return res
-
-
-def test_start_span(sentry_init, capture_envelopes):
+def test_start_span(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     with sentry_sdk.traces.start_span(name="segment") as segment:
         assert segment._is_segment() is True
@@ -56,7 +31,7 @@ def test_start_span(sentry_init, capture_envelopes):
             assert child._segment == segment
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 2
     child, segment = spans
@@ -67,7 +42,7 @@ def test_start_span(sentry_init, capture_envelopes):
     assert child["attributes"]["sentry.segment.name"] == "segment"
 
     assert segment["is_segment"] is True
-    assert segment["parent_span_id"] is None
+    assert "parent_span_id" not in segment
     assert child["is_segment"] is False
     assert child["parent_span_id"] == segment["span_id"]
     assert child["trace_id"] == segment["trace_id"]
@@ -81,13 +56,13 @@ def test_start_span(sentry_init, capture_envelopes):
     assert segment["status"] == "ok"
 
 
-def test_start_span_no_context_manager(sentry_init, capture_envelopes):
+def test_start_span_no_context_manager(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     segment = sentry_sdk.traces.start_span(name="segment")
     child = sentry_sdk.traces.start_span(name="child")
@@ -96,7 +71,7 @@ def test_start_span_no_context_manager(sentry_init, capture_envelopes):
     segment.end()
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 2
     child, segment = spans
@@ -120,7 +95,7 @@ def test_start_span_no_context_manager(sentry_init, capture_envelopes):
     assert segment["status"] == "ok"
 
 
-def test_span_sampled_when_created(sentry_init, capture_envelopes):
+def test_span_sampled_when_created(sentry_init, capture_items):
     # Test that if a span is created without the context manager, it is sampled
     # at start_span() time
 
@@ -133,14 +108,14 @@ def test_span_sampled_when_created(sentry_init, capture_envelopes):
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     segment = sentry_sdk.traces.start_span(name="segment")
     segment.set_attribute("delayed_attribute", 12)
     segment.end()
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 1
     (segment,) = spans
@@ -149,13 +124,13 @@ def test_span_sampled_when_created(sentry_init, capture_envelopes):
     assert segment["attributes"]["delayed_attribute"] == 12
 
 
-def test_start_span_attributes(sentry_init, capture_envelopes):
+def test_start_span_attributes(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     with sentry_sdk.traces.start_span(
         name="segment", attributes={"my_attribute": "my_value"}
@@ -163,7 +138,7 @@ def test_start_span_attributes(sentry_init, capture_envelopes):
         ...
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 1
     (span,) = spans
@@ -172,7 +147,7 @@ def test_start_span_attributes(sentry_init, capture_envelopes):
     assert span["attributes"]["my_attribute"] == "my_value"
 
 
-def test_start_span_attributes_in_traces_sampler(sentry_init, capture_envelopes):
+def test_start_span_attributes_in_traces_sampler(sentry_init, capture_items):
     def traces_sampler(sampling_context):
         assert "attributes" in sampling_context["span_context"]
         assert "my_attribute" in sampling_context["span_context"]["attributes"]
@@ -186,7 +161,7 @@ def test_start_span_attributes_in_traces_sampler(sentry_init, capture_envelopes)
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     with sentry_sdk.traces.start_span(
         name="segment", attributes={"my_attribute": "my_value"}
@@ -194,7 +169,7 @@ def test_start_span_attributes_in_traces_sampler(sentry_init, capture_envelopes)
         ...
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 1
     (span,) = spans
@@ -203,7 +178,7 @@ def test_start_span_attributes_in_traces_sampler(sentry_init, capture_envelopes)
     assert span["attributes"]["my_attribute"] == "my_value"
 
 
-def test_sampling_context(sentry_init, capture_envelopes):
+def test_sampling_context(sentry_init, capture_items):
     received_trace_id = None
 
     def traces_sampler(sampling_context):
@@ -227,7 +202,7 @@ def test_sampling_context(sentry_init, capture_envelopes):
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     with sentry_sdk.traces.start_span(name="span") as span:
         trace_id = span._trace_id
@@ -235,7 +210,7 @@ def test_sampling_context(sentry_init, capture_envelopes):
     assert received_trace_id == trace_id
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 1
 
@@ -296,13 +271,13 @@ def test_custom_sampling_context_update_to_context_value_persists(sentry_init):
         ...
 
 
-def test_span_attributes(sentry_init, capture_envelopes):
+def test_span_attributes(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     with sentry_sdk.traces.start_span(
         name="segment", attributes={"attribute1": "value"}
@@ -318,7 +293,7 @@ def test_span_attributes(sentry_init, capture_envelopes):
         assert attributes["attribute4"] is False
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 1
     (span,) = spans
@@ -330,13 +305,13 @@ def test_span_attributes(sentry_init, capture_envelopes):
     assert span["attributes"]["attribute4"] is False
 
 
-def test_span_attributes_serialize_early(sentry_init, capture_envelopes):
+def test_span_attributes_serialize_early(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     class Class:
         pass
@@ -357,7 +332,7 @@ def test_span_attributes_serialize_early(sentry_init, capture_envelopes):
         assert "Class" in attributes["attribute2"]
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 1
     (span,) = spans
@@ -366,7 +341,7 @@ def test_span_attributes_serialize_early(sentry_init, capture_envelopes):
     assert "Class" in span["attributes"]["attribute2"]
 
 
-def test_traces_sampler_drops_span(sentry_init, capture_envelopes):
+def test_traces_sampler_drops_span(sentry_init, capture_items):
     def traces_sampler(sampling_context):
         assert "attributes" in sampling_context["span_context"]
         assert "drop" in sampling_context["span_context"]["attributes"]
@@ -381,7 +356,7 @@ def test_traces_sampler_drops_span(sentry_init, capture_envelopes):
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     with sentry_sdk.traces.start_span(name="dropped", attributes={"drop": True}):
         ...
@@ -389,7 +364,7 @@ def test_traces_sampler_drops_span(sentry_init, capture_envelopes):
         ...
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 1
     (span,) = spans
@@ -424,13 +399,13 @@ def test_traces_sampler_called_once_per_segment(sentry_init):
     assert span_name_in_traces_sampler == segment.name
 
 
-def test_start_inactive_span(sentry_init, capture_envelopes):
+def test_start_inactive_span(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     with sentry_sdk.traces.start_span(name="segment") as segment:
         with sentry_sdk.traces.start_span(name="child1", active=False):
@@ -439,7 +414,7 @@ def test_start_inactive_span(sentry_init, capture_envelopes):
                 pass
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 3
     child2, child1, segment = spans
@@ -461,13 +436,13 @@ def test_start_inactive_span(sentry_init, capture_envelopes):
     assert child2["trace_id"] == segment["trace_id"]
 
 
-def test_start_span_override_parent(sentry_init, capture_envelopes):
+def test_start_span_override_parent(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     with sentry_sdk.traces.start_span(name="segment") as segment:
         with sentry_sdk.traces.start_span(name="child1"):
@@ -475,7 +450,7 @@ def test_start_span_override_parent(sentry_init, capture_envelopes):
                 pass
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 3
     child2, child1, segment = spans
@@ -500,13 +475,13 @@ def test_start_span_override_parent(sentry_init, capture_envelopes):
     assert child2["trace_id"] == segment["trace_id"]
 
 
-def test_sibling_segments(sentry_init, capture_envelopes):
+def test_sibling_segments(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     with sentry_sdk.traces.start_span(name="segment1"):
         ...
@@ -515,7 +490,7 @@ def test_sibling_segments(sentry_init, capture_envelopes):
         ...
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 2
     segment1, segment2 = spans
@@ -523,23 +498,23 @@ def test_sibling_segments(sentry_init, capture_envelopes):
     assert segment1["name"] == "segment1"
     assert segment1["attributes"]["sentry.segment.name"] == "segment1"
     assert segment1["is_segment"] is True
-    assert segment1["parent_span_id"] is None
+    assert "parent_span_id" not in segment1
 
     assert segment2["name"] == "segment2"
     assert segment2["attributes"]["sentry.segment.name"] == "segment2"
     assert segment2["is_segment"] is True
-    assert segment2["parent_span_id"] is None
+    assert "parent_span_id" not in segment2
 
     assert segment1["trace_id"] == segment2["trace_id"]
 
 
-def test_sibling_segments_new_trace(sentry_init, capture_envelopes):
+def test_sibling_segments_new_trace(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     with sentry_sdk.traces.start_span(name="segment1"):
         ...
@@ -550,7 +525,7 @@ def test_sibling_segments_new_trace(sentry_init, capture_envelopes):
         ...
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 2
     segment1, segment2 = spans
@@ -558,24 +533,24 @@ def test_sibling_segments_new_trace(sentry_init, capture_envelopes):
     assert segment1["name"] == "segment1"
     assert segment1["attributes"]["sentry.segment.name"] == "segment1"
     assert segment1["is_segment"] is True
-    assert segment1["parent_span_id"] is None
+    assert "parent_span_id" not in segment1
 
     assert segment2["name"] == "segment2"
     assert segment2["attributes"]["sentry.segment.name"] == "segment2"
     assert segment2["is_segment"] is True
-    assert segment2["parent_span_id"] is None
+    assert "parent_span_id" not in segment2
 
     assert segment1["trace_id"] != segment2["trace_id"]
 
 
-def test_continue_trace_sampled(sentry_init, capture_envelopes):
+def test_continue_trace_sampled(sentry_init, capture_items):
     sentry_init(
         # parent sampling decision takes precedence over traces_sample_rate
         traces_sample_rate=0.0,
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     trace_id = "0af7651916cd43dd8448eb211c80319c"
     parent_span_id = "b7ad6b7169203331"
@@ -598,7 +573,7 @@ def test_continue_trace_sampled(sentry_init, capture_envelopes):
     assert span._sample_rand == float(sample_rand)
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 1
     (segment,) = spans
@@ -608,14 +583,14 @@ def test_continue_trace_sampled(sentry_init, capture_envelopes):
     assert segment["trace_id"] == trace_id
 
 
-def test_continue_trace_unsampled(sentry_init, capture_envelopes):
+def test_continue_trace_unsampled(sentry_init, capture_items):
     sentry_init(
         # parent sampling decision takes precedence over traces_sample_rate
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     trace_id = "0af7651916cd43dd8448eb211c80319c"
     parent_span_id = "b7ad6b7169203331"
@@ -638,20 +613,20 @@ def test_continue_trace_unsampled(sentry_init, capture_envelopes):
     assert span.span_id == "0000000000000000"
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 0
 
 
 def test_unsampled_spans_produce_client_report(
-    sentry_init, capture_envelopes, capture_record_lost_event_calls
+    sentry_init, capture_items, capture_record_lost_event_calls
 ):
     sentry_init(
         traces_sample_rate=0.0,
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    envelopes = capture_envelopes()
+    items = capture_items("span")
     record_lost_event_calls = capture_record_lost_event_calls()
 
     with sentry_sdk.traces.start_span(name="segment"):
@@ -662,7 +637,7 @@ def test_unsampled_spans_produce_client_report(
 
     sentry_sdk.get_client().flush()
 
-    spans = envelopes_to_spans(envelopes)
+    spans = [item.payload for item in items]
     assert not spans
 
     assert record_lost_event_calls == [
@@ -673,14 +648,14 @@ def test_unsampled_spans_produce_client_report(
 
 
 def test_no_client_reports_if_tracing_is_off(
-    sentry_init, capture_envelopes, capture_record_lost_event_calls
+    sentry_init, capture_items, capture_record_lost_event_calls
 ):
     sentry_init(
         traces_sample_rate=None,
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    envelopes = capture_envelopes()
+    items = capture_items("span")
     record_lost_event_calls = capture_record_lost_event_calls()
 
     with sentry_sdk.traces.start_span(name="segment"):
@@ -691,19 +666,19 @@ def test_no_client_reports_if_tracing_is_off(
 
     sentry_sdk.get_client().flush()
 
-    spans = envelopes_to_spans(envelopes)
+    spans = [item.payload for item in items]
     assert not spans
     assert not record_lost_event_calls
 
 
-def test_continue_trace_no_sample_rand(sentry_init, capture_envelopes):
+def test_continue_trace_no_sample_rand(sentry_init, capture_items):
     sentry_init(
         # parent sampling decision takes precedence over traces_sample_rate
         traces_sample_rate=0.0,
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     trace_id = "0af7651916cd43dd8448eb211c80319c"
     parent_span_id = "b7ad6b7169203331"
@@ -725,7 +700,7 @@ def test_continue_trace_no_sample_rand(sentry_init, capture_envelopes):
     assert isinstance(span._sample_rand, float)
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 1
     (segment,) = spans
@@ -796,13 +771,13 @@ def test_outgoing_traceparent_and_baggage_when_noop_span_is_active(
         assert baggage_items["sentry-trace_id"] == propagation_trace_id
 
 
-def test_trace_decorator(sentry_init, capture_envelopes):
+def test_trace_decorator(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     @sentry_sdk.traces.trace
     def traced_function(): ...
@@ -810,7 +785,7 @@ def test_trace_decorator(sentry_init, capture_envelopes):
     traced_function()
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 1
     (span,) = spans
@@ -822,13 +797,13 @@ def test_trace_decorator(sentry_init, capture_envelopes):
     assert span["status"] == "ok"
 
 
-def test_trace_decorator_arguments(sentry_init, capture_envelopes):
+def test_trace_decorator_arguments(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     @sentry_sdk.traces.trace(name="traced", attributes={"traced.attribute": 123})
     def traced_function(): ...
@@ -836,7 +811,7 @@ def test_trace_decorator_arguments(sentry_init, capture_envelopes):
     traced_function()
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 1
     (span,) = spans
@@ -846,13 +821,13 @@ def test_trace_decorator_arguments(sentry_init, capture_envelopes):
     assert span["status"] == "ok"
 
 
-def test_trace_decorator_inactive(sentry_init, capture_envelopes):
+def test_trace_decorator_inactive(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     @sentry_sdk.traces.trace(name="outer", active=False)
     def traced_function():
@@ -862,25 +837,25 @@ def test_trace_decorator_inactive(sentry_init, capture_envelopes):
     traced_function()
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 2
     (span1, span2) = spans
 
     assert span1["name"] == "inner"
-    assert span1["parent_span_id"] != span2["span_id"]
+    assert span1.get("parent_span_id") != span2["span_id"]
 
     assert span2["name"] == "outer"
 
 
 @minimum_python_38
-def test_trace_decorator_async(sentry_init, capture_envelopes):
+def test_trace_decorator_async(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     @sentry_sdk.traces.trace
     async def traced_function(): ...
@@ -888,7 +863,7 @@ def test_trace_decorator_async(sentry_init, capture_envelopes):
     asyncio.run(traced_function())
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 1
     (span,) = spans
@@ -901,13 +876,13 @@ def test_trace_decorator_async(sentry_init, capture_envelopes):
 
 
 @minimum_python_38
-def test_trace_decorator_async_arguments(sentry_init, capture_envelopes):
+def test_trace_decorator_async_arguments(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     @sentry_sdk.traces.trace(name="traced", attributes={"traced.attribute": 123})
     async def traced_function(): ...
@@ -915,7 +890,7 @@ def test_trace_decorator_async_arguments(sentry_init, capture_envelopes):
     asyncio.run(traced_function())
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 1
     (span,) = spans
@@ -926,13 +901,13 @@ def test_trace_decorator_async_arguments(sentry_init, capture_envelopes):
 
 
 @minimum_python_38
-def test_trace_decorator_async_inactive(sentry_init, capture_envelopes):
+def test_trace_decorator_async_inactive(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     @sentry_sdk.traces.trace(name="outer", active=False)
     async def traced_function():
@@ -942,24 +917,24 @@ def test_trace_decorator_async_inactive(sentry_init, capture_envelopes):
     asyncio.run(traced_function())
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 2
     (span1, span2) = spans
 
     assert span1["name"] == "inner"
-    assert span1["parent_span_id"] != span2["span_id"]
+    assert span1.get("parent_span_id") != span2["span_id"]
 
     assert span2["name"] == "outer"
 
 
-def test_set_span_status(sentry_init, capture_envelopes):
+def test_set_span_status(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     with sentry_sdk.traces.start_span(name="span") as span:
         span.status = SpanStatus.ERROR
@@ -968,7 +943,7 @@ def test_set_span_status(sentry_init, capture_envelopes):
         span.status = "error"
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 2
     (span1, span2) = spans
@@ -977,20 +952,20 @@ def test_set_span_status(sentry_init, capture_envelopes):
     assert span2["status"] == "error"
 
 
-def test_set_span_status_on_error(sentry_init, capture_envelopes):
+def test_set_span_status_on_error(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     with pytest.raises(ValueError):
         with sentry_sdk.traces.start_span(name="span") as span:
             raise ValueError("oh no!")
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 1
     (span,) = spans
@@ -998,19 +973,19 @@ def test_set_span_status_on_error(sentry_init, capture_envelopes):
     assert span["status"] == "error"
 
 
-def test_set_span_status_on_ignored_span(sentry_init, capture_envelopes):
+def test_set_span_status_on_ignored_span(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream", "ignore_spans": ["ignored"]},
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     with sentry_sdk.traces.start_span(name="ignored") as span:
         span.status = "error"
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 0
 
@@ -1099,7 +1074,7 @@ def test_set_span_status_on_ignored_span(sentry_init, capture_envelopes):
     ],
 )
 def test_ignore_spans(
-    sentry_init, capture_envelopes, ignore_spans, name, attributes, ignored
+    sentry_init, capture_items, ignore_spans, name, attributes, ignored
 ):
     sentry_init(
         traces_sample_rate=1.0,
@@ -1109,7 +1084,7 @@ def test_ignore_spans(
         },
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     with sentry_sdk.traces.start_span(name=name, attributes=attributes) as span:
         if ignored:
@@ -1120,7 +1095,7 @@ def test_ignore_spans(
             assert isinstance(span, StreamedSpan)
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     if ignored:
         assert len(spans) == 0
@@ -1131,7 +1106,7 @@ def test_ignore_spans(
 
 
 def test_ignore_spans_basic(
-    sentry_init, capture_envelopes, capture_record_lost_event_calls
+    sentry_init, capture_items, capture_record_lost_event_calls
 ):
     sentry_init(
         traces_sample_rate=1.0,
@@ -1141,7 +1116,7 @@ def test_ignore_spans_basic(
         },
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
     lost_event_calls = capture_record_lost_event_calls()
 
     with sentry_sdk.traces.start_span(name="ignored") as ignored_span:
@@ -1152,19 +1127,19 @@ def test_ignore_spans_basic(
 
     sentry_sdk.get_client().flush()
 
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 1
     (span,) = spans
     assert span["name"] == "not ignored"
-    assert span["parent_span_id"] is None
+    assert "parent_span_id" not in span
 
     assert len(lost_event_calls) == 1
     assert lost_event_calls[0] == ("ignored", "span", None, 1)
 
 
 def test_ignore_spans_ignored_segment_drops_whole_tree(
-    sentry_init, capture_envelopes, capture_record_lost_event_calls
+    sentry_init, capture_items, capture_record_lost_event_calls
 ):
     # Ignored segments should drop the whole span tree.
     sentry_init(
@@ -1175,7 +1150,7 @@ def test_ignore_spans_ignored_segment_drops_whole_tree(
         },
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
     lost_event_calls = capture_record_lost_event_calls()
 
     with sentry_sdk.traces.start_span(name="ignored") as ignored_span:
@@ -1191,7 +1166,7 @@ def test_ignore_spans_ignored_segment_drops_whole_tree(
                 assert isinstance(span2, NoOpStreamedSpan)
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 0
 
@@ -1201,7 +1176,7 @@ def test_ignore_spans_ignored_segment_drops_whole_tree(
 
 
 def test_ignore_spans_ignored_segment_drops_whole_tree_explicit_parent_span(
-    sentry_init, capture_envelopes, capture_record_lost_event_calls
+    sentry_init, capture_items, capture_record_lost_event_calls
 ):
     # Ignored segments should drop the whole span tree.
     sentry_init(
@@ -1212,7 +1187,7 @@ def test_ignore_spans_ignored_segment_drops_whole_tree_explicit_parent_span(
         },
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
     lost_event_calls = capture_record_lost_event_calls()
 
     ignored_span = sentry_sdk.traces.start_span(name="ignored")
@@ -1233,7 +1208,7 @@ def test_ignore_spans_ignored_segment_drops_whole_tree_explicit_parent_span(
 
     sentry_sdk.get_client().flush()
 
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 0
 
@@ -1243,7 +1218,7 @@ def test_ignore_spans_ignored_segment_drops_whole_tree_explicit_parent_span(
 
 
 def test_ignore_spans_set_ignored_child_span_as_parent(
-    sentry_init, capture_envelopes, capture_record_lost_event_calls
+    sentry_init, capture_items, capture_record_lost_event_calls
 ):
     # Ignored non-segment spans should NOT drop the whole subtree under them.
     sentry_init(
@@ -1254,7 +1229,7 @@ def test_ignore_spans_set_ignored_child_span_as_parent(
         },
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
     lost_event_calls = capture_record_lost_event_calls()
 
     with sentry_sdk.traces.start_span(name="segment") as segment:
@@ -1271,7 +1246,7 @@ def test_ignore_spans_set_ignored_child_span_as_parent(
                     assert span._parent_span_id == segment.span_id
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 2
     (child, segment) = spans
@@ -1285,7 +1260,7 @@ def test_ignore_spans_set_ignored_child_span_as_parent(
 
 
 def test_ignore_spans_set_ignored_child_span_as_parent_explicit_parent_span(
-    sentry_init, capture_envelopes, capture_record_lost_event_calls
+    sentry_init, capture_items, capture_record_lost_event_calls
 ):
     # Ignored non-segment spans should NOT drop the whole subtree under them.
     sentry_init(
@@ -1296,7 +1271,7 @@ def test_ignore_spans_set_ignored_child_span_as_parent_explicit_parent_span(
         },
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
     lost_event_calls = capture_record_lost_event_calls()
 
     segment = sentry_sdk.traces.start_span(name="segment")
@@ -1325,7 +1300,7 @@ def test_ignore_spans_set_ignored_child_span_as_parent_explicit_parent_span(
     segment.end()
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 2
     (child, segment) = spans
@@ -1338,7 +1313,7 @@ def test_ignore_spans_set_ignored_child_span_as_parent_explicit_parent_span(
         assert lost_event_call == ("ignored", "span", None, 1)
 
 
-def test_ignore_spans_reparenting(sentry_init, capture_envelopes):
+def test_ignore_spans_reparenting(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         _experiments={
@@ -1347,7 +1322,7 @@ def test_ignore_spans_reparenting(sentry_init, capture_envelopes):
         },
     )
 
-    events = capture_envelopes()
+    items = capture_items("span")
 
     with sentry_sdk.traces.start_span(name="segment") as span1:
         assert span1.sampled is True
@@ -1368,7 +1343,7 @@ def test_ignore_spans_reparenting(sentry_init, capture_envelopes):
                         assert span5._parent_span_id == span3.span_id
 
     sentry_sdk.get_client().flush()
-    spans = envelopes_to_spans(events)
+    spans = [item.payload for item in items]
 
     assert len(spans) == 3
     (span5, span3, span1) = spans
@@ -1380,14 +1355,14 @@ def test_ignore_spans_reparenting(sentry_init, capture_envelopes):
 
 
 def test_ignored_spans_produce_client_report(
-    sentry_init, capture_envelopes, capture_record_lost_event_calls
+    sentry_init, capture_items, capture_record_lost_event_calls
 ):
     sentry_init(
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream", "ignore_spans": ["ignored"]},
     )
 
-    envelopes = capture_envelopes()
+    items = capture_items("span")
     record_lost_event_calls = capture_record_lost_event_calls()
 
     with sentry_sdk.traces.start_span(name="ignored"):
@@ -1398,7 +1373,7 @@ def test_ignored_spans_produce_client_report(
 
     sentry_sdk.get_client().flush()
 
-    spans = envelopes_to_spans(envelopes)
+    spans = [item.payload for item in items]
     assert not spans
 
     # All three spans will be ignored since the segment is ignored
@@ -1411,7 +1386,7 @@ def test_ignored_spans_produce_client_report(
 
 @mock.patch("sentry_sdk.profiler.continuous_profiler.DEFAULT_SAMPLING_FREQUENCY", 21)
 def test_segment_span_has_profiler_id(
-    sentry_init, capture_envelopes, teardown_profiling
+    sentry_init, capture_items, capture_envelopes, teardown_profiling
 ):
     sentry_init(
         traces_sample_rate=1.0,
@@ -1423,6 +1398,7 @@ def test_segment_span_has_profiler_id(
             "continuous_profiling_auto_start": True,
         },
     )
+    items = capture_items("span")
     envelopes = capture_envelopes()
 
     with sentry_sdk.traces.start_span(name="profiled segment"):
@@ -1431,7 +1407,7 @@ def test_segment_span_has_profiler_id(
     sentry_sdk.get_client().flush()
     time.sleep(0.3)  # wait for profiler to flush
 
-    spans = envelopes_to_spans(envelopes)
+    spans = [item.payload for item in items]
     assert len(spans) == 1
     assert "sentry.profiler_id" in spans[0]["attributes"]
 
@@ -1445,7 +1421,7 @@ def test_segment_span_has_profiler_id(
 
 
 def test_segment_span_no_profiler_id_when_unsampled(
-    sentry_init, capture_envelopes, teardown_profiling
+    sentry_init, capture_items, capture_envelopes, teardown_profiling
 ):
     sentry_init(
         traces_sample_rate=1.0,
@@ -1457,6 +1433,7 @@ def test_segment_span_no_profiler_id_when_unsampled(
             "continuous_profiling_auto_start": True,
         },
     )
+    items = capture_items("span")
     envelopes = capture_envelopes()
 
     with sentry_sdk.traces.start_span(name="segment"):
@@ -1465,7 +1442,7 @@ def test_segment_span_no_profiler_id_when_unsampled(
     sentry_sdk.get_client().flush()
     time.sleep(0.2)
 
-    spans = envelopes_to_spans(envelopes)
+    spans = [item.payload for item in items]
     assert len(spans) == 1
     assert "sentry.profiler_id" not in spans[0]["attributes"]
 
@@ -1533,6 +1510,7 @@ def test_default_attributes(sentry_init, capture_envelopes):
     assert item.payload.json["items"][0]["attributes"] == {
         "thread.id": {"value": mock.ANY, "type": "string"},
         "thread.name": {"value": "MainThread", "type": "string"},
+        "process.command_args": {"value": mock.ANY, "type": "array"},
         "sentry.segment.id": {"value": mock.ANY, "type": "string"},
         "sentry.segment.name": {"value": "test", "type": "string"},
         "sentry.sdk.name": {"value": "sentry.python", "type": "string"},
@@ -1542,67 +1520,3 @@ def test_default_attributes(sentry_init, capture_envelopes):
         "sentry.release": {"value": "1.0.0", "type": "string"},
         "sentry.origin": {"value": "manual", "type": "string"},
     }
-
-
-@pytest.mark.skipif(
-    sys.platform == "win32"
-    or not hasattr(os, "fork")
-    or not hasattr(os, "register_at_fork"),
-    reason="requires POSIX fork and os.register_at_fork (Python 3.7+)",
-)
-def test_span_batcher_lock_reset_in_child_after_fork(sentry_init):
-    """Regression test for the SpanBatcher fork-deadlock fix.
-
-    If os.fork() runs while another thread holds SpanBatcher._lock, the
-    child inherits the lock locked. The holding thread does not exist in
-    the child, so the lock can never be released and _ensure_thread
-    deadlocks forever. The after-fork hook must replace the lock with a
-    fresh one in the child and reset
-    _flusher / _flusher_pid / _span_buffer / _running_size / _active /
-    _flush_event.
-    """
-    sentry_init(
-        traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
-    )
-    batcher = sentry_sdk.get_client().span_batcher
-    assert batcher is not None
-
-    original_lock = batcher._lock
-    original_lock.acquire()
-
-    batcher._span_buffer["test-trace-id"].append(object())
-    batcher._running_size["test-trace-id"] = 42
-    batcher._active.flag = True
-    batcher._flush_event.set()
-    batcher._running = False
-
-    pid = os.fork()
-    if pid == 0:
-        replaced = batcher._lock is not original_lock
-        unheld = batcher._lock.acquire(blocking=False)
-
-        flusher_reset = batcher._flusher is None and batcher._flusher_pid is None
-        span_buffer_reset = len(batcher._span_buffer) == 0
-        running_size_reset = len(batcher._running_size) == 0
-
-        active_reset = not getattr(batcher._active, "flag", False)
-        event_reset = not batcher._flush_event.is_set()
-        running_reset = batcher._running is True
-
-        os._exit(
-            0
-            if replaced
-            and unheld
-            and flusher_reset
-            and span_buffer_reset
-            and running_size_reset
-            and active_reset
-            and event_reset
-            and running_reset
-            else 1
-        )
-
-    original_lock.release()
-    _, status = os.waitpid(pid, 0)
-    assert os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0

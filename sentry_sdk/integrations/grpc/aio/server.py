@@ -4,6 +4,7 @@ from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import event_from_exception
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 from typing import TYPE_CHECKING
 
@@ -52,27 +53,57 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
                     if not name:
                         return await handler(request, context)
 
-                    # What if the headers are empty?
-                    transaction = sentry_sdk.continue_trace(
-                        dict(context.invocation_metadata()),
-                        op=OP.GRPC_SERVER,
-                        name=name,
-                        source=TransactionSource.CUSTOM,
-                        origin=SPAN_ORIGIN,
+                    span_streaming = has_span_streaming_enabled(
+                        sentry_sdk.get_client().options
                     )
+                    if span_streaming:
+                        # What if the headers are empty?
+                        sentry_sdk.traces.continue_trace(
+                            dict(context.invocation_metadata())
+                        )
 
-                    with sentry_sdk.start_transaction(transaction=transaction):
-                        try:
-                            return await handler.unary_unary(request, context)
-                        except AbortError:
-                            raise
-                        except Exception as exc:
-                            event, hint = event_from_exception(
-                                exc,
-                                mechanism={"type": "grpc", "handled": False},
-                            )
-                            sentry_sdk.capture_event(event, hint=hint)
-                            raise
+                        with sentry_sdk.traces.start_span(
+                            name=name,
+                            attributes={
+                                "sentry.op": OP.GRPC_SERVER,
+                                "sentry.span.source": TransactionSource.CUSTOM.value,
+                                "sentry.origin": SPAN_ORIGIN,
+                            },
+                            parent_span=None,
+                        ):
+                            try:
+                                return await handler.unary_unary(request, context)
+                            except AbortError:
+                                raise
+                            except Exception as exc:
+                                event, hint = event_from_exception(
+                                    exc,
+                                    mechanism={"type": "grpc", "handled": False},
+                                )
+                                sentry_sdk.capture_event(event, hint=hint)
+                                raise
+                    else:
+                        # What if the headers are empty?
+                        transaction = sentry_sdk.continue_trace(
+                            dict(context.invocation_metadata()),
+                            op=OP.GRPC_SERVER,
+                            name=name,
+                            source=TransactionSource.CUSTOM,
+                            origin=SPAN_ORIGIN,
+                        )
+
+                        with sentry_sdk.start_transaction(transaction=transaction):
+                            try:
+                                return await handler.unary_unary(request, context)
+                            except AbortError:
+                                raise
+                            except Exception as exc:
+                                event, hint = event_from_exception(
+                                    exc,
+                                    mechanism={"type": "grpc", "handled": False},
+                                )
+                                sentry_sdk.capture_event(event, hint=hint)
+                                raise
 
         elif not handler.request_streaming and handler.response_streaming:
             handler_factory = grpc.unary_stream_rpc_method_handler

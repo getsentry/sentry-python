@@ -67,7 +67,7 @@ def test_subprocess_basic(
     )
 
     if span_streaming:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("event", "span")
 
         with sentry_sdk.traces.start_span(name="custom parent") as span:
             args = [
@@ -350,7 +350,7 @@ def test_subprocess_span_origin(
     )
 
     if span_streaming:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("span")
 
         with sentry_sdk.traces.start_span(name="custom parent"):
             args = [

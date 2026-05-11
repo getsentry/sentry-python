@@ -399,9 +399,12 @@ def add_query_source(
     if not should_add_query_source:
         return
 
-    end_timestamp = (
-        datetime.now(timezone.utc) if span.timestamp is None else span.timestamp
-    )
+    if isinstance(span, StreamedSpan):
+        end_timestamp = span.end_timestamp
+    else:
+        end_timestamp = span.timestamp
+
+    end_timestamp = end_timestamp or datetime.now(timezone.utc)
 
     duration = end_timestamp - span.start_timestamp
     threshold = client.options.get("db_query_source_threshold_ms", 0)
@@ -442,9 +445,12 @@ def add_http_request_source(
     if not should_add_request_source:
         return
 
-    end_timestamp = (
-        datetime.now(timezone.utc) if span.timestamp is None else span.timestamp
-    )
+    if isinstance(span, StreamedSpan):
+        end_timestamp = span.end_timestamp
+    else:
+        end_timestamp = span.timestamp
+
+    end_timestamp = end_timestamp or datetime.now(timezone.utc)
 
     duration = end_timestamp - span.start_timestamp
     threshold = client.options.get("http_request_source_threshold_ms", 0)

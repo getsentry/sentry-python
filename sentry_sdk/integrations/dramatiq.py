@@ -70,7 +70,7 @@ def _patch_dramatiq_broker() -> None:
             # RedisBroker does not.
             if len(args) == 1:
                 middleware = args[0]
-                args = []  # type: ignore
+                args = ()
             else:
                 middleware = None
 

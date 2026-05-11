@@ -965,9 +965,7 @@ class Transaction(Span):
 
         # For backwards compatibility, we must handle the case where `scope`
         # or `hub` could both either be a `Scope` or a `Hub`.
-        scope: "Optional[sentry_sdk.Scope]" = self._get_scope_from_finish_args(
-            scope, hub
-        )
+        scope = self._get_scope_from_finish_args(scope, hub)
 
         scope = scope or self.scope or sentry_sdk.get_current_scope()
         client = sentry_sdk.get_client()
