@@ -2,10 +2,12 @@ import copy
 import json
 
 import sentry_sdk
-from sentry_sdk.consts import SPANSTATUS, SPANDATA, OP
+from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import SpanStatus, StreamedSpan
 from sentry_sdk.tracing import Span
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import capture_internal_exceptions
 
 try:
@@ -107,7 +109,7 @@ def _get_db_data(event: "Any") -> "Dict[str, Any]":
 
 class CommandTracer(monitoring.CommandListener):
     def __init__(self) -> None:
-        self._ongoing_operations: "Dict[int, Span]" = {}
+        self._ongoing_operations: "Dict[int, Union[Span, StreamedSpan]]" = {}
 
     def _operation_key(
         self,
@@ -116,7 +118,8 @@ class CommandTracer(monitoring.CommandListener):
         return event.request_id
 
     def started(self, event: "CommandStartedEvent") -> None:
-        if sentry_sdk.get_client().get_integration(PyMongoIntegration) is None:
+        client = sentry_sdk.get_client()
+        if client.get_integration(PyMongoIntegration) is None:
             return
 
         with capture_internal_exceptions():
@@ -126,56 +129,85 @@ class CommandTracer(monitoring.CommandListener):
             command.pop("$clusterTime", None)
             command.pop("$signature", None)
 
-            tags = {
-                "db.name": event.database_name,
-                SPANDATA.DB_SYSTEM: "mongodb",
-                SPANDATA.DB_DRIVER_NAME: "pymongo",
-                SPANDATA.DB_OPERATION: event.command_name,
-                SPANDATA.DB_MONGODB_COLLECTION: command.get(event.command_name),
-            }
-
-            try:
-                tags["net.peer.name"] = event.connection_id[0]
-                tags["net.peer.port"] = str(event.connection_id[1])
-            except TypeError:
-                pass
-
-            data: "Dict[str, Any]" = {"operation_ids": {}}
-            data["operation_ids"]["operation"] = event.operation_id
-            data["operation_ids"]["request"] = event.request_id
-
-            data.update(_get_db_data(event))
-
-            try:
-                lsid = command.pop("lsid")["id"]
-                data["operation_ids"]["session"] = str(lsid)
-            except KeyError:
-                pass
+            db_data = _get_db_data(event)
 
             if not should_send_default_pii():
                 command = _strip_pii(command)
 
             query = json.dumps(command, default=str)
-            span = sentry_sdk.start_span(
-                op=OP.DB,
-                name=query,
-                origin=PyMongoIntegration.origin,
-            )
 
-            for tag, value in tags.items():
-                # set the tag for backwards-compatibility.
-                # TODO: remove the set_tag call in the next major release!
-                span.set_tag(tag, value)
+            if has_span_streaming_enabled(client.options):
+                span_first_data = {
+                    "db.name": event.database_name,
+                    SPANDATA.DB_SYSTEM: "mongodb",
+                    SPANDATA.DB_DRIVER_NAME: "pymongo",
+                    SPANDATA.DB_OPERATION: event.command_name,
+                    "db.collection.name": command.get(event.command_name),
+                    "sentry.op": OP.DB,
+                    "sentry.origin": PyMongoIntegration.origin,
+                    **db_data,
+                }
 
-                span.set_data(tag, value)
-
-            for key, value in data.items():
-                span.set_data(key, value)
-
-            with capture_internal_exceptions():
-                sentry_sdk.add_breadcrumb(
-                    message=query, category="query", type=OP.DB, data=tags
+                span = sentry_sdk.traces.start_span(
+                    name=query, attributes=span_first_data
                 )
+
+                with capture_internal_exceptions():
+                    sentry_sdk.add_breadcrumb(
+                        message=query,
+                        category="query",
+                        type=OP.DB,
+                        data=span_first_data,
+                    )
+
+            else:
+                tags = {
+                    "db.name": event.database_name,
+                    SPANDATA.DB_SYSTEM: "mongodb",
+                    SPANDATA.DB_DRIVER_NAME: "pymongo",
+                    SPANDATA.DB_OPERATION: event.command_name,
+                    # The below is a deprecated field, but leaving for legacy reasons.
+                    # The v2 spans will use `db.collection.name` instead.
+                    SPANDATA.DB_MONGODB_COLLECTION: command.get(event.command_name),
+                }
+
+                try:
+                    tags["net.peer.name"] = event.connection_id[0]
+                    tags["net.peer.port"] = str(event.connection_id[1])
+                except TypeError:
+                    pass
+
+                data: "Dict[str, Any]" = {"operation_ids": {}}
+                data["operation_ids"]["operation"] = event.operation_id
+                data["operation_ids"]["request"] = event.request_id
+
+                data.update(db_data)
+
+                try:
+                    lsid = command.pop("lsid")["id"]
+                    data["operation_ids"]["session"] = str(lsid)
+                except KeyError:
+                    pass
+
+                span = sentry_sdk.start_span(
+                    op=OP.DB,
+                    name=query,
+                    origin=PyMongoIntegration.origin,
+                )
+
+                for tag, value in tags.items():
+                    # set the tag for backwards-compatibility.
+                    # TODO: remove the set_tag call in the next major release!
+                    span.set_tag(tag, value)
+                    span.set_data(tag, value)
+
+                for key, value in data.items():
+                    span.set_data(key, value)
+
+                with capture_internal_exceptions():
+                    sentry_sdk.add_breadcrumb(
+                        message=query, category="query", type=OP.DB, data=tags
+                    )
 
             self._ongoing_operations[self._operation_key(event)] = span.__enter__()
 
@@ -185,7 +217,11 @@ class CommandTracer(monitoring.CommandListener):
 
         try:
             span = self._ongoing_operations.pop(self._operation_key(event))
-            span.set_status(SPANSTATUS.INTERNAL_ERROR)
+            # Ignoring NoOpStreamedSpan as it will always have a status of "ok"
+            if type(span) is StreamedSpan:
+                span.status = SpanStatus.ERROR
+            elif type(span) is Span:
+                span.set_status(SPANSTATUS.INTERNAL_ERROR)
             span.__exit__(None, None, None)
         except KeyError:
             return
@@ -196,7 +232,11 @@ class CommandTracer(monitoring.CommandListener):
 
         try:
             span = self._ongoing_operations.pop(self._operation_key(event))
-            span.set_status(SPANSTATUS.OK)
+            # Ignoring NoOpStreamedSpan as it will always have a status of "ok"
+            if type(span) is StreamedSpan:
+                span.status = SpanStatus.OK
+            elif type(span) is Span:
+                span.set_status(SPANSTATUS.OK)
             span.__exit__(None, None, None)
         except KeyError:
             pass
