@@ -71,7 +71,9 @@ def patch_django_middlewares() -> None:
 def _wrap_middleware(middleware: "Any", middleware_name: str) -> "Any":
     from sentry_sdk.integrations.django import DjangoIntegration
 
-    def _check_middleware_span(old_method: "Callable[..., Any]") -> "Optional[Span]":
+    def _check_middleware_span(
+        old_method: "Callable[..., Any]",
+    ) -> "Optional[Union[Span, StreamedSpan]]":
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
         if integration is None or not integration.middleware_spans:
             return None
