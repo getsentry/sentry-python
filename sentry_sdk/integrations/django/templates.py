@@ -66,9 +66,7 @@ def patch_templates() -> None:
     @property  # type: ignore
     @ensure_integration_enabled(DjangoIntegration, real_rendered_content.fget)
     def rendered_content(self: "SimpleTemplateResponse") -> str:
-        client = sentry_sdk.get_client()
-        span_streaming = has_span_streaming_enabled(client.options)
-
+        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
             with sentry_sdk.traces.start_span(
                 name=_get_template_name_description(self.template_name),

@@ -681,9 +681,7 @@ def install_sql_hook() -> None:
         with capture_internal_exceptions():
             sentry_sdk.add_breadcrumb(message="connect", category="query")
 
-        client = sentry_sdk.get_client()
-        span_streaming = has_span_streaming_enabled(client.options)
-
+        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
             with sentry_sdk.traces.start_span(
                 name="connect",
@@ -709,9 +707,7 @@ def install_sql_hook() -> None:
         if integration is None or not integration.db_transaction_spans:
             return real_commit(self)
 
-        client = sentry_sdk.get_client()
-        span_streaming = has_span_streaming_enabled(client.options)
-
+        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
             with sentry_sdk.traces.start_span(
                 name=SPANNAME.DB_COMMIT,
@@ -737,9 +733,7 @@ def install_sql_hook() -> None:
         if integration is None or not integration.db_transaction_spans:
             return real_rollback(self)
 
-        client = sentry_sdk.get_client()
-        span_streaming = has_span_streaming_enabled(client.options)
-
+        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
             with sentry_sdk.traces.start_span(
                 name=SPANNAME.DB_ROLLBACK,

@@ -85,9 +85,7 @@ def _wrap_middleware(middleware: "Any", middleware_name: str) -> "Any":
         if function_basename:
             description = "{}.{}".format(description, function_basename)
 
-        client = sentry_sdk.get_client()
-        span_streaming = has_span_streaming_enabled(client.options)
-
+        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         middleware_span: "Union[Span, StreamedSpan]"
         if span_streaming:
             middleware_span = sentry_sdk.traces.start_span(

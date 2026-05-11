@@ -65,9 +65,9 @@ def patch_signals() -> None:
             def wrapper(*args: "Any", **kwargs: "Any") -> "Any":
                 signal_name = _get_receiver_name(receiver)
 
-                client = sentry_sdk.get_client()
-                span_streaming = has_span_streaming_enabled(client.options)
-
+                span_streaming = has_span_streaming_enabled(
+                    sentry_sdk.get_client().options
+                )
                 if span_streaming:
                     with sentry_sdk.traces.start_span(
                         name=signal_name,

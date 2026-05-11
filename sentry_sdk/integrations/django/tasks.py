@@ -33,9 +33,7 @@ def patch_tasks() -> None:
 
         name = qualname_from_function(self.func) or "<unknown Django task>"
 
-        client = sentry_sdk.get_client()
-        span_streaming = has_span_streaming_enabled(client.options)
-
+        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
             with sentry_sdk.traces.start_span(
                 name=name,

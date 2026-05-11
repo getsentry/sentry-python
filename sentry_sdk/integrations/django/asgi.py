@@ -183,9 +183,7 @@ def wrap_async_view(callback: "Any") -> "Any":
         if not integration or not integration.middleware_spans:
             return await callback(request, *args, **kwargs)
 
-        client = sentry_sdk.get_client()
-        span_streaming = has_span_streaming_enabled(client.options)
-
+        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
             with sentry_sdk.traces.start_span(
                 name=request.resolver_match.view_name,

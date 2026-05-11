@@ -62,9 +62,7 @@ def _patch_cache_method(
         op = OP.CACHE_PUT if is_set_operation else OP.CACHE_GET
         description = _get_span_description(method_name, args, kwargs)
 
-        client = sentry_sdk.get_client()
-        span_streaming = has_span_streaming_enabled(client.options)
-
+        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
             with sentry_sdk.traces.start_span(
                 name=description,
