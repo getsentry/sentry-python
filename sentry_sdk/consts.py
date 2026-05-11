@@ -46,7 +46,6 @@ if TYPE_CHECKING:
     from typing_extensions import Literal, TypedDict
 
     import sentry_sdk
-    from sentry_sdk.traces import StreamedSpan
     from sentry_sdk._types import (
         BreadcrumbProcessor,
         ContinuousProfilerMode,
@@ -57,6 +56,7 @@ if TYPE_CHECKING:
         Log,
         Metric,
         ProfilerMode,
+        SpanJSON,
         TracesSampler,
         TransactionProcessor,
     )
@@ -87,7 +87,7 @@ if TYPE_CHECKING:
             "trace_lifecycle": Optional[Literal["static", "stream"]],
             "ignore_spans": Optional[IgnoreSpansConfig],
             "before_send_span": Optional[
-                Callable[[StreamedSpan, Hint], Optional[StreamedSpan]]
+                Callable[[SpanJSON, Hint], Optional[SpanJSON]]
             ],
             "suppress_asgi_chained_exceptions": Optional[bool],
         },

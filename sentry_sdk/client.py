@@ -3,7 +3,6 @@ import uuid
 import random
 import socket
 from collections.abc import Mapping
-from copy import deepcopy
 from datetime import datetime, timezone
 from importlib import import_module
 from typing import TYPE_CHECKING, List, Dict, cast, overload
@@ -955,50 +954,50 @@ class _Client(BaseClient):
 
         if ty == "log":
             before_send = get_before_send_log(self.options)
-            snapshot = telemetry
+            serialized = telemetry
 
         elif ty == "metric":
             before_send = get_before_send_metric(self.options)
-            snapshot = telemetry
+            serialized = telemetry
 
         elif ty == "span":
             before_send = get_before_send_span(self.options)
-            # We don't want to expose the actual underlying span in
-            # before_send_span to not allow arbitrary edits. Expose a copy
-            # instead.
-            snapshot = deepcopy(telemetry)
+            serialized = telemetry._to_json()
 
         if before_send is not None:
-            result = before_send(snapshot, {})
+            serialized = before_send(serialized, {})
 
             # Logs and metrics can be dropped in their respective
             # before_send, so if we get None, don't queue them for sending.
             if ty in ("log", "metric"):
-                if result is None:
+                if serialized is None:
                     return
 
             # Spans can't be dropped in before_send_span by design. They can
-            # be altered though (name and attributes can be changed, e.g. to
-            # sanitize).
-            #
-            # If we get anything but a StreamedSpan back from before_send_span,
-            # just ignore it. Otherwise, take the returned StreamedSpan and
-            # merge it with the original.
+            # be altered though (e.g. to sanitize).
             elif ty == "span":
-                if isinstance(result, StreamedSpan):
-                    telemetry._attributes = result._attributes
-                    telemetry._name = result._name
+                if isinstance(serialized, dict) and serialized:
+                    # TODO[ivana]: Figure out the merging/validation here
+                    pass
+                else:
+                    serialized = telemetry._to_json()
+                    logger.debug(
+                        "[Tracing] Invalid return value from before_send_span. Using original span."
+                    )
 
         batcher = None
         if ty == "log":
             batcher = self.log_batcher
+
         elif ty == "metric":
             batcher = self.metrics_batcher
+
         elif ty == "span":
+            serialized["_segment_span"] = telemetry._segment
             batcher = self.span_batcher
 
         if batcher is not None:
-            batcher.add(telemetry)  # type: ignore
+            batcher.add(serialized)  # type: ignore
 
     def _capture_log(self, log: "Optional[Log]", scope: "Scope") -> None:
         self._capture_telemetry(log, "log", scope)

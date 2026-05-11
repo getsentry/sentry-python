@@ -273,12 +273,12 @@ def test_custom_sampling_context_update_to_context_value_persists(sentry_init):
 
 def test_before_send_span_basic(sentry_init, capture_items):
     def before_send_span(span, hint):
-        assert isinstance(span, StreamedSpan)
+        assert isinstance(span, dict)
 
-        span.name = "Better span name"
-        span.remove_attribute("drop")
-        span.set_attribute("sanitize", "[Removed]")
-        span.set_attribute("add", "new")
+        span["name"] = "Better span name"
+        del span["attributes"]["drop"]
+        span["attributes"]["sanitize"] = "[Removed]"
+        span["attributes"]["add"] = "new"
 
         return span
 
@@ -313,11 +313,17 @@ def test_before_send_span_basic(sentry_init, capture_items):
     assert span["attributes"]["add"] == "new"
 
 
-def test_before_send_span_invalid_return_value(sentry_init, capture_items):
+@pytest.mark.parametrize(
+    "return_value",
+    [None, {}, {"not_a_span": True}],
+)
+def test_before_send_span_invalid_return_value(
+    sentry_init, capture_items, return_value
+):
     def before_send_span(span, hint):
         # Spans can't be dropped in before_send_span, so unsupported return
         # values will be ignored
-        return None
+        return return_value
 
     sentry_init(
         traces_sample_rate=1.0,
@@ -344,7 +350,9 @@ def test_before_send_span_invalid_return_value(sentry_init, capture_items):
 def test_before_send_span_unsupported_edit(sentry_init, capture_items):
     def before_send_span(span, hint):
         # Anything beyond attribute and name changes will be ignored
-        span._trace_id = "my-trace-id"
+        span["trace_id"] = "my-trace-id"
+
+        return span
 
     sentry_init(
         traces_sample_rate=1.0,
