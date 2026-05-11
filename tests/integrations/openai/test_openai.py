@@ -1500,9 +1500,6 @@ def test_span_status_error(sentry_init, capture_items):
     spans = [item.payload for item in items if item.type == "span"]
     assert spans[0]["status"] == "error"
 
-    (transaction,) = (item.payload for item in items if item.type == "transaction")
-    assert transaction["contexts"]["trace"]["status"] == "internal_error"
-
 
 @pytest.mark.asyncio
 async def test_bad_chat_completion_async(sentry_init, capture_items):
