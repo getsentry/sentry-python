@@ -979,10 +979,9 @@ class _Client(BaseClient):
                 # name and attributes.
                 if isinstance(serialized, dict) and serialized and "name" in serialized:
                     telemetry.name = serialized["name"]  # type: ignore[typeddict-item]
-                    if serialized.get("attributes"):
-                        telemetry._attributes = {}
-                        for k, v in (serialized.get("attributes") or {}).items():
-                            telemetry.set_attribute(k, v)
+                    telemetry._attributes = {}
+                    for k, v in (serialized.get("attributes") or {}).items():
+                        telemetry.set_attribute(k, v)
 
                 else:
                     logger.debug(
@@ -999,6 +998,8 @@ class _Client(BaseClient):
             batcher = self.metrics_batcher
 
         elif ty == "span":
+            # We need a reference to the segment span in the batcher to populate
+            # the DSC
             serialized["_segment_span"] = telemetry._segment  # type: ignore
             batcher = self.span_batcher
 
