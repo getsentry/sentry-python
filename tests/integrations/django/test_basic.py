@@ -730,7 +730,8 @@ def test_transaction_style(
     content, status, headers = unpack_werkzeug_response(client.get(client_url))
     assert content == expected_response
 
-    (_, transaction) = events
+    (error, transaction) = events
+    assert error["transaction"] == expected_transaction
     assert transaction["transaction"] == expected_transaction
     assert transaction["transaction_info"] == {"source": expected_source}
 
