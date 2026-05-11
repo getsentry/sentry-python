@@ -723,15 +723,17 @@ def test_transaction_style(
 ):
     sentry_init(
         integrations=[DjangoIntegration(transaction_style=transaction_style)],
+        traces_sample_rate=1.0,
         send_default_pii=True,
     )
     events = capture_events()
     content, status, headers = unpack_werkzeug_response(client.get(client_url))
     assert content == expected_response
 
-    (event,) = events
-    assert event["transaction"] == expected_transaction
-    assert event["transaction_info"] == {"source": expected_source}
+    (error, transaction) = events
+    assert error["transaction"] == expected_transaction
+    assert transaction["transaction"] == expected_transaction
+    assert transaction["transaction_info"] == {"source": expected_source}
 
 
 def test_request_body(sentry_init, client, capture_events):
