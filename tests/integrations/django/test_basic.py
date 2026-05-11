@@ -1212,30 +1212,33 @@ def test_custom_urlconf_middleware(
     )
     events = capture_events()
 
-    content, status, _headers = unpack_werkzeug_response(client.get("/custom/ok"))
-    assert status.lower() == "200 ok"
-    assert content == b"custom ok"
+    try:
+        content, status, _headers = unpack_werkzeug_response(client.get("/custom/ok"))
+        assert status.lower() == "200 ok"
+        assert content == b"custom ok"
 
-    event = events.pop(0)
-    assert event["transaction"] == "/custom/ok"
-    if middleware_spans:
-        assert "custom_urlconf_middleware" in render_span_tree(
-            event["spans"], event["contexts"]["trace"]
-        )
+        event = events.pop(0)
+        assert event["transaction"] == "/custom/ok"
+        if middleware_spans:
+            assert "custom_urlconf_middleware" in render_span_tree(
+                event["spans"], event["contexts"]["trace"]
+            )
 
-    _content, status, _headers = unpack_werkzeug_response(client.get("/custom/exc"))
-    assert status.lower() == "500 internal server error"
+        _content, status, _headers = unpack_werkzeug_response(client.get("/custom/exc"))
+        assert status.lower() == "500 internal server error"
 
-    error_event, transaction_event = events
-    assert error_event["transaction"] == "/custom/exc"
-    assert error_event["exception"]["values"][-1]["mechanism"]["type"] == "django"
-    assert transaction_event["transaction"] == "/custom/exc"
-    if middleware_spans:
-        assert "custom_urlconf_middleware" in render_span_tree(
-            transaction_event["spans"], transaction_event["contexts"]["trace"]
-        )
+        error_event, transaction_event = events
+        assert error_event["transaction"] == "/custom/exc"
+        assert error_event["exception"]["values"][-1]["mechanism"]["type"] == "django"
+        assert transaction_event["transaction"] == "/custom/exc"
+        if middleware_spans:
+            assert "custom_urlconf_middleware" in render_span_tree(
+                transaction_event["spans"], transaction_event["contexts"]["trace"]
+            )
 
-    settings.MIDDLEWARE.pop(0)
+    finally:
+        settings.MIDDLEWARE.pop(0)
+        client.application.load_middleware()
 
 
 def test_get_receiver_name():
