@@ -1254,14 +1254,21 @@ def test_transaction_style(
 ):
     sentry_init(
         integrations=[DjangoIntegration(transaction_style=transaction_style)],
+        traces_sample_rate=1.0,
         send_default_pii=True,
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
     if span_streaming:
-        items = capture_items("event")
+        items = capture_items("event", "span")
 
         content, status, headers = unpack_werkzeug_response(client.get(client_url))
         assert content == expected_response
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+
+        assert spans[2]["is_segment"] is True
+        assert spans[2]["attributes"]["sentry.span.source"] == expected_source
 
         (event,) = (item.payload for item in items if item.type == "event")
     else:
@@ -1270,10 +1277,11 @@ def test_transaction_style(
         content, status, headers = unpack_werkzeug_response(client.get(client_url))
         assert content == expected_response
 
-        (event,) = events
+        (event, transaction) = events
+        assert transaction["transaction"] == expected_transaction
+        assert transaction["transaction_info"] == {"source": expected_source}
 
     assert event["transaction"] == expected_transaction
-    assert event["transaction_info"] == {"source": expected_source}
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
