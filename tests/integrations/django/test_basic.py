@@ -2139,62 +2139,79 @@ def test_custom_urlconf_middleware(
     if span_streaming:
         items = capture_items("event", "span")
 
-        content, status, _headers = unpack_werkzeug_response(client.get("/custom/ok"))
-        assert status.lower() == "200 ok"
-        assert content == b"custom ok"
+        try:
+            content, status, _headers = unpack_werkzeug_response(
+                client.get("/custom/ok")
+            )
+            assert status.lower() == "200 ok"
+            assert content == b"custom ok"
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+            sentry_sdk.flush()
+            spans = [item.payload for item in items if item.type == "span"]
 
-        if middleware_spans:
-            assert spans[10]["name"] == "/custom/ok"
-            assert "custom_urlconf_middleware" in render_span_tree(spans)
-        else:
-            assert spans[2]["name"] == "/custom/ok"
+            if middleware_spans:
+                assert spans[10]["name"] == "/custom/ok"
+                assert "custom_urlconf_middleware" in render_span_tree(spans)
+            else:
+                assert spans[2]["name"] == "/custom/ok"
 
-        _content, status, _headers = unpack_werkzeug_response(client.get("/custom/exc"))
-        assert status.lower() == "500 internal server error"
+            _content, status, _headers = unpack_werkzeug_response(
+                client.get("/custom/exc")
+            )
+            assert status.lower() == "500 internal server error"
 
-        (error_event,) = (item.payload for item in items if item.type == "event")
-        assert error_event["transaction"] == "/custom/exc"
-        assert error_event["exception"]["values"][-1]["mechanism"]["type"] == "django"
+            (error_event,) = (item.payload for item in items if item.type == "event")
+            assert error_event["transaction"] == "/custom/exc"
+            assert (
+                error_event["exception"]["values"][-1]["mechanism"]["type"] == "django"
+            )
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+            sentry_sdk.flush()
+            spans = [item.payload for item in items if item.type == "span"]
 
-        if middleware_spans:
-            assert spans[22]["name"] == "/custom/exc"
-            assert "custom_urlconf_middleware" in render_span_tree(spans)
-        else:
-            assert spans[6]["name"] == "/custom/exc"
+            if middleware_spans:
+                assert spans[22]["name"] == "/custom/exc"
+                assert "custom_urlconf_middleware" in render_span_tree(spans)
+            else:
+                assert spans[6]["name"] == "/custom/exc"
+        finally:
+            settings.MIDDLEWARE.pop(0)
+            client.application.load_middleware()
     else:
         events = capture_events()
 
-        content, status, _headers = unpack_werkzeug_response(client.get("/custom/ok"))
-        assert status.lower() == "200 ok"
-        assert content == b"custom ok"
-
-        event = events.pop(0)
-        assert event["transaction"] == "/custom/ok"
-        if middleware_spans:
-            assert "custom_urlconf_middleware" in render_span_tree(
-                event["spans"], event["contexts"]["trace"]
+        try:
+            content, status, _headers = unpack_werkzeug_response(
+                client.get("/custom/ok")
             )
+            assert status.lower() == "200 ok"
+            assert content == b"custom ok"
 
-        _content, status, _headers = unpack_werkzeug_response(client.get("/custom/exc"))
-        assert status.lower() == "500 internal server error"
+            event = events.pop(0)
+            assert event["transaction"] == "/custom/ok"
+            if middleware_spans:
+                assert "custom_urlconf_middleware" in render_span_tree(
+                    event["spans"], event["contexts"]["trace"]
+                )
 
-        error_event, transaction_event = events
-        assert error_event["transaction"] == "/custom/exc"
-        assert error_event["exception"]["values"][-1]["mechanism"]["type"] == "django"
-        assert transaction_event["transaction"] == "/custom/exc"
-        if middleware_spans:
-            assert "custom_urlconf_middleware" in render_span_tree(
-                transaction_event["spans"], transaction_event["contexts"]["trace"]
+            _content, status, _headers = unpack_werkzeug_response(
+                client.get("/custom/exc")
             )
+            assert status.lower() == "500 internal server error"
 
-    settings.MIDDLEWARE.pop(0)
-    client.application.load_middleware()
+            error_event, transaction_event = events
+            assert error_event["transaction"] == "/custom/exc"
+            assert (
+                error_event["exception"]["values"][-1]["mechanism"]["type"] == "django"
+            )
+            assert transaction_event["transaction"] == "/custom/exc"
+            if middleware_spans:
+                assert "custom_urlconf_middleware" in render_span_tree(
+                    transaction_event["spans"], transaction_event["contexts"]["trace"]
+                )
+        finally:
+            settings.MIDDLEWARE.pop(0)
+            client.application.load_middleware()
 
 
 def test_get_receiver_name():
