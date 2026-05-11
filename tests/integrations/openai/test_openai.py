@@ -2852,13 +2852,13 @@ def test_ai_client_span_responses_api(
 )
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 def test_responses_api_conversation_id(
-    sentry_init, capture_events, conversation, expected_id
+    sentry_init, capture_items, conversation, expected_id
 ):
     sentry_init(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
     )
-    events = capture_events()
+    items = capture_items("span")
 
     client = OpenAI(api_key="z")
     client.responses._post = mock.Mock(return_value=EXAMPLE_RESPONSE)
@@ -2870,13 +2870,12 @@ def test_responses_api_conversation_id(
             conversation=conversation,
         )
 
-    (transaction,) = events
-    (span,) = transaction["spans"]
+    (span,) = (item.payload for item in items if item.type == "span")
 
     if expected_id is None:
-        assert "gen_ai.conversation.id" not in span["data"]
+        assert "gen_ai.conversation.id" not in span["attributes"]
     else:
-        assert span["data"]["gen_ai.conversation.id"] == expected_id
+        assert span["attributes"]["gen_ai.conversation.id"] == expected_id
 
 
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
