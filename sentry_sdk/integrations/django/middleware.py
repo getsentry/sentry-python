@@ -22,8 +22,10 @@ if TYPE_CHECKING:
     from typing import Callable
     from typing import Optional
     from typing import TypeVar
+    from typing import Union
 
     from sentry_sdk.tracing import Span
+    from sentry_sdk.traces import StreamedSpan
 
     F = TypeVar("F", bound=Callable[..., Any])
 
@@ -84,6 +86,7 @@ def _wrap_middleware(middleware: "Any", middleware_name: str) -> "Any":
         client = sentry_sdk.get_client()
         span_streaming = has_span_streaming_enabled(client.options)
 
+        middleware_span: "Union[Span, StreamedSpan]"
         if span_streaming:
             middleware_span = sentry_sdk.traces.start_span(
                 name=description,
