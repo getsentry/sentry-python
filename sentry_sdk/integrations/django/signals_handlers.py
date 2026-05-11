@@ -3,7 +3,7 @@ from functools import wraps
 from django.dispatch import Signal
 
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.django import DJANGO_VERSION
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
@@ -76,7 +76,7 @@ def patch_signals() -> None:
                             "sentry.origin": DjangoIntegration.origin,
                         },
                     ) as span:
-                        span.set_attribute("signal", signal_name)
+                        span.set_attribute(SPANDATA.CODE_FUNCTION_NAME, signal_name)
                         return receiver(*args, **kwargs)
                 else:
                     with sentry_sdk.start_span(
