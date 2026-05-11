@@ -12,7 +12,7 @@ from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
     add_query_source,
-    record_sql_queries_supporting_streaming,
+    record_sql_queries,
     has_span_streaming_enabled,
 )
 from sentry_sdk.utils import (
@@ -639,7 +639,7 @@ def install_sql_hook() -> None:
     def execute(
         self: "CursorWrapper", sql: "Any", params: "Optional[Any]" = None
     ) -> "Any":
-        with record_sql_queries_supporting_streaming(
+        with record_sql_queries(
             cursor=self.cursor,
             query=sql,
             params_list=params,
@@ -659,7 +659,7 @@ def install_sql_hook() -> None:
     def executemany(
         self: "CursorWrapper", sql: "Any", param_list: "List[Any]"
     ) -> "Any":
-        with record_sql_queries_supporting_streaming(
+        with record_sql_queries(
             cursor=self.cursor,
             query=sql,
             params_list=param_list,
