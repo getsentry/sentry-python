@@ -20,7 +20,6 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.tracing_utils import (
     record_sql_queries,
-    record_sql_queries_supporting_streaming,
 )
 
 from tests.conftest import unpack_werkzeug_response
@@ -628,16 +627,13 @@ def test_no_query_source_if_duration_too_short(
 
     class fake_record_sql_queries:  # noqa: N801
         def __init__(self, *args, **kwargs):
-            if span_streaming:
-                with record_sql_queries_supporting_streaming(*args, **kwargs) as span:
-                    self.span = span
+            with record_sql_queries(*args, **kwargs) as span:
+                self.span = span
 
+            if span_streaming:
                 self.span._start_timestamp = datetime(2024, 1, 1, microsecond=0)
                 self.span._end_timestamp = datetime(2024, 1, 1, microsecond=99999)
             else:
-                with record_sql_queries(*args, **kwargs) as span:
-                    self.span = span
-
                 self.span.start_timestamp = datetime(2024, 1, 1, microsecond=0)
                 self.span.timestamp = datetime(2024, 1, 1, microsecond=99999)
 
@@ -651,7 +647,7 @@ def test_no_query_source_if_duration_too_short(
         items = capture_items("span")
 
         with mock.patch(
-            "sentry_sdk.integrations.django.record_sql_queries_supporting_streaming",
+            "sentry_sdk.integrations.django.record_sql_queries",
             fake_record_sql_queries,
         ):
             _, status, _ = unpack_werkzeug_response(
@@ -680,7 +676,7 @@ def test_no_query_source_if_duration_too_short(
         events = capture_events()
 
         with mock.patch(
-            "sentry_sdk.integrations.django.record_sql_queries_supporting_streaming",
+            "sentry_sdk.integrations.django.record_sql_queries",
             fake_record_sql_queries,
         ):
             _, status, _ = unpack_werkzeug_response(
@@ -731,7 +727,7 @@ def test_query_source_if_duration_over_threshold(
     class fake_record_sql_queries:  # noqa: N801
         def __init__(self, *args, **kwargs):
             if span_streaming:
-                with record_sql_queries_supporting_streaming(*args, **kwargs) as span:
+                with record_sql_queries(*args, **kwargs) as span:
                     self.span = span
 
                 self.span._start_timestamp = datetime(2024, 1, 1, microsecond=0)
@@ -753,7 +749,7 @@ def test_query_source_if_duration_over_threshold(
         items = capture_items("span")
 
         with mock.patch(
-            "sentry_sdk.integrations.django.record_sql_queries_supporting_streaming",
+            "sentry_sdk.integrations.django.record_sql_queries",
             fake_record_sql_queries,
         ):
             _, status, _ = unpack_werkzeug_response(
@@ -798,7 +794,7 @@ def test_query_source_if_duration_over_threshold(
         events = capture_events()
 
         with mock.patch(
-            "sentry_sdk.integrations.django.record_sql_queries_supporting_streaming",
+            "sentry_sdk.integrations.django.record_sql_queries",
             fake_record_sql_queries,
         ):
             _, status, _ = unpack_werkzeug_response(
