@@ -1,17 +1,22 @@
 from __future__ import annotations
+
 import contextlib
 import re
-from typing import Any, TypeVar, Callable, Awaitable, Iterator
+from typing import Any, Awaitable, Callable, Iterator, TypeVar, Union
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span
-from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
+from sentry_sdk.tracing_utils import (
+    add_query_source,
+    record_sql_queries,
+    record_sql_queries_supporting_streaming,
+)
 from sentry_sdk.utils import (
-    ensure_integration_enabled,
-    parse_version,
     capture_internal_exceptions,
+    parse_version,
 )
 
 try:
@@ -46,8 +51,12 @@ class AsyncPGIntegration(Integration):
         asyncpg.Connection._executemany = _wrap_connection_method(
             asyncpg.Connection._executemany, executemany=True
         )
-        asyncpg.Connection.cursor = _wrap_cursor_creation(asyncpg.Connection.cursor)
         asyncpg.Connection.prepare = _wrap_connection_method(asyncpg.Connection.prepare)
+
+        BaseCursor._bind_exec = _wrap_cursor_method(BaseCursor._bind_exec)
+        BaseCursor._bind = _wrap_cursor_method(BaseCursor._bind)
+        BaseCursor._exec = _wrap_cursor_method(BaseCursor._exec)
+
         asyncpg.connect_utils._connect_addr = _wrap_connect_addr(
             asyncpg.connect_utils._connect_addr
         )
@@ -138,21 +147,26 @@ def _wrap_connection_method(
     return _inner
 
 
-def _wrap_cursor_creation(f: "Callable[..., T]") -> "Callable[..., T]":
-    @ensure_integration_enabled(AsyncPGIntegration, f)
-    def _inner(*args: "Any", **kwargs: "Any") -> "T":  # noqa: N807
-        query = args[1]
-        params_list = args[2] if len(args) > 2 else None
+def _wrap_cursor_method(
+    f: "Callable[..., Awaitable[T]]",
+) -> "Callable[..., Awaitable[T]]":
+    async def _inner(*args: "Any", **kwargs: "Any") -> "T":
+        if sentry_sdk.get_client().get_integration(AsyncPGIntegration) is None:
+            return await f(*args, **kwargs)
 
-        with _record(
-            None,
-            query,
-            params_list,
+        cursor = args[0]
+        query = _normalize_query(cursor._query)
+        with record_sql_queries_supporting_streaming(
+            cursor=cursor,
+            query=query,
+            params_list=None,
+            paramstyle=None,
             executemany=False,
+            record_cursor_repr=True,
+            span_origin=AsyncPGIntegration.origin,
         ) as span:
-            _set_db_data(span, args[0])
-            res = f(*args, **kwargs)
-            span.set_data("db.cursor", res)
+            _set_db_data(span, cursor._connection)
+            res = await f(*args, **kwargs)
 
         return res
 
@@ -197,22 +211,27 @@ def _wrap_connect_addr(
     return _inner
 
 
-def _set_db_data(span: "Span", conn: "Any") -> None:
-    span.set_data(SPANDATA.DB_SYSTEM, "postgresql")
-    span.set_data(SPANDATA.DB_DRIVER_NAME, "asyncpg")
+def _set_db_data(span: "Union[Span, StreamedSpan]", conn: "Any") -> None:
+    if isinstance(span, StreamedSpan):
+        set_on_span = span.set_attribute
+    else:
+        set_on_span = span.set_data
+
+    set_on_span(SPANDATA.DB_SYSTEM, "postgresql")
+    set_on_span(SPANDATA.DB_DRIVER_NAME, "asyncpg")
 
     addr = conn._addr
     if addr:
         try:
-            span.set_data(SPANDATA.SERVER_ADDRESS, addr[0])
-            span.set_data(SPANDATA.SERVER_PORT, addr[1])
+            set_on_span(SPANDATA.SERVER_ADDRESS, addr[0])
+            set_on_span(SPANDATA.SERVER_PORT, addr[1])
         except IndexError:
             pass
 
     database = conn._params.database
     if database:
-        span.set_data(SPANDATA.DB_NAME, database)
+        set_on_span(SPANDATA.DB_NAME, database)
 
     user = conn._params.user
     if user:
-        span.set_data(SPANDATA.DB_USER, user)
+        set_on_span(SPANDATA.DB_USER, user)
