@@ -849,6 +849,10 @@ class Scope:
     def set_transaction_name(self, name: str, source: "Optional[str]" = None) -> None:
         """Set the transaction name and optionally the transaction source."""
         self._transaction = name
+
+        if source:
+            self._transaction_info["source"] = source
+
         if self._span:
             if isinstance(self._span, NoOpStreamedSpan):
                 return
@@ -864,9 +868,6 @@ class Scope:
                 self._span.containing_transaction.name = name
                 if source:
                     self._span.containing_transaction.source = source
-
-        if source:
-            self._transaction_info["source"] = source
 
     @_attr_setter
     def user(self, value: "Optional[Dict[str, Any]]") -> None:
