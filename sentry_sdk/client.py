@@ -985,7 +985,7 @@ class _Client(BaseClient):
 
                 else:
                     logger.debug(
-                        "[Tracing] Invalid return value from before_send_span. Using original span."
+                        "[Tracing] Invalid return value from before_send_span. Keeping original span."
                     )
 
                 serialized = telemetry._to_json()
