@@ -131,6 +131,7 @@ class CommandTracer(monitoring.CommandListener):
 
             db_data = _get_db_data(event)
 
+            lsid = command.pop("lsid", None)
             if not should_send_default_pii():
                 command = _strip_pii(command)
 
@@ -184,8 +185,8 @@ class CommandTracer(monitoring.CommandListener):
                 data.update(db_data)
 
                 try:
-                    lsid = command.pop("lsid")["id"]
-                    data["operation_ids"]["session"] = str(lsid)
+                    lsid_id = lsid["id"]
+                    data["operation_ids"]["session"] = str(lsid_id)
                 except KeyError:
                     pass
 
