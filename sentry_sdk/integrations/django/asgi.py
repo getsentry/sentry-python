@@ -21,6 +21,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
 )
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 from typing import TYPE_CHECKING
 
@@ -182,12 +183,25 @@ def wrap_async_view(callback: "Any") -> "Any":
         if not integration or not integration.middleware_spans:
             return await callback(request, *args, **kwargs)
 
-        with sentry_sdk.start_span(
-            op=OP.VIEW_RENDER,
-            name=request.resolver_match.view_name,
-            origin=DjangoIntegration.origin,
-        ):
-            return await callback(request, *args, **kwargs)
+        client = sentry_sdk.get_client()
+        span_streaming = has_span_streaming_enabled(client.options)
+
+        if span_streaming:
+            with sentry_sdk.traces.start_span(
+                name=request.resolver_match.view_name,
+                attributes={
+                    "sentry.op": OP.VIEW_RENDER,
+                    "sentry.origin": DjangoIntegration.origin,
+                },
+            ):
+                return await callback(request, *args, **kwargs)
+        else:
+            with sentry_sdk.start_span(
+                op=OP.VIEW_RENDER,
+                name=request.resolver_match.view_name,
+                origin=DjangoIntegration.origin,
+            ):
+                return await callback(request, *args, **kwargs)
 
     return sentry_wrapped_callback
 

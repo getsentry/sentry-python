@@ -2,6 +2,7 @@ import functools
 
 import sentry_sdk
 from sentry_sdk.consts import OP
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 from typing import TYPE_CHECKING
 
@@ -30,12 +31,25 @@ def patch_views() -> None:
     old_render = SimpleTemplateResponse.render
 
     def sentry_patched_render(self: "SimpleTemplateResponse") -> "Any":
-        with sentry_sdk.start_span(
-            op=OP.VIEW_RESPONSE_RENDER,
-            name="serialize response",
-            origin=DjangoIntegration.origin,
-        ):
-            return old_render(self)
+        client = sentry_sdk.get_client()
+        span_streaming = has_span_streaming_enabled(client.options)
+
+        if span_streaming:
+            with sentry_sdk.traces.start_span(
+                name="serialize response",
+                attributes={
+                    "sentry.op": OP.VIEW_RESPONSE_RENDER,
+                    "sentry.origin": DjangoIntegration.origin,
+                },
+            ):
+                return old_render(self)
+        else:
+            with sentry_sdk.start_span(
+                op=OP.VIEW_RESPONSE_RENDER,
+                name="serialize response",
+                origin=DjangoIntegration.origin,
+            ):
+                return old_render(self)
 
     @functools.wraps(old_make_view_atomic)
     def sentry_patched_make_view_atomic(
@@ -86,11 +100,24 @@ def _wrap_sync_view(callback: "Any") -> "Any":
         if not integration or not integration.middleware_spans:
             return callback(request, *args, **kwargs)
 
-        with sentry_sdk.start_span(
-            op=OP.VIEW_RENDER,
-            name=request.resolver_match.view_name,
-            origin=DjangoIntegration.origin,
-        ):
-            return callback(request, *args, **kwargs)
+        client = sentry_sdk.get_client()
+        span_streaming = has_span_streaming_enabled(client.options)
+
+        if span_streaming:
+            with sentry_sdk.traces.start_span(
+                name=request.resolver_match.view_name,
+                attributes={
+                    "sentry.op": OP.VIEW_RENDER,
+                    "sentry.origin": DjangoIntegration.origin,
+                },
+            ):
+                return callback(request, *args, **kwargs)
+        else:
+            with sentry_sdk.start_span(
+                op=OP.VIEW_RENDER,
+                name=request.resolver_match.view_name,
+                origin=DjangoIntegration.origin,
+            ):
+                return callback(request, *args, **kwargs)
 
     return sentry_wrapped_callback

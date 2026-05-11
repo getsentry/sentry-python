@@ -7,12 +7,13 @@ from functools import wraps
 from django import VERSION as DJANGO_VERSION
 
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.utils import (
     ContextVar,
     transaction_from_function,
     capture_internal_exceptions,
 )
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 from typing import TYPE_CHECKING
 
@@ -80,13 +81,26 @@ def _wrap_middleware(middleware: "Any", middleware_name: str) -> "Any":
         if function_basename:
             description = "{}.{}".format(description, function_basename)
 
-        middleware_span = sentry_sdk.start_span(
-            op=OP.MIDDLEWARE_DJANGO,
-            name=description,
-            origin=DjangoIntegration.origin,
-        )
-        middleware_span.set_tag("django.function_name", function_name)
-        middleware_span.set_tag("django.middleware_name", middleware_name)
+        client = sentry_sdk.get_client()
+        span_streaming = has_span_streaming_enabled(client.options)
+
+        if span_streaming:
+            middleware_span = sentry_sdk.traces.start_span(
+                name=description,
+                attributes={
+                    "sentry.op": OP.MIDDLEWARE_DJANGO,
+                    "sentry.origin": DjangoIntegration.origin,
+                },
+            )
+            middleware_span.set_attribute(SPANDATA.MIDDLEWARE_NAME, middleware_name)
+        else:
+            middleware_span = sentry_sdk.start_span(
+                op=OP.MIDDLEWARE_DJANGO,
+                name=description,
+                origin=DjangoIntegration.origin,
+            )
+            middleware_span.set_tag("django.function_name", function_name)
+            middleware_span.set_tag("django.middleware_name", middleware_name)
 
         return middleware_span
 
