@@ -6,7 +6,10 @@ from typing import Any, TypeVar, Callable, Awaitable
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
-from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
+from sentry_sdk.tracing_utils import (
+    add_query_source,
+    record_sql_queries_supporting_streaming,
+)
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     parse_version,
@@ -80,7 +83,7 @@ def _wrap_execute(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
         params_list = params if integration and integration._record_params else None
         param_style = "pyformat" if params_list else None
 
-        with record_sql_queries(
+        with record_sql_queries_supporting_streaming(
             cursor=None,
             query=query_str,
             params_list=params_list,
@@ -123,7 +126,7 @@ def _wrap_executemany(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable
         # Prevent double-recording: _do_execute_many calls self.execute internally
         cursor._sentry_skip_next_execute = True
         try:
-            with record_sql_queries(
+            with record_sql_queries_supporting_streaming(
                 cursor=None,
                 query=query_str,
                 params_list=params_list,
