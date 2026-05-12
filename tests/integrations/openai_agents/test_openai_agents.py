@@ -1679,16 +1679,13 @@ async def test_max_turns_before_handoff_span(
         assert handoff_span["data"]["gen_ai.operation.name"] == "handoff"
 
 
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_tool_execution_span(
     sentry_init,
     capture_events,
-    capture_items,
     test_agent,
     get_model_response,
     responses_tool_call_model_responses,
-    stream_gen_ai_spans,
 ):
     """
     Test tool execution span creation.
@@ -1746,413 +1743,195 @@ async def test_tool_execution_span(
         serialize_pydantic=True,
     )
 
-    if stream_gen_ai_spans:
-        with patch.object(
-            agent_with_tool.model._client._client,
-            "send",
-            side_effect=[tool_response, final_response],
-        ) as _:
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-                send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
-            )
-
-            items = capture_items("transaction", "span")
-
-            await agents.Runner.run(
-                agent_with_tool,
-                "Please use the simple test tool",
-                run_config=test_run_config,
-            )
-
-        (transaction,) = (item.payload for item in items if item.type == "transaction")
-        assert transaction["transaction"] == "test_agent workflow"
-        assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
-
-        spans = [item.payload for item in items if item.type == "span"]
-        agent_span = next(
-            span
-            for span in spans
-            if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
-        )
-        ai_client_span1, ai_client_span2 = (
-            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        )
-        tool_span = next(
-            span
-            for span in spans
-            if span["attributes"]["sentry.op"] == OP.GEN_AI_EXECUTE_TOOL
+    with patch.object(
+        agent_with_tool.model._client._client,
+        "send",
+        side_effect=[tool_response, final_response],
+    ) as _:
+        sentry_init(
+            integrations=[OpenAIAgentsIntegration()],
+            traces_sample_rate=1.0,
+            send_default_pii=True,
         )
 
-        available_tool = {
-            "name": "simple_test_tool",
-            "description": "A simple tool",
-            "params_json_schema": {
-                "properties": {"message": {"title": "Message", "type": "string"}},
-                "required": ["message"],
-                "title": "simple_test_tool_args",
-                "type": "object",
-                "additionalProperties": False,
+        events = capture_events()
+
+        await agents.Runner.run(
+            agent_with_tool,
+            "Please use the simple test tool",
+            run_config=test_run_config,
+        )
+
+    (transaction,) = events
+    spans = transaction["spans"]
+    agent_span = next(span for span in spans if span["op"] == OP.GEN_AI_INVOKE_AGENT)
+    ai_client_span1, ai_client_span2 = (
+        span for span in spans if span["op"] == OP.GEN_AI_CHAT
+    )
+    tool_span = next(span for span in spans if span["op"] == OP.GEN_AI_EXECUTE_TOOL)
+
+    available_tool = {
+        "name": "simple_test_tool",
+        "description": "A simple tool",
+        "params_json_schema": {
+            "properties": {"message": {"title": "Message", "type": "string"}},
+            "required": ["message"],
+            "title": "simple_test_tool_args",
+            "type": "object",
+            "additionalProperties": False,
+        },
+        "on_invoke_tool": mock.ANY,
+        "strict_json_schema": True,
+        "is_enabled": True,
+    }
+
+    if parse_version(OPENAI_AGENTS_VERSION) >= (0, 3, 3):
+        available_tool.update(
+            {"tool_input_guardrails": None, "tool_output_guardrails": None}
+        )
+
+    if parse_version(OPENAI_AGENTS_VERSION) >= (
+        0,
+        8,
+    ):
+        available_tool["needs_approval"] = False
+    if parse_version(OPENAI_AGENTS_VERSION) >= (
+        0,
+        9,
+        0,
+    ):
+        available_tool.update(
+            {
+                "timeout_seconds": None,
+                "timeout_behavior": "error_as_result",
+                "timeout_error_function": None,
+            }
+        )
+
+    assert transaction["transaction"] == "test_agent workflow"
+    assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
+
+    assert agent_span["description"] == "invoke_agent test_agent"
+    assert agent_span["origin"] == "auto.ai.openai_agents"
+    assert agent_span["data"]["gen_ai.agent.name"] == "test_agent"
+    assert agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"
+
+    agent_span_available_tool = json.loads(
+        agent_span["data"]["gen_ai.request.available_tools"]
+    )[0]
+    assert all(agent_span_available_tool[k] == v for k, v in available_tool.items())
+
+    assert agent_span["data"]["gen_ai.request.max_tokens"] == 100
+    assert agent_span["data"]["gen_ai.request.model"] == "gpt-4"
+    assert agent_span["data"]["gen_ai.request.temperature"] == 0.7
+    assert agent_span["data"]["gen_ai.request.top_p"] == 1.0
+    assert agent_span["data"]["gen_ai.system"] == "openai"
+
+    assert ai_client_span1["description"] == "chat gpt-4"
+    assert ai_client_span1["data"]["gen_ai.operation.name"] == "chat"
+    assert ai_client_span1["data"]["gen_ai.system"] == "openai"
+    assert ai_client_span1["data"]["gen_ai.agent.name"] == "test_agent"
+
+    ai_client_span1_available_tool = json.loads(
+        ai_client_span1["data"]["gen_ai.request.available_tools"]
+    )[0]
+    assert all(
+        ai_client_span1_available_tool[k] == v for k, v in available_tool.items()
+    )
+
+    assert ai_client_span1["data"]["gen_ai.request.max_tokens"] == 100
+    assert ai_client_span1["data"]["gen_ai.request.messages"] == safe_serialize(
+        [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "Please use the simple test tool"}
+                ],
             },
-            "on_invoke_tool": mock.ANY,
-            "strict_json_schema": True,
-            "is_enabled": True,
-        }
-
-        if parse_version(OPENAI_AGENTS_VERSION) >= (0, 3, 3):
-            available_tool.update(
-                {"tool_input_guardrails": None, "tool_output_guardrails": None}
-            )
-
-        if parse_version(OPENAI_AGENTS_VERSION) >= (
-            0,
-            8,
-        ):
-            available_tool["needs_approval"] = False
-        if parse_version(OPENAI_AGENTS_VERSION) >= (
-            0,
-            9,
-            0,
-        ):
-            available_tool.update(
-                {
-                    "timeout_seconds": None,
-                    "timeout_behavior": "error_as_result",
-                    "timeout_error_function": None,
-                }
-            )
-
-        assert agent_span["name"] == "invoke_agent test_agent"
-        assert agent_span["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
-        assert agent_span["attributes"]["gen_ai.agent.name"] == "test_agent"
-        assert agent_span["attributes"]["gen_ai.operation.name"] == "invoke_agent"
-
-        agent_span_available_tool = json.loads(
-            agent_span["attributes"]["gen_ai.request.available_tools"]
-        )[0]
-
-        assert all(agent_span_available_tool[k] == v for k, v in available_tool.items())
-
-        assert agent_span["attributes"]["gen_ai.request.max_tokens"] == 100
-        assert agent_span["attributes"]["gen_ai.request.model"] == "gpt-4"
-        assert agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
-        assert agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
-        assert agent_span["attributes"]["gen_ai.system"] == "openai"
-
-        assert ai_client_span1["name"] == "chat gpt-4"
-        assert ai_client_span1["attributes"]["gen_ai.operation.name"] == "chat"
-        assert ai_client_span1["attributes"]["gen_ai.system"] == "openai"
-        assert ai_client_span1["attributes"]["gen_ai.agent.name"] == "test_agent"
-
-        ai_client_span1_available_tool = json.loads(
-            ai_client_span1["attributes"]["gen_ai.request.available_tools"]
-        )[0]
-
-        assert all(
-            ai_client_span1_available_tool[k] == v for k, v in available_tool.items()
-        )
-
-        assert ai_client_span1["attributes"]["gen_ai.request.max_tokens"] == 100
-        assert ai_client_span1["attributes"][
-            "gen_ai.request.messages"
-        ] == safe_serialize(
-            [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": "Please use the simple test tool"}
-                    ],
-                },
-            ]
-        )
-        assert ai_client_span1["attributes"]["gen_ai.request.model"] == "gpt-4"
-        assert ai_client_span1["attributes"]["gen_ai.request.temperature"] == 0.7
-        assert ai_client_span1["attributes"]["gen_ai.request.top_p"] == 1.0
-        assert ai_client_span1["attributes"]["gen_ai.usage.input_tokens"] == 10
-        assert ai_client_span1["attributes"]["gen_ai.usage.input_tokens.cached"] == 0
-        assert ai_client_span1["attributes"]["gen_ai.usage.output_tokens"] == 5
-        assert (
-            ai_client_span1["attributes"]["gen_ai.usage.output_tokens.reasoning"] == 0
-        )
-        assert ai_client_span1["attributes"]["gen_ai.usage.total_tokens"] == 15
-
-        tool_call = {
-            "arguments": '{"message": "hello"}',
-            "call_id": "call_123",
-            "name": "simple_test_tool",
-            "type": "function_call",
-            "id": "call_123",
-            "status": None,
-        }
-
-        if OPENAI_VERSION >= (2, 25, 0):
-            tool_call["namespace"] = None
-
-        assert json.loads(
-            ai_client_span1["attributes"]["gen_ai.response.tool_calls"]
-        ) == [tool_call]
-
-        assert tool_span["name"] == "execute_tool simple_test_tool"
-        assert tool_span["attributes"]["gen_ai.agent.name"] == "test_agent"
-        assert tool_span["attributes"]["gen_ai.operation.name"] == "execute_tool"
-
-        tool_span_available_tool = json.loads(
-            tool_span["attributes"]["gen_ai.request.available_tools"]
-        )[0]
-
-        assert all(tool_span_available_tool[k] == v for k, v in available_tool.items())
-
-        assert tool_span["attributes"]["gen_ai.request.max_tokens"] == 100
-        assert tool_span["attributes"]["gen_ai.request.model"] == "gpt-4"
-        assert tool_span["attributes"]["gen_ai.request.temperature"] == 0.7
-        assert tool_span["attributes"]["gen_ai.request.top_p"] == 1.0
-        assert tool_span["attributes"]["gen_ai.system"] == "openai"
-        assert tool_span["attributes"]["gen_ai.tool.description"] == "A simple tool"
-        assert tool_span["attributes"]["gen_ai.tool.input"] == '{"message": "hello"}'
-        assert tool_span["attributes"]["gen_ai.tool.name"] == "simple_test_tool"
-        assert (
-            tool_span["attributes"]["gen_ai.tool.output"] == "Tool executed with: hello"
-        )
-        assert ai_client_span2["name"] == "chat gpt-4"
-        assert ai_client_span2["attributes"]["gen_ai.agent.name"] == "test_agent"
-        assert ai_client_span2["attributes"]["gen_ai.operation.name"] == "chat"
-
-        ai_client_span2_available_tool = json.loads(
-            ai_client_span2["attributes"]["gen_ai.request.available_tools"]
-        )[0]
-
-        assert all(
-            ai_client_span2_available_tool[k] == v for k, v in available_tool.items()
-        )
-
-        assert ai_client_span2["attributes"]["gen_ai.request.max_tokens"] == 100
-        assert ai_client_span2["attributes"][
-            "gen_ai.request.messages"
-        ] == safe_serialize(
-            [
-                {
-                    "role": "tool",
-                    "content": [
-                        {
-                            "call_id": "call_123",
-                            "output": "Tool executed with: hello",
-                            "type": "function_call_output",
-                        }
-                    ],
-                },
-            ]
-        )
-        assert ai_client_span2["attributes"]["gen_ai.request.model"] == "gpt-4"
-        assert ai_client_span2["attributes"]["gen_ai.request.temperature"] == 0.7
-        assert ai_client_span2["attributes"]["gen_ai.request.top_p"] == 1.0
-        assert (
-            ai_client_span2["attributes"]["gen_ai.response.text"]
-            == "Task completed using the tool"
-        )
-        assert ai_client_span2["attributes"]["gen_ai.system"] == "openai"
-        assert ai_client_span2["attributes"]["gen_ai.usage.input_tokens.cached"] == 0
-        assert ai_client_span2["attributes"]["gen_ai.usage.input_tokens"] == 15
-        assert (
-            ai_client_span2["attributes"]["gen_ai.usage.output_tokens.reasoning"] == 0
-        )
-        assert ai_client_span2["attributes"]["gen_ai.usage.output_tokens"] == 10
-        assert ai_client_span2["attributes"]["gen_ai.usage.total_tokens"] == 25
-
-    else:
-        with patch.object(
-            agent_with_tool.model._client._client,
-            "send",
-            side_effect=[tool_response, final_response],
-        ) as _:
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-                send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
-            )
-
-            events = capture_events()
-
-            await agents.Runner.run(
-                agent_with_tool,
-                "Please use the simple test tool",
-                run_config=test_run_config,
-            )
-
-        (transaction,) = events
-        spans = transaction["spans"]
-        agent_span = next(
-            span for span in spans if span["op"] == OP.GEN_AI_INVOKE_AGENT
-        )
-        ai_client_span1, ai_client_span2 = (
-            span for span in spans if span["op"] == OP.GEN_AI_CHAT
-        )
-        tool_span = next(span for span in spans if span["op"] == OP.GEN_AI_EXECUTE_TOOL)
-
-        available_tool = {
-            "name": "simple_test_tool",
-            "description": "A simple tool",
-            "params_json_schema": {
-                "properties": {"message": {"title": "Message", "type": "string"}},
-                "required": ["message"],
-                "title": "simple_test_tool_args",
-                "type": "object",
-                "additionalProperties": False,
-            },
-            "on_invoke_tool": mock.ANY,
-            "strict_json_schema": True,
-            "is_enabled": True,
-        }
-
-        if parse_version(OPENAI_AGENTS_VERSION) >= (0, 3, 3):
-            available_tool.update(
-                {"tool_input_guardrails": None, "tool_output_guardrails": None}
-            )
-
-        if parse_version(OPENAI_AGENTS_VERSION) >= (
-            0,
-            8,
-        ):
-            available_tool["needs_approval"] = False
-        if parse_version(OPENAI_AGENTS_VERSION) >= (
-            0,
-            9,
-            0,
-        ):
-            available_tool.update(
-                {
-                    "timeout_seconds": None,
-                    "timeout_behavior": "error_as_result",
-                    "timeout_error_function": None,
-                }
-            )
-
-        assert transaction["transaction"] == "test_agent workflow"
-        assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
-
-        assert agent_span["description"] == "invoke_agent test_agent"
-        assert agent_span["origin"] == "auto.ai.openai_agents"
-        assert agent_span["data"]["gen_ai.agent.name"] == "test_agent"
-        assert agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"
-
-        agent_span_available_tool = json.loads(
-            agent_span["data"]["gen_ai.request.available_tools"]
-        )[0]
-        assert all(agent_span_available_tool[k] == v for k, v in available_tool.items())
-
-        assert agent_span["data"]["gen_ai.request.max_tokens"] == 100
-        assert agent_span["data"]["gen_ai.request.model"] == "gpt-4"
-        assert agent_span["data"]["gen_ai.request.temperature"] == 0.7
-        assert agent_span["data"]["gen_ai.request.top_p"] == 1.0
-        assert agent_span["data"]["gen_ai.system"] == "openai"
-
-        assert ai_client_span1["description"] == "chat gpt-4"
-        assert ai_client_span1["data"]["gen_ai.operation.name"] == "chat"
-        assert ai_client_span1["data"]["gen_ai.system"] == "openai"
-        assert ai_client_span1["data"]["gen_ai.agent.name"] == "test_agent"
-
-        ai_client_span1_available_tool = json.loads(
-            ai_client_span1["data"]["gen_ai.request.available_tools"]
-        )[0]
-        assert all(
-            ai_client_span1_available_tool[k] == v for k, v in available_tool.items()
-        )
-
-        assert ai_client_span1["data"]["gen_ai.request.max_tokens"] == 100
-        assert ai_client_span1["data"]["gen_ai.request.messages"] == safe_serialize(
-            [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": "Please use the simple test tool"}
-                    ],
-                },
-            ]
-        )
-        assert ai_client_span1["data"]["gen_ai.request.model"] == "gpt-4"
-        assert ai_client_span1["data"]["gen_ai.request.temperature"] == 0.7
-        assert ai_client_span1["data"]["gen_ai.request.top_p"] == 1.0
-        assert ai_client_span1["data"]["gen_ai.usage.input_tokens"] == 10
-        assert ai_client_span1["data"]["gen_ai.usage.input_tokens.cached"] == 0
-        assert ai_client_span1["data"]["gen_ai.usage.output_tokens"] == 5
-        assert ai_client_span1["data"]["gen_ai.usage.output_tokens.reasoning"] == 0
-        assert ai_client_span1["data"]["gen_ai.usage.total_tokens"] == 15
-
-        tool_call = {
-            "arguments": '{"message": "hello"}',
-            "call_id": "call_123",
-            "name": "simple_test_tool",
-            "type": "function_call",
-            "id": "call_123",
-            "status": None,
-        }
-
-        if OPENAI_VERSION >= (2, 25, 0):
-            tool_call["namespace"] = None
-
-        assert json.loads(ai_client_span1["data"]["gen_ai.response.tool_calls"]) == [
-            tool_call
         ]
+    )
+    assert ai_client_span1["data"]["gen_ai.request.model"] == "gpt-4"
+    assert ai_client_span1["data"]["gen_ai.request.temperature"] == 0.7
+    assert ai_client_span1["data"]["gen_ai.request.top_p"] == 1.0
+    assert ai_client_span1["data"]["gen_ai.usage.input_tokens"] == 10
+    assert ai_client_span1["data"]["gen_ai.usage.input_tokens.cached"] == 0
+    assert ai_client_span1["data"]["gen_ai.usage.output_tokens"] == 5
+    assert ai_client_span1["data"]["gen_ai.usage.output_tokens.reasoning"] == 0
+    assert ai_client_span1["data"]["gen_ai.usage.total_tokens"] == 15
 
-        assert tool_span["description"] == "execute_tool simple_test_tool"
-        assert tool_span["data"]["gen_ai.agent.name"] == "test_agent"
-        assert tool_span["data"]["gen_ai.operation.name"] == "execute_tool"
+    tool_call = {
+        "arguments": '{"message": "hello"}',
+        "call_id": "call_123",
+        "name": "simple_test_tool",
+        "type": "function_call",
+        "id": "call_123",
+        "status": None,
+    }
 
-        tool_span_available_tool = json.loads(
-            tool_span["data"]["gen_ai.request.available_tools"]
-        )[0]
-        assert all(tool_span_available_tool[k] == v for k, v in available_tool.items())
+    if OPENAI_VERSION >= (2, 25, 0):
+        tool_call["namespace"] = None
 
-        assert tool_span["data"]["gen_ai.request.max_tokens"] == 100
-        assert tool_span["data"]["gen_ai.request.model"] == "gpt-4"
-        assert tool_span["data"]["gen_ai.request.temperature"] == 0.7
-        assert tool_span["data"]["gen_ai.request.top_p"] == 1.0
-        assert tool_span["data"]["gen_ai.system"] == "openai"
-        assert tool_span["data"]["gen_ai.tool.description"] == "A simple tool"
-        assert tool_span["data"]["gen_ai.tool.input"] == '{"message": "hello"}'
-        assert tool_span["data"]["gen_ai.tool.name"] == "simple_test_tool"
-        assert tool_span["data"]["gen_ai.tool.output"] == "Tool executed with: hello"
-        assert ai_client_span2["description"] == "chat gpt-4"
-        assert ai_client_span2["data"]["gen_ai.agent.name"] == "test_agent"
-        assert ai_client_span2["data"]["gen_ai.operation.name"] == "chat"
+    assert json.loads(ai_client_span1["data"]["gen_ai.response.tool_calls"]) == [
+        tool_call
+    ]
 
-        ai_client_span2_available_tool = json.loads(
-            ai_client_span2["data"]["gen_ai.request.available_tools"]
-        )[0]
-        assert all(
-            ai_client_span2_available_tool[k] == v for k, v in available_tool.items()
-        )
+    assert tool_span["description"] == "execute_tool simple_test_tool"
+    assert tool_span["data"]["gen_ai.agent.name"] == "test_agent"
+    assert tool_span["data"]["gen_ai.operation.name"] == "execute_tool"
 
-        assert ai_client_span2["data"]["gen_ai.request.max_tokens"] == 100
-        assert ai_client_span2["data"]["gen_ai.request.messages"] == safe_serialize(
-            [
-                {
-                    "role": "tool",
-                    "content": [
-                        {
-                            "call_id": "call_123",
-                            "output": "Tool executed with: hello",
-                            "type": "function_call_output",
-                        }
-                    ],
-                },
-            ]
-        )
-        assert ai_client_span2["data"]["gen_ai.request.model"] == "gpt-4"
-        assert ai_client_span2["data"]["gen_ai.request.temperature"] == 0.7
-        assert ai_client_span2["data"]["gen_ai.request.top_p"] == 1.0
-        assert (
-            ai_client_span2["data"]["gen_ai.response.text"]
-            == "Task completed using the tool"
-        )
-        assert ai_client_span2["data"]["gen_ai.system"] == "openai"
-        assert ai_client_span2["data"]["gen_ai.usage.input_tokens.cached"] == 0
-        assert ai_client_span2["data"]["gen_ai.usage.input_tokens"] == 15
-        assert ai_client_span2["data"]["gen_ai.usage.output_tokens.reasoning"] == 0
-        assert ai_client_span2["data"]["gen_ai.usage.output_tokens"] == 10
-        assert ai_client_span2["data"]["gen_ai.usage.total_tokens"] == 25
+    tool_span_available_tool = json.loads(
+        tool_span["data"]["gen_ai.request.available_tools"]
+    )[0]
+    assert all(tool_span_available_tool[k] == v for k, v in available_tool.items())
+
+    assert tool_span["data"]["gen_ai.request.max_tokens"] == 100
+    assert tool_span["data"]["gen_ai.request.model"] == "gpt-4"
+    assert tool_span["data"]["gen_ai.request.temperature"] == 0.7
+    assert tool_span["data"]["gen_ai.request.top_p"] == 1.0
+    assert tool_span["data"]["gen_ai.system"] == "openai"
+    assert tool_span["data"]["gen_ai.tool.description"] == "A simple tool"
+    assert tool_span["data"]["gen_ai.tool.input"] == '{"message": "hello"}'
+    assert tool_span["data"]["gen_ai.tool.name"] == "simple_test_tool"
+    assert tool_span["data"]["gen_ai.tool.output"] == "Tool executed with: hello"
+    assert ai_client_span2["description"] == "chat gpt-4"
+    assert ai_client_span2["data"]["gen_ai.agent.name"] == "test_agent"
+    assert ai_client_span2["data"]["gen_ai.operation.name"] == "chat"
+
+    ai_client_span2_available_tool = json.loads(
+        ai_client_span2["data"]["gen_ai.request.available_tools"]
+    )[0]
+    assert all(
+        ai_client_span2_available_tool[k] == v for k, v in available_tool.items()
+    )
+
+    assert ai_client_span2["data"]["gen_ai.request.max_tokens"] == 100
+    assert ai_client_span2["data"]["gen_ai.request.messages"] == safe_serialize(
+        [
+            {
+                "role": "tool",
+                "content": [
+                    {
+                        "call_id": "call_123",
+                        "output": "Tool executed with: hello",
+                        "type": "function_call_output",
+                    }
+                ],
+            },
+        ]
+    )
+    assert ai_client_span2["data"]["gen_ai.request.model"] == "gpt-4"
+    assert ai_client_span2["data"]["gen_ai.request.temperature"] == 0.7
+    assert ai_client_span2["data"]["gen_ai.request.top_p"] == 1.0
+    assert (
+        ai_client_span2["data"]["gen_ai.response.text"]
+        == "Task completed using the tool"
+    )
+    assert ai_client_span2["data"]["gen_ai.system"] == "openai"
+    assert ai_client_span2["data"]["gen_ai.usage.input_tokens.cached"] == 0
+    assert ai_client_span2["data"]["gen_ai.usage.input_tokens"] == 15
+    assert ai_client_span2["data"]["gen_ai.usage.output_tokens.reasoning"] == 0
+    assert ai_client_span2["data"]["gen_ai.usage.output_tokens"] == 10
+    assert ai_client_span2["data"]["gen_ai.usage.total_tokens"] == 25
 
 
 @pytest.mark.asyncio

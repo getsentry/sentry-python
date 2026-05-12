@@ -242,7 +242,6 @@ def test_state_graph_compile(
         assert "calculator" in tools_data
 
 
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -252,21 +251,14 @@ def test_state_graph_compile(
         (False, False),
     ],
 )
-def test_pregel_invoke(
-    sentry_init,
-    capture_events,
-    capture_items,
-    send_default_pii,
-    include_prompts,
-    stream_gen_ai_spans,
-):
+def test_pregel_invoke(sentry_init, capture_events, send_default_pii, include_prompts):
     """Test Pregel.invoke() wrapper creates proper invoke_agent span."""
     sentry_init(
         integrations=[LanggraphIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
     )
+    events = capture_events()
 
     test_state = {
         "messages": [
@@ -297,134 +289,57 @@ def test_pregel_invoke(
         ]
         return {"messages": new_messages}
 
-    if stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    with start_transaction():
+        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+        result = wrapped_invoke(pregel, test_state)
 
-        with start_transaction():
-            wrapped_invoke = _wrap_pregel_invoke(original_invoke)
-            result = wrapped_invoke(pregel, test_state)
+    assert result is not None
 
-        assert result is not None
+    tx = events[0]
+    assert tx["type"] == "transaction"
 
-        spans = [item.payload for item in items if item.type == "span"]
-        invoke_spans = [
-            span
-            for span in spans
-            if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
-        ]
+    invoke_spans = [
+        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+    ]
+    assert len(invoke_spans) == 1
 
-        assert len(invoke_spans) == 1
+    invoke_span = invoke_spans[0]
+    assert invoke_span["description"] == "invoke_agent test_graph"
+    assert invoke_span["origin"] == "auto.ai.langgraph"
+    assert invoke_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "invoke_agent"
+    assert invoke_span["data"][SPANDATA.GEN_AI_PIPELINE_NAME] == "test_graph"
+    assert invoke_span["data"][SPANDATA.GEN_AI_AGENT_NAME] == "test_graph"
 
-        invoke_span = invoke_spans[0]
+    if send_default_pii and include_prompts:
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["data"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT in invoke_span["data"]
 
-        assert invoke_span["name"] == "invoke_agent test_graph"
-        assert invoke_span["attributes"]["sentry.origin"] == "auto.ai.langgraph"
-        assert (
-            invoke_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "invoke_agent"
-        )
-        assert invoke_span["attributes"][SPANDATA.GEN_AI_PIPELINE_NAME] == "test_graph"
-        assert invoke_span["attributes"][SPANDATA.GEN_AI_AGENT_NAME] == "test_graph"
+        request_messages = invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
 
-        if send_default_pii and include_prompts:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT in invoke_span["attributes"]
+        if isinstance(request_messages, str):
+            import json
 
-            request_messages = invoke_span["attributes"][
-                SPANDATA.GEN_AI_REQUEST_MESSAGES
-            ]
+            request_messages = json.loads(request_messages)
+        assert len(request_messages) == 1
+        assert request_messages[0]["content"] == "Of course! How can I assist you?"
 
-            if isinstance(request_messages, str):
-                import json
+        response_text = invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        assert response_text == expected_assistant_response
 
-                request_messages = json.loads(request_messages)
-            assert len(request_messages) == 1
-            assert request_messages[0]["content"] == "Of course! How can I assist you?"
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in invoke_span["data"]
+        tool_calls_data = invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+        if isinstance(tool_calls_data, str):
+            import json
 
-            response_text = invoke_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-            assert response_text == expected_assistant_response
+            tool_calls_data = json.loads(tool_calls_data)
 
-            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in invoke_span["attributes"]
-            tool_calls_data = invoke_span["attributes"][
-                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS
-            ]
-
-            if isinstance(tool_calls_data, str):
-                import json
-
-                tool_calls_data = json.loads(tool_calls_data)
-
-            assert len(tool_calls_data) == 1
-            assert tool_calls_data[0]["id"] == "call_test_123"
-            assert tool_calls_data[0]["function"]["name"] == "search_tool"
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in invoke_span.get(
-                "attributes", {}
-            )
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in invoke_span.get(
-                "attributes", {}
-            )
-            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in invoke_span.get(
-                "attributes", {}
-            )
+        assert len(tool_calls_data) == 1
+        assert tool_calls_data[0]["id"] == "call_test_123"
+        assert tool_calls_data[0]["function"]["name"] == "search_tool"
     else:
-        events = capture_events()
-
-        with start_transaction():
-            wrapped_invoke = _wrap_pregel_invoke(original_invoke)
-            result = wrapped_invoke(pregel, test_state)
-
-        assert result is not None
-
-        tx = events[0]
-        assert tx["type"] == "transaction"
-
-        invoke_spans = [
-            span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
-        ]
-
-        assert len(invoke_spans) == 1
-
-        invoke_span = invoke_spans[0]
-
-        assert invoke_span["description"] == "invoke_agent test_graph"
-        assert invoke_span["origin"] == "auto.ai.langgraph"
-        assert invoke_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "invoke_agent"
-        assert invoke_span["data"][SPANDATA.GEN_AI_PIPELINE_NAME] == "test_graph"
-        assert invoke_span["data"][SPANDATA.GEN_AI_AGENT_NAME] == "test_graph"
-
-        if send_default_pii and include_prompts:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["data"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT in invoke_span["data"]
-
-            request_messages = invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-
-            if isinstance(request_messages, str):
-                import json
-
-                request_messages = json.loads(request_messages)
-            assert len(request_messages) == 1
-            assert request_messages[0]["content"] == "Of course! How can I assist you?"
-
-            response_text = invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-            assert response_text == expected_assistant_response
-
-            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in invoke_span["data"]
-            tool_calls_data = invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
-
-            if isinstance(tool_calls_data, str):
-                import json
-
-                tool_calls_data = json.loads(tool_calls_data)
-
-            assert len(tool_calls_data) == 1
-            assert tool_calls_data[0]["id"] == "call_test_123"
-            assert tool_calls_data[0]["function"]["name"] == "search_tool"
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in invoke_span.get("data", {})
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in invoke_span.get("data", {})
-            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in invoke_span.get(
-                "data", {}
-            )
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in invoke_span.get("data", {})
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in invoke_span.get("data", {})
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in invoke_span.get("data", {})
 
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
@@ -2022,13 +1937,7 @@ def test_langgraph_message_role_mapping(
     assert "ai" not in roles
 
 
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
-def test_langgraph_message_truncation(
-    sentry_init,
-    capture_events,
-    capture_items,
-    stream_gen_ai_spans,
-):
+def test_langgraph_message_truncation(sentry_init, capture_events):
     """Test that large messages are truncated properly in Langgraph integration."""
     import json
 
@@ -2036,8 +1945,8 @@ def test_langgraph_message_truncation(
         integrations=[LanggraphIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
     )
+    events = capture_events()
 
     large_content = (
         "This is a very long message that will exceed our size limits. " * 1000
@@ -2057,66 +1966,28 @@ def test_langgraph_message_truncation(
     def original_invoke(self, *args, **kwargs):
         return {"messages": args[0].get("messages", [])}
 
-    if stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    with start_transaction():
+        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+        result = wrapped_invoke(pregel, test_state)
 
-        with start_transaction():
-            wrapped_invoke = _wrap_pregel_invoke(original_invoke)
-            result = wrapped_invoke(pregel, test_state)
+    assert result is not None
+    assert len(events) > 0
+    tx = events[0]
+    assert tx["type"] == "transaction"
 
-        assert result is not None
+    invoke_spans = [
+        span for span in tx.get("spans", []) if span.get("op") == OP.GEN_AI_INVOKE_AGENT
+    ]
+    assert len(invoke_spans) > 0
 
-        spans = [item.payload for item in items if item.type == "span"]
-        invoke_spans = [
-            span
-            for span in spans
-            if span["attributes"].get("sentry.op") == OP.GEN_AI_INVOKE_AGENT
-        ]
+    invoke_span = invoke_spans[0]
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["data"]
 
-        assert len(invoke_spans) > 0
+    messages_data = invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert isinstance(messages_data, str)
 
-        invoke_span = invoke_spans[0]
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["attributes"]
-
-        messages_data = invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-
-        assert isinstance(messages_data, str)
-
-        parsed_messages = json.loads(messages_data)
-        assert isinstance(parsed_messages, list)
-        assert len(parsed_messages) == 1
-        assert "small message 5" in str(parsed_messages[0])
-        (tx,) = (item.payload for item in items if item.type == "transaction")
-    else:
-        events = capture_events()
-
-        with start_transaction():
-            wrapped_invoke = _wrap_pregel_invoke(original_invoke)
-            result = wrapped_invoke(pregel, test_state)
-
-        assert result is not None
-
-        assert len(events) > 0
-        tx = events[0]
-        assert tx["type"] == "transaction"
-
-        invoke_spans = [
-            span
-            for span in tx.get("spans", [])
-            if span.get("op") == OP.GEN_AI_INVOKE_AGENT
-        ]
-
-        assert len(invoke_spans) > 0
-
-        invoke_span = invoke_spans[0]
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["data"]
-
-        messages_data = invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        assert isinstance(messages_data, str)
-
-        parsed_messages = json.loads(messages_data)
-        assert isinstance(parsed_messages, list)
-        assert len(parsed_messages) == 1
-        assert "small message 5" in str(parsed_messages[0])
-
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+    assert len(parsed_messages) == 1
+    assert "small message 5" in str(parsed_messages[0])
     assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5

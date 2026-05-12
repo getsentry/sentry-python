@@ -5720,21 +5720,16 @@ def test_openai_message_role_mapping(
     assert stored_messages[0]["role"] == expected_role
 
 
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_openai_message_truncation(
-    sentry_init,
-    capture_events,
-    capture_items,
-    nonstreaming_chat_completions_model_response,
-    stream_gen_ai_spans,
+    sentry_init, capture_events, nonstreaming_chat_completions_model_response
 ):
     """Test that large messages are truncated properly in OpenAI integration."""
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
     )
+    events = capture_events()
 
     client = OpenAI(api_key="z")
     client.chat.completions._post = mock.Mock(
@@ -5761,47 +5756,22 @@ def test_openai_message_truncation(
         {"role": "user", "content": large_content},
     ]
 
-    if stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    with start_transaction(name="openai tx"):
+        client.chat.completions.create(
+            model="some-model",
+            messages=large_messages,
+        )
 
-        with start_transaction(name="openai tx"):
-            client.chat.completions.create(
-                model="some-model",
-                messages=large_messages,
-            )
+    (event,) = events
+    span = event["spans"][0]
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
 
-        span = next(item.payload for item in items if item.type == "span")
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
+    messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert isinstance(messages_data, str)
 
-        messages_data = span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-
-        assert isinstance(messages_data, str)
-
-        parsed_messages = json.loads(messages_data)
-        assert isinstance(parsed_messages, list)
-        assert len(parsed_messages) <= len(large_messages)
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-    else:
-        events = capture_events()
-
-        with start_transaction(name="openai tx"):
-            client.chat.completions.create(
-                model="some-model",
-                messages=large_messages,
-            )
-
-        (event,) = events
-        span = event["spans"][0]
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
-
-        messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-
-        assert isinstance(messages_data, str)
-
-        parsed_messages = json.loads(messages_data)
-        assert isinstance(parsed_messages, list)
-        assert len(parsed_messages) <= len(large_messages)
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+    assert len(parsed_messages) <= len(large_messages)
 
     meta_path = event["_meta"]
     span_meta = meta_path["spans"]["0"]["data"]

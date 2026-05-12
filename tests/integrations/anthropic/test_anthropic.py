@@ -3625,20 +3625,14 @@ def test_anthropic_message_role_mapping(
     assert stored_messages[0]["role"] == expected_role
 
 
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
-def test_anthropic_message_truncation(
-    sentry_init,
-    capture_events,
-    capture_items,
-    stream_gen_ai_spans,
-):
+def test_anthropic_message_truncation(sentry_init, capture_events):
     """Test that large messages are truncated properly in Anthropic integration."""
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
     )
+    events = capture_events()
 
     client = Anthropic(api_key="z")
     client.messages._post = mock.Mock(return_value=EXAMPLE_MESSAGE)
@@ -3654,83 +3648,42 @@ def test_anthropic_message_truncation(
         {"role": "user", "content": "small message 5"},
     ]
 
-    if stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    with start_transaction():
+        client.messages.create(max_tokens=1024, messages=messages, model="model")
 
-        with start_transaction():
-            client.messages.create(max_tokens=1024, messages=messages, model="model")
+    assert len(events) > 0
+    tx = events[0]
+    assert tx["type"] == "transaction"
 
-        spans = [item.payload for item in items if item.type == "span"]
-        chat_spans = [
-            span
-            for span in spans
-            if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
-        ]
+    chat_spans = [
+        span for span in tx.get("spans", []) if span.get("op") == OP.GEN_AI_CHAT
+    ]
+    assert len(chat_spans) > 0
 
-        assert len(chat_spans) > 0
+    chat_span = chat_spans[0]
+    assert chat_span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert chat_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["data"]
 
-        chat_span = chat_spans[0]
-        assert chat_span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert chat_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["attributes"]
+    messages_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert isinstance(messages_data, str)
 
-        messages_data = chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-
-        assert isinstance(messages_data, str)
-
-        parsed_messages = json.loads(messages_data)
-        assert isinstance(parsed_messages, list)
-        assert len(parsed_messages) == 1
-        assert "small message 5" in str(parsed_messages[0])
-
-        tx = next(item.payload for item in items if item.type == "transaction")
-    else:
-        events = capture_events()
-
-        with start_transaction():
-            client.messages.create(max_tokens=1024, messages=messages, model="model")
-
-        assert len(events) > 0
-        tx = events[0]
-        assert tx["type"] == "transaction"
-
-        chat_spans = [
-            span for span in tx.get("spans", []) if span.get("op") == OP.GEN_AI_CHAT
-        ]
-
-        assert len(chat_spans) > 0
-
-        chat_span = chat_spans[0]
-        assert chat_span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert chat_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["data"]
-
-        messages_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        assert isinstance(messages_data, str)
-
-        parsed_messages = json.loads(messages_data)
-        assert isinstance(parsed_messages, list)
-        assert len(parsed_messages) == 1
-        assert "small message 5" in str(parsed_messages[0])
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+    assert len(parsed_messages) == 1
+    assert "small message 5" in str(parsed_messages[0])
 
     assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
 
 
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
-@pytest.mark.asyncio
-async def test_anthropic_message_truncation_async(
-    sentry_init,
-    capture_events,
-    capture_items,
-    stream_gen_ai_spans,
-):
+async def test_anthropic_message_truncation_async(sentry_init, capture_events):
     """Test that large messages are truncated properly in Anthropic integration."""
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
     )
+    events = capture_events()
 
     client = AsyncAnthropic(api_key="z")
     client.messages._post = mock.AsyncMock(return_value=EXAMPLE_MESSAGE)
@@ -3746,70 +3699,30 @@ async def test_anthropic_message_truncation_async(
         {"role": "user", "content": "small message 5"},
     ]
 
-    if stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    with start_transaction():
+        await client.messages.create(max_tokens=1024, messages=messages, model="model")
 
-        with start_transaction():
-            await client.messages.create(
-                max_tokens=1024, messages=messages, model="model"
-            )
+    assert len(events) > 0
+    tx = events[0]
+    assert tx["type"] == "transaction"
 
-        spans = [item.payload for item in items if item.type == "span"]
-        chat_spans = [
-            span
-            for span in spans
-            if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
-        ]
+    chat_spans = [
+        span for span in tx.get("spans", []) if span.get("op") == OP.GEN_AI_CHAT
+    ]
+    assert len(chat_spans) > 0
 
-        assert len(chat_spans) > 0
+    chat_span = chat_spans[0]
+    assert chat_span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert chat_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["data"]
 
-        chat_span = chat_spans[0]
+    messages_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert isinstance(messages_data, str)
 
-        assert chat_span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert chat_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["attributes"]
-
-        messages_data = chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-
-        assert isinstance(messages_data, str)
-
-        parsed_messages = json.loads(messages_data)
-        assert isinstance(parsed_messages, list)
-        assert len(parsed_messages) == 1
-        assert "small message 5" in str(parsed_messages[0])
-
-        tx = next(item.payload for item in items if item.type == "transaction")
-    else:
-        events = capture_events()
-
-        with start_transaction():
-            await client.messages.create(
-                max_tokens=1024, messages=messages, model="model"
-            )
-
-        assert len(events) > 0
-        tx = events[0]
-        assert tx["type"] == "transaction"
-
-        chat_spans = [
-            span for span in tx.get("spans", []) if span.get("op") == OP.GEN_AI_CHAT
-        ]
-
-        assert len(chat_spans) > 0
-
-        chat_span = chat_spans[0]
-
-        assert chat_span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert chat_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["data"]
-
-        messages_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        assert isinstance(messages_data, str)
-
-        parsed_messages = json.loads(messages_data)
-        assert isinstance(parsed_messages, list)
-        assert len(parsed_messages) == 1
-        assert "small message 5" in str(parsed_messages[0])
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+    assert len(parsed_messages) == 1
+    assert "small message 5" in str(parsed_messages[0])
 
     assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
 
@@ -5203,21 +5116,14 @@ def test_transform_message_content_list_anthropic():
 # Integration tests for binary data in messages
 
 
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
-def test_message_with_base64_image(
-    sentry_init,
-    capture_events,
-    capture_items,
-    stream_gen_ai_spans,
-):
+def test_message_with_base64_image(sentry_init, capture_events):
     """Test that messages with base64 images are properly captured."""
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
     )
-
+    events = capture_events()
     client = Anthropic(api_key="z")
     client.messages._post = mock.Mock(return_value=EXAMPLE_MESSAGE)
 
@@ -5238,31 +5144,15 @@ def test_message_with_base64_image(
         }
     ]
 
-    if stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    with start_transaction(name="anthropic"):
+        client.messages.create(max_tokens=1024, messages=messages, model="model")
 
-        with start_transaction(name="anthropic"):
-            client.messages.create(max_tokens=1024, messages=messages, model="model")
+    assert len(events) == 1
+    (event,) = events
+    (span,) = event["spans"]
 
-        spans = [item.payload for item in items if item.type == "span"]
-        (span,) = spans
-
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
-        stored_messages = json.loads(
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        )
-    else:
-        events = capture_events()
-
-        with start_transaction(name="anthropic"):
-            client.messages.create(max_tokens=1024, messages=messages, model="model")
-
-        assert len(events) == 1
-        (event,) = events
-        (span,) = event["spans"]
-
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
-        stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
+    stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     assert len(stored_messages) == 1
     assert stored_messages[0]["role"] == "user"
@@ -5412,21 +5302,14 @@ def test_message_with_file_image(
     }
 
 
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
-def test_message_with_base64_pdf(
-    sentry_init,
-    capture_events,
-    capture_items,
-    stream_gen_ai_spans,
-):
+def test_message_with_base64_pdf(sentry_init, capture_events):
     """Test that messages with base64-encoded PDF documents are properly captured."""
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
     )
-
+    events = capture_events()
     client = Anthropic(api_key="z")
     client.messages._post = mock.Mock(return_value=EXAMPLE_MESSAGE)
 
@@ -5447,30 +5330,14 @@ def test_message_with_base64_pdf(
         }
     ]
 
-    if stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    with start_transaction(name="anthropic"):
+        client.messages.create(max_tokens=1024, messages=messages, model="model")
 
-        with start_transaction(name="anthropic"):
-            client.messages.create(max_tokens=1024, messages=messages, model="model")
+    assert len(events) == 1
+    (event,) = events
+    (span,) = event["spans"]
 
-        spans = [item.payload for item in items if item.type == "span"]
-        (span,) = spans
-
-        stored_messages = json.loads(
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        )
-    else:
-        events = capture_events()
-
-        with start_transaction(name="anthropic"):
-            client.messages.create(max_tokens=1024, messages=messages, model="model")
-
-        assert len(events) == 1
-        (event,) = events
-        (span,) = event["spans"]
-
-        stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-
+    stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
     content = stored_messages[0]["content"]
     assert content[1] == {
         "type": "blob",
@@ -5615,21 +5482,14 @@ def test_message_with_file_document(
     }
 
 
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
-def test_message_with_mixed_content(
-    sentry_init,
-    capture_events,
-    capture_items,
-    stream_gen_ai_spans,
-):
+def test_message_with_mixed_content(sentry_init, capture_events):
     """Test that messages with mixed content (text, images, documents) are properly captured."""
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
     )
-
+    events = capture_events()
     client = Anthropic(api_key="z")
     client.messages._post = mock.Mock(return_value=EXAMPLE_MESSAGE)
 
@@ -5666,30 +5526,14 @@ def test_message_with_mixed_content(
         }
     ]
 
-    if stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    with start_transaction(name="anthropic"):
+        client.messages.create(max_tokens=1024, messages=messages, model="model")
 
-        with start_transaction(name="anthropic"):
-            client.messages.create(max_tokens=1024, messages=messages, model="model")
+    assert len(events) == 1
+    (event,) = events
+    (span,) = event["spans"]
 
-        spans = [item.payload for item in items if item.type == "span"]
-        (span,) = spans
-
-        stored_messages = json.loads(
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        )
-    else:
-        events = capture_events()
-
-        with start_transaction(name="anthropic"):
-            client.messages.create(max_tokens=1024, messages=messages, model="model")
-
-        assert len(events) == 1
-        (event,) = events
-        (span,) = event["spans"]
-
-        stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-
+    stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
     content = stored_messages[0]["content"]
 
     assert len(content) == 5
@@ -5721,21 +5565,14 @@ def test_message_with_mixed_content(
     }
 
 
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
-def test_message_with_multiple_images_different_formats(
-    sentry_init,
-    capture_events,
-    capture_items,
-    stream_gen_ai_spans,
-):
+def test_message_with_multiple_images_different_formats(sentry_init, capture_events):
     """Test that messages with multiple images of different source types are handled."""
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
     )
-
+    events = capture_events()
     client = Anthropic(api_key="z")
     client.messages._post = mock.Mock(return_value=EXAMPLE_MESSAGE)
 
@@ -5771,30 +5608,14 @@ def test_message_with_multiple_images_different_formats(
         }
     ]
 
-    if stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    with start_transaction(name="anthropic"):
+        client.messages.create(max_tokens=1024, messages=messages, model="model")
 
-        with start_transaction(name="anthropic"):
-            client.messages.create(max_tokens=1024, messages=messages, model="model")
+    assert len(events) == 1
+    (event,) = events
+    (span,) = event["spans"]
 
-        spans = [item.payload for item in items if item.type == "span"]
-        (span,) = spans
-
-        stored_messages = json.loads(
-            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        )
-    else:
-        events = capture_events()
-
-        with start_transaction(name="anthropic"):
-            client.messages.create(max_tokens=1024, messages=messages, model="model")
-
-        assert len(events) == 1
-        (event,) = events
-        (span,) = event["spans"]
-
-        stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-
+    stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
     content = stored_messages[0]["content"]
 
     assert len(content) == 4

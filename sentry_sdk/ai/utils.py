@@ -741,6 +741,10 @@ def truncate_and_annotate_messages(
     scope: "Any",
     max_single_message_chars: int = MAX_SINGLE_MESSAGE_CONTENT_CHARS,
 ) -> "Optional[List[Dict[str, Any]]]":
+    client = sentry_sdk.get_client()
+    if client.options["_experiments"].get("stream_gen_ai_spans", False):
+        return messages
+
     if not messages:
         return None
 
@@ -761,6 +765,10 @@ def truncate_and_annotate_embedding_inputs(
     scope: "Any",
     max_bytes: int = MAX_GEN_AI_MESSAGE_BYTES,
 ) -> "Optional[List[Dict[str, Any]]]":
+    client = sentry_sdk.get_client()
+    if client.options["_experiments"].get("stream_gen_ai_spans", False):
+        return messages
+
     if not messages:
         return None
 
