@@ -3125,24 +3125,14 @@ async def test_stream_message_with_input_json_delta_async(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
         if send_default_pii and include_prompts:
-            if stream_gen_ai_spans:
-                assert (
-                    span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                    == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
-                )
-                assert (
-                    span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-                    == '{"location": "San Francisco, CA"}'
-                )
-            else:
-                assert (
-                    span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                    == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
-                )
-                assert (
-                    span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-                    == '{"location": "San Francisco, CA"}'
-                )
+            assert (
+                span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+                == '[{"role": "user", "content": "What is the weather like in San Francisco?"}]'
+            )
+            assert (
+                span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+                == '{"location": "San Francisco, CA"}'
+            )
 
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -3758,20 +3748,45 @@ async def test_anthropic_message_truncation_async(
 
     if stream_gen_ai_spans:
         items = capture_items("transaction", "span")
-    else:
-        events = capture_events()
 
-    with start_transaction():
-        await client.messages.create(max_tokens=1024, messages=messages, model="model")
+        with start_transaction():
+            await client.messages.create(
+                max_tokens=1024, messages=messages, model="model"
+            )
 
-    if stream_gen_ai_spans:
         spans = [item.payload for item in items if item.type == "span"]
         chat_spans = [
             span
             for span in spans
             if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
         ]
+
+        assert len(chat_spans) > 0
+
+        chat_span = chat_spans[0]
+
+        assert chat_span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+        assert chat_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["attributes"]
+
+        messages_data = chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+
+        assert isinstance(messages_data, str)
+
+        parsed_messages = json.loads(messages_data)
+        assert isinstance(parsed_messages, list)
+        assert len(parsed_messages) == 1
+        assert "small message 5" in str(parsed_messages[0])
+
+        tx = next(item.payload for item in items if item.type == "transaction")
     else:
+        events = capture_events()
+
+        with start_transaction():
+            await client.messages.create(
+                max_tokens=1024, messages=messages, model="model"
+            )
+
         assert len(events) > 0
         tx = events[0]
         assert tx["type"] == "transaction"
@@ -3779,32 +3794,23 @@ async def test_anthropic_message_truncation_async(
         chat_spans = [
             span for span in tx.get("spans", []) if span.get("op") == OP.GEN_AI_CHAT
         ]
-    assert len(chat_spans) > 0
 
-    chat_span = chat_spans[0]
-    if stream_gen_ai_spans:
-        assert chat_span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
-        assert chat_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["attributes"]
+        assert len(chat_spans) > 0
 
-        messages_data = chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-    else:
+        chat_span = chat_spans[0]
+
         assert chat_span["data"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
         assert chat_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["data"]
 
         messages_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-    assert isinstance(messages_data, str)
+        assert isinstance(messages_data, str)
 
-    parsed_messages = json.loads(messages_data)
-    assert isinstance(parsed_messages, list)
-    assert len(parsed_messages) == 1
-    assert "small message 5" in str(parsed_messages[0])
+        parsed_messages = json.loads(messages_data)
+        assert isinstance(parsed_messages, list)
+        assert len(parsed_messages) == 1
+        assert "small message 5" in str(parsed_messages[0])
 
-    if stream_gen_ai_spans:
-        tx = next(item.payload for item in items if item.type == "transaction")
-    else:
-        pass
     assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
 
 
@@ -3846,24 +3852,21 @@ def test_nonstreaming_create_message_with_system_prompt(
 
     if stream_gen_ai_spans:
         items = capture_items("transaction", "span")
-    else:
-        events = capture_events()
 
-    with start_transaction(name="anthropic"):
-        response = client.messages.create(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-            system="You are a helpful assistant.",
-        )
+        with start_transaction(name="anthropic"):
+            response = client.messages.create(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+                system="You are a helpful assistant.",
+            )
 
-    assert response == EXAMPLE_MESSAGE
-    usage = response.usage
+        assert response == EXAMPLE_MESSAGE
+        usage = response.usage
 
-    assert usage.input_tokens == 10
-    assert usage.output_tokens == 20
+        assert usage.input_tokens == 10
+        assert usage.output_tokens == 20
 
-    if stream_gen_ai_spans:
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
@@ -3909,6 +3912,22 @@ def test_nonstreaming_create_message_with_system_prompt(
             "end_turn"
         ]
     else:
+        events = capture_events()
+
+        with start_transaction(name="anthropic"):
+            response = client.messages.create(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+                system="You are a helpful assistant.",
+            )
+
+        assert response == EXAMPLE_MESSAGE
+        usage = response.usage
+
+        assert usage.input_tokens == 10
+        assert usage.output_tokens == 20
+
         assert len(events) == 1
         (event,) = events
 
@@ -3933,16 +3952,8 @@ def test_nonstreaming_create_message_with_system_prompt(
                 {"type": "text", "content": "You are a helpful assistant."}
             ]
 
-            if stream_gen_ai_spans:
-                assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
-                stored_messages = json.loads(
-                    span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                )
-            else:
-                assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
-                stored_messages = json.loads(
-                    span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                )
+            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
+            stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
             assert len(stored_messages) == 1
             assert stored_messages[0]["role"] == "user"
             assert stored_messages[0]["content"] == "Hello, Claude"
@@ -3998,24 +4009,21 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
 
     if stream_gen_ai_spans:
         items = capture_items("transaction", "span")
-    else:
-        events = capture_events()
 
-    with start_transaction(name="anthropic"):
-        response = await client.messages.create(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-            system="You are a helpful assistant.",
-        )
+        with start_transaction(name="anthropic"):
+            response = await client.messages.create(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+                system="You are a helpful assistant.",
+            )
 
-    assert response == EXAMPLE_MESSAGE
-    usage = response.usage
+        assert response == EXAMPLE_MESSAGE
+        usage = response.usage
 
-    assert usage.input_tokens == 10
-    assert usage.output_tokens == 20
+        assert usage.input_tokens == 10
+        assert usage.output_tokens == 20
 
-    if stream_gen_ai_spans:
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
@@ -4061,6 +4069,22 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
             "end_turn"
         ]
     else:
+        events = capture_events()
+
+        with start_transaction(name="anthropic"):
+            response = await client.messages.create(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+                system="You are a helpful assistant.",
+            )
+
+        assert response == EXAMPLE_MESSAGE
+        usage = response.usage
+
+        assert usage.input_tokens == 10
+        assert usage.output_tokens == 20
+
         assert len(events) == 1
         (event,) = events
 
@@ -4566,24 +4590,21 @@ async def test_stream_message_with_system_prompt_async(
 
     if stream_gen_ai_spans:
         items = capture_items("transaction", "span")
-    else:
-        events = capture_events()
 
-    with mock.patch.object(
-        client._client,
-        "send",
-        return_value=response,
-    ) as _, start_transaction(name="anthropic"):
-        async with client.messages.stream(
-            max_tokens=1024,
-            messages=messages,
-            model="model",
-            system="You are a helpful assistant.",
-        ) as stream:
-            async for event in stream:
-                pass
+        with mock.patch.object(
+            client._client,
+            "send",
+            return_value=response,
+        ) as _, start_transaction(name="anthropic"):
+            async with client.messages.stream(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+                system="You are a helpful assistant.",
+            ) as stream:
+                async for event in stream:
+                    pass
 
-    if stream_gen_ai_spans:
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
@@ -4626,6 +4647,22 @@ async def test_stream_message_with_system_prompt_async(
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
     else:
+        events = capture_events()
+
+        with mock.patch.object(
+            client._client,
+            "send",
+            return_value=response,
+        ) as _, start_transaction(name="anthropic"):
+            async with client.messages.stream(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+                system="You are a helpful assistant.",
+            ) as stream:
+                async for event in stream:
+                    pass
+
         assert len(events) == 1
         (event,) = events
 
@@ -4764,26 +4801,7 @@ async def test_streaming_create_message_with_system_prompt_async(
 
             async for _ in message:
                 pass
-    else:
-        events = capture_events()
 
-        with mock.patch.object(
-            client._client,
-            "send",
-            return_value=response,
-        ) as _, start_transaction(name="anthropic"):
-            message = await client.messages.create(
-                max_tokens=1024,
-                messages=messages,
-                model="model",
-                stream=True,
-                system="You are a helpful assistant.",
-            )
-
-            async for _ in message:
-                pass
-
-    if stream_gen_ai_spans:
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
@@ -4828,6 +4846,24 @@ async def test_streaming_create_message_with_system_prompt_async(
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 20
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
     else:
+        events = capture_events()
+
+        with mock.patch.object(
+            client._client,
+            "send",
+            return_value=response,
+        ) as _, start_transaction(name="anthropic"):
+            message = await client.messages.create(
+                max_tokens=1024,
+                messages=messages,
+                model="model",
+                stream=True,
+                system="You are a helpful assistant.",
+            )
+
+            async for _ in message:
+                pass
+
         assert len(events) == 1
         (event,) = events
 
