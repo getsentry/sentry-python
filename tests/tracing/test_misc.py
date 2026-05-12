@@ -653,7 +653,7 @@ class TestConversationIdPropagation:
         """Span with gen_ai.* op should get conversation_id."""
         sentry_init(
             traces_sample_rate=1.0,
-            _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            stream_gen_ai_spans=stream_gen_ai_spans,
         )
 
         if stream_gen_ai_spans:

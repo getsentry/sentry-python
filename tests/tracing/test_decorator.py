@@ -169,7 +169,7 @@ def test_span_templates_ai_dicts(
     if stream_gen_ai_spans:
         sentry_init(
             traces_sample_rate=1.0,
-            _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            stream_gen_ai_spans=stream_gen_ai_spans,
         )
         items = capture_items("span")
 
@@ -251,7 +251,7 @@ def test_span_templates_ai_dicts(
     else:
         sentry_init(
             traces_sample_rate=1.0,
-            _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            stream_gen_ai_spans=stream_gen_ai_spans,
         )
         events = capture_events()
 
@@ -361,7 +361,7 @@ def test_span_templates_ai_objects(
 
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     if stream_gen_ai_spans:
@@ -537,7 +537,7 @@ def test_span_templates_ai_pii(
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     if stream_gen_ai_spans:
