@@ -54,7 +54,6 @@ class AsyncPGIntegration(Integration):
         asyncpg.Connection.prepare = _wrap_connection_method(asyncpg.Connection.prepare)
 
         BaseCursor._bind_exec = _wrap_cursor_method(BaseCursor._bind_exec)
-        BaseCursor._bind = _wrap_cursor_method(BaseCursor._bind)
         BaseCursor._exec = _wrap_cursor_method(BaseCursor._exec)
 
         asyncpg.connect_utils._connect_addr = _wrap_connect_addr(

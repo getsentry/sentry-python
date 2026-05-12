@@ -410,12 +410,6 @@ async def test_cursor_manual(sentry_init, capture_events) -> None:
             "message": "SELECT * FROM users WHERE dob > $1",
             "type": "default",
         },
-        {
-            "category": "query",
-            "data": {"db.cursor": mock.ANY},
-            "message": "SELECT * FROM users WHERE dob > $1",
-            "type": "default",
-        },
         {"category": "query", "data": {}, "message": "COMMIT;", "type": "default"},
     ]
 
@@ -1468,9 +1462,7 @@ async def test_cursor__bind_exec_creates_spans(
 
 
 @pytest.mark.asyncio
-async def test_cursor__bind_and__exec_methods_create_spans(
-    sentry_init, capture_events
-) -> None:
+async def test_cursor__exec_methods_create_spans(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
         traces_sample_rate=1.0,
@@ -1491,7 +1483,6 @@ async def test_cursor__bind_and__exec_methods_create_spans(
         )
 
         async with conn.transaction():
-            # This exercises the `_bind` patch and the `cursor` patch
             cur = await conn.cursor(
                 "SELECT * FROM users WHERE dob > $1", datetime.date(1970, 1, 1)
             )
@@ -1503,15 +1494,14 @@ async def test_cursor__bind_and__exec_methods_create_spans(
 
     (event,) = events
 
-    assert len(event["spans"]) == 7
+    assert len(event["spans"]) == 6
 
     connect_span = event["spans"][0]
     executemany_span = event["spans"][1]
     begin_span = event["spans"][2]
-    cursor_creation_and_bind_span = event["spans"][3]
-    fetchrow_span_1 = event["spans"][4]
-    fetchrow_span_2 = event["spans"][5]
-    commit_span = event["spans"][6]
+    fetchrow_span_1 = event["spans"][3]
+    fetchrow_span_2 = event["spans"][4]
+    commit_span = event["spans"][5]
 
     assert connect_span["description"] == "connect"
     assert (
@@ -1520,14 +1510,10 @@ async def test_cursor__bind_and__exec_methods_create_spans(
     )
     assert begin_span["description"] == "BEGIN;"
     assert fetchrow_span_1["description"] == "SELECT * FROM users WHERE dob > $1"
-    assert (
-        cursor_creation_and_bind_span["description"]
-        == "SELECT * FROM users WHERE dob > $1"
-    )
     assert fetchrow_span_2["description"] == "SELECT * FROM users WHERE dob > $1"
     assert commit_span["description"] == "COMMIT;"
 
-    for span in (cursor_creation_and_bind_span, fetchrow_span_1, fetchrow_span_2):
+    for span in (fetchrow_span_1, fetchrow_span_2):
         assert span["data"]["db.cursor"] is not None
         assert span["data"]["db.system"] == "postgresql"
         assert span["data"]["db.driver.name"] == "asyncpg"
@@ -1535,5 +1521,5 @@ async def test_cursor__bind_and__exec_methods_create_spans(
         _assert_query_source(
             span,
             False,
-            "test_cursor__bind_and__exec_methods_create_spans",
+            "test_cursor__exec_methods_create_spans",
         )
