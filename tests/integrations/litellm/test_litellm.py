@@ -324,24 +324,21 @@ async def test_async_nonstreaming_chat_completion(
 
     if stream_gen_ai_spans:
         items = capture_items("transaction", "span")
-    else:
-        events = capture_events()
 
-    with mock.patch.object(
-        client.completions._client._client,
-        "send",
-        return_value=model_response,
-    ), start_transaction(name="litellm test"):
-        await litellm.acompletion(
-            model="gpt-3.5-turbo",
-            messages=messages,
-            client=client,
-        )
+        with mock.patch.object(
+            client.completions._client._client,
+            "send",
+            return_value=model_response,
+        ), start_transaction(name="litellm test"):
+            await litellm.acompletion(
+                model="gpt-3.5-turbo",
+                messages=messages,
+                client=client,
+            )
 
-        await GLOBAL_LOGGING_WORKER.flush()
-        await asyncio.sleep(0.5)
+            await GLOBAL_LOGGING_WORKER.flush()
+            await asyncio.sleep(0.5)
 
-    if stream_gen_ai_spans:
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "litellm test"
 
@@ -373,6 +370,22 @@ async def test_async_nonstreaming_chat_completion(
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     else:
+        events = capture_events()
+
+        with mock.patch.object(
+            client.completions._client._client,
+            "send",
+            return_value=model_response,
+        ), start_transaction(name="litellm test"):
+            await litellm.acompletion(
+                model="gpt-3.5-turbo",
+                messages=messages,
+                client=client,
+            )
+
+            await GLOBAL_LOGGING_WORKER.flush()
+            await asyncio.sleep(0.5)
+
         assert len(events) == 1
         (event,) = events
 
@@ -2385,6 +2398,13 @@ def test_litellm_message_truncation(
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["attributes"]
 
         messages_data = chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert isinstance(messages_data, str)
+
+        parsed_messages = json.loads(messages_data)
+        assert isinstance(parsed_messages, list)
+        assert len(parsed_messages) == 1
+        assert "small message 5" in str(parsed_messages[0])
+        tx = next(item.payload for item in items if item.type == "transaction")
     else:
         events = capture_events()
 
@@ -2415,16 +2435,12 @@ def test_litellm_message_truncation(
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["data"]
 
         messages_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-    assert isinstance(messages_data, str)
+        assert isinstance(messages_data, str)
 
-    parsed_messages = json.loads(messages_data)
-    assert isinstance(parsed_messages, list)
-    assert len(parsed_messages) == 1
-    assert "small message 5" in str(parsed_messages[0])
-    if stream_gen_ai_spans:
-        tx = next(item.payload for item in items if item.type == "transaction")
-    else:
-        pass
+        parsed_messages = json.loads(messages_data)
+        assert isinstance(parsed_messages, list)
+        assert len(parsed_messages) == 1
+        assert "small message 5" in str(parsed_messages[0])
     assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
 
 
@@ -2857,6 +2873,10 @@ async def test_async_binary_content_encoding_mixed_content(
             if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
             and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
         )
+
+        assert len(chat_spans) == 1
+        span = chat_spans[0]
+        messages_data = json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
     else:
         events = capture_events()
 
@@ -2882,11 +2902,8 @@ async def test_async_binary_content_encoding_mixed_content(
             if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
         )
 
-    assert len(chat_spans) == 1
-    span = chat_spans[0]
-    if stream_gen_ai_spans:
-        messages_data = json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
-    else:
+        assert len(chat_spans) == 1
+        span = chat_spans[0]
         messages_data = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     content_items = [
