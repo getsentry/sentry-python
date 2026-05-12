@@ -1121,6 +1121,8 @@ class _Client(BaseClient):
             envelope.add_profile(profile.to_json(event_opt, self.options))
 
         span_recorder_has_gen_ai_span = event.pop("_has_gen_ai_span", False)
+        if "_has_gen_ai_span" in event_opt:
+            del event_opt["_has_gen_ai_span"]
 
         if is_transaction and not span_recorder_has_gen_ai_span:
             envelope.add_transaction(event_opt)
@@ -1135,7 +1137,7 @@ class _Client(BaseClient):
                 envelope.add_transaction(event_opt)
 
                 converted_gen_ai_spans = [
-                    _serialized_v1_span_to_serialized_v2_span(span, event)
+                    _serialized_v1_span_to_serialized_v2_span(span, event_opt)
                     for span in gen_ai_spans
                     if isinstance(span, dict)
                 ]
