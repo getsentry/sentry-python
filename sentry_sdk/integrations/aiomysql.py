@@ -6,8 +6,10 @@ from typing import Any, TypeVar, Callable, Awaitable
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
     add_query_source,
+    has_span_streaming_enabled,
     record_sql_queries_supporting_streaming,
 )
 from sentry_sdk.utils import (
@@ -157,23 +159,52 @@ def _wrap_connect(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
     """Wrap Connection._connect to capture connection spans."""
 
     async def _inner(self: "Connection") -> T:
-        if sentry_sdk.get_client().get_integration(AioMySQLIntegration) is None:
+        client = sentry_sdk.get_client()
+        if client.get_integration(AioMySQLIntegration) is None:
             return await f(self)
 
-        with sentry_sdk.start_span(
-            op=OP.DB,
-            name="connect",
-            origin=AioMySQLIntegration.origin,
-        ) as span:
-            _set_db_data(span, self)
+        if has_span_streaming_enabled(client.options):
+            span_attributes = {
+                "sentry.op": OP.DB,
+                "sentry.origin": AioMySQLIntegration.origin,
+                SPANDATA.DB_SYSTEM: "mysql",
+            }
+            host = getattr(self, "host", None)
+            if host is not None:
+                span_attributes[SPANDATA.SERVER_ADDRESS] = host
+            port = getattr(self, "port", None)
+            if port is not None:
+                span_attributes[SPANDATA.SERVER_PORT] = port
+            database = getattr(self, "db", None)
+            if database is not None:
+                span_attributes[SPANDATA.DB_NAME] = database
+            user = getattr(self, "user", None)
+            if user is not None:
+                span_attributes[SPANDATA.DB_USER] = user
 
-            with capture_internal_exceptions():
-                sentry_sdk.add_breadcrumb(
-                    message="connect",
-                    category="query",
-                    data=span._data,
-                )
-            res = await f(self)
+            with sentry_sdk.traces.start_span(
+                name="connect", attributes=span_attributes
+            ) as span:
+                with capture_internal_exceptions():
+                    sentry_sdk.add_breadcrumb(
+                        message="connect", category="query", data=span_attributes
+                    )
+                res = await f(self)
+        else:
+            with sentry_sdk.start_span(
+                op=OP.DB,
+                name="connect",
+                origin=AioMySQLIntegration.origin,
+            ) as span:
+                _set_db_data(span, self)
+
+                with capture_internal_exceptions():
+                    sentry_sdk.add_breadcrumb(
+                        message="connect",
+                        category="query",
+                        data=span._data,
+                    )
+                res = await f(self)
 
         return res
 
@@ -182,20 +213,22 @@ def _wrap_connect(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
 
 def _set_db_data(span: Any, conn: Any) -> None:
     """Set database-related span data from connection object."""
-    span.set_data(SPANDATA.DB_SYSTEM, "mysql")
+    set_value = span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
+
+    set_value(SPANDATA.DB_SYSTEM, "mysql")
 
     host = getattr(conn, "host", None)
     if host is not None:
-        span.set_data(SPANDATA.SERVER_ADDRESS, host)
+        set_value(SPANDATA.SERVER_ADDRESS, host)
 
     port = getattr(conn, "port", None)
     if port is not None:
-        span.set_data(SPANDATA.SERVER_PORT, port)
+        set_value(SPANDATA.SERVER_PORT, port)
 
     database = getattr(conn, "db", None)
     if database is not None:
-        span.set_data(SPANDATA.DB_NAME, database)
+        set_value(SPANDATA.DB_NAME, database)
 
     user = getattr(conn, "user", None)
     if user is not None:
-        span.set_data(SPANDATA.DB_USER, user)
+        set_value(SPANDATA.DB_USER, user)
