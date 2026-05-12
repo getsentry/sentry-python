@@ -45,7 +45,12 @@ class LogBatcher(Batcher["Log"]):
             headers={
                 "item_count": 1,
             },
-            payload=PayloadRef(json={"items": [self._to_transport_format(item)]}),
+            payload=PayloadRef(
+                json={
+                    "version": 2,
+                    "items": [self._to_transport_format(item)],
+                }
+            ),
         )
 
         self._record_lost_func(
