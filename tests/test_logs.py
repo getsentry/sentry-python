@@ -545,6 +545,7 @@ def test_batcher_drops_logs(sentry_init, monkeypatch):
             "content_type": "application/vnd.sentry.items.log+json",
         }
         assert item.payload.json == {
+            "version": 2,
             "items": [
                 {
                     "body": "This is a 'info' log...",
@@ -583,7 +584,7 @@ def test_batcher_drops_logs(sentry_init, monkeypatch):
                         },
                     },
                 }
-            ]
+            ],
         }
 
 
