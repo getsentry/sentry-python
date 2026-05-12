@@ -3676,6 +3676,7 @@ def test_anthropic_message_truncation(sentry_init, capture_events):
     assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
 
 
+@pytest.mark.asyncio
 async def test_anthropic_message_truncation_async(sentry_init, capture_events):
     """Test that large messages are truncated properly in Anthropic integration."""
     sentry_init(
