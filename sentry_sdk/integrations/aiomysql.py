@@ -96,9 +96,13 @@ def _wrap_execute(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
             if conn:
                 _set_db_data(span, conn)
             res = await f(*args, **kwargs)
+            if isinstance(span, StreamedSpan):
+                with capture_internal_exceptions():
+                    add_query_source(span)
 
-        with capture_internal_exceptions():
-            add_query_source(span)
+        if not isinstance(span, StreamedSpan):
+            with capture_internal_exceptions():
+                add_query_source(span)
 
         return res
 
@@ -139,9 +143,13 @@ def _wrap_executemany(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable
                 if conn:
                     _set_db_data(span, conn)
                 res = await f(*args, **kwargs)
+                if isinstance(span, StreamedSpan):
+                    with capture_internal_exceptions():
+                        add_query_source(span)
 
-            with capture_internal_exceptions():
-                add_query_source(span)
+            if not isinstance(span, StreamedSpan):
+                with capture_internal_exceptions():
+                    add_query_source(span)
 
             return res
         finally:
