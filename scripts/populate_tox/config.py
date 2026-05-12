@@ -317,7 +317,7 @@ TEST_SUITE_CONFIG = {
         "num_versions": 2,
     },
     "pydantic_ai": {
-        "package": "pydantic-ai",
+        "package": "pydantic-ai-slim",
         "deps": {
             "*": ["pytest-asyncio"],
         },
