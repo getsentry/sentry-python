@@ -222,10 +222,7 @@ def test_nonstreaming_generate_content(
 
         if send_default_pii and include_prompts:
             # Response text is stored as a JSON array
-            if stream_gen_ai_spans:
-                response_text = chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-            else:
-                response_text = chat_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            response_text = chat_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
             # Parse the JSON array
             response_texts = json.loads(response_text)
             assert response_texts == ["Hello! How can I help you today?"]
@@ -415,40 +412,52 @@ def test_generate_content_with_tools(
 
     if stream_gen_ai_spans:
         items = capture_items("span")
-    else:
-        events = capture_events()
 
-    with mock.patch.object(
-        mock_genai_client._api_client, "request", return_value=mock_http_response
-    ), start_transaction(name="google_genai"):
-        config = create_test_config(tools=[get_weather, mock_tool])
-        mock_genai_client.models.generate_content(
-            model="gemini-1.5-flash", contents="What's the weather?", config=config
-        )
+        with mock.patch.object(
+            mock_genai_client._api_client, "request", return_value=mock_http_response
+        ), start_transaction(name="google_genai"):
+            config = create_test_config(tools=[get_weather, mock_tool])
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents="What's the weather?", config=config
+            )
 
-    if stream_gen_ai_spans:
         invoke_span = next(item.payload for item in items if item.type == "span")
 
         # Check that tools are recorded (data is serialized as a string)
         tools_data_str = invoke_span["attributes"][
             SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS
         ]
+
+        # Parse the JSON string to verify content
+        tools_data = json.loads(tools_data_str)
+        assert len(tools_data) == 2
+
+        # The order of tools may not be guaranteed, so sort by name and description for comparison
+        sorted_tools = sorted(
+            tools_data, key=lambda t: (t.get("name", ""), t.get("name", ""))
+        )
     else:
+        events = capture_events()
+
+        with mock.patch.object(
+            mock_genai_client._api_client, "request", return_value=mock_http_response
+        ), start_transaction(name="google_genai"):
+            config = create_test_config(tools=[get_weather, mock_tool])
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents="What's the weather?", config=config
+            )
+
         (event,) = events
         invoke_span = event["spans"][0]
 
         # Check that tools are recorded (data is serialized as a string)
         tools_data_str = invoke_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
-    # Parse the JSON string to verify content
-    tools_data = json.loads(tools_data_str)
-    assert len(tools_data) == 2
 
-    # The order of tools may not be guaranteed, so sort by name and description for comparison
-    if stream_gen_ai_spans:
-        sorted_tools = sorted(
-            tools_data, key=lambda t: (t.get("name", ""), t.get("name", ""))
-        )
-    else:
+        # Parse the JSON string to verify content
+        tools_data = json.loads(tools_data_str)
+        assert len(tools_data) == 2
+
+        # The order of tools may not be guaranteed, so sort by name and description for comparison
         sorted_tools = sorted(
             tools_data, key=lambda t: (t.get("name", ""), t.get("description", ""))
         )
@@ -488,16 +497,13 @@ def test_tool_execution(
 
     if stream_gen_ai_spans:
         items = capture_items("span")
-    else:
-        events = capture_events()
 
-    # Execute the wrapped tool
-    with start_transaction(name="test_tool"):
-        result = wrapped_weather("San Francisco")
+        # Execute the wrapped tool
+        with start_transaction(name="test_tool"):
+            result = wrapped_weather("San Francisco")
 
-    assert result == "The weather in San Francisco is sunny"
+        assert result == "The weather in San Francisco is sunny"
 
-    if stream_gen_ai_spans:
         spans = [item.payload for item in items if item.type == "span"]
         assert len(spans) == 1
         tool_span = next(item.payload for item in items if item.type == "span")
@@ -510,6 +516,14 @@ def test_tool_execution(
             == "Get the weather for a location"
         )
     else:
+        events = capture_events()
+
+        # Execute the wrapped tool
+        with start_transaction(name="test_tool"):
+            result = wrapped_weather("San Francisco")
+
+        assert result == "The weather in San Francisco is sunny"
+
         (event,) = events
         assert len(event["spans"]) == 1
         tool_span = event["spans"][0]
@@ -538,24 +552,35 @@ def test_error_handling(
     )
     if stream_gen_ai_spans:
         items = capture_items("event", "transaction")
+
+        # Mock an error at the HTTP level
+        with mock.patch.object(
+            mock_genai_client._api_client, "request", side_effect=Exception("API Error")
+        ), start_transaction(name="google_genai"), pytest.raises(
+            Exception, match="API Error"
+        ):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash",
+                contents="This will fail",
+                config=create_test_config(),
+            )
+
+        (error_event,) = (item.payload for item in items if item.type == "event")
     else:
         events = capture_events()
 
-    # Mock an error at the HTTP level
-    with mock.patch.object(
-        mock_genai_client._api_client, "request", side_effect=Exception("API Error")
-    ), start_transaction(name="google_genai"), pytest.raises(
-        Exception, match="API Error"
-    ):
-        mock_genai_client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents="This will fail",
-            config=create_test_config(),
-        )
+        # Mock an error at the HTTP level
+        with mock.patch.object(
+            mock_genai_client._api_client, "request", side_effect=Exception("API Error")
+        ), start_transaction(name="google_genai"), pytest.raises(
+            Exception, match="API Error"
+        ):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash",
+                contents="This will fail",
+                config=create_test_config(),
+            )
 
-    if stream_gen_ai_spans:
-        (error_event,) = (item.payload for item in items if item.type == "event")
-    else:
         # Should have both transaction and error events
         assert len(events) == 2
         error_event, transaction_event = events
@@ -646,58 +671,48 @@ def test_streaming_generate_content(
 
     if stream_gen_ai_spans:
         items = capture_items("span")
-    else:
-        events = capture_events()
 
-    with mock.patch.object(
-        mock_genai_client._api_client, "request_streamed", return_value=mock_stream
-    ), start_transaction(name="google_genai"):
-        config = create_test_config()
-        stream = mock_genai_client.models.generate_content_stream(
-            model="gemini-1.5-flash", contents="Stream me a response", config=config
+        with mock.patch.object(
+            mock_genai_client._api_client, "request_streamed", return_value=mock_stream
+        ), start_transaction(name="google_genai"):
+            config = create_test_config()
+            stream = mock_genai_client.models.generate_content_stream(
+                model="gemini-1.5-flash", contents="Stream me a response", config=config
+            )
+
+            # Consume the stream (this is what users do with the integration wrapper)
+            collected_chunks = list(stream)
+
+        # Verify we got all chunks
+        assert len(collected_chunks) == 3
+        assert collected_chunks[0].candidates[0].content.parts[0].text == "Hello! "
+        assert collected_chunks[1].candidates[0].content.parts[0].text == "How can I "
+        assert (
+            collected_chunks[2].candidates[0].content.parts[0].text == "help you today?"
         )
 
-        # Consume the stream (this is what users do with the integration wrapper)
-        collected_chunks = list(stream)
-
-    # Verify we got all chunks
-    assert len(collected_chunks) == 3
-    assert collected_chunks[0].candidates[0].content.parts[0].text == "Hello! "
-    assert collected_chunks[1].candidates[0].content.parts[0].text == "How can I "
-    assert collected_chunks[2].candidates[0].content.parts[0].text == "help you today?"
-
-    if stream_gen_ai_spans:
         spans = [item.payload for item in items if item.type == "span"]
         assert len(spans) == 1
         chat_span = next(item.payload for item in items if item.type == "span")
 
         # Check that streaming flag is set on both spans
         assert chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-    else:
-        (event,) = events
 
-        assert len(event["spans"]) == 1
-        chat_span = event["spans"][0]
+        # Verify accumulated response text (all chunks combined)
+        expected_full_text = "Hello! How can I help you today?"
+        # Response text is stored as a JSON string
+        if stream_gen_ai_spans:
+            chat_response_text = json.loads(
+                chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            )
+        else:
+            chat_response_text = json.loads(
+                chat_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            )
+        assert chat_response_text == [expected_full_text]
 
-        # Check that streaming flag is set on both spans
-        assert chat_span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
-
-    # Verify accumulated response text (all chunks combined)
-    expected_full_text = "Hello! How can I help you today?"
-    # Response text is stored as a JSON string
-    if stream_gen_ai_spans:
-        chat_response_text = json.loads(
-            chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-        )
-    else:
-        chat_response_text = json.loads(
-            chat_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-        )
-    assert chat_response_text == [expected_full_text]
-
-    # Verify finish reasons (only the final chunk has a finish reason)
-    # When there's a single finish reason, it's stored as a plain string (not JSON)
-    if stream_gen_ai_spans:
+        # Verify finish reasons (only the final chunk has a finish reason)
+        # When there's a single finish reason, it's stored as a plain string (not JSON)
         assert SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS in chat_span["attributes"]
         assert (
             chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "STOP"
@@ -715,6 +730,50 @@ def test_streaming_generate_content(
             chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
         )
     else:
+        events = capture_events()
+
+        with mock.patch.object(
+            mock_genai_client._api_client, "request_streamed", return_value=mock_stream
+        ), start_transaction(name="google_genai"):
+            config = create_test_config()
+            stream = mock_genai_client.models.generate_content_stream(
+                model="gemini-1.5-flash", contents="Stream me a response", config=config
+            )
+
+            # Consume the stream (this is what users do with the integration wrapper)
+            collected_chunks = list(stream)
+
+        # Verify we got all chunks
+        assert len(collected_chunks) == 3
+        assert collected_chunks[0].candidates[0].content.parts[0].text == "Hello! "
+        assert collected_chunks[1].candidates[0].content.parts[0].text == "How can I "
+        assert (
+            collected_chunks[2].candidates[0].content.parts[0].text == "help you today?"
+        )
+
+        (event,) = events
+
+        assert len(event["spans"]) == 1
+        chat_span = event["spans"][0]
+
+        # Check that streaming flag is set on both spans
+        assert chat_span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+        # Verify accumulated response text (all chunks combined)
+        expected_full_text = "Hello! How can I help you today?"
+        # Response text is stored as a JSON string
+        if stream_gen_ai_spans:
+            chat_response_text = json.loads(
+                chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            )
+        else:
+            chat_response_text = json.loads(
+                chat_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            )
+        assert chat_response_text == [expected_full_text]
+
+        # Verify finish reasons (only the final chunk has a finish reason)
+        # When there's a single finish reason, it's stored as a plain string (not JSON)
         assert SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS in chat_span["data"]
         assert chat_span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "STOP"
         assert chat_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
@@ -745,18 +804,15 @@ def test_span_origin(
 
     if stream_gen_ai_spans:
         items = capture_items("span", "transaction")
-    else:
-        events = capture_events()
 
-    with mock.patch.object(
-        mock_genai_client._api_client, "request", return_value=mock_http_response
-    ), start_transaction(name="google_genai"):
-        config = create_test_config()
-        mock_genai_client.models.generate_content(
-            model="gemini-1.5-flash", contents="Test origin", config=config
-        )
+        with mock.patch.object(
+            mock_genai_client._api_client, "request", return_value=mock_http_response
+        ), start_transaction(name="google_genai"):
+            config = create_test_config()
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents="Test origin", config=config
+            )
 
-    if stream_gen_ai_spans:
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["contexts"]["trace"]["origin"] == "manual"
 
@@ -764,6 +820,16 @@ def test_span_origin(
         for span in spans:
             assert span["attributes"]["sentry.origin"] == "auto.ai.google_genai"
     else:
+        events = capture_events()
+
+        with mock.patch.object(
+            mock_genai_client._api_client, "request", return_value=mock_http_response
+        ), start_transaction(name="google_genai"):
+            config = create_test_config()
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents="Test origin", config=config
+            )
+
         (event,) = events
 
         assert event["contexts"]["trace"]["origin"] == "manual"
@@ -893,6 +959,23 @@ def test_multiple_candidates(
             )
 
         chat_span = next(item.payload for item in items if item.type == "span")
+
+        # Should capture all responses
+        # Response text is stored as a JSON string when there are multiple responses
+        response_text = chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+        if isinstance(response_text, str) and response_text.startswith("["):
+            # It's a JSON array
+            response_list = json.loads(response_text)
+            assert response_list == ["Response 1", "Response 2"]
+        else:
+            # It's concatenated
+            assert response_text == "Response 1\nResponse 2"
+
+        # Finish reasons are serialized as JSON
+        finish_reasons = json.loads(
+            chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS]
+        )
     else:
         events = capture_events()
 
@@ -907,26 +990,19 @@ def test_multiple_candidates(
         (event,) = events
         chat_span = event["spans"][0]
 
-    # Should capture all responses
-    # Response text is stored as a JSON string when there are multiple responses
-    if stream_gen_ai_spans:
-        response_text = chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-    else:
+        # Should capture all responses
+        # Response text is stored as a JSON string when there are multiple responses
         response_text = chat_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-    if isinstance(response_text, str) and response_text.startswith("["):
-        # It's a JSON array
-        response_list = json.loads(response_text)
-        assert response_list == ["Response 1", "Response 2"]
-    else:
-        # It's concatenated
-        assert response_text == "Response 1\nResponse 2"
 
-    # Finish reasons are serialized as JSON
-    if stream_gen_ai_spans:
-        finish_reasons = json.loads(
-            chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS]
-        )
-    else:
+        if isinstance(response_text, str) and response_text.startswith("["):
+            # It's a JSON array
+            response_list = json.loads(response_text)
+            assert response_list == ["Response 1", "Response 2"]
+        else:
+            # It's concatenated
+            assert response_text == "Response 1\nResponse 2"
+
+        # Finish reasons are serialized as JSON
         finish_reasons = json.loads(
             chat_span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS]
         )
@@ -1482,34 +1558,20 @@ def test_embed_content(
 
         # Check input texts if PII is allowed
         if send_default_pii and include_prompts:
-            if stream_gen_ai_spans:
-                input_texts = json.loads(
-                    embed_span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
-                )
-            else:
-                input_texts = json.loads(
-                    embed_span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
-                )
+            input_texts = json.loads(
+                embed_span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+            )
             assert input_texts == [
                 "What is your name?",
                 "What is your favorite color?",
             ]
         else:
-            if stream_gen_ai_spans:
-                assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in embed_span["attributes"]
-            else:
-                assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in embed_span["data"]
+            assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in embed_span["attributes"]
 
         # Check usage data (sum of token counts from statistics: 10 + 15 = 25)
         # Note: Only available in newer versions with ContentEmbeddingStatistics
-        if stream_gen_ai_spans:
-            if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
-                assert (
-                    embed_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 25
-                )
-        else:
-            if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["data"]:
-                assert embed_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 25
+        if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
+            assert embed_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 25
     else:
         events = capture_events()
 
@@ -1546,34 +1608,20 @@ def test_embed_content(
 
         # Check input texts if PII is allowed
         if send_default_pii and include_prompts:
-            if stream_gen_ai_spans:
-                input_texts = json.loads(
-                    embed_span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
-                )
-            else:
-                input_texts = json.loads(
-                    embed_span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
-                )
+            input_texts = json.loads(
+                embed_span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+            )
             assert input_texts == [
                 "What is your name?",
                 "What is your favorite color?",
             ]
         else:
-            if stream_gen_ai_spans:
-                assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in embed_span["attributes"]
-            else:
-                assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in embed_span["data"]
+            assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in embed_span["data"]
 
         # Check usage data (sum of token counts from statistics: 10 + 15 = 25)
         # Note: Only available in newer versions with ContentEmbeddingStatistics
-        if stream_gen_ai_spans:
-            if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
-                assert (
-                    embed_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 25
-                )
-        else:
-            if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["data"]:
-                assert embed_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 25
+        if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["data"]:
+            assert embed_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 25
 
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
@@ -1631,12 +1679,8 @@ def test_embed_content_string_input(
         assert input_texts == ["Single text input"]
         # Should use token_count from statistics (5), not billable_character_count (10)
         # Note: Only available in newer versions with ContentEmbeddingStatistics
-        if stream_gen_ai_spans:
-            if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
-                assert embed_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
-        else:
-            if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["data"]:
-                assert embed_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
+        if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
+            assert embed_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
     else:
         events = capture_events()
 
@@ -1657,12 +1701,8 @@ def test_embed_content_string_input(
         assert input_texts == ["Single text input"]
         # Should use token_count from statistics (5), not billable_character_count (10)
         # Note: Only available in newer versions with ContentEmbeddingStatistics
-        if stream_gen_ai_spans:
-            if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
-                assert embed_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
-        else:
-            if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["data"]:
-                assert embed_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
+        if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["data"]:
+            assert embed_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
 
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
@@ -2024,6 +2064,12 @@ async def test_async_embed_content_string_input(
         input_texts = json.loads(
             embed_span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
         )
+
+        assert input_texts == ["Single text input"]
+        # Should use token_count from statistics (5), not billable_character_count (10)
+        # Note: Only available in newer versions with ContentEmbeddingStatistics
+        if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
+            assert embed_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
     else:
         events = capture_events()
 
@@ -2043,13 +2089,9 @@ async def test_async_embed_content_string_input(
         # Check that single string is handled correctly
         input_texts = json.loads(embed_span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT])
 
-    assert input_texts == ["Single text input"]
-    # Should use token_count from statistics (5), not billable_character_count (10)
-    # Note: Only available in newer versions with ContentEmbeddingStatistics
-    if stream_gen_ai_spans:
-        if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
-            assert embed_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
-    else:
+        assert input_texts == ["Single text input"]
+        # Should use token_count from statistics (5), not billable_character_count (10)
+        # Note: Only available in newer versions with ContentEmbeddingStatistics
         if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["data"]:
             assert embed_span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
 
@@ -2158,6 +2200,10 @@ async def test_async_embed_content_without_statistics(
 
         spans = [item.payload for item in items if item.type == "span"]
         (embed_span,) = spans
+
+        # No usage tokens since there are no statistics in older versions
+        # This is expected and the integration should handle it gracefully
+        assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS not in embed_span["attributes"]
     else:
         events = capture_events()
 
@@ -2174,11 +2220,8 @@ async def test_async_embed_content_without_statistics(
         (event,) = events
         (embed_span,) = event["spans"]
 
-    # No usage tokens since there are no statistics in older versions
-    # This is expected and the integration should handle it gracefully
-    if stream_gen_ai_spans:
-        assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS not in embed_span["attributes"]
-    else:
+        # No usage tokens since there are no statistics in older versions
+        # This is expected and the integration should handle it gracefully
         assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS not in embed_span["data"]
 
 
