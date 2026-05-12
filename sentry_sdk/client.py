@@ -1150,7 +1150,10 @@ class _Client(BaseClient):
                             "item_count": len(converted_gen_ai_spans),
                         },
                         payload=PayloadRef(
-                            json={"items": converted_gen_ai_spans},
+                            json={
+                                "version": 2,
+                                "items": converted_gen_ai_spans,
+                            },
                         ),
                     )
                 )
