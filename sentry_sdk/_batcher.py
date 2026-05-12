@@ -153,9 +153,10 @@ class Batcher(Generic[T]):
                 },
                 payload=PayloadRef(
                     json={
+                        "version": 2,
                         "items": [
                             self._to_transport_format(item) for item in self._buffer
-                        ]
+                        ],
                     }
                 ),
             )

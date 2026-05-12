@@ -342,7 +342,7 @@ async def test_cursor(sentry_init, capture_events) -> None:
         {"category": "query", "data": {}, "message": "BEGIN;", "type": "default"},
         {
             "category": "query",
-            "data": {},
+            "data": {"db.cursor": mock.ANY},
             "message": "SELECT * FROM users WHERE dob > $1",
             "type": "default",
         },
@@ -400,7 +400,19 @@ async def test_cursor_manual(sentry_init, capture_events) -> None:
         {"category": "query", "data": {}, "message": "BEGIN;", "type": "default"},
         {
             "category": "query",
-            "data": {},
+            "data": {"db.cursor": mock.ANY},
+            "message": "SELECT * FROM users WHERE dob > $1",
+            "type": "default",
+        },
+        {
+            "category": "query",
+            "data": {"db.cursor": mock.ANY},
+            "message": "SELECT * FROM users WHERE dob > $1",
+            "type": "default",
+        },
+        {
+            "category": "query",
+            "data": {"db.cursor": mock.ANY},
             "message": "SELECT * FROM users WHERE dob > $1",
             "type": "default",
         },
@@ -1329,9 +1341,13 @@ async def test_query_source_prepare(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("span_streaming", [True, False])
-async def test_query_source_cursor(
+async def test_cursor__bind_exec_creates_spans(
     sentry_init, capture_events, capture_items, span_streaming
-):
+) -> None:
+    """
+    Exercises the bind_exec patch through the iterator that's created in asyncpg when "for record in conn.cursor" is called.
+    See https://github.com/MagicStack/asyncpg/blob/db8ecc2a38e16fb0c090aef6f5506547c2831c24/asyncpg/cursor.py#L234
+    """
     sentry_init(
         integrations=[AsyncPGIntegration()],
         traces_sample_rate=1.0,
@@ -1346,50 +1362,178 @@ async def test_query_source_cursor(
         items = capture_items("span")
         with sentry_sdk.traces.start_span(name="test_transaction"):
             conn: Connection = await connect(PG_CONNECTION_URI)
+
+            await conn.executemany(
+                "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
+                [
+                    ("Bob", "secret_pw", datetime.date(1984, 3, 1)),
+                    ("Alice", "pw", datetime.date(1990, 12, 25)),
+                ],
+            )
+
             async with conn.transaction():
-                async for _ in conn.cursor(
-                    "SELECT * FROM users WHERE dob > $1", datetime.date(1970, 1, 1)
+                async for record in conn.cursor(
+                    "SELECT * FROM users WHERE dob > $1",
+                    datetime.date(1970, 1, 1),
                 ):
                     pass
+
             await conn.close()
         sentry_sdk.flush()
 
         spans = [item.payload for item in items]
-        assert len(spans) == 5
+
+        assert len(spans) == 6
+
         connect_span = spans[0]
-        begin_span = spans[1]
-        query_span = spans[2]
-        commit_span = spans[3]
-        segment = spans[4]
+        executemany_span = spans[1]
+        begin_span = spans[2]
+        bind_exec_span = spans[3]
+        commit_span = spans[4]
+        segment = spans[5]
 
         assert connect_span["name"] == "connect"
+        assert (
+            executemany_span["name"]
+            == "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)"
+        )
         assert begin_span["name"] == "BEGIN;"
-        assert query_span["name"] == "SELECT * FROM users WHERE dob > $1"
+        assert bind_exec_span["name"] == "SELECT * FROM users WHERE dob > $1"
         assert commit_span["name"] == "COMMIT;"
         assert segment["name"] == "test_transaction"
+
+        assert bind_exec_span["attributes"]["sentry.origin"] == "auto.db.asyncpg"
+        assert bind_exec_span["attributes"]["sentry.op"] == "db"
+        assert bind_exec_span["attributes"]["db.system"] == "postgresql"
+        assert bind_exec_span["attributes"]["db.driver.name"] == "asyncpg"
+        assert bind_exec_span["attributes"]["server.address"] == PG_HOST
+        assert bind_exec_span["attributes"]["server.port"] == PG_PORT
+        assert bind_exec_span["attributes"]["db.name"] == PG_NAME
+        assert bind_exec_span["attributes"]["db.user"] == PG_USER
     else:
         events = capture_events()
+
         with start_transaction(name="test_transaction", sampled=True):
             conn: Connection = await connect(PG_CONNECTION_URI)
+
+            await conn.executemany(
+                "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
+                [
+                    ("Bob", "secret_pw", datetime.date(1984, 3, 1)),
+                    ("Alice", "pw", datetime.date(1990, 12, 25)),
+                ],
+            )
+
             async with conn.transaction():
-                async for _ in conn.cursor(
-                    "SELECT * FROM users WHERE dob > $1", datetime.date(1970, 1, 1)
+                async for record in conn.cursor(
+                    "SELECT * FROM users WHERE dob > $1",
+                    datetime.date(1970, 1, 1),
                 ):
                     pass
+
             await conn.close()
 
         (event,) = events
-        spans = event["spans"]
-        assert len(spans) == 4
 
-        connect_span = spans[0]
-        begin_span = spans[1]
-        query_span = spans[2]
-        commit_span = spans[3]
+        assert len(event["spans"]) == 5
+
+        connect_span = event["spans"][0]
+        executemany_span = event["spans"][1]
+        begin_span = event["spans"][2]
+        bind_exec_span = event["spans"][3]
+        commit_span = event["spans"][4]
 
         assert connect_span["description"] == "connect"
+        assert (
+            executemany_span["description"]
+            == "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)"
+        )
         assert begin_span["description"] == "BEGIN;"
-        assert query_span["description"] == "SELECT * FROM users WHERE dob > $1"
+        assert bind_exec_span["description"] == "SELECT * FROM users WHERE dob > $1"
         assert commit_span["description"] == "COMMIT;"
 
-    _assert_query_source(query_span, span_streaming, "test_query_source_cursor")
+        assert bind_exec_span["origin"] == "auto.db.asyncpg"
+        assert bind_exec_span["data"]["db.system"] == "postgresql"
+        assert bind_exec_span["data"]["db.driver.name"] == "asyncpg"
+        assert bind_exec_span["data"]["server.address"] == PG_HOST
+        assert bind_exec_span["data"]["server.port"] == PG_PORT
+        assert bind_exec_span["data"]["db.name"] == PG_NAME
+        assert bind_exec_span["data"]["db.user"] == PG_USER
+
+    _assert_query_source(
+        bind_exec_span,
+        span_streaming,
+        "test_cursor__bind_exec_creates_spans",
+    )
+
+
+@pytest.mark.asyncio
+async def test_cursor__bind_and__exec_methods_create_spans(
+    sentry_init, capture_events
+) -> None:
+    sentry_init(
+        integrations=[AsyncPGIntegration()],
+        traces_sample_rate=1.0,
+        enable_db_query_source=True,
+        db_query_source_threshold_ms=0,
+    )
+    events = capture_events()
+
+    with start_transaction(name="test_transaction"):
+        conn: Connection = await connect(PG_CONNECTION_URI)
+
+        await conn.executemany(
+            "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
+            [
+                ("Bob", "secret_pw", datetime.date(1984, 3, 1)),
+                ("Alice", "pw", datetime.date(1990, 12, 25)),
+            ],
+        )
+
+        async with conn.transaction():
+            # This exercises the `_bind` patch and the `cursor` patch
+            cur = await conn.cursor(
+                "SELECT * FROM users WHERE dob > $1", datetime.date(1970, 1, 1)
+            )
+            # These exercise the `_exec` patch
+            await cur.fetchrow()
+            await cur.fetchrow()
+
+        await conn.close()
+
+    (event,) = events
+
+    assert len(event["spans"]) == 7
+
+    connect_span = event["spans"][0]
+    executemany_span = event["spans"][1]
+    begin_span = event["spans"][2]
+    cursor_creation_and_bind_span = event["spans"][3]
+    fetchrow_span_1 = event["spans"][4]
+    fetchrow_span_2 = event["spans"][5]
+    commit_span = event["spans"][6]
+
+    assert connect_span["description"] == "connect"
+    assert (
+        executemany_span["description"]
+        == "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)"
+    )
+    assert begin_span["description"] == "BEGIN;"
+    assert fetchrow_span_1["description"] == "SELECT * FROM users WHERE dob > $1"
+    assert (
+        cursor_creation_and_bind_span["description"]
+        == "SELECT * FROM users WHERE dob > $1"
+    )
+    assert fetchrow_span_2["description"] == "SELECT * FROM users WHERE dob > $1"
+    assert commit_span["description"] == "COMMIT;"
+
+    for span in (cursor_creation_and_bind_span, fetchrow_span_1, fetchrow_span_2):
+        assert span["data"]["db.cursor"] is not None
+        assert span["data"]["db.system"] == "postgresql"
+        assert span["data"]["db.driver.name"] == "asyncpg"
+        assert span["origin"] == "auto.db.asyncpg"
+        _assert_query_source(
+            span,
+            False,
+            "test_cursor__bind_and__exec_methods_create_spans",
+        )
