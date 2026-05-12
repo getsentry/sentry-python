@@ -186,7 +186,7 @@ async def test_agent_invocation_span_no_pii(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=False,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             items = capture_items("span", "transaction")
@@ -249,7 +249,7 @@ async def test_agent_invocation_span_no_pii(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=False,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
             events = capture_events()
 
@@ -404,7 +404,7 @@ async def test_agent_invocation_span(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             items = capture_items("span", "transaction")
@@ -573,7 +573,7 @@ async def test_agent_invocation_span(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
             events = capture_events()
 
@@ -762,7 +762,7 @@ async def test_client_span_custom_model(
             sentry_init(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             items = capture_items("span")
@@ -790,7 +790,7 @@ async def test_client_span_custom_model(
             sentry_init(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
             events = capture_events()
 
@@ -840,7 +840,7 @@ def test_agent_invocation_span_sync_no_pii(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=False,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             items = capture_items("span", "transaction")
@@ -900,7 +900,7 @@ def test_agent_invocation_span_sync_no_pii(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=False,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
             events = capture_events()
 
@@ -1051,7 +1051,7 @@ def test_agent_invocation_span_sync(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             items = capture_items("span", "transaction")
@@ -1200,7 +1200,7 @@ def test_agent_invocation_span_sync(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             events = capture_events()
@@ -1449,7 +1449,7 @@ async def test_handoff_span(
             sentry_init(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             items = capture_items("transaction", "span")
@@ -1482,7 +1482,7 @@ async def test_handoff_span(
             sentry_init(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
             events = capture_events()
 
@@ -1619,7 +1619,7 @@ async def test_max_turns_before_handoff_span(
             sentry_init(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             items = capture_items("transaction", "span")
@@ -1652,7 +1652,7 @@ async def test_max_turns_before_handoff_span(
             sentry_init(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
             events = capture_events()
 
@@ -1756,7 +1756,7 @@ async def test_tool_execution_span(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             items = capture_items("transaction", "span")
@@ -1970,7 +1970,7 @@ async def test_tool_execution_span(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             events = capture_events()
@@ -2458,7 +2458,7 @@ async def test_model_behavior_error(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             items = capture_items("span", "transaction")
@@ -2512,7 +2512,7 @@ async def test_model_behavior_error(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
             events = capture_events()
 
@@ -2566,7 +2566,7 @@ async def test_error_handling(
                     LoggingIntegration(event_level=logging.CRITICAL),
                 ],
                 traces_sample_rate=1.0,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             items = capture_items("event", "span", "transaction")
@@ -2613,7 +2613,7 @@ async def test_error_handling(
                     LoggingIntegration(event_level=logging.CRITICAL),
                 ],
                 traces_sample_rate=1.0,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
             events = capture_events()
 
@@ -2689,7 +2689,7 @@ async def test_error_captures_input_data(
                 ],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             items = capture_items("event", "span")
@@ -2732,7 +2732,7 @@ async def test_error_captures_input_data(
                 ],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             events = capture_events()
@@ -2785,7 +2785,7 @@ async def test_span_status_error(
                     LoggingIntegration(event_level=logging.CRITICAL),
                 ],
                 traces_sample_rate=1.0,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             items = capture_items("event", "transaction", "span")
@@ -2814,7 +2814,7 @@ async def test_span_status_error(
                     LoggingIntegration(event_level=logging.CRITICAL),
                 ],
                 traces_sample_rate=1.0,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             events = capture_events()
@@ -2933,7 +2933,7 @@ async def test_mcp_tool_execution_spans(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             items = capture_items("span", "transaction")
@@ -2979,7 +2979,7 @@ async def test_mcp_tool_execution_spans(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
             events = capture_events()
 
@@ -3115,7 +3115,7 @@ async def test_mcp_tool_execution_with_error(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             items = capture_items("span", "transaction")
@@ -3154,7 +3154,7 @@ async def test_mcp_tool_execution_with_error(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
             events = capture_events()
 
@@ -3287,7 +3287,7 @@ async def test_mcp_tool_execution_without_pii(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=False,  # PII disabled
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             items = capture_items("span", "transaction")
@@ -3325,7 +3325,7 @@ async def test_mcp_tool_execution_without_pii(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=False,  # PII disabled
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
             events = capture_events()
 
@@ -3387,7 +3387,7 @@ async def test_multiple_agents_asyncio(
             sentry_init(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             items = capture_items("span", "transaction")
@@ -3417,7 +3417,7 @@ async def test_multiple_agents_asyncio(
             sentry_init(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
             events = capture_events()
 
@@ -3567,7 +3567,7 @@ async def test_tool_execution_error_tracing(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
             items = capture_items("span", "transaction")
 
@@ -3609,7 +3609,7 @@ async def test_tool_execution_error_tracing(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
             events = capture_events()
 
@@ -3712,7 +3712,7 @@ async def test_invoke_agent_span_includes_usage_data(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
             items = capture_items("span", "transaction")
 
@@ -3752,7 +3752,7 @@ async def test_invoke_agent_span_includes_usage_data(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
             events = capture_events()
 
@@ -3848,7 +3848,7 @@ async def test_ai_client_span_includes_response_model(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
             items = capture_items("span", "transaction")
 
@@ -3880,7 +3880,7 @@ async def test_ai_client_span_includes_response_model(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
             events = capture_events()
 
@@ -3971,7 +3971,7 @@ async def test_ai_client_span_response_model_with_chat_completions(
             sentry_init(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             items = capture_items("span", "transaction")
@@ -4002,7 +4002,7 @@ async def test_ai_client_span_response_model_with_chat_completions(
             sentry_init(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
             events = capture_events()
 
@@ -4129,7 +4129,7 @@ async def test_multiple_llm_calls_aggregate_usage(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             items = capture_items("span", "transaction")
@@ -4167,7 +4167,7 @@ async def test_multiple_llm_calls_aggregate_usage(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
             events = capture_events()
 
@@ -4261,7 +4261,7 @@ async def test_invoke_agent_span_includes_response_model(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             items = capture_items("span", "transaction")
@@ -4306,7 +4306,7 @@ async def test_invoke_agent_span_includes_response_model(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
             events = capture_events()
 
@@ -4441,7 +4441,7 @@ async def test_invoke_agent_span_uses_last_response_model(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             items = capture_items("span", "transaction")
@@ -4485,7 +4485,7 @@ async def test_invoke_agent_span_uses_last_response_model(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 send_default_pii=True,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
             events = capture_events()
 
@@ -4795,7 +4795,7 @@ async def test_conversation_id_on_all_spans(
             sentry_init(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             items = capture_items("span", "transaction")
@@ -4843,7 +4843,7 @@ async def test_conversation_id_on_all_spans(
             sentry_init(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
             events = capture_events()
 
@@ -4984,7 +4984,7 @@ async def test_conversation_id_on_tool_span(
             sentry_init(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             items = capture_items("span", "transaction")
@@ -5026,7 +5026,7 @@ async def test_conversation_id_on_tool_span(
             sentry_init(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             events = capture_events()
@@ -5095,7 +5095,7 @@ async def test_no_conversation_id_when_not_provided(
             sentry_init(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             items = capture_items("span", "transaction")
@@ -5134,7 +5134,7 @@ async def test_no_conversation_id_when_not_provided(
             sentry_init(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
-                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                stream_gen_ai_spans=stream_gen_ai_spans,
             )
 
             events = capture_events()

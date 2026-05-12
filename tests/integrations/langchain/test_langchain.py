@@ -273,7 +273,7 @@ def test_langchain_text_completion(
         ],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     model_response = get_model_response(
@@ -395,7 +395,7 @@ def test_langchain_chat_with_run_name(
         ],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     request_headers = {}
@@ -484,7 +484,7 @@ def test_langchain_tool_call_with_run_name(
         ],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
     if stream_gen_ai_spans:
         items = capture_items("span")
@@ -566,7 +566,7 @@ def test_langchain_create_agent(
         ],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     model_response = get_model_response(
@@ -766,7 +766,7 @@ def test_tool_execution_span(
         ],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     responses = responses_tool_call_model_responses(
@@ -1056,7 +1056,7 @@ def test_langchain_openai_tools_agent_no_prompts(
         ],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -1328,7 +1328,7 @@ def test_langchain_openai_tools_agent(
         ],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -1605,7 +1605,7 @@ def test_langchain_openai_tools_agent_with_config(
         ],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -1726,7 +1726,7 @@ def test_langchain_openai_tools_agent_stream_no_prompts(
         ],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -2000,7 +2000,7 @@ def test_langchain_openai_tools_agent_stream(
         ],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -2293,7 +2293,7 @@ def test_langchain_openai_tools_agent_stream_with_config(
         ],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -2400,7 +2400,7 @@ def test_langchain_error(
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -2454,7 +2454,7 @@ def test_span_status_error(
     sentry_init(
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
     if stream_gen_ai_spans:
         items = capture_items("event", "transaction", "span")
@@ -2761,7 +2761,7 @@ def test_langchain_message_role_mapping(
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -2963,7 +2963,7 @@ def test_langchain_message_truncation(
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
@@ -3114,7 +3114,7 @@ def test_langchain_embeddings_sync(
         integrations=[LangchainIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
     if stream_gen_ai_spans:
         items = capture_items("span")
@@ -3262,7 +3262,7 @@ def test_langchain_embeddings_embed_query(
         integrations=[LangchainIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
     if stream_gen_ai_spans:
         items = capture_items("span")
@@ -3403,7 +3403,7 @@ async def test_langchain_embeddings_async(
         integrations=[LangchainIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     async def mock_aembed_documents(self, texts):
@@ -3554,7 +3554,7 @@ async def test_langchain_embeddings_aembed_query(
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     async def mock_aembed_query(self, text):
@@ -3671,7 +3671,7 @@ def test_langchain_embeddings_no_model_name(
     sentry_init(
         integrations=[LangchainIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
     if stream_gen_ai_spans:
         items = capture_items("span")
@@ -3772,7 +3772,7 @@ def test_langchain_embeddings_integration_disabled(
 
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     # Initialize without LangchainIntegration
@@ -3844,7 +3844,7 @@ def test_langchain_embeddings_multiple_providers(
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
     if stream_gen_ai_spans:
         items = capture_items("span")
@@ -3999,7 +3999,7 @@ def test_langchain_embeddings_multiple_calls(
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
     if stream_gen_ai_spans:
         items = capture_items("span")
@@ -4125,7 +4125,7 @@ def test_langchain_embeddings_span_hierarchy(
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
     if stream_gen_ai_spans:
         items = capture_items("transaction", "span")
@@ -4235,7 +4235,7 @@ def test_langchain_embeddings_with_list_and_string_inputs(
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
     if stream_gen_ai_spans:
         items = capture_items("span")
@@ -4359,7 +4359,7 @@ def test_langchain_response_model_extraction(
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
@@ -4718,7 +4718,7 @@ def test_langchain_ai_system_detection(
     sentry_init(
         integrations=[LangchainIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)

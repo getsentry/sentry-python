@@ -103,7 +103,7 @@ def test_nonstreaming_create_message(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = Anthropic(api_key="z")
@@ -238,7 +238,7 @@ async def test_nonstreaming_create_message_async(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = AsyncAnthropic(api_key="z")
@@ -409,7 +409,7 @@ def test_streaming_create_message(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [
@@ -574,7 +574,7 @@ def test_streaming_create_message_close(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [
@@ -726,7 +726,7 @@ def test_streaming_create_message_api_error(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [
@@ -891,7 +891,7 @@ def test_stream_messages(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [
@@ -1055,7 +1055,7 @@ def test_stream_messages_close(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [
@@ -1215,7 +1215,7 @@ def test_stream_messages_api_error(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [
@@ -1386,7 +1386,7 @@ async def test_streaming_create_message_async(
         traces_sample_rate=1.0,
         default_integrations=False,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [
@@ -1555,7 +1555,7 @@ async def test_streaming_create_message_async_close(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [
@@ -1709,7 +1709,7 @@ async def test_streaming_create_message_async_api_error(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [
@@ -1879,7 +1879,7 @@ async def test_stream_message_async(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [
@@ -2044,7 +2044,7 @@ async def test_stream_messages_async_api_error(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [
@@ -2205,7 +2205,7 @@ async def test_stream_messages_async_close(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [
@@ -2417,7 +2417,7 @@ def test_streaming_create_message_with_input_json_delta(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [
@@ -2619,7 +2619,7 @@ def test_stream_messages_with_input_json_delta(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [
@@ -2827,7 +2827,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [
@@ -3037,7 +3037,7 @@ async def test_stream_message_with_input_json_delta_async(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [
@@ -3154,7 +3154,7 @@ def test_exception_message_create(
     sentry_init(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = Anthropic(api_key="z")
@@ -3202,7 +3202,7 @@ def test_span_status_error(
     sentry_init(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
     if stream_gen_ai_spans:
         items = capture_items("event", "span")
@@ -3264,7 +3264,7 @@ async def test_span_status_error_async(
     sentry_init(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
     if stream_gen_ai_spans:
         items = capture_items("event", "span")
@@ -3326,7 +3326,7 @@ async def test_exception_message_create_async(
     sentry_init(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = AsyncAnthropic(api_key="z")
@@ -3373,7 +3373,7 @@ def test_span_origin(
     sentry_init(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = Anthropic(api_key="z")
@@ -3423,7 +3423,7 @@ async def test_span_origin_async(
     sentry_init(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = AsyncAnthropic(api_key="z")
@@ -3561,7 +3561,7 @@ def test_anthropic_message_role_mapping(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = Anthropic(api_key="z")
@@ -3637,7 +3637,7 @@ def test_anthropic_message_truncation(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = Anthropic(api_key="z")
@@ -3729,7 +3729,7 @@ async def test_anthropic_message_truncation_async(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = AsyncAnthropic(api_key="z")
@@ -3837,7 +3837,7 @@ def test_nonstreaming_create_message_with_system_prompt(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = Anthropic(api_key="z")
@@ -3994,7 +3994,7 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = AsyncAnthropic(api_key="z")
@@ -4191,7 +4191,7 @@ def test_streaming_create_message_with_system_prompt(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [
@@ -4388,7 +4388,7 @@ def test_stream_messages_with_system_prompt(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [
@@ -4578,7 +4578,7 @@ async def test_stream_message_with_system_prompt_async(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [
@@ -4773,7 +4773,7 @@ async def test_streaming_create_message_with_system_prompt_async(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [
@@ -4917,7 +4917,7 @@ def test_system_prompt_with_complex_structure(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = Anthropic(api_key="z")
@@ -5215,7 +5215,7 @@ def test_message_with_base64_image(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = Anthropic(api_key="z")
@@ -5289,7 +5289,7 @@ def test_message_with_url_image(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = Anthropic(api_key="z")
@@ -5356,7 +5356,7 @@ def test_message_with_file_image(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = Anthropic(api_key="z")
@@ -5424,7 +5424,7 @@ def test_message_with_base64_pdf(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = Anthropic(api_key="z")
@@ -5492,7 +5492,7 @@ def test_message_with_url_pdf(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = Anthropic(api_key="z")
@@ -5559,7 +5559,7 @@ def test_message_with_file_document(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = Anthropic(api_key="z")
@@ -5627,7 +5627,7 @@ def test_message_with_mixed_content(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = Anthropic(api_key="z")
@@ -5733,7 +5733,7 @@ def test_message_with_multiple_images_different_formats(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = Anthropic(api_key="z")
@@ -5831,7 +5831,7 @@ def test_binary_content_not_stored_when_pii_disabled(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=False,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = Anthropic(api_key="z")
@@ -5891,7 +5891,7 @@ def test_binary_content_not_stored_when_prompts_disabled(
         integrations=[AnthropicIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = Anthropic(api_key="z")
@@ -5950,7 +5950,7 @@ def test_cache_tokens_nonstreaming(
     sentry_init(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = Anthropic(api_key="z")
@@ -6028,7 +6028,7 @@ def test_input_tokens_include_cache_write_nonstreaming(
     sentry_init(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = Anthropic(api_key="z")
@@ -6110,7 +6110,7 @@ def test_input_tokens_include_cache_read_nonstreaming(
     sentry_init(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = Anthropic(api_key="z")
@@ -6216,7 +6216,7 @@ def test_input_tokens_include_cache_read_streaming(
     sentry_init(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     if stream_gen_ai_spans:
@@ -6315,7 +6315,7 @@ def test_stream_messages_input_tokens_include_cache_read_streaming(
     sentry_init(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     if stream_gen_ai_spans:
@@ -6382,7 +6382,7 @@ def test_input_tokens_unchanged_without_caching(
     sentry_init(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = Anthropic(api_key="z")
@@ -6474,7 +6474,7 @@ def test_cache_tokens_streaming(
     sentry_init(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     if stream_gen_ai_spans:
@@ -6568,7 +6568,7 @@ def test_stream_messages_cache_tokens(
     sentry_init(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     if stream_gen_ai_spans:

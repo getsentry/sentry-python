@@ -68,7 +68,7 @@ async def test_agent_run_async(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_agent = get_test_agent()
@@ -150,7 +150,7 @@ async def test_agent_run_async_model_error(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     def failing_model(messages, info):
@@ -205,7 +205,7 @@ async def test_agent_run_async_usage_data(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_agent = get_test_agent()
@@ -269,7 +269,7 @@ def test_agent_run_sync(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_agent = get_test_agent()
@@ -336,7 +336,7 @@ def test_agent_run_sync_model_error(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     def failing_model(messages, info):
@@ -391,7 +391,7 @@ async def test_agent_run_stream(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_agent = get_test_agent()
@@ -478,7 +478,7 @@ async def test_agent_run_stream_events(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     # Consume all events
@@ -545,7 +545,7 @@ async def test_agent_with_tools(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_agent = get_test_agent()
@@ -651,7 +651,7 @@ async def test_agent_with_tool_model_retry(
         ],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     retries = 0
@@ -790,7 +790,7 @@ async def test_agent_with_tool_validation_error(
         ],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_agent = get_test_agent()
@@ -910,7 +910,7 @@ async def test_agent_with_tools_streaming(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_agent = get_test_agent()
@@ -994,7 +994,7 @@ async def test_model_settings(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_agent_with_settings = get_test_agent_with_settings()
@@ -1068,7 +1068,7 @@ async def test_system_prompt_attribute(
         integrations=[PydanticAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     if stream_gen_ai_spans:
@@ -1147,7 +1147,7 @@ async def test_error_handling(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     if stream_gen_ai_spans:
@@ -1190,7 +1190,7 @@ async def test_without_pii(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=False,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     if stream_gen_ai_spans:
@@ -1244,7 +1244,7 @@ async def test_without_pii_tools(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=False,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_agent = get_test_agent()
@@ -1304,7 +1304,7 @@ async def test_multiple_agents_concurrent(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_agent = get_test_agent()
@@ -1363,7 +1363,7 @@ async def test_message_history(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     # Second message with history
@@ -1444,7 +1444,7 @@ async def test_gen_ai_system(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_agent = get_test_agent()
@@ -1500,7 +1500,7 @@ async def test_include_prompts_false(
         integrations=[PydanticAIIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
         send_default_pii=True,  # Even with PII enabled, prompts should not be captured
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_agent = get_test_agent()
@@ -1554,7 +1554,7 @@ async def test_include_prompts_true(
         integrations=[PydanticAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_agent = get_test_agent()
@@ -1608,7 +1608,7 @@ async def test_include_prompts_false_with_tools(
         integrations=[PydanticAIIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_agent = get_test_agent()
@@ -1669,7 +1669,7 @@ async def test_include_prompts_requires_pii(
         integrations=[PydanticAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=False,  # PII disabled
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_agent = get_test_agent()
@@ -1784,7 +1784,7 @@ async def test_mcp_tool_execution_spans(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     if stream_gen_ai_spans:
@@ -2080,7 +2080,7 @@ async def test_invoke_agent_with_list_user_prompt(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     if stream_gen_ai_spans:
@@ -2146,7 +2146,7 @@ async def test_invoke_agent_with_instructions(
         integrations=[PydanticAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     if stream_gen_ai_spans:
@@ -2307,7 +2307,7 @@ async def test_usage_data_partial(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     if stream_gen_ai_spans:
@@ -2358,7 +2358,7 @@ async def test_agent_data_from_scope(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     if stream_gen_ai_spans:
@@ -2397,7 +2397,7 @@ async def test_available_tools_without_description(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_agent = get_test_agent()
@@ -2454,7 +2454,7 @@ async def test_output_with_tool_calls(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_agent = get_test_agent()
@@ -2525,7 +2525,7 @@ async def test_message_formatting_with_different_parts(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     # Create message history with different part types
@@ -2651,7 +2651,7 @@ async def test_agent_without_name(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     if stream_gen_ai_spans:
@@ -2849,7 +2849,7 @@ async def test_message_parts_with_tool_return(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     if stream_gen_ai_spans:
@@ -3775,7 +3775,7 @@ async def test_binary_content_encoding_image(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     if stream_gen_ai_spans:
@@ -3830,7 +3830,7 @@ async def test_binary_content_encoding_mixed_content(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     if stream_gen_ai_spans:
@@ -3901,7 +3901,7 @@ async def test_binary_content_in_agent_run(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     binary_content = BinaryContent(
@@ -3957,7 +3957,7 @@ async def test_set_usage_data_with_cache_tokens(
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     if stream_gen_ai_spans:
@@ -4053,7 +4053,7 @@ def test_image_url_base64_content_in_span(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     found_image = False
@@ -4157,7 +4157,7 @@ async def test_invoke_agent_image_url(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     agent = Agent("test", name="test_image_url_agent")
@@ -4233,7 +4233,7 @@ async def test_tool_description_in_execute_tool_span(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     if stream_gen_ai_spans:
