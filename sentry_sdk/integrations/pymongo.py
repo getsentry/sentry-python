@@ -141,6 +141,10 @@ class CommandTracer(monitoring.CommandListener):
 
             db_data = _get_db_data(event)
 
+            collection_name = command.get(event.command_name)
+            operation_name = event.command_name
+            db_name = event.database_name
+
             lsid = command.pop("lsid", None)
             if not should_send_default_pii():
                 command = _strip_pii(command)
@@ -149,11 +153,8 @@ class CommandTracer(monitoring.CommandListener):
 
             if has_span_streaming_enabled(client.options):
                 span_first_data = {
-                    "db.namespace": event.database_name,
-                    "db.system.name": "mongodb",
-                    SPANDATA.DB_DRIVER_NAME: "pymongo",
-                    "db.operation.name": event.command_name,
-                    "db.collection.name": command.get(event.command_name),
+                    "db.operation.name": operation_name,
+                    "db.collection.name": collection_name,
                     "sentry.op": OP.DB,
                     "sentry.origin": PyMongoIntegration.origin,
                     **db_data,
@@ -173,13 +174,13 @@ class CommandTracer(monitoring.CommandListener):
 
             else:
                 tags = {
-                    "db.name": event.database_name,
+                    "db.name": db_name,
                     SPANDATA.DB_SYSTEM: "mongodb",
                     SPANDATA.DB_DRIVER_NAME: "pymongo",
-                    SPANDATA.DB_OPERATION: event.command_name,
+                    SPANDATA.DB_OPERATION: operation_name,
                     # The below is a deprecated field, but leaving for legacy reasons.
                     # The v2 spans will use `db.collection.name` instead.
-                    SPANDATA.DB_MONGODB_COLLECTION: command.get(event.command_name),
+                    SPANDATA.DB_MONGODB_COLLECTION: collection_name,
                 }
 
                 try:
