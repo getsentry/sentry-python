@@ -153,10 +153,6 @@ class Batcher(Generic[T]):
                 },
                 payload=PayloadRef(
                     json={
-                        "ingest_settings": {
-                            "infer_ip": "never",
-                            "infer_user_agent": "never",
-                        },
                         "version": 2,
                         "items": [
                             self._to_transport_format(item) for item in self._buffer
