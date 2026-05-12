@@ -1262,7 +1262,7 @@ async def test_cursor__bind_and__exec_methods_create_spans(
             cur = await conn.cursor(
                 "SELECT * FROM users WHERE dob > $1", datetime.date(1970, 1, 1)
             )
-            # These exercises the `_exec` patch
+            # These exercise the `_exec` patch
             await cur.fetchrow()
             await cur.fetchrow()
 
