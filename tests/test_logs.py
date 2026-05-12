@@ -466,6 +466,7 @@ def test_transport_format(sentry_init, capture_envelopes):
         "content_type": "application/vnd.sentry.items.log+json",
     }
     assert item.payload.json == {
+        "version": 2,
         "items": [
             {
                 "body": "This is a log...",
@@ -504,7 +505,7 @@ def test_transport_format(sentry_init, capture_envelopes):
                     },
                 },
             }
-        ]
+        ],
     }
 
 
