@@ -12,32 +12,54 @@
         # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-22.04]
 
-    {% if needs_docker %}
+    {% if needs_postgres or needs_mysql or needs_docker %}
     services:
-      docker:
-        image: docker:dind  # Required for Docker network management
-        options: --privileged  # Required for Docker-in-Docker operations
-    {% endif %}
     {% if needs_postgres %}
-    services:
       postgres:
         image: postgres
         env:
           POSTGRES_PASSWORD: sentry
-        # Set health checks to wait until postgres has started
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-        # Maps tcp port 5432 on service container to the host
         ports:
           - 5432:5432
+    {% endif %}
+    {% if needs_mysql %}
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: test
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+        ports:
+          - 3306:3306
+    {% endif %}
+    {% if needs_docker %}
+      docker:
+        image: docker:dind  # Required for Docker network management
+        options: --privileged  # Required for Docker-in-Docker operations
+    {% endif %}
+    {% endif %}
+    {% if needs_postgres or needs_mysql %}
     env:
+    {% if needs_postgres %}
       SENTRY_PYTHON_TEST_POSTGRES_HOST: {% raw %}${{ matrix.python-version == '3.6' && 'postgres' || 'localhost' }}{% endraw %}
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
-
+    {% endif %}
+    {% if needs_mysql %}
+      SENTRY_PYTHON_TEST_MYSQL_HOST: {% raw %}${{ matrix.python-version == '3.6' && 'mysql' || 'localhost' }}{% endraw %}
+      SENTRY_PYTHON_TEST_MYSQL_USER: root
+      SENTRY_PYTHON_TEST_MYSQL_PASSWORD: root
+      SENTRY_PYTHON_TEST_MYSQL_DB: test
+    {% endif %}
     {% endif %}
     # Use Docker container only for Python 3.6
     {% raw %}container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}{% endraw %}

@@ -46,6 +46,10 @@ FRAMEWORKS_NEEDING_POSTGRES = {
     "asyncpg",
 }
 
+FRAMEWORKS_NEEDING_MYSQL = {
+    "aiomysql",
+}
+
 FRAMEWORKS_NEEDING_REDIS = {
     "celery",
 }
@@ -99,6 +103,7 @@ GROUPS = {
         "gcp",
     ],
     "DBs": [
+        "aiomysql",
         "asyncpg",
         "clickhouse_driver",
         "pymongo",
@@ -324,6 +329,7 @@ def render_template(group, frameworks, py_versions):
         "frameworks": frameworks,
         "needs_clickhouse": bool(set(frameworks) & FRAMEWORKS_NEEDING_CLICKHOUSE),
         "needs_docker": bool(set(frameworks) & FRAMEWORKS_NEEDING_DOCKER),
+        "needs_mysql": bool(set(frameworks) & FRAMEWORKS_NEEDING_MYSQL),
         "needs_postgres": bool(set(frameworks) & FRAMEWORKS_NEEDING_POSTGRES),
         "needs_redis": bool(set(frameworks) & FRAMEWORKS_NEEDING_REDIS),
         "needs_java": bool(set(frameworks) & FRAMEWORKS_NEEDING_JAVA),
