@@ -1538,5 +1538,5 @@ async def test_cursor_bind_and_exec_methods_create_spans(
         _assert_query_source(
             span,
             False,
-            "test_cursor__exec_methods_create_spans",
+            "test_cursor_bind_and_exec_methods_create_spans",
         )
