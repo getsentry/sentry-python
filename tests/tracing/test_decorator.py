@@ -359,11 +359,12 @@ def test_span_templates_ai_objects(
             presence_penalty=2.0,
         )
 
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+    )
+
     if stream_gen_ai_spans:
-        sentry_init(
-            traces_sample_rate=1.0,
-            _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
-        )
         items = capture_items("span")
 
         with sentry_sdk.start_transaction(name="test-transaction"):

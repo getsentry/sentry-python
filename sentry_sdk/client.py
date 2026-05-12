@@ -174,11 +174,12 @@ def _serialized_v1_span_to_serialized_v2_span(
         res["span_id"] = span["span_id"]
 
     if "description" in span:
-        res["name"] = span["description"]
-    elif (
-        "op" in span
-    ):  # fallback based on observed downstream fallback for transactions
-        res["name"] = span["op"]
+        description = span["description"]
+
+        if description is None and "op" in span:
+            description = span["op"]
+
+        res["name"] = description
 
     if "start_timestamp" in span:
         start_timestamp = None
@@ -1082,6 +1083,8 @@ class _Client(BaseClient):
         event_id = event.get("event_id")
         if event_id is None:
             event["event_id"] = event_id = uuid.uuid4().hex
+
+        span_recorder_has_gen_ai_span = event.pop("_has_gen_ai_span", False)
         event_opt = self._prepare_event(event, hint, scope)
         if event_opt is None:
             return None
@@ -1120,8 +1123,6 @@ class _Client(BaseClient):
         if is_transaction and isinstance(profile, Profile):
             envelope.add_profile(profile.to_json(event_opt, self.options))
 
-        span_recorder_has_gen_ai_span = event.pop("_has_gen_ai_span", False)
-
         if is_transaction and not span_recorder_has_gen_ai_span:
             envelope.add_transaction(event_opt)
         elif is_transaction:
@@ -1135,7 +1136,7 @@ class _Client(BaseClient):
                 envelope.add_transaction(event_opt)
 
                 converted_gen_ai_spans = [
-                    _serialized_v1_span_to_serialized_v2_span(span, event)
+                    _serialized_v1_span_to_serialized_v2_span(span, event_opt)
                     for span in gen_ai_spans
                     if isinstance(span, dict)
                 ]
@@ -1148,7 +1149,10 @@ class _Client(BaseClient):
                             "item_count": len(converted_gen_ai_spans),
                         },
                         payload=PayloadRef(
-                            json={"items": converted_gen_ai_spans},
+                            json={
+                                "version": 2,
+                                "items": converted_gen_ai_spans,
+                            },
                         ),
                     )
                 )

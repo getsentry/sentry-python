@@ -156,7 +156,7 @@ def test_nonstreaming_chat_completion(
         integrations=[LiteLLMIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -299,7 +299,7 @@ async def test_async_nonstreaming_chat_completion(
         integrations=[LiteLLMIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -445,7 +445,7 @@ def test_streaming_chat_completion(
         integrations=[LiteLLMIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -553,7 +553,7 @@ async def test_async_streaming_chat_completion(
         integrations=[LiteLLMIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -658,7 +658,7 @@ def test_embeddings_create(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = OpenAI(api_key="test-key")
@@ -777,7 +777,7 @@ async def test_async_embeddings_create(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = AsyncOpenAI(api_key="test-key")
@@ -892,7 +892,7 @@ def test_embeddings_create_with_list_input(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = OpenAI(api_key="test-key")
@@ -1003,7 +1003,7 @@ async def test_async_embeddings_create_with_list_input(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = AsyncOpenAI(api_key="test-key")
@@ -1115,7 +1115,7 @@ def test_embeddings_no_pii(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=False,  # PII disabled
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = OpenAI(api_key="test-key")
@@ -1213,7 +1213,7 @@ async def test_async_embeddings_no_pii(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=False,  # PII disabled
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = AsyncOpenAI(api_key="test-key")
@@ -1308,7 +1308,7 @@ def test_exception_handling(
     sentry_init(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1374,7 +1374,7 @@ async def test_async_exception_handling(
     sentry_init(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1441,7 +1441,7 @@ def test_span_origin(
     sentry_init(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1523,7 +1523,7 @@ def test_multiple_providers(
     sentry_init(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1698,7 +1698,7 @@ async def test_async_multiple_providers(
     sentry_init(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1877,7 +1877,7 @@ def test_additional_parameters(
     sentry_init(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1986,7 +1986,7 @@ async def test_async_additional_parameters(
     sentry_init(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -2096,7 +2096,7 @@ def test_no_integration(
     """Test that when integration is not enabled, callbacks don't break."""
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -2181,7 +2181,7 @@ async def test_async_no_integration(
     """Test that when integration is not enabled, callbacks don't break."""
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -2266,7 +2266,7 @@ def test_response_without_usage(
     sentry_init(
         integrations=[LiteLLMIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -2417,7 +2417,7 @@ def test_binary_content_encoding_image_url(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [
@@ -2537,7 +2537,7 @@ async def test_async_binary_content_encoding_image_url(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [
@@ -2659,7 +2659,7 @@ def test_binary_content_encoding_mixed_content(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [
@@ -2768,7 +2768,7 @@ async def test_async_binary_content_encoding_mixed_content(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [
@@ -2881,7 +2881,7 @@ def test_binary_content_encoding_uri_type(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [
@@ -2998,7 +2998,7 @@ async def test_async_binary_content_encoding_uri_type(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     messages = [

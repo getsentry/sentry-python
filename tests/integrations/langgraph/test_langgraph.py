@@ -160,7 +160,7 @@ def test_state_graph_compile(
         integrations=[LanggraphIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     graph = MockStateGraph()
@@ -365,7 +365,7 @@ def test_pregel_ainvoke(
         integrations=[LanggraphIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_state = {"messages": [MockMessage("What's the weather like?", name="user")]}
@@ -513,7 +513,7 @@ def test_pregel_invoke_error(
         integrations=[LanggraphIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_state = {"messages": [MockMessage("This will fail")]}
@@ -575,7 +575,7 @@ def test_pregel_ainvoke_error(
         integrations=[LanggraphIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_state = {"messages": [MockMessage("This will fail async")]}
@@ -635,7 +635,7 @@ def test_span_origin(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     graph = MockStateGraph()
@@ -688,7 +688,7 @@ def test_pregel_invoke_with_different_graph_names(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     pregel = MockPregelInstance(graph_name) if graph_name else MockPregelInstance()
@@ -769,7 +769,7 @@ def test_pregel_invoke_span_includes_usage_data(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_state = {
@@ -885,7 +885,7 @@ def test_pregel_ainvoke_span_includes_usage_data(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_state = {
@@ -1001,7 +1001,7 @@ def test_pregel_invoke_multiple_llm_calls_aggregate_usage(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_state = {
@@ -1116,7 +1116,7 @@ def test_pregel_ainvoke_multiple_llm_calls_aggregate_usage(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_state = {
@@ -1231,7 +1231,7 @@ def test_pregel_invoke_span_includes_response_model(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_state = {
@@ -1340,7 +1340,7 @@ def test_pregel_ainvoke_span_includes_response_model(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_state = {
@@ -1449,7 +1449,7 @@ def test_pregel_invoke_span_uses_last_response_model(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_state = {
@@ -1569,7 +1569,7 @@ def test_pregel_ainvoke_span_uses_last_response_model(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     test_state = {
@@ -1734,7 +1734,7 @@ def test_extraction_functions_complex_scenario(
         integrations=[LanggraphIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     pregel = MockPregelInstance("complex_graph")
@@ -1845,7 +1845,7 @@ def test_langgraph_message_role_mapping(
         integrations=[LanggraphIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     # Mock a langgraph message with mixed roles
