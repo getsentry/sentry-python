@@ -1083,6 +1083,8 @@ class _Client(BaseClient):
         event_id = event.get("event_id")
         if event_id is None:
             event["event_id"] = event_id = uuid.uuid4().hex
+
+        span_recorder_has_gen_ai_span = event.pop("_has_gen_ai_span", False)
         event_opt = self._prepare_event(event, hint, scope)
         if event_opt is None:
             return None
@@ -1120,10 +1122,6 @@ class _Client(BaseClient):
 
         if is_transaction and isinstance(profile, Profile):
             envelope.add_profile(profile.to_json(event_opt, self.options))
-
-        span_recorder_has_gen_ai_span = event.pop("_has_gen_ai_span", False)
-        if "_has_gen_ai_span" in event_opt:
-            del event_opt["_has_gen_ai_span"]
 
         if is_transaction and not span_recorder_has_gen_ai_span:
             envelope.add_transaction(event_opt)
