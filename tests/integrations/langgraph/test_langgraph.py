@@ -171,12 +171,11 @@ def test_state_graph_compile(
     if stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
-        with patch("sentry_sdk.integrations.langgraph.StateGraph"):
-            with start_transaction():
-                wrapped_compile = _wrap_state_graph_compile(original_compile)
-                compiled_graph = wrapped_compile(
-                    graph, model="test-model", checkpointer=None
-                )
+        with patch("sentry_sdk.integrations.langgraph.StateGraph"), start_transaction():
+            wrapped_compile = _wrap_state_graph_compile(original_compile)
+            compiled_graph = wrapped_compile(
+                graph, model="test-model", checkpointer=None
+            )
 
         assert compiled_graph is not None
         assert compiled_graph.name == "test_graph"
@@ -209,12 +208,11 @@ def test_state_graph_compile(
     else:
         events = capture_events()
 
-        with patch("sentry_sdk.integrations.langgraph.StateGraph"):
-            with start_transaction():
-                wrapped_compile = _wrap_state_graph_compile(original_compile)
-                compiled_graph = wrapped_compile(
-                    graph, model="test-model", checkpointer=None
-                )
+        with patch("sentry_sdk.integrations.langgraph.StateGraph"), start_transaction():
+            wrapped_compile = _wrap_state_graph_compile(original_compile)
+            compiled_graph = wrapped_compile(
+                graph, model="test-model", checkpointer=None
+            )
 
         assert compiled_graph is not None
         assert compiled_graph.name == "test_graph"
