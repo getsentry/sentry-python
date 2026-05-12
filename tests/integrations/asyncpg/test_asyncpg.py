@@ -410,6 +410,12 @@ async def test_cursor_manual(sentry_init, capture_events) -> None:
             "message": "SELECT * FROM users WHERE dob > $1",
             "type": "default",
         },
+        {
+            "category": "query",
+            "data": {"db.cursor": mock.ANY},
+            "message": "SELECT * FROM users WHERE dob > $1",
+            "type": "default",
+        },
         {"category": "query", "data": {}, "message": "COMMIT;", "type": "default"},
     ]
 
@@ -1462,7 +1468,9 @@ async def test_cursor__bind_exec_creates_spans(
 
 
 @pytest.mark.asyncio
-async def test_cursor__exec_methods_create_spans(sentry_init, capture_events) -> None:
+async def test_cursor_bind_and_exec_methods_create_spans(
+    sentry_init, capture_events
+) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
         traces_sample_rate=1.0,
@@ -1494,14 +1502,15 @@ async def test_cursor__exec_methods_create_spans(sentry_init, capture_events) ->
 
     (event,) = events
 
-    assert len(event["spans"]) == 6
+    assert len(event["spans"]) == 7
 
     connect_span = event["spans"][0]
     executemany_span = event["spans"][1]
     begin_span = event["spans"][2]
-    fetchrow_span_1 = event["spans"][3]
-    fetchrow_span_2 = event["spans"][4]
-    commit_span = event["spans"][5]
+    bind_span = event["spans"][3]
+    fetchrow_span_1 = event["spans"][4]
+    fetchrow_span_2 = event["spans"][5]
+    commit_span = event["spans"][6]
 
     assert connect_span["description"] == "connect"
     assert (
@@ -1509,9 +1518,17 @@ async def test_cursor__exec_methods_create_spans(sentry_init, capture_events) ->
         == "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)"
     )
     assert begin_span["description"] == "BEGIN;"
+    assert bind_span["description"] == "SELECT * FROM users WHERE dob > $1"
     assert fetchrow_span_1["description"] == "SELECT * FROM users WHERE dob > $1"
     assert fetchrow_span_2["description"] == "SELECT * FROM users WHERE dob > $1"
     assert commit_span["description"] == "COMMIT;"
+
+    assert bind_span["data"]["db.cursor"] is not None
+    assert bind_span["data"]["db.system"] == "postgresql"
+    assert bind_span["data"]["db.driver.name"] == "asyncpg"
+    assert bind_span["origin"] == "auto.db.asyncpg"
+    assert SPANDATA.CODE_LINENO not in bind_span.get("data", {})
+    assert SPANDATA.CODE_FILEPATH not in bind_span.get("data", {})
 
     for span in (fetchrow_span_1, fetchrow_span_2):
         assert span["data"]["db.cursor"] is not None

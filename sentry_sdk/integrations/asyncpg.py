@@ -53,6 +53,9 @@ class AsyncPGIntegration(Integration):
         )
         asyncpg.Connection.prepare = _wrap_connection_method(asyncpg.Connection.prepare)
 
+        BaseCursor._bind = _wrap_cursor_method(
+            BaseCursor._bind, record_query_source=False
+        )
         BaseCursor._bind_exec = _wrap_cursor_method(BaseCursor._bind_exec)
         BaseCursor._exec = _wrap_cursor_method(BaseCursor._exec)
 
@@ -163,6 +166,8 @@ def _wrap_connection_method(
 
 def _wrap_cursor_method(
     f: "Callable[..., Awaitable[T]]",
+    *,
+    record_query_source: bool = True,
 ) -> "Callable[..., Awaitable[T]]":
     async def _inner(*args: "Any", **kwargs: "Any") -> "T":
         if sentry_sdk.get_client().get_integration(AsyncPGIntegration) is None:
@@ -182,11 +187,11 @@ def _wrap_cursor_method(
             _set_db_data(span, cursor._connection)
             res = await f(*args, **kwargs)
 
-            if isinstance(span, StreamedSpan):
+            if record_query_source and isinstance(span, StreamedSpan):
                 with capture_internal_exceptions():
                     add_query_source(span)
 
-        if not isinstance(span, StreamedSpan):
+        if record_query_source and not isinstance(span, StreamedSpan):
             with capture_internal_exceptions():
                 add_query_source(span)
 
