@@ -1042,7 +1042,7 @@ class Transaction(Span):
 
         finished_spans = []
         has_gen_ai_span = False
-        if client.options["_experiments"].get("stream_gen_ai_spans", False):
+        if client.options.get("stream_gen_ai_spans", False):
             for span in self._span_recorder.spans:
                 if span.timestamp is None:
                     continue
