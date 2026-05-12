@@ -176,6 +176,7 @@ class CloudResourceContextIntegration(Integration):
             "cloud.platform": CLOUD_PLATFORM.GCP_COMPUTE_ENGINE,
         }
 
+        gcp_metadata = cls.gcp_metadata
         try:
             if cls.gcp_metadata is None:
                 r = cls.http.request(
@@ -187,30 +188,29 @@ class CloudResourceContextIntegration(Integration):
                 if r.status != 200:
                     return ctx
 
-                cls.gcp_metadata = json.loads(r.data.decode("utf-8"))
+                gcp_metadata = json.loads(r.data.decode("utf-8"))
+                cls.gcp_metadata = gcp_metadata
 
             try:
-                ctx["cloud.account.id"] = cls.gcp_metadata["project"]["projectId"]
+                ctx["cloud.account.id"] = gcp_metadata["project"]["projectId"]
             except Exception:
                 pass
 
             try:
-                ctx["cloud.availability_zone"] = cls.gcp_metadata["instance"][
-                    "zone"
-                ].split("/")[-1]
+                ctx["cloud.availability_zone"] = gcp_metadata["instance"]["zone"].split(
+                    "/"
+                )[-1]
             except Exception:
                 pass
 
             try:
                 # only populated in google cloud run
-                ctx["cloud.region"] = cls.gcp_metadata["instance"]["region"].split("/")[
-                    -1
-                ]
+                ctx["cloud.region"] = gcp_metadata["instance"]["region"].split("/")[-1]
             except Exception:
                 pass
 
             try:
-                ctx["host.id"] = cls.gcp_metadata["instance"]["id"]
+                ctx["host.id"] = gcp_metadata["instance"]["id"]
             except Exception:
                 pass
 

@@ -1,11 +1,11 @@
 import base64
 import contextvars
+import copy
 import json
 import linecache
 import logging
 import math
 import os
-import copy
 import random
 import re
 import subprocess
@@ -26,6 +26,11 @@ try:
 except ImportError:
     # Python 3.10 and below
     BaseExceptionGroup = None  # type: ignore
+
+try:
+    from aiohttp.web_exceptions import HTTPException as AIOHttpHttpException
+except ImportError:
+    AIOHttpHttpException = None
 
 from typing import TYPE_CHECKING
 
@@ -65,12 +70,12 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import (
         AttributeValue,
-        SerializedAttributeValue,
         Event,
         ExcInfo,
         Hint,
         Log,
         Metric,
+        SerializedAttributeValue,
     )
 
     P = ParamSpec("P")
@@ -1472,16 +1477,6 @@ def qualname_from_function(func: "Callable[..., Any]") -> "Optional[str]":
     """Return the qualified name of func. Works with regular function, lambda, partial and partialmethod."""
     func_qualname: "Optional[str]" = None
 
-    # Python 2
-    try:
-        return "%s.%s.%s" % (
-            func.im_class.__module__,  # type: ignore
-            func.im_class.__name__,  # type: ignore
-            func.__name__,
-        )
-    except Exception:
-        pass
-
     prefix, suffix = "", ""
 
     if isinstance(func, partial) and hasattr(func.func, "__name__"):
@@ -1499,10 +1494,9 @@ def qualname_from_function(func: "Callable[..., Any]") -> "Optional[str]":
 
     if hasattr(func, "__qualname__"):
         func_qualname = func.__qualname__
-    elif hasattr(func, "__name__"):  # Python 2.7 has no __qualname__
+    elif hasattr(func, "__name__"):
         func_qualname = func.__name__
 
-    # Python 3: methods, functions, classes
     if func_qualname is not None:
         if hasattr(func, "__module__") and isinstance(func.__module__, str):
             func_qualname = func.__module__ + "." + func_qualname
@@ -1995,6 +1989,12 @@ def get_current_thread_meta(
 def should_be_treated_as_error(ty: "Any", value: "Any") -> bool:
     if ty == SystemExit and hasattr(value, "code") and value.code in (0, None):
         # https://docs.python.org/3/library/exceptions.html#SystemExit
+        return False
+
+    # In the aiohttp integration, all of their HTTP responses are Exceptions.
+    # Because they have to be raised and handled by the framework, we need this check so
+    # that we don't accidentally overwrite a status of "ok" with "error" here.
+    if AIOHttpHttpException and isinstance(value, AIOHttpHttpException):
         return False
 
     return True

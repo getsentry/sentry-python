@@ -54,7 +54,7 @@ def check_uwsgi_thread_support() -> bool:
             except Exception:
                 pass
 
-        return value and str(value).lower() not in FALSE_VALUES
+        return value and str(value).lower() not in FALSE_VALUES  # type: ignore[return-value]
 
     # When `threads` is passed in as a uwsgi option,
     # `enable-threads` is implied on.

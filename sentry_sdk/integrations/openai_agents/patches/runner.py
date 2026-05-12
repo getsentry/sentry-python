@@ -5,9 +5,10 @@ import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.utils import capture_internal_exceptions, reraise
+from sentry_sdk.tracing_utils import set_span_errored
 
 from ..spans import agent_workflow_span, end_invoke_agent_span
-from ..utils import _capture_exception, _record_exception_on_span
+from ..utils import _capture_exception
 
 try:
     from agents.exceptions import AgentsException
@@ -65,7 +66,7 @@ def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., A
                                 invoke_agent_span is not None
                                 and invoke_agent_span.timestamp is None
                             ):
-                                _record_exception_on_span(invoke_agent_span, exc)
+                                set_span_errored(invoke_agent_span)
                                 end_invoke_agent_span(context_wrapper, agent)
                     reraise(*exc_info)
                 except Exception as exc:

@@ -243,7 +243,6 @@ def assert_single_transaction_without_profile_chunks(envelopes):
         pytest.param(get_client_options(False), id="experiment"),
     ],
 )
-@mock.patch("sentry_sdk.profiler.continuous_profiler.PROFILE_BUFFER_SECONDS", 0.01)
 def test_continuous_profiler_auto_start_and_manual_stop(
     sentry_init,
     capture_envelopes,
@@ -265,12 +264,12 @@ def test_continuous_profiler_auto_start_and_manual_stop(
 
     with sentry_sdk.start_transaction(name="profiling"):
         with sentry_sdk.start_span(op="op"):
-            time.sleep(0.05)
-
-    assert_single_transaction_with_profile_chunks(envelopes, thread)
+            pass
 
     for _ in range(3):
         stop_profiler_func()
+
+        assert_single_transaction_with_profile_chunks(envelopes, thread)
 
         envelopes.clear()
 
@@ -286,9 +285,11 @@ def test_continuous_profiler_auto_start_and_manual_stop(
 
         with sentry_sdk.start_transaction(name="profiling"):
             with sentry_sdk.start_span(op="op"):
-                time.sleep(0.05)
+                pass
 
-        assert_single_transaction_with_profile_chunks(envelopes, thread)
+    stop_profiler_func()
+
+    assert_single_transaction_with_profile_chunks(envelopes, thread)
 
 
 @pytest.mark.parametrize(
@@ -353,11 +354,11 @@ def test_continuous_profiler_manual_start_and_stop_sampled(
                 time.sleep(0.1)
             assert get_profiler_id() is not None, "profiler should be running"
 
-        assert_single_transaction_with_profile_chunks(envelopes, thread)
-
         assert get_profiler_id() is not None, "profiler should be running"
 
         stop_profiler_func()
+
+        assert_single_transaction_with_profile_chunks(envelopes, thread)
 
         # the profiler stops immediately in manual mode
         assert get_profiler_id() is None, "profiler should not be running"
@@ -425,11 +426,11 @@ def test_continuous_profiler_manual_start_and_stop_unsampled(
 
     with sentry_sdk.start_transaction(name="profiling"):
         with sentry_sdk.start_span(op="op"):
-            time.sleep(0.05)
-
-    assert_single_transaction_without_profile_chunks(envelopes)
+            pass
 
     stop_profiler_func()
+
+    assert_single_transaction_without_profile_chunks(envelopes)
 
 
 @pytest.mark.parametrize(
@@ -623,7 +624,6 @@ def test_continuous_profiler_manual_start_and_stop_noop_when_using_trace_lifecyl
         mock_teardown.assert_not_called()
 
 
-@mock.patch("sentry_sdk.profiler.continuous_profiler.PROFILE_BUFFER_SECONDS", 0.01)
 def test_continuous_profiler_run_does_not_null_buffer(
     sentry_init,
     capture_envelopes,
@@ -656,8 +656,7 @@ def test_continuous_profiler_run_does_not_null_buffer(
     envelopes.clear()
     with sentry_sdk.start_transaction(name="profiling"):
         with sentry_sdk.start_span(op="op"):
-            time.sleep(0.1)
-    assert_single_transaction_with_profile_chunks(envelopes, thread)
+            pass
 
     # Get the scheduler and create a sentinel buffer.
     # We'll call run() directly to verify it doesn't null out self.buffer.
@@ -666,6 +665,8 @@ def test_continuous_profiler_run_does_not_null_buffer(
 
     # Stop the profiler so the thread exits cleanly
     stop_profiler()
+
+    assert_single_transaction_with_profile_chunks(envelopes, thread)
 
     # Now set up a fresh buffer and mark the scheduler as not running
     # (simulating the state right after ensure_running() created a new buffer

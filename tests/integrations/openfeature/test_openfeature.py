@@ -155,25 +155,51 @@ def test_openfeature_integration_asyncio(
     }
 
 
+@pytest.mark.parametrize(
+    "span_streaming",
+    [True, False],
+)
 def test_openfeature_span_integration(
-    sentry_init, capture_events, uninstall_integration
+    sentry_init,
+    capture_events,
+    capture_items,
+    uninstall_integration,
+    span_streaming,
 ):
     uninstall_integration(OpenFeatureIntegration.identifier)
-    sentry_init(traces_sample_rate=1.0, integrations=[OpenFeatureIntegration()])
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[OpenFeatureIntegration()],
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
 
     api.set_provider(
         InMemoryProvider({"hello": InMemoryFlag("on", {"on": True, "off": False})})
     )
     client = api.get_client()
 
-    events = capture_events()
-
-    with start_transaction(name="hi"):
-        with start_span(op="foo", name="bar"):
+    if span_streaming:
+        items = capture_items("span")
+        with sentry_sdk.traces.start_span(name="bar"):
             client.get_boolean_value("hello", default_value=False)
             client.get_boolean_value("world", default_value=False)
 
-    (event,) = events
-    assert event["spans"][0]["data"] == ApproxDict(
-        {"flag.evaluation.hello": True, "flag.evaluation.world": False}
-    )
+        sentry_sdk.flush()
+
+        assert len(items) == 1
+        span = items[0].payload
+        assert span["attributes"]["flag.evaluation.hello"] is True
+        assert span["attributes"]["flag.evaluation.world"] is False
+
+    else:
+        events = capture_events()
+
+        with start_transaction(name="hi"):
+            with start_span(op="foo", name="bar"):
+                client.get_boolean_value("hello", default_value=False)
+                client.get_boolean_value("world", default_value=False)
+
+        (event,) = events
+        assert event["spans"][0]["data"] == ApproxDict(
+            {"flag.evaluation.hello": True, "flag.evaluation.world": False}
+        )

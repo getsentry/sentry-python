@@ -3,13 +3,17 @@ import json
 from copy import deepcopy
 
 import sentry_sdk
+from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import AnnotatedValue, logger
 
 try:
     from django.http.request import RawPostDataException
+
+    _RAW_DATA_EXCEPTIONS = (RawPostDataException, ValueError)
 except ImportError:
     RawPostDataException = None
+    _RAW_DATA_EXCEPTIONS = (ValueError,)
 
 from typing import TYPE_CHECKING
 
@@ -30,6 +34,7 @@ SENSITIVE_ENV_KEYS = (
     "HTTP_SET_COOKIE",
     "HTTP_COOKIE",
     "HTTP_AUTHORIZATION",
+    "HTTP_PROXY_AUTHORIZATION",
     "HTTP_X_API_KEY",
     "HTTP_X_FORWARDED_FOR",
     "HTTP_X_REAL_IP",
@@ -108,7 +113,7 @@ class RequestExtractor:
             raw_data = None
             try:
                 raw_data = self.raw_data()
-            except (RawPostDataException, ValueError):
+            except _RAW_DATA_EXCEPTIONS:
                 # If DjangoRestFramework is used it already read the body for us
                 # so reading it here will fail. We can ignore this.
                 pass
@@ -173,7 +178,7 @@ class RequestExtractor:
 
             try:
                 raw_data = self.raw_data()
-            except (RawPostDataException, ValueError):
+            except _RAW_DATA_EXCEPTIONS:
                 # The body might have already been read, in which case this will
                 # fail
                 raw_data = None
@@ -211,16 +216,19 @@ def _is_json_content_type(ct: "Optional[str]") -> bool:
 
 def _filter_headers(
     headers: "Mapping[str, str]",
+    use_annotated_value: bool = True,
 ) -> "Mapping[str, Union[AnnotatedValue, str]]":
     if should_send_default_pii():
         return headers
 
+    substitute: "Union[AnnotatedValue, str]" = (
+        SENSITIVE_DATA_SUBSTITUTE
+        if not use_annotated_value
+        else AnnotatedValue.removed_because_over_size_limit()
+    )
+
     return {
-        k: (
-            v
-            if k.upper().replace("-", "_") not in SENSITIVE_HEADERS
-            else AnnotatedValue.removed_because_over_size_limit()
-        )
+        k: (v if k.upper().replace("-", "_") not in SENSITIVE_HEADERS else substitute)
         for k, v in headers.items()
     }
 

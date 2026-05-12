@@ -4,6 +4,7 @@ from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import event_from_exception
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 from typing import TYPE_CHECKING
 
@@ -25,7 +26,7 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
         self: "ServerInterceptor",
         find_name: "Callable[[ServicerContext], str] | None" = None,
     ) -> None:
-        self._find_method_name = find_name or self._find_name
+        self._custom_find_name = find_name
 
         super().__init__()
 
@@ -34,40 +35,75 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
         continuation: "Callable[[HandlerCallDetails], Awaitable[RpcMethodHandler]]",
         handler_call_details: "HandlerCallDetails",
     ) -> "Optional[Awaitable[RpcMethodHandler]]":
-        self._handler_call_details = handler_call_details
         handler = await continuation(handler_call_details)
         if handler is None:
             return None
+
+        method_name = handler_call_details.method
+        custom_find_name = self._custom_find_name
 
         if not handler.request_streaming and not handler.response_streaming:
             handler_factory = grpc.unary_unary_rpc_method_handler
 
             async def wrapped(request: "Any", context: "ServicerContext") -> "Any":
-                name = self._find_method_name(context)
-                if not name:
-                    return await handler(request, context)
+                with sentry_sdk.isolation_scope():
+                    name = (
+                        custom_find_name(context) if custom_find_name else method_name
+                    )
+                    if not name:
+                        return await handler(request, context)
 
-                # What if the headers are empty?
-                transaction = sentry_sdk.continue_trace(
-                    dict(context.invocation_metadata()),
-                    op=OP.GRPC_SERVER,
-                    name=name,
-                    source=TransactionSource.CUSTOM,
-                    origin=SPAN_ORIGIN,
-                )
-
-                with sentry_sdk.start_transaction(transaction=transaction):
-                    try:
-                        return await handler.unary_unary(request, context)
-                    except AbortError:
-                        raise
-                    except Exception as exc:
-                        event, hint = event_from_exception(
-                            exc,
-                            mechanism={"type": "grpc", "handled": False},
+                    span_streaming = has_span_streaming_enabled(
+                        sentry_sdk.get_client().options
+                    )
+                    if span_streaming:
+                        # What if the headers are empty?
+                        sentry_sdk.traces.continue_trace(
+                            dict(context.invocation_metadata())
                         )
-                        sentry_sdk.capture_event(event, hint=hint)
-                        raise
+
+                        with sentry_sdk.traces.start_span(
+                            name=name,
+                            attributes={
+                                "sentry.op": OP.GRPC_SERVER,
+                                "sentry.span.source": TransactionSource.CUSTOM.value,
+                                "sentry.origin": SPAN_ORIGIN,
+                            },
+                            parent_span=None,
+                        ):
+                            try:
+                                return await handler.unary_unary(request, context)
+                            except AbortError:
+                                raise
+                            except Exception as exc:
+                                event, hint = event_from_exception(
+                                    exc,
+                                    mechanism={"type": "grpc", "handled": False},
+                                )
+                                sentry_sdk.capture_event(event, hint=hint)
+                                raise
+                    else:
+                        # What if the headers are empty?
+                        transaction = sentry_sdk.continue_trace(
+                            dict(context.invocation_metadata()),
+                            op=OP.GRPC_SERVER,
+                            name=name,
+                            source=TransactionSource.CUSTOM,
+                            origin=SPAN_ORIGIN,
+                        )
+
+                        with sentry_sdk.start_transaction(transaction=transaction):
+                            try:
+                                return await handler.unary_unary(request, context)
+                            except AbortError:
+                                raise
+                            except Exception as exc:
+                                event, hint = event_from_exception(
+                                    exc,
+                                    mechanism={"type": "grpc", "handled": False},
+                                )
+                                sentry_sdk.capture_event(event, hint=hint)
+                                raise
 
         elif not handler.request_streaming and handler.response_streaming:
             handler_factory = grpc.unary_stream_rpc_method_handler
@@ -95,6 +131,3 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
             request_deserializer=handler.request_deserializer,
             response_serializer=handler.response_serializer,
         )
-
-    def _find_name(self, context: "ServicerContext") -> str:
-        return self._handler_call_details.method

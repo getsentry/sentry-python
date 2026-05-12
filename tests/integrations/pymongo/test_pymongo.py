@@ -52,11 +52,13 @@ def test_transactions(sentry_init, capture_events, mongo_server, with_pii):
     common_tags = {
         "db.name": "test_db",
         "db.system": "mongodb",
+        "db.driver.name": "pymongo",
         "net.peer.name": mongo_server.host,
         "net.peer.port": str(mongo_server.port),
     }
     for span in find, insert_success, insert_fail:
         assert span["data"][SPANDATA.DB_SYSTEM] == "mongodb"
+        assert span["data"][SPANDATA.DB_DRIVER_NAME] == "pymongo"
         assert span["data"][SPANDATA.DB_NAME] == "test_db"
         assert span["data"][SPANDATA.SERVER_ADDRESS] == "localhost"
         assert span["data"][SPANDATA.SERVER_PORT] == mongo_server.port
@@ -136,6 +138,7 @@ def test_breadcrumbs(sentry_init, capture_events, mongo_server, with_pii):
     assert crumb["data"] == {
         "db.name": "test_db",
         "db.system": "mongodb",
+        "db.driver.name": "pymongo",
         "db.operation": "find",
         "net.peer.name": mongo_server.host,
         "net.peer.port": str(mongo_server.port),

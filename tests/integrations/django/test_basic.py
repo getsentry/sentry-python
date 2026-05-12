@@ -457,7 +457,7 @@ def test_response_trace(sentry_init, client, capture_events, render_span_tree):
 
     assert (
         '- op="view.response.render": description="serialize response"'
-        in render_span_tree(events[0])
+        in render_span_tree(events[0]["spans"], events[0]["contexts"]["trace"])
     )
 
 
@@ -596,7 +596,9 @@ def test_django_connect_trace(sentry_init, client, capture_events, render_span_t
             data = span.get("data")
             assert data.get(SPANDATA.DB_SYSTEM) == "postgresql"
 
-    assert '- op="db": description="connect"' in render_span_tree(event)
+    assert '- op="db": description="connect"' in render_span_tree(
+        event["spans"], event["contexts"]["trace"]
+    )
 
 
 @pytest.mark.forked
@@ -721,15 +723,17 @@ def test_transaction_style(
 ):
     sentry_init(
         integrations=[DjangoIntegration(transaction_style=transaction_style)],
+        traces_sample_rate=1.0,
         send_default_pii=True,
     )
     events = capture_events()
     content, status, headers = unpack_werkzeug_response(client.get(client_url))
     assert content == expected_response
 
-    (event,) = events
-    assert event["transaction"] == expected_transaction
-    assert event["transaction_info"] == {"source": expected_source}
+    (error, transaction) = events
+    assert error["transaction"] == expected_transaction
+    assert transaction["transaction"] == expected_transaction
+    assert transaction["transaction_info"] == {"source": expected_source}
 
 
 def test_request_body(sentry_init, client, capture_events):
@@ -954,7 +958,9 @@ def test_render_spans(sentry_init, client, capture_events, render_span_tree):
         events = capture_events()
         client.get(url)
         transaction = events[0]
-        assert expected_line in render_span_tree(transaction)
+        assert expected_line in render_span_tree(
+            transaction["spans"], transaction["contexts"]["trace"]
+        )
 
 
 @pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
@@ -1034,7 +1040,10 @@ def test_middleware_spans(sentry_init, client, capture_events, render_span_tree)
     message, transaction = events
 
     assert message["message"] == "hi"
-    assert render_span_tree(transaction) == EXPECTED_MIDDLEWARE_SPANS
+    assert (
+        render_span_tree(transaction["spans"], transaction["contexts"]["trace"])
+        == EXPECTED_MIDDLEWARE_SPANS
+    )
 
 
 def test_middleware_spans_disabled(sentry_init, client, capture_events):
@@ -1075,7 +1084,10 @@ def test_signals_spans(sentry_init, client, capture_events, render_span_tree):
     message, transaction = events
 
     assert message["message"] == "hi"
-    assert render_span_tree(transaction) == EXPECTED_SIGNALS_SPANS
+    assert (
+        render_span_tree(transaction["spans"], transaction["contexts"]["trace"])
+        == EXPECTED_SIGNALS_SPANS
+    )
 
     assert transaction["spans"][0]["op"] == "event.django"
     assert transaction["spans"][0]["description"] == "django.db.reset_queries"
@@ -1127,7 +1139,10 @@ def test_signals_spans_filtering(sentry_init, client, capture_events, render_spa
 
     (transaction,) = events
 
-    assert render_span_tree(transaction) == EXPECTED_SIGNALS_SPANS_FILTERED
+    assert (
+        render_span_tree(transaction["spans"], transaction["contexts"]["trace"])
+        == EXPECTED_SIGNALS_SPANS_FILTERED
+    )
 
     assert transaction["spans"][0]["op"] == "event.django"
     assert transaction["spans"][0]["description"] == "django.db.reset_queries"
@@ -1199,26 +1214,33 @@ def test_custom_urlconf_middleware(
     )
     events = capture_events()
 
-    content, status, _headers = unpack_werkzeug_response(client.get("/custom/ok"))
-    assert status.lower() == "200 ok"
-    assert content == b"custom ok"
+    try:
+        content, status, _headers = unpack_werkzeug_response(client.get("/custom/ok"))
+        assert status.lower() == "200 ok"
+        assert content == b"custom ok"
 
-    event = events.pop(0)
-    assert event["transaction"] == "/custom/ok"
-    if middleware_spans:
-        assert "custom_urlconf_middleware" in render_span_tree(event)
+        event = events.pop(0)
+        assert event["transaction"] == "/custom/ok"
+        if middleware_spans:
+            assert "custom_urlconf_middleware" in render_span_tree(
+                event["spans"], event["contexts"]["trace"]
+            )
 
-    _content, status, _headers = unpack_werkzeug_response(client.get("/custom/exc"))
-    assert status.lower() == "500 internal server error"
+        _content, status, _headers = unpack_werkzeug_response(client.get("/custom/exc"))
+        assert status.lower() == "500 internal server error"
 
-    error_event, transaction_event = events
-    assert error_event["transaction"] == "/custom/exc"
-    assert error_event["exception"]["values"][-1]["mechanism"]["type"] == "django"
-    assert transaction_event["transaction"] == "/custom/exc"
-    if middleware_spans:
-        assert "custom_urlconf_middleware" in render_span_tree(transaction_event)
+        error_event, transaction_event = events
+        assert error_event["transaction"] == "/custom/exc"
+        assert error_event["exception"]["values"][-1]["mechanism"]["type"] == "django"
+        assert transaction_event["transaction"] == "/custom/exc"
+        if middleware_spans:
+            assert "custom_urlconf_middleware" in render_span_tree(
+                transaction_event["spans"], transaction_event["contexts"]["trace"]
+            )
 
-    settings.MIDDLEWARE.pop(0)
+    finally:
+        settings.MIDDLEWARE.pop(0)
+        client.application.load_middleware()
 
 
 def test_get_receiver_name():
