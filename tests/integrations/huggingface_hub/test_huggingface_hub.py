@@ -651,34 +651,23 @@ def test_text_generation_streaming(
         assert span["name"] == "text_completion test-model"
         assert span["attributes"]["sentry.origin"] == "auto.ai.huggingface_hub"
 
-        if stream_gen_ai_spans:
-            expected_data = {
-                "gen_ai.operation.name": "text_completion",
-                "gen_ai.request.model": "test-model",
-                "gen_ai.response.finish_reasons": "length",
-                "gen_ai.response.streaming": True,
-                "gen_ai.usage.total_tokens": 10,
-                "sentry.environment": "production",
-                "sentry.op": "gen_ai.text_completion",
-                "sentry.origin": "auto.ai.huggingface_hub",
-                "sentry.release": mock.ANY,
-                "sentry.sdk.name": "sentry.python",
-                "sentry.sdk.version": mock.ANY,
-                "sentry.segment.id": mock.ANY,
-                "sentry.segment.name": "test",
-                "thread.id": mock.ANY,
-                "thread.name": mock.ANY,
-            }
-        else:
-            expected_data = {
-                "gen_ai.operation.name": "text_completion",
-                "gen_ai.request.model": "test-model",
-                "gen_ai.response.finish_reasons": "length",
-                "gen_ai.response.streaming": True,
-                "gen_ai.usage.total_tokens": 10,
-                "thread.id": mock.ANY,
-                "thread.name": mock.ANY,
-            }
+        expected_data = {
+            "gen_ai.operation.name": "text_completion",
+            "gen_ai.request.model": "test-model",
+            "gen_ai.response.finish_reasons": "length",
+            "gen_ai.response.streaming": True,
+            "gen_ai.usage.total_tokens": 10,
+            "sentry.environment": "production",
+            "sentry.op": "gen_ai.text_completion",
+            "sentry.origin": "auto.ai.huggingface_hub",
+            "sentry.release": mock.ANY,
+            "sentry.sdk.name": "sentry.python",
+            "sentry.sdk.version": mock.ANY,
+            "sentry.segment.id": mock.ANY,
+            "sentry.segment.name": "test",
+            "thread.id": mock.ANY,
+            "thread.name": mock.ANY,
+        }
 
         if send_default_pii and include_prompts:
             expected_data["gen_ai.request.messages"] = "Hello"
@@ -721,34 +710,15 @@ def test_text_generation_streaming(
         assert span["description"] == "text_completion test-model"
         assert span["origin"] == "auto.ai.huggingface_hub"
 
-        if stream_gen_ai_spans:
-            expected_data = {
-                "gen_ai.operation.name": "text_completion",
-                "gen_ai.request.model": "test-model",
-                "gen_ai.response.finish_reasons": "length",
-                "gen_ai.response.streaming": True,
-                "gen_ai.usage.total_tokens": 10,
-                "sentry.environment": "production",
-                "sentry.op": "gen_ai.text_completion",
-                "sentry.origin": "auto.ai.huggingface_hub",
-                "sentry.release": mock.ANY,
-                "sentry.sdk.name": "sentry.python",
-                "sentry.sdk.version": mock.ANY,
-                "sentry.segment.id": mock.ANY,
-                "sentry.segment.name": "test",
-                "thread.id": mock.ANY,
-                "thread.name": mock.ANY,
-            }
-        else:
-            expected_data = {
-                "gen_ai.operation.name": "text_completion",
-                "gen_ai.request.model": "test-model",
-                "gen_ai.response.finish_reasons": "length",
-                "gen_ai.response.streaming": True,
-                "gen_ai.usage.total_tokens": 10,
-                "thread.id": mock.ANY,
-                "thread.name": mock.ANY,
-            }
+        expected_data = {
+            "gen_ai.operation.name": "text_completion",
+            "gen_ai.request.model": "test-model",
+            "gen_ai.response.finish_reasons": "length",
+            "gen_ai.response.streaming": True,
+            "gen_ai.usage.total_tokens": 10,
+            "thread.id": mock.ANY,
+            "thread.name": mock.ANY,
+        }
 
         if send_default_pii and include_prompts:
             expected_data["gen_ai.request.messages"] = "Hello"
@@ -783,20 +753,18 @@ def test_chat_completion(
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
         _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
     )
-    if stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-    else:
-        events = capture_events()
 
     client = get_hf_provider_inference_client()
 
-    with sentry_sdk.start_transaction(name="test"):
-        client.chat_completion(
-            messages=[{"role": "user", "content": "Hello!"}],
-            stream=False,
-        )
-
     if stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with sentry_sdk.start_transaction(name="test"):
+            client.chat_completion(
+                messages=[{"role": "user", "content": "Hello!"}],
+                stream=False,
+            )
+
         spans = [item.payload for item in items if item.type == "span"]
         span = None
         for sp in spans:
@@ -849,6 +817,14 @@ def test_chat_completion(
 
         assert span["attributes"] == expected_data
     else:
+        events = capture_events()
+
+        with sentry_sdk.start_transaction(name="test"):
+            client.chat_completion(
+                messages=[{"role": "user", "content": "Hello!"}],
+                stream=False,
+            )
+
         (transaction,) = events
 
         span = None
@@ -863,14 +839,9 @@ def test_chat_completion(
 
         assert span is not None
 
-        if stream_gen_ai_spans:
-            assert span["attributes"]["sentry.op"] == "gen_ai.chat"
-            assert span["name"] == "chat test-model"
-            assert span["attributes"]["sentry.origin"] == "auto.ai.huggingface_hub"
-        else:
-            assert span["op"] == "gen_ai.chat"
-            assert span["description"] == "chat test-model"
-            assert span["origin"] == "auto.ai.huggingface_hub"
+        assert span["op"] == "gen_ai.chat"
+        assert span["description"] == "chat test-model"
+        assert span["origin"] == "auto.ai.huggingface_hub"
 
         expected_data = {
             "gen_ai.operation.name": "chat",
@@ -1397,10 +1368,6 @@ def test_chat_completion_streaming_with_tools(
         integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
         _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
     )
-    if stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-    else:
-        events = capture_events()
 
     client = get_hf_provider_inference_client()
 
@@ -1419,17 +1386,21 @@ def test_chat_completion_streaming_with_tools(
         }
     ]
 
-    with sentry_sdk.start_transaction(name="test"):
-        _ = list(
-            client.chat_completion(
-                messages=[{"role": "user", "content": "What is the weather in Paris?"}],
-                stream=True,
-                tools=tools,
-                tool_choice="auto",
-            )
-        )
-
     if stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with sentry_sdk.start_transaction(name="test"):
+            _ = list(
+                client.chat_completion(
+                    messages=[
+                        {"role": "user", "content": "What is the weather in Paris?"}
+                    ],
+                    stream=True,
+                    tools=tools,
+                    tool_choice="auto",
+                )
+            )
+
         spans = [item.payload for item in items if item.type == "span"]
         span = None
         for sp in spans:
@@ -1487,6 +1458,20 @@ def test_chat_completion_streaming_with_tools(
 
         assert span["attributes"] == expected_data
     else:
+        events = capture_events()
+
+        with sentry_sdk.start_transaction(name="test"):
+            _ = list(
+                client.chat_completion(
+                    messages=[
+                        {"role": "user", "content": "What is the weather in Paris?"}
+                    ],
+                    stream=True,
+                    tools=tools,
+                    tool_choice="auto",
+                )
+            )
+
         (transaction,) = events
 
         span = None
