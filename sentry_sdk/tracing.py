@@ -1042,14 +1042,21 @@ class Transaction(Span):
 
         finished_spans = []
         has_gen_ai_span = False
-        for span in self._span_recorder.spans:
-            if span.timestamp is None:
-                continue
+        if client.options["_experiments"].get("stream_gen_ai_spans", False):
+            for span in self._span_recorder.spans:
+                if span.timestamp is None:
+                    continue
 
-            if isinstance(span.op, str) and span.op.startswith("gen_ai."):
-                has_gen_ai_span = True
+                if isinstance(span.op, str) and span.op.startswith("gen_ai."):
+                    has_gen_ai_span = True
 
-            finished_spans.append(span.to_json())
+                finished_spans.append(span.to_json())
+        else:
+            finished_spans = [
+                span.to_json()
+                for span in self._span_recorder.spans
+                if span.timestamp is not None
+            ]
 
         len_diff = len(self._span_recorder.spans) - len(finished_spans)
         dropped_spans = len_diff + self._span_recorder.dropped_spans

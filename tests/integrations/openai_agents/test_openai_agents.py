@@ -157,13 +157,16 @@ def test_agent_custom_model():
     )
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_agent_invocation_span_no_pii(
     sentry_init,
+    capture_events,
     capture_items,
     test_agent,
     nonstreaming_responses_model_response,
     get_model_response,
+    stream_gen_ai_spans,
 ):
     client = AsyncOpenAI(api_key="test-key")
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
@@ -173,64 +176,125 @@ async def test_agent_invocation_span_no_pii(
         nonstreaming_responses_model_response, serialize_pydantic=True
     )
 
-    with patch.object(
-        agent.model._client._client,
-        "send",
-        return_value=response,
-    ) as _:
-        sentry_init(
-            integrations=[OpenAIAgentsIntegration()],
-            traces_sample_rate=1.0,
-            send_default_pii=False,
+    if stream_gen_ai_spans:
+        with patch.object(
+            agent.model._client._client,
+            "send",
+            return_value=response,
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=False,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            )
+
+            items = capture_items("span", "transaction")
+
+            result = await agents.Runner.run(
+                agent, "Test input", run_config=test_run_config
+            )
+
+            assert result is not None
+            assert result.final_output == "Hello, how can I help you?"
+
+        spans = [item.payload for item in items if item.type == "span"]
+        invoke_agent_span = next(
+            span
+            for span in spans
+            if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
+        )
+        ai_client_span = next(
+            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
         )
 
-        items = capture_items("span", "transaction")
+        (transaction,) = (item.payload for item in items if item.type == "transaction")
 
-        result = await agents.Runner.run(
-            agent, "Test input", run_config=test_run_config
+        assert transaction["transaction"] == "test_agent workflow"
+        assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
+
+        assert invoke_agent_span["name"] == "invoke_agent test_agent"
+
+        assert (
+            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in invoke_agent_span["attributes"]
         )
+        assert "gen_ai.request.messages" not in invoke_agent_span["attributes"]
+        assert "gen_ai.response.text" not in invoke_agent_span["attributes"]
 
-        assert result is not None
-        assert result.final_output == "Hello, how can I help you?"
+        assert (
+            invoke_agent_span["attributes"]["gen_ai.operation.name"] == "invoke_agent"
+        )
+        assert invoke_agent_span["attributes"]["gen_ai.system"] == "openai"
+        assert invoke_agent_span["attributes"]["gen_ai.agent.name"] == "test_agent"
+        assert invoke_agent_span["attributes"]["gen_ai.request.max_tokens"] == 100
+        assert invoke_agent_span["attributes"]["gen_ai.request.model"] == "gpt-4"
+        assert invoke_agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
+        assert invoke_agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
 
-    spans = [item.payload for item in items if item.type == "span"]
-    invoke_agent_span = next(
-        span
-        for span in spans
-        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
-    )
-    ai_client_span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-    )
+        assert ai_client_span["name"] == "chat gpt-4"
+        assert ai_client_span["attributes"]["gen_ai.operation.name"] == "chat"
+        assert ai_client_span["attributes"]["gen_ai.system"] == "openai"
+        assert ai_client_span["attributes"]["gen_ai.agent.name"] == "test_agent"
+        assert ai_client_span["attributes"]["gen_ai.request.max_tokens"] == 100
+        assert ai_client_span["attributes"]["gen_ai.request.model"] == "gpt-4"
+        assert ai_client_span["attributes"]["gen_ai.request.temperature"] == 0.7
+        assert ai_client_span["attributes"]["gen_ai.request.top_p"] == 1.0
+    else:
+        with patch.object(
+            agent.model._client._client,
+            "send",
+            return_value=response,
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=False,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            )
+            events = capture_events()
 
-    (transaction,) = (item.payload for item in items if item.type == "transaction")
-    assert transaction["transaction"] == "test_agent workflow"
-    assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
+            result = await agents.Runner.run(
+                agent, "Test input", run_config=test_run_config
+            )
 
-    assert invoke_agent_span["name"] == "invoke_agent test_agent"
+            assert result is not None
+            assert result.final_output == "Hello, how can I help you?"
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in invoke_agent_span["attributes"]
-    assert "gen_ai.request.messages" not in invoke_agent_span["attributes"]
-    assert "gen_ai.response.text" not in invoke_agent_span["attributes"]
+        (transaction,) = events
+        spans = transaction["spans"]
+        invoke_agent_span = next(
+            span for span in spans if span["op"] == OP.GEN_AI_INVOKE_AGENT
+        )
+        ai_client_span = next(span for span in spans if span["op"] == OP.GEN_AI_CHAT)
 
-    assert invoke_agent_span["attributes"]["gen_ai.operation.name"] == "invoke_agent"
-    assert invoke_agent_span["attributes"]["gen_ai.system"] == "openai"
-    assert invoke_agent_span["attributes"]["gen_ai.agent.name"] == "test_agent"
-    assert invoke_agent_span["attributes"]["gen_ai.request.max_tokens"] == 100
-    assert invoke_agent_span["attributes"]["gen_ai.request.model"] == "gpt-4"
-    assert invoke_agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
-    assert invoke_agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
+        assert transaction["transaction"] == "test_agent workflow"
+        assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
 
-    assert ai_client_span["name"] == "chat gpt-4"
-    assert ai_client_span["attributes"]["gen_ai.operation.name"] == "chat"
-    assert ai_client_span["attributes"]["gen_ai.system"] == "openai"
-    assert ai_client_span["attributes"]["gen_ai.agent.name"] == "test_agent"
-    assert ai_client_span["attributes"]["gen_ai.request.max_tokens"] == 100
-    assert ai_client_span["attributes"]["gen_ai.request.model"] == "gpt-4"
-    assert ai_client_span["attributes"]["gen_ai.request.temperature"] == 0.7
-    assert ai_client_span["attributes"]["gen_ai.request.top_p"] == 1.0
+        assert invoke_agent_span["description"] == "invoke_agent test_agent"
+
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in invoke_agent_span["data"]
+        assert "gen_ai.request.messages" not in invoke_agent_span["data"]
+        assert "gen_ai.response.text" not in invoke_agent_span["data"]
+
+        assert invoke_agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"
+        assert invoke_agent_span["data"]["gen_ai.system"] == "openai"
+        assert invoke_agent_span["data"]["gen_ai.agent.name"] == "test_agent"
+        assert invoke_agent_span["data"]["gen_ai.request.max_tokens"] == 100
+        assert invoke_agent_span["data"]["gen_ai.request.model"] == "gpt-4"
+        assert invoke_agent_span["data"]["gen_ai.request.temperature"] == 0.7
+        assert invoke_agent_span["data"]["gen_ai.request.top_p"] == 1.0
+
+        assert ai_client_span["description"] == "chat gpt-4"
+        assert ai_client_span["data"]["gen_ai.operation.name"] == "chat"
+        assert ai_client_span["data"]["gen_ai.system"] == "openai"
+        assert ai_client_span["data"]["gen_ai.agent.name"] == "test_agent"
+        assert ai_client_span["data"]["gen_ai.request.max_tokens"] == 100
+        assert ai_client_span["data"]["gen_ai.request.model"] == "gpt-4"
+        assert ai_client_span["data"]["gen_ai.request.temperature"] == 0.7
+        assert ai_client_span["data"]["gen_ai.request.top_p"] == 1.0
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "instructions",
@@ -309,6 +373,7 @@ async def test_agent_invocation_span_no_pii(
 )
 async def test_agent_invocation_span(
     sentry_init,
+    capture_events,
     capture_items,
     test_agent_with_instructions,
     nonstreaming_responses_model_response,
@@ -316,6 +381,7 @@ async def test_agent_invocation_span(
     input,
     request,
     get_model_response,
+    stream_gen_ai_spans,
 ):
     """
     Test that the integration creates spans for agent invocations.
@@ -328,176 +394,360 @@ async def test_agent_invocation_span(
         nonstreaming_responses_model_response, serialize_pydantic=True
     )
 
-    with patch.object(
-        agent.model._client._client,
-        "send",
-        return_value=response,
-    ) as _:
-        sentry_init(
-            integrations=[OpenAIAgentsIntegration()],
-            traces_sample_rate=1.0,
-            send_default_pii=True,
-        )
+    if stream_gen_ai_spans:
+        with patch.object(
+            agent.model._client._client,
+            "send",
+            return_value=response,
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            )
 
-        items = capture_items("span", "transaction")
+            items = capture_items("span", "transaction")
 
-        result = await agents.Runner.run(
-            agent,
-            input,
-            run_config=test_run_config,
-        )
+            result = await agents.Runner.run(
+                agent,
+                input,
+                run_config=test_run_config,
+            )
 
-        assert result is not None
-        assert result.final_output == "Hello, how can I help you?"
+            assert result is not None
+            assert result.final_output == "Hello, how can I help you?"
 
-    (transaction,) = (item.payload for item in items if item.type == "transaction")
-    assert transaction["transaction"] == "test_agent workflow"
-    assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
+        (transaction,) = (item.payload for item in items if item.type == "transaction")
 
-    spans = [item.payload for item in items if item.type == "span"]
-    invoke_agent_span, ai_client_span = spans
+        assert transaction["transaction"] == "test_agent workflow"
+        assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
 
-    assert invoke_agent_span["name"] == "invoke_agent test_agent"
+        spans = [item.payload for item in items if item.type == "span"]
+        invoke_agent_span, ai_client_span = spans
+
+        assert invoke_agent_span["name"] == "invoke_agent test_agent"
+    else:
+        with patch.object(
+            agent.model._client._client,
+            "send",
+            return_value=response,
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            )
+            events = capture_events()
+
+            result = await agents.Runner.run(
+                agent,
+                input,
+                run_config=test_run_config,
+            )
+
+            assert result is not None
+            assert result.final_output == "Hello, how can I help you?"
+
+        (transaction,) = events
+        spans = transaction["spans"]
+        invoke_agent_span, ai_client_span = spans
+
+        assert transaction["transaction"] == "test_agent workflow"
+        assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
+
+        assert invoke_agent_span["description"] == "invoke_agent test_agent"
 
     # Only first case checks "gen_ai.request.messages" until further input handling work.
     param_id = request.node.callspec.id
     if "string" in param_id and instructions is None:  # type: ignore
-        assert "gen_ai.system_instructions" not in ai_client_span["attributes"]
+        if stream_gen_ai_spans:
+            assert "gen_ai.system_instructions" not in ai_client_span["attributes"]
 
-        assert invoke_agent_span["attributes"][
-            "gen_ai.request.messages"
-        ] == safe_serialize(
-            [
-                {"content": [{"text": "Test input", "type": "text"}], "role": "user"},
-            ]
-        )
+            assert invoke_agent_span["attributes"][
+                "gen_ai.request.messages"
+            ] == safe_serialize(
+                [
+                    {
+                        "content": [{"text": "Test input", "type": "text"}],
+                        "role": "user",
+                    },
+                ]
+            )
+        else:
+            assert "gen_ai.system_instructions" not in ai_client_span["data"]
+
+            assert invoke_agent_span["data"][
+                "gen_ai.request.messages"
+            ] == safe_serialize(
+                [
+                    {
+                        "content": [{"text": "Test input", "type": "text"}],
+                        "role": "user",
+                    },
+                ]
+            )
 
     elif "string" in param_id:
-        assert ai_client_span["attributes"][
-            "gen_ai.system_instructions"
-        ] == safe_serialize(
-            [
-                {
-                    "type": "text",
-                    "content": "You are a coding assistant that talks like a pirate.",
-                },
-            ]
-        )
+        if stream_gen_ai_spans:
+            assert ai_client_span["attributes"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {
+                        "type": "text",
+                        "content": "You are a coding assistant that talks like a pirate.",
+                    },
+                ]
+            )
+        else:
+            assert ai_client_span["data"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {
+                        "type": "text",
+                        "content": "You are a coding assistant that talks like a pirate.",
+                    },
+                ]
+            )
     elif "blocks_no_type" in param_id and instructions is None:  # type: ignore
-        assert ai_client_span["attributes"][
-            "gen_ai.system_instructions"
-        ] == safe_serialize(
-            [
-                {"type": "text", "content": "You are a helpful assistant."},
-            ]
-        )
+        if stream_gen_ai_spans:
+            assert ai_client_span["attributes"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {"type": "text", "content": "You are a helpful assistant."},
+                ]
+            )
+        else:
+            assert ai_client_span["data"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {"type": "text", "content": "You are a helpful assistant."},
+                ]
+            )
     elif "blocks_no_type" in param_id:
-        assert ai_client_span["attributes"][
-            "gen_ai.system_instructions"
-        ] == safe_serialize(
-            [
-                {
-                    "type": "text",
-                    "content": "You are a coding assistant that talks like a pirate.",
-                },
-                {"type": "text", "content": "You are a helpful assistant."},
-            ]
-        )
+        if stream_gen_ai_spans:
+            assert ai_client_span["attributes"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {
+                        "type": "text",
+                        "content": "You are a coding assistant that talks like a pirate.",
+                    },
+                    {"type": "text", "content": "You are a helpful assistant."},
+                ]
+            )
+        else:
+            assert ai_client_span["data"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {
+                        "type": "text",
+                        "content": "You are a coding assistant that talks like a pirate.",
+                    },
+                    {"type": "text", "content": "You are a helpful assistant."},
+                ]
+            )
     elif "blocks" in param_id and instructions is None:  # type: ignore
-        assert ai_client_span["attributes"][
-            "gen_ai.system_instructions"
-        ] == safe_serialize(
-            [
-                {"type": "text", "content": "You are a helpful assistant."},
-            ]
-        )
+        if stream_gen_ai_spans:
+            assert ai_client_span["attributes"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {"type": "text", "content": "You are a helpful assistant."},
+                ]
+            )
+        else:
+            assert ai_client_span["data"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {"type": "text", "content": "You are a helpful assistant."},
+                ]
+            )
     elif "blocks" in param_id:
-        assert ai_client_span["attributes"][
-            "gen_ai.system_instructions"
-        ] == safe_serialize(
-            [
-                {
-                    "type": "text",
-                    "content": "You are a coding assistant that talks like a pirate.",
-                },
-                {"type": "text", "content": "You are a helpful assistant."},
-            ]
-        )
+        if stream_gen_ai_spans:
+            assert ai_client_span["attributes"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {
+                        "type": "text",
+                        "content": "You are a coding assistant that talks like a pirate.",
+                    },
+                    {"type": "text", "content": "You are a helpful assistant."},
+                ]
+            )
+        else:
+            assert ai_client_span["data"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {
+                        "type": "text",
+                        "content": "You are a coding assistant that talks like a pirate.",
+                    },
+                    {"type": "text", "content": "You are a helpful assistant."},
+                ]
+            )
     elif "parts_no_type" in param_id and instructions is None:
-        assert ai_client_span["attributes"][
-            "gen_ai.system_instructions"
-        ] == safe_serialize(
-            [
-                {"type": "text", "content": "You are a helpful assistant."},
-                {"type": "text", "content": "Be concise and clear."},
-            ]
-        )
+        if stream_gen_ai_spans:
+            assert ai_client_span["attributes"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {"type": "text", "content": "You are a helpful assistant."},
+                    {"type": "text", "content": "Be concise and clear."},
+                ]
+            )
+        else:
+            assert ai_client_span["data"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {"type": "text", "content": "You are a helpful assistant."},
+                    {"type": "text", "content": "Be concise and clear."},
+                ]
+            )
     elif "parts_no_type" in param_id:
-        assert ai_client_span["attributes"][
-            "gen_ai.system_instructions"
-        ] == safe_serialize(
-            [
-                {
-                    "type": "text",
-                    "content": "You are a coding assistant that talks like a pirate.",
-                },
-                {"type": "text", "content": "You are a helpful assistant."},
-                {"type": "text", "content": "Be concise and clear."},
-            ]
-        )
+        if stream_gen_ai_spans:
+            assert ai_client_span["attributes"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {
+                        "type": "text",
+                        "content": "You are a coding assistant that talks like a pirate.",
+                    },
+                    {"type": "text", "content": "You are a helpful assistant."},
+                    {"type": "text", "content": "Be concise and clear."},
+                ]
+            )
+        else:
+            assert ai_client_span["data"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {
+                        "type": "text",
+                        "content": "You are a coding assistant that talks like a pirate.",
+                    },
+                    {"type": "text", "content": "You are a helpful assistant."},
+                    {"type": "text", "content": "Be concise and clear."},
+                ]
+            )
     elif instructions is None:  # type: ignore
-        assert ai_client_span["attributes"][
-            "gen_ai.system_instructions"
-        ] == safe_serialize(
-            [
-                {"type": "text", "content": "You are a helpful assistant."},
-                {"type": "text", "content": "Be concise and clear."},
-            ]
+        if stream_gen_ai_spans:
+            assert ai_client_span["attributes"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {"type": "text", "content": "You are a helpful assistant."},
+                    {"type": "text", "content": "Be concise and clear."},
+                ]
+            )
+        else:
+            assert ai_client_span["data"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {"type": "text", "content": "You are a helpful assistant."},
+                    {"type": "text", "content": "Be concise and clear."},
+                ]
+            )
+    else:
+        if stream_gen_ai_spans:
+            assert ai_client_span["attributes"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {
+                        "type": "text",
+                        "content": "You are a coding assistant that talks like a pirate.",
+                    },
+                    {"type": "text", "content": "You are a helpful assistant."},
+                    {"type": "text", "content": "Be concise and clear."},
+                ]
+            )
+        else:
+            assert ai_client_span["data"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {
+                        "type": "text",
+                        "content": "You are a coding assistant that talks like a pirate.",
+                    },
+                    {"type": "text", "content": "You are a helpful assistant."},
+                    {"type": "text", "content": "Be concise and clear."},
+                ]
+            )
+
+    if stream_gen_ai_spans:
+        assert (
+            invoke_agent_span["attributes"]["gen_ai.response.text"]
+            == "Hello, how can I help you?"
         )
     else:
-        assert ai_client_span["attributes"][
-            "gen_ai.system_instructions"
-        ] == safe_serialize(
-            [
-                {
-                    "type": "text",
-                    "content": "You are a coding assistant that talks like a pirate.",
-                },
-                {"type": "text", "content": "You are a helpful assistant."},
-                {"type": "text", "content": "Be concise and clear."},
-            ]
+        assert (
+            invoke_agent_span["data"]["gen_ai.response.text"]
+            == "Hello, how can I help you?"
         )
 
-    assert (
-        invoke_agent_span["attributes"]["gen_ai.response.text"]
-        == "Hello, how can I help you?"
-    )
+    if stream_gen_ai_spans:
+        assert (
+            invoke_agent_span["attributes"]["gen_ai.operation.name"] == "invoke_agent"
+        )
+        assert invoke_agent_span["attributes"]["gen_ai.system"] == "openai"
+        assert invoke_agent_span["attributes"]["gen_ai.agent.name"] == "test_agent"
+        assert invoke_agent_span["attributes"]["gen_ai.request.max_tokens"] == 100
+        assert invoke_agent_span["attributes"]["gen_ai.request.model"] == "gpt-4"
+        assert invoke_agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
+        assert invoke_agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
 
-    assert invoke_agent_span["attributes"]["gen_ai.operation.name"] == "invoke_agent"
-    assert invoke_agent_span["attributes"]["gen_ai.system"] == "openai"
-    assert invoke_agent_span["attributes"]["gen_ai.agent.name"] == "test_agent"
-    assert invoke_agent_span["attributes"]["gen_ai.request.max_tokens"] == 100
-    assert invoke_agent_span["attributes"]["gen_ai.request.model"] == "gpt-4"
-    assert invoke_agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
-    assert invoke_agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
+        assert ai_client_span["name"] == "chat gpt-4"
+        assert ai_client_span["attributes"]["gen_ai.operation.name"] == "chat"
+        assert ai_client_span["attributes"]["gen_ai.system"] == "openai"
+        assert ai_client_span["attributes"]["gen_ai.agent.name"] == "test_agent"
+        assert ai_client_span["attributes"]["gen_ai.request.max_tokens"] == 100
+        assert ai_client_span["attributes"]["gen_ai.request.model"] == "gpt-4"
+        assert ai_client_span["attributes"]["gen_ai.request.temperature"] == 0.7
+        assert ai_client_span["attributes"]["gen_ai.request.top_p"] == 1.0
+    else:
+        assert invoke_agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"
+        assert invoke_agent_span["data"]["gen_ai.system"] == "openai"
+        assert invoke_agent_span["data"]["gen_ai.agent.name"] == "test_agent"
+        assert invoke_agent_span["data"]["gen_ai.request.max_tokens"] == 100
+        assert invoke_agent_span["data"]["gen_ai.request.model"] == "gpt-4"
+        assert invoke_agent_span["data"]["gen_ai.request.temperature"] == 0.7
+        assert invoke_agent_span["data"]["gen_ai.request.top_p"] == 1.0
 
-    assert ai_client_span["name"] == "chat gpt-4"
-    assert ai_client_span["attributes"]["gen_ai.operation.name"] == "chat"
-    assert ai_client_span["attributes"]["gen_ai.system"] == "openai"
-    assert ai_client_span["attributes"]["gen_ai.agent.name"] == "test_agent"
-    assert ai_client_span["attributes"]["gen_ai.request.max_tokens"] == 100
-    assert ai_client_span["attributes"]["gen_ai.request.model"] == "gpt-4"
-    assert ai_client_span["attributes"]["gen_ai.request.temperature"] == 0.7
-    assert ai_client_span["attributes"]["gen_ai.request.top_p"] == 1.0
+        assert ai_client_span["description"] == "chat gpt-4"
+        assert ai_client_span["data"]["gen_ai.operation.name"] == "chat"
+        assert ai_client_span["data"]["gen_ai.system"] == "openai"
+        assert ai_client_span["data"]["gen_ai.agent.name"] == "test_agent"
+        assert ai_client_span["data"]["gen_ai.request.max_tokens"] == 100
+        assert ai_client_span["data"]["gen_ai.request.model"] == "gpt-4"
+        assert ai_client_span["data"]["gen_ai.request.temperature"] == 0.7
+        assert ai_client_span["data"]["gen_ai.request.top_p"] == 1.0
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_client_span_custom_model(
     sentry_init,
+    capture_events,
     capture_items,
     test_agent_custom_model,
     nonstreaming_responses_model_response,
     get_model_response,
+    stream_gen_ai_spans,
 ):
     """
     Test that the integration uses the correct model name if a custom model is used.
@@ -511,40 +761,78 @@ async def test_client_span_custom_model(
         nonstreaming_responses_model_response, serialize_pydantic=True
     )
 
-    with patch.object(
-        agent.model._client._client,
-        "send",
-        return_value=response,
-    ) as _:
-        sentry_init(
-            integrations=[OpenAIAgentsIntegration()],
-            traces_sample_rate=1.0,
-        )
+    if stream_gen_ai_spans:
+        with patch.object(
+            agent.model._client._client,
+            "send",
+            return_value=response,
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            )
 
-        items = capture_items("span")
+            items = capture_items("span")
 
-        result = await agents.Runner.run(
-            agent, "Test input", run_config=test_run_config
-        )
+            result = await agents.Runner.run(
+                agent, "Test input", run_config=test_run_config
+            )
 
-        assert result is not None
-        assert result.final_output == "Hello, how can I help you?"
+            assert result is not None
+            assert result.final_output == "Hello, how can I help you?"
 
-    spans = [item.payload for item in items if item.type == "span"]
-    ai_client_span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-    )
+            spans = [item.payload for item in items if item.type == "span"]
+            ai_client_span = next(
+                span
+                for span in spans
+                if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+            )
 
-    assert ai_client_span["name"] == "chat my-custom-model"
-    assert ai_client_span["attributes"]["gen_ai.request.model"] == "my-custom-model"
+            assert ai_client_span["name"] == "chat my-custom-model"
+            assert (
+                ai_client_span["attributes"]["gen_ai.request.model"]
+                == "my-custom-model"
+            )
+    else:
+        with patch.object(
+            agent.model._client._client,
+            "send",
+            return_value=response,
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            )
+            events = capture_events()
+
+            result = await agents.Runner.run(
+                agent, "Test input", run_config=test_run_config
+            )
+
+            assert result is not None
+            assert result.final_output == "Hello, how can I help you?"
+
+            (transaction,) = events
+            spans = transaction["spans"]
+            ai_client_span = next(
+                span for span in spans if span["op"] == OP.GEN_AI_CHAT
+            )
+
+            assert ai_client_span["description"] == "chat my-custom-model"
+            assert ai_client_span["data"]["gen_ai.request.model"] == "my-custom-model"
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_agent_invocation_span_sync_no_pii(
     sentry_init,
+    capture_events,
     capture_items,
     test_agent,
     nonstreaming_responses_model_response,
     get_model_response,
+    stream_gen_ai_spans,
 ):
     """
     Test that the integration creates spans for agent invocations.
@@ -557,59 +845,127 @@ def test_agent_invocation_span_sync_no_pii(
         nonstreaming_responses_model_response, serialize_pydantic=True
     )
 
-    with patch.object(
-        agent.model._client._client,
-        "send",
-        return_value=response,
-    ) as _:
-        sentry_init(
-            integrations=[OpenAIAgentsIntegration()],
-            traces_sample_rate=1.0,
-            send_default_pii=False,
-        )
+    if stream_gen_ai_spans:
+        with patch.object(
+            agent.model._client._client,
+            "send",
+            return_value=response,
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=False,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            )
 
-        items = capture_items("span", "transaction")
+            items = capture_items("span", "transaction")
 
-        result = agents.Runner.run_sync(agent, "Test input", run_config=test_run_config)
+            result = agents.Runner.run_sync(
+                agent, "Test input", run_config=test_run_config
+            )
 
-        assert result is not None
-        assert result.final_output == "Hello, how can I help you?"
+            assert result is not None
+            assert result.final_output == "Hello, how can I help you?"
 
-    (transaction,) = (item.payload for item in items if item.type == "transaction")
-    assert transaction["transaction"] == "test_agent workflow"
-    assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
+            (transaction,) = (
+                item.payload for item in items if item.type == "transaction"
+            )
 
-    spans = [item.payload for item in items if item.type == "span"]
-    invoke_agent_span = next(
-        span
-        for span in spans
-        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
-    )
-    ai_client_span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-    )
+            assert transaction["transaction"] == "test_agent workflow"
+            assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
 
-    assert invoke_agent_span["name"] == "invoke_agent test_agent"
-    assert invoke_agent_span["attributes"]["gen_ai.operation.name"] == "invoke_agent"
-    assert invoke_agent_span["attributes"]["gen_ai.system"] == "openai"
-    assert invoke_agent_span["attributes"]["gen_ai.agent.name"] == "test_agent"
-    assert invoke_agent_span["attributes"]["gen_ai.request.max_tokens"] == 100
-    assert invoke_agent_span["attributes"]["gen_ai.request.model"] == "gpt-4"
-    assert invoke_agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
-    assert invoke_agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
+            spans = [item.payload for item in items if item.type == "span"]
+            invoke_agent_span = next(
+                span
+                for span in spans
+                if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
+            )
+            ai_client_span = next(
+                span
+                for span in spans
+                if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+            )
 
-    assert ai_client_span["name"] == "chat gpt-4"
-    assert ai_client_span["attributes"]["gen_ai.operation.name"] == "chat"
-    assert ai_client_span["attributes"]["gen_ai.system"] == "openai"
-    assert ai_client_span["attributes"]["gen_ai.agent.name"] == "test_agent"
-    assert ai_client_span["attributes"]["gen_ai.request.max_tokens"] == 100
-    assert ai_client_span["attributes"]["gen_ai.request.model"] == "gpt-4"
-    assert ai_client_span["attributes"]["gen_ai.request.temperature"] == 0.7
-    assert ai_client_span["attributes"]["gen_ai.request.top_p"] == 1.0
+            assert invoke_agent_span["name"] == "invoke_agent test_agent"
+            assert (
+                invoke_agent_span["attributes"]["gen_ai.operation.name"]
+                == "invoke_agent"
+            )
+            assert invoke_agent_span["attributes"]["gen_ai.system"] == "openai"
+            assert invoke_agent_span["attributes"]["gen_ai.agent.name"] == "test_agent"
+            assert invoke_agent_span["attributes"]["gen_ai.request.max_tokens"] == 100
+            assert invoke_agent_span["attributes"]["gen_ai.request.model"] == "gpt-4"
+            assert invoke_agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
+            assert invoke_agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in invoke_agent_span["attributes"]
+            assert ai_client_span["name"] == "chat gpt-4"
+            assert ai_client_span["attributes"]["gen_ai.operation.name"] == "chat"
+            assert ai_client_span["attributes"]["gen_ai.system"] == "openai"
+            assert ai_client_span["attributes"]["gen_ai.agent.name"] == "test_agent"
+            assert ai_client_span["attributes"]["gen_ai.request.max_tokens"] == 100
+            assert ai_client_span["attributes"]["gen_ai.request.model"] == "gpt-4"
+            assert ai_client_span["attributes"]["gen_ai.request.temperature"] == 0.7
+            assert ai_client_span["attributes"]["gen_ai.request.top_p"] == 1.0
+
+            assert (
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS
+                not in invoke_agent_span["attributes"]
+            )
+    else:
+        with patch.object(
+            agent.model._client._client,
+            "send",
+            return_value=response,
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=False,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            )
+            events = capture_events()
+
+            result = agents.Runner.run_sync(
+                agent, "Test input", run_config=test_run_config
+            )
+
+            assert result is not None
+            assert result.final_output == "Hello, how can I help you?"
+
+            (transaction,) = events
+            spans = transaction["spans"]
+            invoke_agent_span = next(
+                span for span in spans if span["op"] == OP.GEN_AI_INVOKE_AGENT
+            )
+            ai_client_span = next(
+                span for span in spans if span["op"] == OP.GEN_AI_CHAT
+            )
+
+            assert transaction["transaction"] == "test_agent workflow"
+            assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
+
+            assert invoke_agent_span["description"] == "invoke_agent test_agent"
+            assert invoke_agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"
+            assert invoke_agent_span["data"]["gen_ai.system"] == "openai"
+            assert invoke_agent_span["data"]["gen_ai.agent.name"] == "test_agent"
+            assert invoke_agent_span["data"]["gen_ai.request.max_tokens"] == 100
+            assert invoke_agent_span["data"]["gen_ai.request.model"] == "gpt-4"
+            assert invoke_agent_span["data"]["gen_ai.request.temperature"] == 0.7
+            assert invoke_agent_span["data"]["gen_ai.request.top_p"] == 1.0
+
+            assert ai_client_span["description"] == "chat gpt-4"
+            assert ai_client_span["data"]["gen_ai.operation.name"] == "chat"
+            assert ai_client_span["data"]["gen_ai.system"] == "openai"
+            assert ai_client_span["data"]["gen_ai.agent.name"] == "test_agent"
+            assert ai_client_span["data"]["gen_ai.request.max_tokens"] == 100
+            assert ai_client_span["data"]["gen_ai.request.model"] == "gpt-4"
+            assert ai_client_span["data"]["gen_ai.request.temperature"] == 0.7
+            assert ai_client_span["data"]["gen_ai.request.top_p"] == 1.0
+
+            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in invoke_agent_span["data"]
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "instructions",
     (
@@ -687,6 +1043,7 @@ def test_agent_invocation_span_sync_no_pii(
 )
 def test_agent_invocation_span_sync(
     sentry_init,
+    capture_events,
     capture_items,
     test_agent_with_instructions,
     nonstreaming_responses_model_response,
@@ -694,6 +1051,7 @@ def test_agent_invocation_span_sync(
     input,
     request,
     get_model_response,
+    stream_gen_ai_spans,
 ):
     """
     Test that the integration creates spans for agent invocations.
@@ -706,155 +1064,313 @@ def test_agent_invocation_span_sync(
         nonstreaming_responses_model_response, serialize_pydantic=True
     )
 
-    with patch.object(
-        agent.model._client._client,
-        "send",
-        return_value=response,
-    ) as _:
-        sentry_init(
-            integrations=[OpenAIAgentsIntegration()],
-            traces_sample_rate=1.0,
-            send_default_pii=True,
-        )
+    if stream_gen_ai_spans:
+        with patch.object(
+            agent.model._client._client,
+            "send",
+            return_value=response,
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            )
 
-        items = capture_items("span", "transaction")
+            items = capture_items("span", "transaction")
 
-        result = agents.Runner.run_sync(
-            agent,
-            input,
-            run_config=test_run_config,
-        )
+            result = agents.Runner.run_sync(
+                agent,
+                input,
+                run_config=test_run_config,
+            )
 
-        assert result is not None
-        assert result.final_output == "Hello, how can I help you?"
+            assert result is not None
+            assert result.final_output == "Hello, how can I help you?"
 
-    (transaction,) = (item.payload for item in items if item.type == "transaction")
-    assert transaction["transaction"] == "test_agent workflow"
-    assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
+        (transaction,) = (item.payload for item in items if item.type == "transaction")
+        assert transaction["transaction"] == "test_agent workflow"
+        assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
 
-    spans = [item.payload for item in items if item.type == "span"]
-    invoke_agent_span, ai_client_span = spans
+        spans = [item.payload for item in items if item.type == "span"]
+        invoke_agent_span, ai_client_span = spans
 
-    assert invoke_agent_span["name"] == "invoke_agent test_agent"
-    assert invoke_agent_span["attributes"]["gen_ai.operation.name"] == "invoke_agent"
-    assert invoke_agent_span["attributes"]["gen_ai.system"] == "openai"
-    assert invoke_agent_span["attributes"]["gen_ai.agent.name"] == "test_agent"
-    assert invoke_agent_span["attributes"]["gen_ai.request.max_tokens"] == 100
-    assert invoke_agent_span["attributes"]["gen_ai.request.model"] == "gpt-4"
-    assert invoke_agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
-    assert invoke_agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
+        assert invoke_agent_span["name"] == "invoke_agent test_agent"
+        assert (
+            invoke_agent_span["attributes"]["gen_ai.operation.name"] == "invoke_agent"
+        )
+        assert invoke_agent_span["attributes"]["gen_ai.system"] == "openai"
+        assert invoke_agent_span["attributes"]["gen_ai.agent.name"] == "test_agent"
+        assert invoke_agent_span["attributes"]["gen_ai.request.max_tokens"] == 100
+        assert invoke_agent_span["attributes"]["gen_ai.request.model"] == "gpt-4"
+        assert invoke_agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
+        assert invoke_agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
 
-    assert ai_client_span["name"] == "chat gpt-4"
-    assert ai_client_span["attributes"]["gen_ai.operation.name"] == "chat"
-    assert ai_client_span["attributes"]["gen_ai.system"] == "openai"
-    assert ai_client_span["attributes"]["gen_ai.agent.name"] == "test_agent"
-    assert ai_client_span["attributes"]["gen_ai.request.max_tokens"] == 100
-    assert ai_client_span["attributes"]["gen_ai.request.model"] == "gpt-4"
-    assert ai_client_span["attributes"]["gen_ai.request.temperature"] == 0.7
-    assert ai_client_span["attributes"]["gen_ai.request.top_p"] == 1.0
+        assert ai_client_span["name"] == "chat gpt-4"
+        assert ai_client_span["attributes"]["gen_ai.operation.name"] == "chat"
+        assert ai_client_span["attributes"]["gen_ai.system"] == "openai"
+        assert ai_client_span["attributes"]["gen_ai.agent.name"] == "test_agent"
+        assert ai_client_span["attributes"]["gen_ai.request.max_tokens"] == 100
+        assert ai_client_span["attributes"]["gen_ai.request.model"] == "gpt-4"
+        assert ai_client_span["attributes"]["gen_ai.request.temperature"] == 0.7
+        assert ai_client_span["attributes"]["gen_ai.request.top_p"] == 1.0
 
-    param_id = request.node.callspec.id
-    if "string" in param_id and instructions is None:  # type: ignore
-        assert "gen_ai.system_instructions" not in ai_client_span["attributes"]
-    elif "string" in param_id:
-        assert ai_client_span["attributes"][
-            "gen_ai.system_instructions"
-        ] == safe_serialize(
-            [
-                {
-                    "type": "text",
-                    "content": "You are a coding assistant that talks like a pirate.",
-                },
-            ]
-        )
-    elif "blocks_no_type" in param_id and instructions is None:  # type: ignore
-        assert ai_client_span["attributes"][
-            "gen_ai.system_instructions"
-        ] == safe_serialize(
-            [
-                {"type": "text", "content": "You are a helpful assistant."},
-            ]
-        )
-    elif "blocks_no_type" in param_id:
-        assert ai_client_span["attributes"][
-            "gen_ai.system_instructions"
-        ] == safe_serialize(
-            [
-                {
-                    "type": "text",
-                    "content": "You are a coding assistant that talks like a pirate.",
-                },
-                {"type": "text", "content": "You are a helpful assistant."},
-            ]
-        )
-    elif "blocks" in param_id and instructions is None:  # type: ignore
-        assert ai_client_span["attributes"][
-            "gen_ai.system_instructions"
-        ] == safe_serialize(
-            [
-                {"type": "text", "content": "You are a helpful assistant."},
-            ]
-        )
-    elif "blocks" in param_id:
-        assert ai_client_span["attributes"][
-            "gen_ai.system_instructions"
-        ] == safe_serialize(
-            [
-                {
-                    "type": "text",
-                    "content": "You are a coding assistant that talks like a pirate.",
-                },
-                {"type": "text", "content": "You are a helpful assistant."},
-            ]
-        )
-    elif "parts_no_type" in param_id and instructions is None:
-        assert ai_client_span["attributes"][
-            "gen_ai.system_instructions"
-        ] == safe_serialize(
-            [
-                {"type": "text", "content": "You are a helpful assistant."},
-                {"type": "text", "content": "Be concise and clear."},
-            ]
-        )
-    elif "parts_no_type" in param_id:
-        assert ai_client_span["attributes"][
-            "gen_ai.system_instructions"
-        ] == safe_serialize(
-            [
-                {
-                    "type": "text",
-                    "content": "You are a coding assistant that talks like a pirate.",
-                },
-                {"type": "text", "content": "You are a helpful assistant."},
-                {"type": "text", "content": "Be concise and clear."},
-            ]
-        )
-    elif instructions is None:  # type: ignore
-        assert ai_client_span["attributes"][
-            "gen_ai.system_instructions"
-        ] == safe_serialize(
-            [
-                {"type": "text", "content": "You are a helpful assistant."},
-                {"type": "text", "content": "Be concise and clear."},
-            ]
-        )
+        param_id = request.node.callspec.id
+        if "string" in param_id and instructions is None:  # type: ignore
+            assert "gen_ai.system_instructions" not in ai_client_span["attributes"]
+        elif "string" in param_id:
+            assert ai_client_span["attributes"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {
+                        "type": "text",
+                        "content": "You are a coding assistant that talks like a pirate.",
+                    },
+                ]
+            )
+        elif "blocks_no_type" in param_id and instructions is None:  # type: ignore
+            assert ai_client_span["attributes"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {"type": "text", "content": "You are a helpful assistant."},
+                ]
+            )
+        elif "blocks_no_type" in param_id:
+            assert ai_client_span["attributes"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {
+                        "type": "text",
+                        "content": "You are a coding assistant that talks like a pirate.",
+                    },
+                    {"type": "text", "content": "You are a helpful assistant."},
+                ]
+            )
+        elif "blocks" in param_id and instructions is None:  # type: ignore
+            assert ai_client_span["attributes"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {"type": "text", "content": "You are a helpful assistant."},
+                ]
+            )
+        elif "blocks" in param_id:
+            assert ai_client_span["attributes"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {
+                        "type": "text",
+                        "content": "You are a coding assistant that talks like a pirate.",
+                    },
+                    {"type": "text", "content": "You are a helpful assistant."},
+                ]
+            )
+        elif "parts_no_type" in param_id and instructions is None:
+            assert ai_client_span["attributes"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {"type": "text", "content": "You are a helpful assistant."},
+                    {"type": "text", "content": "Be concise and clear."},
+                ]
+            )
+        elif "parts_no_type" in param_id:
+            assert ai_client_span["attributes"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {
+                        "type": "text",
+                        "content": "You are a coding assistant that talks like a pirate.",
+                    },
+                    {"type": "text", "content": "You are a helpful assistant."},
+                    {"type": "text", "content": "Be concise and clear."},
+                ]
+            )
+        elif instructions is None:  # type: ignore
+            assert ai_client_span["attributes"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {"type": "text", "content": "You are a helpful assistant."},
+                    {"type": "text", "content": "Be concise and clear."},
+                ]
+            )
+        else:
+            assert ai_client_span["attributes"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {
+                        "type": "text",
+                        "content": "You are a coding assistant that talks like a pirate.",
+                    },
+                    {"type": "text", "content": "You are a helpful assistant."},
+                    {"type": "text", "content": "Be concise and clear."},
+                ]
+            )
     else:
-        assert ai_client_span["attributes"][
-            "gen_ai.system_instructions"
-        ] == safe_serialize(
-            [
-                {
-                    "type": "text",
-                    "content": "You are a coding assistant that talks like a pirate.",
-                },
-                {"type": "text", "content": "You are a helpful assistant."},
-                {"type": "text", "content": "Be concise and clear."},
-            ]
-        )
+        with patch.object(
+            agent.model._client._client,
+            "send",
+            return_value=response,
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            )
+
+            events = capture_events()
+
+            result = agents.Runner.run_sync(
+                agent,
+                input,
+                run_config=test_run_config,
+            )
+
+            assert result is not None
+            assert result.final_output == "Hello, how can I help you?"
+
+        (transaction,) = events
+        spans = transaction["spans"]
+        invoke_agent_span, ai_client_span = spans
+
+        assert transaction["transaction"] == "test_agent workflow"
+        assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
+
+        assert invoke_agent_span["description"] == "invoke_agent test_agent"
+        assert invoke_agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"
+        assert invoke_agent_span["data"]["gen_ai.system"] == "openai"
+        assert invoke_agent_span["data"]["gen_ai.agent.name"] == "test_agent"
+        assert invoke_agent_span["data"]["gen_ai.request.max_tokens"] == 100
+        assert invoke_agent_span["data"]["gen_ai.request.model"] == "gpt-4"
+        assert invoke_agent_span["data"]["gen_ai.request.temperature"] == 0.7
+        assert invoke_agent_span["data"]["gen_ai.request.top_p"] == 1.0
+
+        assert ai_client_span["description"] == "chat gpt-4"
+        assert ai_client_span["data"]["gen_ai.operation.name"] == "chat"
+        assert ai_client_span["data"]["gen_ai.system"] == "openai"
+        assert ai_client_span["data"]["gen_ai.agent.name"] == "test_agent"
+        assert ai_client_span["data"]["gen_ai.request.max_tokens"] == 100
+        assert ai_client_span["data"]["gen_ai.request.model"] == "gpt-4"
+        assert ai_client_span["data"]["gen_ai.request.temperature"] == 0.7
+        assert ai_client_span["data"]["gen_ai.request.top_p"] == 1.0
+
+        param_id = request.node.callspec.id
+        if "string" in param_id and instructions is None:  # type: ignore
+            assert "gen_ai.system_instructions" not in ai_client_span["data"]
+        elif "string" in param_id:
+            assert ai_client_span["data"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {
+                        "type": "text",
+                        "content": "You are a coding assistant that talks like a pirate.",
+                    },
+                ]
+            )
+        elif "blocks_no_type" in param_id and instructions is None:  # type: ignore
+            assert ai_client_span["data"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {"type": "text", "content": "You are a helpful assistant."},
+                ]
+            )
+        elif "blocks_no_type" in param_id:
+            assert ai_client_span["data"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {
+                        "type": "text",
+                        "content": "You are a coding assistant that talks like a pirate.",
+                    },
+                    {"type": "text", "content": "You are a helpful assistant."},
+                ]
+            )
+        elif "blocks" in param_id and instructions is None:  # type: ignore
+            assert ai_client_span["data"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {"type": "text", "content": "You are a helpful assistant."},
+                ]
+            )
+        elif "blocks" in param_id:
+            assert ai_client_span["data"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {
+                        "type": "text",
+                        "content": "You are a coding assistant that talks like a pirate.",
+                    },
+                    {"type": "text", "content": "You are a helpful assistant."},
+                ]
+            )
+        elif "parts_no_type" in param_id and instructions is None:
+            assert ai_client_span["data"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {"type": "text", "content": "You are a helpful assistant."},
+                    {"type": "text", "content": "Be concise and clear."},
+                ]
+            )
+        elif "parts_no_type" in param_id:
+            assert ai_client_span["data"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {
+                        "type": "text",
+                        "content": "You are a coding assistant that talks like a pirate.",
+                    },
+                    {"type": "text", "content": "You are a helpful assistant."},
+                    {"type": "text", "content": "Be concise and clear."},
+                ]
+            )
+        elif instructions is None:  # type: ignore
+            assert ai_client_span["data"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {"type": "text", "content": "You are a helpful assistant."},
+                    {"type": "text", "content": "Be concise and clear."},
+                ]
+            )
+        else:
+            assert ai_client_span["data"][
+                "gen_ai.system_instructions"
+            ] == safe_serialize(
+                [
+                    {
+                        "type": "text",
+                        "content": "You are a coding assistant that talks like a pirate.",
+                    },
+                    {"type": "text", "content": "You are a helpful assistant."},
+                    {"type": "text", "content": "Be concise and clear."},
+                ]
+            )
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
-async def test_handoff_span(sentry_init, capture_items, get_model_response):
+async def test_handoff_span(
+    sentry_init,
+    capture_events,
+    capture_items,
+    get_model_response,
+    stream_gen_ai_spans,
+):
     """
     Test that handoff spans are created when agents hand off to other agents.
     """
@@ -947,42 +1463,85 @@ async def test_handoff_span(sentry_init, capture_items, get_model_response):
         serialize_pydantic=True,
     )
 
-    with patch.object(
-        primary_agent.model._client._client,
-        "send",
-        side_effect=[handoff_response, final_response],
-    ) as _:
-        sentry_init(
-            integrations=[OpenAIAgentsIntegration()],
-            traces_sample_rate=1.0,
-        )
+    if stream_gen_ai_spans:
+        with patch.object(
+            primary_agent.model._client._client,
+            "send",
+            side_effect=[handoff_response, final_response],
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            )
 
-        items = capture_items("transaction", "span")
+            items = capture_items("transaction", "span")
 
-        result = await agents.Runner.run(
-            primary_agent,
-            "Please hand off to secondary agent",
-            run_config=test_run_config,
-        )
+            result = await agents.Runner.run(
+                primary_agent,
+                "Please hand off to secondary agent",
+                run_config=test_run_config,
+            )
 
-        assert result is not None
+            assert result is not None
 
-    spans = [item.payload for item in items if item.type == "span"]
-    handoff_span = next(
-        span
-        for span in spans
-        if span["attributes"].get("sentry.op") == OP.GEN_AI_HANDOFF
-    )
+            spans = [item.payload for item in items if item.type == "span"]
+            handoff_span = next(
+                span
+                for span in spans
+                if span["attributes"].get("sentry.op") == OP.GEN_AI_HANDOFF
+            )
 
-    # Verify handoff span was created
-    assert handoff_span is not None
-    assert handoff_span["name"] == "handoff from primary_agent to secondary_agent"
-    assert handoff_span["attributes"]["gen_ai.operation.name"] == "handoff"
+            # Verify handoff span was created
+            assert handoff_span is not None
+            assert (
+                handoff_span["name"] == "handoff from primary_agent to secondary_agent"
+            )
+            assert handoff_span["attributes"]["gen_ai.operation.name"] == "handoff"
+    else:
+        with patch.object(
+            primary_agent.model._client._client,
+            "send",
+            side_effect=[handoff_response, final_response],
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            )
+            events = capture_events()
+
+            result = await agents.Runner.run(
+                primary_agent,
+                "Please hand off to secondary agent",
+                run_config=test_run_config,
+            )
+
+            assert result is not None
+
+            (transaction,) = events
+            spans = transaction["spans"]
+            handoff_span = next(
+                span for span in spans if span.get("op") == OP.GEN_AI_HANDOFF
+            )
+
+            # Verify handoff span was created
+            assert handoff_span is not None
+            assert (
+                handoff_span["description"]
+                == "handoff from primary_agent to secondary_agent"
+            )
+            assert handoff_span["data"]["gen_ai.operation.name"] == "handoff"
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_max_turns_before_handoff_span(
-    sentry_init, capture_items, get_model_response
+    sentry_init,
+    capture_events,
+    capture_items,
+    get_model_response,
+    stream_gen_ai_spans,
 ):
     """
     Example raising agents.exceptions.AgentsException after the agent invocation span is complete.
@@ -1076,46 +1635,87 @@ async def test_max_turns_before_handoff_span(
         serialize_pydantic=True,
     )
 
-    with patch.object(
-        primary_agent.model._client._client,
-        "send",
-        side_effect=[handoff_response, final_response],
-    ) as _:
-        sentry_init(
-            integrations=[OpenAIAgentsIntegration()],
-            traces_sample_rate=1.0,
-        )
-
-        items = capture_items("transaction", "span")
-
-        with pytest.raises(MaxTurnsExceeded):
-            await agents.Runner.run(
-                primary_agent,
-                "Please hand off to secondary agent",
-                run_config=test_run_config,
-                max_turns=1,
+    if stream_gen_ai_spans:
+        with patch.object(
+            primary_agent.model._client._client,
+            "send",
+            side_effect=[handoff_response, final_response],
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
             )
 
-    spans = [item.payload for item in items if item.type == "span"]
-    handoff_span = next(
-        span
-        for span in spans
-        if span["attributes"].get("sentry.op") == OP.GEN_AI_HANDOFF
-    )
+            items = capture_items("transaction", "span")
 
-    # Verify handoff span was created
-    assert handoff_span is not None
-    assert handoff_span["name"] == "handoff from primary_agent to secondary_agent"
-    assert handoff_span["attributes"]["gen_ai.operation.name"] == "handoff"
+            with pytest.raises(MaxTurnsExceeded):
+                await agents.Runner.run(
+                    primary_agent,
+                    "Please hand off to secondary agent",
+                    run_config=test_run_config,
+                    max_turns=1,
+                )
+
+            spans = [item.payload for item in items if item.type == "span"]
+            handoff_span = next(
+                span
+                for span in spans
+                if span["attributes"].get("sentry.op") == OP.GEN_AI_HANDOFF
+            )
+
+            # Verify handoff span was created
+            assert handoff_span is not None
+            assert (
+                handoff_span["name"] == "handoff from primary_agent to secondary_agent"
+            )
+            assert handoff_span["attributes"]["gen_ai.operation.name"] == "handoff"
+    else:
+        with patch.object(
+            primary_agent.model._client._client,
+            "send",
+            side_effect=[handoff_response, final_response],
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            )
+            events = capture_events()
+
+            with pytest.raises(MaxTurnsExceeded):
+                await agents.Runner.run(
+                    primary_agent,
+                    "Please hand off to secondary agent",
+                    run_config=test_run_config,
+                    max_turns=1,
+                )
+
+            (error, transaction) = events
+            spans = transaction["spans"]
+            handoff_span = next(
+                span for span in spans if span.get("op") == OP.GEN_AI_HANDOFF
+            )
+
+            # Verify handoff span was created
+            assert handoff_span is not None
+            assert (
+                handoff_span["description"]
+                == "handoff from primary_agent to secondary_agent"
+            )
+            assert handoff_span["data"]["gen_ai.operation.name"] == "handoff"
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_tool_execution_span(
     sentry_init,
+    capture_events,
     capture_items,
     test_agent,
     get_model_response,
     responses_tool_call_model_responses,
+    stream_gen_ai_spans,
 ):
     """
     Test tool execution span creation.
@@ -1182,9 +1782,13 @@ async def test_tool_execution_span(
             integrations=[OpenAIAgentsIntegration()],
             traces_sample_rate=1.0,
             send_default_pii=True,
+            _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
         )
 
-        items = capture_items("transaction", "span")
+        if stream_gen_ai_spans:
+            items = capture_items("transaction", "span")
+        else:
+            events = capture_events()
 
         await agents.Runner.run(
             agent_with_tool,
@@ -1192,24 +1796,35 @@ async def test_tool_execution_span(
             run_config=test_run_config,
         )
 
-    (transaction,) = (item.payload for item in items if item.type == "transaction")
-    assert transaction["transaction"] == "test_agent workflow"
-    assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
+    if stream_gen_ai_spans:
+        (transaction,) = (item.payload for item in items if item.type == "transaction")
+        assert transaction["transaction"] == "test_agent workflow"
+        assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
 
-    spans = [item.payload for item in items if item.type == "span"]
-    agent_span = next(
-        span
-        for span in spans
-        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
-    )
-    ai_client_span1, ai_client_span2 = (
-        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-    )
-    tool_span = next(
-        span
-        for span in spans
-        if span["attributes"]["sentry.op"] == OP.GEN_AI_EXECUTE_TOOL
-    )
+        spans = [item.payload for item in items if item.type == "span"]
+        agent_span = next(
+            span
+            for span in spans
+            if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
+        )
+        ai_client_span1, ai_client_span2 = (
+            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        )
+        tool_span = next(
+            span
+            for span in spans
+            if span["attributes"]["sentry.op"] == OP.GEN_AI_EXECUTE_TOOL
+        )
+    else:
+        (transaction,) = events
+        spans = transaction["spans"]
+        agent_span = next(
+            span for span in spans if span["op"] == OP.GEN_AI_INVOKE_AGENT
+        )
+        ai_client_span1, ai_client_span2 = (
+            span for span in spans if span["op"] == OP.GEN_AI_CHAT
+        )
+        tool_span = next(span for span in spans if span["op"] == OP.GEN_AI_EXECUTE_TOOL)
 
     available_tool = {
         "name": "simple_test_tool",
@@ -1249,53 +1864,107 @@ async def test_tool_execution_span(
             }
         )
 
-    assert agent_span["name"] == "invoke_agent test_agent"
-    assert agent_span["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
-    assert agent_span["attributes"]["gen_ai.agent.name"] == "test_agent"
-    assert agent_span["attributes"]["gen_ai.operation.name"] == "invoke_agent"
+    if stream_gen_ai_spans:
+        assert agent_span["name"] == "invoke_agent test_agent"
+        assert agent_span["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
+        assert agent_span["attributes"]["gen_ai.agent.name"] == "test_agent"
+        assert agent_span["attributes"]["gen_ai.operation.name"] == "invoke_agent"
 
-    agent_span_available_tool = json.loads(
-        agent_span["attributes"]["gen_ai.request.available_tools"]
-    )[0]
+        agent_span_available_tool = json.loads(
+            agent_span["attributes"]["gen_ai.request.available_tools"]
+        )[0]
+    else:
+        assert transaction["transaction"] == "test_agent workflow"
+        assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
+
+        assert agent_span["description"] == "invoke_agent test_agent"
+        assert agent_span["origin"] == "auto.ai.openai_agents"
+        assert agent_span["data"]["gen_ai.agent.name"] == "test_agent"
+        assert agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"
+
+        agent_span_available_tool = json.loads(
+            agent_span["data"]["gen_ai.request.available_tools"]
+        )[0]
     assert all(agent_span_available_tool[k] == v for k, v in available_tool.items())
 
-    assert agent_span["attributes"]["gen_ai.request.max_tokens"] == 100
-    assert agent_span["attributes"]["gen_ai.request.model"] == "gpt-4"
-    assert agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
-    assert agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
-    assert agent_span["attributes"]["gen_ai.system"] == "openai"
+    if stream_gen_ai_spans:
+        assert agent_span["attributes"]["gen_ai.request.max_tokens"] == 100
+        assert agent_span["attributes"]["gen_ai.request.model"] == "gpt-4"
+        assert agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
+        assert agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
+        assert agent_span["attributes"]["gen_ai.system"] == "openai"
 
-    assert ai_client_span1["name"] == "chat gpt-4"
-    assert ai_client_span1["attributes"]["gen_ai.operation.name"] == "chat"
-    assert ai_client_span1["attributes"]["gen_ai.system"] == "openai"
-    assert ai_client_span1["attributes"]["gen_ai.agent.name"] == "test_agent"
+        assert ai_client_span1["name"] == "chat gpt-4"
+        assert ai_client_span1["attributes"]["gen_ai.operation.name"] == "chat"
+        assert ai_client_span1["attributes"]["gen_ai.system"] == "openai"
+        assert ai_client_span1["attributes"]["gen_ai.agent.name"] == "test_agent"
 
-    ai_client_span1_available_tool = json.loads(
-        ai_client_span1["attributes"]["gen_ai.request.available_tools"]
-    )[0]
+        ai_client_span1_available_tool = json.loads(
+            ai_client_span1["attributes"]["gen_ai.request.available_tools"]
+        )[0]
+    else:
+        assert agent_span["data"]["gen_ai.request.max_tokens"] == 100
+        assert agent_span["data"]["gen_ai.request.model"] == "gpt-4"
+        assert agent_span["data"]["gen_ai.request.temperature"] == 0.7
+        assert agent_span["data"]["gen_ai.request.top_p"] == 1.0
+        assert agent_span["data"]["gen_ai.system"] == "openai"
+
+        assert ai_client_span1["description"] == "chat gpt-4"
+        assert ai_client_span1["data"]["gen_ai.operation.name"] == "chat"
+        assert ai_client_span1["data"]["gen_ai.system"] == "openai"
+        assert ai_client_span1["data"]["gen_ai.agent.name"] == "test_agent"
+
+        ai_client_span1_available_tool = json.loads(
+            ai_client_span1["data"]["gen_ai.request.available_tools"]
+        )[0]
     assert all(
         ai_client_span1_available_tool[k] == v for k, v in available_tool.items()
     )
 
-    assert ai_client_span1["attributes"]["gen_ai.request.max_tokens"] == 100
-    assert ai_client_span1["attributes"]["gen_ai.request.messages"] == safe_serialize(
-        [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "Please use the simple test tool"}
-                ],
-            },
-        ]
-    )
-    assert ai_client_span1["attributes"]["gen_ai.request.model"] == "gpt-4"
-    assert ai_client_span1["attributes"]["gen_ai.request.temperature"] == 0.7
-    assert ai_client_span1["attributes"]["gen_ai.request.top_p"] == 1.0
-    assert ai_client_span1["attributes"]["gen_ai.usage.input_tokens"] == 10
-    assert ai_client_span1["attributes"]["gen_ai.usage.input_tokens.cached"] == 0
-    assert ai_client_span1["attributes"]["gen_ai.usage.output_tokens"] == 5
-    assert ai_client_span1["attributes"]["gen_ai.usage.output_tokens.reasoning"] == 0
-    assert ai_client_span1["attributes"]["gen_ai.usage.total_tokens"] == 15
+    if stream_gen_ai_spans:
+        assert ai_client_span1["attributes"]["gen_ai.request.max_tokens"] == 100
+        assert ai_client_span1["attributes"][
+            "gen_ai.request.messages"
+        ] == safe_serialize(
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Please use the simple test tool"}
+                    ],
+                },
+            ]
+        )
+        assert ai_client_span1["attributes"]["gen_ai.request.model"] == "gpt-4"
+        assert ai_client_span1["attributes"]["gen_ai.request.temperature"] == 0.7
+        assert ai_client_span1["attributes"]["gen_ai.request.top_p"] == 1.0
+        assert ai_client_span1["attributes"]["gen_ai.usage.input_tokens"] == 10
+        assert ai_client_span1["attributes"]["gen_ai.usage.input_tokens.cached"] == 0
+        assert ai_client_span1["attributes"]["gen_ai.usage.output_tokens"] == 5
+        assert (
+            ai_client_span1["attributes"]["gen_ai.usage.output_tokens.reasoning"] == 0
+        )
+        assert ai_client_span1["attributes"]["gen_ai.usage.total_tokens"] == 15
+    else:
+        assert ai_client_span1["data"]["gen_ai.request.max_tokens"] == 100
+        assert ai_client_span1["data"]["gen_ai.request.messages"] == safe_serialize(
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Please use the simple test tool"}
+                    ],
+                },
+            ]
+        )
+        assert ai_client_span1["data"]["gen_ai.request.model"] == "gpt-4"
+        assert ai_client_span1["data"]["gen_ai.request.temperature"] == 0.7
+        assert ai_client_span1["data"]["gen_ai.request.top_p"] == 1.0
+        assert ai_client_span1["data"]["gen_ai.usage.input_tokens"] == 10
+        assert ai_client_span1["data"]["gen_ai.usage.input_tokens.cached"] == 0
+        assert ai_client_span1["data"]["gen_ai.usage.output_tokens"] == 5
+        assert ai_client_span1["data"]["gen_ai.usage.output_tokens.reasoning"] == 0
+        assert ai_client_span1["data"]["gen_ai.usage.total_tokens"] == 15
 
     tool_call = {
         "arguments": '{"message": "hello"}',
@@ -1309,67 +1978,135 @@ async def test_tool_execution_span(
     if OPENAI_VERSION >= (2, 25, 0):
         tool_call["namespace"] = None
 
-    assert json.loads(ai_client_span1["attributes"]["gen_ai.response.tool_calls"]) == [
-        tool_call
-    ]
+    if stream_gen_ai_spans:
+        assert json.loads(
+            ai_client_span1["attributes"]["gen_ai.response.tool_calls"]
+        ) == [tool_call]
+    else:
+        assert json.loads(ai_client_span1["data"]["gen_ai.response.tool_calls"]) == [
+            tool_call
+        ]
 
-    assert tool_span["name"] == "execute_tool simple_test_tool"
-    assert tool_span["attributes"]["gen_ai.agent.name"] == "test_agent"
-    assert tool_span["attributes"]["gen_ai.operation.name"] == "execute_tool"
+    if stream_gen_ai_spans:
+        assert tool_span["name"] == "execute_tool simple_test_tool"
+        assert tool_span["attributes"]["gen_ai.agent.name"] == "test_agent"
+        assert tool_span["attributes"]["gen_ai.operation.name"] == "execute_tool"
 
-    tool_span_available_tool = json.loads(
-        tool_span["attributes"]["gen_ai.request.available_tools"]
-    )[0]
+        tool_span_available_tool = json.loads(
+            tool_span["attributes"]["gen_ai.request.available_tools"]
+        )[0]
+    else:
+        assert tool_span["description"] == "execute_tool simple_test_tool"
+        assert tool_span["data"]["gen_ai.agent.name"] == "test_agent"
+        assert tool_span["data"]["gen_ai.operation.name"] == "execute_tool"
+
+        tool_span_available_tool = json.loads(
+            tool_span["data"]["gen_ai.request.available_tools"]
+        )[0]
     assert all(tool_span_available_tool[k] == v for k, v in available_tool.items())
 
-    assert tool_span["attributes"]["gen_ai.request.max_tokens"] == 100
-    assert tool_span["attributes"]["gen_ai.request.model"] == "gpt-4"
-    assert tool_span["attributes"]["gen_ai.request.temperature"] == 0.7
-    assert tool_span["attributes"]["gen_ai.request.top_p"] == 1.0
-    assert tool_span["attributes"]["gen_ai.system"] == "openai"
-    assert tool_span["attributes"]["gen_ai.tool.description"] == "A simple tool"
-    assert tool_span["attributes"]["gen_ai.tool.input"] == '{"message": "hello"}'
-    assert tool_span["attributes"]["gen_ai.tool.name"] == "simple_test_tool"
-    assert tool_span["attributes"]["gen_ai.tool.output"] == "Tool executed with: hello"
-    assert ai_client_span2["name"] == "chat gpt-4"
-    assert ai_client_span2["attributes"]["gen_ai.agent.name"] == "test_agent"
-    assert ai_client_span2["attributes"]["gen_ai.operation.name"] == "chat"
+    if stream_gen_ai_spans:
+        assert tool_span["attributes"]["gen_ai.request.max_tokens"] == 100
+        assert tool_span["attributes"]["gen_ai.request.model"] == "gpt-4"
+        assert tool_span["attributes"]["gen_ai.request.temperature"] == 0.7
+        assert tool_span["attributes"]["gen_ai.request.top_p"] == 1.0
+        assert tool_span["attributes"]["gen_ai.system"] == "openai"
+        assert tool_span["attributes"]["gen_ai.tool.description"] == "A simple tool"
+        assert tool_span["attributes"]["gen_ai.tool.input"] == '{"message": "hello"}'
+        assert tool_span["attributes"]["gen_ai.tool.name"] == "simple_test_tool"
+        assert (
+            tool_span["attributes"]["gen_ai.tool.output"] == "Tool executed with: hello"
+        )
+        assert ai_client_span2["name"] == "chat gpt-4"
+        assert ai_client_span2["attributes"]["gen_ai.agent.name"] == "test_agent"
+        assert ai_client_span2["attributes"]["gen_ai.operation.name"] == "chat"
 
-    ai_client_span2_available_tool = json.loads(
-        ai_client_span2["attributes"]["gen_ai.request.available_tools"]
-    )[0]
+        ai_client_span2_available_tool = json.loads(
+            ai_client_span2["attributes"]["gen_ai.request.available_tools"]
+        )[0]
+    else:
+        assert tool_span["data"]["gen_ai.request.max_tokens"] == 100
+        assert tool_span["data"]["gen_ai.request.model"] == "gpt-4"
+        assert tool_span["data"]["gen_ai.request.temperature"] == 0.7
+        assert tool_span["data"]["gen_ai.request.top_p"] == 1.0
+        assert tool_span["data"]["gen_ai.system"] == "openai"
+        assert tool_span["data"]["gen_ai.tool.description"] == "A simple tool"
+        assert tool_span["data"]["gen_ai.tool.input"] == '{"message": "hello"}'
+        assert tool_span["data"]["gen_ai.tool.name"] == "simple_test_tool"
+        assert tool_span["data"]["gen_ai.tool.output"] == "Tool executed with: hello"
+        assert ai_client_span2["description"] == "chat gpt-4"
+        assert ai_client_span2["data"]["gen_ai.agent.name"] == "test_agent"
+        assert ai_client_span2["data"]["gen_ai.operation.name"] == "chat"
+
+        ai_client_span2_available_tool = json.loads(
+            ai_client_span2["data"]["gen_ai.request.available_tools"]
+        )[0]
     assert all(
         ai_client_span2_available_tool[k] == v for k, v in available_tool.items()
     )
 
-    assert ai_client_span2["attributes"]["gen_ai.request.max_tokens"] == 100
-    assert ai_client_span2["attributes"]["gen_ai.request.messages"] == safe_serialize(
-        [
-            {
-                "role": "tool",
-                "content": [
-                    {
-                        "call_id": "call_123",
-                        "output": "Tool executed with: hello",
-                        "type": "function_call_output",
-                    }
-                ],
-            },
-        ]
-    )
-    assert ai_client_span2["attributes"]["gen_ai.request.model"] == "gpt-4"
-    assert ai_client_span2["attributes"]["gen_ai.request.temperature"] == 0.7
-    assert ai_client_span2["attributes"]["gen_ai.request.top_p"] == 1.0
-    assert (
-        ai_client_span2["attributes"]["gen_ai.response.text"]
-        == "Task completed using the tool"
-    )
-    assert ai_client_span2["attributes"]["gen_ai.system"] == "openai"
-    assert ai_client_span2["attributes"]["gen_ai.usage.input_tokens.cached"] == 0
-    assert ai_client_span2["attributes"]["gen_ai.usage.input_tokens"] == 15
-    assert ai_client_span2["attributes"]["gen_ai.usage.output_tokens.reasoning"] == 0
-    assert ai_client_span2["attributes"]["gen_ai.usage.output_tokens"] == 10
-    assert ai_client_span2["attributes"]["gen_ai.usage.total_tokens"] == 25
+    if stream_gen_ai_spans:
+        assert ai_client_span2["attributes"]["gen_ai.request.max_tokens"] == 100
+        assert ai_client_span2["attributes"][
+            "gen_ai.request.messages"
+        ] == safe_serialize(
+            [
+                {
+                    "role": "tool",
+                    "content": [
+                        {
+                            "call_id": "call_123",
+                            "output": "Tool executed with: hello",
+                            "type": "function_call_output",
+                        }
+                    ],
+                },
+            ]
+        )
+        assert ai_client_span2["attributes"]["gen_ai.request.model"] == "gpt-4"
+        assert ai_client_span2["attributes"]["gen_ai.request.temperature"] == 0.7
+        assert ai_client_span2["attributes"]["gen_ai.request.top_p"] == 1.0
+        assert (
+            ai_client_span2["attributes"]["gen_ai.response.text"]
+            == "Task completed using the tool"
+        )
+        assert ai_client_span2["attributes"]["gen_ai.system"] == "openai"
+        assert ai_client_span2["attributes"]["gen_ai.usage.input_tokens.cached"] == 0
+        assert ai_client_span2["attributes"]["gen_ai.usage.input_tokens"] == 15
+        assert (
+            ai_client_span2["attributes"]["gen_ai.usage.output_tokens.reasoning"] == 0
+        )
+        assert ai_client_span2["attributes"]["gen_ai.usage.output_tokens"] == 10
+        assert ai_client_span2["attributes"]["gen_ai.usage.total_tokens"] == 25
+    else:
+        assert ai_client_span2["data"]["gen_ai.request.max_tokens"] == 100
+        assert ai_client_span2["data"]["gen_ai.request.messages"] == safe_serialize(
+            [
+                {
+                    "role": "tool",
+                    "content": [
+                        {
+                            "call_id": "call_123",
+                            "output": "Tool executed with: hello",
+                            "type": "function_call_output",
+                        }
+                    ],
+                },
+            ]
+        )
+        assert ai_client_span2["data"]["gen_ai.request.model"] == "gpt-4"
+        assert ai_client_span2["data"]["gen_ai.request.temperature"] == 0.7
+        assert ai_client_span2["data"]["gen_ai.request.top_p"] == 1.0
+        assert (
+            ai_client_span2["data"]["gen_ai.response.text"]
+            == "Task completed using the tool"
+        )
+        assert ai_client_span2["data"]["gen_ai.system"] == "openai"
+        assert ai_client_span2["data"]["gen_ai.usage.input_tokens.cached"] == 0
+        assert ai_client_span2["data"]["gen_ai.usage.input_tokens"] == 15
+        assert ai_client_span2["data"]["gen_ai.usage.output_tokens.reasoning"] == 0
+        assert ai_client_span2["data"]["gen_ai.usage.output_tokens"] == 10
+        assert ai_client_span2["data"]["gen_ai.usage.total_tokens"] == 25
 
 
 @pytest.mark.asyncio
@@ -1626,8 +2363,15 @@ async def test_hosted_mcp_tool_propagation_headers(
         assert hosted_mcp_tool["headers"]["baggage"] == expected_outgoing_baggage
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
-async def test_model_behavior_error(sentry_init, capture_items, test_agent):
+async def test_model_behavior_error(
+    sentry_init,
+    capture_events,
+    capture_items,
+    test_agent,
+    stream_gen_ai_spans,
+):
     """
     Example raising agents.exceptions.AgentsException before the agent invocation span is complete.
     The mocked API response indicates that "wrong_tool" was called.
@@ -1641,63 +2385,129 @@ async def test_model_behavior_error(sentry_init, capture_items, test_agent):
     # Create agent with the tool
     agent_with_tool = test_agent.clone(tools=[simple_test_tool])
 
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
-        with patch(
-            "agents.models.openai_responses.OpenAIResponsesModel.get_response"
-        ) as mock_get_response:
-            # Create a mock response that includes tool calls
-            tool_call = ResponseFunctionToolCall(
-                id="call_123",
-                call_id="call_123",
-                name="wrong_tool",
-                type="function_call",
-                arguments='{"message": "hello"}',
-            )
-
-            tool_response = ModelResponse(
-                output=[tool_call],
-                usage=Usage(
-                    requests=1, input_tokens=10, output_tokens=5, total_tokens=15
-                ),
-                response_id="resp_tool_123",
-            )
-
-            mock_get_response.side_effect = [tool_response]
-
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-                send_default_pii=True,
-            )
-
-            items = capture_items("span", "transaction")
-
-            with pytest.raises(ModelBehaviorError):
-                await agents.Runner.run(
-                    agent_with_tool,
-                    "Please use the simple test tool",
-                    run_config=test_run_config,
+    if stream_gen_ai_spans:
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+            with patch(
+                "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+            ) as mock_get_response:
+                # Create a mock response that includes tool calls
+                tool_call = ResponseFunctionToolCall(
+                    id="call_123",
+                    call_id="call_123",
+                    name="wrong_tool",
+                    type="function_call",
+                    arguments='{"message": "hello"}',
                 )
 
-    (transaction,) = (item.payload for item in items if item.type == "transaction")
-    assert transaction["transaction"] == "test_agent workflow"
-    assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
+                tool_response = ModelResponse(
+                    output=[tool_call],
+                    usage=Usage(
+                        requests=1, input_tokens=10, output_tokens=5, total_tokens=15
+                    ),
+                    response_id="resp_tool_123",
+                )
 
-    spans = [item.payload for item in items if item.type == "span"]
-    (
-        agent_span,
-        ai_client_span1,
-    ) = spans
+                mock_get_response.side_effect = [tool_response]
 
-    assert agent_span["name"] == "invoke_agent test_agent"
-    assert agent_span["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
+                sentry_init(
+                    integrations=[OpenAIAgentsIntegration()],
+                    traces_sample_rate=1.0,
+                    send_default_pii=True,
+                    _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                )
 
-    # Error due to unrecognized tool in model response.
-    assert agent_span["status"] == "error"
+                items = capture_items("span", "transaction")
+
+                with pytest.raises(ModelBehaviorError):
+                    await agents.Runner.run(
+                        agent_with_tool,
+                        "Please use the simple test tool",
+                        run_config=test_run_config,
+                    )
+
+            (transaction,) = (
+                item.payload for item in items if item.type == "transaction"
+            )
+            assert transaction["transaction"] == "test_agent workflow"
+            assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
+
+            spans = [item.payload for item in items if item.type == "span"]
+
+            (
+                agent_span,
+                ai_client_span1,
+            ) = spans
+            assert agent_span["name"] == "invoke_agent test_agent"
+            assert agent_span["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
+
+            # Error due to unrecognized tool in model response.
+            assert agent_span["status"] == "error"
+    else:
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
+            with patch(
+                "agents.models.openai_responses.OpenAIResponsesModel.get_response"
+            ) as mock_get_response:
+                # Create a mock response that includes tool calls
+                tool_call = ResponseFunctionToolCall(
+                    id="call_123",
+                    call_id="call_123",
+                    name="wrong_tool",
+                    type="function_call",
+                    arguments='{"message": "hello"}',
+                )
+
+                tool_response = ModelResponse(
+                    output=[tool_call],
+                    usage=Usage(
+                        requests=1, input_tokens=10, output_tokens=5, total_tokens=15
+                    ),
+                    response_id="resp_tool_123",
+                )
+
+                mock_get_response.side_effect = [tool_response]
+
+                sentry_init(
+                    integrations=[OpenAIAgentsIntegration()],
+                    traces_sample_rate=1.0,
+                    send_default_pii=True,
+                    _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+                )
+                events = capture_events()
+
+                with pytest.raises(ModelBehaviorError):
+                    await agents.Runner.run(
+                        agent_with_tool,
+                        "Please use the simple test tool",
+                        run_config=test_run_config,
+                    )
+
+            (error, transaction) = events
+            spans = transaction["spans"]
+            (
+                agent_span,
+                ai_client_span1,
+            ) = spans
+
+            assert transaction["transaction"] == "test_agent workflow"
+            assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
+
+            assert agent_span["description"] == "invoke_agent test_agent"
+            assert agent_span["origin"] == "auto.ai.openai_agents"
+
+            # Error due to unrecognized tool in model response.
+            assert agent_span["status"] == "internal_error"
+            assert agent_span["tags"]["status"] == "internal_error"
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
-async def test_error_handling(sentry_init, capture_items, test_agent):
+async def test_error_handling(
+    sentry_init,
+    capture_events,
+    capture_items,
+    test_agent,
+    stream_gen_ai_spans,
+):
     """
     Test error handling in agent execution.
     """
@@ -1714,37 +2524,100 @@ async def test_error_handling(sentry_init, capture_items, test_agent):
                     LoggingIntegration(event_level=logging.CRITICAL),
                 ],
                 traces_sample_rate=1.0,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
             )
 
-            items = capture_items("event", "span", "transaction")
+            if stream_gen_ai_spans:
+                items = capture_items("event", "span", "transaction")
 
-            with pytest.raises(Exception, match="Model Error"):
-                await agents.Runner.run(
-                    test_agent, "Test input", run_config=test_run_config
+                with pytest.raises(Exception, match="Model Error"):
+                    await agents.Runner.run(
+                        test_agent, "Test input", run_config=test_run_config
+                    )
+
+                (error_event,) = (
+                    item.payload for item in items if item.type == "event"
                 )
 
-    (error_event,) = (item.payload for item in items if item.type == "event")
-    assert error_event["exception"]["values"][0]["type"] == "Exception"
-    assert error_event["exception"]["values"][0]["value"] == "Model Error"
-    assert error_event["exception"]["values"][0]["mechanism"]["type"] == "openai_agents"
+                assert error_event["exception"]["values"][0]["type"] == "Exception"
+                assert error_event["exception"]["values"][0]["value"] == "Model Error"
+                assert (
+                    error_event["exception"]["values"][0]["mechanism"]["type"]
+                    == "openai_agents"
+                )
 
-    (transaction,) = (item.payload for item in items if item.type == "transaction")
-    assert transaction["transaction"] == "test_agent workflow"
-    assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
+                (transaction,) = (
+                    item.payload for item in items if item.type == "transaction"
+                )
 
-    spans = [item.payload for item in items if item.type == "span"]
-    (invoke_agent_span, ai_client_span) = spans
+                assert transaction["transaction"] == "test_agent workflow"
+                assert (
+                    transaction["contexts"]["trace"]["origin"]
+                    == "auto.ai.openai_agents"
+                )
 
-    assert invoke_agent_span["name"] == "invoke_agent test_agent"
-    assert invoke_agent_span["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
+                spans = [item.payload for item in items if item.type == "span"]
+                (invoke_agent_span, ai_client_span) = spans
 
-    assert ai_client_span["name"] == "chat gpt-4"
-    assert ai_client_span["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
-    assert ai_client_span["status"] == "error"
+                assert invoke_agent_span["name"] == "invoke_agent test_agent"
+                assert (
+                    invoke_agent_span["attributes"]["sentry.origin"]
+                    == "auto.ai.openai_agents"
+                )
+
+                assert ai_client_span["name"] == "chat gpt-4"
+                assert (
+                    ai_client_span["attributes"]["sentry.origin"]
+                    == "auto.ai.openai_agents"
+                )
+                assert ai_client_span["status"] == "error"
+            else:
+                events = capture_events()
+
+                with pytest.raises(Exception, match="Model Error"):
+                    await agents.Runner.run(
+                        test_agent, "Test input", run_config=test_run_config
+                    )
+
+                (
+                    error_event,
+                    transaction,
+                ) = events
+
+                assert error_event["exception"]["values"][0]["type"] == "Exception"
+                assert error_event["exception"]["values"][0]["value"] == "Model Error"
+                assert (
+                    error_event["exception"]["values"][0]["mechanism"]["type"]
+                    == "openai_agents"
+                )
+
+                spans = transaction["spans"]
+                (invoke_agent_span, ai_client_span) = spans
+
+                assert transaction["transaction"] == "test_agent workflow"
+                assert (
+                    transaction["contexts"]["trace"]["origin"]
+                    == "auto.ai.openai_agents"
+                )
+
+                assert invoke_agent_span["description"] == "invoke_agent test_agent"
+                assert invoke_agent_span["origin"] == "auto.ai.openai_agents"
+
+                assert ai_client_span["description"] == "chat gpt-4"
+                assert ai_client_span["origin"] == "auto.ai.openai_agents"
+                assert ai_client_span["status"] == "internal_error"
+                assert ai_client_span["tags"]["status"] == "internal_error"
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
-async def test_error_captures_input_data(sentry_init, capture_items, test_agent):
+async def test_error_captures_input_data(
+    sentry_init,
+    capture_events,
+    capture_items,
+    test_agent,
+    stream_gen_ai_spans,
+):
     """
     Test that input data is captured even when the API call raises an exception.
     This verifies that _set_input_data is called before the API call.
@@ -1775,36 +2648,69 @@ async def test_error_captures_input_data(sentry_init, capture_items, test_agent)
             ],
             traces_sample_rate=1.0,
             send_default_pii=True,
+            _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
         )
 
-        items = capture_items("event", "span")
+        if stream_gen_ai_spans:
+            items = capture_items("event", "span")
+        else:
+            events = capture_events()
 
         with pytest.raises(InternalServerError, match="Error code: 500"):
             await agents.Runner.run(agent, "Test input", run_config=test_run_config)
 
-    (error_event,) = (item.payload for item in items if item.type == "event")
+    if stream_gen_ai_spans:
+        (error_event,) = (item.payload for item in items if item.type == "event")
+    else:
+        (
+            error_event,
+            transaction,
+        ) = events
+
     assert error_event["exception"]["values"][0]["type"] == "InternalServerError"
     assert error_event["exception"]["values"][0]["value"] == "Error code: 500"
 
-    spans = [item.payload for item in items if item.type == "span"]
-    ai_client_span = [
-        s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
-    ][0]
+    if stream_gen_ai_spans:
+        spans = [item.payload for item in items if item.type == "span"]
+        ai_client_span = [
+            s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        ][0]
 
-    assert ai_client_span["name"] == "chat gpt-4"
-    assert ai_client_span["status"] == "error"
+        assert ai_client_span["name"] == "chat gpt-4"
+        assert ai_client_span["status"] == "error"
 
-    assert "gen_ai.request.messages" in ai_client_span["attributes"]
+        assert "gen_ai.request.messages" in ai_client_span["attributes"]
+    else:
+        spans = transaction["spans"]
+        ai_client_span = [s for s in spans if s["op"] == "gen_ai.chat"][0]
+
+        assert ai_client_span["description"] == "chat gpt-4"
+        assert ai_client_span["status"] == "internal_error"
+        assert ai_client_span["tags"]["status"] == "internal_error"
+
+        assert "gen_ai.request.messages" in ai_client_span["data"]
     request_messages = safe_serialize(
         [
             {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
         ]
     )
-    assert ai_client_span["attributes"]["gen_ai.request.messages"] == request_messages
+    if stream_gen_ai_spans:
+        assert (
+            ai_client_span["attributes"]["gen_ai.request.messages"] == request_messages
+        )
+    else:
+        assert ai_client_span["data"]["gen_ai.request.messages"] == request_messages
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
-async def test_span_status_error(sentry_init, capture_items, test_agent):
+async def test_span_status_error(
+    sentry_init,
+    capture_events,
+    capture_items,
+    test_agent,
+    stream_gen_ai_spans,
+):
     with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}):
         with patch(
             "agents.models.openai_responses.OpenAIResponsesModel.get_response"
@@ -1817,28 +2723,51 @@ async def test_span_status_error(sentry_init, capture_items, test_agent):
                     LoggingIntegration(event_level=logging.CRITICAL),
                 ],
                 traces_sample_rate=1.0,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
             )
 
-            items = capture_items("event", "transaction", "span")
+            if stream_gen_ai_spans:
+                items = capture_items("event", "transaction", "span")
 
-            with pytest.raises(ValueError, match="Model Error"):
-                await agents.Runner.run(
-                    test_agent, "Test input", run_config=test_run_config
+                with pytest.raises(ValueError, match="Model Error"):
+                    await agents.Runner.run(
+                        test_agent, "Test input", run_config=test_run_config
+                    )
+
+                (error,) = (item.payload for item in items if item.type == "event")
+                assert error["level"] == "error"
+
+                spans = [item.payload for item in items if item.type == "span"]
+                assert spans[0]["status"] == "error"
+
+                (transaction,) = (
+                    item.payload for item in items if item.type == "transaction"
                 )
+            else:
+                events = capture_events()
 
-    (error,) = (item.payload for item in items if item.type == "event")
-    assert error["level"] == "error"
+                with pytest.raises(ValueError, match="Model Error"):
+                    await agents.Runner.run(
+                        test_agent, "Test input", run_config=test_run_config
+                    )
 
-    spans = [item.payload for item in items if item.type == "span"]
-    assert spans[0]["status"] == "error"
+                (error, transaction) = events
+                assert error["level"] == "error"
+                assert transaction["spans"][0]["status"] == "internal_error"
+                assert transaction["spans"][0]["tags"]["status"] == "internal_error"
 
-    (transaction,) = (item.payload for item in items if item.type == "transaction")
     assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_mcp_tool_execution_spans(
-    sentry_init, capture_items, test_agent, get_model_response
+    sentry_init,
+    capture_events,
+    capture_items,
+    test_agent,
+    get_model_response,
+    stream_gen_ai_spans,
 ):
     """
     Test that MCP (Model Context Protocol) tool calls create execute_tool spans.
@@ -1930,45 +2859,88 @@ async def test_mcp_tool_execution_spans(
             integrations=[OpenAIAgentsIntegration()],
             traces_sample_rate=1.0,
             send_default_pii=True,
+            _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
         )
 
-        items = capture_items("span", "transaction")
+        if stream_gen_ai_spans:
+            items = capture_items("span", "transaction")
 
-        await agents.Runner.run(
-            agent,
-            "Please use MCP tool",
-            run_config=test_run_config,
-        )
+            await agents.Runner.run(
+                agent,
+                "Please use MCP tool",
+                run_config=test_run_config,
+            )
 
-    spans = [item.payload for item in items if item.type == "span"]
+            spans = [item.payload for item in items if item.type == "span"]
 
-    # Find the MCP execute_tool span
-    mcp_tool_span = None
-    for span in spans:
-        if span.get("name") == "execute_tool test_mcp_tool":
-            mcp_tool_span = span
-            break
+            # Find the MCP execute_tool span
+            mcp_tool_span = None
+            for span in spans:
+                if span.get("name") == "execute_tool test_mcp_tool":
+                    mcp_tool_span = span
+                    break
 
-    # Verify the MCP tool span was created
-    assert mcp_tool_span is not None, "MCP execute_tool span was not created"
-    assert mcp_tool_span["name"] == "execute_tool test_mcp_tool"
-    assert mcp_tool_span["attributes"]["gen_ai.tool.name"] == "test_mcp_tool"
-    assert (
-        mcp_tool_span["attributes"]["gen_ai.tool.input"] == '{"query": "search term"}'
-    )
-    assert (
-        mcp_tool_span["attributes"]["gen_ai.tool.output"]
-        == "MCP tool executed successfully"
-    )
+            # Verify the MCP tool span was created
+            assert mcp_tool_span is not None, "MCP execute_tool span was not created"
+            assert mcp_tool_span["name"] == "execute_tool test_mcp_tool"
+            assert mcp_tool_span["attributes"]["gen_ai.tool.name"] == "test_mcp_tool"
+            assert (
+                mcp_tool_span["attributes"]["gen_ai.tool.input"]
+                == '{"query": "search term"}'
+            )
+            assert (
+                mcp_tool_span["attributes"]["gen_ai.tool.output"]
+                == "MCP tool executed successfully"
+            )
 
-    # Verify no error status since error was None
-    assert mcp_tool_span.get("status") != "error"
-    assert mcp_tool_span.get("tags", {}).get("status") != "error"
+            # Verify no error status since error was None
+            assert mcp_tool_span.get("status") != "error"
+            assert mcp_tool_span.get("tags", {}).get("status") != "error"
+        else:
+            events = capture_events()
+
+            await agents.Runner.run(
+                agent,
+                "Please use MCP tool",
+                run_config=test_run_config,
+            )
+
+            (transaction,) = events
+            spans = transaction["spans"]
+
+            # Find the MCP execute_tool span
+            mcp_tool_span = None
+            for span in spans:
+                if span.get("description") == "execute_tool test_mcp_tool":
+                    mcp_tool_span = span
+                    break
+
+            # Verify the MCP tool span was created
+            assert mcp_tool_span is not None, "MCP execute_tool span was not created"
+            assert mcp_tool_span["description"] == "execute_tool test_mcp_tool"
+            assert mcp_tool_span["data"]["gen_ai.tool.name"] == "test_mcp_tool"
+            assert (
+                mcp_tool_span["data"]["gen_ai.tool.input"] == '{"query": "search term"}'
+            )
+            assert (
+                mcp_tool_span["data"]["gen_ai.tool.output"]
+                == "MCP tool executed successfully"
+            )
+
+            # Verify no error status since error was None
+            assert mcp_tool_span.get("status") != "internal_error"
+            assert mcp_tool_span.get("tags", {}).get("status") != "internal_error"
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_mcp_tool_execution_with_error(
-    sentry_init, capture_items, test_agent, get_model_response
+    sentry_init,
+    capture_events,
+    capture_items,
+    test_agent,
+    get_model_response,
+    stream_gen_ai_spans,
 ):
     """
     Test that MCP tool calls with errors are tracked with error status.
@@ -2060,9 +3032,13 @@ async def test_mcp_tool_execution_with_error(
             integrations=[OpenAIAgentsIntegration()],
             traces_sample_rate=1.0,
             send_default_pii=True,
+            _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
         )
 
-        items = capture_items("span", "transaction")
+        if stream_gen_ai_spans:
+            items = capture_items("span", "transaction")
+        else:
+            events = capture_events()
 
         await agents.Runner.run(
             agent,
@@ -2070,29 +3046,57 @@ async def test_mcp_tool_execution_with_error(
             run_config=test_run_config,
         )
 
-    spans = [item.payload for item in items if item.type == "span"]
+    if stream_gen_ai_spans:
+        spans = [item.payload for item in items if item.type == "span"]
 
-    # Find the MCP execute_tool span with error
-    mcp_tool_span = None
-    for span in spans:
-        if span.get("name") == "execute_tool failing_mcp_tool":
-            mcp_tool_span = span
-            break
+        # Find the MCP execute_tool span with error
+        mcp_tool_span = None
+        for span in spans:
+            if span.get("name") == "execute_tool failing_mcp_tool":
+                mcp_tool_span = span
+                break
 
-    # Verify the MCP tool span was created with error status
-    assert mcp_tool_span is not None, "MCP execute_tool span was not created"
-    assert mcp_tool_span["name"] == "execute_tool failing_mcp_tool"
-    assert mcp_tool_span["attributes"]["gen_ai.tool.name"] == "failing_mcp_tool"
-    assert mcp_tool_span["attributes"]["gen_ai.tool.input"] == '{"query": "test"}'
-    assert mcp_tool_span["attributes"]["gen_ai.tool.output"] == "None"
+        # Verify the MCP tool span was created with error status
+        assert mcp_tool_span is not None, "MCP execute_tool span was not created"
+        assert mcp_tool_span["name"] == "execute_tool failing_mcp_tool"
+        assert mcp_tool_span["attributes"]["gen_ai.tool.name"] == "failing_mcp_tool"
+        assert mcp_tool_span["attributes"]["gen_ai.tool.input"] == '{"query": "test"}'
+        assert mcp_tool_span["attributes"]["gen_ai.tool.output"] == "None"
 
-    # Verify error status was set
-    assert mcp_tool_span["status"] == "error"
+        # Verify error status was set
+        assert mcp_tool_span["status"] == "error"
+    else:
+        (transaction,) = events
+        spans = transaction["spans"]
+
+        # Find the MCP execute_tool span with error
+        mcp_tool_span = None
+        for span in spans:
+            if span.get("description") == "execute_tool failing_mcp_tool":
+                mcp_tool_span = span
+                break
+
+        # Verify the MCP tool span was created with error status
+        assert mcp_tool_span is not None, "MCP execute_tool span was not created"
+        assert mcp_tool_span["description"] == "execute_tool failing_mcp_tool"
+        assert mcp_tool_span["data"]["gen_ai.tool.name"] == "failing_mcp_tool"
+        assert mcp_tool_span["data"]["gen_ai.tool.input"] == '{"query": "test"}'
+        assert mcp_tool_span["data"]["gen_ai.tool.output"] is None
+
+        # Verify error status was set
+        assert mcp_tool_span["status"] == "internal_error"
+        assert mcp_tool_span["tags"]["status"] == "internal_error"
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_mcp_tool_execution_without_pii(
-    sentry_init, capture_items, test_agent, get_model_response
+    sentry_init,
+    capture_events,
+    capture_items,
+    test_agent,
+    get_model_response,
+    stream_gen_ai_spans,
 ):
     """
     Test that MCP tool input/output are not included when send_default_pii is False.
@@ -2184,42 +3188,74 @@ async def test_mcp_tool_execution_without_pii(
             integrations=[OpenAIAgentsIntegration()],
             traces_sample_rate=1.0,
             send_default_pii=False,  # PII disabled
+            _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
         )
 
-        items = capture_items("span", "transaction")
+        if stream_gen_ai_spans:
+            items = capture_items("span", "transaction")
 
-        await agents.Runner.run(
-            agent,
-            "Please use MCP tool",
-            run_config=test_run_config,
-        )
+            await agents.Runner.run(
+                agent,
+                "Please use MCP tool",
+                run_config=test_run_config,
+            )
 
-    spans = [item.payload for item in items if item.type == "span"]
+            spans = [item.payload for item in items if item.type == "span"]
 
-    # Find the MCP execute_tool span
-    mcp_tool_span = None
-    for span in spans:
-        if span.get("name") == "execute_tool test_mcp_tool":
-            mcp_tool_span = span
-            break
+            # Find the MCP execute_tool span
+            mcp_tool_span = None
+            for span in spans:
+                if span.get("name") == "execute_tool test_mcp_tool":
+                    mcp_tool_span = span
+                    break
 
-    # Verify the MCP tool span was created but without input/output
-    assert mcp_tool_span is not None, "MCP execute_tool span was not created"
-    assert mcp_tool_span["name"] == "execute_tool test_mcp_tool"
-    assert mcp_tool_span["attributes"]["gen_ai.tool.name"] == "test_mcp_tool"
+            # Verify the MCP tool span was created but without input/output
+            assert mcp_tool_span is not None, "MCP execute_tool span was not created"
+            assert mcp_tool_span["name"] == "execute_tool test_mcp_tool"
+            assert mcp_tool_span["attributes"]["gen_ai.tool.name"] == "test_mcp_tool"
 
-    # Verify input and output are not included when send_default_pii is False
-    assert "gen_ai.tool.input" not in mcp_tool_span["attributes"]
-    assert "gen_ai.tool.output" not in mcp_tool_span["attributes"]
+            # Verify input and output are not included when send_default_pii is False
+            assert "gen_ai.tool.input" not in mcp_tool_span["attributes"]
+            assert "gen_ai.tool.output" not in mcp_tool_span["attributes"]
+        else:
+            events = capture_events()
+
+            await agents.Runner.run(
+                agent,
+                "Please use MCP tool",
+                run_config=test_run_config,
+            )
+
+            (transaction,) = events
+            spans = transaction["spans"]
+
+            # Find the MCP execute_tool span
+            mcp_tool_span = None
+            for span in spans:
+                if span.get("description") == "execute_tool test_mcp_tool":
+                    mcp_tool_span = span
+                    break
+
+            # Verify the MCP tool span was created but without input/output
+            assert mcp_tool_span is not None, "MCP execute_tool span was not created"
+            assert mcp_tool_span["description"] == "execute_tool test_mcp_tool"
+            assert mcp_tool_span["data"]["gen_ai.tool.name"] == "test_mcp_tool"
+
+            # Verify input and output are not included when send_default_pii is False
+            assert "gen_ai.tool.input" not in mcp_tool_span["data"]
+            assert "gen_ai.tool.output" not in mcp_tool_span["data"]
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_multiple_agents_asyncio(
     sentry_init,
+    capture_events,
     capture_items,
     test_agent,
     nonstreaming_responses_model_response,
     get_model_response,
+    stream_gen_ai_spans,
 ):
     """
     Test that multiple agents can be run at the same time in asyncio tasks
@@ -2241,9 +3277,8 @@ async def test_multiple_agents_asyncio(
         sentry_init(
             integrations=[OpenAIAgentsIntegration()],
             traces_sample_rate=1.0,
+            _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
         )
-
-        items = capture_items("span", "transaction")
 
         async def run():
             await agents.Runner.run(
@@ -2252,12 +3287,31 @@ async def test_multiple_agents_asyncio(
                 run_config=test_run_config,
             )
 
-        await asyncio.gather(*[run() for _ in range(3)])
+        if stream_gen_ai_spans:
+            items = capture_items("span", "transaction")
 
-    txn1, txn2, txn3 = (item.payload for item in items if item.type == "transaction")
+            await asyncio.gather(*[run() for _ in range(3)])
 
-    assert txn1["transaction"] == "test_agent workflow"
-    assert txn2["transaction"] == "test_agent workflow"
+            txn1, txn2, txn3 = (
+                item.payload for item in items if item.type == "transaction"
+            )
+
+            assert txn1["transaction"] == "test_agent workflow"
+            assert txn2["transaction"] == "test_agent workflow"
+        else:
+            events = capture_events()
+
+            await asyncio.gather(*[run() for _ in range(3)])
+
+            assert len(events) == 3
+            txn1, txn2, txn3 = events
+
+            assert txn1["type"] == "transaction"
+            assert txn1["transaction"] == "test_agent workflow"
+            assert txn2["type"] == "transaction"
+            assert txn2["transaction"] == "test_agent workflow"
+            assert txn3["type"] == "transaction"
+
     assert txn3["transaction"] == "test_agent workflow"
 
 
@@ -2303,13 +3357,16 @@ def test_openai_agents_message_role_mapping(
     assert stored_messages[0]["role"] == expected_role
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_tool_execution_error_tracing(
     sentry_init,
+    capture_events,
     capture_items,
     test_agent,
     get_model_response,
     responses_tool_call_model_responses,
+    stream_gen_ai_spans,
 ):
     """
     Test that tool execution errors are properly tracked via error tracing patch.
@@ -2383,46 +3440,84 @@ async def test_tool_execution_error_tracing(
             integrations=[OpenAIAgentsIntegration()],
             traces_sample_rate=1.0,
             send_default_pii=True,
+            _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
         )
 
-        items = capture_items("span", "transaction")
+        if stream_gen_ai_spans:
+            items = capture_items("span", "transaction")
 
-        # Note: The agents library catches tool exceptions internally,
-        # so we don't expect this to raise
-        await agents.Runner.run(
-            agent_with_tool,
-            "Please use the failing tool",
-            run_config=test_run_config,
-        )
+            # Note: The agents library catches tool exceptions internally,
+            # so we don't expect this to raise
+            await agents.Runner.run(
+                agent_with_tool,
+                "Please use the failing tool",
+                run_config=test_run_config,
+            )
 
-    spans = [item.payload for item in items if item.type == "span"]
+            spans = [item.payload for item in items if item.type == "span"]
 
-    # Find the execute_tool span
-    execute_tool_span = None
-    for span in spans:
-        description = span.get("name", "")
-        if description is not None and description.startswith(
-            "execute_tool failing_tool"
-        ):
-            execute_tool_span = span
-            break
+            # Find the execute_tool span
+            execute_tool_span = None
+            for span in spans:
+                description = span.get("name", "")
+                if description is not None and description.startswith(
+                    "execute_tool failing_tool"
+                ):
+                    execute_tool_span = span
+                    break
 
-    # Verify the execute_tool span was created
-    assert execute_tool_span is not None, "execute_tool span was not created"
-    assert execute_tool_span["name"] == "execute_tool failing_tool"
-    assert execute_tool_span["attributes"]["gen_ai.tool.name"] == "failing_tool"
+            # Verify the execute_tool span was created
+            assert execute_tool_span is not None, "execute_tool span was not created"
+            assert execute_tool_span["name"] == "execute_tool failing_tool"
+            assert execute_tool_span["attributes"]["gen_ai.tool.name"] == "failing_tool"
 
-    # Verify error status was set (this is the key test for our patch)
-    # The span should be marked as error because the tool execution failed
-    assert execute_tool_span["status"] == "error"
+            # Verify error status was set (this is the key test for our patch)
+            # The span should be marked as error because the tool execution failed
+            assert execute_tool_span["status"] == "error"
+        else:
+            events = capture_events()
+
+            # Note: The agents library catches tool exceptions internally,
+            # so we don't expect this to raise
+            await agents.Runner.run(
+                agent_with_tool,
+                "Please use the failing tool",
+                run_config=test_run_config,
+            )
+
+            (transaction,) = events
+            spans = transaction["spans"]
+
+            # Find the execute_tool span
+            execute_tool_span = None
+            for span in spans:
+                description = span.get("description", "")
+                if description is not None and description.startswith(
+                    "execute_tool failing_tool"
+                ):
+                    execute_tool_span = span
+                    break
+
+            # Verify the execute_tool span was created
+            assert execute_tool_span is not None, "execute_tool span was not created"
+            assert execute_tool_span["description"] == "execute_tool failing_tool"
+            assert execute_tool_span["data"]["gen_ai.tool.name"] == "failing_tool"
+
+            # Verify error status was set (this is the key test for our patch)
+            # The span should be marked as error because the tool execution failed
+            assert execute_tool_span["status"] == "internal_error"
+            assert execute_tool_span["tags"]["status"] == "internal_error"
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_invoke_agent_span_includes_usage_data(
     sentry_init,
+    capture_events,
     capture_items,
     test_agent,
     get_model_response,
+    stream_gen_ai_spans,
 ):
     """
     Test that invoke_agent spans include aggregated usage data from context_wrapper.
@@ -2480,42 +3575,80 @@ async def test_invoke_agent_span_includes_usage_data(
             integrations=[OpenAIAgentsIntegration()],
             traces_sample_rate=1.0,
             send_default_pii=True,
+            _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
         )
 
-        items = capture_items("span", "transaction")
+        if stream_gen_ai_spans:
+            items = capture_items("span", "transaction")
 
-        result = await agents.Runner.run(
-            agent, "Test input", run_config=test_run_config
-        )
+            result = await agents.Runner.run(
+                agent, "Test input", run_config=test_run_config
+            )
 
-        assert result is not None
+            assert result is not None
 
-    spans = [item.payload for item in items if item.type == "span"]
-    invoke_agent_span = next(
-        span
-        for span in spans
-        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
-    )
+            spans = [item.payload for item in items if item.type == "span"]
+            invoke_agent_span = next(
+                span
+                for span in spans
+                if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
+            )
 
-    # Verify invoke_agent span has usage data from context_wrapper
-    assert invoke_agent_span["name"] == "invoke_agent test_agent"
-    assert "gen_ai.usage.input_tokens" in invoke_agent_span["attributes"]
-    assert "gen_ai.usage.output_tokens" in invoke_agent_span["attributes"]
-    assert "gen_ai.usage.total_tokens" in invoke_agent_span["attributes"]
+            # Verify invoke_agent span has usage data from context_wrapper
+            assert invoke_agent_span["name"] == "invoke_agent test_agent"
+            assert "gen_ai.usage.input_tokens" in invoke_agent_span["attributes"]
+            assert "gen_ai.usage.output_tokens" in invoke_agent_span["attributes"]
+            assert "gen_ai.usage.total_tokens" in invoke_agent_span["attributes"]
 
-    assert invoke_agent_span["attributes"]["gen_ai.usage.input_tokens"] == 10
-    assert invoke_agent_span["attributes"]["gen_ai.usage.output_tokens"] == 20
-    assert invoke_agent_span["attributes"]["gen_ai.usage.total_tokens"] == 30
-    assert invoke_agent_span["attributes"]["gen_ai.usage.input_tokens.cached"] == 0
-    assert invoke_agent_span["attributes"]["gen_ai.usage.output_tokens.reasoning"] == 5
+            assert invoke_agent_span["attributes"]["gen_ai.usage.input_tokens"] == 10
+            assert invoke_agent_span["attributes"]["gen_ai.usage.output_tokens"] == 20
+            assert invoke_agent_span["attributes"]["gen_ai.usage.total_tokens"] == 30
+            assert (
+                invoke_agent_span["attributes"]["gen_ai.usage.input_tokens.cached"] == 0
+            )
+            assert (
+                invoke_agent_span["attributes"]["gen_ai.usage.output_tokens.reasoning"]
+                == 5
+            )
+        else:
+            events = capture_events()
+
+            result = await agents.Runner.run(
+                agent, "Test input", run_config=test_run_config
+            )
+
+            assert result is not None
+
+            (transaction,) = events
+            spans = transaction["spans"]
+            invoke_agent_span = next(
+                span for span in spans if span["op"] == OP.GEN_AI_INVOKE_AGENT
+            )
+
+            # Verify invoke_agent span has usage data from context_wrapper
+            assert invoke_agent_span["description"] == "invoke_agent test_agent"
+            assert "gen_ai.usage.input_tokens" in invoke_agent_span["data"]
+            assert "gen_ai.usage.output_tokens" in invoke_agent_span["data"]
+            assert "gen_ai.usage.total_tokens" in invoke_agent_span["data"]
+
+            assert invoke_agent_span["data"]["gen_ai.usage.input_tokens"] == 10
+            assert invoke_agent_span["data"]["gen_ai.usage.output_tokens"] == 20
+            assert invoke_agent_span["data"]["gen_ai.usage.total_tokens"] == 30
+            assert invoke_agent_span["data"]["gen_ai.usage.input_tokens.cached"] == 0
+            assert (
+                invoke_agent_span["data"]["gen_ai.usage.output_tokens.reasoning"] == 5
+            )
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_ai_client_span_includes_response_model(
     sentry_init,
+    capture_events,
     capture_items,
     test_agent,
     get_model_response,
+    stream_gen_ai_spans,
 ):
     """
     Test that ai_client spans (gen_ai.chat) include the response model from the actual API response.
@@ -2573,32 +3706,63 @@ async def test_ai_client_span_includes_response_model(
             integrations=[OpenAIAgentsIntegration()],
             traces_sample_rate=1.0,
             send_default_pii=True,
+            _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
         )
 
-        items = capture_items("span", "transaction")
+        if stream_gen_ai_spans:
+            items = capture_items("span", "transaction")
 
-        result = await agents.Runner.run(
-            agent, "Test input", run_config=test_run_config
-        )
+            result = await agents.Runner.run(
+                agent, "Test input", run_config=test_run_config
+            )
 
-        assert result is not None
+            assert result is not None
 
-    spans = [item.payload for item in items if item.type == "span"]
-    ai_client_span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-    )
+            spans = [item.payload for item in items if item.type == "span"]
+            ai_client_span = next(
+                span
+                for span in spans
+                if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+            )
 
-    # Verify ai_client span has response model from API response
-    assert ai_client_span["name"] == "chat gpt-4"
-    assert "gen_ai.response.model" in ai_client_span["attributes"]
-    assert ai_client_span["attributes"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
+            # Verify ai_client span has response model from API response
+            assert ai_client_span["name"] == "chat gpt-4"
+            assert "gen_ai.response.model" in ai_client_span["attributes"]
+            assert (
+                ai_client_span["attributes"]["gen_ai.response.model"]
+                == "gpt-4.1-2025-04-14"
+            )
+        else:
+            events = capture_events()
+
+            result = await agents.Runner.run(
+                agent, "Test input", run_config=test_run_config
+            )
+
+            assert result is not None
+
+            (transaction,) = events
+            spans = transaction["spans"]
+            ai_client_span = next(
+                span for span in spans if span["op"] == OP.GEN_AI_CHAT
+            )
+
+            # Verify ai_client span has response model from API response
+            assert ai_client_span["description"] == "chat gpt-4"
+            assert "gen_ai.response.model" in ai_client_span["data"]
+            assert (
+                ai_client_span["data"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
+            )
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_ai_client_span_response_model_with_chat_completions(
     sentry_init,
+    capture_events,
     capture_items,
     get_model_response,
+    stream_gen_ai_spans,
 ):
     """
     Test that response model is captured when using ChatCompletions API (not Responses API).
@@ -2661,32 +3825,63 @@ async def test_ai_client_span_response_model_with_chat_completions(
         sentry_init(
             integrations=[OpenAIAgentsIntegration()],
             traces_sample_rate=1.0,
+            _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
         )
 
-        items = capture_items("span", "transaction")
+        if stream_gen_ai_spans:
+            items = capture_items("span", "transaction")
 
-        result = await agents.Runner.run(
-            agent, "Test input", run_config=test_run_config
-        )
+            result = await agents.Runner.run(
+                agent, "Test input", run_config=test_run_config
+            )
 
-        assert result is not None
+            assert result is not None
 
-    spans = [item.payload for item in items if item.type == "span"]
-    ai_client_span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-    )
+            spans = [item.payload for item in items if item.type == "span"]
+            ai_client_span = next(
+                span
+                for span in spans
+                if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+            )
 
-    # Verify response model from API response is captured
-    assert "gen_ai.response.model" in ai_client_span["attributes"]
-    assert (
-        ai_client_span["attributes"]["gen_ai.response.model"]
-        == "gpt-4o-mini-2024-07-18"
-    )
+            # Verify response model from API response is captured
+            assert "gen_ai.response.model" in ai_client_span["attributes"]
+            assert (
+                ai_client_span["attributes"]["gen_ai.response.model"]
+                == "gpt-4o-mini-2024-07-18"
+            )
+        else:
+            events = capture_events()
+
+            result = await agents.Runner.run(
+                agent, "Test input", run_config=test_run_config
+            )
+
+            assert result is not None
+
+            (transaction,) = events
+            spans = transaction["spans"]
+            ai_client_span = next(
+                span for span in spans if span["op"] == OP.GEN_AI_CHAT
+            )
+
+            # Verify response model from API response is captured
+            assert "gen_ai.response.model" in ai_client_span["data"]
+            assert (
+                ai_client_span["data"]["gen_ai.response.model"]
+                == "gpt-4o-mini-2024-07-18"
+            )
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_multiple_llm_calls_aggregate_usage(
-    sentry_init, capture_items, test_agent, get_model_response
+    sentry_init,
+    capture_events,
+    capture_items,
+    test_agent,
+    get_model_response,
+    stream_gen_ai_spans,
 ):
     """
     Test that invoke_agent spans show aggregated usage across multiple LLM calls
@@ -2774,47 +3969,91 @@ async def test_multiple_llm_calls_aggregate_usage(
         serialize_pydantic=True,
     )
 
-    with patch.object(
-        agent_with_tool.model._client._client,
-        "send",
-        side_effect=[tool_call_response, final_response],
-    ) as _:
-        sentry_init(
-            integrations=[OpenAIAgentsIntegration()],
-            traces_sample_rate=1.0,
-            send_default_pii=True,
+    if stream_gen_ai_spans:
+        with patch.object(
+            agent_with_tool.model._client._client,
+            "send",
+            side_effect=[tool_call_response, final_response],
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            )
+
+            items = capture_items("span", "transaction")
+
+            result = await agents.Runner.run(
+                agent_with_tool,
+                "What is 5 + 3?",
+                run_config=test_run_config,
+            )
+
+            assert result is not None
+
+        spans = [item.payload for item in items if item.type == "span"]
+
+        invoke_agent_span = spans[0]
+
+        # Verify invoke_agent span has aggregated usage from both API calls
+        # Total: 10 + 20 = 30 input tokens, 5 + 15 = 20 output tokens, 15 + 35 = 50 total
+        assert invoke_agent_span["attributes"]["gen_ai.usage.input_tokens"] == 30
+        assert invoke_agent_span["attributes"]["gen_ai.usage.output_tokens"] == 20
+        assert invoke_agent_span["attributes"]["gen_ai.usage.total_tokens"] == 50
+        # Cached tokens should be aggregated: 0 + 5 = 5
+        assert invoke_agent_span["attributes"]["gen_ai.usage.input_tokens.cached"] == 5
+        # Reasoning tokens should be aggregated: 0 + 3 = 3
+        assert (
+            invoke_agent_span["attributes"]["gen_ai.usage.output_tokens.reasoning"] == 3
         )
+    else:
+        with patch.object(
+            agent_with_tool.model._client._client,
+            "send",
+            side_effect=[tool_call_response, final_response],
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            )
+            events = capture_events()
 
-        items = capture_items("span", "transaction")
+            result = await agents.Runner.run(
+                agent_with_tool,
+                "What is 5 + 3?",
+                run_config=test_run_config,
+            )
 
-        result = await agents.Runner.run(
-            agent_with_tool,
-            "What is 5 + 3?",
-            run_config=test_run_config,
-        )
+            assert result is not None
 
-        assert result is not None
+        (transaction,) = events
+        spans = transaction["spans"]
 
-    spans = [item.payload for item in items if item.type == "span"]
-    invoke_agent_span = spans[0]
+        invoke_agent_span = spans[0]
 
-    # Verify invoke_agent span has aggregated usage from both API calls
-    # Total: 10 + 20 = 30 input tokens, 5 + 15 = 20 output tokens, 15 + 35 = 50 total
-    assert invoke_agent_span["attributes"]["gen_ai.usage.input_tokens"] == 30
-    assert invoke_agent_span["attributes"]["gen_ai.usage.output_tokens"] == 20
-    assert invoke_agent_span["attributes"]["gen_ai.usage.total_tokens"] == 50
-    # Cached tokens should be aggregated: 0 + 5 = 5
-    assert invoke_agent_span["attributes"]["gen_ai.usage.input_tokens.cached"] == 5
-    # Reasoning tokens should be aggregated: 0 + 3 = 3
-    assert invoke_agent_span["attributes"]["gen_ai.usage.output_tokens.reasoning"] == 3
+        # Verify invoke_agent span has aggregated usage from both API calls
+        # Total: 10 + 20 = 30 input tokens, 5 + 15 = 20 output tokens, 15 + 35 = 50 total
+        assert invoke_agent_span["data"]["gen_ai.usage.input_tokens"] == 30
+        assert invoke_agent_span["data"]["gen_ai.usage.output_tokens"] == 20
+        assert invoke_agent_span["data"]["gen_ai.usage.total_tokens"] == 50
+        # Cached tokens should be aggregated: 0 + 5 = 5
+        assert invoke_agent_span["data"]["gen_ai.usage.input_tokens.cached"] == 5
+        # Reasoning tokens should be aggregated: 0 + 3 = 3
+        assert invoke_agent_span["data"]["gen_ai.usage.output_tokens.reasoning"] == 3
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_invoke_agent_span_includes_response_model(
     sentry_init,
+    capture_events,
     capture_items,
     test_agent,
     get_model_response,
+    stream_gen_ai_spans,
 ):
     """
     Test that invoke_agent spans include the response model from the API response.
@@ -2862,53 +4101,106 @@ async def test_invoke_agent_span_includes_response_model(
         serialize_pydantic=True,
     )
 
-    with patch.object(
-        agent.model._client._client,
-        "send",
-        return_value=response,
-    ) as _:
-        sentry_init(
-            integrations=[OpenAIAgentsIntegration()],
-            traces_sample_rate=1.0,
-            send_default_pii=True,
-        )
+    if stream_gen_ai_spans:
+        with patch.object(
+            agent.model._client._client,
+            "send",
+            return_value=response,
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            )
 
-        items = capture_items("span", "transaction")
+            items = capture_items("span", "transaction")
 
-        result = await agents.Runner.run(
-            agent, "Test input", run_config=test_run_config
-        )
+            result = await agents.Runner.run(
+                agent, "Test input", run_config=test_run_config
+            )
 
-        assert result is not None
+            assert result is not None
 
-    spans = [item.payload for item in items if item.type == "span"]
-    invoke_agent_span = next(
-        span
-        for span in spans
-        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
-    )
-    ai_client_span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-    )
+            spans = [item.payload for item in items if item.type == "span"]
+            invoke_agent_span = next(
+                span
+                for span in spans
+                if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
+            )
+            ai_client_span = next(
+                span
+                for span in spans
+                if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+            )
 
-    # Verify invoke_agent span has response model from API
-    assert invoke_agent_span["name"] == "invoke_agent test_agent"
-    assert "gen_ai.response.model" in invoke_agent_span["attributes"]
-    assert (
-        invoke_agent_span["attributes"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
-    )
+            # Verify invoke_agent span has response model from API
+            assert invoke_agent_span["name"] == "invoke_agent test_agent"
+            assert "gen_ai.response.model" in invoke_agent_span["attributes"]
+            assert (
+                invoke_agent_span["attributes"]["gen_ai.response.model"]
+                == "gpt-4.1-2025-04-14"
+            )
 
-    # Also verify ai_client span has it
-    assert "gen_ai.response.model" in ai_client_span["attributes"]
-    assert ai_client_span["attributes"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
+            # Also verify ai_client span has it
+            assert "gen_ai.response.model" in ai_client_span["attributes"]
+            assert (
+                ai_client_span["attributes"]["gen_ai.response.model"]
+                == "gpt-4.1-2025-04-14"
+            )
+    else:
+        with patch.object(
+            agent.model._client._client,
+            "send",
+            return_value=response,
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            )
+            events = capture_events()
+
+            result = await agents.Runner.run(
+                agent, "Test input", run_config=test_run_config
+            )
+
+            assert result is not None
+
+            (transaction,) = events
+            spans = transaction["spans"]
+            invoke_agent_span = next(
+                span for span in spans if span["op"] == OP.GEN_AI_INVOKE_AGENT
+            )
+            ai_client_span = next(
+                span for span in spans if span["op"] == OP.GEN_AI_CHAT
+            )
+
+            # Verify invoke_agent span has response model from API
+            assert invoke_agent_span["description"] == "invoke_agent test_agent"
+            assert "gen_ai.response.model" in invoke_agent_span["data"]
+            assert (
+                invoke_agent_span["data"]["gen_ai.response.model"]
+                == "gpt-4.1-2025-04-14"
+            )
+
+            # Also verify ai_client span has it
+            assert "gen_ai.response.model" in ai_client_span["data"]
+            assert (
+                ai_client_span["data"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
+            )
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_invoke_agent_span_uses_last_response_model(
     sentry_init,
+    capture_events,
     capture_items,
     test_agent,
     get_model_response,
+    stream_gen_ai_spans,
 ):
     """
     Test that when an agent makes multiple LLM calls (e.g., with tools),
@@ -2996,44 +4288,93 @@ async def test_invoke_agent_span_uses_last_response_model(
         serialize_pydantic=True,
     )
 
-    with patch.object(
-        agent_with_tool.model._client._client,
-        "send",
-        side_effect=[first_response, second_response],
-    ) as _:
-        sentry_init(
-            integrations=[OpenAIAgentsIntegration()],
-            traces_sample_rate=1.0,
-            send_default_pii=True,
-        )
+    if stream_gen_ai_spans:
+        with patch.object(
+            agent_with_tool.model._client._client,
+            "send",
+            side_effect=[first_response, second_response],
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            )
 
-        items = capture_items("span", "transaction")
+            items = capture_items("span", "transaction")
 
-        result = await agents.Runner.run(
-            agent_with_tool,
-            "What is 5 + 3?",
-            run_config=test_run_config,
-        )
+            result = await agents.Runner.run(
+                agent_with_tool,
+                "What is 5 + 3?",
+                run_config=test_run_config,
+            )
 
-        assert result is not None
+            assert result is not None
 
-    spans = [item.payload for item in items if item.type == "span"]
-    invoke_agent_span = spans[0]
-    first_ai_client_span = spans[1]
-    second_ai_client_span = spans[3]  # After tool span
+            spans = [item.payload for item in items if item.type == "span"]
 
-    # Invoke_agent span uses the LAST response model
-    assert "gen_ai.response.model" in invoke_agent_span["attributes"]
-    assert (
-        invoke_agent_span["attributes"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
-    )
+            invoke_agent_span = spans[0]
+            first_ai_client_span = spans[1]
+            second_ai_client_span = spans[3]  # After tool span
 
-    # Each ai_client span has its own response model from the API
-    assert first_ai_client_span["attributes"]["gen_ai.response.model"] == "gpt-4-0613"
-    assert (
-        second_ai_client_span["attributes"]["gen_ai.response.model"]
-        == "gpt-4.1-2025-04-14"
-    )
+            # Invoke_agent span uses the LAST response model
+            assert "gen_ai.response.model" in invoke_agent_span["attributes"]
+            assert (
+                invoke_agent_span["attributes"]["gen_ai.response.model"]
+                == "gpt-4.1-2025-04-14"
+            )
+
+            # Each ai_client span has its own response model from the API
+            assert (
+                first_ai_client_span["attributes"]["gen_ai.response.model"]
+                == "gpt-4-0613"
+            )
+            assert (
+                second_ai_client_span["attributes"]["gen_ai.response.model"]
+                == "gpt-4.1-2025-04-14"
+            )
+    else:
+        with patch.object(
+            agent_with_tool.model._client._client,
+            "send",
+            side_effect=[first_response, second_response],
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=True,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            )
+            events = capture_events()
+
+            result = await agents.Runner.run(
+                agent_with_tool,
+                "What is 5 + 3?",
+                run_config=test_run_config,
+            )
+
+            assert result is not None
+
+            (transaction,) = events
+            spans = transaction["spans"]
+
+            invoke_agent_span = spans[0]
+            first_ai_client_span = spans[1]
+            second_ai_client_span = spans[3]  # After tool span
+
+            # Invoke_agent span uses the LAST response model
+            assert "gen_ai.response.model" in invoke_agent_span["data"]
+            assert (
+                invoke_agent_span["data"]["gen_ai.response.model"]
+                == "gpt-4.1-2025-04-14"
+            )
+
+            # Each ai_client span has its own response model from the API
+            assert first_ai_client_span["data"]["gen_ai.response.model"] == "gpt-4-0613"
+            assert (
+                second_ai_client_span["data"]["gen_ai.response.model"]
+                == "gpt-4.1-2025-04-14"
+            )
 
 
 def test_openai_agents_message_truncation(sentry_init, capture_items):
@@ -3280,6 +4621,7 @@ async def test_streaming_ttft_on_chat_span(
             assert chat_span._data.get(SPANDATA.GEN_AI_RESPONSE_STREAMING) is True
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.skipif(
     parse_version(OPENAI_AGENTS_VERSION) < (0, 4, 0),
     reason="conversation_id support requires openai-agents >= 0.4.0",
@@ -3287,10 +4629,12 @@ async def test_streaming_ttft_on_chat_span(
 @pytest.mark.asyncio
 async def test_conversation_id_on_all_spans(
     sentry_init,
+    capture_events,
     capture_items,
     test_agent,
     nonstreaming_responses_model_response,
     get_model_response,
+    stream_gen_ai_spans,
 ):
     """
     Test that gen_ai.conversation.id is set on all AI-related spans when passed to Runner.run().
@@ -3304,58 +4648,121 @@ async def test_conversation_id_on_all_spans(
         nonstreaming_responses_model_response, serialize_pydantic=True
     )
 
-    with patch.object(
-        agent.model._client._client,
-        "send",
-        return_value=response,
-    ) as _:
-        sentry_init(
-            integrations=[OpenAIAgentsIntegration()],
-            traces_sample_rate=1.0,
-        )
+    if stream_gen_ai_spans:
+        with patch.object(
+            agent.model._client._client,
+            "send",
+            return_value=response,
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            )
 
-        items = capture_items("span", "transaction")
+            items = capture_items("span", "transaction")
 
-        result = await agents.Runner.run(
-            agent,
-            "Test input",
-            run_config=test_run_config,
-            conversation_id="conv_test_123",
-        )
+            result = await agents.Runner.run(
+                agent,
+                "Test input",
+                run_config=test_run_config,
+                conversation_id="conv_test_123",
+            )
 
-        assert result is not None
+            assert result is not None
 
-    spans = [item.payload for item in items if item.type == "span"]
-    invoke_agent_span = next(
-        span
-        for span in spans
-        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
-    )
-    ai_client_span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-    )
+            spans = [item.payload for item in items if item.type == "span"]
+            invoke_agent_span = next(
+                span
+                for span in spans
+                if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
+            )
+            ai_client_span = next(
+                span
+                for span in spans
+                if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+            )
 
-    # Verify workflow span (transaction) has conversation_id
-    (transaction,) = (item.payload for item in items if item.type == "transaction")
-    assert (
-        transaction["contexts"]["trace"]["data"]["gen_ai.conversation.id"]
-        == "conv_test_123"
-    )
+            # Verify workflow span (transaction) has conversation_id
+            (transaction,) = (
+                item.payload for item in items if item.type == "transaction"
+            )
 
-    # Verify invoke_agent span has conversation_id
-    assert invoke_agent_span["attributes"]["gen_ai.conversation.id"] == "conv_test_123"
+            assert (
+                transaction["contexts"]["trace"]["data"]["gen_ai.conversation.id"]
+                == "conv_test_123"
+            )
 
-    # Verify ai_client span has conversation_id
-    assert ai_client_span["attributes"]["gen_ai.conversation.id"] == "conv_test_123"
+            # Verify invoke_agent span has conversation_id
+            assert (
+                invoke_agent_span["attributes"]["gen_ai.conversation.id"]
+                == "conv_test_123"
+            )
+
+            # Verify ai_client span has conversation_id
+            assert (
+                ai_client_span["attributes"]["gen_ai.conversation.id"]
+                == "conv_test_123"
+            )
+    else:
+        with patch.object(
+            agent.model._client._client,
+            "send",
+            return_value=response,
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            )
+            events = capture_events()
+
+            result = await agents.Runner.run(
+                agent,
+                "Test input",
+                run_config=test_run_config,
+                conversation_id="conv_test_123",
+            )
+
+            assert result is not None
+
+            (transaction,) = events
+            spans = transaction["spans"]
+            invoke_agent_span = next(
+                span for span in spans if span["op"] == OP.GEN_AI_INVOKE_AGENT
+            )
+            ai_client_span = next(
+                span for span in spans if span["op"] == OP.GEN_AI_CHAT
+            )
+
+            # Verify workflow span (transaction) has conversation_id
+            assert (
+                transaction["contexts"]["trace"]["data"]["gen_ai.conversation.id"]
+                == "conv_test_123"
+            )
+
+            # Verify invoke_agent span has conversation_id
+            assert (
+                invoke_agent_span["data"]["gen_ai.conversation.id"] == "conv_test_123"
+            )
+
+            # Verify ai_client span has conversation_id
+            assert ai_client_span["data"]["gen_ai.conversation.id"] == "conv_test_123"
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.skipif(
     parse_version(OPENAI_AGENTS_VERSION) < (0, 4, 0),
     reason="conversation_id support requires openai-agents >= 0.4.0",
 )
 @pytest.mark.asyncio
 async def test_conversation_id_on_tool_span(
-    sentry_init, capture_items, test_agent, get_model_response
+    sentry_init,
+    capture_events,
+    capture_items,
+    test_agent,
+    get_model_response,
+    stream_gen_ai_spans,
 ):
     """
     Test that gen_ai.conversation.id is set on tool execution spans when passed to Runner.run().
@@ -3442,45 +4849,91 @@ async def test_conversation_id_on_tool_span(
         serialize_pydantic=True,
     )
 
-    with patch.object(
-        agent_with_tool.model._client._client,
-        "send",
-        side_effect=[tool_response, final_response],
-    ) as _:
-        sentry_init(
-            integrations=[OpenAIAgentsIntegration()],
-            traces_sample_rate=1.0,
+    if stream_gen_ai_spans:
+        with patch.object(
+            agent_with_tool.model._client._client,
+            "send",
+            side_effect=[tool_response, final_response],
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            )
+
+            items = capture_items("span", "transaction")
+
+            await agents.Runner.run(
+                agent_with_tool,
+                "Use the tool",
+                run_config=test_run_config,
+                conversation_id="conv_tool_test_456",
+            )
+
+        spans = [item.payload for item in items if item.type == "span"]
+
+        # Find the tool span
+        tool_span = None
+        for span in spans:
+            if span.get("name", "").startswith("execute_tool"):
+                tool_span = span
+                break
+
+        assert tool_span is not None
+        # Tool span should have the conversation_id passed to Runner.run()
+        assert tool_span["attributes"]["gen_ai.conversation.id"] == "conv_tool_test_456"
+
+        # Workflow span (transaction) should have the same conversation_id
+        (transaction,) = (item.payload for item in items if item.type == "transaction")
+
+        # Workflow span (transaction) should have the same conversation_id
+        assert (
+            transaction["contexts"]["trace"]["data"]["gen_ai.conversation.id"]
+            == "conv_tool_test_456"
+        )
+    else:
+        with patch.object(
+            agent_with_tool.model._client._client,
+            "send",
+            side_effect=[tool_response, final_response],
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            )
+
+            events = capture_events()
+
+            await agents.Runner.run(
+                agent_with_tool,
+                "Use the tool",
+                run_config=test_run_config,
+                conversation_id="conv_tool_test_456",
+            )
+
+        (transaction,) = events
+        spans = transaction["spans"]
+
+        # Find the tool span
+        tool_span = None
+        for span in spans:
+            if span.get("description", "").startswith("execute_tool"):
+                tool_span = span
+                break
+
+        assert tool_span is not None
+        # Tool span should have the conversation_id passed to Runner.run()
+        assert tool_span["data"]["gen_ai.conversation.id"] == "conv_tool_test_456"
+
+        # Workflow span (transaction) should have the same conversation_id
+        assert (
+            transaction["contexts"]["trace"]["data"]["gen_ai.conversation.id"]
+            == "conv_tool_test_456"
         )
 
-        items = capture_items("span", "transaction")
 
-        await agents.Runner.run(
-            agent_with_tool,
-            "Use the tool",
-            run_config=test_run_config,
-            conversation_id="conv_tool_test_456",
-        )
-
-    spans = [item.payload for item in items if item.type == "span"]
-    # Find the tool span
-    tool_span = None
-    for span in spans:
-        if span.get("name", "").startswith("execute_tool"):
-            tool_span = span
-            break
-
-    assert tool_span is not None
-    # Tool span should have the conversation_id passed to Runner.run()
-    assert tool_span["attributes"]["gen_ai.conversation.id"] == "conv_tool_test_456"
-
-    # Workflow span (transaction) should have the same conversation_id
-    (transaction,) = (item.payload for item in items if item.type == "transaction")
-    assert (
-        transaction["contexts"]["trace"]["data"]["gen_ai.conversation.id"]
-        == "conv_tool_test_456"
-    )
-
-
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.skipif(
     parse_version(OPENAI_AGENTS_VERSION) < (0, 4, 0),
     reason="conversation_id support requires openai-agents >= 0.4.0",
@@ -3488,10 +4941,12 @@ async def test_conversation_id_on_tool_span(
 @pytest.mark.asyncio
 async def test_no_conversation_id_when_not_provided(
     sentry_init,
+    capture_events,
     capture_items,
     test_agent,
     nonstreaming_responses_model_response,
     get_model_response,
+    stream_gen_ai_spans,
 ):
     """
     Test that gen_ai.conversation.id is not set when not passed to Runner.run().
@@ -3505,40 +4960,84 @@ async def test_no_conversation_id_when_not_provided(
         nonstreaming_responses_model_response, serialize_pydantic=True
     )
 
-    with patch.object(
-        agent.model._client._client,
-        "send",
-        return_value=response,
-    ) as _:
-        sentry_init(
-            integrations=[OpenAIAgentsIntegration()],
-            traces_sample_rate=1.0,
-        )
+    if stream_gen_ai_spans:
+        with patch.object(
+            agent.model._client._client,
+            "send",
+            return_value=response,
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            )
 
-        items = capture_items("span", "transaction")
+            items = capture_items("span", "transaction")
 
-        # Don't pass conversation_id
-        result = await agents.Runner.run(
-            agent, "Test input", run_config=test_run_config
-        )
+            # Don't pass conversation_id
+            result = await agents.Runner.run(
+                agent, "Test input", run_config=test_run_config
+            )
 
-        assert result is not None
+            assert result is not None
 
-    (transaction,) = (item.payload for item in items if item.type == "transaction")
+            (transaction,) = (
+                item.payload for item in items if item.type == "transaction"
+            )
 
-    spans = [item.payload for item in items if item.type == "span"]
-    invoke_agent_span = next(
-        span
-        for span in spans
-        if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
-    )
-    ai_client_span = next(
-        span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-    )
+            spans = [item.payload for item in items if item.type == "span"]
+            invoke_agent_span = next(
+                span
+                for span in spans
+                if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
+            )
+            ai_client_span = next(
+                span
+                for span in spans
+                if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+            )
 
-    # Verify conversation_id is NOT set on any spans
-    assert "gen_ai.conversation.id" not in transaction["contexts"]["trace"].get(
-        "attributes", {}
-    )
-    assert "gen_ai.conversation.id" not in invoke_agent_span.get("attributes", {})
-    assert "gen_ai.conversation.id" not in ai_client_span.get("attributes", {})
+            # Verify conversation_id is NOT set on any spans
+            assert "gen_ai.conversation.id" not in transaction["contexts"]["trace"].get(
+                "attributes", {}
+            )
+            assert "gen_ai.conversation.id" not in invoke_agent_span.get(
+                "attributes", {}
+            )
+            assert "gen_ai.conversation.id" not in ai_client_span.get("attributes", {})
+    else:
+        with patch.object(
+            agent.model._client._client,
+            "send",
+            return_value=response,
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
+            )
+
+            events = capture_events()
+
+            # Don't pass conversation_id
+            result = await agents.Runner.run(
+                agent, "Test input", run_config=test_run_config
+            )
+
+            assert result is not None
+
+            (transaction,) = events
+            spans = transaction["spans"]
+            invoke_agent_span = next(
+                span for span in spans if span["op"] == OP.GEN_AI_INVOKE_AGENT
+            )
+            ai_client_span = next(
+                span for span in spans if span["op"] == OP.GEN_AI_CHAT
+            )
+
+            # Verify conversation_id is NOT set on any spans
+            assert "gen_ai.conversation.id" not in transaction["contexts"]["trace"].get(
+                "data", {}
+            )
+            assert "gen_ai.conversation.id" not in invoke_agent_span.get("data", {})
+            assert "gen_ai.conversation.id" not in ai_client_span.get("data", {})
