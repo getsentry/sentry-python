@@ -177,7 +177,7 @@ def _serialized_v1_span_to_serialized_v2_span(
         description = span["description"]
 
         if description is None and "op" in span:
-            res["name"] = span["op"]
+            description = span["op"]
 
         res["name"] = description
 
