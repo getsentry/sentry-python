@@ -111,9 +111,7 @@ def test_transactions(sentry_init, capture_events, mongo_server, with_pii):
 
 
 @pytest.mark.parametrize("with_pii", [False, True])
-def test_transactions_span_streaming(
-    sentry_init, capture_items, mongo_server, with_pii
-):
+def test_segment_span_streaming(sentry_init, capture_items, mongo_server, with_pii):
     sentry_init(
         integrations=[PyMongoIntegration()],
         traces_sample_rate=1.0,
@@ -124,7 +122,7 @@ def test_transactions_span_streaming(
 
     connection = MongoClient(mongo_server.uri)
 
-    with sentry_sdk.traces.start_span(name="test_transaction"):
+    with sentry_sdk.traces.start_span(name="test_segment"):
         list(
             connection["test_db"]["test_collection"].find({"foobar": 1})
         )  # force query execution
@@ -140,21 +138,21 @@ def test_transactions_span_streaming(
     assert len(spans) == 4
 
     (find, insert_success, insert_fail, segment) = spans
-    assert segment["name"] == "test_transaction"
+    assert segment["name"] == "test_segment"
 
     for span in find, insert_success, insert_fail:
         attrs = span["attributes"]
-        assert attrs[SPANDATA.DB_SYSTEM] == "mongodb"
+        assert attrs["db.system.name"] == "mongodb"
         assert attrs[SPANDATA.DB_DRIVER_NAME] == "pymongo"
-        assert attrs["db.name"] == "test_db"
+        assert attrs["db.namespace"] == "test_db"
         assert attrs[SPANDATA.SERVER_ADDRESS] == "localhost"
         assert attrs[SPANDATA.SERVER_PORT] == mongo_server.port
         assert attrs["sentry.op"] == "db"
         assert attrs["sentry.origin"] == "auto.db.pymongo"
 
-    assert find["attributes"][SPANDATA.DB_OPERATION] == "find"
-    assert insert_success["attributes"][SPANDATA.DB_OPERATION] == "insert"
-    assert insert_fail["attributes"][SPANDATA.DB_OPERATION] == "insert"
+    assert find["attributes"]["db.operation.name"] == "find"
+    assert insert_success["attributes"]["db.operation.name"] == "insert"
+    assert insert_fail["attributes"]["db.operation.name"] == "insert"
 
     assert find["name"].startswith('{"find')
     assert insert_success["name"].startswith('{"insert')
@@ -244,10 +242,10 @@ def test_breadcrumbs_span_streaming(sentry_init, capture_items, mongo_server, wi
     assert crumb["type"] == "db"
 
     data = crumb["data"]
-    assert data["db.name"] == "test_db"
-    assert data[SPANDATA.DB_SYSTEM] == "mongodb"
-    assert data[SPANDATA.DB_DRIVER_NAME] == "pymongo"
-    assert data[SPANDATA.DB_OPERATION] == "find"
+    assert data["db.namespace"] == "test_db"
+    assert data["db.system.name"] == "mongodb"
+    assert data["db.driver.name"] == "pymongo"
+    assert data["db.operation.name"] == "find"
     assert data["db.collection.name"] == "test_collection"
     assert data["sentry.op"] == "db"
     assert data["sentry.origin"] == "auto.db.pymongo"
@@ -581,7 +579,7 @@ def test_span_origin_span_streaming(sentry_init, capture_items, mongo_server):
 
     connection = MongoClient(mongo_server.uri)
 
-    with sentry_sdk.traces.start_span(name="test_transaction"):
+    with sentry_sdk.traces.start_span(name="test_segment"):
         list(
             connection["test_db"]["test_collection"].find({"foobar": 1})
         )  # force query execution
@@ -590,7 +588,7 @@ def test_span_origin_span_streaming(sentry_init, capture_items, mongo_server):
     spans = [item.payload for item in items]
     assert len(spans) == 2
     (db_span, segment) = spans
-    assert segment["name"] == "test_transaction"
+    assert segment["name"] == "test_segment"
     assert db_span["attributes"]["sentry.origin"] == "auto.db.pymongo"
 
 
@@ -604,14 +602,14 @@ def test_span_streaming_status_on_success(sentry_init, capture_items, mongo_serv
 
     connection = MongoClient(mongo_server.uri)
 
-    with sentry_sdk.traces.start_span(name="test_transaction"):
+    with sentry_sdk.traces.start_span(name="test_segment"):
         connection["test_db"]["test_collection"].insert_one({"foo": 1})
     sentry_sdk.flush()
 
     spans = [item.payload for item in items]
     assert len(spans) == 2
     (db_span, segment) = spans
-    assert segment["name"] == "test_transaction"
+    assert segment["name"] == "test_segment"
     assert db_span["status"] == "ok"
 
 
@@ -625,7 +623,7 @@ def test_span_streaming_status_on_failure(sentry_init, capture_items, mongo_serv
 
     connection = MongoClient(mongo_server.uri)
 
-    with sentry_sdk.traces.start_span(name="test_transaction"):
+    with sentry_sdk.traces.start_span(name="test_segment"):
         try:
             connection["test_db"]["erroneous"].insert_many([{"bar": 3}])
             pytest.fail("Request should raise")
@@ -638,5 +636,5 @@ def test_span_streaming_status_on_failure(sentry_init, capture_items, mongo_serv
     assert len(spans) == 2
     (db_span, segment) = spans
 
-    assert segment["name"] == "test_transaction"
+    assert segment["name"] == "test_segment"
     assert db_span["status"] == "error"

@@ -89,12 +89,11 @@ def _strip_pii(command: "Dict[str, Any]") -> "Dict[str, Any]":
 def _get_db_data(event: "Any") -> "Dict[str, Any]":
     data = {}
 
-    data[SPANDATA.DB_SYSTEM] = "mongodb"
-    data[SPANDATA.DB_DRIVER_NAME] = "pymongo"
+    client = sentry_sdk.get_client()
+    is_span_streaming_enabled = has_span_streaming_enabled(client.options)
 
+    data[SPANDATA.DB_DRIVER_NAME] = "pymongo"
     db_name = event.database_name
-    if db_name is not None:
-        data[SPANDATA.DB_NAME] = db_name
 
     server_address = event.connection_id[0]
     if server_address is not None:
@@ -103,6 +102,17 @@ def _get_db_data(event: "Any") -> "Dict[str, Any]":
     server_port = event.connection_id[1]
     if server_port is not None:
         data[SPANDATA.SERVER_PORT] = server_port
+
+    if is_span_streaming_enabled:
+        data["db.system.name"] = "mongodb"
+
+        if db_name is not None:
+            data["db.namespace"] = db_name
+    else:
+        data[SPANDATA.DB_SYSTEM] = "mongodb"
+
+        if db_name is not None:
+            data[SPANDATA.DB_NAME] = db_name
 
     return data
 
@@ -139,10 +149,10 @@ class CommandTracer(monitoring.CommandListener):
 
             if has_span_streaming_enabled(client.options):
                 span_first_data = {
-                    "db.name": event.database_name,
-                    SPANDATA.DB_SYSTEM: "mongodb",
+                    "db.namespace": event.database_name,
+                    "db.system.name": "mongodb",
                     SPANDATA.DB_DRIVER_NAME: "pymongo",
-                    SPANDATA.DB_OPERATION: event.command_name,
+                    "db.operation.name": event.command_name,
                     "db.collection.name": command.get(event.command_name),
                     "sentry.op": OP.DB,
                     "sentry.origin": PyMongoIntegration.origin,
@@ -234,10 +244,7 @@ class CommandTracer(monitoring.CommandListener):
 
         try:
             span = self._ongoing_operations.pop(self._operation_key(event))
-            # Ignoring NoOpStreamedSpan as it will always have a status of "ok"
-            if type(span) is StreamedSpan:
-                span.status = SpanStatus.OK
-            elif type(span) is Span:
+            if type(span) is Span:
                 span.set_status(SPANSTATUS.OK)
             span.__exit__(None, None, None)
         except KeyError:
