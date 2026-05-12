@@ -224,10 +224,15 @@ class SpanBatcher(Batcher["StreamedSpan"]):
                             },
                             payload=PayloadRef(
                                 json={
+                                    "ingest_settings": {
+                                        "infer_ip": "never",
+                                        "infer_user_agent": "never",
+                                    },
+                                    "version": 2,
                                     "items": [
                                         self._to_transport_format(spans[j])
                                         for j in range(start, end)
-                                    ]
+                                    ],
                                 }
                             ),
                         )
