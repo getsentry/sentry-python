@@ -1366,9 +1366,6 @@ async def test_message_history(
         _experiments={"stream_gen_ai_spans": stream_gen_ai_spans},
     )
 
-    # First message
-    await agent.run("Hello, I'm Alice")
-
     # Second message with history
     from pydantic_ai import messages
 
@@ -1384,6 +1381,9 @@ async def test_message_history(
 
     if stream_gen_ai_spans:
         items = capture_items("transaction", "span")
+
+        # First message
+        await agent.run("Hello, I'm Alice")
 
         await agent.run("What is my name?", message_history=history)
 
@@ -1406,6 +1406,9 @@ async def test_message_history(
                 assert len(messages_data) > 1
     else:
         events = capture_events()
+
+        # First message
+        await agent.run("Hello, I'm Alice")
 
         await agent.run("What is my name?", message_history=history)
 
