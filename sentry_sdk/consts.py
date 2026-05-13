@@ -1222,6 +1222,7 @@ class ClientConstructor:
         before_send_metric: "Optional[Callable[[Metric, Hint], Optional[Metric]]]" = None,
         org_id: "Optional[str]" = None,
         strict_trace_continuation: bool = False,
+        stream_gen_ai_spans: bool = False,
     ) -> None:
         """Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.
 
@@ -1636,6 +1637,9 @@ class ClientConstructor:
         :param org_id: An optional organization ID. The SDK will try to extract if from the DSN in most cases
             but you can provide it explicitly for self-hosted and Relay setups. This value is used for
             trace propagation and for features like `strict_trace_continuation`.
+
+        :param stream_gen_ai_spans: When set, generative AI spans are sent in a new transport format to
+            reduce downstream data loss.
 
         :param _experiments:
         """
