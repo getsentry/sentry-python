@@ -2944,7 +2944,6 @@ def test_binary_content_encoding_uri_type(
             for x in event["spans"]
             if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
         )
-
         assert len(chat_spans) == 1
         span = chat_spans[0]
         messages_data = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
