@@ -237,6 +237,7 @@ def get_word_length(word: str) -> int:
     return len(word)
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_langchain_text_completion(
     sentry_init,
     capture_events,
