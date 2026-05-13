@@ -1436,16 +1436,21 @@ def test_tool_calls_extraction(
     assert json.loads(tool_calls[1]["arguments"]) == {"timezone": "PST"}
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_google_genai_message_truncation(
-    sentry_init, capture_events, mock_genai_client
+    sentry_init,
+    capture_events,
+    capture_items,
+    mock_genai_client,
+    stream_gen_ai_spans,
 ):
     """Test that large messages are truncated properly in Google GenAI integration."""
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
 
     large_content = (
         "This is a very long message that will exceed our size limits. " * 1000
@@ -1454,21 +1459,39 @@ def test_google_genai_message_truncation(
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
-    with mock.patch.object(
-        mock_genai_client._api_client, "request", return_value=mock_http_response
-    ):
-        with start_transaction(name="google_genai"):
+    if stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with mock.patch.object(
+            mock_genai_client._api_client, "request", return_value=mock_http_response
+        ), start_transaction(name="google_genai"):
             mock_genai_client.models.generate_content(
                 model="gemini-1.5-flash",
                 contents=[large_content, small_content],
                 config=create_test_config(),
             )
 
-    (event,) = events
-    invoke_span = event["spans"][0]
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["data"]
+        invoke_span = next(item.payload for item in items if item.type == "span")
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["attributes"]
 
-    messages_data = invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        messages_data = invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            mock_genai_client._api_client, "request", return_value=mock_http_response
+        ), start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash",
+                contents=[large_content, small_content],
+                config=create_test_config(),
+            )
+
+        (event,) = events
+        invoke_span = event["spans"][0]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["data"]
+
+        messages_data = invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
     assert isinstance(messages_data, str)
 
     parsed_messages = json.loads(messages_data)
@@ -2551,16 +2574,21 @@ def test_generate_content_with_inline_data(
     assert messages[0]["content"][1]["content"] == BLOB_DATA_SUBSTITUTE
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_generate_content_with_function_response(
-    sentry_init, capture_events, mock_genai_client
+    sentry_init,
+    capture_events,
+    capture_items,
+    mock_genai_client,
+    stream_gen_ai_spans,
 ):
     """Test generate_content with function_response (tool result)."""
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
@@ -2586,18 +2614,36 @@ def test_generate_content_with_function_response(
         ),
     ]
 
-    with mock.patch.object(
-        mock_genai_client._api_client, "request", return_value=mock_http_response
-    ):
-        with start_transaction(name="google_genai"):
+    if stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with mock.patch.object(
+            mock_genai_client._api_client, "request", return_value=mock_http_response
+        ), start_transaction(name="google_genai"):
             mock_genai_client.models.generate_content(
                 model="gemini-1.5-flash", contents=contents, config=create_test_config()
             )
 
-    (event,) = events
-    invoke_span = event["spans"][0]
+        invoke_span = next(item.payload for item in items if item.type == "span")
 
-    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+        messages = json.loads(
+            invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        )
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            mock_genai_client._api_client, "request", return_value=mock_http_response
+        ), start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents=contents, config=create_test_config()
+            )
+
+        (event,) = events
+        invoke_span = event["spans"][0]
+
+        messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+
     assert len(messages) == 1
     # First message is user message
     assert messages[0]["role"] == "tool"
@@ -2606,16 +2652,21 @@ def test_generate_content_with_function_response(
     assert messages[0]["content"]["output"] == "Sunny, 72F"
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_generate_content_with_mixed_string_and_content(
-    sentry_init, capture_events, mock_genai_client
+    sentry_init,
+    capture_events,
+    capture_items,
+    mock_genai_client,
+    stream_gen_ai_spans,
 ):
     """Test generate_content with mixed string and Content objects in list."""
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
@@ -2632,18 +2683,36 @@ def test_generate_content_with_mixed_string_and_content(
         ),
     ]
 
-    with mock.patch.object(
-        mock_genai_client._api_client, "request", return_value=mock_http_response
-    ):
-        with start_transaction(name="google_genai"):
+    if stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with mock.patch.object(
+            mock_genai_client._api_client, "request", return_value=mock_http_response
+        ), start_transaction(name="google_genai"):
             mock_genai_client.models.generate_content(
                 model="gemini-1.5-flash", contents=contents, config=create_test_config()
             )
 
-    (event,) = events
-    invoke_span = event["spans"][0]
+        invoke_span = next(item.payload for item in items if item.type == "span")
 
-    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+        messages = json.loads(
+            invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        )
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            mock_genai_client._api_client, "request", return_value=mock_http_response
+        ), start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents=contents, config=create_test_config()
+            )
+
+        (event,) = events
+        invoke_span = event["spans"][0]
+
+        messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+
     assert len(messages) == 1
     # User message
     assert messages[0]["role"] == "user"
@@ -2706,8 +2775,13 @@ def test_generate_content_with_part_object_directly(
     assert messages[0]["content"] == [{"text": "Direct Part object", "type": "text"}]
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_generate_content_with_list_of_dicts(
-    sentry_init, capture_events, mock_genai_client
+    sentry_init,
+    capture_events,
+    capture_items,
+    mock_genai_client,
+    stream_gen_ai_spans,
 ):
     """
     Test generate_content with list of dict format inputs.
@@ -2720,8 +2794,8 @@ def test_generate_content_with_list_of_dicts(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
@@ -2732,18 +2806,36 @@ def test_generate_content_with_list_of_dicts(
         {"role": "user", "parts": [{"text": "Second user message"}]},
     ]
 
-    with mock.patch.object(
-        mock_genai_client._api_client, "request", return_value=mock_http_response
-    ):
-        with start_transaction(name="google_genai"):
+    if stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with mock.patch.object(
+            mock_genai_client._api_client, "request", return_value=mock_http_response
+        ), start_transaction(name="google_genai"):
             mock_genai_client.models.generate_content(
                 model="gemini-1.5-flash", contents=contents, config=create_test_config()
             )
 
-    (event,) = events
-    invoke_span = event["spans"][0]
+        invoke_span = next(item.payload for item in items if item.type == "span")
 
-    messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+        messages = json.loads(
+            invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        )
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            mock_genai_client._api_client, "request", return_value=mock_http_response
+        ), start_transaction(name="google_genai"):
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents=contents, config=create_test_config()
+            )
+
+        (event,) = events
+        invoke_span = event["spans"][0]
+
+        messages = json.loads(invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+
     assert len(messages) == 1
     assert messages[0]["role"] == "user"
     assert messages[0]["content"] == [{"text": "Second user message", "type": "text"}]

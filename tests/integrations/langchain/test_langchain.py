@@ -2991,7 +2991,13 @@ def test_langchain_message_role_normalization_units():
     assert normalized[5] == "string message"  # String message unchanged
 
 
-def test_langchain_message_truncation(sentry_init, capture_events):
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_langchain_message_truncation(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+):
     """Test that large messages are truncated properly in Langchain integration."""
     from langchain_core.outputs import LLMResult, Generation
 
@@ -2999,8 +3005,8 @@ def test_langchain_message_truncation(sentry_init, capture_events):
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
 
     callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
 
@@ -3018,48 +3024,101 @@ def test_langchain_message_truncation(sentry_init, capture_events):
         "small message 5",
     ]
 
-    with start_transaction():
-        callback.on_llm_start(
-            serialized=serialized,
-            prompts=prompts,
-            run_id=run_id,
-            name="my_pipeline",
-            invocation_params={
-                "temperature": 0.7,
-                "max_tokens": 100,
-                "model": "gpt-3.5-turbo",
-            },
-        )
+    if stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
 
-        response = LLMResult(
-            generations=[[Generation(text="The response")]],
-            llm_output={
-                "token_usage": {
-                    "total_tokens": 25,
-                    "prompt_tokens": 10,
-                    "completion_tokens": 15,
-                }
-            },
-        )
-        callback.on_llm_end(response=response, run_id=run_id)
+        with start_transaction():
+            callback.on_llm_start(
+                serialized=serialized,
+                prompts=prompts,
+                run_id=run_id,
+                name="my_pipeline",
+                invocation_params={
+                    "temperature": 0.7,
+                    "max_tokens": 100,
+                    "model": "gpt-3.5-turbo",
+                },
+            )
 
-    assert len(events) > 0
-    tx = events[0]
-    assert tx["type"] == "transaction"
+            response = LLMResult(
+                generations=[[Generation(text="The response")]],
+                llm_output={
+                    "token_usage": {
+                        "total_tokens": 25,
+                        "prompt_tokens": 10,
+                        "completion_tokens": 15,
+                    }
+                },
+            )
+            callback.on_llm_end(response=response, run_id=run_id)
 
-    llm_spans = [
-        span
-        for span in tx.get("spans", [])
-        if span.get("op") == "gen_ai.text_completion"
-    ]
-    assert len(llm_spans) > 0
+        tx = next(item.payload for item in items if item.type == "transaction")
+        assert tx["type"] == "transaction"
 
-    llm_span = llm_spans[0]
-    assert llm_span["data"]["gen_ai.operation.name"] == "text_completion"
-    assert llm_span["data"][SPANDATA.GEN_AI_FUNCTION_ID] == "my_pipeline"
+        spans = [item.payload for item in items if item.type == "span"]
+        llm_spans = [
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == "gen_ai.text_completion"
+        ]
 
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in llm_span["data"]
-    messages_data = llm_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert len(llm_spans) > 0
+
+        llm_span = llm_spans[0]
+
+        assert llm_span["attributes"]["gen_ai.operation.name"] == "text_completion"
+        assert llm_span["attributes"][SPANDATA.GEN_AI_FUNCTION_ID] == "my_pipeline"
+
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in llm_span["attributes"]
+        messages_data = llm_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    else:
+        events = capture_events()
+
+        with start_transaction():
+            callback.on_llm_start(
+                serialized=serialized,
+                prompts=prompts,
+                run_id=run_id,
+                name="my_pipeline",
+                invocation_params={
+                    "temperature": 0.7,
+                    "max_tokens": 100,
+                    "model": "gpt-3.5-turbo",
+                },
+            )
+
+            response = LLMResult(
+                generations=[[Generation(text="The response")]],
+                llm_output={
+                    "token_usage": {
+                        "total_tokens": 25,
+                        "prompt_tokens": 10,
+                        "completion_tokens": 15,
+                    }
+                },
+            )
+            callback.on_llm_end(response=response, run_id=run_id)
+
+        assert len(events) > 0
+        tx = events[0]
+        assert tx["type"] == "transaction"
+
+        llm_spans = [
+            span
+            for span in tx.get("spans", [])
+            if span.get("op") == "gen_ai.text_completion"
+        ]
+
+        assert len(llm_spans) > 0
+
+        llm_span = llm_spans[0]
+
+        assert llm_span["data"]["gen_ai.operation.name"] == "text_completion"
+        assert llm_span["data"][SPANDATA.GEN_AI_FUNCTION_ID] == "my_pipeline"
+
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in llm_span["data"]
+        messages_data = llm_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+
     assert isinstance(messages_data, str)
 
     parsed_messages = json.loads(messages_data)

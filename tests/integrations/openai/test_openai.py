@@ -6110,7 +6110,9 @@ def test_openai_message_role_mapping(
 
 
 def test_openai_message_truncation(
-    sentry_init, capture_events, nonstreaming_chat_completions_model_response
+    sentry_init,
+    capture_events,
+    nonstreaming_chat_completions_model_response,
 ):
     """Test that large messages are truncated properly in OpenAI integration."""
     sentry_init(
@@ -6118,7 +6120,6 @@ def test_openai_message_truncation(
         traces_sample_rate=1.0,
         send_default_pii=True,
     )
-    events = capture_events()
 
     client = OpenAI(api_key="z")
     client.chat.completions._post = mock.Mock(
@@ -6144,6 +6145,8 @@ def test_openai_message_truncation(
         {"role": "assistant", "content": large_content},
         {"role": "user", "content": large_content},
     ]
+
+    events = capture_events()
 
     with start_transaction(name="openai tx"):
         client.chat.completions.create(

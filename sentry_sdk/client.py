@@ -50,7 +50,7 @@ from sentry_sdk.consts import (
 from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
 from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.sessions import SessionFlusher
-from sentry_sdk.envelope import Envelope
+from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk.profiler.continuous_profiler import setup_continuous_profiler
 from sentry_sdk.profiler.transaction_profiler import (
     has_profiling_enabled,
@@ -59,7 +59,6 @@ from sentry_sdk.profiler.transaction_profiler import (
 )
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.monitor import Monitor
-from sentry_sdk.envelope import Item, PayloadRef
 from sentry_sdk.utils import datetime_from_isoformat
 
 if TYPE_CHECKING:

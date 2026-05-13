@@ -1988,7 +1988,13 @@ def test_langgraph_message_role_mapping(
     assert "ai" not in roles
 
 
-def test_langgraph_message_truncation(sentry_init, capture_events):
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_langgraph_message_truncation(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+):
     """Test that large messages are truncated properly in Langgraph integration."""
     import json
 
@@ -1996,8 +2002,8 @@ def test_langgraph_message_truncation(sentry_init, capture_events):
         integrations=[LanggraphIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
 
     large_content = (
         "This is a very long message that will exceed our size limits. " * 1000
@@ -2017,28 +2023,66 @@ def test_langgraph_message_truncation(sentry_init, capture_events):
     def original_invoke(self, *args, **kwargs):
         return {"messages": args[0].get("messages", [])}
 
-    with start_transaction():
-        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
-        result = wrapped_invoke(pregel, test_state)
+    if stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
 
-    assert result is not None
-    assert len(events) > 0
-    tx = events[0]
-    assert tx["type"] == "transaction"
+        with start_transaction():
+            wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+            result = wrapped_invoke(pregel, test_state)
 
-    invoke_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == OP.GEN_AI_INVOKE_AGENT
-    ]
-    assert len(invoke_spans) > 0
+        assert result is not None
 
-    invoke_span = invoke_spans[0]
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["data"]
+        spans = [item.payload for item in items if item.type == "span"]
+        invoke_spans = [
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == OP.GEN_AI_INVOKE_AGENT
+        ]
 
-    messages_data = invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-    assert isinstance(messages_data, str)
+        assert len(invoke_spans) > 0
 
-    parsed_messages = json.loads(messages_data)
-    assert isinstance(parsed_messages, list)
-    assert len(parsed_messages) == 1
-    assert "small message 5" in str(parsed_messages[0])
+        invoke_span = invoke_spans[0]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["attributes"]
+
+        messages_data = invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+
+        assert isinstance(messages_data, str)
+
+        parsed_messages = json.loads(messages_data)
+        assert isinstance(parsed_messages, list)
+        assert len(parsed_messages) == 1
+        assert "small message 5" in str(parsed_messages[0])
+        (tx,) = (item.payload for item in items if item.type == "transaction")
+    else:
+        events = capture_events()
+
+        with start_transaction():
+            wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+            result = wrapped_invoke(pregel, test_state)
+
+        assert result is not None
+
+        assert len(events) > 0
+        tx = events[0]
+        assert tx["type"] == "transaction"
+
+        invoke_spans = [
+            span
+            for span in tx.get("spans", [])
+            if span.get("op") == OP.GEN_AI_INVOKE_AGENT
+        ]
+
+        assert len(invoke_spans) > 0
+
+        invoke_span = invoke_spans[0]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in invoke_span["data"]
+
+        messages_data = invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert isinstance(messages_data, str)
+
+        parsed_messages = json.loads(messages_data)
+        assert isinstance(parsed_messages, list)
+        assert len(parsed_messages) == 1
+        assert "small message 5" in str(parsed_messages[0])
+
     assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
