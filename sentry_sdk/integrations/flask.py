@@ -1,4 +1,3 @@
-import json
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -7,6 +6,7 @@ from sentry_sdk.integrations._wsgi_common import (
     _RAW_DATA_EXCEPTIONS,
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     RequestExtractor,
+    _serialize_request_body_data,
     request_body_within_bounds,
 )
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
@@ -197,14 +197,9 @@ def _set_request_body_data_on_streaming_segment(
             else:
                 return
 
-        def _default(value: "Any") -> "Any":
-            if isinstance(value, AnnotatedValue):
-                return value.value
-            return str(value)
-
         current_span._segment.set_attribute(
             "http.request.body.data",
-            json.dumps(data, default=_default),
+            _serialize_request_body_data(data),
         )
 
 

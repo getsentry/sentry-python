@@ -1,5 +1,4 @@
 import functools
-import json
 import sys
 import warnings
 from collections.abc import Set
@@ -18,6 +17,7 @@ from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     HttpCodeRangeContainer,
     _is_json_content_type,
+    _serialize_request_body_data,
     request_body_within_bounds,
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
@@ -240,16 +240,6 @@ def _enable_span_for_middleware(middleware_class: "Any") -> type:
         middleware_class.__call__ = _create_span_call
 
     return middleware_class
-
-
-def _serialize_request_body_data(data: "Any") -> str:
-    # data may be a JSON-serializable value, an AnnotatedValue, or a dict with AnnotatedValue values
-    def _default(value: "Any") -> "Any":
-        if isinstance(value, AnnotatedValue):
-            return value.value
-        return str(value)
-
-    return json.dumps(data, default=_default)
 
 
 def _set_request_body_data_on_streaming_segment(
