@@ -337,7 +337,7 @@ def test_pregel_invoke(
                 import json
 
                 request_messages = json.loads(request_messages)
-            assert len(request_messages) == 1
+            assert len(request_messages) == 2
             assert request_messages[0]["content"] == "Hello, can you help me?"
             assert request_messages[1]["content"] == "Of course! How can I assist you?"
 
