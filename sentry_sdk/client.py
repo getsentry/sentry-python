@@ -2,11 +2,12 @@ import os
 import uuid
 import random
 import socket
-from collections.abc import Mapping
+from collections.abc import Mapping, Iterable
 from datetime import datetime, timezone
 from importlib import import_module
 from typing import TYPE_CHECKING, List, Dict, cast, overload
 import warnings
+import json
 
 from sentry_sdk._compat import check_uwsgi_thread_support
 from sentry_sdk._metrics_batcher import MetricsBatcher
@@ -30,6 +31,7 @@ from sentry_sdk.utils import (
 )
 from sentry_sdk.serializer import serialize
 from sentry_sdk.tracing import trace
+from sentry_sdk.traces import SpanStatus
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.transport import (
     HttpTransportCore,
@@ -38,6 +40,7 @@ from sentry_sdk.transport import (
 )
 from sentry_sdk.consts import (
     SPANDATA,
+    SPANSTATUS,
     DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
     INSTRUMENTER,
@@ -47,7 +50,7 @@ from sentry_sdk.consts import (
 from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
 from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.sessions import SessionFlusher
-from sentry_sdk.envelope import Envelope
+from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk.profiler.continuous_profiler import setup_continuous_profiler
 from sentry_sdk.profiler.transaction_profiler import (
     has_profiling_enabled,
@@ -56,6 +59,7 @@ from sentry_sdk.profiler.transaction_profiler import (
 )
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.monitor import Monitor
+from sentry_sdk.utils import datetime_from_isoformat
 
 if TYPE_CHECKING:
     from typing import Any
@@ -66,7 +70,15 @@ if TYPE_CHECKING:
     from typing import Union
     from typing import TypeVar
 
-    from sentry_sdk._types import Event, Hint, SDKInfo, Log, Metric, EventDataCategory
+    from sentry_sdk._types import (
+        Event,
+        Hint,
+        SDKInfo,
+        Log,
+        Metric,
+        EventDataCategory,
+        SerializedAttributeValue,
+    )
     from sentry_sdk.integrations import Integration
     from sentry_sdk.scope import Scope
     from sentry_sdk.session import Session
@@ -87,6 +99,196 @@ SDK_INFO: "SDKInfo" = {
     "version": VERSION,
     "packages": [{"name": "pypi:sentry-sdk", "version": VERSION}],
 }
+
+
+def _serialized_v1_attribute_to_serialized_v2_attribute(
+    attribute_value: "Any",
+) -> "Optional[SerializedAttributeValue]":
+    if isinstance(attribute_value, bool):
+        return {
+            "value": attribute_value,
+            "type": "boolean",
+        }
+
+    if isinstance(attribute_value, int):
+        return {
+            "value": attribute_value,
+            "type": "integer",
+        }
+
+    if isinstance(attribute_value, float):
+        return {
+            "value": attribute_value,
+            "type": "double",
+        }
+
+    if isinstance(attribute_value, str):
+        return {
+            "value": attribute_value,
+            "type": "string",
+        }
+
+    if isinstance(attribute_value, list):
+        if not attribute_value:
+            return {"value": [], "type": "array"}
+
+        ty = type(attribute_value[0])
+        if ty in (int, str, bool, float) and all(
+            type(v) is ty for v in attribute_value
+        ):
+            return {
+                "value": attribute_value,
+                "type": "array",
+            }
+
+    # Types returned when the serializer for V1 span attributes recurses into some container types.
+    if isinstance(attribute_value, (dict, list)):
+        return {
+            "value": json.dumps(attribute_value),
+            "type": "string",
+        }
+
+    return None
+
+
+def _serialized_v1_span_to_serialized_v2_span(
+    span: "dict[str, Any]", event: "Event"
+) -> "dict[str, Any]":
+    # See SpanBatcher._to_transport_format() for analogous population of all entries except "attributes".
+    res: "dict[str, Any]" = {
+        "status": SpanStatus.OK.value,
+        "is_segment": False,
+    }
+
+    if "trace_id" in span:
+        res["trace_id"] = span["trace_id"]
+
+    if "span_id" in span:
+        res["span_id"] = span["span_id"]
+
+    if "description" in span:
+        description = span["description"]
+
+        if description is None and "op" in span:
+            description = span["op"]
+
+        res["name"] = description
+
+    if "start_timestamp" in span:
+        start_timestamp = None
+        try:
+            start_timestamp = datetime_from_isoformat(span["start_timestamp"])
+        except Exception:
+            pass
+
+        if start_timestamp is not None:
+            res["start_timestamp"] = start_timestamp.timestamp()
+
+    if "timestamp" in span:
+        end_timestamp = None
+        try:
+            end_timestamp = datetime_from_isoformat(span["timestamp"])
+        except Exception:
+            pass
+
+        if end_timestamp is not None:
+            res["end_timestamp"] = end_timestamp.timestamp()
+
+    if "parent_span_id" in span:
+        res["parent_span_id"] = span["parent_span_id"]
+
+    if "status" in span and span["status"] != SPANSTATUS.OK:
+        res["status"] = "error"
+
+    attributes: "Dict[str, Any]" = {}
+
+    if "op" in span:
+        attributes["sentry.op"] = span["op"]
+    if "origin" in span:
+        attributes["sentry.origin"] = span["origin"]
+
+    span_data = span.get("data")
+    if isinstance(span_data, dict):
+        attributes.update(span_data)
+
+    span_tags = span.get("tags")
+    if isinstance(span_tags, dict):
+        attributes.update(span_tags)
+
+    # See Scope._apply_user_attributes_to_telemetry() for user attributes.
+    user = event.get("user")
+    if isinstance(user, dict):
+        if "id" in user:
+            attributes["user.id"] = user["id"]
+        if "username" in user:
+            attributes["user.name"] = user["username"]
+        if "email" in user:
+            attributes["user.email"] = user["email"]
+
+    # See Scope.set_global_attributes() for release, environment, and SDK metadata.
+    if "release" in event:
+        attributes["sentry.release"] = event["release"]
+    if "environment" in event:
+        attributes["sentry.environment"] = event["environment"]
+    if "transaction" in event:
+        attributes["sentry.segment.name"] = event["transaction"]
+
+    trace_context = event.get("contexts", {}).get("trace", {})
+    if "span_id" in trace_context:
+        attributes["sentry.segment.id"] = trace_context["span_id"]
+
+    sdk_info = event.get("sdk")
+    if isinstance(sdk_info, dict):
+        if "name" in sdk_info:
+            attributes["sentry.sdk.name"] = sdk_info["name"]
+        if "version" in sdk_info:
+            attributes["sentry.sdk.version"] = sdk_info["version"]
+
+    if not attributes:
+        return res
+
+    res["attributes"] = {}
+    for key, value in attributes.items():
+        converted_value = _serialized_v1_attribute_to_serialized_v2_attribute(value)
+        if converted_value is None:
+            continue
+
+        res["attributes"][key] = converted_value
+
+    # Remove redundant attribute, as status is stored in the status field.
+    if "status" in res["attributes"]:
+        del res["attributes"]["status"]
+
+    return res
+
+
+def _split_gen_ai_spans(
+    event_opt: "Event",
+) -> "Optional[tuple[List[Dict[str, object]], List[Dict[str, object]]]]":
+    if "spans" not in event_opt:
+        return None
+
+    spans: "Any" = event_opt["spans"]
+    if isinstance(spans, AnnotatedValue):
+        spans = spans.value
+
+    if not isinstance(spans, Iterable):
+        return None
+
+    non_gen_ai_spans = []
+    gen_ai_spans = []
+    for span in spans:
+        if not isinstance(span, dict):
+            non_gen_ai_spans.append(span)
+            continue
+
+        span_op = span.get("op")
+        if isinstance(span_op, str) and span_op.startswith("gen_ai."):
+            gen_ai_spans.append(span)
+        else:
+            non_gen_ai_spans.append(span)
+
+    return non_gen_ai_spans, gen_ai_spans
 
 
 def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
@@ -874,6 +1076,8 @@ class _Client(BaseClient):
         event_id = event.get("event_id")
         if event_id is None:
             event["event_id"] = event_id = uuid.uuid4().hex
+
+        span_recorder_has_gen_ai_span = event.pop("_has_gen_ai_span", False)
         event_opt = self._prepare_event(event, hint, scope)
         if event_opt is None:
             return None
@@ -909,10 +1113,43 @@ class _Client(BaseClient):
 
         envelope = Envelope(headers=headers)
 
-        if is_transaction:
-            if isinstance(profile, Profile):
-                envelope.add_profile(profile.to_json(event_opt, self.options))
+        if is_transaction and isinstance(profile, Profile):
+            envelope.add_profile(profile.to_json(event_opt, self.options))
+
+        if is_transaction and not span_recorder_has_gen_ai_span:
             envelope.add_transaction(event_opt)
+        elif is_transaction:
+            split_spans = _split_gen_ai_spans(event_opt)
+            if split_spans is None or not split_spans[1]:
+                envelope.add_transaction(event_opt)
+            else:
+                non_gen_ai_spans, gen_ai_spans = split_spans
+
+                event_opt["spans"] = non_gen_ai_spans
+                envelope.add_transaction(event_opt)
+
+                converted_gen_ai_spans = [
+                    _serialized_v1_span_to_serialized_v2_span(span, event_opt)
+                    for span in gen_ai_spans
+                    if isinstance(span, dict)
+                ]
+
+                envelope.add_item(
+                    Item(
+                        type=SpanBatcher.TYPE,
+                        content_type=SpanBatcher.CONTENT_TYPE,
+                        headers={
+                            "item_count": len(converted_gen_ai_spans),
+                        },
+                        payload=PayloadRef(
+                            json={
+                                "version": 2,
+                                "items": converted_gen_ai_spans,
+                            },
+                        ),
+                    )
+                )
+
         elif is_checkin:
             envelope.add_checkin(event_opt)
         else:
