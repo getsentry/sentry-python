@@ -438,9 +438,13 @@ def _set_common_input_data(
                 normalized_messages.append(transformed_message)
 
         role_normalized_messages = normalize_message_roles(normalized_messages)
+
+        client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
-        messages_data = truncate_and_annotate_messages(
-            role_normalized_messages, span, scope
+        messages_data = (
+            role_normalized_messages
+            if client.options.get("stream_gen_ai_spans", False)
+            else truncate_and_annotate_messages(role_normalized_messages, span, scope)
         )
         if messages_data is not None:
             set_data_normalized(

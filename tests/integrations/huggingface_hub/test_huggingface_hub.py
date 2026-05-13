@@ -2,6 +2,7 @@ import re
 from typing import TYPE_CHECKING
 from unittest import mock
 
+from sentry_sdk.utils import safe_serialize
 import pytest
 import responses
 from huggingface_hub import InferenceClient
@@ -761,7 +762,13 @@ def test_chat_completion(
 
         with sentry_sdk.start_transaction(name="test"):
             client.chat_completion(
-                messages=[{"role": "user", "content": "Hello!"}],
+                messages=[
+                    {
+                        "role": "user",
+                        "content": "Message demonstrating the absence of truncation.",
+                    },
+                    {"role": "user", "content": "Hello!"},
+                ],
                 stream=False,
             )
 
@@ -804,8 +811,14 @@ def test_chat_completion(
         }
 
         if send_default_pii and include_prompts:
-            expected_data["gen_ai.request.messages"] = (
-                '[{"role": "user", "content": "Hello!"}]'
+            expected_data["gen_ai.request.messages"] = safe_serialize(
+                [
+                    {
+                        "role": "user",
+                        "content": "Message demonstrating the absence of truncation.",
+                    },
+                    {"role": "user", "content": "Hello!"},
+                ]
             )
             expected_data["gen_ai.response.text"] = (
                 "[mocked] Hello! How can I help you today?"
@@ -899,7 +912,13 @@ def test_chat_completion_streaming(
         with sentry_sdk.start_transaction(name="test"):
             _ = list(
                 client.chat_completion(
-                    [{"role": "user", "content": "Hello!"}],
+                    [
+                        {
+                            "role": "user",
+                            "content": "Message demonstrating the absence of truncation.",
+                        },
+                        {"role": "user", "content": "Hello!"},
+                    ],
                     stream=True,
                 )
             )
@@ -945,8 +964,14 @@ def test_chat_completion_streaming(
             expected_data["gen_ai.usage.total_tokens"] = 197
 
         if send_default_pii and include_prompts:
-            expected_data["gen_ai.request.messages"] = (
-                '[{"role": "user", "content": "Hello!"}]'
+            expected_data["gen_ai.request.messages"] = safe_serialize(
+                [
+                    {
+                        "role": "user",
+                        "content": "Message demonstrating the absence of truncation.",
+                    },
+                    {"role": "user", "content": "Hello!"},
+                ]
             )
             expected_data["gen_ai.response.text"] = "the mocked model response"
 

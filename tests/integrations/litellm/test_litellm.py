@@ -159,7 +159,10 @@ def test_nonstreaming_chat_completion(
         stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
-    messages = [{"role": "user", "content": "Hello!"}]
+    messages = [
+        {"role": "user", "content": "Message demonstrating the absence of truncation."},
+        {"role": "user", "content": "Hello!"},
+    ]
 
     client = OpenAI(api_key="test-key")
 
@@ -216,7 +219,13 @@ def test_nonstreaming_chat_completion(
         assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
         if send_default_pii and include_prompts:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {"role": "user", "content": "Hello!"},
+            ]
             assert SPANDATA.GEN_AI_RESPONSE_TEXT in span["attributes"]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
@@ -302,7 +311,10 @@ async def test_async_nonstreaming_chat_completion(
         stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
-    messages = [{"role": "user", "content": "Hello!"}]
+    messages = [
+        {"role": "user", "content": "Message demonstrating the absence of truncation."},
+        {"role": "user", "content": "Hello!"},
+    ]
 
     client = AsyncOpenAI(api_key="test-key")
 
@@ -360,7 +372,13 @@ async def test_async_nonstreaming_chat_completion(
         assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
         if send_default_pii and include_prompts:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {"role": "user", "content": "Hello!"},
+            ]
             assert SPANDATA.GEN_AI_RESPONSE_TEXT in span["attributes"]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
@@ -448,7 +466,10 @@ def test_streaming_chat_completion(
         stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
-    messages = [{"role": "user", "content": "Hello!"}]
+    messages = [
+        {"role": "user", "content": "Message demonstrating the absence of truncation."},
+        {"role": "user", "content": "Hello!"},
+    ]
 
     client = OpenAI(api_key="test-key")
 
@@ -556,7 +577,10 @@ async def test_async_streaming_chat_completion(
         stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
-    messages = [{"role": "user", "content": "Hello!"}]
+    messages = [
+        {"role": "user", "content": "Message demonstrating the absence of truncation."},
+        {"role": "user", "content": "Hello!"},
+    ]
 
     client = AsyncOpenAI(api_key="test-key")
 
@@ -2325,20 +2349,14 @@ def test_integration_setup(sentry_init):
     assert _failure_callback in (litellm.failure_callback or [])
 
 
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
-def test_litellm_message_truncation(
-    sentry_init,
-    capture_events,
-    capture_items,
-    stream_gen_ai_spans,
-):
+def test_litellm_message_truncation(sentry_init, capture_events):
     """Test that large messages are truncated properly in LiteLLM integration."""
     sentry_init(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
     )
+    events = capture_events()
 
     large_content = (
         "This is a very long message that will exceed our size limits. " * 1000
@@ -2352,78 +2370,39 @@ def test_litellm_message_truncation(
     ]
     mock_response = MockCompletionResponse()
 
-    if stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    with start_transaction(name="litellm test"):
+        kwargs = {
+            "model": "gpt-3.5-turbo",
+            "messages": messages,
+        }
 
-        with start_transaction(name="litellm test"):
-            kwargs = {
-                "model": "gpt-3.5-turbo",
-                "messages": messages,
-            }
+        _input_callback(kwargs)
+        _success_callback(
+            kwargs,
+            mock_response,
+            datetime.now(),
+            datetime.now(),
+        )
 
-            _input_callback(kwargs)
-            _success_callback(
-                kwargs,
-                mock_response,
-                datetime.now(),
-                datetime.now(),
-            )
+    assert len(events) > 0
+    tx = events[0]
+    assert tx["type"] == "transaction"
 
-        spans = [item.payload for item in items if item.type == "span"]
-        chat_spans = [
-            span
-            for span in spans
-            if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
-        ]
-        assert len(chat_spans) > 0
+    chat_spans = [
+        span for span in tx.get("spans", []) if span.get("op") == OP.GEN_AI_CHAT
+    ]
+    assert len(chat_spans) > 0
 
-        chat_span = chat_spans[0]
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["attributes"]
+    chat_span = chat_spans[0]
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["data"]
 
-        messages_data = chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        assert isinstance(messages_data, str)
+    messages_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert isinstance(messages_data, str)
 
-        parsed_messages = json.loads(messages_data)
-        assert isinstance(parsed_messages, list)
-        assert len(parsed_messages) == 1
-        assert "small message 5" in str(parsed_messages[0])
-        tx = next(item.payload for item in items if item.type == "transaction")
-    else:
-        events = capture_events()
-
-        with start_transaction(name="litellm test"):
-            kwargs = {
-                "model": "gpt-3.5-turbo",
-                "messages": messages,
-            }
-
-            _input_callback(kwargs)
-            _success_callback(
-                kwargs,
-                mock_response,
-                datetime.now(),
-                datetime.now(),
-            )
-
-        assert len(events) > 0
-        tx = events[0]
-        assert tx["type"] == "transaction"
-
-        chat_spans = [
-            span for span in tx.get("spans", []) if span.get("op") == OP.GEN_AI_CHAT
-        ]
-        assert len(chat_spans) > 0
-
-        chat_span = chat_spans[0]
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["data"]
-
-        messages_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        assert isinstance(messages_data, str)
-
-        parsed_messages = json.loads(messages_data)
-        assert isinstance(parsed_messages, list)
-        assert len(parsed_messages) == 1
-        assert "small message 5" in str(parsed_messages[0])
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+    assert len(parsed_messages) == 1
+    assert "small message 5" in str(parsed_messages[0])
     assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
 
 

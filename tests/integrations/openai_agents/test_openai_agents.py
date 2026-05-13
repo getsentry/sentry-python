@@ -315,6 +315,10 @@ async def test_agent_invocation_span_no_pii(
                 },
                 {
                     "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {
+                    "role": "user",
                     "content": "Test input",
                 },
             ],
@@ -326,6 +330,11 @@ async def test_agent_invocation_span_no_pii(
                     "type": "message",
                     "role": "system",
                     "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
                 },
                 {
                     "type": "message",
@@ -346,6 +355,10 @@ async def test_agent_invocation_span_no_pii(
                 },
                 {
                     "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {
+                    "role": "user",
                     "content": "Test input",
                 },
             ],
@@ -360,6 +373,11 @@ async def test_agent_invocation_span_no_pii(
                         {"type": "text", "text": "You are a helpful assistant."},
                         {"type": "text", "text": "Be concise and clear."},
                     ],
+                },
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
                 },
                 {
                     "type": "message",
@@ -462,6 +480,21 @@ async def test_agent_invocation_span(
                     {"type": "text", "content": "You are a helpful assistant."},
                 ]
             )
+
+            assert json.loads(
+                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            ) == [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        }
+                    ],
+                },
+                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
+            ]
         elif "blocks_no_type" in param_id:
             assert ai_client_span["attributes"][
                 "gen_ai.system_instructions"
@@ -474,6 +507,21 @@ async def test_agent_invocation_span(
                     {"type": "text", "content": "You are a helpful assistant."},
                 ]
             )
+
+            assert json.loads(
+                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            ) == [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        }
+                    ],
+                },
+                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
+            ]
         elif "blocks" in param_id and instructions is None:  # type: ignore
             assert ai_client_span["attributes"][
                 "gen_ai.system_instructions"
@@ -482,6 +530,21 @@ async def test_agent_invocation_span(
                     {"type": "text", "content": "You are a helpful assistant."},
                 ]
             )
+
+            assert json.loads(
+                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            ) == [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        }
+                    ],
+                },
+                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
+            ]
         elif "blocks" in param_id:
             assert ai_client_span["attributes"][
                 "gen_ai.system_instructions"
@@ -494,6 +557,21 @@ async def test_agent_invocation_span(
                     {"type": "text", "content": "You are a helpful assistant."},
                 ]
             )
+
+            assert json.loads(
+                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            ) == [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        }
+                    ],
+                },
+                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
+            ]
         elif "parts_no_type" in param_id and instructions is None:
             assert ai_client_span["attributes"][
                 "gen_ai.system_instructions"
@@ -503,6 +581,21 @@ async def test_agent_invocation_span(
                     {"type": "text", "content": "Be concise and clear."},
                 ]
             )
+
+            assert json.loads(
+                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            ) == [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        }
+                    ],
+                },
+                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
+            ]
         elif "parts_no_type" in param_id:
             assert ai_client_span["attributes"][
                 "gen_ai.system_instructions"
@@ -516,6 +609,21 @@ async def test_agent_invocation_span(
                     {"type": "text", "content": "Be concise and clear."},
                 ]
             )
+
+            assert json.loads(
+                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            ) == [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        }
+                    ],
+                },
+                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
+            ]
         elif instructions is None:  # type: ignore
             assert ai_client_span["attributes"][
                 "gen_ai.system_instructions"
@@ -525,6 +633,21 @@ async def test_agent_invocation_span(
                     {"type": "text", "content": "Be concise and clear."},
                 ]
             )
+
+            assert json.loads(
+                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            ) == [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        }
+                    ],
+                },
+                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
+            ]
         else:
             assert ai_client_span["attributes"][
                 "gen_ai.system_instructions"
@@ -538,6 +661,21 @@ async def test_agent_invocation_span(
                     {"type": "text", "content": "Be concise and clear."},
                 ]
             )
+
+            assert json.loads(
+                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            ) == [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        }
+                    ],
+                },
+                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
+            ]
 
         assert (
             invoke_agent_span["attributes"]["gen_ai.response.text"]
@@ -962,6 +1100,10 @@ def test_agent_invocation_span_sync_no_pii(
                 },
                 {
                     "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {
+                    "role": "user",
                     "content": "Test input",
                 },
             ],
@@ -973,6 +1115,11 @@ def test_agent_invocation_span_sync_no_pii(
                     "type": "message",
                     "role": "system",
                     "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
                 },
                 {
                     "type": "message",
@@ -993,6 +1140,10 @@ def test_agent_invocation_span_sync_no_pii(
                 },
                 {
                     "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {
+                    "role": "user",
                     "content": "Test input",
                 },
             ],
@@ -1007,6 +1158,11 @@ def test_agent_invocation_span_sync_no_pii(
                         {"type": "text", "text": "You are a helpful assistant."},
                         {"type": "text", "text": "Be concise and clear."},
                     ],
+                },
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
                 },
                 {
                     "type": "message",
@@ -1114,6 +1270,21 @@ def test_agent_invocation_span_sync(
                     {"type": "text", "content": "You are a helpful assistant."},
                 ]
             )
+
+            assert json.loads(
+                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            ) == [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        }
+                    ],
+                },
+                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
+            ]
         elif "blocks_no_type" in param_id:
             assert ai_client_span["attributes"][
                 "gen_ai.system_instructions"
@@ -1126,6 +1297,21 @@ def test_agent_invocation_span_sync(
                     {"type": "text", "content": "You are a helpful assistant."},
                 ]
             )
+
+            assert json.loads(
+                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            ) == [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        }
+                    ],
+                },
+                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
+            ]
         elif "blocks" in param_id and instructions is None:  # type: ignore
             assert ai_client_span["attributes"][
                 "gen_ai.system_instructions"
@@ -1134,6 +1320,21 @@ def test_agent_invocation_span_sync(
                     {"type": "text", "content": "You are a helpful assistant."},
                 ]
             )
+
+            assert json.loads(
+                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            ) == [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        }
+                    ],
+                },
+                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
+            ]
         elif "blocks" in param_id:
             assert ai_client_span["attributes"][
                 "gen_ai.system_instructions"
@@ -1146,6 +1347,21 @@ def test_agent_invocation_span_sync(
                     {"type": "text", "content": "You are a helpful assistant."},
                 ]
             )
+
+            assert json.loads(
+                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            ) == [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        }
+                    ],
+                },
+                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
+            ]
         elif "parts_no_type" in param_id and instructions is None:
             assert ai_client_span["attributes"][
                 "gen_ai.system_instructions"
@@ -1155,6 +1371,21 @@ def test_agent_invocation_span_sync(
                     {"type": "text", "content": "Be concise and clear."},
                 ]
             )
+
+            assert json.loads(
+                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            ) == [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        }
+                    ],
+                },
+                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
+            ]
         elif "parts_no_type" in param_id:
             assert ai_client_span["attributes"][
                 "gen_ai.system_instructions"
@@ -1168,6 +1399,21 @@ def test_agent_invocation_span_sync(
                     {"type": "text", "content": "Be concise and clear."},
                 ]
             )
+
+            assert json.loads(
+                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            ) == [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        }
+                    ],
+                },
+                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
+            ]
         elif instructions is None:  # type: ignore
             assert ai_client_span["attributes"][
                 "gen_ai.system_instructions"
@@ -1177,6 +1423,21 @@ def test_agent_invocation_span_sync(
                     {"type": "text", "content": "Be concise and clear."},
                 ]
             )
+
+            assert json.loads(
+                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            ) == [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        }
+                    ],
+                },
+                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
+            ]
         else:
             assert ai_client_span["attributes"][
                 "gen_ai.system_instructions"
@@ -1190,6 +1451,21 @@ def test_agent_invocation_span_sync(
                     {"type": "text", "content": "Be concise and clear."},
                 ]
             )
+
+            assert json.loads(
+                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            ) == [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        }
+                    ],
+                },
+                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
+            ]
     else:
         with patch.object(
             agent.model._client._client,
@@ -1932,6 +2208,24 @@ async def test_tool_execution_span(
             "gen_ai.request.messages"
         ] == safe_serialize(
             [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Please use the simple test tool"}
+                    ],
+                },
+                {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "arguments": '{"message": "hello"}',
+                            "call_id": "call_123",
+                            "name": "simple_test_tool",
+                            "type": "function_call",
+                            "id": "call_123",
+                        }
+                    ],
+                },
                 {
                     "role": "tool",
                     "content": [

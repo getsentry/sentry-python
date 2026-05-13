@@ -76,7 +76,9 @@ async def test_agent_run_async(
     if stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
-        result = await test_agent.run("Test input")
+        result = await test_agent.run(
+            ["Message demonstrating the absence of truncation.", "Test input"]
+        )
 
         assert result is not None
         assert result.output is not None
@@ -102,7 +104,23 @@ async def test_agent_run_async(
         assert "chat" in chat_span["name"]
         assert chat_span["attributes"]["gen_ai.operation.name"] == "chat"
         assert chat_span["attributes"]["gen_ai.response.streaming"] is False
-        assert "gen_ai.request.messages" in chat_span["attributes"]
+        assert json.loads(
+            chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        ) == [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Message demonstrating the absence of truncation.",
+                    },
+                    {
+                        "type": "text",
+                        "text": "Test input",
+                    },
+                ],
+            }
+        ]
         assert "gen_ai.usage.input_tokens" in chat_span["attributes"]
         assert "gen_ai.usage.output_tokens" in chat_span["attributes"]
     else:
@@ -275,7 +293,9 @@ def test_agent_run_sync(
     if stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
-        result = test_agent.run_sync("Test input")
+        result = test_agent.run_sync(
+            ["Message demonstrating the absence of truncation.", "Test input"]
+        )
 
         assert result is not None
         assert result.output is not None
@@ -394,7 +414,9 @@ async def test_agent_run_stream(
     if stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
-        async with test_agent.run_stream("Test input") as result:
+        async with test_agent.run_stream(
+            ["Message demonstrating the absence of truncation.", "Test input"]
+        ) as result:
             # Consume the stream
             async for _ in result.stream_output():
                 pass
@@ -416,7 +438,23 @@ async def test_agent_run_stream(
         # Verify streaming flag is True for streaming
         for chat_span in chat_spans:
             assert chat_span["attributes"]["gen_ai.response.streaming"] is True
-            assert "gen_ai.request.messages" in chat_span["attributes"]
+            assert json.loads(
+                chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            ) == [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        },
+                        {
+                            "type": "text",
+                            "text": "Test input",
+                        },
+                    ],
+                }
+            ]
             assert "gen_ai.usage.input_tokens" in chat_span["attributes"]
             # Streaming responses should still have output data
             assert (
@@ -479,7 +517,9 @@ async def test_agent_run_stream_events(
     if stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
-        async for _ in test_agent.run_stream_events("Test input"):
+        async for _ in test_agent.run_stream_events(
+            ["Message demonstrating the absence of truncation.", "Test input"]
+        ):
             pass
 
         # Verify transaction

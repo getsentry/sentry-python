@@ -122,9 +122,12 @@ def invoke_agent_span(
 
         if messages:
             normalized_messages = normalize_message_roles(messages)
+            client = sentry_sdk.get_client()
             scope = sentry_sdk.get_current_scope()
-            messages_data = truncate_and_annotate_messages(
-                normalized_messages, span, scope
+            messages_data = (
+                normalized_messages
+                if client.options.get("stream_gen_ai_spans", False)
+                else truncate_and_annotate_messages(normalized_messages, span, scope)
             )
             set_data_normalized(
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
