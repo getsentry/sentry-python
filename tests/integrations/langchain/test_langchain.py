@@ -305,11 +305,9 @@ def test_langchain_text_completion(
             for span in spans
             if span["attributes"].get("sentry.op") == "gen_ai.text_completion"
         ]
-
         assert len(llm_spans) > 0
 
         llm_span = llm_spans[0]
-
         assert llm_span["name"] == "text_completion gpt-3.5-turbo"
         assert llm_span["attributes"]["gen_ai.system"] == "openai"
         assert llm_span["attributes"]["gen_ai.function_id"] == "my-snazzy-pipeline"
@@ -340,11 +338,9 @@ def test_langchain_text_completion(
             for span in tx.get("spans", [])
             if span.get("op") == "gen_ai.text_completion"
         ]
-
         assert len(llm_spans) > 0
 
         llm_span = llm_spans[0]
-
         assert llm_span["description"] == "text_completion gpt-3.5-turbo"
         assert llm_span["data"]["gen_ai.system"] == "openai"
         assert llm_span["data"]["gen_ai.function_id"] == "my-snazzy-pipeline"
@@ -587,7 +583,6 @@ def test_langchain_create_agent(
             )
 
         tx = next(item.payload for item in items if item.type == "transaction")
-
         assert tx["type"] == "transaction"
         assert tx["contexts"]["trace"]["origin"] == "manual"
 
@@ -662,7 +657,6 @@ def test_langchain_create_agent(
             )
 
         tx = events[0]
-
         assert tx["type"] == "transaction"
         assert tx["contexts"]["trace"]["origin"] == "manual"
 
@@ -826,7 +820,6 @@ def test_tool_execution_span(
             )
 
         tx = next(item.payload for item in items if item.type == "transaction")
-
         assert tx["type"] == "transaction"
         assert tx["contexts"]["trace"]["origin"] == "manual"
 
@@ -839,7 +832,6 @@ def test_tool_execution_span(
         tool_exec_spans = list(
             x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.execute_tool"
         )
-
         assert len(tool_exec_spans) == 1
         tool_exec_span = tool_exec_spans[0]
 
@@ -934,13 +926,11 @@ def test_tool_execution_span(
             )
 
         tx = events[0]
-
         assert tx["type"] == "transaction"
         assert tx["contexts"]["trace"]["origin"] == "manual"
 
         chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
         assert len(chat_spans) == 2
-
         tool_exec_spans = list(
             x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool"
         )
@@ -1091,7 +1081,6 @@ def test_langchain_openai_tools_agent_no_prompts(
             )
 
         tx = next(item.payload for item in items if item.type == "transaction")
-
         assert tx["type"] == "transaction"
         assert tx["contexts"]["trace"]["origin"] == "manual"
 
@@ -1200,7 +1189,6 @@ def test_langchain_openai_tools_agent_no_prompts(
             )
 
         tx = events[0]
-
         assert tx["type"] == "transaction"
         assert tx["contexts"]["trace"]["origin"] == "manual"
 
@@ -1358,7 +1346,6 @@ def test_langchain_openai_tools_agent(
             list(agent_executor.stream({"input": "How many letters in the word eudca"}))
 
         tx = next(item.payload for item in items if item.type == "transaction")
-
         assert tx["type"] == "transaction"
         assert tx["contexts"]["trace"]["origin"] == "manual"
 
@@ -1474,7 +1461,6 @@ def test_langchain_openai_tools_agent(
             list(agent_executor.stream({"input": "How many letters in the word eudca"}))
 
         tx = events[0]
-
         assert tx["type"] == "transaction"
         assert tx["contexts"]["trace"]["origin"] == "manual"
 
@@ -1641,7 +1627,6 @@ def test_langchain_openai_tools_agent_with_config(
             )
 
         tx = next(item.payload for item in items if item.type == "transaction")
-
         assert tx["type"] == "transaction"
         assert tx["contexts"]["trace"]["origin"] == "manual"
 
@@ -1668,7 +1653,6 @@ def test_langchain_openai_tools_agent_with_config(
             )
 
         tx = events[0]
-
         assert tx["type"] == "transaction"
         assert tx["contexts"]["trace"]["origin"] == "manual"
 
@@ -1761,7 +1745,6 @@ def test_langchain_openai_tools_agent_stream_no_prompts(
             )
 
         tx = next(item.payload for item in items if item.type == "transaction")
-
         assert tx["type"] == "transaction"
         assert tx["contexts"]["trace"]["origin"] == "manual"
 
@@ -1872,7 +1855,6 @@ def test_langchain_openai_tools_agent_stream_no_prompts(
             )
 
         tx = events[0]
-
         assert tx["type"] == "transaction"
         assert tx["contexts"]["trace"]["origin"] == "manual"
 
@@ -2035,7 +2017,6 @@ def test_langchain_openai_tools_agent_stream(
             )
 
         tx = next(item.payload for item in items if item.type == "transaction")
-
         assert tx["type"] == "transaction"
         assert tx["contexts"]["trace"]["origin"] == "manual"
 
@@ -2161,7 +2142,6 @@ def test_langchain_openai_tools_agent_stream(
             )
 
         tx = events[0]
-
         assert tx["type"] == "transaction"
         assert tx["contexts"]["trace"]["origin"] == "manual"
 
@@ -2329,7 +2309,6 @@ def test_langchain_openai_tools_agent_stream_with_config(
             )
 
         tx = next(item.payload for item in items if item.type == "transaction")
-
         assert tx["type"] == "transaction"
         assert tx["contexts"]["trace"]["origin"] == "manual"
 
@@ -2356,7 +2335,6 @@ def test_langchain_openai_tools_agent_stream_with_config(
             )
 
         tx = events[0]
-
         assert tx["type"] == "transaction"
         assert tx["contexts"]["trace"]["origin"] == "manual"
 
@@ -2496,10 +2474,8 @@ def test_span_status_error(
 
         (error,) = (item.payload for item in items if item.type == "event")
         assert error["level"] == "error"
-
         spans = [item.payload for item in items if item.type == "span"]
         assert spans[0]["status"] == "error"
-
         (transaction,) = (item.payload for item in items if item.type == "transaction")
     else:
         events = capture_events()
@@ -3105,7 +3081,6 @@ def test_langchain_embeddings_sync(
             for span in spans
             if span["attributes"].get("sentry.op") == "gen_ai.embeddings"
         ]
-
         assert len(embeddings_spans) == 1
 
         embeddings_span = embeddings_spans[0]
@@ -3167,7 +3142,6 @@ def test_langchain_embeddings_sync(
             for span in tx.get("spans", [])
             if span.get("op") == "gen_ai.embeddings"
         ]
-
         assert len(embeddings_spans) == 1
 
         embeddings_span = embeddings_spans[0]
@@ -3252,11 +3226,9 @@ def test_langchain_embeddings_embed_query(
             for span in spans
             if span["attributes"].get("sentry.op") == "gen_ai.embeddings"
         ]
-
         assert len(embeddings_spans) == 1
 
         embeddings_span = embeddings_spans[0]
-
         assert embeddings_span["attributes"]["gen_ai.operation.name"] == "embeddings"
         assert (
             embeddings_span["attributes"]["gen_ai.request.model"]
@@ -3310,11 +3282,9 @@ def test_langchain_embeddings_embed_query(
             for span in tx.get("spans", [])
             if span.get("op") == "gen_ai.embeddings"
         ]
-
         assert len(embeddings_spans) == 1
 
         embeddings_span = embeddings_spans[0]
-
         assert embeddings_span["data"]["gen_ai.operation.name"] == "embeddings"
         assert (
             embeddings_span["data"]["gen_ai.request.model"] == "text-embedding-ada-002"
@@ -3399,7 +3369,6 @@ async def test_langchain_embeddings_async(
             for span in spans
             if span["attributes"].get("sentry.op") == "gen_ai.embeddings"
         ]
-
         assert len(embeddings_spans) == 1
 
         embeddings_span = embeddings_spans[0]
@@ -3465,7 +3434,6 @@ async def test_langchain_embeddings_async(
             for span in tx.get("spans", [])
             if span.get("op") == "gen_ai.embeddings"
         ]
-
         assert len(embeddings_spans) == 1
 
         embeddings_span = embeddings_spans[0]
@@ -3548,7 +3516,6 @@ async def test_langchain_embeddings_aembed_query(
             for span in spans
             if span["attributes"].get("sentry.op") == "gen_ai.embeddings"
         ]
-
         assert len(embeddings_spans) == 1
 
         embeddings_span = embeddings_spans[0]
@@ -3594,7 +3561,6 @@ async def test_langchain_embeddings_aembed_query(
             for span in tx.get("spans", [])
             if span.get("op") == "gen_ai.embeddings"
         ]
-
         assert len(embeddings_spans) == 1
 
         embeddings_span = embeddings_spans[0]
@@ -3660,7 +3626,6 @@ def test_langchain_embeddings_no_model_name(
             for span in spans
             if span["attributes"].get("sentry.op") == "gen_ai.embeddings"
         ]
-
         assert len(embeddings_spans) == 1
 
         embeddings_span = embeddings_spans[0]
@@ -3703,7 +3668,6 @@ def test_langchain_embeddings_no_model_name(
             for span in tx.get("spans", [])
             if span.get("op") == "gen_ai.embeddings"
         ]
-
         assert len(embeddings_spans) == 1
 
         embeddings_span = embeddings_spans[0]
@@ -3841,7 +3805,6 @@ def test_langchain_embeddings_multiple_providers(
             for span in spans
             if span["attributes"].get("sentry.op") == "gen_ai.embeddings"
         ]
-
         # Should have 2 spans, one for each provider
         assert len(embeddings_spans) == 2
 
@@ -3892,7 +3855,6 @@ def test_langchain_embeddings_multiple_providers(
             for span in tx.get("spans", [])
             if span.get("op") == "gen_ai.embeddings"
         ]
-
         # Should have 2 spans, one for each provider
         assert len(embeddings_spans) == 2
 
@@ -3995,7 +3957,6 @@ def test_langchain_embeddings_multiple_calls(
             for span in spans
             if span["attributes"].get("sentry.op") == "gen_ai.embeddings"
         ]
-
         assert len(embeddings_spans) == 3
 
         # Verify all spans have proper data
@@ -4050,7 +4011,6 @@ def test_langchain_embeddings_multiple_calls(
             for span in tx.get("spans", [])
             if span.get("op") == "gen_ai.embeddings"
         ]
-
         assert len(embeddings_spans) == 3
 
         # Verify all spans have proper data
@@ -4114,9 +4074,7 @@ def test_langchain_embeddings_span_hierarchy(
             for span in spans
             if span["attributes"].get("sentry.op") == "gen_ai.embeddings"
         ]
-
         tx = next(item.payload for item in items if item.type == "transaction")
-
         custom_spans = [
             span for span in tx.get("spans", []) if span.get("op") == "custom"
         ]
@@ -4161,7 +4119,6 @@ def test_langchain_embeddings_span_hierarchy(
             for span in tx.get("spans", [])
             if span.get("op") == "gen_ai.embeddings"
         ]
-
         custom_spans = [
             span for span in tx.get("spans", []) if span.get("op") == "custom"
         ]
@@ -4231,7 +4188,6 @@ def test_langchain_embeddings_with_list_and_string_inputs(
             for span in spans
             if span["attributes"].get("sentry.op") == "gen_ai.embeddings"
         ]
-
         assert len(embeddings_spans) == 2
 
         # Both should have input data captured as lists
@@ -4283,7 +4239,6 @@ def test_langchain_embeddings_with_list_and_string_inputs(
             for span in tx.get("spans", [])
             if span.get("op") == "gen_ai.embeddings"
         ]
-
         assert len(embeddings_spans) == 2
 
         # Both should have input data captured as lists
@@ -4353,11 +4308,9 @@ def test_langchain_response_model_extraction(
             for span in spans
             if span["attributes"].get("sentry.op") == "gen_ai.text_completion"
         ]
-
         assert len(llm_spans) > 0
 
         llm_span = llm_spans[0]
-
         assert llm_span["attributes"]["gen_ai.operation.name"] == "text_completion"
 
         if expected_model is not None:
@@ -4396,11 +4349,9 @@ def test_langchain_response_model_extraction(
             for span in tx.get("spans", [])
             if span.get("op") == "gen_ai.text_completion"
         ]
-
         assert len(llm_spans) > 0
 
         llm_span = llm_spans[0]
-
         assert llm_span["data"]["gen_ai.operation.name"] == "text_completion"
 
         if expected_model is not None:

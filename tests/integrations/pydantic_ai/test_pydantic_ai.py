@@ -95,7 +95,6 @@ async def test_agent_run_async(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-
         assert len(chat_spans) >= 1
 
         # Check chat span
@@ -126,7 +125,6 @@ async def test_agent_run_async(
 
         # Find child span types (invoke_agent is the transaction, not a child span)
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
-
         assert len(chat_spans) >= 1
 
         # Check chat span
@@ -282,8 +280,6 @@ def test_agent_run_sync(
         assert result is not None
         assert result.output is not None
 
-        spans = [item.payload for item in items if item.type == "span"]
-
         # Verify transaction
         (transaction,) = (item.payload for item in items if item.type == "transaction")
 
@@ -292,10 +288,10 @@ def test_agent_run_sync(
         assert transaction["contexts"]["trace"]["origin"] == "auto.ai.pydantic_ai"
 
         # Find span types
+        spans = [item.payload for item in items if item.type == "span"]
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-
         assert len(chat_spans) >= 1
 
         # Verify streaming flag is False for sync
@@ -318,7 +314,6 @@ def test_agent_run_sync(
 
         # Find span types
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
-
         assert len(chat_spans) >= 1
 
         # Verify streaming flag is False for sync
@@ -404,8 +399,6 @@ async def test_agent_run_stream(
             async for _ in result.stream_output():
                 pass
 
-        spans = [item.payload for item in items if item.type == "span"]
-
         # Verify transaction
         (transaction,) = (item.payload for item in items if item.type == "transaction")
 
@@ -414,10 +407,10 @@ async def test_agent_run_stream(
         assert transaction["contexts"]["trace"]["origin"] == "auto.ai.pydantic_ai"
 
         # Find chat spans
+        spans = [item.payload for item in items if item.type == "span"]
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-
         assert len(chat_spans) >= 1
 
         # Verify streaming flag is True for streaming
@@ -447,7 +440,6 @@ async def test_agent_run_stream(
 
         # Find chat spans
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
-
         assert len(chat_spans) >= 1
 
         # Verify streaming flag is True for streaming
@@ -501,7 +493,6 @@ async def test_agent_run_stream_events(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-
         assert len(chat_spans) >= 1
 
         # run_stream_events uses run() internally, so streaming should be False
@@ -521,7 +512,6 @@ async def test_agent_run_stream_events(
         # Find chat spans
         spans = transaction["spans"]
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
-
         assert len(chat_spans) >= 1
 
         # run_stream_events uses run() internally, so streaming should be False
@@ -1082,7 +1072,6 @@ async def test_system_prompt_attribute(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-
         assert len(chat_spans) >= 1
 
         chat_span = chat_spans[0]
@@ -1109,7 +1098,6 @@ async def test_system_prompt_attribute(
 
         # The transaction IS the invoke_agent span, check for messages in chat spans instead
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
-
         assert len(chat_spans) >= 1
 
         chat_span = chat_spans[0]
@@ -1332,7 +1320,6 @@ async def test_multiple_agents_concurrent(
         results = await asyncio.gather(*[run_agent(f"Input {i}") for i in range(3)])
 
         assert len(results) == 3
-
         assert len(events) == 3
 
         # Verify each transaction is separate
@@ -1393,7 +1380,6 @@ async def test_message_history(
         # Check the second transaction has the full history
         second_transaction = events[1]
         spans = second_transaction["spans"]
-
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
@@ -1418,7 +1404,6 @@ async def test_message_history(
         # Check the second transaction has the full history
         second_transaction = events[1]
         spans = second_transaction["spans"]
-
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
 
         if chat_spans:
@@ -2160,7 +2145,6 @@ async def test_invoke_agent_with_instructions(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-
         assert len(chat_spans) >= 1
 
         chat_span = chat_spans[0]
@@ -2186,7 +2170,6 @@ async def test_invoke_agent_with_instructions(
 
         # The transaction IS the invoke_agent span, check for messages in chat spans instead
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
-
         assert len(chat_spans) >= 1
 
         chat_span = chat_spans[0]
@@ -2378,7 +2361,7 @@ async def test_agent_data_from_scope(
         # Verify agent name is capture
         (transaction,) = events
 
-        # Verify agent name is captured
+    # Verify agent name is captured
     assert transaction["transaction"] == "invoke_agent test_scope_agent"
 
 
@@ -3917,7 +3900,6 @@ async def test_binary_content_in_agent_run(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-
         assert len(chat_spans) >= 1
 
         chat_span = chat_spans[0]
@@ -3934,7 +3916,6 @@ async def test_binary_content_in_agent_run(
 
         (transaction,) = events
         chat_spans = [s for s in transaction["spans"] if s["op"] == "gen_ai.chat"]
-
         assert len(chat_spans) >= 1
 
         chat_span = chat_spans[0]

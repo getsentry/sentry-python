@@ -688,7 +688,6 @@ def test_embeddings_create(
 
             # Response is processed by litellm, so just check it exists
             assert response is not None
-
             spans = [item.payload for item in items if item.type == "span"]
             spans = list(
                 x
@@ -710,7 +709,6 @@ def test_embeddings_create(
             )
             # Check that embeddings input is captured (it's JSON serialized)
             embeddings_input = span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
-
             assert json.loads(embeddings_input) == ["Hello, world!"]
     else:
         events = capture_events()
@@ -731,7 +729,6 @@ def test_embeddings_create(
 
             # Response is processed by litellm, so just check it exists
             assert response is not None
-
             assert len(events) == 1
             (event,) = events
 
@@ -808,7 +805,6 @@ async def test_async_embeddings_create(
 
             # Response is processed by litellm, so just check it exists
             assert response is not None
-
             spans = [item.payload for item in items if item.type == "span"]
             spans = list(
                 x
@@ -816,7 +812,6 @@ async def test_async_embeddings_create(
                 if x["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
                 and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
             )
-
             assert len(spans) == 1
             span = spans[0]
 
@@ -852,7 +847,6 @@ async def test_async_embeddings_create(
 
             # Response is processed by litellm, so just check it exists
             assert response is not None
-
             assert len(events) == 1
             (event,) = events
 
@@ -930,7 +924,6 @@ def test_embeddings_create_with_list_input(
                 if x["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
                 and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
             )
-
             assert len(spans) == 1
             span = spans[0]
 
@@ -963,7 +956,6 @@ def test_embeddings_create_with_list_input(
 
             # Response is processed by litellm, so just check it exists
             assert response is not None
-
             assert len(events) == 1
             (event,) = events
 
@@ -1034,7 +1026,6 @@ async def test_async_embeddings_create_with_list_input(
 
             # Response is processed by litellm, so just check it exists
             assert response is not None
-
             spans = [item.payload for item in items if item.type == "span"]
             spans = list(
                 x
@@ -1042,7 +1033,6 @@ async def test_async_embeddings_create_with_list_input(
                 if x["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
                 and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
             )
-
             assert len(spans) == 1
             span = spans[0]
 
@@ -1076,7 +1066,6 @@ async def test_async_embeddings_create_with_list_input(
 
             # Response is processed by litellm, so just check it exists
             assert response is not None
-
             assert len(events) == 1
             (event,) = events
 
@@ -1145,7 +1134,6 @@ def test_embeddings_no_pii(
 
             # Response is processed by litellm, so just check it exists
             assert response is not None
-
             spans = [item.payload for item in items if item.type == "span"]
             spans = list(
                 x
@@ -1153,7 +1141,6 @@ def test_embeddings_no_pii(
                 if x["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
                 and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
             )
-
             assert len(spans) == 1
             span = spans[0]
 
@@ -1179,7 +1166,6 @@ def test_embeddings_no_pii(
 
             # Response is processed by litellm, so just check it exists
             assert response is not None
-
             assert len(events) == 1
             (event,) = events
 
@@ -1251,7 +1237,6 @@ async def test_async_embeddings_no_pii(
                 if x["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
                 and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
             )
-
             assert len(spans) == 1
             span = spans[0]
 
@@ -1278,7 +1263,6 @@ async def test_async_embeddings_no_pii(
 
             # Response is processed by litellm, so just check it exists
             assert response is not None
-
             assert len(events) == 1
             (event,) = events
 
@@ -2341,14 +2325,20 @@ def test_integration_setup(sentry_init):
     assert _failure_callback in (litellm.failure_callback or [])
 
 
-def test_litellm_message_truncation(sentry_init, capture_events):
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_litellm_message_truncation(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+):
     """Test that large messages are truncated properly in LiteLLM integration."""
     sentry_init(
         integrations=[LiteLLMIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
 
     large_content = (
         "This is a very long message that will exceed our size limits. " * 1000
@@ -2362,39 +2352,78 @@ def test_litellm_message_truncation(sentry_init, capture_events):
     ]
     mock_response = MockCompletionResponse()
 
-    with start_transaction(name="litellm test"):
-        kwargs = {
-            "model": "gpt-3.5-turbo",
-            "messages": messages,
-        }
+    if stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
 
-        _input_callback(kwargs)
-        _success_callback(
-            kwargs,
-            mock_response,
-            datetime.now(),
-            datetime.now(),
-        )
+        with start_transaction(name="litellm test"):
+            kwargs = {
+                "model": "gpt-3.5-turbo",
+                "messages": messages,
+            }
 
-    assert len(events) > 0
-    tx = events[0]
-    assert tx["type"] == "transaction"
+            _input_callback(kwargs)
+            _success_callback(
+                kwargs,
+                mock_response,
+                datetime.now(),
+                datetime.now(),
+            )
 
-    chat_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == OP.GEN_AI_CHAT
-    ]
-    assert len(chat_spans) > 0
+        spans = [item.payload for item in items if item.type == "span"]
+        chat_spans = [
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        ]
+        assert len(chat_spans) > 0
 
-    chat_span = chat_spans[0]
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["data"]
+        chat_span = chat_spans[0]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["attributes"]
 
-    messages_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-    assert isinstance(messages_data, str)
+        messages_data = chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert isinstance(messages_data, str)
 
-    parsed_messages = json.loads(messages_data)
-    assert isinstance(parsed_messages, list)
-    assert len(parsed_messages) == 1
-    assert "small message 5" in str(parsed_messages[0])
+        parsed_messages = json.loads(messages_data)
+        assert isinstance(parsed_messages, list)
+        assert len(parsed_messages) == 1
+        assert "small message 5" in str(parsed_messages[0])
+        tx = next(item.payload for item in items if item.type == "transaction")
+    else:
+        events = capture_events()
+
+        with start_transaction(name="litellm test"):
+            kwargs = {
+                "model": "gpt-3.5-turbo",
+                "messages": messages,
+            }
+
+            _input_callback(kwargs)
+            _success_callback(
+                kwargs,
+                mock_response,
+                datetime.now(),
+                datetime.now(),
+            )
+
+        assert len(events) > 0
+        tx = events[0]
+        assert tx["type"] == "transaction"
+
+        chat_spans = [
+            span for span in tx.get("spans", []) if span.get("op") == OP.GEN_AI_CHAT
+        ]
+        assert len(chat_spans) > 0
+
+        chat_span = chat_spans[0]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["data"]
+
+        messages_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert isinstance(messages_data, str)
+
+        parsed_messages = json.loads(messages_data)
+        assert isinstance(parsed_messages, list)
+        assert len(parsed_messages) == 1
+        assert "small message 5" in str(parsed_messages[0])
     assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
 
 
@@ -2827,7 +2856,6 @@ async def test_async_binary_content_encoding_mixed_content(
             if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
             and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
         )
-
         assert len(chat_spans) == 1
         span = chat_spans[0]
         messages_data = json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
@@ -2855,7 +2883,6 @@ async def test_async_binary_content_encoding_mixed_content(
             for x in event["spans"]
             if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
         )
-
         assert len(chat_spans) == 1
         span = chat_spans[0]
         messages_data = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
@@ -2936,7 +2963,6 @@ def test_binary_content_encoding_uri_type(
             if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
             and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
         )
-
         assert len(chat_spans) == 1
         span = chat_spans[0]
 
