@@ -102,7 +102,6 @@ def expected_error(integrations):
             "user": {
                 "id": "123",
                 "email": "jane.doe@example.com",
-                "ip_address": "[Filtered]",
             },
             "transaction": "test_transaction",
             "transaction_info": {"source": "custom"},
@@ -137,7 +136,6 @@ def expected_error(integrations):
             },
             "platform": "python",
             "_meta": {
-                "user": {"ip_address": {"": {"rem": [["!config", "s"]]}}},
                 "extra": {
                     "should_be_removed_by_event_scrubber": {
                         "": {"rem": [["!config", "s"]]}
@@ -207,7 +205,6 @@ def expected_transaction(integrations):
             "user": {
                 "id": "123",
                 "email": "jane.doe@example.com",
-                "ip_address": "[Filtered]",
             },
             "extra": {
                 "extra1": "extra1_value",
@@ -226,7 +223,6 @@ def expected_transaction(integrations):
             },
             "platform": "python",
             "_meta": {
-                "user": {"ip_address": {"": {"rem": [["!config", "s"]]}}},
                 "extra": {
                     "should_be_removed_by_event_scrubber": {
                         "": {"rem": [["!config", "s"]]}
