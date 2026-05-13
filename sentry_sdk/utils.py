@@ -76,8 +76,8 @@ if TYPE_CHECKING:
         Log,
         Metric,
         SerializedAttributeValue,
+        SpanJSON,
     )
-    from sentry_sdk.traces import StreamedSpan
 
     P = ParamSpec("P")
     R = TypeVar("R")
@@ -2114,7 +2114,7 @@ def get_before_send_metric(
 
 def get_before_send_span(
     options: "Optional[dict[str, Any]]",
-) -> "Optional[Callable[[StreamedSpan, Hint], Optional[StreamedSpan]]]":
+) -> "Optional[Callable[[SpanJSON, Hint], Optional[SpanJSON]]]":
     if options is None:
         return None
 
