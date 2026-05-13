@@ -186,7 +186,6 @@ def test_state_graph_compile(
             for span in spans
             if span["attributes"]["sentry.op"] == OP.GEN_AI_CREATE_AGENT
         ]
-
         assert len(agent_spans) == 1
         agent_span = agent_spans[0]
 
@@ -200,7 +199,6 @@ def test_state_graph_compile(
         assert SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS in agent_span["attributes"]
 
         tools_data = agent_span["attributes"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
-
         assert tools_data == ["search_tool", "calculator"]
         assert len(tools_data) == 2
         assert "search_tool" in tools_data
@@ -223,7 +221,6 @@ def test_state_graph_compile(
         agent_spans = [
             span for span in tx["spans"] if span["op"] == OP.GEN_AI_CREATE_AGENT
         ]
-
         assert len(agent_spans) == 1
         agent_span = agent_spans[0]
 
@@ -312,11 +309,9 @@ def test_pregel_invoke(
             for span in spans
             if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
 
         invoke_span = invoke_spans[0]
-
         assert invoke_span["name"] == "invoke_agent test_graph"
         assert invoke_span["attributes"]["sentry.origin"] == "auto.ai.langgraph"
         assert (
@@ -381,11 +376,9 @@ def test_pregel_invoke(
         invoke_spans = [
             span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
 
         invoke_span = invoke_spans[0]
-
         assert invoke_span["description"] == "invoke_agent test_graph"
         assert invoke_span["origin"] == "auto.ai.langgraph"
         assert invoke_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "invoke_agent"
@@ -494,11 +487,9 @@ def test_pregel_ainvoke(
             for span in spans
             if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
 
         invoke_span = invoke_spans[0]
-
         assert invoke_span["name"] == "invoke_agent async_graph"
         assert invoke_span["attributes"]["sentry.origin"] == "auto.ai.langgraph"
         assert (
@@ -549,11 +540,9 @@ def test_pregel_ainvoke(
         invoke_spans = [
             span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
 
         invoke_span = invoke_spans[0]
-
         assert invoke_span["description"] == "invoke_agent async_graph"
         assert invoke_span["origin"] == "auto.ai.langgraph"
         assert invoke_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "invoke_agent"
@@ -622,7 +611,6 @@ def test_pregel_invoke_error(
             for span in spans
             if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
 
         invoke_span = invoke_spans[0]
@@ -640,7 +628,6 @@ def test_pregel_invoke_error(
         invoke_spans = [
             span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
 
         invoke_span = invoke_spans[0]
@@ -687,7 +674,6 @@ def test_pregel_ainvoke_error(
             for span in spans
             if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
 
         invoke_span = invoke_spans[0]
@@ -701,7 +687,6 @@ def test_pregel_ainvoke_error(
         invoke_spans = [
             span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
 
         invoke_span = invoke_spans[0]
@@ -797,7 +782,6 @@ def test_pregel_invoke_with_different_graph_names(
             for span in spans
             if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
 
         invoke_span = invoke_spans[0]
@@ -825,7 +809,6 @@ def test_pregel_invoke_with_different_graph_names(
         invoke_spans = [
             span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
 
         invoke_span = invoke_spans[0]
@@ -909,7 +892,6 @@ def test_pregel_invoke_span_includes_usage_data(
             for span in spans
             if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
 
         invoke_agent_span = invoke_spans[0]
@@ -939,7 +921,6 @@ def test_pregel_invoke_span_includes_usage_data(
         invoke_spans = [
             span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
 
         invoke_agent_span = invoke_spans[0]
@@ -1028,7 +1009,6 @@ def test_pregel_ainvoke_span_includes_usage_data(
             for span in spans
             if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
 
         invoke_agent_span = invoke_spans[0]
@@ -1055,7 +1035,6 @@ def test_pregel_ainvoke_span_includes_usage_data(
         invoke_spans = [
             span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
 
         invoke_agent_span = invoke_spans[0]
@@ -1152,7 +1131,6 @@ def test_pregel_invoke_multiple_llm_calls_aggregate_usage(
             for span in spans
             if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
         invoke_agent_span = invoke_spans[0]
 
@@ -1176,7 +1154,6 @@ def test_pregel_invoke_multiple_llm_calls_aggregate_usage(
         invoke_spans = [
             span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
         invoke_agent_span = invoke_spans[0]
 
@@ -1270,7 +1247,6 @@ def test_pregel_ainvoke_multiple_llm_calls_aggregate_usage(
             for span in spans
             if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
         invoke_agent_span = invoke_spans[0]
 
@@ -1291,7 +1267,6 @@ def test_pregel_ainvoke_multiple_llm_calls_aggregate_usage(
         invoke_spans = [
             span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
         invoke_agent_span = invoke_spans[0]
 
@@ -1371,7 +1346,6 @@ def test_pregel_invoke_span_includes_response_model(
             for span in spans
             if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
 
         invoke_agent_span = invoke_spans[0]
@@ -1398,7 +1372,6 @@ def test_pregel_invoke_span_includes_response_model(
         invoke_spans = [
             span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
 
         invoke_agent_span = invoke_spans[0]
@@ -1483,7 +1456,6 @@ def test_pregel_ainvoke_span_includes_response_model(
             for span in spans
             if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
 
         invoke_agent_span = invoke_spans[0]
@@ -1507,7 +1479,6 @@ def test_pregel_ainvoke_span_includes_response_model(
         invoke_spans = [
             span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
 
         invoke_agent_span = invoke_spans[0]
@@ -1602,7 +1573,6 @@ def test_pregel_invoke_span_uses_last_response_model(
             for span in spans
             if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
 
         invoke_agent_span = invoke_spans[0]
@@ -1628,7 +1598,6 @@ def test_pregel_invoke_span_uses_last_response_model(
         invoke_spans = [
             span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
 
         invoke_agent_span = invoke_spans[0]
@@ -1725,7 +1694,6 @@ def test_pregel_ainvoke_span_uses_last_response_model(
             for span in spans
             if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
 
         invoke_agent_span = invoke_spans[0]
@@ -1748,7 +1716,6 @@ def test_pregel_ainvoke_span_uses_last_response_model(
         invoke_spans = [
             span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
 
         invoke_agent_span = invoke_spans[0]
@@ -1870,7 +1837,6 @@ def test_extraction_functions_complex_scenario(
             for span in spans
             if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
 
         invoke_span = invoke_spans[0]
@@ -1895,7 +1861,6 @@ def test_extraction_functions_complex_scenario(
         invoke_spans = [
             span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
         ]
-
         assert len(invoke_spans) == 1
 
         invoke_span = invoke_spans[0]

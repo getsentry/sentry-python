@@ -427,7 +427,6 @@ def test_generate_content_with_tools(
         tools_data_str = invoke_span["attributes"][
             SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS
         ]
-
         # Parse the JSON string to verify content
         tools_data = json.loads(tools_data_str)
         assert len(tools_data) == 2
@@ -452,7 +451,6 @@ def test_generate_content_with_tools(
 
         # Check that tools are recorded (data is serialized as a string)
         tools_data_str = invoke_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
-
         # Parse the JSON string to verify content
         tools_data = json.loads(tools_data_str)
         assert len(tools_data) == 2
@@ -701,14 +699,10 @@ def test_streaming_generate_content(
         # Verify accumulated response text (all chunks combined)
         expected_full_text = "Hello! How can I help you today?"
         # Response text is stored as a JSON string
-        if stream_gen_ai_spans:
-            chat_response_text = json.loads(
-                chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-            )
-        else:
-            chat_response_text = json.loads(
-                chat_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-            )
+        chat_response_text = json.loads(
+            chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        )
+
         assert chat_response_text == [expected_full_text]
 
         # Verify finish reasons (only the final chunk has a finish reason)
@@ -762,14 +756,9 @@ def test_streaming_generate_content(
         # Verify accumulated response text (all chunks combined)
         expected_full_text = "Hello! How can I help you today?"
         # Response text is stored as a JSON string
-        if stream_gen_ai_spans:
-            chat_response_text = json.loads(
-                chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-            )
-        else:
-            chat_response_text = json.loads(
-                chat_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-            )
+        chat_response_text = json.loads(
+            chat_span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        )
         assert chat_response_text == [expected_full_text]
 
         # Verify finish reasons (only the final chunk has a finish reason)
@@ -1592,7 +1581,6 @@ def test_embed_content(
         (event,) = events
 
         assert event["type"] == "transaction"
-
         assert event["transaction"] == "google_genai_embeddings"
 
         # Should have 1 span for embeddings
@@ -1697,7 +1685,6 @@ def test_embed_content_string_input(
 
         # Check that single string is handled correctly
         input_texts = json.loads(embed_span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT])
-
         assert input_texts == ["Single text input"]
         # Should use token_count from statistics (5), not billable_character_count (10)
         # Note: Only available in newer versions with ContentEmbeddingStatistics
@@ -2064,7 +2051,6 @@ async def test_async_embed_content_string_input(
         input_texts = json.loads(
             embed_span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
         )
-
         assert input_texts == ["Single text input"]
         # Should use token_count from statistics (5), not billable_character_count (10)
         # Note: Only available in newer versions with ContentEmbeddingStatistics
@@ -2088,7 +2074,6 @@ async def test_async_embed_content_string_input(
 
         # Check that single string is handled correctly
         input_texts = json.loads(embed_span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT])
-
         assert input_texts == ["Single text input"]
         # Should use token_count from statistics (5), not billable_character_count (10)
         # Note: Only available in newer versions with ContentEmbeddingStatistics

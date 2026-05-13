@@ -688,7 +688,6 @@ def test_embeddings_create(
 
             # Response is processed by litellm, so just check it exists
             assert response is not None
-
             spans = [item.payload for item in items if item.type == "span"]
             spans = list(
                 x
@@ -710,7 +709,6 @@ def test_embeddings_create(
             )
             # Check that embeddings input is captured (it's JSON serialized)
             embeddings_input = span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
-
             assert json.loads(embeddings_input) == ["Hello, world!"]
     else:
         events = capture_events()
@@ -731,7 +729,6 @@ def test_embeddings_create(
 
             # Response is processed by litellm, so just check it exists
             assert response is not None
-
             assert len(events) == 1
             (event,) = events
 
@@ -808,7 +805,6 @@ async def test_async_embeddings_create(
 
             # Response is processed by litellm, so just check it exists
             assert response is not None
-
             spans = [item.payload for item in items if item.type == "span"]
             spans = list(
                 x
@@ -816,7 +812,6 @@ async def test_async_embeddings_create(
                 if x["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
                 and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
             )
-
             assert len(spans) == 1
             span = spans[0]
 
@@ -852,7 +847,6 @@ async def test_async_embeddings_create(
 
             # Response is processed by litellm, so just check it exists
             assert response is not None
-
             assert len(events) == 1
             (event,) = events
 
@@ -930,7 +924,6 @@ def test_embeddings_create_with_list_input(
                 if x["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
                 and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
             )
-
             assert len(spans) == 1
             span = spans[0]
 
@@ -963,7 +956,6 @@ def test_embeddings_create_with_list_input(
 
             # Response is processed by litellm, so just check it exists
             assert response is not None
-
             assert len(events) == 1
             (event,) = events
 
@@ -1034,7 +1026,6 @@ async def test_async_embeddings_create_with_list_input(
 
             # Response is processed by litellm, so just check it exists
             assert response is not None
-
             spans = [item.payload for item in items if item.type == "span"]
             spans = list(
                 x
@@ -1042,7 +1033,6 @@ async def test_async_embeddings_create_with_list_input(
                 if x["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
                 and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
             )
-
             assert len(spans) == 1
             span = spans[0]
 
@@ -1076,7 +1066,6 @@ async def test_async_embeddings_create_with_list_input(
 
             # Response is processed by litellm, so just check it exists
             assert response is not None
-
             assert len(events) == 1
             (event,) = events
 
@@ -1145,7 +1134,6 @@ def test_embeddings_no_pii(
 
             # Response is processed by litellm, so just check it exists
             assert response is not None
-
             spans = [item.payload for item in items if item.type == "span"]
             spans = list(
                 x
@@ -1153,7 +1141,6 @@ def test_embeddings_no_pii(
                 if x["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
                 and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
             )
-
             assert len(spans) == 1
             span = spans[0]
 
@@ -1179,7 +1166,6 @@ def test_embeddings_no_pii(
 
             # Response is processed by litellm, so just check it exists
             assert response is not None
-
             assert len(events) == 1
             (event,) = events
 
@@ -1251,7 +1237,6 @@ async def test_async_embeddings_no_pii(
                 if x["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
                 and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
             )
-
             assert len(spans) == 1
             span = spans[0]
 
@@ -1278,7 +1263,6 @@ async def test_async_embeddings_no_pii(
 
             # Response is processed by litellm, so just check it exists
             assert response is not None
-
             assert len(events) == 1
             (event,) = events
 
@@ -2391,7 +2375,6 @@ def test_litellm_message_truncation(
             for span in spans
             if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
         ]
-
         assert len(chat_spans) > 0
 
         chat_span = chat_spans[0]
@@ -2873,7 +2856,6 @@ async def test_async_binary_content_encoding_mixed_content(
             if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
             and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
         )
-
         assert len(chat_spans) == 1
         span = chat_spans[0]
         messages_data = json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
@@ -2901,7 +2883,6 @@ async def test_async_binary_content_encoding_mixed_content(
             for x in event["spans"]
             if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
         )
-
         assert len(chat_spans) == 1
         span = chat_spans[0]
         messages_data = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
@@ -2982,10 +2963,8 @@ def test_binary_content_encoding_uri_type(
             if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
             and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
         )
-
         assert len(chat_spans) == 1
         span = chat_spans[0]
-
         messages_data = json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
     else:
         events = capture_events()
@@ -3010,10 +2989,8 @@ def test_binary_content_encoding_uri_type(
             for x in event["spans"]
             if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
         )
-
         assert len(chat_spans) == 1
         span = chat_spans[0]
-
         messages_data = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     uri_item = next(
@@ -3101,10 +3078,8 @@ async def test_async_binary_content_encoding_uri_type(
             if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
             and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
         )
-
         assert len(chat_spans) == 1
         span = chat_spans[0]
-
         messages_data = json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
     else:
         events = capture_events()
@@ -3130,10 +3105,8 @@ async def test_async_binary_content_encoding_uri_type(
             for x in event["spans"]
             if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
         )
-
         assert len(chat_spans) == 1
         span = chat_spans[0]
-
         messages_data = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     uri_item = next(

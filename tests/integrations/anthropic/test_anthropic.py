@@ -3675,7 +3675,6 @@ def test_anthropic_message_truncation(
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in chat_span["attributes"]
 
         messages_data = chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-
         assert isinstance(messages_data, str)
 
         parsed_messages = json.loads(messages_data)
@@ -3760,7 +3759,6 @@ async def test_anthropic_message_truncation_async(
             for span in spans
             if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
         ]
-
         assert len(chat_spans) > 0
 
         chat_span = chat_spans[0]
@@ -3794,7 +3792,6 @@ async def test_anthropic_message_truncation_async(
         chat_spans = [
             span for span in tx.get("spans", []) if span.get("op") == OP.GEN_AI_CHAT
         ]
-
         assert len(chat_spans) > 0
 
         chat_span = chat_spans[0]
