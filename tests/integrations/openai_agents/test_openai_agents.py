@@ -332,6 +332,7 @@ async def test_agent_invocation_span_no_pii(
                     "content": "You are a helpful assistant.",
                 },
                 {
+                    "type": "message",
                     "role": "user",
                     "content": "Message demonstrating the absence of truncation.",
                 },
@@ -374,6 +375,7 @@ async def test_agent_invocation_span_no_pii(
                     ],
                 },
                 {
+                    "type": "message",
                     "role": "user",
                     "content": "Message demonstrating the absence of truncation.",
                 },
