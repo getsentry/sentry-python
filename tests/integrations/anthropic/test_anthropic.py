@@ -112,8 +112,12 @@ def test_nonstreaming_create_message(
     messages = [
         {
             "role": "user",
+            "content": "Message demonstrating the absence of truncation.",
+        },
+        {
+            "role": "user",
             "content": "Hello, Claude",
-        }
+        },
     ]
 
     if stream_gen_ai_spans:
@@ -144,10 +148,16 @@ def test_nonstreaming_create_message(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
         if send_default_pii and include_prompts:
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                == '[{"role": "user", "content": "Hello, Claude"}]'
-            )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {
+                    "role": "user",
+                    "content": "Hello, Claude",
+                },
+            ]
             assert (
                 span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
             )
@@ -247,8 +257,12 @@ async def test_nonstreaming_create_message_async(
     messages = [
         {
             "role": "user",
+            "content": "Message demonstrating the absence of truncation.",
+        },
+        {
+            "role": "user",
             "content": "Hello, Claude",
-        }
+        },
     ]
 
     if stream_gen_ai_spans:
@@ -279,10 +293,16 @@ async def test_nonstreaming_create_message_async(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
         if send_default_pii and include_prompts:
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                == '[{"role": "user", "content": "Hello, Claude"}]'
-            )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {
+                    "role": "user",
+                    "content": "Hello, Claude",
+                },
+            ]
             assert (
                 span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
             )
@@ -415,8 +435,12 @@ def test_streaming_create_message(
     messages = [
         {
             "role": "user",
+            "content": "Message demonstrating the absence of truncation.",
+        },
+        {
+            "role": "user",
             "content": "Hello, Claude",
-        }
+        },
     ]
 
     if stream_gen_ai_spans:
@@ -449,10 +473,16 @@ def test_streaming_create_message(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
         if send_default_pii and include_prompts:
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                == '[{"role": "user", "content": "Hello, Claude"}]'
-            )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {
+                    "role": "user",
+                    "content": "Hello, Claude",
+                },
+            ]
             assert (
                 span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
             )
@@ -897,8 +927,12 @@ def test_stream_messages(
     messages = [
         {
             "role": "user",
+            "content": "Message demonstrating the absence of truncation.",
+        },
+        {
+            "role": "user",
             "content": "Hello, Claude",
-        }
+        },
     ]
 
     if stream_gen_ai_spans:
@@ -931,10 +965,16 @@ def test_stream_messages(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
         if send_default_pii and include_prompts:
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                == '[{"role": "user", "content": "Hello, Claude"}]'
-            )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {
+                    "role": "user",
+                    "content": "Hello, Claude",
+                },
+            ]
             assert (
                 span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
             )
@@ -1392,8 +1432,12 @@ async def test_streaming_create_message_async(
     messages = [
         {
             "role": "user",
+            "content": "Message demonstrating the absence of truncation.",
+        },
+        {
+            "role": "user",
             "content": "Hello, Claude",
-        }
+        },
     ]
 
     if stream_gen_ai_spans:
@@ -1425,10 +1469,16 @@ async def test_streaming_create_message_async(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
         if send_default_pii and include_prompts:
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                == '[{"role": "user", "content": "Hello, Claude"}]'
-            )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {
+                    "role": "user",
+                    "content": "Hello, Claude",
+                },
+            ]
             assert (
                 span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
             )
@@ -1885,8 +1935,12 @@ async def test_stream_message_async(
     messages = [
         {
             "role": "user",
+            "content": "Message demonstrating the absence of truncation.",
+        },
+        {
+            "role": "user",
             "content": "Hello, Claude",
-        }
+        },
     ]
 
     if stream_gen_ai_spans:
@@ -1919,10 +1973,16 @@ async def test_stream_message_async(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
 
         if send_default_pii and include_prompts:
-            assert (
-                span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-                == '[{"role": "user", "content": "Hello, Claude"}]'
-            )
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {
+                    "role": "user",
+                    "content": "Hello, Claude",
+                },
+            ]
             assert (
                 span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
             )

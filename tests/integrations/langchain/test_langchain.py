@@ -577,6 +577,9 @@ def test_langchain_create_agent(
             agent.invoke(
                 {
                     "messages": [
+                        HumanMessage(
+                            content="Message demonstrating the absence of truncation."
+                        ),
                         HumanMessage(content="How many letters in the word eudca"),
                     ],
                 },
@@ -605,6 +608,19 @@ def test_langchain_create_agent(
                 chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
                 == "Hello, how can I help you?"
             )
+
+            assert json.loads(
+                chat_spans[0]["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            ) == [
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {
+                    "role": "user",
+                    "content": "How many letters in the word eudca",
+                },
+            ]
 
             param_id = request.node.callspec.id
             if "string" in param_id:
@@ -1343,7 +1359,16 @@ def test_langchain_openai_tools_agent(
             "send",
             side_effect=[tool_response, final_response],
         ) as _, start_transaction():
-            list(agent_executor.stream({"input": "How many letters in the word eudca"}))
+            list(
+                agent_executor.stream(
+                    {
+                        "input": [
+                            "Message demonstrating the absence of truncation.",
+                            "How many letters in the word eudca",
+                        ]
+                    }
+                )
+            )
 
         tx = next(item.payload for item in items if item.type == "transaction")
         assert tx["type"] == "transaction"
@@ -1388,6 +1413,15 @@ def test_langchain_openai_tools_agent(
         assert "5" in chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
         assert "word" in tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_INPUT]
         assert 5 == int(tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_OUTPUT])
+
+        assert json.loads(
+            chat_spans[0]["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        ) == [
+            {
+                "role": "user",
+                "content": "['Message demonstrating the absence of truncation.', 'How many letters in the word eudca']",
+            }
+        ]
 
         param_id = request.node.callspec.id
         if "string" in param_id:
@@ -2011,7 +2045,12 @@ def test_langchain_openai_tools_agent_stream(
         ) as _, start_transaction():
             list(
                 agent_executor.stream(
-                    {"input": "How many letters in the word eudca"},
+                    {
+                        "input": [
+                            "Message demonstrating the absence of truncation.",
+                            "How many letters in the word eudca",
+                        ]
+                    },
                     {"run_name": "my-snazzy-pipeline"},
                 )
             )
@@ -2064,6 +2103,15 @@ def test_langchain_openai_tools_agent_stream(
         assert "5" in chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
         assert "word" in tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_INPUT]
         assert 5 == int(tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_OUTPUT])
+
+        assert json.loads(
+            chat_spans[0]["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        ) == [
+            {
+                "role": "user",
+                "content": "['Message demonstrating the absence of truncation.', 'How many letters in the word eudca']",
+            }
+        ]
 
         param_id = request.node.callspec.id
         if "string" in param_id:

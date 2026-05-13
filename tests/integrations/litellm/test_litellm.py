@@ -159,7 +159,10 @@ def test_nonstreaming_chat_completion(
         stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
-    messages = [{"role": "user", "content": "Hello!"}]
+    messages = [
+        {"role": "user", "content": "Message demonstrating the absence of truncation."},
+        {"role": "user", "content": "Hello!"},
+    ]
 
     client = OpenAI(api_key="test-key")
 
@@ -216,7 +219,13 @@ def test_nonstreaming_chat_completion(
         assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
         if send_default_pii and include_prompts:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {"role": "user", "content": "Hello!"},
+            ]
             assert SPANDATA.GEN_AI_RESPONSE_TEXT in span["attributes"]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
@@ -302,7 +311,10 @@ async def test_async_nonstreaming_chat_completion(
         stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
-    messages = [{"role": "user", "content": "Hello!"}]
+    messages = [
+        {"role": "user", "content": "Message demonstrating the absence of truncation."},
+        {"role": "user", "content": "Hello!"},
+    ]
 
     client = AsyncOpenAI(api_key="test-key")
 
@@ -360,7 +372,13 @@ async def test_async_nonstreaming_chat_completion(
         assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
         if send_default_pii and include_prompts:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {"role": "user", "content": "Hello!"},
+            ]
             assert SPANDATA.GEN_AI_RESPONSE_TEXT in span["attributes"]
         else:
             assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
@@ -448,7 +466,10 @@ def test_streaming_chat_completion(
         stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
-    messages = [{"role": "user", "content": "Hello!"}]
+    messages = [
+        {"role": "user", "content": "Message demonstrating the absence of truncation."},
+        {"role": "user", "content": "Hello!"},
+    ]
 
     client = OpenAI(api_key="test-key")
 
@@ -556,7 +577,10 @@ async def test_async_streaming_chat_completion(
         stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
-    messages = [{"role": "user", "content": "Hello!"}]
+    messages = [
+        {"role": "user", "content": "Message demonstrating the absence of truncation."},
+        {"role": "user", "content": "Hello!"},
+    ]
 
     client = AsyncOpenAI(api_key="test-key")
 

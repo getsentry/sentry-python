@@ -153,7 +153,12 @@ def test_nonstreaming_generate_content(
         ), start_transaction(name="google_genai"):
             config = create_test_config(temperature=0.7, max_output_tokens=100)
             mock_genai_client.models.generate_content(
-                model="gemini-1.5-flash", contents="Tell me a joke", config=config
+                model="gemini-1.5-flash",
+                contents=[
+                    "Message demonstrating the absence of truncation.",
+                    "Tell me a joke",
+                ],
+                config=config,
             )
 
         (event,) = (item.payload for item in items if item.type == "transaction")
@@ -173,6 +178,24 @@ def test_nonstreaming_generate_content(
         )
 
         if send_default_pii and include_prompts:
+            assert json.loads(
+                chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            ) == [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        },
+                        {
+                            "type": "text",
+                            "text": "Tell me a joke",
+                        },
+                    ],
+                }
+            ]
+
             # Response text is stored as a JSON array
             response_text = chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
@@ -675,7 +698,12 @@ def test_streaming_generate_content(
         ), start_transaction(name="google_genai"):
             config = create_test_config()
             stream = mock_genai_client.models.generate_content_stream(
-                model="gemini-1.5-flash", contents="Stream me a response", config=config
+                model="gemini-1.5-flash",
+                contents=[
+                    "Message demonstrating the absence of truncation.",
+                    "Stream me a response",
+                ],
+                config=config,
             )
 
             # Consume the stream (this is what users do with the integration wrapper)
@@ -692,6 +720,24 @@ def test_streaming_generate_content(
         spans = [item.payload for item in items if item.type == "span"]
         assert len(spans) == 1
         chat_span = next(item.payload for item in items if item.type == "span")
+
+        assert json.loads(
+            chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        ) == [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Message demonstrating the absence of truncation.",
+                    },
+                    {
+                        "type": "text",
+                        "text": "Stream me a response",
+                    },
+                ],
+            }
+        ]
 
         # Check that streaming flag is set on both spans
         assert chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
