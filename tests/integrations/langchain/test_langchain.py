@@ -237,27 +237,6 @@ def get_word_length(word: str) -> int:
     return len(word)
 
 
-global stream_result_mock  # type: Mock
-global llm_type  # type: str
-
-
-class MockOpenAI(ChatOpenAI):
-    def _stream(
-        self,
-        messages: List[BaseMessage],
-        stop: Optional[List[str]] = None,
-        run_manager: Optional[CallbackManagerForLLMRun] = None,
-        **kwargs: Any,
-    ) -> Iterator[ChatGenerationChunk]:
-        for x in stream_result_mock():
-            yield x
-
-    @property
-    def _llm_type(self) -> str:
-        return llm_type
-
-
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_langchain_text_completion(
     sentry_init,
     capture_events,
@@ -2393,8 +2372,22 @@ def test_langchain_error(
     capture_items,
     stream_gen_ai_spans,
 ):
-    global llm_type
-    llm_type = "acme-llm"
+    class MockOpenAI(ChatOpenAI):
+        def _stream(
+            self,
+            messages: List[BaseMessage],
+            stop: Optional[List[str]] = None,
+            run_manager: Optional[CallbackManagerForLLMRun] = None,
+            **kwargs: Any,
+        ) -> Iterator[ChatGenerationChunk]:
+            stream_result_mock = Mock(side_effect=ValueError("API rate limit error"))
+
+            for x in stream_result_mock():
+                yield x
+
+        @property
+        def _llm_type(self) -> str:
+            return "acme-llm"
 
     sentry_init(
         integrations=[LangchainIntegration(include_prompts=True)],
@@ -2413,8 +2406,6 @@ def test_langchain_error(
             MessagesPlaceholder(variable_name="agent_scratchpad"),
         ]
     )
-    global stream_result_mock
-    stream_result_mock = Mock(side_effect=ValueError("API rate limit error"))
     llm = MockOpenAI(
         model_name="gpt-3.5-turbo",
         temperature=0,
@@ -2448,8 +2439,22 @@ def test_span_status_error(
     capture_items,
     stream_gen_ai_spans,
 ):
-    global llm_type
-    llm_type = "acme-llm"
+    class MockOpenAI(ChatOpenAI):
+        def _stream(
+            self,
+            messages: List[BaseMessage],
+            stop: Optional[List[str]] = None,
+            run_manager: Optional[CallbackManagerForLLMRun] = None,
+            **kwargs: Any,
+        ) -> Iterator[ChatGenerationChunk]:
+            stream_result_mock = Mock(side_effect=ValueError("API rate limit error"))
+
+            for x in stream_result_mock():
+                yield x
+
+        @property
+        def _llm_type(self) -> str:
+            return "acme-llm"
 
     sentry_init(
         integrations=[LangchainIntegration(include_prompts=True)],
@@ -2754,8 +2759,32 @@ def test_langchain_message_role_mapping(
     stream_gen_ai_spans,
 ):
     """Test that message roles are properly normalized in langchain integration."""
-    global llm_type
-    llm_type = "openai-chat"
+
+    class MockOpenAI(ChatOpenAI):
+        def _stream(
+            self,
+            messages: List[BaseMessage],
+            stop: Optional[List[str]] = None,
+            run_manager: Optional[CallbackManagerForLLMRun] = None,
+            **kwargs: Any,
+        ) -> Iterator[ChatGenerationChunk]:
+            stream_result_mock = Mock(
+                side_effect=[
+                    [
+                        ChatGenerationChunk(
+                            type="ChatGenerationChunk",
+                            message=AIMessageChunk(content="Test response"),
+                        ),
+                    ]
+                ]
+            )
+
+            for x in stream_result_mock():
+                yield x
+
+        @property
+        def _llm_type(self) -> str:
+            return "openai-chat"
 
     sentry_init(
         integrations=[LangchainIntegration(include_prompts=True)],
@@ -2769,18 +2798,6 @@ def test_langchain_message_role_mapping(
             ("system", "You are a helpful assistant"),
             ("human", "{input}"),
             MessagesPlaceholder(variable_name="agent_scratchpad"),
-        ]
-    )
-
-    global stream_result_mock
-    stream_result_mock = Mock(
-        side_effect=[
-            [
-                ChatGenerationChunk(
-                    type="ChatGenerationChunk",
-                    message=AIMessageChunk(content="Test response"),
-                ),
-            ]
         ]
     )
 

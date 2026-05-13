@@ -137,7 +137,10 @@ class EventScrubber:
     def scrub_user(self, event: "Event") -> None:
         with capture_internal_exceptions():
             if "user" in event:
-                self.scrub_dict(event["user"])
+                user = event["user"]
+                if "ip_address" in self.denylist and isinstance(user, dict):
+                    user.pop("ip_address", None)
+                self.scrub_dict(user)
 
     def scrub_breadcrumbs(self, event: "Event") -> None:
         with capture_internal_exceptions():
