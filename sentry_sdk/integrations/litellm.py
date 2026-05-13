@@ -119,8 +119,11 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
                     if isinstance(embedding_input, list)
                     else [embedding_input]
                 )
-                messages_data = truncate_and_annotate_embedding_inputs(
-                    input_list, span, scope
+                client = sentry_sdk.get_client()
+                messages_data = (
+                    input_list
+                    if client.options.get("stream_gen_ai_spans", False)
+                    else truncate_and_annotate_embedding_inputs(input_list, span, scope)
                 )
                 if messages_data is not None:
                     set_data_normalized(
@@ -133,9 +136,14 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
             # For chat, look for the 'messages' parameter
             messages = kwargs.get("messages", [])
             if messages:
+                client = sentry_sdk.get_client()
                 scope = sentry_sdk.get_current_scope()
                 messages = _convert_message_parts(messages)
-                messages_data = truncate_and_annotate_messages(messages, span, scope)
+                messages_data = (
+                    messages
+                    if client.options.get("stream_gen_ai_spans", False)
+                    else truncate_and_annotate_messages(messages, span, scope)
+                )
                 if messages_data is not None:
                     set_data_normalized(
                         span,

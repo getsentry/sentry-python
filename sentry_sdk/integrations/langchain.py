@@ -374,9 +374,15 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     }
                     for prompt in prompts
                 ]
+
+                client = sentry_sdk.get_client()
                 scope = sentry_sdk.get_current_scope()
-                messages_data = truncate_and_annotate_messages(
-                    normalized_messages, span, scope
+                messages_data = (
+                    normalized_messages
+                    if client.options.get("stream_gen_ai_spans", False)
+                    else truncate_and_annotate_messages(
+                        normalized_messages, span, scope
+                    )
                 )
                 if messages_data is not None:
                     set_data_normalized(
@@ -463,9 +469,15 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                             self._normalize_langchain_message(message)
                         )
                 normalized_messages = normalize_message_roles(normalized_messages)
+
+                client = sentry_sdk.get_client()
                 scope = sentry_sdk.get_current_scope()
-                messages_data = truncate_and_annotate_messages(
-                    normalized_messages, span, scope
+                messages_data = (
+                    normalized_messages
+                    if client.options.get("stream_gen_ai_spans", False)
+                    else truncate_and_annotate_messages(
+                        normalized_messages, span, scope
+                    )
                 )
                 if messages_data is not None:
                     set_data_normalized(
@@ -992,9 +1004,15 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
                 and integration.include_prompts
             ):
                 normalized_messages = normalize_message_roles([input])
+
+                client = sentry_sdk.get_client()
                 scope = sentry_sdk.get_current_scope()
-                messages_data = truncate_and_annotate_messages(
-                    normalized_messages, span, scope
+                messages_data = (
+                    normalized_messages
+                    if client.options.get("stream_gen_ai_spans", False)
+                    else truncate_and_annotate_messages(
+                        normalized_messages, span, scope
+                    )
                 )
                 if messages_data is not None:
                     set_data_normalized(
@@ -1049,9 +1067,13 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
             and integration.include_prompts
         ):
             normalized_messages = normalize_message_roles([input])
+
+            client = sentry_sdk.get_client()
             scope = sentry_sdk.get_current_scope()
-            messages_data = truncate_and_annotate_messages(
-                normalized_messages, span, scope
+            messages_data = (
+                normalized_messages
+                if client.options.get("stream_gen_ai_spans", False)
+                else truncate_and_annotate_messages(normalized_messages, span, scope)
             )
             if messages_data is not None:
                 set_data_normalized(

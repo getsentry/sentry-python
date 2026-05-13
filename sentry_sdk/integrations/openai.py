@@ -398,8 +398,13 @@ def _set_responses_api_input_data(
 
     if isinstance(messages, str):
         normalized_messages = normalize_message_roles([messages])  # type: ignore
+        client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
-        messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
+        messages_data = (
+            normalized_messages
+            if client.options.get("stream_gen_ai_spans", False)
+            else truncate_and_annotate_messages(normalized_messages, span, scope)
+        )
         if messages_data is not None:
             set_data_normalized(
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
@@ -413,8 +418,13 @@ def _set_responses_api_input_data(
     ]
     if len(non_system_messages) > 0:
         normalized_messages = normalize_message_roles(non_system_messages)
+        client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
-        messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
+        messages_data = (
+            normalized_messages
+            if client.options.get("stream_gen_ai_spans", False)
+            else truncate_and_annotate_messages(normalized_messages, span, scope)
+        )
         if messages_data is not None:
             set_data_normalized(
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
@@ -472,8 +482,13 @@ def _set_completions_api_input_data(
 
     if isinstance(messages, str):
         normalized_messages = normalize_message_roles([messages])  # type: ignore
+        client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
-        messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
+        messages_data = (
+            normalized_messages
+            if client.options.get("stream_gen_ai_spans", False)
+            else truncate_and_annotate_messages(normalized_messages, span, scope)
+        )
         if messages_data is not None:
             set_data_normalized(
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
@@ -503,8 +518,13 @@ def _set_completions_api_input_data(
     ]
     if len(non_system_messages) > 0:
         normalized_messages = normalize_message_roles(non_system_messages)
+        client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
-        messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
+        messages_data = (
+            normalized_messages
+            if client.options.get("stream_gen_ai_spans", False)
+            else truncate_and_annotate_messages(normalized_messages, span, scope)
+        )
         if messages_data is not None:
             set_data_normalized(
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
@@ -539,9 +559,14 @@ def _set_embeddings_input_data(
         set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
 
         normalized_messages = normalize_message_roles([messages])  # type: ignore
+        client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
-        messages_data = truncate_and_annotate_embedding_inputs(
-            normalized_messages, span, scope
+        messages_data = (
+            normalized_messages
+            if client.options.get("stream_gen_ai_spans", False)
+            else truncate_and_annotate_embedding_inputs(
+                normalized_messages, span, scope
+            )
         )
         if messages_data is not None:
             set_data_normalized(
@@ -560,9 +585,14 @@ def _set_embeddings_input_data(
 
     if len(messages) > 0:
         normalized_messages = normalize_message_roles(messages)
+        client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
-        messages_data = truncate_and_annotate_embedding_inputs(
-            normalized_messages, span, scope
+        messages_data = (
+            normalized_messages
+            if client.options.get("stream_gen_ai_spans", False)
+            else truncate_and_annotate_embedding_inputs(
+                normalized_messages, span, scope
+            )
         )
         if messages_data is not None:
             set_data_normalized(
