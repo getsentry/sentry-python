@@ -1818,11 +1818,10 @@ async def test_mcp_tool_execution_spans(
                 # MCP tool might raise if not fully mocked, that's okay
                 pass
 
-        events_list = items
-        if len(events_list) == 0:
+        if len(items) == 0:
             pytest.skip("No events captured, MCP test setup incomplete")
 
-        (transaction,) = events_list
+        (transaction,) = (item.payload for item in items if item.type == "transaction")
         transaction["spans"]
     else:
         events = capture_events()
