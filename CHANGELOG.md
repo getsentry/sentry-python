@@ -2,14 +2,25 @@
 
 ## 2.60.0
 
+Adds a new `stream_gen_ai_spans` option that controls how `gen_ai` spans are
+sent to Sentry. When set, the SDK extracts all `gen_ai` spans out of a
+transaction and sends them as v2 envelope items.
+
+Enable this option if `gen_ai` spans are being dropped because the transaction payload exceeds size limits.
+
+```python
+import sentry_sdk
+
+sentry_sdk.init(
+  dsn='https://examplePublicKey@o0.ingest.sentry.io/0',
+  stream_gen_ai_spans=True,
+)
+```
+
 ### New Features ✨
 
-- (aiohttp) Add span streaming support by @ericapisani in [#6179](https://github.com/getsentry/sentry-python/pull/6179)
-- (argv) Support span streaming by @sentrivana in [#6227](https://github.com/getsentry/sentry-python/pull/6227)
 - (asyncpg) Add cursor span support via BaseCursor method patching by @ericapisani in [#6252](https://github.com/getsentry/sentry-python/pull/6252)
-- (boto3) Support span streaming by @alexander-alderman-webb in [#6193](https://github.com/getsentry/sentry-python/pull/6193)
 - (integrations) Pass along the conversation ID for openai `responses` calls by @constantinius in [#6199](https://github.com/getsentry/sentry-python/pull/6199)
-- (transport) Add EnvelopePrinterTransport for debug logging by @ericapisani in [#6181](https://github.com/getsentry/sentry-python/pull/6181)
 - (wsgi,asgi) Introduce substitute values for filtered fields in span-streaming mode by @ericapisani in [#6178](https://github.com/getsentry/sentry-python/pull/6178)
 - Remove truncation when `stream_gen_ai_spans` is enabled by @alexander-alderman-webb in [#6260](https://github.com/getsentry/sentry-python/pull/6260)
 - Add option to send GenAI spans in the new span format by @alexander-alderman-webb in [#6079](https://github.com/getsentry/sentry-python/pull/6079)
@@ -46,7 +57,6 @@
 
 #### Other
 
-- (asyncio) Migrate integration to span-first by @ericapisani in [#6198](https://github.com/getsentry/sentry-python/pull/6198)
 - (langchain) Inline global state by @alexander-alderman-webb in [#6261](https://github.com/getsentry/sentry-python/pull/6261)
 - (stdlib) Only capture relevant telemetry with `capture_items()` by @alexander-alderman-webb in [#6214](https://github.com/getsentry/sentry-python/pull/6214)
 - (tests) Replace custom `envelopes_to_x` helpers with `capture_items` by @sentrivana in [#6233](https://github.com/getsentry/sentry-python/pull/6233)
@@ -58,12 +68,10 @@
 - Move batcher fork safety test to batcher tests by @sentrivana in [#6225](https://github.com/getsentry/sentry-python/pull/6225)
 - Introduce inline type check for whether a span is StreamedSpan by @ericapisani in [#6180](https://github.com/getsentry/sentry-python/pull/6180)
 - Add `botocore-stubs` by @alexander-alderman-webb in [#6203](https://github.com/getsentry/sentry-python/pull/6203)
-
-### Other
-
 - Add option to drop scrubbed user IP addresses by @juliosuas in [#6241](https://github.com/getsentry/sentry-python/pull/6241)
 - Add .warden to .gitignore by @ericapisani in [#6210](https://github.com/getsentry/sentry-python/pull/6210)
 - removed universal bdist_wheel option by @Muskaan436 in [#6197](https://github.com/getsentry/sentry-python/pull/6197)
+- (transport) Add EnvelopePrinterTransport for debug logging by @ericapisani in [#6181](https://github.com/getsentry/sentry-python/pull/6181)
 
 ## 2.59.0
 
