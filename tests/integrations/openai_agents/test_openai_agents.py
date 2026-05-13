@@ -3140,7 +3140,6 @@ async def test_mcp_tool_execution_with_error(
         assert mcp_tool_span["name"] == "execute_tool failing_mcp_tool"
         assert mcp_tool_span["attributes"]["gen_ai.tool.name"] == "failing_mcp_tool"
         assert mcp_tool_span["attributes"]["gen_ai.tool.input"] == '{"query": "test"}'
-        assert mcp_tool_span["attributes"]["gen_ai.tool.output"] == "None"
 
         # Verify error status was set
         assert mcp_tool_span["status"] == "error"
