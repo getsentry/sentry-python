@@ -1975,24 +1975,6 @@ async def test_streaming_chat_completion_async(
                     "content": "You are a helpful assistant.",
                 }
             ]
-
-            assert "hello" in span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            assert "hello world" in span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-
-            try:
-                import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
-
-                if "blocks" in param_id:
-                    assert span["attributes"]["gen_ai.usage.output_tokens"] == 2
-                    assert span["attributes"]["gen_ai.usage.input_tokens"] == 7
-                    assert span["attributes"]["gen_ai.usage.total_tokens"] == 9
-                else:
-                    assert span["attributes"]["gen_ai.usage.output_tokens"] == 2
-                    assert span["attributes"]["gen_ai.usage.input_tokens"] == 12
-                    assert span["attributes"]["gen_ai.usage.total_tokens"] == 14
-
-            except ImportError:
-                pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
         else:
             assert json.loads(
                 span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
@@ -2007,23 +1989,23 @@ async def test_streaming_chat_completion_async(
                 },
             ]
 
-            assert "hello" in span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            assert "hello world" in span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        assert "hello" in span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert "hello world" in span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
-            try:
-                import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
+        try:
+            import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
 
-                if "blocks" in param_id:
-                    assert span["attributes"]["gen_ai.usage.output_tokens"] == 2
-                    assert span["attributes"]["gen_ai.usage.input_tokens"] == 7
-                    assert span["attributes"]["gen_ai.usage.total_tokens"] == 9
-                else:
-                    assert span["attributes"]["gen_ai.usage.output_tokens"] == 2
-                    assert span["attributes"]["gen_ai.usage.input_tokens"] == 12
-                    assert span["attributes"]["gen_ai.usage.total_tokens"] == 14
+            if "blocks" in param_id:
+                assert span["attributes"]["gen_ai.usage.output_tokens"] == 2
+                assert span["attributes"]["gen_ai.usage.input_tokens"] == 7
+                assert span["attributes"]["gen_ai.usage.total_tokens"] == 9
+            else:
+                assert span["attributes"]["gen_ai.usage.output_tokens"] == 2
+                assert span["attributes"]["gen_ai.usage.input_tokens"] == 12
+                assert span["attributes"]["gen_ai.usage.total_tokens"] == 14
 
-            except ImportError:
-                pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
+        except ImportError:
+            pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
     else:
         events = capture_events()
 
