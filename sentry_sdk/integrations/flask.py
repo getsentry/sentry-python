@@ -1,27 +1,34 @@
+import json
+from typing import TYPE_CHECKING
+
 import sentry_sdk
-from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import (
+    _RAW_DATA_EXCEPTIONS,
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     RequestExtractor,
+    request_body_within_bounds,
 )
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import StreamedSpan, _get_current_streamed_span
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
+    AnnotatedValue,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
     package_version,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Union
 
+    from werkzeug.datastructures import FileStorage, ImmutableMultiDict
+
     from sentry_sdk._types import Event, EventProcessor
     from sentry_sdk.integrations.wsgi import _ScopedResponse
-    from werkzeug.datastructures import FileStorage, ImmutableMultiDict
 
 
 try:
@@ -94,10 +101,9 @@ class FlaskIntegration(Integration):
         def sentry_patched_wsgi_app(
             self: "Any", environ: "Dict[str, str]", start_response: "Callable[..., Any]"
         ) -> "_ScopedResponse":
-            if sentry_sdk.get_client().get_integration(FlaskIntegration) is None:
-                return old_app(self, environ, start_response)
-
             integration = sentry_sdk.get_client().get_integration(FlaskIntegration)
+            if integration is None:
+                return old_app(self, environ, start_response)
 
             middleware = SentryWsgiMiddleware(
                 lambda *a, **kw: old_app(self, *a, **kw),
@@ -157,6 +163,49 @@ def _request_started(app: "Flask", **kwargs: "Any") -> None:
     scope = sentry_sdk.get_isolation_scope()
     evt_processor = _make_request_event_processor(app, request, integration)
     scope.add_event_processor(evt_processor)
+
+    client = sentry_sdk.get_client()
+    if has_span_streaming_enabled(client.options):
+        _set_request_body_data_on_streaming_segment(request, client)
+
+
+def _set_request_body_data_on_streaming_segment(
+    request: "Request", client: "sentry_sdk.client.BaseClient"
+) -> None:
+    current_span = _get_current_streamed_span()
+    if type(current_span) is not StreamedSpan:
+        return
+
+    with capture_internal_exceptions():
+        content_length = int(request.content_length or 0)
+        extractor = FlaskRequestExtractor(request)
+
+        if not request_body_within_bounds(client, content_length):
+            data = AnnotatedValue.substituted_because_over_size_limit()
+        else:
+            raw_data = None
+            try:
+                raw_data = extractor.raw_data()
+            except _RAW_DATA_EXCEPTIONS:
+                pass
+
+            parsed_body = extractor.parsed_body()
+            if parsed_body is not None:
+                data = parsed_body
+            elif raw_data:
+                data = AnnotatedValue.substituted_because_raw_data()
+            else:
+                return
+
+        def _default(value: "Any") -> "Any":
+            if isinstance(value, AnnotatedValue):
+                return value.value
+            return str(value)
+
+        current_span._segment.set_attribute(
+            "http.request.body.data",
+            json.dumps(data, default=_default),
+        )
 
 
 class FlaskRequestExtractor(RequestExtractor):
