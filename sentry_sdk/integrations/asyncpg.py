@@ -16,7 +16,6 @@ from sentry_sdk.tracing_utils import (
 )
 from sentry_sdk.utils import (
     capture_internal_exceptions,
-    ensure_integration_enabled,
     parse_version,
 )
 
@@ -52,8 +51,12 @@ class AsyncPGIntegration(Integration):
         asyncpg.Connection._executemany = _wrap_connection_method(
             asyncpg.Connection._executemany, executemany=True
         )
-        asyncpg.Connection.cursor = _wrap_cursor_creation(asyncpg.Connection.cursor)
         asyncpg.Connection.prepare = _wrap_connection_method(asyncpg.Connection.prepare)
+
+        BaseCursor._bind_exec = _wrap_cursor_method(BaseCursor._bind_exec)
+        BaseCursor._bind = _wrap_cursor_method(BaseCursor._bind)
+        BaseCursor._exec = _wrap_cursor_method(BaseCursor._exec)
+
         asyncpg.connect_utils._connect_addr = _wrap_connect_addr(
             asyncpg.connect_utils._connect_addr
         )
@@ -150,20 +153,26 @@ def _wrap_connection_method(
     return _inner
 
 
-def _wrap_cursor_creation(f: "Callable[..., T]") -> "Callable[..., T]":
-    @ensure_integration_enabled(AsyncPGIntegration, f)
-    def _inner(*args: "Any", **kwargs: "Any") -> "T":  # noqa: N807
-        query = args[1]
-        params_list = args[2] if len(args) > 2 else None
+def _wrap_cursor_method(
+    f: "Callable[..., Awaitable[T]]",
+) -> "Callable[..., Awaitable[T]]":
+    async def _inner(*args: "Any", **kwargs: "Any") -> "T":
+        if sentry_sdk.get_client().get_integration(AsyncPGIntegration) is None:
+            return await f(*args, **kwargs)
 
-        with _record(
-            None,
-            query,
-            params_list,
+        cursor = args[0]
+        query = _normalize_query(cursor._query)
+        with record_sql_queries_supporting_streaming(
+            cursor=cursor,
+            query=query,
+            params_list=None,
+            paramstyle=None,
             executemany=False,
+            record_cursor_repr=True,
+            span_origin=AsyncPGIntegration.origin,
         ) as span:
-            _set_db_data(span, args[0])
-            res = f(*args, **kwargs)
+            _set_db_data(span, cursor._connection)
+            res = await f(*args, **kwargs)
 
         return res
 

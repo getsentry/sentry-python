@@ -267,6 +267,7 @@ def test_transport_format(sentry_init, capture_envelopes):
         "content_type": "application/vnd.sentry.items.trace-metric+json",
     }
     assert item.payload.json == {
+        "version": 2,
         "items": [
             {
                 "name": "test.counter",
@@ -297,7 +298,7 @@ def test_transport_format(sentry_init, capture_envelopes):
                     },
                 },
             }
-        ]
+        ],
     }
 
 

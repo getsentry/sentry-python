@@ -214,10 +214,11 @@ class SpanBatcher(Batcher["SpanJSON"]):
                             },
                             payload=PayloadRef(
                                 json={
+                                    "version": 2,
                                     "items": [
                                         self._to_transport_format(spans[j])
                                         for j in range(start, end)
-                                    ]
+                                    ],
                                 }
                             ),
                         )
