@@ -2920,7 +2920,6 @@ def test_binary_content_encoding_uri_type(
         )
         assert len(chat_spans) == 1
         span = chat_spans[0]
-
         messages_data = json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
     else:
         events = capture_events()
@@ -2948,7 +2947,6 @@ def test_binary_content_encoding_uri_type(
 
         assert len(chat_spans) == 1
         span = chat_spans[0]
-
         messages_data = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     uri_item = next(
@@ -3036,10 +3034,8 @@ async def test_async_binary_content_encoding_uri_type(
             if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
             and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
         )
-
         assert len(chat_spans) == 1
         span = chat_spans[0]
-
         messages_data = json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
     else:
         events = capture_events()
@@ -3065,10 +3061,8 @@ async def test_async_binary_content_encoding_uri_type(
             for x in event["spans"]
             if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
         )
-
         assert len(chat_spans) == 1
         span = chat_spans[0]
-
         messages_data = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     uri_item = next(
