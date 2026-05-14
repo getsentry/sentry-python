@@ -15,6 +15,8 @@ from flask import (
 from flask.views import View
 from flask_login import LoginManager, login_user
 
+from sentry_sdk.traces import SpanStatus
+
 try:
     from werkzeug.wrappers.request import UnsupportedMediaType
 except ImportError:
@@ -814,7 +816,7 @@ def test_tracing_success(
         span = spans[0].payload
         assert span["is_segment"] is True
         assert span["name"] == "hi_tx"
-        assert span["status"] == "ok"
+        assert span["status"] == SpanStatus.OK
         assert span["attributes"]["sentry.op"] == "http.server"
         assert span["attributes"]["sentry.origin"] == "auto.http.flask"
 
@@ -870,7 +872,7 @@ def test_tracing_error(sentry_init, capture_events, capture_items, app, span_str
         span = spans[0].payload
         assert span["is_segment"] is True
         assert span["name"] == "error"
-        assert span["status"] == "error"
+        assert span["status"] == SpanStatus.ERROR
         assert span["attributes"]["sentry.op"] == "http.server"
         assert span["attributes"]["sentry.origin"] == "auto.http.flask"
         assert len(error_events) == 1
@@ -1011,6 +1013,7 @@ def test_response_status_code_ok(
 ):
     """
     Tests that the response status code is added to the transaction/span.
+    This also works for when there is an Exception during the request, but somehow the test flask app doesn't seem to trigger that.
     """
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
@@ -1033,7 +1036,7 @@ def test_response_status_code_ok(
         assert len(items) == 1
         span = items[0].payload
         assert span["attributes"]["http.response.status_code"] == 200
-        assert span["status"] == "ok"
+        assert span["status"] == SpanStatus.OK
     else:
         (_, transaction_envelope, _) = envelopes
         transaction = transaction_envelope.get_transaction_event()
@@ -1071,7 +1074,7 @@ def test_response_status_code_not_found(
         assert len(items) == 1
         span = items[0].payload
         assert span["attributes"]["http.response.status_code"] == 404
-        assert span["status"] == "error"
+        assert span["status"] == SpanStatus.ERROR
     else:
         (transaction_envelope, _) = envelopes
         transaction = transaction_envelope.get_transaction_event()
