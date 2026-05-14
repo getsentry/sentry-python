@@ -169,7 +169,7 @@ def _wrap_beat_scheduler(
     - a new Sentry trace is started for each task started by Celery Beat and
       it is propagated to the task.
     - the Sentry Crons information is set in the Celery Beat task's
-      headers so that is is monitored with Sentry Crons.
+      headers so that is monitored with Sentry Crons.
 
     After the patched function is called,
     Celery Beat will call apply_async to put the task in the queue.
