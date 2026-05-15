@@ -188,6 +188,12 @@ def _set_request_body_data_on_streaming_segment(
     with capture_internal_exceptions():
         content_length = int(request.content_length or 0)
 
+        # Proceeding without a content length means that we may be consuming the request
+        # without respecting the bounds specified by the user via `max_request_body_size`
+        # option in the SDK.
+        if not content_length:
+            return
+
         if not request_body_within_bounds(client, content_length):
             data = AnnotatedValue.substituted_because_over_size_limit()
         else:
