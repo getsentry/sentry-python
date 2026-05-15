@@ -157,23 +157,6 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
             )
 
         with span_ctx as span:
-            if isinstance(span, StreamedSpan) and not isinstance(
-                span, NoOpStreamedSpan
-            ):
-                with capture_internal_exceptions():
-                    for attr, value in _get_request_attributes(self.request).items():
-                        span.set_attribute(attr, value)
-
-                    method = getattr(self, self.request.method.lower(), None)
-                    if method is not None:
-                        span_name = transaction_from_function(method)
-                        if span_name:
-                            span.name = span_name
-                            span.set_attribute(
-                                "sentry.span.source",
-                                SegmentSource.COMPONENT,
-                            )
-
             try:
                 yield
             finally:
@@ -181,6 +164,21 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
                     span, NoOpStreamedSpan
                 ):
                     with capture_internal_exceptions():
+                        for attr, value in _get_request_attributes(
+                            self.request
+                        ).items():
+                            span.set_attribute(attr, value)
+
+                        method = getattr(self, self.request.method.lower(), None)
+                        if method is not None:
+                            span_name = transaction_from_function(method)
+                            if span_name:
+                                span.name = span_name
+                                span.set_attribute(
+                                    "sentry.span.source",
+                                    SegmentSource.COMPONENT,
+                                )
+
                         status_int = self.get_status()
                         span.set_attribute(SPANDATA.HTTP_STATUS_CODE, status_int)
                         span.status = "error" if status_int >= 400 else "ok"
