@@ -140,6 +140,7 @@ Annotated = Union[AnnotatedValue, T]
 if TYPE_CHECKING:
     from collections.abc import Container, MutableMapping, Sequence
     from datetime import datetime
+    from sentry_sdk.traces import StreamedSpan
     from types import TracebackType
     from typing import Any, Callable, Dict, Mapping, NotRequired, Optional, Type
 
@@ -317,6 +318,22 @@ if TYPE_CHECKING:
     )
 
     MetricProcessor = Callable[[Metric, Hint], Optional[Metric]]
+
+    SpanJSON = TypedDict(
+        "SpanJSON",
+        {
+            "trace_id": str,
+            "span_id": str,
+            "parent_span_id": NotRequired[str],
+            "name": str,
+            "status": str,
+            "is_segment": bool,
+            "start_timestamp": float,
+            "end_timestamp": NotRequired[float],
+            "attributes": NotRequired[Attributes],
+            "_segment_span": NotRequired[StreamedSpan],
+        },
+    )
 
     # TODO: Make a proper type definition for this (PRs welcome!)
     Breadcrumb = Dict[str, Any]

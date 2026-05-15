@@ -13,10 +13,10 @@ from sentry_sdk.utils import format_timestamp, serialize_attribute
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional
-    from sentry_sdk.traces import StreamedSpan
+    from sentry_sdk._types import SpanJSON
 
 
-class SpanBatcher(Batcher["StreamedSpan"]):
+class SpanBatcher(Batcher["SpanJSON"]):
     # MAX_BEFORE_FLUSH should be lower than MAX_BEFORE_DROP, so that there is
     # a bit of a buffer for spans that appear between the trigger to flush
     # and actually flushing the buffer.
@@ -42,7 +42,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
         # by trace_id, so that we can then send the buckets each in its own
         # envelope.
         # trace_id -> span buffer
-        self._span_buffer: dict[str, list["StreamedSpan"]] = defaultdict(list)
+        self._span_buffer: dict[str, list["SpanJSON"]] = defaultdict(list)
         self._running_size: dict[str, int] = defaultdict(lambda: 0)
         self._capture_func = capture_func
         self._record_lost_func = record_lost_func
@@ -99,7 +99,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
                 self._flush()
                 self._last_full_flush = time.monotonic()
 
-    def add(self, span: "StreamedSpan") -> None:
+    def add(self, span: "SpanJSON") -> None:
         # Bail out if the current thread is already executing batcher code.
         # This prevents deadlocks when code running inside the batcher (e.g.
         # _add_to_envelope during flush, or _flush_event.wait/set) triggers
@@ -115,7 +115,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
                 return None
 
             with self._lock:
-                size = len(self._span_buffer[span.trace_id])
+                size = len(self._span_buffer[span["trace_id"]])
                 if size >= self.MAX_BEFORE_DROP:
                     self._record_lost_func(
                         reason="queue_overflow",
@@ -124,14 +124,15 @@ class SpanBatcher(Batcher["StreamedSpan"]):
                     )
                     return None
 
-                self._span_buffer[span.trace_id].append(span)
-                self._running_size[span.trace_id] += self._estimate_size(span)
+                self._span_buffer[span["trace_id"]].append(span)
+                self._running_size[span["trace_id"]] += self._estimate_size(span)
 
                 if (
                     size + 1 >= self.MAX_BEFORE_FLUSH
-                    or self._running_size[span.trace_id] >= self.MAX_BYTES_BEFORE_FLUSH
+                    or self._running_size[span["trace_id"]]
+                    >= self.MAX_BYTES_BEFORE_FLUSH
                 ):
-                    self._pending_flush.add(span.trace_id)
+                    self._pending_flush.add(span["trace_id"])
                     notify = True
                 else:
                     notify = False
@@ -142,12 +143,12 @@ class SpanBatcher(Batcher["StreamedSpan"]):
             self._active.flag = False
 
     @staticmethod
-    def _estimate_size(item: "StreamedSpan") -> int:
+    def _estimate_size(item: "SpanJSON") -> int:
         # Rough estimate of serialized span size that's quick to compute.
         # 210 is the rough size of the payload without attributes, and then we
         # estimate the attributes separately.
         estimate = 210
-        for value in item._attributes.values():
+        for value in (item.get("attributes") or {}).values():
             estimate += 50
 
             if isinstance(value, str):
@@ -158,26 +159,15 @@ class SpanBatcher(Batcher["StreamedSpan"]):
         return estimate
 
     @staticmethod
-    def _to_transport_format(item: "StreamedSpan") -> "Any":
-        res: "dict[str, Any]" = {
-            "trace_id": item.trace_id,
-            "span_id": item.span_id,
-            "name": item._name if item._name is not None else "<unlabeled span>",
-            "status": item._status,
-            "is_segment": item._is_segment(),
-            "start_timestamp": item._start_timestamp.timestamp(),
-        }
+    def _to_transport_format(item: "SpanJSON") -> "Any":
+        res = {k: v for k, v in item.items() if k not in ("_segment_span",)}
 
-        if item._end_timestamp:
-            res["end_timestamp"] = item._end_timestamp.timestamp()
-
-        if item._parent_span_id:
-            res["parent_span_id"] = item._parent_span_id
-
-        if item._attributes:
+        if item.get("attributes"):
             res["attributes"] = {
-                k: serialize_attribute(v) for (k, v) in item._attributes.items()
+                k: serialize_attribute(v) for (k, v) in item["attributes"].items()
             }
+        else:
+            del res["attributes"]
 
         return res
 
@@ -201,7 +191,7 @@ class SpanBatcher(Batcher["StreamedSpan"]):
                 if not spans:
                     continue
 
-                dsc = spans[0]._dynamic_sampling_context()
+                dsc = spans[0]["_segment_span"]._dynamic_sampling_context()
 
                 # Max per envelope is 1000, so if we happen to have more than
                 # 1000 spans in one bucket, we'll need to separate them.

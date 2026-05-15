@@ -43,7 +43,7 @@ if TYPE_CHECKING:
         Union,
     )
 
-    from sentry_sdk._types import Attributes, AttributeValue
+    from sentry_sdk._types import Attributes, AttributeValue, SpanJSON
     from sentry_sdk.profiler.continuous_profiler import ContinuousProfile
 
     P = ParamSpec("P")
@@ -573,6 +573,26 @@ class StreamedSpan:
             return
 
         self.set_attribute("process.command_args", sys.argv)
+
+    def _to_json(self) -> "SpanJSON":
+        res: "SpanJSON" = {
+            "trace_id": self.trace_id,
+            "span_id": self.span_id,
+            "name": self._name if self._name is not None else "<unlabeled span>",
+            "status": self._status,
+            "is_segment": self._is_segment(),
+            "start_timestamp": self._start_timestamp.timestamp(),
+        }
+
+        if self._end_timestamp:
+            res["end_timestamp"] = self._end_timestamp.timestamp()
+
+        if self._parent_span_id:
+            res["parent_span_id"] = self._parent_span_id
+
+        res["attributes"] = {k: v for k, v in self._attributes.items()}
+
+        return res
 
 
 class NoOpStreamedSpan(StreamedSpan):

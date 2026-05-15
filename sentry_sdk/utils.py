@@ -76,6 +76,7 @@ if TYPE_CHECKING:
         Log,
         Metric,
         SerializedAttributeValue,
+        SpanJSON,
     )
 
     P = ParamSpec("P")
@@ -2109,6 +2110,15 @@ def get_before_send_metric(
     return options.get("before_send_metric") or options["_experiments"].get(
         "before_send_metric"
     )
+
+
+def get_before_send_span(
+    options: "Optional[dict[str, Any]]",
+) -> "Optional[Callable[[SpanJSON, Hint], Optional[SpanJSON]]]":
+    if options is None:
+        return None
+
+    return options["_experiments"].get("before_send_span")
 
 
 def format_attribute(val: "Any") -> "AttributeValue":

@@ -56,6 +56,7 @@ if TYPE_CHECKING:
         Log,
         Metric,
         ProfilerMode,
+        SpanJSON,
         TracesSampler,
         TransactionProcessor,
     )
@@ -85,6 +86,9 @@ if TYPE_CHECKING:
             "before_send_metric": Optional[Callable[[Metric, Hint], Optional[Metric]]],
             "trace_lifecycle": Optional[Literal["static", "stream"]],
             "ignore_spans": Optional[IgnoreSpansConfig],
+            "before_send_span": Optional[
+                Callable[[SpanJSON, Hint], Optional[SpanJSON]]
+            ],
             "suppress_asgi_chained_exceptions": Optional[bool],
         },
         total=False,
