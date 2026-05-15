@@ -42,6 +42,7 @@ try:
     from flask.signals import (
         before_render_template,
         got_request_exception,
+        request_finished,
         request_started,
     )
     from markupsafe import Markup
@@ -94,6 +95,7 @@ class FlaskIntegration(Integration):
 
         before_render_template.connect(_add_sentry_trace)
         request_started.connect(_request_started)
+        request_finished.connect(_request_finished)
         got_request_exception.connect(_capture_exception)
 
         old_app = Flask.__call__
@@ -164,8 +166,15 @@ def _request_started(app: "Flask", **kwargs: "Any") -> None:
     evt_processor = _make_request_event_processor(app, request, integration)
     scope.add_event_processor(evt_processor)
 
+
+def _request_finished(sender: "Flask", response: "Any", **kwargs: "Any") -> None:
+    integration = sentry_sdk.get_client().get_integration(FlaskIntegration)
+    if integration is None:
+        return
+
     client = sentry_sdk.get_client()
     if has_span_streaming_enabled(client.options):
+        request = flask_request._get_current_object()
         _set_request_body_data_on_streaming_segment(request, client)
 
 
@@ -178,18 +187,26 @@ def _set_request_body_data_on_streaming_segment(
 
     with capture_internal_exceptions():
         content_length = int(request.content_length or 0)
-        extractor = FlaskRequestExtractor(request)
 
         if not request_body_within_bounds(client, content_length):
             data = AnnotatedValue.substituted_because_over_size_limit()
         else:
-            raw_data = None
-            try:
-                raw_data = extractor.raw_data()
-            except _RAW_DATA_EXCEPTIONS:
-                pass
+            # Only use data that Werkzeug has already cached — never consume
+            # wsgi.input ourselves, as that would break user code that reads
+            # the stream directly.
+            # You can find where this gets set here:
+            # https://github.com/pallets/werkzeug/blob/1b00618e787f40dfb21eba29caf8f8be7c8e1d93/src/werkzeug/wrappers/request.py#L444
+            raw_data = getattr(request, "_cached_data", None)
 
-            parsed_body = extractor.parsed_body()
+            parsed_body = None
+            if "form" in request.__dict__:
+                extractor = FlaskRequestExtractor(request)
+                parsed_body = extractor.parsed_body()
+            elif raw_data is not None:
+                extractor = FlaskRequestExtractor(request)
+                if extractor.is_json():
+                    parsed_body = extractor.json()
+
             if parsed_body is not None:
                 data = parsed_body
             elif raw_data:

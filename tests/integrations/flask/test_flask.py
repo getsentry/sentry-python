@@ -1355,3 +1355,43 @@ def test_sensitive_header_scrubbing_span_streaming(sentry_init, capture_items, a
         == SENSITIVE_DATA_SUBSTITUTE
     )
     assert span["attributes"]["http.request.header.x-custom-header"] == "passthrough"
+
+
+def test_wsgi_input_direct_read_does_not_hang_span_streaming(
+    sentry_init, capture_items, app
+):
+    """
+    Regression test: reading wsgi.input directly must not hang when span streaming is enabled.
+    The SDK must not consume wsgi.input before user code runs.
+    """
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+        max_request_body_size="always",
+    )
+
+    @app.route("/raw-wsgi", methods=["POST"])
+    def raw_wsgi_endpoint():
+        content_length = int(request.environ.get("CONTENT_LENGTH", 0))
+        body = request.environ["wsgi.input"].read(content_length)
+        return {"size": len(body), "body": body.decode("utf-8", errors="replace")}
+
+    items = capture_items("span")
+
+    client = app.test_client()
+    response = client.post(
+        "/raw-wsgi", data=b"hello from test", content_type="text/plain"
+    )
+    assert response.status_code == 200
+    assert response.get_json()["body"] == "hello from test"
+
+    sentry_sdk.flush()
+
+    assert len(items) == 1
+    span = items[0].payload
+
+    # The SDK should not have captured the body since the user read wsgi.input
+    # directly (bypassing Werkzeug's cache). This is an acceptable trade-off
+    # vs. consuming the stream and causing user applications to hang.
+    assert "http.request.body.data" not in span.get("attributes", {})
