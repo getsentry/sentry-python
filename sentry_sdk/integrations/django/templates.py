@@ -1,21 +1,16 @@
 import functools
+from typing import TYPE_CHECKING
 
+from django import VERSION as DJANGO_VERSION
 from django.template import TemplateSyntaxError
 from django.utils.safestring import mark_safe
-from django import VERSION as DJANGO_VERSION
 
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.utils import ensure_integration_enabled
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Dict
-    from typing import Optional
-    from typing import Iterator
-    from typing import Tuple
+    from typing import Any, Dict, Iterator, Optional, Tuple
 
 try:
     # support Django 1.9
@@ -58,6 +53,7 @@ def _get_template_name_description(template_name: str) -> str:
 
 def patch_templates() -> None:
     from django.template.response import SimpleTemplateResponse
+
     from sentry_sdk.integrations.django import DjangoIntegration
 
     real_rendered_content = SimpleTemplateResponse.rendered_content

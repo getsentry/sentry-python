@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from sentry_sdk import start_transaction
-from sentry_sdk.consts import SPANDATA, OP
+from sentry_sdk.consts import OP, SPANDATA
 
 
 def mock_langgraph_imports():
@@ -31,9 +31,9 @@ mock_state_graph, mock_pregel = mock_langgraph_imports()
 from sentry_sdk.integrations.langgraph import (  # noqa: E402
     LanggraphIntegration,
     _parse_langgraph_messages,
-    _wrap_state_graph_compile,
-    _wrap_pregel_invoke,
     _wrap_pregel_ainvoke,
+    _wrap_pregel_invoke,
+    _wrap_state_graph_compile,
 )
 
 

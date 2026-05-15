@@ -1,5 +1,5 @@
-from unittest.mock import MagicMock, patch
 import re
+from unittest.mock import MagicMock, patch
 
 import pytest
 from loguru import logger
@@ -7,7 +7,7 @@ from loguru._recattrs import RecordFile, RecordLevel
 
 import sentry_sdk
 from sentry_sdk.consts import VERSION
-from sentry_sdk.integrations.loguru import LoguruIntegration, LoggingLevels
+from sentry_sdk.integrations.loguru import LoggingLevels, LoguruIntegration
 
 logger.remove(0)  # don't print to console
 

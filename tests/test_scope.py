@@ -1,7 +1,8 @@
 import copy
 import os
-import pytest
 from unittest import mock
+
+import pytest
 
 import sentry_sdk
 from sentry_sdk import (
@@ -13,11 +14,11 @@ from sentry_sdk.client import Client, NonRecordingClient
 from sentry_sdk.scope import (
     Scope,
     ScopeType,
-    use_isolation_scope,
-    use_scope,
-    should_send_default_pii,
     register_external_propagation_context,
     remove_external_propagation_context,
+    should_send_default_pii,
+    use_isolation_scope,
+    use_scope,
 )
 
 

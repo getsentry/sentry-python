@@ -16,7 +16,7 @@ from sentry_sdk.integrations._wsgi_common import (
     request_body_within_bounds,
 )
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.scope import should_send_default_pii, Scope
+from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.sessions import track_session
 from sentry_sdk.traces import (
     SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE,

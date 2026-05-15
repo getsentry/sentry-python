@@ -2,6 +2,7 @@ import django
 
 if django.VERSION >= (3, 1):
     import asyncio
+
     from django.utils.decorators import sync_and_async_middleware
 
     @sync_and_async_middleware

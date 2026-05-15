@@ -3,11 +3,10 @@ from datetime import datetime
 from unittest import mock
 
 import pytest
-from sqlalchemy import Column, ForeignKey, Integer, String, create_engine
+from sqlalchemy import Column, ForeignKey, Integer, String, create_engine, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
-from sqlalchemy import text
 
 import sentry_sdk
 from sentry_sdk import capture_message, start_transaction

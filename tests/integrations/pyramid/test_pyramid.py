@@ -4,17 +4,16 @@ from io import BytesIO
 
 import pyramid.testing
 import pytest
+from packaging.version import Version
 from pyramid.authorization import ACLAuthorizationPolicy
 from pyramid.response import Response
-from packaging.version import Version
 from werkzeug.test import Client
 
-from sentry_sdk import capture_message, add_breadcrumb
+from sentry_sdk import add_breadcrumb, capture_message
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
 from sentry_sdk.integrations.pyramid import PyramidIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from tests.conftest import unpack_werkzeug_response
-
 
 try:
     from importlib.metadata import version

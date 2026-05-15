@@ -2,9 +2,9 @@ import logging
 import os
 import sys
 import time
+from unittest import mock
 
 import pytest
-from unittest import mock
 
 import sentry_sdk
 import sentry_sdk.logger

@@ -7,7 +7,7 @@ from sentry_sdk.integrations import Integration
 
 if MYPY:
     from socket import AddressFamily, SocketKind
-    from typing import Tuple, Optional, Union, List
+    from typing import List, Optional, Tuple, Union
 
 __all__ = ["SocketIntegration"]
 

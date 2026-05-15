@@ -1,4 +1,5 @@
 import json
+
 import pytest
 
 from sentry_sdk.utils import package_version
@@ -8,22 +9,28 @@ try:
 except ImportError:
     NOT_GIVEN = None
 try:
-    from openai import omit
-    from openai import Omit
+    from openai import Omit, omit
 except ImportError:
     omit = None
     Omit = None
 
-from openai import AsyncOpenAI, OpenAI, AsyncStream, Stream, OpenAIError
+from openai import AsyncOpenAI, AsyncStream, OpenAI, OpenAIError, Stream
 from openai.types import CompletionUsage, CreateEmbeddingResponse, Embedding
-from openai.types.chat import ChatCompletionMessage, ChatCompletionChunk
+from openai.types.chat import ChatCompletionChunk, ChatCompletionMessage
 from openai.types.chat.chat_completion import Choice
-from openai.types.chat.chat_completion_chunk import ChoiceDelta, Choice as DeltaChoice
+from openai.types.chat.chat_completion_chunk import Choice as DeltaChoice
+from openai.types.chat.chat_completion_chunk import ChoiceDelta
 from openai.types.create_embedding_response import Usage as EmbeddingTokenUsage
 
 SKIP_RESPONSES_TESTS = False
 
 try:
+    from openai.types.responses import (
+        Response,
+        ResponseOutputMessage,
+        ResponseOutputText,
+        ResponseUsage,
+    )
     from openai.types.responses.response_completed_event import ResponseCompletedEvent
     from openai.types.responses.response_created_event import ResponseCreatedEvent
     from openai.types.responses.response_text_delta_event import ResponseTextDeltaEvent
@@ -31,25 +38,19 @@ try:
         InputTokensDetails,
         OutputTokensDetails,
     )
-    from openai.types.responses import (
-        Response,
-        ResponseUsage,
-        ResponseOutputMessage,
-        ResponseOutputText,
-    )
 except ImportError:
     SKIP_RESPONSES_TESTS = True
 
+from unittest import mock  # python 3.3 and above
+
 from sentry_sdk import start_transaction
-from sentry_sdk.consts import SPANDATA, OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.openai import (
     OpenAIIntegration,
     _calculate_completions_token_usage,
     _calculate_responses_token_usage,
 )
 from sentry_sdk.utils import safe_serialize
-
-from unittest import mock  # python 3.3 and above
 
 try:
     from unittest.mock import AsyncMock

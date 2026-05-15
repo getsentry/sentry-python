@@ -1,13 +1,13 @@
-import pytest
 import time
-from chalice import Chalice, BadRequestError
+
+import pytest
+from chalice import BadRequestError, Chalice
 from chalice.local import LambdaContext, LocalGateway
+from pytest_chalice.handlers import RequestHandler
 
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.chalice import CHALICE_VERSION, ChaliceIntegration
 from sentry_sdk.utils import parse_version
-
-from pytest_chalice.handlers import RequestHandler
 
 
 def _generate_lambda_context(self):

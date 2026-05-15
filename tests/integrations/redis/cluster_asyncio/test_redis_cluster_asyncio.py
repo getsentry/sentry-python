@@ -1,12 +1,11 @@
 import pytest
+from redis.asyncio import cluster
 
 import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
 from tests.conftest import ApproxDict
-
-from redis.asyncio import cluster
 
 
 async def fake_initialize(*_, **__):

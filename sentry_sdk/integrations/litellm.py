@@ -7,9 +7,9 @@ from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import (
     get_start_span_function,
     set_data_normalized,
-    truncate_and_annotate_messages,
     transform_openai_content_part,
     truncate_and_annotate_embedding_inputs,
+    truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -17,12 +17,12 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import event_from_exception
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List
     from datetime import datetime
+    from typing import Any, Dict, List
 
 try:
     import litellm  # type: ignore[import-not-found]
-    from litellm import input_callback, success_callback, failure_callback
+    from litellm import failure_callback, input_callback, success_callback
 except ImportError:
     raise DidNotEnable("LiteLLM not installed")
 
