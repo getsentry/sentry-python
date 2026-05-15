@@ -10,15 +10,17 @@ from sentry_sdk.integrations._wsgi_common import (
     RequestExtractor,
     _filter_headers,
     _is_json_content_type,
+    request_body_within_bounds,
 )
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import SegmentSource, StreamedSpan
+from sentry_sdk.traces import NoOpStreamedSpan, SegmentSource, StreamedSpan
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     CONTEXTVARS_ERROR_MESSAGE,
     HAS_REAL_CONTEXTVARS,
+    AnnotatedValue,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
@@ -155,14 +157,16 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
             )
 
         with span_ctx as span:
-            if isinstance(span, StreamedSpan):
+            if isinstance(span, StreamedSpan) and not isinstance(
+                span, NoOpStreamedSpan
+            ):
                 with capture_internal_exceptions():
                     for attr, value in _get_request_attributes(self.request).items():
                         span.set_attribute(attr, value)
 
                     method = getattr(self, self.request.method.lower(), None)
                     if method is not None:
-                        span_name = transaction_from_function(method) or ""
+                        span_name = transaction_from_function(method)
                         if span_name:
                             span.name = span_name
                             span.set_attribute(
@@ -173,7 +177,9 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
             try:
                 yield
             finally:
-                if isinstance(span, StreamedSpan):
+                if isinstance(span, StreamedSpan) and not isinstance(
+                    span, NoOpStreamedSpan
+                ):
                     with capture_internal_exceptions():
                         status_int = self.get_status()
                         span.set_attribute(SPANDATA.HTTP_STATUS_CODE, status_int)
@@ -188,7 +194,7 @@ def _get_request_attributes(request: "Any") -> "Dict[str, Any]":
 
     headers = _filter_headers(dict(request.headers), use_annotated_value=False)
     for header, value in headers.items():
-        attributes[f"http.request.header.{header.lower()}"] = value
+        attributes[f"{SPANDATA.HTTP_REQUEST_HEADER}.{header.lower()}"] = value
 
     if request.query:
         attributes[SPANDATA.HTTP_QUERY] = request.query
@@ -200,13 +206,32 @@ def _get_request_attributes(request: "Any") -> "Dict[str, Any]":
     )
 
     if request.protocol:
-        attributes["network.protocol.name"] = request.protocol
+        attributes[SPANDATA.NETWORK_PROTOCOL_NAME] = request.protocol
 
     if should_send_default_pii() and request.remote_ip:
-        attributes["client.address"] = request.remote_ip
-        attributes["user.ip_address"] = request.remote_ip
+        attributes[SPANDATA.CLIENT_ADDRESS] = request.remote_ip
+        attributes[SPANDATA.USER_IP_ADDRESS] = request.remote_ip
+
+    with capture_internal_exceptions():
+        raw_data = _get_tornado_request_data(request)
+        body_data = raw_data.value if isinstance(raw_data, AnnotatedValue) else raw_data
+        if body_data is not None:
+            attributes[SPANDATA.HTTP_REQUEST_BODY_DATA] = body_data
 
     return attributes
+
+
+def _get_tornado_request_data(
+    request: "Any",
+) -> "Union[Optional[str], AnnotatedValue]":
+    body = request.body
+    if not body:
+        return None
+
+    if not request_body_within_bounds(sentry_sdk.get_client(), len(body)):
+        return AnnotatedValue.substituted_because_over_size_limit()
+
+    return body.decode("utf-8", "replace")
 
 
 @ensure_integration_enabled(TornadoIntegration)
