@@ -1,13 +1,12 @@
 import pytest
+import redis
 
 import sentry_sdk
 from sentry_sdk import capture_message
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.api import start_transaction
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
 from tests.conftest import ApproxDict
-
-import redis
 
 
 @pytest.fixture(autouse=True)

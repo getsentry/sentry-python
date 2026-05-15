@@ -1,4 +1,4 @@
-from sentry_sdk import start_transaction, start_span
+from sentry_sdk import start_span, start_transaction
 
 
 def test_span_origin_manual(sentry_init, capture_events):

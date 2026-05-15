@@ -1,12 +1,11 @@
-import pytest
-
 from unittest import mock
+
+import pytest
 
 import sentry_sdk
 from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import iter_default_integrations
-from sentry_sdk.scrubber import EventScrubber, DEFAULT_DENYLIST
-
+from sentry_sdk.scrubber import DEFAULT_DENYLIST, EventScrubber
 
 """
 Those tests are meant to check the compatibility of the new scopes in SDK 2.0 with the old Hub/Scope system in SDK 1.x.

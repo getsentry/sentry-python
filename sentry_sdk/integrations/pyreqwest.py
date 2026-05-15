@@ -1,12 +1,15 @@
+from contextlib import contextmanager
+from typing import Any, Generator
+
 import sentry_sdk
 from sentry_sdk import start_span
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
 from sentry_sdk.tracing_utils import (
-    should_propagate_trace,
     add_http_request_source,
     add_sentry_baggage_to_headers,
+    should_propagate_trace,
 )
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
@@ -15,18 +18,21 @@ from sentry_sdk.utils import (
     parse_url,
 )
 
-from contextlib import contextmanager
-from typing import Any, Generator
-
 try:
-    from pyreqwest.client import ClientBuilder, SyncClientBuilder  # type: ignore[import-not-found]
-    from pyreqwest.request import (  # type: ignore[import-not-found]
-        Request,
-        OneOffRequestBuilder,
-        SyncOneOffRequestBuilder,
+    from pyreqwest.client import (  # type: ignore[import-not-found]
+        ClientBuilder,
+        SyncClientBuilder,
     )
     from pyreqwest.middleware import Next, SyncNext  # type: ignore[import-not-found]
-    from pyreqwest.response import Response, SyncResponse  # type: ignore[import-not-found]
+    from pyreqwest.request import (  # type: ignore[import-not-found]
+        OneOffRequestBuilder,
+        Request,
+        SyncOneOffRequestBuilder,
+    )
+    from pyreqwest.response import (  # type: ignore[import-not-found]
+        Response,
+        SyncResponse,
+    )
 except ImportError:
     raise DidNotEnable("pyreqwest not installed or incompatible version installed")
 

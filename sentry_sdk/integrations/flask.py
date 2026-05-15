@@ -1,5 +1,7 @@
+from typing import TYPE_CHECKING
+
 import sentry_sdk
-from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     RequestExtractor,
@@ -14,14 +16,13 @@ from sentry_sdk.utils import (
     package_version,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Union
 
+    from werkzeug.datastructures import FileStorage, ImmutableMultiDict
+
     from sentry_sdk._types import Event, EventProcessor
     from sentry_sdk.integrations.wsgi import _ScopedResponse
-    from werkzeug.datastructures import FileStorage, ImmutableMultiDict
 
 
 try:

@@ -1,8 +1,7 @@
 import sentry_sdk
-from sentry_sdk.integrations import Integration
+from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.utils import ensure_integration_enabled, event_from_exception
-from sentry_sdk.integrations import DidNotEnable
 
 try:
     from trytond.exceptions import TrytonException  # type: ignore

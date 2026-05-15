@@ -22,8 +22,7 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import _get_current_streamed_span
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import StreamedSpan, _get_current_streamed_span
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TransactionSource,

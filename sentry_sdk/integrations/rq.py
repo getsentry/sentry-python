@@ -1,9 +1,9 @@
 import weakref
 
 import sentry_sdk
-from sentry_sdk.consts import OP
 from sentry_sdk.api import continue_trace
-from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
+from sentry_sdk.consts import OP
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import TransactionSource
@@ -17,11 +17,11 @@ from sentry_sdk.utils import (
 )
 
 try:
+    from rq.job import JobStatus
     from rq.queue import Queue
     from rq.timeouts import JobTimeoutException
     from rq.version import VERSION as RQ_VERSION
     from rq.worker import Worker
-    from rq.job import JobStatus
 except ImportError:
     raise DidNotEnable("RQ not installed")
 
@@ -38,10 +38,10 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any, Callable
 
+    from rq.job import Job
+
     from sentry_sdk._types import Event, EventProcessor
     from sentry_sdk.utils import ExcInfo
-
-    from rq.job import Job
 
 
 class RqIntegration(Integration):

@@ -1,13 +1,13 @@
 from collections import Counter
 
 import pytest
+from async_asgi_testclient import TestClient
+
 import sentry_sdk
 from sentry_sdk import capture_message
-from sentry_sdk.tracing import TransactionSource
-from sentry_sdk.integrations._asgi_common import _get_ip, _get_headers
+from sentry_sdk.integrations._asgi_common import _get_headers, _get_ip
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware, _looks_like_asgi3
-
-from async_asgi_testclient import TestClient
+from sentry_sdk.tracing import TransactionSource
 
 
 @pytest.fixture

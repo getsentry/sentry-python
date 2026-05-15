@@ -1,9 +1,8 @@
 import functools
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import OP
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
@@ -24,6 +23,7 @@ except (ImportError, SyntaxError):
 def patch_views() -> None:
     from django.core.handlers.base import BaseHandler
     from django.template.response import SimpleTemplateResponse
+
     from sentry_sdk.integrations.django import DjangoIntegration
 
     old_make_view_atomic = BaseHandler.make_view_atomic

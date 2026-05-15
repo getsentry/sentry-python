@@ -1,17 +1,14 @@
-import time
 import re
 import sys
-
-import requests
-
+import time
 from collections import defaultdict
-
 from pathlib import Path
 
+import requests
 from tox.config.cli.parse import get_options
-from tox.session.state import State
 from tox.config.sets import CoreConfigSet
 from tox.config.source.tox_ini import ToxIni
+from tox.session.state import State
 
 PYTHON_VERSION = "3.13"
 

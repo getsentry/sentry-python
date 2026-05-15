@@ -1,5 +1,5 @@
 import time
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 import sentry_sdk
 from sentry_sdk.utils import format_attribute

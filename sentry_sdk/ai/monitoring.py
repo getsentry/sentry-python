@@ -1,19 +1,18 @@
 import inspect
 import sys
 from functools import wraps
-
-from sentry_sdk.ai.utils import _set_span_data_attribute
-from sentry_sdk.consts import SPANDATA
-import sentry_sdk.utils
-from sentry_sdk import start_span
-from sentry_sdk.tracing import Span
-from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.utils import ContextVar, reraise, capture_internal_exceptions
-
 from typing import TYPE_CHECKING
 
+import sentry_sdk.utils
+from sentry_sdk import start_span
+from sentry_sdk.ai.utils import _set_span_data_attribute
+from sentry_sdk.consts import SPANDATA
+from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.tracing import Span
+from sentry_sdk.utils import ContextVar, capture_internal_exceptions, reraise
+
 if TYPE_CHECKING:
-    from typing import Optional, Callable, Awaitable, Any, Union, TypeVar
+    from typing import Any, Awaitable, Callable, Optional, TypeVar, Union
 
     F = TypeVar("F", bound=Union[Callable[..., Any], Callable[..., Awaitable[Any]]])
 

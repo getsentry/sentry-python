@@ -1,15 +1,14 @@
 import logging
 
-import pytest
-
 import falcon
 import falcon.testing
+import pytest
+
 import sentry_sdk
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
 from sentry_sdk.integrations.falcon import FalconIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.utils import parse_version
-
 
 try:
     import falcon.asgi

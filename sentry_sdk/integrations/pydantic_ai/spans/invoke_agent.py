@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 import sentry_sdk
 from sentry_sdk.ai.utils import (
     get_start_span_function,
@@ -19,8 +21,6 @@ from .utils import (
     _serialize_image_url_item,
     _set_usage_data,
 )
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any

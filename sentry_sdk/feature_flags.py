@@ -1,11 +1,11 @@
 import copy
+from threading import Lock
+from typing import TYPE_CHECKING, Any
+
 import sentry_sdk
 from sentry_sdk._lru_cache import LRUCache
 from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
-from threading import Lock
-
-from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from typing import TypedDict

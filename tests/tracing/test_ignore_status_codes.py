@@ -1,9 +1,9 @@
-import sentry_sdk
-from sentry_sdk import start_transaction, start_span
+from collections import Counter
 
 import pytest
 
-from collections import Counter
+import sentry_sdk
+from sentry_sdk import start_span, start_transaction
 
 
 def test_no_ignored_codes(sentry_init, capture_events):

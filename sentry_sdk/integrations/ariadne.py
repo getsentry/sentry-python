@@ -1,10 +1,10 @@
 from importlib import import_module
 
 import sentry_sdk
-from sentry_sdk import get_client, capture_event
-from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
-from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk import capture_event, get_client
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import request_body_within_bounds
+from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -24,8 +24,15 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional
-    from ariadne.types import GraphQLError, GraphQLResult, GraphQLSchema, QueryParser  # type: ignore
+
+    from ariadne.types import (  # type: ignore
+        GraphQLError,
+        GraphQLResult,
+        GraphQLSchema,
+        QueryParser,
+    )
     from graphql.language.ast import DocumentNode
+
     from sentry_sdk._types import Event, EventProcessor
 
 

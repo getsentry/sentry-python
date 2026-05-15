@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 from time import time
 from typing import TYPE_CHECKING, cast
 
+from urllib3.util import parse_url as urlparse
+
 from sentry_sdk import get_client, start_transaction
 from sentry_sdk.consts import INSTRUMENTER, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable
@@ -10,19 +12,19 @@ from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_TRACE_KEY,
 )
 from sentry_sdk.scope import add_global_event_processor
-from sentry_sdk.tracing import Transaction, Span as SentrySpan
-
-from urllib3.util import parse_url as urlparse
+from sentry_sdk.tracing import Span as SentrySpan
+from sentry_sdk.tracing import Transaction
 
 try:
     from opentelemetry.context import get_value
-    from opentelemetry.sdk.trace import SpanProcessor, ReadableSpan as OTelSpan
+    from opentelemetry.sdk.trace import ReadableSpan as OTelSpan
+    from opentelemetry.sdk.trace import SpanProcessor
     from opentelemetry.semconv.trace import SpanAttributes
     from opentelemetry.trace import (
+        SpanKind,
         format_span_id,
         format_trace_id,
         get_current_span,
-        SpanKind,
     )
     from opentelemetry.trace.span import (
         INVALID_SPAN_ID,
@@ -33,8 +35,10 @@ except ImportError:
 
 if TYPE_CHECKING:
     from typing import Any, Optional, Union
+
     from opentelemetry import context as context_api
     from opentelemetry.trace import SpanContext
+
     from sentry_sdk._types import Event, Hint
 
 OPEN_TELEMETRY_CONTEXT = "otel"
@@ -83,6 +87,8 @@ class SentrySpanProcessor(SpanProcessor):
     # The currently open spans. Elements will be discarded after SPAN_MAX_TIME_OPEN_MINUTES
     open_spans: "dict[int, set[str]]" = {}
 
+    initialized: "bool" = False
+
     def __new__(cls) -> "SentrySpanProcessor":
         if not hasattr(cls, "instance"):
             cls.instance = super().__new__(cls)
@@ -91,9 +97,14 @@ class SentrySpanProcessor(SpanProcessor):
         return cls.instance  # type: ignore[misc]
 
     def __init__(self) -> None:
+        if self.initialized:
+            return
+
         @add_global_event_processor
         def global_event_processor(event: "Event", hint: "Hint") -> "Event":
             return link_trace_context_to_error_event(event, self.otel_span_map)
+
+        self.initialized = True
 
     def _prune_old_spans(self: "SentrySpanProcessor") -> None:
         """

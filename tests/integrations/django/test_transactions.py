@@ -1,19 +1,19 @@
 from unittest import mock
 
-import pytest
 import django
+import pytest
 from django.utils.translation import pgettext_lazy
-
 
 # django<2.0 has only `url` with regex based patterns.
 # django>=2.0 renames `url` to `re_path`, and additionally introduces `path`
 # for new style URL patterns, e.g. <int:article_id>.
 if django.VERSION >= (2, 0):
+    from django.conf.urls import include
     from django.urls import path, re_path
     from django.urls.converters import PathConverter
-    from django.conf.urls import include
 else:
-    from django.conf.urls import url as re_path, include
+    from django.conf.urls import include
+    from django.conf.urls import url as re_path
 
 if django.VERSION < (1, 9):
     included_url_conf = (re_path(r"^foo/bar/(?P<param>[\w]+)", lambda x: ""),), "", ""
@@ -21,7 +21,6 @@ else:
     included_url_conf = ((re_path(r"^foo/bar/(?P<param>[\w]+)", lambda x: ""),), "")
 
 from sentry_sdk.integrations.django.transactions import RavenResolver
-
 
 example_url_conf = (
     re_path(r"^api/(?P<project_id>[\w_-]+)/store/$", lambda x: ""),

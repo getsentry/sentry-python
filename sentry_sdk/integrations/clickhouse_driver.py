@@ -1,18 +1,18 @@
+from typing import TYPE_CHECKING, TypeVar
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
-from sentry_sdk.tracing import Span
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.tracing import Span
 from sentry_sdk.utils import capture_internal_exceptions, ensure_integration_enabled
-
-from typing import TYPE_CHECKING, TypeVar
 
 # Hack to get new Python features working in older versions
 # without introducing a hard dependency on `typing_extensions`
 # from: https://stackoverflow.com/a/71944042/300572
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from typing import Any, ParamSpec, Callable
+    from typing import Any, Callable, ParamSpec
 else:
     # Fake ParamSpec
     class ParamSpec:
@@ -32,7 +32,9 @@ else:
 try:
     from clickhouse_driver import VERSION  # type: ignore[import-not-found]
     from clickhouse_driver.client import Client  # type: ignore[import-not-found]
-    from clickhouse_driver.connection import Connection  # type: ignore[import-not-found]
+    from clickhouse_driver.connection import (  # type: ignore[import-not-found]
+        Connection,
+    )
 
 except ImportError:
     raise DidNotEnable("clickhouse-driver not installed.")

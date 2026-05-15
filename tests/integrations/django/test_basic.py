@@ -1,23 +1,20 @@
 import inspect
 import json
 import os
-import pytest
 import re
 import sys
-
 from functools import partial
 from unittest.mock import patch
 
-from werkzeug.test import Client
-
+import pytest
 from django import VERSION as DJANGO_VERSION
-
 from django.contrib.auth.models import User
 from django.core.management import execute_from_command_line
-from django.db.utils import OperationalError, ProgrammingError, DataError
+from django.db.utils import DataError, OperationalError, ProgrammingError
 from django.http.request import RawPostDataException
 from django.template.context import make_context
 from django.utils.functional import SimpleLazyObject
+from werkzeug.test import Client
 
 try:
     from django.urls import reverse
@@ -25,8 +22,8 @@ except ImportError:
     from django.core.urlresolvers import reverse
 
 import sentry_sdk
+from sentry_sdk import capture_exception, capture_message
 from sentry_sdk._compat import PY310
-from sentry_sdk import capture_message, capture_exception
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import (
     DjangoIntegration,
@@ -38,8 +35,8 @@ from sentry_sdk.integrations.executing import ExecutingIntegration
 from sentry_sdk.profiler.utils import get_frame_name
 from sentry_sdk.tracing import Span
 from tests.conftest import unpack_werkzeug_response
-from tests.integrations.django.myapp.wsgi import application
 from tests.integrations.django.myapp.signals import myapp_custom_signal_silenced
+from tests.integrations.django.myapp.wsgi import application
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
 
 DJANGO_VERSION = DJANGO_VERSION[:2]

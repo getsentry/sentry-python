@@ -1,20 +1,21 @@
 import os
+import platform
 import subprocess
 import sys
-import platform
 from http.client import HTTPConnection, HTTPResponse
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
-from sentry_sdk.tracing import Span
 from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import (
     EnvironHeaders,
-    should_propagate_trace,
     add_http_request_source,
     has_span_streaming_enabled,
+    should_propagate_trace,
 )
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
@@ -22,19 +23,12 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     is_sentry_url,
     logger,
-    safe_repr,
     parse_url,
+    safe_repr,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import Dict
-    from typing import Optional
-    from typing import List
-    from typing import Union
+    from typing import Any, Callable, Dict, List, Optional, Union
 
     from sentry_sdk._types import Event, Hint
 
