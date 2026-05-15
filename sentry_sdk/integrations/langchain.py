@@ -61,7 +61,8 @@ except ImportError:
     try:
         # <v1
         from langchain.agents import AgentExecutor
-    except ImportError:
+    # Catch TypeError due to changes in type hint evaluation order: https://github.com/pydantic/pydantic/issues/13036
+    except (ImportError, TypeError):
         AgentExecutor = None
 
 
