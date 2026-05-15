@@ -5,11 +5,16 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     RequestExtractor,
+    _serialize_request_body_data,
+    request_body_within_bounds,
 )
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import StreamedSpan, _get_current_streamed_span
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
+    AnnotatedValue,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
@@ -36,9 +41,11 @@ try:
     from flask.signals import (
         before_render_template,
         got_request_exception,
+        request_finished,
         request_started,
     )
     from markupsafe import Markup
+    from werkzeug.exceptions import ClientDisconnected
 except ImportError:
     raise DidNotEnable("Flask is not installed")
 
@@ -88,6 +95,7 @@ class FlaskIntegration(Integration):
 
         before_render_template.connect(_add_sentry_trace)
         request_started.connect(_request_started)
+        request_finished.connect(_request_finished)
         got_request_exception.connect(_capture_exception)
 
         old_app = Flask.__call__
@@ -95,10 +103,9 @@ class FlaskIntegration(Integration):
         def sentry_patched_wsgi_app(
             self: "Any", environ: "Dict[str, str]", start_response: "Callable[..., Any]"
         ) -> "_ScopedResponse":
-            if sentry_sdk.get_client().get_integration(FlaskIntegration) is None:
-                return old_app(self, environ, start_response)
-
             integration = sentry_sdk.get_client().get_integration(FlaskIntegration)
+            if integration is None:
+                return old_app(self, environ, start_response)
 
             middleware = SentryWsgiMiddleware(
                 lambda *a, **kw: old_app(self, *a, **kw),
@@ -158,6 +165,72 @@ def _request_started(app: "Flask", **kwargs: "Any") -> None:
     scope = sentry_sdk.get_isolation_scope()
     evt_processor = _make_request_event_processor(app, request, integration)
     scope.add_event_processor(evt_processor)
+
+
+def _request_finished(sender: "Flask", response: "Any", **kwargs: "Any") -> None:
+    integration = sentry_sdk.get_client().get_integration(FlaskIntegration)
+    if integration is None:
+        return
+
+    client = sentry_sdk.get_client()
+    if has_span_streaming_enabled(client.options):
+        request = flask_request._get_current_object()
+        _set_request_body_data_on_streaming_segment(request, client)
+
+
+def _set_request_body_data_on_streaming_segment(
+    request: "Request", client: "sentry_sdk.client.BaseClient"
+) -> None:
+    current_span = _get_current_streamed_span()
+    if type(current_span) is not StreamedSpan:
+        return
+
+    with capture_internal_exceptions():
+        content_length = int(request.content_length or 0)
+
+        # Proceeding without a content length means that we may be consuming the request
+        # without respecting the bounds specified by the user via `max_request_body_size`
+        # option in the SDK.
+        if not content_length:
+            return
+
+        if not request_body_within_bounds(client, content_length):
+            data = AnnotatedValue.substituted_because_over_size_limit()
+        else:
+            raw_data = getattr(request, "_cached_data", None)
+            parsed_body = None
+            if "form" in request.__dict__:
+                extractor = FlaskRequestExtractor(request)
+                parsed_body = extractor.parsed_body()
+            elif raw_data is not None:
+                extractor = FlaskRequestExtractor(request)
+                if extractor.is_json():
+                    parsed_body = extractor.json()
+            else:
+                # The route never read the body via Werkzeug, but it
+                # may have consumed wsgi.input directly. get_data()
+                # raises ClientDisconnected if the stream is exhausted.
+                try:
+                    raw_data = request.get_data()
+                except ClientDisconnected:
+                    raw_data = None
+
+                if raw_data:
+                    extractor = FlaskRequestExtractor(request)
+                    if extractor.is_json():
+                        parsed_body = extractor.json()
+
+            if parsed_body is not None:
+                data = parsed_body
+            elif raw_data:
+                data = AnnotatedValue.substituted_because_raw_data()
+            else:
+                return
+
+        current_span._segment.set_attribute(
+            "http.request.body.data",
+            _serialize_request_body_data(data),
+        )
 
 
 class FlaskRequestExtractor(RequestExtractor):

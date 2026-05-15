@@ -209,6 +209,15 @@ def _is_json_content_type(ct: "Optional[str]") -> bool:
     )
 
 
+def _serialize_request_body_data(data: "Any") -> str:
+    def _default(value: "Any") -> "Any":
+        if isinstance(value, AnnotatedValue):
+            return value.value
+        return str(value)
+
+    return json.dumps(data, default=_default)
+
+
 def _filter_headers(
     headers: "Mapping[str, str]",
     use_annotated_value: bool = True,
