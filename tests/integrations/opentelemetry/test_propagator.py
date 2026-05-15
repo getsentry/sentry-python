@@ -1,3 +1,10 @@
+from sentry_sdk.integrations.opentelemetry.integration import (
+    OpenTelemetryIntegration,
+)
+from opentelemetry import trace
+from sentry_sdk.scope import global_event_processors
+
+
 import pytest
 
 from unittest import mock
@@ -298,3 +305,21 @@ def test_inject_sentry_span_baggage():
             "baggage",
             baggage.serialize(),
         )
+
+
+def test_inject_no_memory_leak():
+
+    OpenTelemetryIntegration.setup_once()
+
+    tracer = trace.get_tracer(__name__)
+    propagator = SentryPropagator()
+
+    cnt_before = len(global_event_processors)
+
+    with tracer.start_as_current_span("bar") as new_span:
+        context = set_span_in_context(new_span)
+        carrier = "any_carrier"
+        propagator.inject(carrier, context)
+
+    cnt_after = len(global_event_processors)
+    assert cnt_after == cnt_before
