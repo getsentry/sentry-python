@@ -961,15 +961,15 @@ def test_cache_spans_get_many(
 
         assert spans[2]["attributes"]["sentry.op"] == "cache.get"
         assert spans[2]["name"] == f"S{id}, S{id + 1}"
-        assert not spans[0]["attributes"]["cache.hit"]
+        assert not spans[2]["attributes"]["cache.hit"]
 
         assert spans[0]["attributes"]["sentry.op"] == "cache.get"
         assert spans[0]["name"] == f"S{id}"
-        assert not spans[1]["attributes"]["cache.hit"]
+        assert not spans[0]["attributes"]["cache.hit"]
 
         assert spans[1]["attributes"]["sentry.op"] == "cache.get"
         assert spans[1]["name"] == f"S{id + 1}"
-        assert not spans[2]["attributes"]["cache.hit"]
+        assert not spans[1]["attributes"]["cache.hit"]
 
         assert spans[3]["attributes"]["sentry.op"] == "cache.put"
         assert spans[3]["name"] == f"S{id}"
