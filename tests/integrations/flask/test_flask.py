@@ -406,13 +406,18 @@ def test_flask_medium_formdata_request(sentry_init, capture_events, app):
     assert len(event["request"]["data"]["foo"]) == DEFAULT_MAX_VALUE_LENGTH
 
 
-def test_flask_formdata_request_appear_transaction_body(
-    sentry_init, capture_events, app
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_flask_formdata_request_appear_in_segment_or_transaction_body(
+    sentry_init, capture_events, capture_items, app, span_streaming
 ):
     """
-    Test that ensures that transaction request data contains body, even if no exception was raised
+    Test that ensures that transaction/segment request data contains body, even if no exception was raised
     """
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"} if span_streaming else {},
+    )
 
     data = {"username": "sentry-user", "age": "26"}
 
@@ -430,17 +435,29 @@ def test_flask_formdata_request_appear_transaction_body(
         capture_message("hi")
         return "ok"
 
-    events = capture_events()
+    if span_streaming:
+        items = capture_items("event", "span")
+    else:
+        events = capture_events()
 
     client = app.test_client()
     response = client.post("/", data=data)
     assert response.status_code == 200
 
-    event, transaction_event = events
+    if span_streaming:
+        sentry_sdk.flush()
 
-    assert "request" in transaction_event
-    assert "data" in transaction_event["request"]
-    assert transaction_event["request"]["data"] == data
+        spans = [i for i in items if i.type == "span"]
+        assert len(spans) == 1
+        span = spans[0].payload
+
+        assert span["attributes"]["http.request.body.data"] == json.dumps(data)
+    else:
+        event, transaction_event = events
+
+        assert "request" in transaction_event
+        assert "data" in transaction_event["request"]
+        assert transaction_event["request"]["data"] == data
 
 
 @pytest.mark.parametrize("input_char", ["a", b"a"])
@@ -1355,6 +1372,86 @@ def test_sensitive_header_scrubbing_span_streaming(sentry_init, capture_items, a
         == SENSITIVE_DATA_SUBSTITUTE
     )
     assert span["attributes"]["http.request.header.x-custom-header"] == "passthrough"
+
+
+def test_request_body_captured_when_route_ignores_body_span_streaming(
+    sentry_init, capture_items, app
+):
+    """
+    When the route handler never reads the request body, the SDK should
+    still capture it in _request_finished via request.get_data().
+    """
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        traces_sample_rate=1.0,
+        max_request_body_size="always",
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    body = {"key": "value"}
+
+    @app.route("/ignore-body", methods=["POST"])
+    def ignore_body_endpoint():
+        return "ok"
+
+    items = capture_items("span")
+
+    client = app.test_client()
+    response = client.post("/ignore-body", json=body)
+    assert response.status_code == 200
+
+    sentry_sdk.flush()
+
+    assert len(items) == 1
+    span = items[0].payload
+    assert span["attributes"]["http.request.body.data"] == json.dumps(body)
+
+
+def test_client_disconnected_handled_gracefully_span_streaming(
+    sentry_init, capture_items, app
+):
+    from unittest.mock import patch
+
+    from werkzeug.exceptions import ClientDisconnected
+
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        traces_sample_rate=1.0,
+        max_request_body_size="always",
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    @app.route("/disconnect", methods=["POST"])
+    def disconnect_endpoint():
+        # Simulate a client that disconnected: patch get_data so that
+        # when _request_finished tries to read the body it raises.
+        request._cached_data = None
+        request.__dict__.pop("form", None)
+        patch.object(
+            type(request._get_current_object()),
+            "get_data",
+            side_effect=ClientDisconnected(),
+        ).start()
+        return "ok"
+
+    items = capture_items("span")
+
+    client = app.test_client()
+    try:
+        response = client.post(
+            "/disconnect",
+            data=b'{"key": "value"}',
+            content_type="application/json",
+        )
+        assert response.status_code == 200
+    finally:
+        patch.stopall()
+
+    sentry_sdk.flush()
+
+    assert len(items) == 1
+    span = items[0].payload
+    assert "http.request.body.data" not in span.get("attributes", {})
 
 
 def test_wsgi_input_direct_read_does_not_hang_span_streaming(

@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import (
-    _RAW_DATA_EXCEPTIONS,
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     RequestExtractor,
     _serialize_request_body_data,
@@ -46,6 +45,7 @@ try:
         request_started,
     )
     from markupsafe import Markup
+    from werkzeug.exceptions import ClientDisconnected
 except ImportError:
     raise DidNotEnable("Flask is not installed")
 
@@ -191,13 +191,7 @@ def _set_request_body_data_on_streaming_segment(
         if not request_body_within_bounds(client, content_length):
             data = AnnotatedValue.substituted_because_over_size_limit()
         else:
-            # Only use data that Werkzeug has already cached — never consume
-            # wsgi.input ourselves, as that would break user code that reads
-            # the stream directly.
-            # You can find where this gets set here:
-            # https://github.com/pallets/werkzeug/blob/1b00618e787f40dfb21eba29caf8f8be7c8e1d93/src/werkzeug/wrappers/request.py#L444
             raw_data = getattr(request, "_cached_data", None)
-
             parsed_body = None
             if "form" in request.__dict__:
                 extractor = FlaskRequestExtractor(request)
@@ -206,6 +200,19 @@ def _set_request_body_data_on_streaming_segment(
                 extractor = FlaskRequestExtractor(request)
                 if extractor.is_json():
                     parsed_body = extractor.json()
+            else:
+                # The route never read the body via Werkzeug, but it
+                # may have consumed wsgi.input directly. get_data()
+                # raises ClientDisconnected if the stream is exhausted.
+                try:
+                    raw_data = request.get_data()
+                except ClientDisconnected:
+                    raw_data = None
+
+                if raw_data:
+                    extractor = FlaskRequestExtractor(request)
+                    if extractor.is_json():
+                        parsed_body = extractor.json()
 
             if parsed_body is not None:
                 data = parsed_body
