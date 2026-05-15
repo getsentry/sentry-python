@@ -1,17 +1,17 @@
-from unittest import mock
-import pytest
-
 from string import Template
 from typing import Dict
+from unittest import mock
+
+import pytest
 
 import sentry_sdk
+from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.integrations.rust_tracing import (
+    EventTypeMapping,
     RustTracingIntegration,
     RustTracingLayer,
     RustTracingLevel,
-    EventTypeMapping,
 )
-from sentry_sdk import start_transaction, capture_message
 
 
 def _test_event_type_mapping(metadata: Dict[str, object]) -> EventTypeMapping:

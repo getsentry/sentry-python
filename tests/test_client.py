@@ -1,6 +1,6 @@
 import contextlib
-import os
 import json
+import os
 import subprocess
 import sys
 import time
@@ -13,24 +13,24 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk import (
-    Hub,
     Client,
+    Hub,
     add_breadcrumb,
-    configure_scope,
-    capture_message,
-    capture_exception,
     capture_event,
+    capture_exception,
+    capture_message,
+    configure_scope,
     set_tag,
     start_transaction,
 )
-from sentry_sdk.spotlight import DEFAULT_SPOTLIGHT_URL
-from sentry_sdk.utils import capture_internal_exception
-from sentry_sdk.integrations.executing import ExecutingIntegration
-from sentry_sdk.integrations.asyncio import AsyncioIntegration
-from sentry_sdk.transport import Transport, AsyncHttpTransport
-from sentry_sdk.serializer import MAX_DATABAG_BREADTH
-from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, DEFAULT_MAX_VALUE_LENGTH
 from sentry_sdk._compat import PY38
+from sentry_sdk.consts import DEFAULT_MAX_BREADCRUMBS, DEFAULT_MAX_VALUE_LENGTH
+from sentry_sdk.integrations.asyncio import AsyncioIntegration
+from sentry_sdk.integrations.executing import ExecutingIntegration
+from sentry_sdk.serializer import MAX_DATABAG_BREADTH
+from sentry_sdk.spotlight import DEFAULT_SPOTLIGHT_URL
+from sentry_sdk.transport import AsyncHttpTransport, Transport
+from sentry_sdk.utils import capture_internal_exception
 
 try:
     import gevent  # noqa: F401
@@ -48,6 +48,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import Any, Optional, Union
+
     from sentry_sdk._types import Event
 
 

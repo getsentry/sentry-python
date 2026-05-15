@@ -2,6 +2,7 @@ import asyncio
 import inspect
 import sys
 from functools import wraps
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -14,11 +15,9 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
 )
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Union
+    from typing import Any, Union
 
     from sentry_sdk._types import Event, EventProcessor
 
@@ -29,10 +28,10 @@ except ImportError:
 
 try:
     from quart import (  # type: ignore
+        Quart,
+        Request,
         has_request_context,
         has_websocket_context,
-        Request,
-        Quart,
         request,
         websocket,
     )

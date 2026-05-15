@@ -1,4 +1,5 @@
 import json
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.ai.utils import (
@@ -11,11 +12,11 @@ from sentry_sdk.utils import safe_serialize
 
 from ..consts import SPAN_ORIGIN
 from ..utils import (
+    _get_model_name,
     _set_agent_data,
     _set_available_tools,
     _set_model_data,
     _should_send_prompts,
-    _get_model_name,
     get_current_agent,
     get_is_streaming,
 )
@@ -25,23 +26,23 @@ from .utils import (
     _set_usage_data,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any, List, Dict
+    from typing import Any, Dict, List
+
     from pydantic_ai.messages import ModelMessage, SystemPromptPart  # type: ignore
+
     from sentry_sdk._types import TextPart as SentryTextPart
 
 try:
     from pydantic_ai.messages import (
         BaseToolCallPart,
         BaseToolReturnPart,
-        SystemPromptPart,
-        UserPromptPart,
-        TextPart,
-        ThinkingPart,
         BinaryContent,
         ImageUrl,
+        SystemPromptPart,
+        TextPart,
+        ThinkingPart,
+        UserPromptPart,
     )
 except ImportError:
     # Fallback if these classes are not available
@@ -182,9 +183,12 @@ def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> Non
 
         if formatted_messages:
             normalized_messages = normalize_message_roles(formatted_messages)
+            client = sentry_sdk.get_client()
             scope = sentry_sdk.get_current_scope()
-            messages_data = truncate_and_annotate_messages(
-                normalized_messages, span, scope
+            messages_data = (
+                normalized_messages
+                if client.options.get("stream_gen_ai_spans", False)
+                else truncate_and_annotate_messages(normalized_messages, span, scope)
             )
             set_data_normalized(
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False

@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis.consts import (
     _COMMANDS_INCLUDING_SENSITIVE_DATA,
@@ -10,8 +12,6 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Optional, Sequence, Union

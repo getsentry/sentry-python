@@ -1,9 +1,8 @@
 import pytest
 
 import sentry_sdk
-from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.consts import OP
-
+from sentry_sdk.integrations.django import DjangoIntegration
 
 try:
     from django.tasks import task

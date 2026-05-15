@@ -1,29 +1,29 @@
 import json
+from typing import TYPE_CHECKING
 
 import sentry_sdk
+from sentry_sdk.ai._openai_completions_api import _transform_system_instructions
+from sentry_sdk.ai._openai_responses_api import (
+    _get_system_instructions,
+    _is_system_instruction,
+)
 from sentry_sdk.ai.utils import (
     GEN_AI_ALLOWED_MESSAGE_ROLES,
+    normalize_message_role,
     normalize_message_roles,
     set_data_normalized,
-    normalize_message_role,
     truncate_and_annotate_messages,
 )
-from sentry_sdk.consts import SPANDATA, SPANSTATUS, OP
+from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing_utils import set_span_errored
 from sentry_sdk.utils import event_from_exception, safe_serialize
-from sentry_sdk.ai._openai_completions_api import _transform_system_instructions
-from sentry_sdk.ai._openai_responses_api import (
-    _is_system_instruction,
-    _get_system_instructions,
-)
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
-    from agents import Usage, TResponseInputItem
+
+    from agents import TResponseInputItem, Usage
 
     from sentry_sdk._types import TextPart
 
@@ -173,8 +173,13 @@ def _set_input_data(
                 )
 
     normalized_messages = normalize_message_roles(request_messages)
+    client = sentry_sdk.get_client()
     scope = sentry_sdk.get_current_scope()
-    messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
+    messages_data = (
+        normalized_messages
+        if client.options.get("stream_gen_ai_spans", False)
+        else truncate_and_annotate_messages(normalized_messages, span, scope)
+    )
     if messages_data is not None:
         set_data_normalized(
             span,

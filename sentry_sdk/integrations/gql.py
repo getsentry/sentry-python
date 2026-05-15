@@ -1,23 +1,27 @@
 import sentry_sdk
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
-    event_from_exception,
     ensure_integration_enabled,
+    event_from_exception,
     parse_version,
 )
 
-from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
-from sentry_sdk.scope import should_send_default_pii
-
 try:
     import gql  # type: ignore[import-not-found]
+    from gql.transport import (  # type: ignore[import-not-found]
+        AsyncTransport,
+        Transport,
+    )
+    from gql.transport.exceptions import (  # type: ignore[import-not-found]
+        TransportQueryError,
+    )
     from graphql import (
-        print_ast,
-        get_operation_ast,
         DocumentNode,
         VariableDefinitionNode,
+        get_operation_ast,
+        print_ast,
     )
-    from gql.transport import Transport, AsyncTransport  # type: ignore[import-not-found]
-    from gql.transport.exceptions import TransportQueryError  # type: ignore[import-not-found]
 
     try:
         # gql 4.0+
@@ -32,6 +36,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Tuple, Union
+
     from sentry_sdk._types import Event, EventProcessor
 
     EventDataType = Dict[str, Union[str, Tuple[VariableDefinitionNode, ...]]]

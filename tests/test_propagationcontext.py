@@ -5,7 +5,6 @@ import pytest
 
 from sentry_sdk.tracing_utils import PropagationContext
 
-
 SAMPLED_FLAG = {
     None: "",
     False: "-0",

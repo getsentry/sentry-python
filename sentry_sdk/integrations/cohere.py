@@ -1,31 +1,30 @@
 import sys
 from functools import wraps
+from typing import TYPE_CHECKING
 
 from sentry_sdk import consts
 from sentry_sdk.ai.monitoring import record_token_usage
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.ai.utils import set_data_normalized
-
-from typing import TYPE_CHECKING
-
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.tracing_utils import set_span_errored
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Iterator
+
     from sentry_sdk.tracing import Span
 
 import sentry_sdk
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception, reraise
 
 try:
-    from cohere.client import Client
-    from cohere.base_client import BaseCohere
     from cohere import (
         ChatStreamEndEvent,
         NonStreamedChatResponse,
     )
+    from cohere.base_client import BaseCohere
+    from cohere.client import Client
 
     if TYPE_CHECKING:
         from cohere import StreamedChatResponse

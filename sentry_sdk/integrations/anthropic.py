@@ -1,5 +1,5 @@
-import sys
 import json
+import sys
 from collections.abc import Iterable
 from functools import wraps
 from typing import TYPE_CHECKING
@@ -8,21 +8,21 @@ import sentry_sdk
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import (
     GEN_AI_ALLOWED_MESSAGE_ROLES,
-    set_data_normalized,
-    normalize_message_roles,
-    truncate_and_annotate_messages,
     get_start_span_function,
+    normalize_message_roles,
+    set_data_normalized,
     transform_anthropic_content_part,
+    truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     package_version,
-    safe_serialize,
     reraise,
+    safe_serialize,
 )
 
 try:
@@ -36,22 +36,21 @@ try:
     except ImportError:
         Omit = None
 
-    from anthropic import Stream, AsyncStream
-    from anthropic.resources import AsyncMessages, Messages
+    from anthropic import AsyncStream, Stream
     from anthropic.lib.streaming import (
-        MessageStreamManager,
-        MessageStream,
-        AsyncMessageStreamManager,
         AsyncMessageStream,
+        AsyncMessageStreamManager,
+        MessageStream,
+        MessageStreamManager,
     )
-
+    from anthropic.resources import AsyncMessages, Messages
     from anthropic.types import (
-        MessageStartEvent,
-        MessageDeltaEvent,
-        MessageStopEvent,
-        ContentBlockStartEvent,
         ContentBlockDeltaEvent,
+        ContentBlockStartEvent,
         ContentBlockStopEvent,
+        MessageDeltaEvent,
+        MessageStartEvent,
+        MessageStopEvent,
     )
 
     if TYPE_CHECKING:
@@ -63,22 +62,23 @@ if TYPE_CHECKING:
     from typing import (
         Any,
         AsyncIterator,
+        Awaitable,
+        Callable,
         Iterator,
         Optional,
         Union,
-        Callable,
-        Awaitable,
     )
-    from sentry_sdk.tracing import Span
-    from sentry_sdk._types import TextPart
 
     from anthropic.types import (
-        RawMessageStreamEvent,
         MessageParam,
         ModelParam,
+        RawMessageStreamEvent,
         TextBlockParam,
         ToolUnionParam,
     )
+
+    from sentry_sdk._types import TextPart
+    from sentry_sdk.tracing import Span
 
 
 class _RecordedUsage:
@@ -438,9 +438,13 @@ def _set_common_input_data(
                 normalized_messages.append(transformed_message)
 
         role_normalized_messages = normalize_message_roles(normalized_messages)
+
+        client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
-        messages_data = truncate_and_annotate_messages(
-            role_normalized_messages, span, scope
+        messages_data = (
+            role_normalized_messages
+            if client.options.get("stream_gen_ai_spans", False)
+            else truncate_and_annotate_messages(role_normalized_messages, span, scope)
         )
         if messages_data is not None:
             set_data_normalized(

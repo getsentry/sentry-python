@@ -1,5 +1,5 @@
 import json
-from typing import List, Optional, Any, Iterator
+from typing import Any, Iterator, List, Optional
 from unittest import mock
 from unittest.mock import Mock, patch
 
@@ -12,37 +12,39 @@ try:
     from langchain_openai import ChatOpenAI, OpenAI
 except ImportError:
     # Langchain < 0.2
-    from langchain_community.llms import OpenAI
     from langchain_community.chat_models import ChatOpenAI
+    from langchain_community.llms import OpenAI
 
 from langchain_core.callbacks import BaseCallbackManager, CallbackManagerForLLMRun
-from langchain_core.messages import BaseMessage, AIMessageChunk
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import AIMessageChunk, BaseMessage
 from langchain_core.outputs import ChatGenerationChunk, ChatResult
 from langchain_core.runnables import RunnableConfig
-from langchain_core.language_models.chat_models import BaseChatModel
 
 import sentry_sdk
 from sentry_sdk import start_transaction
-from sentry_sdk.utils import package_version
 from sentry_sdk.integrations.langchain import (
     LangchainIntegration,
     SentryLangchainCallback,
     _transform_langchain_content_block,
     _transform_langchain_message_content,
 )
+from sentry_sdk.utils import package_version
 
 try:
     # langchain v1+
-    from langchain.tools import tool
     from langchain.agents import create_agent
-    from langchain_classic.agents import AgentExecutor, create_openai_tools_agent  # type: ignore[import-not-found]
+    from langchain.tools import tool
+    from langchain_classic.agents import (  # type: ignore[import-not-found]
+        AgentExecutor,
+        create_openai_tools_agent,
+    )
 except ImportError:
     # langchain <v1
-    from langchain.agents import tool, AgentExecutor, create_openai_tools_agent
+    from langchain.agents import AgentExecutor, create_openai_tools_agent, tool
 
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, SystemMessage
-
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from openai.types.chat.chat_completion_chunk import (
     ChatCompletionChunk,
     Choice,
@@ -50,14 +52,11 @@ from openai.types.chat.chat_completion_chunk import (
     ChoiceDeltaToolCall,
     ChoiceDeltaToolCallFunction,
 )
-
 from openai.types.completion import Completion
 from openai.types.completion_choice import CompletionChoice
-
 from openai.types.completion_usage import (
     CompletionUsage,
 )
-
 from openai.types.responses import (
     ResponseUsage,
 )
@@ -237,30 +236,13 @@ def get_word_length(word: str) -> int:
     return len(word)
 
 
-global stream_result_mock  # type: Mock
-global llm_type  # type: str
-
-
-class MockOpenAI(ChatOpenAI):
-    def _stream(
-        self,
-        messages: List[BaseMessage],
-        stop: Optional[List[str]] = None,
-        run_manager: Optional[CallbackManagerForLLMRun] = None,
-        **kwargs: Any,
-    ) -> Iterator[ChatGenerationChunk]:
-        for x in stream_result_mock():
-            yield x
-
-    @property
-    def _llm_type(self) -> str:
-        return llm_type
-
-
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_langchain_text_completion(
     sentry_init,
     capture_events,
+    capture_items,
     get_model_response,
+    stream_gen_ai_spans,
 ):
     sentry_init(
         integrations=[
@@ -270,8 +252,8 @@ def test_langchain_text_completion(
         ],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
 
     model_response = get_model_response(
         Completion(
@@ -302,41 +284,83 @@ def test_langchain_text_completion(
         openai_api_key="badkey",
     )
 
-    with patch.object(
-        model.client._client._client,
-        "send",
-        return_value=model_response,
-    ) as _:
-        with start_transaction():
+    if stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with patch.object(
+            model.client._client._client,
+            "send",
+            return_value=model_response,
+        ) as _, start_transaction():
             input_text = "What is the capital of France?"
             model.invoke(input_text, config={"run_name": "my-snazzy-pipeline"})
 
-    tx = events[0]
-    assert tx["type"] == "transaction"
+        tx = next(item.payload for item in items if item.type == "transaction")
+        assert tx["type"] == "transaction"
 
-    llm_spans = [
-        span
-        for span in tx.get("spans", [])
-        if span.get("op") == "gen_ai.text_completion"
-    ]
-    assert len(llm_spans) > 0
+        spans = [item.payload for item in items if item.type == "span"]
+        llm_spans = [
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == "gen_ai.text_completion"
+        ]
+        assert len(llm_spans) > 0
 
-    llm_span = llm_spans[0]
-    assert llm_span["description"] == "text_completion gpt-3.5-turbo"
-    assert llm_span["data"]["gen_ai.system"] == "openai"
-    assert llm_span["data"]["gen_ai.function_id"] == "my-snazzy-pipeline"
-    assert llm_span["data"]["gen_ai.request.model"] == "gpt-3.5-turbo"
-    assert llm_span["data"]["gen_ai.response.text"] == "The capital of France is Paris."
-    assert llm_span["data"]["gen_ai.usage.total_tokens"] == 25
-    assert llm_span["data"]["gen_ai.usage.input_tokens"] == 10
-    assert llm_span["data"]["gen_ai.usage.output_tokens"] == 15
+        llm_span = llm_spans[0]
+        assert llm_span["name"] == "text_completion gpt-3.5-turbo"
+        assert llm_span["attributes"]["gen_ai.system"] == "openai"
+        assert llm_span["attributes"]["gen_ai.function_id"] == "my-snazzy-pipeline"
+        assert llm_span["attributes"]["gen_ai.request.model"] == "gpt-3.5-turbo"
+        assert (
+            llm_span["attributes"]["gen_ai.response.text"]
+            == "The capital of France is Paris."
+        )
+        assert llm_span["attributes"]["gen_ai.usage.total_tokens"] == 25
+        assert llm_span["attributes"]["gen_ai.usage.input_tokens"] == 10
+        assert llm_span["attributes"]["gen_ai.usage.output_tokens"] == 15
+    else:
+        events = capture_events()
+
+        with patch.object(
+            model.client._client._client,
+            "send",
+            return_value=model_response,
+        ) as _, start_transaction():
+            input_text = "What is the capital of France?"
+            model.invoke(input_text, config={"run_name": "my-snazzy-pipeline"})
+
+        tx = events[0]
+        assert tx["type"] == "transaction"
+
+        llm_spans = [
+            span
+            for span in tx.get("spans", [])
+            if span.get("op") == "gen_ai.text_completion"
+        ]
+        assert len(llm_spans) > 0
+
+        llm_span = llm_spans[0]
+        assert llm_span["description"] == "text_completion gpt-3.5-turbo"
+        assert llm_span["data"]["gen_ai.system"] == "openai"
+        assert llm_span["data"]["gen_ai.function_id"] == "my-snazzy-pipeline"
+        assert llm_span["data"]["gen_ai.request.model"] == "gpt-3.5-turbo"
+        assert (
+            llm_span["data"]["gen_ai.response.text"]
+            == "The capital of France is Paris."
+        )
+        assert llm_span["data"]["gen_ai.usage.total_tokens"] == 25
+        assert llm_span["data"]["gen_ai.usage.input_tokens"] == 10
+        assert llm_span["data"]["gen_ai.usage.output_tokens"] == 15
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_langchain_chat_with_run_name(
     sentry_init,
     capture_events,
+    capture_items,
     get_model_response,
     nonstreaming_chat_completions_model_response,
+    stream_gen_ai_spans,
 ):
     sentry_init(
         integrations=[
@@ -346,8 +370,8 @@ def test_langchain_chat_with_run_name(
         ],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
 
     request_headers = {}
     # Changed in https://github.com/langchain-ai/langchain/pull/32655
@@ -376,27 +400,56 @@ def test_langchain_chat_with_run_name(
         openai_api_key="badkey",
     )
 
-    with patch.object(
-        llm.client._client._client,
-        "send",
-        return_value=model_response,
-    ) as _:
-        with start_transaction():
+    if stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with patch.object(
+            llm.client._client._client,
+            "send",
+            return_value=model_response,
+        ) as _, start_transaction():
             llm.invoke(
                 "How many letters in the word eudca",
                 config={"run_name": "my-snazzy-pipeline"},
             )
 
-    tx = events[0]
+        spans = [item.payload for item in items if item.type == "span"]
+        chat_spans = list(
+            x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.chat"
+        )
+        assert len(chat_spans) == 1
+        assert (
+            chat_spans[0]["attributes"][SPANDATA.GEN_AI_FUNCTION_ID]
+            == "my-snazzy-pipeline"
+        )
+    else:
+        events = capture_events()
 
-    chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
-    assert len(chat_spans) == 1
-    assert chat_spans[0]["data"][SPANDATA.GEN_AI_FUNCTION_ID] == "my-snazzy-pipeline"
+        with patch.object(
+            llm.client._client._client,
+            "send",
+            return_value=model_response,
+        ) as _, start_transaction():
+            llm.invoke(
+                "How many letters in the word eudca",
+                config={"run_name": "my-snazzy-pipeline"},
+            )
+
+        tx = events[0]
+
+        chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
+        assert len(chat_spans) == 1
+        assert (
+            chat_spans[0]["data"][SPANDATA.GEN_AI_FUNCTION_ID] == "my-snazzy-pipeline"
+        )
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_langchain_tool_call_with_run_name(
     sentry_init,
     capture_events,
+    capture_items,
+    stream_gen_ai_spans,
 ):
     sentry_init(
         integrations=[
@@ -406,21 +459,44 @@ def test_langchain_tool_call_with_run_name(
         ],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
+    if stream_gen_ai_spans:
+        items = capture_items("span")
 
-    with start_transaction():
-        get_word_length.invoke(
-            {"word": "eudca"},
-            config={"run_name": "my-snazzy-pipeline"},
+        with start_transaction():
+            get_word_length.invoke(
+                {"word": "eudca"},
+                config={"run_name": "my-snazzy-pipeline"},
+            )
+
+        spans = [item.payload for item in items if item.type == "span"]
+        tool_spans = list(
+            x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.execute_tool"
+        )
+        assert len(tool_spans) == 1
+        assert (
+            tool_spans[0]["attributes"][SPANDATA.GEN_AI_FUNCTION_ID]
+            == "my-snazzy-pipeline"
+        )
+    else:
+        events = capture_events()
+
+        with start_transaction():
+            get_word_length.invoke(
+                {"word": "eudca"},
+                config={"run_name": "my-snazzy-pipeline"},
+            )
+
+        tx = events[0]
+        tool_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool")
+        assert len(tool_spans) == 1
+        assert (
+            tool_spans[0]["data"][SPANDATA.GEN_AI_FUNCTION_ID] == "my-snazzy-pipeline"
         )
 
-    tx = events[0]
-    tool_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool")
-    assert len(tool_spans) == 1
-    assert tool_spans[0]["data"][SPANDATA.GEN_AI_FUNCTION_ID] == "my-snazzy-pipeline"
 
-
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.skipif(
     LANGCHAIN_VERSION < (1,),
     reason="LangChain 1.0+ required (ONE AGENT refactor)",
@@ -448,12 +524,14 @@ def test_langchain_tool_call_with_run_name(
 def test_langchain_create_agent(
     sentry_init,
     capture_events,
+    capture_items,
     send_default_pii,
     include_prompts,
     system_instructions_content,
     request,
     get_model_response,
     nonstreaming_responses_model_response,
+    stream_gen_ai_spans,
 ):
     sentry_init(
         integrations=[
@@ -463,8 +541,8 @@ def test_langchain_create_agent(
         ],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
 
     model_response = get_model_response(
         nonstreaming_responses_model_response,
@@ -487,12 +565,104 @@ def test_langchain_create_agent(
         name="word_length_agent",
     )
 
-    with patch.object(
-        llm.client._client._client,
-        "send",
-        return_value=model_response,
-    ) as _:
-        with start_transaction():
+    if stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with patch.object(
+            llm.client._client._client,
+            "send",
+            return_value=model_response,
+        ) as _, start_transaction():
+            agent.invoke(
+                {
+                    "messages": [
+                        HumanMessage(
+                            content="Message demonstrating the absence of truncation."
+                        ),
+                        HumanMessage(content="How many letters in the word eudca"),
+                    ],
+                },
+            )
+
+        tx = next(item.payload for item in items if item.type == "transaction")
+        assert tx["type"] == "transaction"
+        assert tx["contexts"]["trace"]["origin"] == "manual"
+
+        spans = [item.payload for item in items if item.type == "span"]
+        chat_spans = list(
+            x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.chat"
+        )
+        assert len(chat_spans) == 1
+        assert chat_spans[0]["attributes"]["sentry.origin"] == "auto.ai.langchain"
+
+        assert chat_spans[0]["attributes"]["gen_ai.system"] == "openai-chat"
+        assert chat_spans[0]["attributes"]["gen_ai.agent.name"] == "word_length_agent"
+
+        assert chat_spans[0]["attributes"]["gen_ai.usage.input_tokens"] == 10
+        assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens"] == 20
+        assert chat_spans[0]["attributes"]["gen_ai.usage.total_tokens"] == 30
+
+        if send_default_pii and include_prompts:
+            assert (
+                chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+                == "Hello, how can I help you?"
+            )
+
+            assert json.loads(
+                chat_spans[0]["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            ) == [
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {
+                    "role": "user",
+                    "content": "How many letters in the word eudca",
+                },
+            ]
+
+            param_id = request.node.callspec.id
+            if "string" in param_id:
+                assert [
+                    {
+                        "type": "text",
+                        "content": "You are very powerful assistant, but don't know current events",
+                    }
+                ] == json.loads(
+                    chat_spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+                )
+            else:
+                assert [
+                    {
+                        "type": "text",
+                        "content": "You are a helpful assistant.",
+                    },
+                    {
+                        "type": "text",
+                        "content": "Be concise and clear.",
+                    },
+                ] == json.loads(
+                    chat_spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+                )
+        else:
+            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get(
+                "attributes", {}
+            )
+            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get(
+                "attributes", {}
+            )
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get(
+                "attributes", {}
+            )
+
+    else:
+        events = capture_events()
+
+        with patch.object(
+            llm.client._client._client,
+            "send",
+            return_value=model_response,
+        ) as _, start_transaction():
             agent.invoke(
                 {
                     "messages": [
@@ -501,52 +671,59 @@ def test_langchain_create_agent(
                 },
             )
 
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    assert tx["contexts"]["trace"]["origin"] == "manual"
+        tx = events[0]
+        assert tx["type"] == "transaction"
+        assert tx["contexts"]["trace"]["origin"] == "manual"
 
-    chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
-    assert len(chat_spans) == 1
-    assert chat_spans[0]["origin"] == "auto.ai.langchain"
+        chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
+        assert len(chat_spans) == 1
+        assert chat_spans[0]["origin"] == "auto.ai.langchain"
 
-    assert chat_spans[0]["data"]["gen_ai.system"] == "openai-chat"
-    assert chat_spans[0]["data"]["gen_ai.agent.name"] == "word_length_agent"
+        assert chat_spans[0]["data"]["gen_ai.system"] == "openai-chat"
+        assert chat_spans[0]["data"]["gen_ai.agent.name"] == "word_length_agent"
 
-    assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 10
-    assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 20
-    assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 30
+        assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 10
+        assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 20
+        assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 30
 
-    if send_default_pii and include_prompts:
-        assert (
-            chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-            == "Hello, how can I help you?"
-        )
+        if send_default_pii and include_prompts:
+            assert (
+                chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+                == "Hello, how can I help you?"
+            )
 
-        param_id = request.node.callspec.id
-        if "string" in param_id:
-            assert [
-                {
-                    "type": "text",
-                    "content": "You are very powerful assistant, but don't know current events",
-                }
-            ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+            param_id = request.node.callspec.id
+            if "string" in param_id:
+                assert [
+                    {
+                        "type": "text",
+                        "content": "You are very powerful assistant, but don't know current events",
+                    }
+                ] == json.loads(
+                    chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+                )
+            else:
+                assert [
+                    {
+                        "type": "text",
+                        "content": "You are a helpful assistant.",
+                    },
+                    {
+                        "type": "text",
+                        "content": "Be concise and clear.",
+                    },
+                ] == json.loads(
+                    chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+                )
         else:
-            assert [
-                {
-                    "type": "text",
-                    "content": "You are a helpful assistant.",
-                },
-                {
-                    "type": "text",
-                    "content": "Be concise and clear.",
-                },
-            ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
-    else:
-        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get("data", {})
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("data", {})
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("data", {})
+            assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get(
+                "data", {}
+            )
+            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("data", {})
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("data", {})
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.skipif(
     LANGCHAIN_VERSION < (1,),
     reason="LangChain 1.0+ required (ONE AGENT refactor)",
@@ -563,10 +740,12 @@ def test_langchain_create_agent(
 def test_tool_execution_span(
     sentry_init,
     capture_events,
+    capture_items,
     send_default_pii,
     include_prompts,
     get_model_response,
     responses_tool_call_model_responses,
+    stream_gen_ai_spans,
 ):
     sentry_init(
         integrations=[
@@ -576,8 +755,8 @@ def test_tool_execution_span(
         ],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
 
     responses = responses_tool_call_model_responses(
         tool_name="get_word_length",
@@ -639,12 +818,14 @@ def test_tool_execution_span(
         name="word_length_agent",
     )
 
-    with patch.object(
-        llm.client._client._client,
-        "send",
-        side_effect=[tool_response, final_response],
-    ) as _:
-        with start_transaction():
+    if stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with patch.object(
+            llm.client._client._client,
+            "send",
+            side_effect=[tool_response, final_response],
+        ) as _, start_transaction():
             agent.invoke(
                 {
                     "messages": [
@@ -653,50 +834,415 @@ def test_tool_execution_span(
                 },
             )
 
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    assert tx["contexts"]["trace"]["origin"] == "manual"
+        tx = next(item.payload for item in items if item.type == "transaction")
+        assert tx["type"] == "transaction"
+        assert tx["contexts"]["trace"]["origin"] == "manual"
 
-    chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
-    assert len(chat_spans) == 2
-
-    tool_exec_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool")
-    assert len(tool_exec_spans) == 1
-    tool_exec_span = tool_exec_spans[0]
-
-    assert chat_spans[0]["origin"] == "auto.ai.langchain"
-    assert chat_spans[1]["origin"] == "auto.ai.langchain"
-    assert tool_exec_span["origin"] == "auto.ai.langchain"
-
-    assert chat_spans[0]["data"]["gen_ai.agent.name"] == "word_length_agent"
-    assert chat_spans[1]["data"]["gen_ai.agent.name"] == "word_length_agent"
-    assert tool_exec_span["data"]["gen_ai.agent.name"] == "word_length_agent"
-
-    assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 142
-    assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 50
-    assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 192
-    assert chat_spans[0]["data"]["gen_ai.system"] == "openai-chat"
-
-    assert chat_spans[1]["data"]["gen_ai.usage.input_tokens"] == 89
-    assert chat_spans[1]["data"]["gen_ai.usage.output_tokens"] == 28
-    assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
-    assert chat_spans[1]["data"]["gen_ai.system"] == "openai-chat"
-
-    if send_default_pii and include_prompts:
-        assert "word" in tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_INPUT]
-
-        assert "5" in chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-
-        # Verify tool calls are recorded when PII is enabled
-        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get("data", {}), (
-            "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
+        spans = [item.payload for item in items if item.type == "span"]
+        chat_spans = list(
+            x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.chat"
         )
-        tool_calls_data = chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
-        assert isinstance(tool_calls_data, str)
-        assert "get_word_length" in tool_calls_data
+        assert len(chat_spans) == 2
+
+        tool_exec_spans = list(
+            x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.execute_tool"
+        )
+        assert len(tool_exec_spans) == 1
+        tool_exec_span = tool_exec_spans[0]
+
+        assert chat_spans[0]["attributes"]["sentry.origin"] == "auto.ai.langchain"
+        assert chat_spans[1]["attributes"]["sentry.origin"] == "auto.ai.langchain"
+        assert tool_exec_span["attributes"]["sentry.origin"] == "auto.ai.langchain"
+
+        assert chat_spans[0]["attributes"]["gen_ai.agent.name"] == "word_length_agent"
+        assert chat_spans[1]["attributes"]["gen_ai.agent.name"] == "word_length_agent"
+        assert tool_exec_span["attributes"]["gen_ai.agent.name"] == "word_length_agent"
+
+        assert chat_spans[0]["attributes"]["gen_ai.usage.input_tokens"] == 142
+        assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens"] == 50
+        assert chat_spans[0]["attributes"]["gen_ai.usage.total_tokens"] == 192
+        assert chat_spans[0]["attributes"]["gen_ai.system"] == "openai-chat"
+
+        assert chat_spans[1]["attributes"]["gen_ai.usage.input_tokens"] == 89
+        assert chat_spans[1]["attributes"]["gen_ai.usage.output_tokens"] == 28
+        assert chat_spans[1]["attributes"]["gen_ai.usage.total_tokens"] == 117
+        assert chat_spans[1]["attributes"]["gen_ai.system"] == "openai-chat"
+
+        if send_default_pii and include_prompts:
+            assert "word" in tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_INPUT]
+
+            assert "5" in chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+            # Verify tool calls are recorded when PII is enabled
+            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get(
+                "attributes", {}
+            ), (
+                "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
+            )
+            tool_calls_data = chat_spans[0]["attributes"][
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS
+            ]
+            assert isinstance(tool_calls_data, str)
+            assert "get_word_length" in tool_calls_data
+        else:
+            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get(
+                "attributes", {}
+            )
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get(
+                "attributes", {}
+            )
+            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[1].get(
+                "attributes", {}
+            )
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[1].get(
+                "attributes", {}
+            )
+            assert SPANDATA.GEN_AI_TOOL_INPUT not in tool_exec_span.get(
+                "attributes", {}
+            )
+            assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_exec_span.get(
+                "attributes", {}
+            )
+
+            # Verify tool calls are NOT recorded when PII is disabled
+            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[0].get(
+                "attributes", {}
+            ), (
+                f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
+                f"and include_prompts={include_prompts}"
+            )
+            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[1].get(
+                "attributes", {}
+            ), (
+                f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
+                f"and include_prompts={include_prompts}"
+            )
+
+        # Verify that available tools are always recorded regardless of PII settings
+        for chat_span in chat_spans:
+            tools_data = chat_span["attributes"][
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS
+            ]
+            assert "get_word_length" in tools_data
     else:
+        events = capture_events()
+
+        with patch.object(
+            llm.client._client._client,
+            "send",
+            side_effect=[tool_response, final_response],
+        ) as _, start_transaction():
+            agent.invoke(
+                {
+                    "messages": [
+                        HumanMessage(content="How many letters in the word eudca"),
+                    ],
+                },
+            )
+
+        tx = events[0]
+        assert tx["type"] == "transaction"
+        assert tx["contexts"]["trace"]["origin"] == "manual"
+
+        chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
+        assert len(chat_spans) == 2
+        tool_exec_spans = list(
+            x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool"
+        )
+
+        assert len(tool_exec_spans) == 1
+        tool_exec_span = tool_exec_spans[0]
+
+        assert chat_spans[0]["origin"] == "auto.ai.langchain"
+        assert chat_spans[1]["origin"] == "auto.ai.langchain"
+        assert tool_exec_span["origin"] == "auto.ai.langchain"
+
+        assert chat_spans[0]["data"]["gen_ai.agent.name"] == "word_length_agent"
+        assert chat_spans[1]["data"]["gen_ai.agent.name"] == "word_length_agent"
+        assert tool_exec_span["data"]["gen_ai.agent.name"] == "word_length_agent"
+
+        assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 142
+        assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 50
+        assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 192
+        assert chat_spans[0]["data"]["gen_ai.system"] == "openai-chat"
+
+        assert chat_spans[1]["data"]["gen_ai.usage.input_tokens"] == 89
+        assert chat_spans[1]["data"]["gen_ai.usage.output_tokens"] == 28
+        assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
+        assert chat_spans[1]["data"]["gen_ai.system"] == "openai-chat"
+
+        if send_default_pii and include_prompts:
+            assert "word" in tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_INPUT]
+
+            assert "5" in chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+            # Verify tool calls are recorded when PII is enabled
+            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get(
+                "data", {}
+            ), (
+                "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
+            )
+            tool_calls_data = chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+            assert isinstance(tool_calls_data, str)
+            assert "get_word_length" in tool_calls_data
+        else:
+            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("data", {})
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("data", {})
+            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[1].get("data", {})
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[1].get("data", {})
+            assert SPANDATA.GEN_AI_TOOL_INPUT not in tool_exec_span.get("data", {})
+            assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_exec_span.get("data", {})
+
+            # Verify tool calls are NOT recorded when PII is disabled
+            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[0].get(
+                "data", {}
+            ), (
+                f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
+                f"and include_prompts={include_prompts}"
+            )
+            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[1].get(
+                "data", {}
+            ), (
+                f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
+                f"and include_prompts={include_prompts}"
+            )
+
+        # Verify that available tools are always recorded regardless of PII settings
+        for chat_span in chat_spans:
+            tools_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
+            assert "get_word_length" in tools_data
+
+
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+def test_langchain_openai_tools_agent_no_prompts(
+    sentry_init,
+    capture_events,
+    capture_items,
+    send_default_pii,
+    include_prompts,
+    get_model_response,
+    server_side_event_chunks,
+    streaming_chat_completions_model_responses,
+    stream_gen_ai_spans,
+):
+    sentry_init(
+        integrations=[
+            LangchainIntegration(
+                include_prompts=include_prompts,
+            )
+        ],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+    )
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                "You are very powerful assistant, but don't know current events",
+            ),
+            ("user", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ]
+    )
+
+    model_responses = streaming_chat_completions_model_responses()
+
+    tool_response = get_model_response(
+        server_side_event_chunks(
+            next(model_responses),
+            include_event_type=False,
+        )
+    )
+
+    final_response = get_model_response(
+        server_side_event_chunks(
+            next(model_responses),
+            include_event_type=False,
+        )
+    )
+
+    llm = ChatOpenAI(
+        model_name="gpt-3.5-turbo",
+        temperature=0,
+        openai_api_key="badkey",
+    )
+    agent = create_openai_tools_agent(llm, [get_word_length], prompt)
+
+    agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
+
+    if stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with patch.object(
+            llm.client._client._client,
+            "send",
+            side_effect=[tool_response, final_response],
+        ) as _, start_transaction():
+            list(
+                agent_executor.invoke(
+                    {"input": "How many letters in the word eudca"},
+                    {"run_name": "my-snazzy-pipeline"},
+                )
+            )
+
+        tx = next(item.payload for item in items if item.type == "transaction")
+        assert tx["type"] == "transaction"
+        assert tx["contexts"]["trace"]["origin"] == "manual"
+
+        spans = [item.payload for item in items if item.type == "span"]
+        invoke_agent_span = next(
+            x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.invoke_agent"
+        )
+        chat_spans = list(
+            x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.chat"
+        )
+        tool_exec_span = next(
+            x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.execute_tool"
+        )
+
+        assert len(chat_spans) == 2
+
+        assert invoke_agent_span["attributes"]["sentry.origin"] == "auto.ai.langchain"
+        assert chat_spans[0]["attributes"]["sentry.origin"] == "auto.ai.langchain"
+        assert chat_spans[1]["attributes"]["sentry.origin"] == "auto.ai.langchain"
+        assert tool_exec_span["attributes"]["sentry.origin"] == "auto.ai.langchain"
+
+        assert (
+            invoke_agent_span["attributes"]["gen_ai.function_id"]
+            == "my-snazzy-pipeline"
+        )
+
+        # We can't guarantee anything about the "shape" of the langchain execution graph
+        assert (
+            len(list(x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.chat"))
+            > 0
+        )
+
+        # Token usage is only available in newer versions of langchain (v0.2+)
+        # where usage_metadata is supported on AIMessageChunk
+        if "gen_ai.usage.input_tokens" in chat_spans[0]["attributes"]:
+            assert chat_spans[0]["attributes"]["gen_ai.usage.input_tokens"] == 142
+            assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens"] == 50
+            assert chat_spans[0]["attributes"]["gen_ai.usage.total_tokens"] == 192
+
+        if "gen_ai.usage.input_tokens" in chat_spans[1]["attributes"]:
+            assert chat_spans[1]["attributes"]["gen_ai.usage.input_tokens"] == 89
+            assert chat_spans[1]["attributes"]["gen_ai.usage.output_tokens"] == 28
+            assert chat_spans[1]["attributes"]["gen_ai.usage.total_tokens"] == 117
+
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get(
+            "attributes", {}
+        )
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get(
+            "attributes", {}
+        )
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("attributes", {})
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[1].get(
+            "attributes", {}
+        )
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[1].get(
+            "attributes", {}
+        )
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[1].get("attributes", {})
+        assert SPANDATA.GEN_AI_TOOL_INPUT not in tool_exec_span.get("attributes", {})
+        assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_exec_span.get("attributes", {})
+
+        # Verify tool calls are NOT recorded when PII is disabled
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[0].get(
+            "attributes", {}
+        ), (
+            f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
+            f"and include_prompts={include_prompts}"
+        )
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[1].get(
+            "attributes", {}
+        ), (
+            f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
+            f"and include_prompts={include_prompts}"
+        )
+
+        # Verify finish_reasons is always an array of strings
+        assert chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
+            "function_call"
+        ]
+        assert chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
+            "stop"
+        ]
+
+        # Verify that available tools are always recorded regardless of PII settings
+        for chat_span in chat_spans:
+            tools_data = chat_span["attributes"][
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS
+            ]
+            assert tools_data is not None, (
+                "Available tools should always be recorded regardless of PII settings"
+            )
+            assert "get_word_length" in tools_data
+    else:
+        events = capture_events()
+
+        with patch.object(
+            llm.client._client._client,
+            "send",
+            side_effect=[tool_response, final_response],
+        ) as _, start_transaction():
+            list(
+                agent_executor.invoke(
+                    {"input": "How many letters in the word eudca"},
+                    {"run_name": "my-snazzy-pipeline"},
+                )
+            )
+
+        tx = events[0]
+        assert tx["type"] == "transaction"
+        assert tx["contexts"]["trace"]["origin"] == "manual"
+
+        invoke_agent_span = next(
+            x for x in tx["spans"] if x["op"] == "gen_ai.invoke_agent"
+        )
+        chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
+        tool_exec_span = next(
+            x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool"
+        )
+
+        assert len(chat_spans) == 2
+
+        assert invoke_agent_span["origin"] == "auto.ai.langchain"
+        assert chat_spans[0]["origin"] == "auto.ai.langchain"
+        assert chat_spans[1]["origin"] == "auto.ai.langchain"
+        assert tool_exec_span["origin"] == "auto.ai.langchain"
+
+        assert invoke_agent_span["data"]["gen_ai.function_id"] == "my-snazzy-pipeline"
+
+        # We can't guarantee anything about the "shape" of the langchain execution graph
+        assert len(list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")) > 0
+
+        # Token usage is only available in newer versions of langchain (v0.2+)
+        # where usage_metadata is supported on AIMessageChunk
+        if "gen_ai.usage.input_tokens" in chat_spans[0]["data"]:
+            assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 142
+            assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 50
+            assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 192
+
+        if "gen_ai.usage.input_tokens" in chat_spans[1]["data"]:
+            assert chat_spans[1]["data"]["gen_ai.usage.input_tokens"] == 89
+            assert chat_spans[1]["data"]["gen_ai.usage.output_tokens"] == 28
+            assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
+
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get("data", {})
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("data", {})
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("data", {})
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[1].get("data", {})
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[1].get("data", {})
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[1].get("data", {})
         assert SPANDATA.GEN_AI_TOOL_INPUT not in tool_exec_span.get("data", {})
@@ -716,155 +1262,24 @@ def test_tool_execution_span(
             f"and include_prompts={include_prompts}"
         )
 
-    # Verify that available tools are always recorded regardless of PII settings
-    for chat_span in chat_spans:
-        tools_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
-        assert "get_word_length" in tools_data
-
-
-@pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
-    [
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
-)
-def test_langchain_openai_tools_agent_no_prompts(
-    sentry_init,
-    capture_events,
-    send_default_pii,
-    include_prompts,
-    get_model_response,
-    server_side_event_chunks,
-    streaming_chat_completions_model_responses,
-):
-    sentry_init(
-        integrations=[
-            LangchainIntegration(
-                include_prompts=include_prompts,
-            )
-        ],
-        traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
-    )
-    events = capture_events()
-
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            (
-                "system",
-                "You are very powerful assistant, but don't know current events",
-            ),
-            ("user", "{input}"),
-            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        # Verify finish_reasons is always an array of strings
+        assert chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
+            "function_call"
         ]
-    )
+        assert chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
+            "stop"
+        ]
 
-    model_responses = streaming_chat_completions_model_responses()
-
-    tool_response = get_model_response(
-        server_side_event_chunks(
-            next(model_responses),
-            include_event_type=False,
-        )
-    )
-
-    final_response = get_model_response(
-        server_side_event_chunks(
-            next(model_responses),
-            include_event_type=False,
-        )
-    )
-
-    llm = ChatOpenAI(
-        model_name="gpt-3.5-turbo",
-        temperature=0,
-        openai_api_key="badkey",
-    )
-    agent = create_openai_tools_agent(llm, [get_word_length], prompt)
-
-    agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
-
-    with patch.object(
-        llm.client._client._client,
-        "send",
-        side_effect=[tool_response, final_response],
-    ) as _:
-        with start_transaction():
-            list(
-                agent_executor.invoke(
-                    {"input": "How many letters in the word eudca"},
-                    {"run_name": "my-snazzy-pipeline"},
-                )
+        # Verify that available tools are always recorded regardless of PII settings
+        for chat_span in chat_spans:
+            tools_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
+            assert tools_data is not None, (
+                "Available tools should always be recorded regardless of PII settings"
             )
-
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    assert tx["contexts"]["trace"]["origin"] == "manual"
-
-    invoke_agent_span = next(x for x in tx["spans"] if x["op"] == "gen_ai.invoke_agent")
-    chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
-    tool_exec_span = next(x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool")
-
-    assert len(chat_spans) == 2
-
-    assert invoke_agent_span["origin"] == "auto.ai.langchain"
-    assert chat_spans[0]["origin"] == "auto.ai.langchain"
-    assert chat_spans[1]["origin"] == "auto.ai.langchain"
-    assert tool_exec_span["origin"] == "auto.ai.langchain"
-
-    assert invoke_agent_span["data"]["gen_ai.function_id"] == "my-snazzy-pipeline"
-
-    # We can't guarantee anything about the "shape" of the langchain execution graph
-    assert len(list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")) > 0
-
-    # Token usage is only available in newer versions of langchain (v0.2+)
-    # where usage_metadata is supported on AIMessageChunk
-    if "gen_ai.usage.input_tokens" in chat_spans[0]["data"]:
-        assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 142
-        assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 50
-        assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 192
-
-    if "gen_ai.usage.input_tokens" in chat_spans[1]["data"]:
-        assert chat_spans[1]["data"]["gen_ai.usage.input_tokens"] == 89
-        assert chat_spans[1]["data"]["gen_ai.usage.output_tokens"] == 28
-        assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
-
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get("data", {})
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("data", {})
-    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("data", {})
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[1].get("data", {})
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[1].get("data", {})
-    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[1].get("data", {})
-    assert SPANDATA.GEN_AI_TOOL_INPUT not in tool_exec_span.get("data", {})
-    assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_exec_span.get("data", {})
-
-    # Verify tool calls are NOT recorded when PII is disabled
-    assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[0].get("data", {}), (
-        f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
-        f"and include_prompts={include_prompts}"
-    )
-    assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[1].get("data", {}), (
-        f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
-        f"and include_prompts={include_prompts}"
-    )
-
-    # Verify finish_reasons is always an array of strings
-    assert chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-        "function_call"
-    ]
-    assert chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["stop"]
-
-    # Verify that available tools are always recorded regardless of PII settings
-    for chat_span in chat_spans:
-        tools_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
-        assert tools_data is not None, (
-            "Available tools should always be recorded regardless of PII settings"
-        )
-        assert "get_word_length" in tools_data
+            assert "get_word_length" in tools_data
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "system_instructions_content",
     [
@@ -880,11 +1295,13 @@ def test_langchain_openai_tools_agent_no_prompts(
 def test_langchain_openai_tools_agent(
     sentry_init,
     capture_events,
+    capture_items,
     system_instructions_content,
     request,
     get_model_response,
     server_side_event_chunks,
     streaming_chat_completions_model_responses,
+    stream_gen_ai_spans,
 ):
     sentry_init(
         integrations=[
@@ -894,8 +1311,8 @@ def test_langchain_openai_tools_agent(
         ],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
 
     prompt = ChatPromptTemplate.from_messages(
         [
@@ -933,104 +1350,251 @@ def test_langchain_openai_tools_agent(
 
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
 
-    with patch.object(
-        llm.client._client._client,
-        "send",
-        side_effect=[tool_response, final_response],
-    ) as _:
-        with start_transaction():
+    if stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with patch.object(
+            llm.client._client._client,
+            "send",
+            side_effect=[tool_response, final_response],
+        ) as _, start_transaction():
+            list(
+                agent_executor.stream(
+                    {
+                        "input": [
+                            "Message demonstrating the absence of truncation.",
+                            "How many letters in the word eudca",
+                        ]
+                    }
+                )
+            )
+
+        tx = next(item.payload for item in items if item.type == "transaction")
+        assert tx["type"] == "transaction"
+        assert tx["contexts"]["trace"]["origin"] == "manual"
+
+        spans = [item.payload for item in items if item.type == "span"]
+        invoke_agent_span = next(
+            x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.invoke_agent"
+        )
+        chat_spans = list(
+            x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.chat"
+        )
+        tool_exec_span = next(
+            x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.execute_tool"
+        )
+
+        assert len(chat_spans) == 2
+
+        assert invoke_agent_span["attributes"]["sentry.origin"] == "auto.ai.langchain"
+        assert chat_spans[0]["attributes"]["sentry.origin"] == "auto.ai.langchain"
+        assert chat_spans[1]["attributes"]["sentry.origin"] == "auto.ai.langchain"
+        assert tool_exec_span["attributes"]["sentry.origin"] == "auto.ai.langchain"
+
+        # We can't guarantee anything about the "shape" of the langchain execution graph
+        assert (
+            len(list(x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.chat"))
+            > 0
+        )
+
+        # Token usage is only available in newer versions of langchain (v0.2+)
+        # where usage_metadata is supported on AIMessageChunk
+        if "gen_ai.usage.input_tokens" in chat_spans[0]["attributes"]:
+            assert chat_spans[0]["attributes"]["gen_ai.usage.input_tokens"] == 142
+            assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens"] == 50
+            assert chat_spans[0]["attributes"]["gen_ai.usage.total_tokens"] == 192
+
+        if "gen_ai.usage.input_tokens" in chat_spans[1]["attributes"]:
+            assert chat_spans[1]["attributes"]["gen_ai.usage.input_tokens"] == 89
+            assert chat_spans[1]["attributes"]["gen_ai.usage.output_tokens"] == 28
+            assert chat_spans[1]["attributes"]["gen_ai.usage.total_tokens"] == 117
+
+        assert "5" in chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        assert "word" in tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_INPUT]
+        assert 5 == int(tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_OUTPUT])
+
+        assert json.loads(
+            chat_spans[0]["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        ) == [
+            {
+                "role": "user",
+                "content": "['Message demonstrating the absence of truncation.', 'How many letters in the word eudca']",
+            }
+        ]
+
+        param_id = request.node.callspec.id
+        if "string" in param_id:
+            assert [
+                {
+                    "type": "text",
+                    "content": "You are very powerful assistant, but don't know current events",
+                }
+            ] == json.loads(
+                chat_spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+            )
+        else:
+            assert [
+                {
+                    "type": "text",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "text",
+                    "content": "Be concise and clear.",
+                },
+            ] == json.loads(
+                chat_spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+            )
+
+            assert "5" in chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+            # Verify tool calls are recorded when PII is enabled
+            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get(
+                "attributes", {}
+            ), (
+                "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
+            )
+            tool_calls_data = chat_spans[0]["attributes"][
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS
+            ]
+
+            assert isinstance(tool_calls_data, (list, str))  # Could be serialized
+            if isinstance(tool_calls_data, str):
+                assert "get_word_length" in tool_calls_data
+            elif isinstance(tool_calls_data, list) and len(tool_calls_data) > 0:
+                # Check if tool calls contain expected function name
+                tool_call_str = str(tool_calls_data)
+                assert "get_word_length" in tool_call_str
+
+            # Verify finish_reasons is always an array of strings
+            assert chat_spans[0]["attributes"][
+                SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS
+            ] == ["function_call"]
+            assert chat_spans[1]["attributes"][
+                SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS
+            ] == ["stop"]
+
+            # Verify that available tools are always recorded regardless of PII settings
+            for chat_span in chat_spans:
+                tools_data = chat_span["attributes"][
+                    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS
+                ]
+                assert tools_data is not None, (
+                    "Available tools should always be recorded regardless of PII settings"
+                )
+                assert "get_word_length" in tools_data
+    else:
+        events = capture_events()
+
+        with patch.object(
+            llm.client._client._client,
+            "send",
+            side_effect=[tool_response, final_response],
+        ) as _, start_transaction():
             list(agent_executor.stream({"input": "How many letters in the word eudca"}))
 
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    assert tx["contexts"]["trace"]["origin"] == "manual"
+        tx = events[0]
+        assert tx["type"] == "transaction"
+        assert tx["contexts"]["trace"]["origin"] == "manual"
 
-    invoke_agent_span = next(x for x in tx["spans"] if x["op"] == "gen_ai.invoke_agent")
-    chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
-    tool_exec_span = next(x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool")
-
-    assert len(chat_spans) == 2
-
-    assert invoke_agent_span["origin"] == "auto.ai.langchain"
-    assert chat_spans[0]["origin"] == "auto.ai.langchain"
-    assert chat_spans[1]["origin"] == "auto.ai.langchain"
-    assert tool_exec_span["origin"] == "auto.ai.langchain"
-
-    # We can't guarantee anything about the "shape" of the langchain execution graph
-    assert len(list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")) > 0
-
-    # Token usage is only available in newer versions of langchain (v0.2+)
-    # where usage_metadata is supported on AIMessageChunk
-    if "gen_ai.usage.input_tokens" in chat_spans[0]["data"]:
-        assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 142
-        assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 50
-        assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 192
-
-    if "gen_ai.usage.input_tokens" in chat_spans[1]["data"]:
-        assert chat_spans[1]["data"]["gen_ai.usage.input_tokens"] == 89
-        assert chat_spans[1]["data"]["gen_ai.usage.output_tokens"] == 28
-        assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
-
-    assert "5" in chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-    assert "word" in tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_INPUT]
-    assert 5 == int(tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_OUTPUT])
-
-    param_id = request.node.callspec.id
-    if "string" in param_id:
-        assert [
-            {
-                "type": "text",
-                "content": "You are very powerful assistant, but don't know current events",
-            }
-        ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
-    else:
-        assert [
-            {
-                "type": "text",
-                "content": "You are a helpful assistant.",
-            },
-            {
-                "type": "text",
-                "content": "Be concise and clear.",
-            },
-        ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
-
-    assert "5" in chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-
-    # Verify tool calls are recorded when PII is enabled
-    assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get("data", {}), (
-        "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
-    )
-    tool_calls_data = chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
-    assert isinstance(tool_calls_data, (list, str))  # Could be serialized
-    if isinstance(tool_calls_data, str):
-        assert "get_word_length" in tool_calls_data
-    elif isinstance(tool_calls_data, list) and len(tool_calls_data) > 0:
-        # Check if tool calls contain expected function name
-        tool_call_str = str(tool_calls_data)
-        assert "get_word_length" in tool_call_str
-
-    # Verify finish_reasons is always an array of strings
-    assert chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-        "function_call"
-    ]
-    assert chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["stop"]
-
-    # Verify that available tools are always recorded regardless of PII settings
-    for chat_span in chat_spans:
-        tools_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
-        assert tools_data is not None, (
-            "Available tools should always be recorded regardless of PII settings"
+        invoke_agent_span = next(
+            x for x in tx["spans"] if x["op"] == "gen_ai.invoke_agent"
         )
-        assert "get_word_length" in tools_data
+        chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
+        tool_exec_span = next(
+            x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool"
+        )
+
+        assert len(chat_spans) == 2
+
+        assert invoke_agent_span["origin"] == "auto.ai.langchain"
+        assert chat_spans[0]["origin"] == "auto.ai.langchain"
+        assert chat_spans[1]["origin"] == "auto.ai.langchain"
+        assert tool_exec_span["origin"] == "auto.ai.langchain"
+
+        # We can't guarantee anything about the "shape" of the langchain execution graph
+        assert len(list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")) > 0
+
+        # Token usage is only available in newer versions of langchain (v0.2+)
+        # where usage_metadata is supported on AIMessageChunk
+        if "gen_ai.usage.input_tokens" in chat_spans[0]["data"]:
+            assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 142
+            assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 50
+            assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 192
+
+        if "gen_ai.usage.input_tokens" in chat_spans[1]["data"]:
+            assert chat_spans[1]["data"]["gen_ai.usage.input_tokens"] == 89
+            assert chat_spans[1]["data"]["gen_ai.usage.output_tokens"] == 28
+            assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
+
+        assert "5" in chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        assert "word" in tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_INPUT]
+        assert 5 == int(tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_OUTPUT])
+
+        param_id = request.node.callspec.id
+        if "string" in param_id:
+            assert [
+                {
+                    "type": "text",
+                    "content": "You are very powerful assistant, but don't know current events",
+                }
+            ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+        else:
+            assert [
+                {
+                    "type": "text",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "text",
+                    "content": "Be concise and clear.",
+                },
+            ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+
+            assert "5" in chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+            # Verify tool calls are recorded when PII is enabled
+            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get(
+                "data", {}
+            ), (
+                "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
+            )
+            tool_calls_data = chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+
+            assert isinstance(tool_calls_data, (list, str))  # Could be serialized
+            if isinstance(tool_calls_data, str):
+                assert "get_word_length" in tool_calls_data
+            elif isinstance(tool_calls_data, list) and len(tool_calls_data) > 0:
+                # Check if tool calls contain expected function name
+                tool_call_str = str(tool_calls_data)
+                assert "get_word_length" in tool_call_str
+
+            # Verify finish_reasons is always an array of strings
+            assert chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
+                "function_call"
+            ]
+            assert chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
+                "stop"
+            ]
+
+            # Verify that available tools are always recorded regardless of PII settings
+            for chat_span in chat_spans:
+                tools_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
+                assert tools_data is not None, (
+                    "Available tools should always be recorded regardless of PII settings"
+                )
+                assert "get_word_length" in tools_data
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_langchain_openai_tools_agent_with_config(
     sentry_init,
     capture_events,
+    capture_items,
     get_model_response,
     server_side_event_chunks,
     streaming_chat_completions_model_responses,
+    stream_gen_ai_spans,
 ):
     sentry_init(
         integrations=[
@@ -1040,8 +1604,8 @@ def test_langchain_openai_tools_agent_with_config(
         ],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
 
     prompt = ChatPromptTemplate.from_messages(
         [
@@ -1081,26 +1645,57 @@ def test_langchain_openai_tools_agent_with_config(
 
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
 
-    with patch.object(
-        llm.client._client._client,
-        "send",
-        side_effect=[tool_response, final_response],
-    ) as _:
-        with start_transaction():
+    if stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with patch.object(
+            llm.client._client._client,
+            "send",
+            side_effect=[tool_response, final_response],
+        ) as _, start_transaction():
             list(
                 agent_executor.invoke(
                     {"input": "How many letters in the word eudca"},
                 )
             )
 
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    assert tx["contexts"]["trace"]["origin"] == "manual"
+        tx = next(item.payload for item in items if item.type == "transaction")
+        assert tx["type"] == "transaction"
+        assert tx["contexts"]["trace"]["origin"] == "manual"
 
-    invoke_agent_span = next(x for x in tx["spans"] if x["op"] == "gen_ai.invoke_agent")
-    assert invoke_agent_span["data"]["gen_ai.function_id"] == "my-snazzy-pipeline"
+        spans = [item.payload for item in items if item.type == "span"]
+        invoke_agent_span = next(
+            x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.invoke_agent"
+        )
+        assert (
+            invoke_agent_span["attributes"]["gen_ai.function_id"]
+            == "my-snazzy-pipeline"
+        )
+    else:
+        events = capture_events()
+
+        with patch.object(
+            llm.client._client._client,
+            "send",
+            side_effect=[tool_response, final_response],
+        ) as _, start_transaction():
+            list(
+                agent_executor.invoke(
+                    {"input": "How many letters in the word eudca"},
+                )
+            )
+
+        tx = events[0]
+        assert tx["type"] == "transaction"
+        assert tx["contexts"]["trace"]["origin"] == "manual"
+
+        invoke_agent_span = next(
+            x for x in tx["spans"] if x["op"] == "gen_ai.invoke_agent"
+        )
+        assert invoke_agent_span["data"]["gen_ai.function_id"] == "my-snazzy-pipeline"
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -1112,11 +1707,13 @@ def test_langchain_openai_tools_agent_with_config(
 def test_langchain_openai_tools_agent_stream_no_prompts(
     sentry_init,
     capture_events,
+    capture_items,
     send_default_pii,
     include_prompts,
     get_model_response,
     server_side_event_chunks,
     streaming_chat_completions_model_responses,
+    stream_gen_ai_spans,
 ):
     sentry_init(
         integrations=[
@@ -1126,8 +1723,8 @@ def test_langchain_openai_tools_agent_stream_no_prompts(
         ],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
 
     prompt = ChatPromptTemplate.from_messages(
         [
@@ -1165,12 +1762,14 @@ def test_langchain_openai_tools_agent_stream_no_prompts(
 
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
 
-    with patch.object(
-        llm.client._client._client,
-        "send",
-        side_effect=[tool_response, final_response],
-    ) as _:
-        with start_transaction():
+    if stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with patch.object(
+            llm.client._client._client,
+            "send",
+            side_effect=[tool_response, final_response],
+        ) as _, start_transaction():
             list(
                 agent_executor.stream(
                     {"input": "How many letters in the word eudca"},
@@ -1178,72 +1777,193 @@ def test_langchain_openai_tools_agent_stream_no_prompts(
                 )
             )
 
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    assert tx["contexts"]["trace"]["origin"] == "manual"
+        tx = next(item.payload for item in items if item.type == "transaction")
+        assert tx["type"] == "transaction"
+        assert tx["contexts"]["trace"]["origin"] == "manual"
 
-    invoke_agent_span = next(x for x in tx["spans"] if x["op"] == "gen_ai.invoke_agent")
-    chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
-    tool_exec_span = next(x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool")
-
-    assert len(chat_spans) == 2
-
-    assert invoke_agent_span["origin"] == "auto.ai.langchain"
-    assert chat_spans[0]["origin"] == "auto.ai.langchain"
-    assert chat_spans[1]["origin"] == "auto.ai.langchain"
-    assert tool_exec_span["origin"] == "auto.ai.langchain"
-
-    assert invoke_agent_span["data"]["gen_ai.function_id"] == "my-snazzy-pipeline"
-
-    # We can't guarantee anything about the "shape" of the langchain execution graph
-    assert len(list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")) > 0
-
-    # Token usage is only available in newer versions of langchain (v0.2+)
-    # where usage_metadata is supported on AIMessageChunk
-    if "gen_ai.usage.input_tokens" in chat_spans[0]["data"]:
-        assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 142
-        assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 50
-        assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 192
-
-    if "gen_ai.usage.input_tokens" in chat_spans[1]["data"]:
-        assert chat_spans[1]["data"]["gen_ai.usage.input_tokens"] == 89
-        assert chat_spans[1]["data"]["gen_ai.usage.output_tokens"] == 28
-        assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
-
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get("data", {})
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("data", {})
-    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("data", {})
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[1].get("data", {})
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[1].get("data", {})
-    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[1].get("data", {})
-    assert SPANDATA.GEN_AI_TOOL_INPUT not in tool_exec_span.get("data", {})
-    assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_exec_span.get("data", {})
-
-    # Verify tool calls are NOT recorded when PII is disabled
-    assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[0].get("data", {}), (
-        f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
-        f"and include_prompts={include_prompts}"
-    )
-    assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[1].get("data", {}), (
-        f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
-        f"and include_prompts={include_prompts}"
-    )
-
-    # Verify finish_reasons is always an array of strings
-    assert chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-        "function_call"
-    ]
-    assert chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["stop"]
-
-    # Verify that available tools are always recorded regardless of PII settings
-    for chat_span in chat_spans:
-        tools_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
-        assert tools_data is not None, (
-            "Available tools should always be recorded regardless of PII settings"
+        spans = [item.payload for item in items if item.type == "span"]
+        invoke_agent_span = next(
+            x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.invoke_agent"
         )
-        assert "get_word_length" in tools_data
+        chat_spans = list(
+            x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.chat"
+        )
+        tool_exec_span = next(
+            x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.execute_tool"
+        )
+
+        assert len(chat_spans) == 2
+
+        assert invoke_agent_span["attributes"]["sentry.origin"] == "auto.ai.langchain"
+        assert chat_spans[0]["attributes"]["sentry.origin"] == "auto.ai.langchain"
+        assert chat_spans[1]["attributes"]["sentry.origin"] == "auto.ai.langchain"
+        assert tool_exec_span["attributes"]["sentry.origin"] == "auto.ai.langchain"
+
+        assert (
+            invoke_agent_span["attributes"]["gen_ai.function_id"]
+            == "my-snazzy-pipeline"
+        )
+
+        spans = [item.payload for item in items if item.type == "span"]
+        # We can't guarantee anything about the "shape" of the langchain execution graph
+        assert (
+            len(list(x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.chat"))
+            > 0
+        )
+
+        # Token usage is only available in newer versions of langchain (v0.2+)
+        # where usage_metadata is supported on AIMessageChunk
+        if "gen_ai.usage.input_tokens" in chat_spans[0]["attributes"]:
+            assert chat_spans[0]["attributes"]["gen_ai.usage.input_tokens"] == 142
+            assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens"] == 50
+            assert chat_spans[0]["attributes"]["gen_ai.usage.total_tokens"] == 192
+
+        if "gen_ai.usage.input_tokens" in chat_spans[1]["attributes"]:
+            assert chat_spans[1]["attributes"]["gen_ai.usage.input_tokens"] == 89
+            assert chat_spans[1]["attributes"]["gen_ai.usage.output_tokens"] == 28
+            assert chat_spans[1]["attributes"]["gen_ai.usage.total_tokens"] == 117
+
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get(
+            "attributes", {}
+        )
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get(
+            "attributes", {}
+        )
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("attributes", {})
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[1].get(
+            "attributes", {}
+        )
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[1].get(
+            "attributes", {}
+        )
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[1].get("attributes", {})
+        assert SPANDATA.GEN_AI_TOOL_INPUT not in tool_exec_span.get("attributes", {})
+        assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_exec_span.get("attributes", {})
+
+        # Verify tool calls are NOT recorded when PII is disabled
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[0].get(
+            "attributes", {}
+        ), (
+            f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
+            f"and include_prompts={include_prompts}"
+        )
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[1].get(
+            "attributes", {}
+        ), (
+            f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
+            f"and include_prompts={include_prompts}"
+        )
+
+        # Verify finish_reasons is always an array of strings
+        assert chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
+            "function_call"
+        ]
+        assert chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
+            "stop"
+        ]
+
+        # Verify that available tools are always recorded regardless of PII settings
+        for chat_span in chat_spans:
+            tools_data = chat_span["attributes"][
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS
+            ]
+
+            assert tools_data is not None, (
+                "Available tools should always be recorded regardless of PII settings"
+            )
+            assert "get_word_length" in tools_data
+    else:
+        events = capture_events()
+
+        with patch.object(
+            llm.client._client._client,
+            "send",
+            side_effect=[tool_response, final_response],
+        ) as _, start_transaction():
+            list(
+                agent_executor.stream(
+                    {"input": "How many letters in the word eudca"},
+                    {"run_name": "my-snazzy-pipeline"},
+                )
+            )
+
+        tx = events[0]
+        assert tx["type"] == "transaction"
+        assert tx["contexts"]["trace"]["origin"] == "manual"
+
+        invoke_agent_span = next(
+            x for x in tx["spans"] if x["op"] == "gen_ai.invoke_agent"
+        )
+        chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
+        tool_exec_span = next(
+            x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool"
+        )
+
+        assert len(chat_spans) == 2
+
+        assert invoke_agent_span["origin"] == "auto.ai.langchain"
+        assert chat_spans[0]["origin"] == "auto.ai.langchain"
+        assert chat_spans[1]["origin"] == "auto.ai.langchain"
+        assert tool_exec_span["origin"] == "auto.ai.langchain"
+
+        assert invoke_agent_span["data"]["gen_ai.function_id"] == "my-snazzy-pipeline"
+
+        # We can't guarantee anything about the "shape" of the langchain execution graph
+        assert len(list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")) > 0
+
+        # Token usage is only available in newer versions of langchain (v0.2+)
+        # where usage_metadata is supported on AIMessageChunk
+        if "gen_ai.usage.input_tokens" in chat_spans[0]["data"]:
+            assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 142
+            assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 50
+            assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 192
+
+        if "gen_ai.usage.input_tokens" in chat_spans[1]["data"]:
+            assert chat_spans[1]["data"]["gen_ai.usage.input_tokens"] == 89
+            assert chat_spans[1]["data"]["gen_ai.usage.output_tokens"] == 28
+            assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
+
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get("data", {})
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("data", {})
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[0].get("data", {})
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[1].get("data", {})
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[1].get("data", {})
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_spans[1].get("data", {})
+        assert SPANDATA.GEN_AI_TOOL_INPUT not in tool_exec_span.get("data", {})
+        assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_exec_span.get("data", {})
+
+        # Verify tool calls are NOT recorded when PII is disabled
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[0].get(
+            "data", {}
+        ), (
+            f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
+            f"and include_prompts={include_prompts}"
+        )
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in chat_spans[1].get(
+            "data", {}
+        ), (
+            f"Tool calls should NOT be recorded when send_default_pii={send_default_pii} "
+            f"and include_prompts={include_prompts}"
+        )
+
+        # Verify finish_reasons is always an array of strings
+        assert chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
+            "function_call"
+        ]
+        assert chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
+            "stop"
+        ]
+
+        # Verify that available tools are always recorded regardless of PII settings
+        for chat_span in chat_spans:
+            tools_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
+            assert tools_data is not None, (
+                "Available tools should always be recorded regardless of PII settings"
+            )
+            assert "get_word_length" in tools_data
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "system_instructions_content",
     [
@@ -1259,11 +1979,13 @@ def test_langchain_openai_tools_agent_stream_no_prompts(
 def test_langchain_openai_tools_agent_stream(
     sentry_init,
     capture_events,
+    capture_items,
     system_instructions_content,
     request,
     get_model_response,
     server_side_event_chunks,
     streaming_chat_completions_model_responses,
+    stream_gen_ai_spans,
 ):
     sentry_init(
         integrations=[
@@ -1273,8 +1995,8 @@ def test_langchain_openai_tools_agent_stream(
         ],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
 
     prompt = ChatPromptTemplate.from_messages(
         [
@@ -1312,12 +2034,153 @@ def test_langchain_openai_tools_agent_stream(
 
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
 
-    with patch.object(
-        llm.client._client._client,
-        "send",
-        side_effect=[tool_response, final_response],
-    ) as _:
-        with start_transaction():
+    if stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with patch.object(
+            llm.client._client._client,
+            "send",
+            side_effect=[tool_response, final_response],
+        ) as _, start_transaction():
+            list(
+                agent_executor.stream(
+                    {
+                        "input": [
+                            "Message demonstrating the absence of truncation.",
+                            "How many letters in the word eudca",
+                        ]
+                    },
+                    {"run_name": "my-snazzy-pipeline"},
+                )
+            )
+
+        tx = next(item.payload for item in items if item.type == "transaction")
+        assert tx["type"] == "transaction"
+        assert tx["contexts"]["trace"]["origin"] == "manual"
+
+        spans = [item.payload for item in items if item.type == "span"]
+        invoke_agent_span = next(
+            x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.invoke_agent"
+        )
+        chat_spans = list(
+            x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.chat"
+        )
+        tool_exec_span = next(
+            x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.execute_tool"
+        )
+
+        assert len(chat_spans) == 2
+
+        assert invoke_agent_span["attributes"]["sentry.origin"] == "auto.ai.langchain"
+        assert chat_spans[0]["attributes"]["sentry.origin"] == "auto.ai.langchain"
+        assert chat_spans[1]["attributes"]["sentry.origin"] == "auto.ai.langchain"
+        assert tool_exec_span["attributes"]["sentry.origin"] == "auto.ai.langchain"
+
+        assert (
+            invoke_agent_span["attributes"]["gen_ai.function_id"]
+            == "my-snazzy-pipeline"
+        )
+
+        # We can't guarantee anything about the "shape" of the langchain execution graph
+        assert (
+            len(list(x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.chat"))
+            > 0
+        )
+
+        # Token usage is only available in newer versions of langchain (v0.2+)
+        # where usage_metadata is supported on AIMessageChunk
+        if "gen_ai.usage.input_tokens" in chat_spans[0]["attributes"]:
+            assert chat_spans[0]["attributes"]["gen_ai.usage.input_tokens"] == 142
+            assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens"] == 50
+            assert chat_spans[0]["attributes"]["gen_ai.usage.total_tokens"] == 192
+
+        if "gen_ai.usage.input_tokens" in chat_spans[1]["attributes"]:
+            assert chat_spans[1]["attributes"]["gen_ai.usage.input_tokens"] == 89
+            assert chat_spans[1]["attributes"]["gen_ai.usage.output_tokens"] == 28
+            assert chat_spans[1]["attributes"]["gen_ai.usage.total_tokens"] == 117
+
+        assert "5" in chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        assert "word" in tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_INPUT]
+        assert 5 == int(tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_OUTPUT])
+
+        assert json.loads(
+            chat_spans[0]["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        ) == [
+            {
+                "role": "user",
+                "content": "['Message demonstrating the absence of truncation.', 'How many letters in the word eudca']",
+            }
+        ]
+
+        param_id = request.node.callspec.id
+        if "string" in param_id:
+            assert [
+                {
+                    "type": "text",
+                    "content": "You are very powerful assistant, but don't know current events",
+                }
+            ] == json.loads(
+                chat_spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+            )
+        else:
+            assert [
+                {
+                    "type": "text",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "text",
+                    "content": "Be concise and clear.",
+                },
+            ] == json.loads(
+                chat_spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+            )
+
+            assert "5" in chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+            # Verify tool calls are recorded when PII is enabled
+            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get(
+                "attributes", {}
+            ), (
+                "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
+            )
+            tool_calls_data = chat_spans[0]["attributes"][
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS
+            ]
+
+            assert isinstance(tool_calls_data, (list, str))  # Could be serialized
+            if isinstance(tool_calls_data, str):
+                assert "get_word_length" in tool_calls_data
+            elif isinstance(tool_calls_data, list) and len(tool_calls_data) > 0:
+                # Check if tool calls contain expected function name
+                tool_call_str = str(tool_calls_data)
+                assert "get_word_length" in tool_call_str
+
+            # Verify finish_reasons is always an array of strings
+            assert chat_spans[0]["attributes"][
+                SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS
+            ] == ["function_call"]
+            assert chat_spans[1]["attributes"][
+                SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS
+            ] == ["stop"]
+
+            # Verify that available tools are always recorded regardless of PII settings
+            for chat_span in chat_spans:
+                tools_data = chat_span["attributes"][
+                    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS
+                ]
+                assert tools_data is not None, (
+                    "Available tools should always be recorded regardless of PII settings"
+                )
+                assert "get_word_length" in tools_data
+    else:
+        events = capture_events()
+
+        with patch.object(
+            llm.client._client._client,
+            "send",
+            side_effect=[tool_response, final_response],
+        ) as _, start_transaction():
             list(
                 agent_executor.stream(
                     {"input": "How many letters in the word eudca"},
@@ -1325,98 +2188,109 @@ def test_langchain_openai_tools_agent_stream(
                 )
             )
 
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    assert tx["contexts"]["trace"]["origin"] == "manual"
+        tx = events[0]
+        assert tx["type"] == "transaction"
+        assert tx["contexts"]["trace"]["origin"] == "manual"
 
-    invoke_agent_span = next(x for x in tx["spans"] if x["op"] == "gen_ai.invoke_agent")
-    chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
-    tool_exec_span = next(x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool")
-
-    assert len(chat_spans) == 2
-
-    assert invoke_agent_span["origin"] == "auto.ai.langchain"
-    assert chat_spans[0]["origin"] == "auto.ai.langchain"
-    assert chat_spans[1]["origin"] == "auto.ai.langchain"
-    assert tool_exec_span["origin"] == "auto.ai.langchain"
-
-    assert invoke_agent_span["data"]["gen_ai.function_id"] == "my-snazzy-pipeline"
-
-    # We can't guarantee anything about the "shape" of the langchain execution graph
-    assert len(list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")) > 0
-
-    # Token usage is only available in newer versions of langchain (v0.2+)
-    # where usage_metadata is supported on AIMessageChunk
-    if "gen_ai.usage.input_tokens" in chat_spans[0]["data"]:
-        assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 142
-        assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 50
-        assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 192
-
-    if "gen_ai.usage.input_tokens" in chat_spans[1]["data"]:
-        assert chat_spans[1]["data"]["gen_ai.usage.input_tokens"] == 89
-        assert chat_spans[1]["data"]["gen_ai.usage.output_tokens"] == 28
-        assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
-
-    assert "5" in chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-    assert "word" in tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_INPUT]
-    assert 5 == int(tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_OUTPUT])
-
-    param_id = request.node.callspec.id
-    if "string" in param_id:
-        assert [
-            {
-                "type": "text",
-                "content": "You are very powerful assistant, but don't know current events",
-            }
-        ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
-    else:
-        assert [
-            {
-                "type": "text",
-                "content": "You are a helpful assistant.",
-            },
-            {
-                "type": "text",
-                "content": "Be concise and clear.",
-            },
-        ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
-
-    assert "5" in chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-
-    # Verify tool calls are recorded when PII is enabled
-    assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get("data", {}), (
-        "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
-    )
-    tool_calls_data = chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
-    assert isinstance(tool_calls_data, (list, str))  # Could be serialized
-    if isinstance(tool_calls_data, str):
-        assert "get_word_length" in tool_calls_data
-    elif isinstance(tool_calls_data, list) and len(tool_calls_data) > 0:
-        # Check if tool calls contain expected function name
-        tool_call_str = str(tool_calls_data)
-        assert "get_word_length" in tool_call_str
-
-    # Verify finish_reasons is always an array of strings
-    assert chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-        "function_call"
-    ]
-    assert chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["stop"]
-
-    # Verify that available tools are always recorded regardless of PII settings
-    for chat_span in chat_spans:
-        tools_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
-        assert tools_data is not None, (
-            "Available tools should always be recorded regardless of PII settings"
+        invoke_agent_span = next(
+            x for x in tx["spans"] if x["op"] == "gen_ai.invoke_agent"
         )
-        assert "get_word_length" in tools_data
+        chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
+        tool_exec_span = next(
+            x for x in tx["spans"] if x["op"] == "gen_ai.execute_tool"
+        )
+
+        assert len(chat_spans) == 2
+
+        assert invoke_agent_span["origin"] == "auto.ai.langchain"
+        assert chat_spans[0]["origin"] == "auto.ai.langchain"
+        assert chat_spans[1]["origin"] == "auto.ai.langchain"
+        assert tool_exec_span["origin"] == "auto.ai.langchain"
+
+        assert invoke_agent_span["data"]["gen_ai.function_id"] == "my-snazzy-pipeline"
+
+        # We can't guarantee anything about the "shape" of the langchain execution graph
+        assert len(list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")) > 0
+
+        # Token usage is only available in newer versions of langchain (v0.2+)
+        # where usage_metadata is supported on AIMessageChunk
+        if "gen_ai.usage.input_tokens" in chat_spans[0]["data"]:
+            assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 142
+            assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 50
+            assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 192
+
+        if "gen_ai.usage.input_tokens" in chat_spans[1]["data"]:
+            assert chat_spans[1]["data"]["gen_ai.usage.input_tokens"] == 89
+            assert chat_spans[1]["data"]["gen_ai.usage.output_tokens"] == 28
+            assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
+
+        assert "5" in chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        assert "word" in tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_INPUT]
+        assert 5 == int(tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_OUTPUT])
+
+        param_id = request.node.callspec.id
+        if "string" in param_id:
+            assert [
+                {
+                    "type": "text",
+                    "content": "You are very powerful assistant, but don't know current events",
+                }
+            ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+        else:
+            assert [
+                {
+                    "type": "text",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "text",
+                    "content": "Be concise and clear.",
+                },
+            ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+
+            assert "5" in chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+            # Verify tool calls are recorded when PII is enabled
+            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get(
+                "data", {}
+            ), (
+                "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
+            )
+            tool_calls_data = chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+            assert isinstance(tool_calls_data, (list, str))  # Could be serialized
+            if isinstance(tool_calls_data, str):
+                assert "get_word_length" in tool_calls_data
+            elif isinstance(tool_calls_data, list) and len(tool_calls_data) > 0:
+                # Check if tool calls contain expected function name
+                tool_call_str = str(tool_calls_data)
+                assert "get_word_length" in tool_call_str
+
+            # Verify finish_reasons is always an array of strings
+            assert chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
+                "function_call"
+            ]
+            assert chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
+                "stop"
+            ]
+
+            # Verify that available tools are always recorded regardless of PII settings
+            for chat_span in chat_spans:
+                tools_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
+                assert tools_data is not None, (
+                    "Available tools should always be recorded regardless of PII settings"
+                )
+                assert "get_word_length" in tools_data
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_langchain_openai_tools_agent_stream_with_config(
     sentry_init,
     capture_events,
+    capture_items,
     get_model_response,
     server_side_event_chunks,
     streaming_chat_completions_model_responses,
+    stream_gen_ai_spans,
 ):
     sentry_init(
         integrations=[
@@ -1426,8 +2300,8 @@ def test_langchain_openai_tools_agent_stream_with_config(
         ],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
 
     prompt = ChatPromptTemplate.from_messages(
         [
@@ -1467,36 +2341,86 @@ def test_langchain_openai_tools_agent_stream_with_config(
 
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
 
-    with patch.object(
-        llm.client._client._client,
-        "send",
-        side_effect=[tool_response, final_response],
-    ) as _:
-        with start_transaction():
+    if stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with patch.object(
+            llm.client._client._client,
+            "send",
+            side_effect=[tool_response, final_response],
+        ) as _, start_transaction():
             list(
                 agent_executor.stream(
                     {"input": "How many letters in the word eudca"},
                 )
             )
 
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    assert tx["contexts"]["trace"]["origin"] == "manual"
+        tx = next(item.payload for item in items if item.type == "transaction")
+        assert tx["type"] == "transaction"
+        assert tx["contexts"]["trace"]["origin"] == "manual"
 
-    invoke_agent_span = next(x for x in tx["spans"] if x["op"] == "gen_ai.invoke_agent")
-    assert invoke_agent_span["data"]["gen_ai.function_id"] == "my-snazzy-pipeline"
+        spans = [item.payload for item in items if item.type == "span"]
+        invoke_agent_span = next(
+            x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.invoke_agent"
+        )
+        assert (
+            invoke_agent_span["attributes"]["gen_ai.function_id"]
+            == "my-snazzy-pipeline"
+        )
+    else:
+        events = capture_events()
+
+        with patch.object(
+            llm.client._client._client,
+            "send",
+            side_effect=[tool_response, final_response],
+        ) as _, start_transaction():
+            list(
+                agent_executor.stream(
+                    {"input": "How many letters in the word eudca"},
+                )
+            )
+
+        tx = events[0]
+        assert tx["type"] == "transaction"
+        assert tx["contexts"]["trace"]["origin"] == "manual"
+
+        invoke_agent_span = next(
+            x for x in tx["spans"] if x["op"] == "gen_ai.invoke_agent"
+        )
+        assert invoke_agent_span["data"]["gen_ai.function_id"] == "my-snazzy-pipeline"
 
 
-def test_langchain_error(sentry_init, capture_events):
-    global llm_type
-    llm_type = "acme-llm"
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_langchain_error(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+):
+    class MockOpenAI(ChatOpenAI):
+        def _stream(
+            self,
+            messages: List[BaseMessage],
+            stop: Optional[List[str]] = None,
+            run_manager: Optional[CallbackManagerForLLMRun] = None,
+            **kwargs: Any,
+        ) -> Iterator[ChatGenerationChunk]:
+            stream_result_mock = Mock(side_effect=ValueError("API rate limit error"))
+
+            for x in stream_result_mock():
+                yield x
+
+        @property
+        def _llm_type(self) -> str:
+            return "acme-llm"
 
     sentry_init(
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
 
     prompt = ChatPromptTemplate.from_messages(
         [
@@ -1508,8 +2432,6 @@ def test_langchain_error(sentry_init, capture_events):
             MessagesPlaceholder(variable_name="agent_scratchpad"),
         ]
     )
-    global stream_result_mock
-    stream_result_mock = Mock(side_effect=ValueError("API rate limit error"))
     llm = MockOpenAI(
         model_name="gpt-3.5-turbo",
         temperature=0,
@@ -1519,54 +2441,126 @@ def test_langchain_error(sentry_init, capture_events):
 
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
 
-    with start_transaction(), pytest.raises(ValueError):
-        list(agent_executor.stream({"input": "How many letters in the word eudca"}))
+    if stream_gen_ai_spans:
+        items = capture_items("event")
 
-    error = events[0]
+        with start_transaction(), pytest.raises(ValueError):
+            list(agent_executor.stream({"input": "How many letters in the word eudca"}))
+
+        (error,) = (item.payload for item in items if item.type == "event")
+    else:
+        events = capture_events()
+
+        with start_transaction(), pytest.raises(ValueError):
+            list(agent_executor.stream({"input": "How many letters in the word eudca"}))
+
+        error = events[0]
     assert error["level"] == "error"
 
 
-def test_span_status_error(sentry_init, capture_events):
-    global llm_type
-    llm_type = "acme-llm"
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_span_status_error(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+):
+    class MockOpenAI(ChatOpenAI):
+        def _stream(
+            self,
+            messages: List[BaseMessage],
+            stop: Optional[List[str]] = None,
+            run_manager: Optional[CallbackManagerForLLMRun] = None,
+            **kwargs: Any,
+        ) -> Iterator[ChatGenerationChunk]:
+            stream_result_mock = Mock(side_effect=ValueError("API rate limit error"))
+
+            for x in stream_result_mock():
+                yield x
+
+        @property
+        def _llm_type(self) -> str:
+            return "acme-llm"
 
     sentry_init(
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
+    if stream_gen_ai_spans:
+        items = capture_items("event", "transaction", "span")
 
-    with start_transaction(name="test"):
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    "You are very powerful assistant, but don't know current events",
-                ),
-                ("user", "{input}"),
-                MessagesPlaceholder(variable_name="agent_scratchpad"),
-            ]
-        )
-        global stream_result_mock
-        stream_result_mock = Mock(side_effect=ValueError("API rate limit error"))
-        llm = MockOpenAI(
-            model_name="gpt-3.5-turbo",
-            temperature=0,
-            openai_api_key="badkey",
-        )
-        agent = create_openai_tools_agent(llm, [get_word_length], prompt)
+        with start_transaction(name="test"):
+            prompt = ChatPromptTemplate.from_messages(
+                [
+                    (
+                        "system",
+                        "You are very powerful assistant, but don't know current events",
+                    ),
+                    ("user", "{input}"),
+                    MessagesPlaceholder(variable_name="agent_scratchpad"),
+                ]
+            )
+            llm = MockOpenAI(
+                model_name="gpt-3.5-turbo",
+                temperature=0,
+                openai_api_key="badkey",
+            )
+            agent = create_openai_tools_agent(llm, [get_word_length], prompt)
 
-        agent_executor = AgentExecutor(
-            agent=agent, tools=[get_word_length], verbose=True
-        )
+            agent_executor = AgentExecutor(
+                agent=agent, tools=[get_word_length], verbose=True
+            )
 
-        with pytest.raises(ValueError):
-            list(agent_executor.stream({"input": "How many letters in the word eudca"}))
+            with pytest.raises(ValueError):
+                list(
+                    agent_executor.stream(
+                        {"input": "How many letters in the word eudca"}
+                    )
+                )
 
-    (error, transaction) = events
-    assert error["level"] == "error"
-    assert transaction["spans"][0]["status"] == "internal_error"
-    assert transaction["spans"][0]["tags"]["status"] == "internal_error"
+        (error,) = (item.payload for item in items if item.type == "event")
+        assert error["level"] == "error"
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[0]["status"] == "error"
+        (transaction,) = (item.payload for item in items if item.type == "transaction")
+    else:
+        events = capture_events()
+
+        with start_transaction(name="test"):
+            prompt = ChatPromptTemplate.from_messages(
+                [
+                    (
+                        "system",
+                        "You are very powerful assistant, but don't know current events",
+                    ),
+                    ("user", "{input}"),
+                    MessagesPlaceholder(variable_name="agent_scratchpad"),
+                ]
+            )
+            llm = MockOpenAI(
+                model_name="gpt-3.5-turbo",
+                temperature=0,
+                openai_api_key="badkey",
+            )
+            agent = create_openai_tools_agent(llm, [get_word_length], prompt)
+
+            agent_executor = AgentExecutor(
+                agent=agent, tools=[get_word_length], verbose=True
+            )
+
+            with pytest.raises(ValueError):
+                list(
+                    agent_executor.stream(
+                        {"input": "How many letters in the word eudca"}
+                    )
+                )
+
+        (error, transaction) = events
+        assert error["level"] == "error"
+        assert transaction["spans"][0]["status"] == "internal_error"
+        assert transaction["spans"][0]["tags"]["status"] == "internal_error"
+
     assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
 
@@ -1614,7 +2608,9 @@ def test_manual_callback_no_duplication(sentry_init):
         def _identifying_params(self):
             return {}
 
-    sentry_init(integrations=[LangchainIntegration()])
+    sentry_init(
+        integrations=[LangchainIntegration()], _experiments={"gen_ai_as_v2_spans": True}
+    )
 
     # Create a manual SentryLangchainCallback
     manual_callback = SentryLangchainCallback(
@@ -1779,35 +2775,53 @@ def test_langchain_callback_list_existing_callback(sentry_init):
         assert handler is sentry_callback
 
 
-def test_langchain_message_role_mapping(sentry_init, capture_events):
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_langchain_message_role_mapping(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+):
     """Test that message roles are properly normalized in langchain integration."""
-    global llm_type
-    llm_type = "openai-chat"
+
+    class MockOpenAI(ChatOpenAI):
+        def _stream(
+            self,
+            messages: List[BaseMessage],
+            stop: Optional[List[str]] = None,
+            run_manager: Optional[CallbackManagerForLLMRun] = None,
+            **kwargs: Any,
+        ) -> Iterator[ChatGenerationChunk]:
+            stream_result_mock = Mock(
+                side_effect=[
+                    [
+                        ChatGenerationChunk(
+                            type="ChatGenerationChunk",
+                            message=AIMessageChunk(content="Test response"),
+                        ),
+                    ]
+                ]
+            )
+
+            for x in stream_result_mock():
+                yield x
+
+        @property
+        def _llm_type(self) -> str:
+            return "openai-chat"
 
     sentry_init(
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
 
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", "You are a helpful assistant"),
             ("human", "{input}"),
             MessagesPlaceholder(variable_name="agent_scratchpad"),
-        ]
-    )
-
-    global stream_result_mock
-    stream_result_mock = Mock(
-        side_effect=[
-            [
-                ChatGenerationChunk(
-                    type="ChatGenerationChunk",
-                    message=AIMessageChunk(content="Test response"),
-                ),
-            ]
         ]
     )
 
@@ -1822,54 +2836,112 @@ def test_langchain_message_role_mapping(sentry_init, capture_events):
     # Test input that should trigger message role normalization
     test_input = "Hello, how are you?"
 
-    with start_transaction():
-        list(agent_executor.stream({"input": test_input}))
-
-    assert len(events) > 0
-    tx = events[0]
-    assert tx["type"] == "transaction"
-
-    # Find spans with gen_ai operation that should have message data
-    gen_ai_spans = [
-        span for span in tx.get("spans", []) if span.get("op", "").startswith("gen_ai")
-    ]
-
-    # Check if any span has message data with normalized roles
     message_data_found = False
-    for span in gen_ai_spans:
-        span_data = span.get("data", {})
-        if SPANDATA.GEN_AI_REQUEST_MESSAGES in span_data:
-            message_data_found = True
-            messages_data = span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    if stream_gen_ai_spans:
+        items = capture_items("span")
 
-            # Parse the message data (might be JSON string)
-            if isinstance(messages_data, str):
-                try:
-                    messages = json.loads(messages_data)
-                except json.JSONDecodeError:
-                    # If not valid JSON, skip this assertion
-                    continue
-            else:
-                messages = messages_data
+        with start_transaction():
+            list(agent_executor.stream({"input": test_input}))
 
-            # Verify that the input message is present and contains the test input
-            assert isinstance(messages, list)
-            assert len(messages) > 0
+        spans = [item.payload for item in items if item.type == "span"]
+        # Find spans with gen_ai operation that should have message data
+        gen_ai_spans = [
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op", "").startswith("gen_ai")
+        ]
 
-            # The test input should be in one of the messages
-            input_found = False
-            for msg in messages:
-                if isinstance(msg, dict) and test_input in str(msg.get("content", "")):
-                    input_found = True
-                    break
-                elif isinstance(msg, str) and test_input in msg:
-                    input_found = True
-                    break
+        # Check if any span has message data with normalized roles
+        for span in gen_ai_spans:
+            span_data = span.get("attributes", {})
+            if SPANDATA.GEN_AI_REQUEST_MESSAGES in span_data:
+                message_data_found = True
+                messages_data = span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES]
 
-            assert input_found, (
-                f"Test input '{test_input}' not found in messages: {messages}"
-            )
-            break
+                # Parse the message data (might be JSON string)
+                if isinstance(messages_data, str):
+                    try:
+                        messages = json.loads(messages_data)
+                    except json.JSONDecodeError:
+                        # If not valid JSON, skip this assertion
+                        continue
+                else:
+                    messages = messages_data
+
+                # Verify that the input message is present and contains the test input
+                assert isinstance(messages, list)
+                assert len(messages) > 0
+
+                # The test input should be in one of the messages
+                input_found = False
+                for msg in messages:
+                    if isinstance(msg, dict) and test_input in str(
+                        msg.get("content", "")
+                    ):
+                        input_found = True
+                        break
+                    elif isinstance(msg, str) and test_input in msg:
+                        input_found = True
+                        break
+
+                assert input_found, (
+                    f"Test input '{test_input}' not found in messages: {messages}"
+                )
+                break
+    else:
+        events = capture_events()
+
+        with start_transaction():
+            list(agent_executor.stream({"input": test_input}))
+
+        assert len(events) > 0
+        tx = events[0]
+        assert tx["type"] == "transaction"
+
+        # Find spans with gen_ai operation that should have message data
+        gen_ai_spans = [
+            span
+            for span in tx.get("spans", [])
+            if span.get("op", "").startswith("gen_ai")
+        ]
+
+        # Check if any span has message data with normalized roles
+        for span in gen_ai_spans:
+            span_data = span.get("data", {})
+            if SPANDATA.GEN_AI_REQUEST_MESSAGES in span_data:
+                message_data_found = True
+                messages_data = span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES]
+
+                # Parse the message data (might be JSON string)
+                if isinstance(messages_data, str):
+                    try:
+                        messages = json.loads(messages_data)
+                    except json.JSONDecodeError:
+                        # If not valid JSON, skip this assertion
+                        continue
+                else:
+                    messages = messages_data
+
+                # Verify that the input message is present and contains the test input
+                assert isinstance(messages, list)
+                assert len(messages) > 0
+
+                # The test input should be in one of the messages
+                input_found = False
+                for msg in messages:
+                    if isinstance(msg, dict) and test_input in str(
+                        msg.get("content", "")
+                    ):
+                        input_found = True
+                        break
+                    elif isinstance(msg, str) and test_input in msg:
+                        input_found = True
+                        break
+
+                assert input_found, (
+                    f"Test input '{test_input}' not found in messages: {messages}"
+                )
+                break
 
     # The message role mapping functionality is primarily tested through the normalization
     # that happens in the integration code. The fact that we can capture and process
@@ -1920,7 +2992,7 @@ def test_langchain_message_role_normalization_units():
 
 def test_langchain_message_truncation(sentry_init, capture_events):
     """Test that large messages are truncated properly in Langchain integration."""
-    from langchain_core.outputs import LLMResult, Generation
+    from langchain_core.outputs import Generation, LLMResult
 
     sentry_init(
         integrations=[LangchainIntegration(include_prompts=True)],
@@ -1996,6 +3068,7 @@ def test_langchain_message_truncation(sentry_init, capture_events):
     assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -2006,7 +3079,12 @@ def test_langchain_message_truncation(sentry_init, capture_events):
     ],
 )
 def test_langchain_embeddings_sync(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    capture_items,
+    send_default_pii,
+    include_prompts,
+    stream_gen_ai_spans,
 ):
     """Test that sync embedding methods (embed_documents, embed_query) are properly traced."""
     try:
@@ -2018,61 +3096,127 @@ def test_langchain_embeddings_sync(
         integrations=[LangchainIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
+    if stream_gen_ai_spans:
+        items = capture_items("span")
 
-    # Mock the actual API call
-    with mock.patch.object(
-        OpenAIEmbeddings,
-        "embed_documents",
-        wraps=lambda self, texts: [[0.1, 0.2, 0.3] for _ in texts],
-    ) as mock_embed_documents:
-        embeddings = OpenAIEmbeddings(
-            model="text-embedding-ada-002", openai_api_key="test-key"
+        # Mock the actual API call
+        with mock.patch.object(
+            OpenAIEmbeddings,
+            "embed_documents",
+            wraps=lambda self, texts: [[0.1, 0.2, 0.3] for _ in texts],
+        ) as mock_embed_documents:
+            embeddings = OpenAIEmbeddings(
+                model="text-embedding-ada-002", openai_api_key="test-key"
+            )
+
+            # Force setup to re-run to ensure our mock is wrapped
+            LangchainIntegration.setup_once()
+
+            with start_transaction(name="test_embeddings"):
+                # Test embed_documents
+                result = embeddings.embed_documents(["Hello world", "Test document"])
+
+            assert len(result) == 2
+            mock_embed_documents.assert_called_once()
+
+        spans = [item.payload for item in items if item.type == "span"]
+        # Find embeddings span
+        embeddings_spans = [
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == "gen_ai.embeddings"
+        ]
+        assert len(embeddings_spans) == 1
+
+        embeddings_span = embeddings_spans[0]
+        assert embeddings_span["name"] == "embeddings text-embedding-ada-002"
+        assert embeddings_span["attributes"]["sentry.origin"] == "auto.ai.langchain"
+        assert embeddings_span["attributes"]["gen_ai.operation.name"] == "embeddings"
+        assert (
+            embeddings_span["attributes"]["gen_ai.request.model"]
+            == "text-embedding-ada-002"
         )
 
-        # Force setup to re-run to ensure our mock is wrapped
-        LangchainIntegration.setup_once()
+        # Check if input is captured based on PII settings
+        if send_default_pii and include_prompts:
+            assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT in embeddings_span["attributes"]
+            input_data = embeddings_span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
 
-        with start_transaction(name="test_embeddings"):
-            # Test embed_documents
-            result = embeddings.embed_documents(["Hello world", "Test document"])
-
-        assert len(result) == 2
-        mock_embed_documents.assert_called_once()
-
-    # Check captured events
-    assert len(events) >= 1
-    tx = events[0]
-    assert tx["type"] == "transaction"
-
-    # Find embeddings span
-    embeddings_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.embeddings"
-    ]
-    assert len(embeddings_spans) == 1
-
-    embeddings_span = embeddings_spans[0]
-    assert embeddings_span["description"] == "embeddings text-embedding-ada-002"
-    assert embeddings_span["origin"] == "auto.ai.langchain"
-    assert embeddings_span["data"]["gen_ai.operation.name"] == "embeddings"
-    assert embeddings_span["data"]["gen_ai.request.model"] == "text-embedding-ada-002"
-
-    # Check if input is captured based on PII settings
-    if send_default_pii and include_prompts:
-        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT in embeddings_span["data"]
-        input_data = embeddings_span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
-        # Could be serialized as string
-        if isinstance(input_data, str):
-            assert "Hello world" in input_data
-            assert "Test document" in input_data
+            # Could be serialized as string
+            if isinstance(input_data, str):
+                assert "Hello world" in input_data
+                assert "Test document" in input_data
+            else:
+                assert "Hello world" in input_data
+                assert "Test document" in input_data
         else:
-            assert "Hello world" in input_data
-            assert "Test document" in input_data
+            assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in embeddings_span.get(
+                "attributes", {}
+            )
     else:
-        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in embeddings_span.get("data", {})
+        events = capture_events()
+
+        # Mock the actual API call
+        with mock.patch.object(
+            OpenAIEmbeddings,
+            "embed_documents",
+            wraps=lambda self, texts: [[0.1, 0.2, 0.3] for _ in texts],
+        ) as mock_embed_documents:
+            embeddings = OpenAIEmbeddings(
+                model="text-embedding-ada-002", openai_api_key="test-key"
+            )
+
+            # Force setup to re-run to ensure our mock is wrapped
+            LangchainIntegration.setup_once()
+
+            with start_transaction(name="test_embeddings"):
+                # Test embed_documents
+                result = embeddings.embed_documents(["Hello world", "Test document"])
+
+            assert len(result) == 2
+            mock_embed_documents.assert_called_once()
+
+        # Check captured events
+        assert len(events) >= 1
+        tx = events[0]
+        assert tx["type"] == "transaction"
+
+        # Find embeddings span
+        embeddings_spans = [
+            span
+            for span in tx.get("spans", [])
+            if span.get("op") == "gen_ai.embeddings"
+        ]
+        assert len(embeddings_spans) == 1
+
+        embeddings_span = embeddings_spans[0]
+        assert embeddings_span["description"] == "embeddings text-embedding-ada-002"
+        assert embeddings_span["origin"] == "auto.ai.langchain"
+        assert embeddings_span["data"]["gen_ai.operation.name"] == "embeddings"
+        assert (
+            embeddings_span["data"]["gen_ai.request.model"] == "text-embedding-ada-002"
+        )
+
+        # Check if input is captured based on PII settings
+        if send_default_pii and include_prompts:
+            assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT in embeddings_span["data"]
+            input_data = embeddings_span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+            # Could be serialized as string
+            if isinstance(input_data, str):
+                assert "Hello world" in input_data
+                assert "Test document" in input_data
+            else:
+                assert "Hello world" in input_data
+                assert "Test document" in input_data
+        else:
+            assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in embeddings_span.get(
+                "data", {}
+            )
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -2081,7 +3225,12 @@ def test_langchain_embeddings_sync(
     ],
 )
 def test_langchain_embeddings_embed_query(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    capture_items,
+    send_default_pii,
+    include_prompts,
+    stream_gen_ai_spans,
 ):
     """Test that embed_query method is properly traced."""
     try:
@@ -2093,56 +3242,117 @@ def test_langchain_embeddings_embed_query(
         integrations=[LangchainIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
+    if stream_gen_ai_spans:
+        items = capture_items("span")
 
-    # Mock the actual API call
-    with mock.patch.object(
-        OpenAIEmbeddings,
-        "embed_query",
-        wraps=lambda self, text: [0.1, 0.2, 0.3],
-    ) as mock_embed_query:
-        embeddings = OpenAIEmbeddings(
-            model="text-embedding-ada-002", openai_api_key="test-key"
+        # Mock the actual API call
+        with mock.patch.object(
+            OpenAIEmbeddings,
+            "embed_query",
+            wraps=lambda self, text: [0.1, 0.2, 0.3],
+        ) as mock_embed_query:
+            embeddings = OpenAIEmbeddings(
+                model="text-embedding-ada-002", openai_api_key="test-key"
+            )
+
+            # Force setup to re-run to ensure our mock is wrapped
+            LangchainIntegration.setup_once()
+
+            with start_transaction(name="test_embeddings_query"):
+                result = embeddings.embed_query("What is the capital of France?")
+
+            assert len(result) == 3
+            mock_embed_query.assert_called_once()
+
+        spans = [item.payload for item in items if item.type == "span"]
+        # Find embeddings span
+        embeddings_spans = [
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == "gen_ai.embeddings"
+        ]
+        assert len(embeddings_spans) == 1
+
+        embeddings_span = embeddings_spans[0]
+        assert embeddings_span["attributes"]["gen_ai.operation.name"] == "embeddings"
+        assert (
+            embeddings_span["attributes"]["gen_ai.request.model"]
+            == "text-embedding-ada-002"
         )
 
-        # Force setup to re-run to ensure our mock is wrapped
-        LangchainIntegration.setup_once()
+        # Check if input is captured based on PII settings
+        if send_default_pii and include_prompts:
+            assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT in embeddings_span["attributes"]
+            input_data = embeddings_span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
 
-        with start_transaction(name="test_embeddings_query"):
-            result = embeddings.embed_query("What is the capital of France?")
-
-        assert len(result) == 3
-        mock_embed_query.assert_called_once()
-
-    # Check captured events
-    assert len(events) >= 1
-    tx = events[0]
-    assert tx["type"] == "transaction"
-
-    # Find embeddings span
-    embeddings_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.embeddings"
-    ]
-    assert len(embeddings_spans) == 1
-
-    embeddings_span = embeddings_spans[0]
-    assert embeddings_span["data"]["gen_ai.operation.name"] == "embeddings"
-    assert embeddings_span["data"]["gen_ai.request.model"] == "text-embedding-ada-002"
-
-    # Check if input is captured based on PII settings
-    if send_default_pii and include_prompts:
-        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT in embeddings_span["data"]
-        input_data = embeddings_span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
-        # Could be serialized as string
-        if isinstance(input_data, str):
-            assert "What is the capital of France?" in input_data
+            # Could be serialized as string
+            if isinstance(input_data, str):
+                assert "What is the capital of France?" in input_data
+            else:
+                assert "What is the capital of France?" in input_data
         else:
-            assert "What is the capital of France?" in input_data
+            assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in embeddings_span.get(
+                "attributes", {}
+            )
     else:
-        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in embeddings_span.get("data", {})
+        events = capture_events()
+
+        # Mock the actual API call
+        with mock.patch.object(
+            OpenAIEmbeddings,
+            "embed_query",
+            wraps=lambda self, text: [0.1, 0.2, 0.3],
+        ) as mock_embed_query:
+            embeddings = OpenAIEmbeddings(
+                model="text-embedding-ada-002", openai_api_key="test-key"
+            )
+
+            # Force setup to re-run to ensure our mock is wrapped
+            LangchainIntegration.setup_once()
+
+            with start_transaction(name="test_embeddings_query"):
+                result = embeddings.embed_query("What is the capital of France?")
+
+            assert len(result) == 3
+            mock_embed_query.assert_called_once()
+
+        # Check captured events
+        assert len(events) >= 1
+        tx = events[0]
+        assert tx["type"] == "transaction"
+
+        # Find embeddings span
+        embeddings_spans = [
+            span
+            for span in tx.get("spans", [])
+            if span.get("op") == "gen_ai.embeddings"
+        ]
+        assert len(embeddings_spans) == 1
+
+        embeddings_span = embeddings_spans[0]
+        assert embeddings_span["data"]["gen_ai.operation.name"] == "embeddings"
+        assert (
+            embeddings_span["data"]["gen_ai.request.model"] == "text-embedding-ada-002"
+        )
+
+        # Check if input is captured based on PII settings
+        if send_default_pii and include_prompts:
+            assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT in embeddings_span["data"]
+            input_data = embeddings_span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+            # Could be serialized as string
+            if isinstance(input_data, str):
+                assert "What is the capital of France?" in input_data
+            else:
+                assert "What is the capital of France?" in input_data
+        else:
+            assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in embeddings_span.get(
+                "data", {}
+            )
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -2152,7 +3362,12 @@ def test_langchain_embeddings_embed_query(
 )
 @pytest.mark.asyncio
 async def test_langchain_embeddings_async(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    capture_items,
+    send_default_pii,
+    include_prompts,
+    stream_gen_ai_spans,
 ):
     """Test that async embedding methods (aembed_documents, aembed_query) are properly traced."""
     try:
@@ -2164,65 +3379,145 @@ async def test_langchain_embeddings_async(
         integrations=[LangchainIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
 
     async def mock_aembed_documents(self, texts):
         return [[0.1, 0.2, 0.3] for _ in texts]
 
-    # Mock the actual API call
-    with mock.patch.object(
-        OpenAIEmbeddings,
-        "aembed_documents",
-        wraps=mock_aembed_documents,
-    ) as mock_aembed:
-        embeddings = OpenAIEmbeddings(
-            model="text-embedding-ada-002", openai_api_key="test-key"
-        )
+    if stream_gen_ai_spans:
+        items = capture_items("span")
 
-        # Force setup to re-run to ensure our mock is wrapped
-        LangchainIntegration.setup_once()
-
-        with start_transaction(name="test_async_embeddings"):
-            result = await embeddings.aembed_documents(
-                ["Async hello", "Async test document"]
+        # Mock the actual API call
+        with mock.patch.object(
+            OpenAIEmbeddings,
+            "aembed_documents",
+            wraps=mock_aembed_documents,
+        ) as mock_aembed:
+            embeddings = OpenAIEmbeddings(
+                model="text-embedding-ada-002", openai_api_key="test-key"
             )
 
-        assert len(result) == 2
-        mock_aembed.assert_called_once()
+            # Force setup to re-run to ensure our mock is wrapped
+            LangchainIntegration.setup_once()
 
-    # Check captured events
-    assert len(events) >= 1
-    tx = events[0]
-    assert tx["type"] == "transaction"
+            with start_transaction(name="test_async_embeddings"):
+                result = await embeddings.aembed_documents(
+                    ["Async hello", "Async test document"]
+                )
 
-    # Find embeddings span
-    embeddings_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.embeddings"
-    ]
-    assert len(embeddings_spans) == 1
+            assert len(result) == 2
+            mock_aembed.assert_called_once()
 
-    embeddings_span = embeddings_spans[0]
-    assert embeddings_span["description"] == "embeddings text-embedding-ada-002"
-    assert embeddings_span["origin"] == "auto.ai.langchain"
-    assert embeddings_span["data"]["gen_ai.operation.name"] == "embeddings"
-    assert embeddings_span["data"]["gen_ai.request.model"] == "text-embedding-ada-002"
+        spans = [item.payload for item in items if item.type == "span"]
+        # Find embeddings span
+        embeddings_spans = [
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == "gen_ai.embeddings"
+        ]
+        assert len(embeddings_spans) == 1
 
-    # Check if input is captured based on PII settings
-    if send_default_pii and include_prompts:
-        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT in embeddings_span["data"]
-        input_data = embeddings_span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
-        # Could be serialized as string
-        if isinstance(input_data, str):
-            assert "Async hello" in input_data or "Async test document" in input_data
+        embeddings_span = embeddings_spans[0]
+        assert embeddings_span["name"] == "embeddings text-embedding-ada-002"
+        assert embeddings_span["attributes"]["sentry.origin"] == "auto.ai.langchain"
+        assert embeddings_span["attributes"]["gen_ai.operation.name"] == "embeddings"
+        assert (
+            embeddings_span["attributes"]["gen_ai.request.model"]
+            == "text-embedding-ada-002"
+        )
+
+        # Check if input is captured based on PII settings
+        if send_default_pii and include_prompts:
+            assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT in embeddings_span["attributes"]
+            input_data = embeddings_span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+
+            # Could be serialized as string
+            if isinstance(input_data, str):
+                assert (
+                    "Async hello" in input_data or "Async test document" in input_data
+                )
+            else:
+                assert (
+                    "Async hello" in input_data or "Async test document" in input_data
+                )
         else:
-            assert "Async hello" in input_data or "Async test document" in input_data
+            assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in embeddings_span.get(
+                "attributes", {}
+            )
+
     else:
-        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in embeddings_span.get("data", {})
+        events = capture_events()
+
+        # Mock the actual API call
+        with mock.patch.object(
+            OpenAIEmbeddings,
+            "aembed_documents",
+            wraps=mock_aembed_documents,
+        ) as mock_aembed:
+            embeddings = OpenAIEmbeddings(
+                model="text-embedding-ada-002", openai_api_key="test-key"
+            )
+
+            # Force setup to re-run to ensure our mock is wrapped
+            LangchainIntegration.setup_once()
+
+            with start_transaction(name="test_async_embeddings"):
+                result = await embeddings.aembed_documents(
+                    ["Async hello", "Async test document"]
+                )
+
+            assert len(result) == 2
+            mock_aembed.assert_called_once()
+
+        # Check captured events
+        assert len(events) >= 1
+        tx = events[0]
+        assert tx["type"] == "transaction"
+
+        # Find embeddings span
+        embeddings_spans = [
+            span
+            for span in tx.get("spans", [])
+            if span.get("op") == "gen_ai.embeddings"
+        ]
+        assert len(embeddings_spans) == 1
+
+        embeddings_span = embeddings_spans[0]
+        assert embeddings_span["description"] == "embeddings text-embedding-ada-002"
+        assert embeddings_span["origin"] == "auto.ai.langchain"
+        assert embeddings_span["data"]["gen_ai.operation.name"] == "embeddings"
+        assert (
+            embeddings_span["data"]["gen_ai.request.model"] == "text-embedding-ada-002"
+        )
+
+        # Check if input is captured based on PII settings
+        if send_default_pii and include_prompts:
+            assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT in embeddings_span["data"]
+            input_data = embeddings_span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+            # Could be serialized as string
+            if isinstance(input_data, str):
+                assert (
+                    "Async hello" in input_data or "Async test document" in input_data
+                )
+            else:
+                assert (
+                    "Async hello" in input_data or "Async test document" in input_data
+                )
+        else:
+            assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in embeddings_span.get(
+                "data", {}
+            )
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
-async def test_langchain_embeddings_aembed_query(sentry_init, capture_events):
+async def test_langchain_embeddings_aembed_query(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+):
     """Test that aembed_query method is properly traced."""
     try:
         from langchain_openai import OpenAIEmbeddings
@@ -2233,49 +3528,98 @@ async def test_langchain_embeddings_aembed_query(sentry_init, capture_events):
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
 
     async def mock_aembed_query(self, text):
         return [0.1, 0.2, 0.3]
 
-    # Mock the actual API call
-    with mock.patch.object(
-        OpenAIEmbeddings,
-        "aembed_query",
-        wraps=mock_aembed_query,
-    ) as mock_aembed:
-        embeddings = OpenAIEmbeddings(
-            model="text-embedding-ada-002", openai_api_key="test-key"
+    if stream_gen_ai_spans:
+        items = capture_items("span")
+
+        # Mock the actual API call
+        with mock.patch.object(
+            OpenAIEmbeddings,
+            "aembed_query",
+            wraps=mock_aembed_query,
+        ) as mock_aembed:
+            embeddings = OpenAIEmbeddings(
+                model="text-embedding-ada-002", openai_api_key="test-key"
+            )
+
+            # Force setup to re-run to ensure our mock is wrapped
+            LangchainIntegration.setup_once()
+
+            with start_transaction(name="test_async_embeddings_query"):
+                result = await embeddings.aembed_query("Async query test")
+
+            assert len(result) == 3
+            mock_aembed.assert_called_once()
+
+        spans = [item.payload for item in items if item.type == "span"]
+        # Find embeddings span
+        embeddings_spans = [
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == "gen_ai.embeddings"
+        ]
+        assert len(embeddings_spans) == 1
+
+        embeddings_span = embeddings_spans[0]
+        assert embeddings_span["attributes"]["gen_ai.operation.name"] == "embeddings"
+        assert (
+            embeddings_span["attributes"]["gen_ai.request.model"]
+            == "text-embedding-ada-002"
         )
 
-        # Force setup to re-run to ensure our mock is wrapped
-        LangchainIntegration.setup_once()
+        # Check if input is captured
+        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT in embeddings_span["attributes"]
+        input_data = embeddings_span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+    else:
+        events = capture_events()
 
-        with start_transaction(name="test_async_embeddings_query"):
-            result = await embeddings.aembed_query("Async query test")
+        # Mock the actual API call
+        with mock.patch.object(
+            OpenAIEmbeddings,
+            "aembed_query",
+            wraps=mock_aembed_query,
+        ) as mock_aembed:
+            embeddings = OpenAIEmbeddings(
+                model="text-embedding-ada-002", openai_api_key="test-key"
+            )
 
-        assert len(result) == 3
-        mock_aembed.assert_called_once()
+            # Force setup to re-run to ensure our mock is wrapped
+            LangchainIntegration.setup_once()
 
-    # Check captured events
-    assert len(events) >= 1
-    tx = events[0]
-    assert tx["type"] == "transaction"
+            with start_transaction(name="test_async_embeddings_query"):
+                result = await embeddings.aembed_query("Async query test")
 
-    # Find embeddings span
-    embeddings_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.embeddings"
-    ]
-    assert len(embeddings_spans) == 1
+            assert len(result) == 3
+            mock_aembed.assert_called_once()
 
-    embeddings_span = embeddings_spans[0]
-    assert embeddings_span["data"]["gen_ai.operation.name"] == "embeddings"
-    assert embeddings_span["data"]["gen_ai.request.model"] == "text-embedding-ada-002"
+        # Check captured events
+        assert len(events) >= 1
+        tx = events[0]
+        assert tx["type"] == "transaction"
 
-    # Check if input is captured
-    assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT in embeddings_span["data"]
-    input_data = embeddings_span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+        # Find embeddings span
+        embeddings_spans = [
+            span
+            for span in tx.get("spans", [])
+            if span.get("op") == "gen_ai.embeddings"
+        ]
+        assert len(embeddings_spans) == 1
+
+        embeddings_span = embeddings_spans[0]
+        assert embeddings_span["data"]["gen_ai.operation.name"] == "embeddings"
+        assert (
+            embeddings_span["data"]["gen_ai.request.model"] == "text-embedding-ada-002"
+        )
+
+        # Check if input is captured
+        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT in embeddings_span["data"]
+        input_data = embeddings_span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+
     # Could be serialized as string
     if isinstance(input_data, str):
         assert "Async query test" in input_data
@@ -2283,7 +3627,13 @@ async def test_langchain_embeddings_aembed_query(sentry_init, capture_events):
         assert "Async query test" in input_data
 
 
-def test_langchain_embeddings_no_model_name(sentry_init, capture_events):
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_langchain_embeddings_no_model_name(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+):
     """Test embeddings when model name is not available."""
     try:
         from langchain_openai import OpenAIEmbeddings
@@ -2293,87 +3643,170 @@ def test_langchain_embeddings_no_model_name(sentry_init, capture_events):
     sentry_init(
         integrations=[LangchainIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
+    if stream_gen_ai_spans:
+        items = capture_items("span")
 
-    # Mock the actual API call and remove model attribute
-    with mock.patch.object(
-        OpenAIEmbeddings,
-        "embed_documents",
-        wraps=lambda self, texts: [[0.1, 0.2, 0.3] for _ in texts],
-    ):
-        embeddings = OpenAIEmbeddings(openai_api_key="test-key")
-        # Remove model attribute to test fallback
-        delattr(embeddings, "model")
-        if hasattr(embeddings, "model_name"):
-            delattr(embeddings, "model_name")
+        # Mock the actual API call and remove model attribute
+        with mock.patch.object(
+            OpenAIEmbeddings,
+            "embed_documents",
+            wraps=lambda self, texts: [[0.1, 0.2, 0.3] for _ in texts],
+        ):
+            embeddings = OpenAIEmbeddings(openai_api_key="test-key")
+            # Remove model attribute to test fallback
+            delattr(embeddings, "model")
+            if hasattr(embeddings, "model_name"):
+                delattr(embeddings, "model_name")
 
-        # Force setup to re-run to ensure our mock is wrapped
-        LangchainIntegration.setup_once()
+            # Force setup to re-run to ensure our mock is wrapped
+            LangchainIntegration.setup_once()
 
-        with start_transaction(name="test_embeddings_no_model"):
-            embeddings.embed_documents(["Test"])
+            with start_transaction(name="test_embeddings_no_model"):
+                embeddings.embed_documents(["Test"])
 
-    # Check captured events
-    assert len(events) >= 1
-    tx = events[0]
-    assert tx["type"] == "transaction"
+        spans = [item.payload for item in items if item.type == "span"]
+        # Find embeddings span
+        embeddings_spans = [
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == "gen_ai.embeddings"
+        ]
+        assert len(embeddings_spans) == 1
 
-    # Find embeddings span
-    embeddings_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.embeddings"
-    ]
-    assert len(embeddings_spans) == 1
+        embeddings_span = embeddings_spans[0]
+        assert embeddings_span["name"] == "embeddings"
+        assert embeddings_span["attributes"]["gen_ai.operation.name"] == "embeddings"
+        # Model name should not be set if not available
+        assert (
+            "gen_ai.request.model" not in embeddings_span["attributes"]
+            or embeddings_span["attributes"]["gen_ai.request.model"] is None
+        )
+    else:
+        events = capture_events()
 
-    embeddings_span = embeddings_spans[0]
-    assert embeddings_span["description"] == "embeddings"
-    assert embeddings_span["data"]["gen_ai.operation.name"] == "embeddings"
-    # Model name should not be set if not available
-    assert (
-        "gen_ai.request.model" not in embeddings_span["data"]
-        or embeddings_span["data"]["gen_ai.request.model"] is None
-    )
+        # Mock the actual API call and remove model attribute
+        with mock.patch.object(
+            OpenAIEmbeddings,
+            "embed_documents",
+            wraps=lambda self, texts: [[0.1, 0.2, 0.3] for _ in texts],
+        ):
+            embeddings = OpenAIEmbeddings(openai_api_key="test-key")
+            # Remove model attribute to test fallback
+            delattr(embeddings, "model")
+            if hasattr(embeddings, "model_name"):
+                delattr(embeddings, "model_name")
+
+            # Force setup to re-run to ensure our mock is wrapped
+            LangchainIntegration.setup_once()
+
+            with start_transaction(name="test_embeddings_no_model"):
+                embeddings.embed_documents(["Test"])
+
+        # Check captured events
+        assert len(events) >= 1
+        tx = events[0]
+        assert tx["type"] == "transaction"
+
+        # Find embeddings span
+        embeddings_spans = [
+            span
+            for span in tx.get("spans", [])
+            if span.get("op") == "gen_ai.embeddings"
+        ]
+        assert len(embeddings_spans) == 1
+
+        embeddings_span = embeddings_spans[0]
+        assert embeddings_span["description"] == "embeddings"
+        assert embeddings_span["data"]["gen_ai.operation.name"] == "embeddings"
+        # Model name should not be set if not available
+        assert (
+            "gen_ai.request.model" not in embeddings_span["data"]
+            or embeddings_span["data"]["gen_ai.request.model"] is None
+        )
 
 
-def test_langchain_embeddings_integration_disabled(sentry_init, capture_events):
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_langchain_embeddings_integration_disabled(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+):
     """Test that embeddings are not traced when integration is disabled."""
     try:
         from langchain_openai import OpenAIEmbeddings
     except ImportError:
         pytest.skip("langchain_openai not installed")
 
+    sentry_init(
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+    )
+
     # Initialize without LangchainIntegration
-    sentry_init(traces_sample_rate=1.0)
-    events = capture_events()
+    if stream_gen_ai_spans:
+        items = capture_items("span")
 
-    with mock.patch.object(
-        OpenAIEmbeddings,
-        "embed_documents",
-        return_value=[[0.1, 0.2, 0.3]],
-    ):
-        embeddings = OpenAIEmbeddings(
-            model="text-embedding-ada-002", openai_api_key="test-key"
-        )
+        with mock.patch.object(
+            OpenAIEmbeddings,
+            "embed_documents",
+            return_value=[[0.1, 0.2, 0.3]],
+        ):
+            embeddings = OpenAIEmbeddings(
+                model="text-embedding-ada-002", openai_api_key="test-key"
+            )
 
-        with start_transaction(name="test_embeddings_disabled"):
-            embeddings.embed_documents(["Test"])
+            with start_transaction(name="test_embeddings_disabled"):
+                embeddings.embed_documents(["Test"])
 
-    # Check that no embeddings spans were created
-    if events:
-        tx = events[0]
+        # Check that no embeddings spans were created
+        spans = [item.payload for item in items if item.type == "span"]
         embeddings_spans = [
             span
-            for span in tx.get("spans", [])
-            if span.get("op") == "gen_ai.embeddings"
+            for span in spans
+            if span["attributes"].get("sentry.op") == "gen_ai.embeddings"
         ]
         # Should be empty since integration is disabled
         assert len(embeddings_spans) == 0
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            OpenAIEmbeddings,
+            "embed_documents",
+            return_value=[[0.1, 0.2, 0.3]],
+        ):
+            embeddings = OpenAIEmbeddings(
+                model="text-embedding-ada-002", openai_api_key="test-key"
+            )
+
+            with start_transaction(name="test_embeddings_disabled"):
+                embeddings.embed_documents(["Test"])
+
+        # Check that no embeddings spans were created
+        if events:
+            tx = events[0]
+            embeddings_spans = [
+                span
+                for span in tx.get("spans", [])
+                if span.get("op") == "gen_ai.embeddings"
+            ]
+            # Should be empty since integration is disabled
+            assert len(embeddings_spans) == 0
 
 
-def test_langchain_embeddings_multiple_providers(sentry_init, capture_events):
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_langchain_embeddings_multiple_providers(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+):
     """Test that embeddings work with different providers."""
     try:
-        from langchain_openai import OpenAIEmbeddings, AzureOpenAIEmbeddings
+        from langchain_openai import AzureOpenAIEmbeddings, OpenAIEmbeddings
     except ImportError:
         pytest.skip("langchain_openai not installed")
 
@@ -2381,52 +3814,102 @@ def test_langchain_embeddings_multiple_providers(sentry_init, capture_events):
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
+    if stream_gen_ai_spans:
+        items = capture_items("span")
 
-    # Mock both providers
-    with mock.patch.object(
-        OpenAIEmbeddings,
-        "embed_documents",
-        wraps=lambda self, texts: [[0.1, 0.2, 0.3] for _ in texts],
-    ), mock.patch.object(
-        AzureOpenAIEmbeddings,
-        "embed_documents",
-        wraps=lambda self, texts: [[0.4, 0.5, 0.6] for _ in texts],
-    ):
-        openai_embeddings = OpenAIEmbeddings(
-            model="text-embedding-ada-002", openai_api_key="test-key"
-        )
-        azure_embeddings = AzureOpenAIEmbeddings(
-            model="text-embedding-ada-002",
-            azure_endpoint="https://test.openai.azure.com/",
-            openai_api_key="test-key",
-        )
+        # Mock both providers
+        with mock.patch.object(
+            OpenAIEmbeddings,
+            "embed_documents",
+            wraps=lambda self, texts: [[0.1, 0.2, 0.3] for _ in texts],
+        ), mock.patch.object(
+            AzureOpenAIEmbeddings,
+            "embed_documents",
+            wraps=lambda self, texts: [[0.4, 0.5, 0.6] for _ in texts],
+        ):
+            openai_embeddings = OpenAIEmbeddings(
+                model="text-embedding-ada-002", openai_api_key="test-key"
+            )
+            azure_embeddings = AzureOpenAIEmbeddings(
+                model="text-embedding-ada-002",
+                azure_endpoint="https://test.openai.azure.com/",
+                openai_api_key="test-key",
+            )
 
-        # Force setup to re-run
-        LangchainIntegration.setup_once()
+            # Force setup to re-run
+            LangchainIntegration.setup_once()
 
-        with start_transaction(name="test_multiple_providers"):
-            openai_embeddings.embed_documents(["OpenAI test"])
-            azure_embeddings.embed_documents(["Azure test"])
+            with start_transaction(name="test_multiple_providers"):
+                openai_embeddings.embed_documents(["OpenAI test"])
+                azure_embeddings.embed_documents(["Azure test"])
 
-    # Check captured events
-    assert len(events) >= 1
-    tx = events[0]
-    assert tx["type"] == "transaction"
+        spans = [item.payload for item in items if item.type == "span"]
+        # Find embeddings spans
+        embeddings_spans = [
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == "gen_ai.embeddings"
+        ]
+        # Should have 2 spans, one for each provider
+        assert len(embeddings_spans) == 2
 
-    # Find embeddings spans
-    embeddings_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.embeddings"
-    ]
-    # Should have 2 spans, one for each provider
-    assert len(embeddings_spans) == 2
+        # Verify both spans have proper data
+        for span in embeddings_spans:
+            assert span["attributes"]["gen_ai.operation.name"] == "embeddings"
+            assert (
+                span["attributes"]["gen_ai.request.model"] == "text-embedding-ada-002"
+            )
+            assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT in span["attributes"]
+    else:
+        events = capture_events()
 
-    # Verify both spans have proper data
-    for span in embeddings_spans:
-        assert span["data"]["gen_ai.operation.name"] == "embeddings"
-        assert span["data"]["gen_ai.request.model"] == "text-embedding-ada-002"
-        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT in span["data"]
+        # Mock both providers
+        with mock.patch.object(
+            OpenAIEmbeddings,
+            "embed_documents",
+            wraps=lambda self, texts: [[0.1, 0.2, 0.3] for _ in texts],
+        ), mock.patch.object(
+            AzureOpenAIEmbeddings,
+            "embed_documents",
+            wraps=lambda self, texts: [[0.4, 0.5, 0.6] for _ in texts],
+        ):
+            openai_embeddings = OpenAIEmbeddings(
+                model="text-embedding-ada-002", openai_api_key="test-key"
+            )
+            azure_embeddings = AzureOpenAIEmbeddings(
+                model="text-embedding-ada-002",
+                azure_endpoint="https://test.openai.azure.com/",
+                openai_api_key="test-key",
+            )
+
+            # Force setup to re-run
+            LangchainIntegration.setup_once()
+
+            with start_transaction(name="test_multiple_providers"):
+                openai_embeddings.embed_documents(["OpenAI test"])
+                azure_embeddings.embed_documents(["Azure test"])
+
+        # Check captured events
+        assert len(events) >= 1
+        tx = events[0]
+        assert tx["type"] == "transaction"
+
+        # Find embeddings spans
+        embeddings_spans = [
+            span
+            for span in tx.get("spans", [])
+            if span.get("op") == "gen_ai.embeddings"
+        ]
+        # Should have 2 spans, one for each provider
+        assert len(embeddings_spans) == 2
+
+        # Verify both spans have proper data
+        for span in embeddings_spans:
+            assert span["data"]["gen_ai.operation.name"] == "embeddings"
+            assert span["data"]["gen_ai.request.model"] == "text-embedding-ada-002"
+            assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT in span["data"]
 
 
 def test_langchain_embeddings_error_handling(sentry_init, capture_events):
@@ -2456,9 +3939,8 @@ def test_langchain_embeddings_error_handling(sentry_init, capture_events):
         # Force setup to re-run
         LangchainIntegration.setup_once()
 
-        with start_transaction(name="test_embeddings_error"):
-            with pytest.raises(ValueError):
-                embeddings.embed_documents(["Test"])
+        with start_transaction(name="test_embeddings_error"), pytest.raises(ValueError):
+            embeddings.embed_documents(["Test"])
 
     # The error should be captured
     assert len(events) >= 1
@@ -2468,7 +3950,13 @@ def test_langchain_embeddings_error_handling(sentry_init, capture_events):
     # but the span should still be created
 
 
-def test_langchain_embeddings_multiple_calls(sentry_init, capture_events):
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_langchain_embeddings_multiple_calls(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+):
     """Test that multiple embeddings calls within a transaction are all traced."""
     try:
         from langchain_openai import OpenAIEmbeddings
@@ -2479,60 +3967,120 @@ def test_langchain_embeddings_multiple_calls(sentry_init, capture_events):
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
+    if stream_gen_ai_spans:
+        items = capture_items("span")
 
-    # Mock the actual API calls
-    with mock.patch.object(
-        OpenAIEmbeddings,
-        "embed_documents",
-        wraps=lambda self, texts: [[0.1, 0.2, 0.3] for _ in texts],
-    ), mock.patch.object(
-        OpenAIEmbeddings,
-        "embed_query",
-        wraps=lambda self, text: [0.4, 0.5, 0.6],
-    ):
-        embeddings = OpenAIEmbeddings(
-            model="text-embedding-ada-002", openai_api_key="test-key"
-        )
+        # Mock the actual API calls
+        with mock.patch.object(
+            OpenAIEmbeddings,
+            "embed_documents",
+            wraps=lambda self, texts: [[0.1, 0.2, 0.3] for _ in texts],
+        ), mock.patch.object(
+            OpenAIEmbeddings,
+            "embed_query",
+            wraps=lambda self, text: [0.4, 0.5, 0.6],
+        ):
+            embeddings = OpenAIEmbeddings(
+                model="text-embedding-ada-002", openai_api_key="test-key"
+            )
 
-        # Force setup to re-run
-        LangchainIntegration.setup_once()
+            # Force setup to re-run
+            LangchainIntegration.setup_once()
 
-        with start_transaction(name="test_multiple_embeddings"):
-            # Call embed_documents
-            embeddings.embed_documents(["First batch", "Second batch"])
-            # Call embed_query
-            embeddings.embed_query("Single query")
-            # Call embed_documents again
-            embeddings.embed_documents(["Third batch"])
+            with start_transaction(name="test_multiple_embeddings"):
+                # Call embed_documents
+                embeddings.embed_documents(["First batch", "Second batch"])
+                # Call embed_query
+                embeddings.embed_query("Single query")
+                # Call embed_documents again
+                embeddings.embed_documents(["Third batch"])
 
-    # Check captured events
-    assert len(events) >= 1
-    tx = events[0]
-    assert tx["type"] == "transaction"
+        spans = [item.payload for item in items if item.type == "span"]
+        # Find embeddings spans - should have 3 (2 embed_documents + 1 embed_query)
+        embeddings_spans = [
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == "gen_ai.embeddings"
+        ]
+        assert len(embeddings_spans) == 3
 
-    # Find embeddings spans - should have 3 (2 embed_documents + 1 embed_query)
-    embeddings_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.embeddings"
-    ]
-    assert len(embeddings_spans) == 3
+        # Verify all spans have proper data
+        for span in embeddings_spans:
+            assert span["attributes"]["gen_ai.operation.name"] == "embeddings"
+            assert (
+                span["attributes"]["gen_ai.request.model"] == "text-embedding-ada-002"
+            )
+            assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT in span["attributes"]
 
-    # Verify all spans have proper data
-    for span in embeddings_spans:
-        assert span["data"]["gen_ai.operation.name"] == "embeddings"
-        assert span["data"]["gen_ai.request.model"] == "text-embedding-ada-002"
-        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT in span["data"]
+        # Verify the input data is different for each span
+        input_data_list = [
+            span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+            for span in embeddings_spans
+        ]
+    else:
+        events = capture_events()
 
-    # Verify the input data is different for each span
-    input_data_list = [
-        span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT] for span in embeddings_spans
-    ]
+        # Mock the actual API calls
+        with mock.patch.object(
+            OpenAIEmbeddings,
+            "embed_documents",
+            wraps=lambda self, texts: [[0.1, 0.2, 0.3] for _ in texts],
+        ), mock.patch.object(
+            OpenAIEmbeddings,
+            "embed_query",
+            wraps=lambda self, text: [0.4, 0.5, 0.6],
+        ):
+            embeddings = OpenAIEmbeddings(
+                model="text-embedding-ada-002", openai_api_key="test-key"
+            )
+
+            # Force setup to re-run
+            LangchainIntegration.setup_once()
+
+            with start_transaction(name="test_multiple_embeddings"):
+                # Call embed_documents
+                embeddings.embed_documents(["First batch", "Second batch"])
+                # Call embed_query
+                embeddings.embed_query("Single query")
+                # Call embed_documents again
+                embeddings.embed_documents(["Third batch"])
+
+        # Check captured events
+        assert len(events) >= 1
+        tx = events[0]
+        assert tx["type"] == "transaction"
+
+        # Find embeddings spans - should have 3 (2 embed_documents + 1 embed_query)
+        embeddings_spans = [
+            span
+            for span in tx.get("spans", [])
+            if span.get("op") == "gen_ai.embeddings"
+        ]
+        assert len(embeddings_spans) == 3
+
+        # Verify all spans have proper data
+        for span in embeddings_spans:
+            assert span["data"]["gen_ai.operation.name"] == "embeddings"
+            assert span["data"]["gen_ai.request.model"] == "text-embedding-ada-002"
+            assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT in span["data"]
+
+        # Verify the input data is different for each span
+        input_data_list = [
+            span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT] for span in embeddings_spans
+        ]
     # They should all be different (different inputs)
     assert len(set(str(data) for data in input_data_list)) == 3
 
 
-def test_langchain_embeddings_span_hierarchy(sentry_init, capture_events):
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_langchain_embeddings_span_hierarchy(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+):
     """Test that embeddings spans are properly nested within parent spans."""
     try:
         from langchain_openai import OpenAIEmbeddings
@@ -2543,49 +4091,103 @@ def test_langchain_embeddings_span_hierarchy(sentry_init, capture_events):
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
+    if stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
 
-    # Mock the actual API call
-    with mock.patch.object(
-        OpenAIEmbeddings,
-        "embed_documents",
-        wraps=lambda self, texts: [[0.1, 0.2, 0.3] for _ in texts],
-    ):
-        embeddings = OpenAIEmbeddings(
-            model="text-embedding-ada-002", openai_api_key="test-key"
-        )
+        # Mock the actual API call
+        with mock.patch.object(
+            OpenAIEmbeddings,
+            "embed_documents",
+            wraps=lambda self, texts: [[0.1, 0.2, 0.3] for _ in texts],
+        ):
+            embeddings = OpenAIEmbeddings(
+                model="text-embedding-ada-002", openai_api_key="test-key"
+            )
 
-        # Force setup to re-run
-        LangchainIntegration.setup_once()
+            # Force setup to re-run
+            LangchainIntegration.setup_once()
 
-        with start_transaction(name="test_span_hierarchy"):
-            with sentry_sdk.start_span(op="custom", name="custom operation"):
+            with start_transaction(name="test_span_hierarchy"), sentry_sdk.start_span(
+                op="custom", name="custom operation"
+            ):
                 embeddings.embed_documents(["Test within custom span"])
 
-    # Check captured events
-    assert len(events) >= 1
-    tx = events[0]
-    assert tx["type"] == "transaction"
+        spans = [item.payload for item in items if item.type == "span"]
+        # Find all spans
+        embeddings_spans = [
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == "gen_ai.embeddings"
+        ]
+        tx = next(item.payload for item in items if item.type == "transaction")
+        custom_spans = [
+            span for span in tx.get("spans", []) if span.get("op") == "custom"
+        ]
 
-    # Find all spans
-    embeddings_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.embeddings"
-    ]
-    custom_spans = [span for span in tx.get("spans", []) if span.get("op") == "custom"]
+        assert len(embeddings_spans) == 1
+        assert len(custom_spans) == 1
 
-    assert len(embeddings_spans) == 1
-    assert len(custom_spans) == 1
+        # Both spans should exist
+        embeddings_span = embeddings_spans[0]
+        custom_span = custom_spans[0]
 
-    # Both spans should exist
-    embeddings_span = embeddings_spans[0]
-    custom_span = custom_spans[0]
+        assert embeddings_span["attributes"]["gen_ai.operation.name"] == "embeddings"
+    else:
+        events = capture_events()
 
-    assert embeddings_span["data"]["gen_ai.operation.name"] == "embeddings"
+        # Mock the actual API call
+        with mock.patch.object(
+            OpenAIEmbeddings,
+            "embed_documents",
+            wraps=lambda self, texts: [[0.1, 0.2, 0.3] for _ in texts],
+        ):
+            embeddings = OpenAIEmbeddings(
+                model="text-embedding-ada-002", openai_api_key="test-key"
+            )
+
+            # Force setup to re-run
+            LangchainIntegration.setup_once()
+
+            with start_transaction(name="test_span_hierarchy"), sentry_sdk.start_span(
+                op="custom", name="custom operation"
+            ):
+                embeddings.embed_documents(["Test within custom span"])
+
+        # Check captured events
+        assert len(events) >= 1
+        tx = events[0]
+        assert tx["type"] == "transaction"
+
+        # Find all spans
+        embeddings_spans = [
+            span
+            for span in tx.get("spans", [])
+            if span.get("op") == "gen_ai.embeddings"
+        ]
+        custom_spans = [
+            span for span in tx.get("spans", []) if span.get("op") == "custom"
+        ]
+
+        assert len(embeddings_spans) == 1
+        assert len(custom_spans) == 1
+
+        # Both spans should exist
+        embeddings_span = embeddings_spans[0]
+        custom_span = custom_spans[0]
+
+        assert embeddings_span["data"]["gen_ai.operation.name"] == "embeddings"
     assert custom_span["description"] == "custom operation"
 
 
-def test_langchain_embeddings_with_list_and_string_inputs(sentry_init, capture_events):
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_langchain_embeddings_with_list_and_string_inputs(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+):
     """Test that embeddings correctly handle both list and string inputs."""
     try:
         from langchain_openai import OpenAIEmbeddings
@@ -2596,55 +4198,109 @@ def test_langchain_embeddings_with_list_and_string_inputs(sentry_init, capture_e
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
+    if stream_gen_ai_spans:
+        items = capture_items("span")
 
-    # Mock the actual API calls
-    with mock.patch.object(
-        OpenAIEmbeddings,
-        "embed_documents",
-        wraps=lambda self, texts: [[0.1, 0.2, 0.3] for _ in texts],
-    ), mock.patch.object(
-        OpenAIEmbeddings,
-        "embed_query",
-        wraps=lambda self, text: [0.4, 0.5, 0.6],
-    ):
-        embeddings = OpenAIEmbeddings(
-            model="text-embedding-ada-002", openai_api_key="test-key"
-        )
-
-        # Force setup to re-run
-        LangchainIntegration.setup_once()
-
-        with start_transaction(name="test_input_types"):
-            # embed_documents takes a list
-            embeddings.embed_documents(["List item 1", "List item 2", "List item 3"])
-            # embed_query takes a string
-            embeddings.embed_query("Single string query")
-
-    # Check captured events
-    assert len(events) >= 1
-    tx = events[0]
-    assert tx["type"] == "transaction"
-
-    # Find embeddings spans
-    embeddings_spans = [
-        span for span in tx.get("spans", []) if span.get("op") == "gen_ai.embeddings"
-    ]
-    assert len(embeddings_spans) == 2
-
-    # Both should have input data captured as lists
-    for span in embeddings_spans:
-        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT in span["data"]
-        input_data = span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
-        # Input should be normalized to list format
-        if isinstance(input_data, str):
-            # If serialized, should contain the input text
-            assert "List item" in input_data or "Single string query" in input_data, (
-                f"Expected input text in serialized data: {input_data}"
+        # Mock the actual API calls
+        with mock.patch.object(
+            OpenAIEmbeddings,
+            "embed_documents",
+            wraps=lambda self, texts: [[0.1, 0.2, 0.3] for _ in texts],
+        ), mock.patch.object(
+            OpenAIEmbeddings,
+            "embed_query",
+            wraps=lambda self, text: [0.4, 0.5, 0.6],
+        ):
+            embeddings = OpenAIEmbeddings(
+                model="text-embedding-ada-002", openai_api_key="test-key"
             )
 
+            # Force setup to re-run
+            LangchainIntegration.setup_once()
 
+            with start_transaction(name="test_input_types"):
+                # embed_documents takes a list
+                embeddings.embed_documents(
+                    ["List item 1", "List item 2", "List item 3"]
+                )
+                # embed_query takes a string
+                embeddings.embed_query("Single string query")
+
+        spans = [item.payload for item in items if item.type == "span"]
+        # Find embeddings spans
+        embeddings_spans = [
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == "gen_ai.embeddings"
+        ]
+        assert len(embeddings_spans) == 2
+
+        # Both should have input data captured as lists
+        for span in embeddings_spans:
+            assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT in span["attributes"]
+            input_data = span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+            # Input should be normalized to list format
+            if isinstance(input_data, str):
+                # If serialized, should contain the input text
+                assert (
+                    "List item" in input_data or "Single string query" in input_data
+                ), f"Expected input text in serialized data: {input_data}"
+    else:
+        events = capture_events()
+
+        # Mock the actual API calls
+        with mock.patch.object(
+            OpenAIEmbeddings,
+            "embed_documents",
+            wraps=lambda self, texts: [[0.1, 0.2, 0.3] for _ in texts],
+        ), mock.patch.object(
+            OpenAIEmbeddings,
+            "embed_query",
+            wraps=lambda self, text: [0.4, 0.5, 0.6],
+        ):
+            embeddings = OpenAIEmbeddings(
+                model="text-embedding-ada-002", openai_api_key="test-key"
+            )
+
+            # Force setup to re-run
+            LangchainIntegration.setup_once()
+
+            with start_transaction(name="test_input_types"):
+                # embed_documents takes a list
+                embeddings.embed_documents(
+                    ["List item 1", "List item 2", "List item 3"]
+                )
+                # embed_query takes a string
+                embeddings.embed_query("Single string query")
+
+        # Check captured events
+        assert len(events) >= 1
+        tx = events[0]
+        assert tx["type"] == "transaction"
+
+        # Find embeddings spans
+        embeddings_spans = [
+            span
+            for span in tx.get("spans", [])
+            if span.get("op") == "gen_ai.embeddings"
+        ]
+        assert len(embeddings_spans) == 2
+
+        # Both should have input data captured as lists
+        for span in embeddings_spans:
+            assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT in span["data"]
+            input_data = span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+            # Input should be normalized to list format
+            if isinstance(input_data, str):
+                # If serialized, should contain the input text
+                assert (
+                    "List item" in input_data or "Single string query" in input_data
+                ), f"Expected input text in serialized data: {input_data}"
+
+
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "response_metadata_model,expected_model",
     [
@@ -2655,15 +4311,17 @@ def test_langchain_embeddings_with_list_and_string_inputs(sentry_init, capture_e
 def test_langchain_response_model_extraction(
     sentry_init,
     capture_events,
+    capture_items,
     response_metadata_model,
     expected_model,
+    stream_gen_ai_spans,
 ):
     sentry_init(
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
 
     callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
 
@@ -2671,42 +4329,83 @@ def test_langchain_response_model_extraction(
     serialized = {"_type": "openai-chat", "model_name": "gpt-3.5-turbo"}
     prompts = ["Test prompt"]
 
-    with start_transaction():
-        callback.on_llm_start(
-            serialized=serialized,
-            prompts=prompts,
-            run_id=run_id,
-            invocation_params={"model": "gpt-3.5-turbo"},
-        )
+    if stream_gen_ai_spans:
+        items = capture_items("span")
 
-        response_metadata = {"model_name": response_metadata_model}
-        message = AIMessageChunk(
-            content="Test response", response_metadata=response_metadata
-        )
+        with start_transaction():
+            callback.on_llm_start(
+                serialized=serialized,
+                prompts=prompts,
+                run_id=run_id,
+                invocation_params={"model": "gpt-3.5-turbo"},
+            )
 
-        generation = Mock(text="Test response", message=message)
-        response = Mock(generations=[[generation]])
-        callback.on_llm_end(response=response, run_id=run_id)
+            response_metadata = {"model_name": response_metadata_model}
+            message = AIMessageChunk(
+                content="Test response", response_metadata=response_metadata
+            )
 
-    assert len(events) > 0
-    tx = events[0]
-    assert tx["type"] == "transaction"
+            generation = Mock(text="Test response", message=message)
+            response = Mock(generations=[[generation]])
+            callback.on_llm_end(response=response, run_id=run_id)
 
-    llm_spans = [
-        span
-        for span in tx.get("spans", [])
-        if span.get("op") == "gen_ai.text_completion"
-    ]
-    assert len(llm_spans) > 0
+        spans = [item.payload for item in items if item.type == "span"]
+        llm_spans = [
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == "gen_ai.text_completion"
+        ]
+        assert len(llm_spans) > 0
 
-    llm_span = llm_spans[0]
-    assert llm_span["data"]["gen_ai.operation.name"] == "text_completion"
+        llm_span = llm_spans[0]
+        assert llm_span["attributes"]["gen_ai.operation.name"] == "text_completion"
 
-    if expected_model is not None:
-        assert SPANDATA.GEN_AI_RESPONSE_MODEL in llm_span["data"]
-        assert llm_span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == expected_model
+        if expected_model is not None:
+            assert SPANDATA.GEN_AI_RESPONSE_MODEL in llm_span["attributes"]
+            assert (
+                llm_span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == expected_model
+            )
+        else:
+            assert SPANDATA.GEN_AI_RESPONSE_MODEL not in llm_span.get("attributes", {})
     else:
-        assert SPANDATA.GEN_AI_RESPONSE_MODEL not in llm_span.get("data", {})
+        events = capture_events()
+
+        with start_transaction():
+            callback.on_llm_start(
+                serialized=serialized,
+                prompts=prompts,
+                run_id=run_id,
+                invocation_params={"model": "gpt-3.5-turbo"},
+            )
+
+            response_metadata = {"model_name": response_metadata_model}
+            message = AIMessageChunk(
+                content="Test response", response_metadata=response_metadata
+            )
+
+            generation = Mock(text="Test response", message=message)
+            response = Mock(generations=[[generation]])
+            callback.on_llm_end(response=response, run_id=run_id)
+
+        assert len(events) > 0
+        tx = events[0]
+        assert tx["type"] == "transaction"
+
+        llm_spans = [
+            span
+            for span in tx.get("spans", [])
+            if span.get("op") == "gen_ai.text_completion"
+        ]
+        assert len(llm_spans) > 0
+
+        llm_span = llm_spans[0]
+        assert llm_span["data"]["gen_ai.operation.name"] == "text_completion"
+
+        if expected_model is not None:
+            assert SPANDATA.GEN_AI_RESPONSE_MODEL in llm_span["data"]
+            assert llm_span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == expected_model
+        else:
+            assert SPANDATA.GEN_AI_RESPONSE_MODEL not in llm_span.get("data", {})
 
 
 # Tests for multimodal content transformation functions
@@ -2920,6 +4619,7 @@ class TestTransformLangchainContentBlock:
         }
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "ai_type,expected_system",
     [
@@ -2965,13 +4665,18 @@ class TestTransformLangchainContentBlock:
     ],
 )
 def test_langchain_ai_system_detection(
-    sentry_init, capture_events, ai_type, expected_system
+    sentry_init,
+    capture_events,
+    capture_items,
+    ai_type,
+    expected_system,
+    stream_gen_ai_spans,
 ):
     sentry_init(
         integrations=[LangchainIntegration()],
         traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    events = capture_events()
 
     callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
 
@@ -2979,35 +4684,67 @@ def test_langchain_ai_system_detection(
     serialized = {"_type": ai_type} if ai_type is not None else {}
     prompts = ["Test prompt"]
 
-    with start_transaction():
-        callback.on_llm_start(
-            serialized=serialized,
-            prompts=prompts,
-            run_id=run_id,
-            invocation_params={"_type": ai_type, "model": "test-model"},
-        )
+    if stream_gen_ai_spans:
+        items = capture_items("span")
 
-        generation = Mock(text="Test response", message=None)
-        response = Mock(generations=[[generation]])
-        callback.on_llm_end(response=response, run_id=run_id)
+        with start_transaction():
+            callback.on_llm_start(
+                serialized=serialized,
+                prompts=prompts,
+                run_id=run_id,
+                invocation_params={"_type": ai_type, "model": "test-model"},
+            )
 
-    assert len(events) > 0
-    tx = events[0]
-    assert tx["type"] == "transaction"
+            generation = Mock(text="Test response", message=None)
+            response = Mock(generations=[[generation]])
+            callback.on_llm_end(response=response, run_id=run_id)
 
-    llm_spans = [
-        span
-        for span in tx.get("spans", [])
-        if span.get("op") == "gen_ai.text_completion"
-    ]
-    assert len(llm_spans) > 0
+        spans = [item.payload for item in items if item.type == "span"]
+        llm_spans = [
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == "gen_ai.text_completion"
+        ]
 
-    llm_span = llm_spans[0]
+        assert len(llm_spans) > 0
+        llm_span = llm_spans[0]
 
-    if expected_system is not None:
-        assert llm_span["data"][SPANDATA.GEN_AI_SYSTEM] == expected_system
+        if expected_system is not None:
+            assert llm_span["attributes"][SPANDATA.GEN_AI_SYSTEM] == expected_system
+        else:
+            assert SPANDATA.GEN_AI_SYSTEM not in llm_span.get("attributes", {})
     else:
-        assert SPANDATA.GEN_AI_SYSTEM not in llm_span.get("data", {})
+        events = capture_events()
+
+        with start_transaction():
+            callback.on_llm_start(
+                serialized=serialized,
+                prompts=prompts,
+                run_id=run_id,
+                invocation_params={"_type": ai_type, "model": "test-model"},
+            )
+
+            generation = Mock(text="Test response", message=None)
+            response = Mock(generations=[[generation]])
+            callback.on_llm_end(response=response, run_id=run_id)
+
+        assert len(events) > 0
+        tx = events[0]
+        assert tx["type"] == "transaction"
+
+        llm_spans = [
+            span
+            for span in tx.get("spans", [])
+            if span.get("op") == "gen_ai.text_completion"
+        ]
+
+        assert len(llm_spans) > 0
+        llm_span = llm_spans[0]
+
+        if expected_system is not None:
+            assert llm_span["data"][SPANDATA.GEN_AI_SYSTEM] == expected_system
+        else:
+            assert SPANDATA.GEN_AI_SYSTEM not in llm_span.get("data", {})
 
 
 class TestTransformLangchainMessageContent:

@@ -1,4 +1,5 @@
 from functools import wraps
+from typing import TYPE_CHECKING
 
 from django.dispatch import Signal
 
@@ -6,8 +7,6 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.django import DJANGO_VERSION
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Callable

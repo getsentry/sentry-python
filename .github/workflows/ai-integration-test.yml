@@ -34,7 +34,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Python SDK Tests
-        uses: getsentry/testing-ai-sdk-integrations@1dd9ee2a2d821f41473fc90809a758e8394c689c
+        uses: getsentry/testing-ai-sdk-integrations@18229d1da4bb8120ce923bdf7aac00fcf6f38311
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:

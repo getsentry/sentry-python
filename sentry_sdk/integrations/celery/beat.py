@@ -1,5 +1,7 @@
+from typing import TYPE_CHECKING
+
 import sentry_sdk
-from sentry_sdk.crons import capture_checkin, MonitorStatus
+from sentry_sdk.crons import MonitorStatus, capture_checkin
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.celery.utils import (
     _get_humanized_interval,
@@ -10,11 +12,10 @@ from sentry_sdk.utils import (
     match_regex_list,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import Any, Optional, TypeVar, Union
+
     from sentry_sdk._types import (
         MonitorConfig,
         MonitorConfigScheduleType,
@@ -25,13 +26,13 @@ if TYPE_CHECKING:
 
 
 try:
-    from celery import Task, Celery  # type: ignore
+    from celery import Celery, Task  # type: ignore
     from celery.beat import Scheduler  # type: ignore
     from celery.schedules import crontab, schedule  # type: ignore
     from celery.signals import (  # type: ignore
         task_failure,
-        task_success,
         task_retry,
+        task_success,
     )
 except ImportError:
     raise DidNotEnable("Celery not installed")

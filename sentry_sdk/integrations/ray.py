@@ -1,10 +1,10 @@
-import inspect
 import functools
+import inspect
 import sys
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANSTATUS
-from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
     event_from_exception,
@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import Any, Optional
+
     from sentry_sdk.utils import ExcInfo
 
 

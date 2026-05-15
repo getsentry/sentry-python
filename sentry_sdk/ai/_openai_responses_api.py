@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Union
 
-    from openai.types.responses import ResponseInputParam, ResponseInputItemParam
+    from openai.types.responses import ResponseInputItemParam, ResponseInputParam
 
 
 def _is_system_instruction(message: "ResponseInputItemParam") -> bool:

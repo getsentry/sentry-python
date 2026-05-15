@@ -1,23 +1,23 @@
-import json
-import os
 import asyncio
-from urllib.parse import urlparse, parse_qs
-import socket
-import warnings
-import brotli
 import gzip
 import io
-from dataclasses import dataclass
-from threading import Thread
-from contextlib import contextmanager
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from unittest import mock
+import json
+import os
+import socket
+import warnings
 from collections import namedtuple
+from contextlib import contextmanager
+from dataclasses import dataclass
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from threading import Thread
+from unittest import mock
+from urllib.parse import parse_qs, urlparse
 
+import brotli
+import jsonschema
 import pytest
 from pytest_localserver.http import WSGIServer
 from werkzeug.wrappers import Request, Response
-import jsonschema
 
 try:
     from starlette.testclient import TestClient
@@ -67,21 +67,25 @@ except ImportError:
     google = None
 
 
-from tests import _warning_recorder, _warning_recorder_mgr
-
 from typing import TYPE_CHECKING
 
+from tests import _warning_recorder, _warning_recorder_mgr
+
 if TYPE_CHECKING:
-    from typing import Any, Callable, MutableMapping, Optional
     from collections.abc import Iterator
+    from typing import Any, Callable, MutableMapping, Optional
 
 try:
     from httpx import (
         ASGITransport,
-        Request as HttpxRequest,
-        Response as HttpxResponse,
         AsyncByteStream,
         AsyncClient,
+    )
+    from httpx import (
+        Request as HttpxRequest,
+    )
+    from httpx import (
+        Response as HttpxResponse,
     )
 except ImportError:
     ASGITransport = None
@@ -92,13 +96,13 @@ except ImportError:
 
 
 try:
-    from anyio import create_memory_object_stream, create_task_group, EndOfStream
+    from anyio import EndOfStream, create_memory_object_stream, create_task_group
+    from mcp.shared.message import SessionMessage
     from mcp.types import (
         JSONRPCMessage,
         JSONRPCNotification,
         JSONRPCRequest,
     )
-    from mcp.shared.message import SessionMessage
 except ImportError:
     create_memory_object_stream = None
     create_task_group = None

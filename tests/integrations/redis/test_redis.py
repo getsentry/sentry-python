@@ -8,7 +8,6 @@ from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
 
-
 MOCK_CONNECTION_POOL = mock.MagicMock()
 MOCK_CONNECTION_POOL.connection_kwargs = {
     "host": "localhost",

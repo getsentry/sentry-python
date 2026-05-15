@@ -7,13 +7,13 @@ from unittest import mock
 import pytest
 
 import sentry_sdk
+import sentry_sdk.integrations.quart as quart_sentry
 from sentry_sdk import (
-    set_tag,
-    capture_message,
     capture_exception,
+    capture_message,
+    set_tag,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration
-import sentry_sdk.integrations.quart as quart_sentry
 
 
 def quart_app_factory():

@@ -2,23 +2,23 @@ import sys
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANSTATUS
-from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import Transaction, TransactionSource
 from sentry_sdk.utils import (
+    SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    SENSITIVE_DATA_SUBSTITUTE,
     parse_version,
     reraise,
 )
 
 try:
     import arq.worker
-    from arq.version import VERSION as ARQ_VERSION
     from arq.connections import ArqRedis
+    from arq.version import VERSION as ARQ_VERSION
     from arq.worker import JobExecutionFailed, Retry, RetryJob, Worker
 except ImportError:
     raise DidNotEnable("Arq is not installed")
@@ -28,12 +28,12 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional, Union
 
-    from sentry_sdk._types import EventProcessor, Event, ExcInfo, Hint
-
     from arq.cron import CronJob
     from arq.jobs import Job
     from arq.typing import WorkerCoroutine
     from arq.worker import Function
+
+    from sentry_sdk._types import Event, EventProcessor, ExcInfo, Hint
 
 ARQ_CONTROL_FLOW_EXCEPTIONS = (JobExecutionFailed, Retry, RetryJob)
 

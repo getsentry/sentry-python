@@ -1,18 +1,16 @@
-import boto3
-import docker
 import json
-import pytest
 import subprocess
 import tempfile
 import time
-import yaml
-
 from unittest import mock
 
+import boto3
+import docker
+import pytest
+import yaml
 from aws_cdk import App
 
-from .utils import LocalLambdaStack, SentryServerForTesting, SAM_PORT
-
+from .utils import SAM_PORT, LocalLambdaStack, SentryServerForTesting
 
 DOCKER_NETWORK_NAME = "lambda-test-network"
 SAM_TEMPLATE_FILE = "sam.template.yaml"

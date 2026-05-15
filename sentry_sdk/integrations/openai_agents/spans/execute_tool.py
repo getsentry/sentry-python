@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.scope import should_send_default_pii
@@ -5,11 +7,10 @@ from sentry_sdk.scope import should_send_default_pii
 from ..consts import SPAN_ORIGIN
 from ..utils import _set_agent_data
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    import agents
     from typing import Any
+
+    import agents
 
 
 def execute_tool_span(

@@ -1,9 +1,10 @@
-import sys
 import ast
-import types
-import pkgutil
 import importlib
 import pathlib
+import pkgutil
+import sys
+import types
+
 import pytest
 
 from sentry_sdk import integrations

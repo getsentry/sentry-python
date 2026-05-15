@@ -2,8 +2,8 @@ from functools import wraps
 
 import sentry_sdk
 from sentry_sdk.consts import OP
-from sentry_sdk.utils import qualname_from_function
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
+from sentry_sdk.utils import qualname_from_function
 
 try:
     # django.tasks were added in Django 6.0

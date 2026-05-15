@@ -1224,6 +1224,7 @@ class ClientConstructor:
         before_send_metric: "Optional[Callable[[Metric, Hint], Optional[Metric]]]" = None,
         org_id: "Optional[str]" = None,
         strict_trace_continuation: bool = False,
+        stream_gen_ai_spans: bool = False,
     ) -> None:
         """Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.
 
@@ -1639,6 +1640,9 @@ class ClientConstructor:
             but you can provide it explicitly for self-hosted and Relay setups. This value is used for
             trace propagation and for features like `strict_trace_continuation`.
 
+        :param stream_gen_ai_spans: When set, generative AI spans are sent in a new transport format to
+            reduce downstream data loss.
+
         :param _experiments:
         """
         pass
@@ -1663,4 +1667,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.59.0"
+VERSION = "2.60.0"

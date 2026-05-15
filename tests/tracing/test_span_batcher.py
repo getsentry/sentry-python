@@ -406,6 +406,7 @@ def test_transport_format(sentry_init, capture_envelopes):
         "content_type": "application/vnd.sentry.items.span.v2+json",
     }
     assert item.payload.json == {
+        "version": 2,
         "items": [
             {
                 "trace_id": mock.ANY,
@@ -417,7 +418,7 @@ def test_transport_format(sentry_init, capture_envelopes):
                 "end_timestamp": mock.ANY,
                 "attributes": mock.ANY,
             }
-        ]
+        ],
     }
     for attribute, value in item.payload.json["items"][0]["attributes"].items():
         assert isinstance(attribute, str)

@@ -1,31 +1,27 @@
 import io
 import logging
 import os
+import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
-import urllib.error
-import urllib3
-import sys
-
 from itertools import chain, product
-
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import Dict
-    from typing import Optional
-    from typing import Self
+import urllib3
 
+if TYPE_CHECKING:
+    from typing import Any, Callable, Dict, Optional, Self
+
+from sentry_sdk.envelope import Envelope
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    env_to_bool,
+)
 from sentry_sdk.utils import (
     logger as sentry_logger,
-    env_to_bool,
-    capture_internal_exceptions,
 )
-from sentry_sdk.envelope import Envelope
-
 
 logger = logging.getLogger("spotlight")
 
@@ -95,9 +91,9 @@ class SpotlightClient:
 
 
 try:
-    from django.utils.deprecation import MiddlewareMixin
-    from django.http import HttpResponseServerError, HttpResponse, HttpRequest
     from django.conf import settings
+    from django.http import HttpRequest, HttpResponse, HttpResponseServerError
+    from django.utils.deprecation import MiddlewareMixin
 
     SPOTLIGHT_JS_ENTRY_PATH = "/assets/main.js"
     SPOTLIGHT_JS_SNIPPET_PATTERN = (
