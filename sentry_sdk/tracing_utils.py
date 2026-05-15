@@ -1721,9 +1721,7 @@ from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     LOW_QUALITY_TRANSACTION_SOURCES,
     SENTRY_TRACE_HEADER_NAME,
-)
-from sentry_sdk.tracing import (
-    Span
+    Span,
 )
 
 if TYPE_CHECKING:
