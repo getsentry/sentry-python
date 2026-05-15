@@ -1,9 +1,11 @@
 from sentry_sdk import metrics, profiler
-from sentry_sdk.api import *  # noqa
-from sentry_sdk.client import Client
+
+from sentry_sdk.scope import Scope  # isort: skip
+from sentry_sdk.client import Client  # isort: skip
 from sentry_sdk.consts import VERSION
-from sentry_sdk.scope import Scope
 from sentry_sdk.transport import HttpTransport, Transport
+
+from sentry_sdk.api import *  # noqa # isort: skip
 
 __all__ = [  # noqa
     "Hub",

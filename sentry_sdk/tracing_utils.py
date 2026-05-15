@@ -21,7 +21,6 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS, SPANTEMPLATE
-from sentry_sdk.tracing import Span as LegacySpan
 from sentry_sdk.utils import (
     _is_external_source,
     _is_in_project_root,
@@ -1722,7 +1721,9 @@ from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     LOW_QUALITY_TRANSACTION_SOURCES,
     SENTRY_TRACE_HEADER_NAME,
-    Span,
+)
+from sentry_sdk.tracing import (
+    Span as LegacySpan,
 )
 
 if TYPE_CHECKING:
