@@ -142,7 +142,7 @@ def test_transactions(
         request_headers = dict(span.iter_headers())
 
     response = client.fetch(
-        "/hi", method="POST", body=b"heyoo", headers=request_headers
+        "/hi?foo=bar", method="POST", body=b"heyoo", headers=request_headers
     )
     assert response.code == code
 
@@ -178,6 +178,9 @@ def test_transactions(
         assert server_segment["attributes"]["http.request.method"] == "POST"
         assert server_segment["attributes"]["http.request.body.data"] == "heyoo"
         assert server_segment["attributes"]["http.response.status_code"] == code
+        assert server_segment["attributes"]["url.query"] == "foo=bar"
+        assert server_segment["attributes"]["url.full"].endswith("/hi?foo=bar")
+        assert server_segment["attributes"]["url.full"].startswith("http://")
         assert server_segment["status"] == ("ok" if code == 200 else "error")
         assert client_segment["trace_id"] == server_segment["trace_id"]
     else:
@@ -225,7 +228,7 @@ def test_transactions(
                 **request["headers"],
             },
             "method": "POST",
-            "query_string": "",
+            "query_string": "foo=bar",
             "data": {"heyoo": [""]},
             "url": "http://{host}/hi".format(host=host),
         }

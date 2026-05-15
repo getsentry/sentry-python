@@ -169,6 +169,7 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
                         ).items():
                             span.set_attribute(attr, value)
 
+                    with capture_internal_exceptions():
                         method = getattr(self, self.request.method.lower(), None)
                         if method is not None:
                             span_name = transaction_from_function(method)
@@ -179,6 +180,7 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
                                     SegmentSource.COMPONENT,
                                 )
 
+                    with capture_internal_exceptions():
                         status_int = self.get_status()
                         span.set_attribute(SPANDATA.HTTP_STATUS_CODE, status_int)
                         span.status = "error" if status_int >= 400 else "ok"
@@ -195,13 +197,9 @@ def _get_request_attributes(request: "Any") -> "Dict[str, Any]":
         attributes[f"{SPANDATA.HTTP_REQUEST_HEADER}.{header.lower()}"] = value
 
     if request.query:
-        attributes[SPANDATA.HTTP_QUERY] = request.query
+        attributes[SPANDATA.URL_QUERY] = request.query
 
-    attributes[SPANDATA.URL_FULL] = "%s://%s%s" % (
-        request.protocol,
-        request.host,
-        request.path,
-    )
+    attributes[SPANDATA.URL_FULL] = request.full_url()
 
     if request.protocol:
         attributes[SPANDATA.NETWORK_PROTOCOL_NAME] = request.protocol
