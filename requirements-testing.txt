@@ -1,5 +1,5 @@
 pip
-pytest>=6.0.0
+pytest>=8.4.2
 tomli;python_version<"3.11"  # Only needed for pytest on Python < 3.11
 pytest-cov
 pytest-forked
