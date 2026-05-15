@@ -18,6 +18,6 @@ statsig
 UnleashClient
 typer
 strawberry-graphql
-setuptools<82
+setuptools
 httpx
 botocore-stubs
