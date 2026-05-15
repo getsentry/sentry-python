@@ -2,7 +2,7 @@ import sys
 from functools import wraps
 
 import sentry_sdk
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.aws_lambda import _make_request_event_processor
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
@@ -14,19 +14,18 @@ from sentry_sdk.utils import (
 
 try:
     import chalice  # type: ignore
-    from chalice import __version__ as CHALICE_VERSION
     from chalice import Chalice, ChaliceViewError
-    from chalice.app import EventSourceHandler as ChaliceEventSourceHandler  # type: ignore
+    from chalice import __version__ as CHALICE_VERSION
+    from chalice.app import (
+        EventSourceHandler as ChaliceEventSourceHandler,  # type: ignore
+    )
 except ImportError:
     raise DidNotEnable("Chalice is not installed")
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Dict
-    from typing import TypeVar
-    from typing import Callable
+    from typing import Any, Callable, Dict, TypeVar
 
     F = TypeVar("F", bound=Callable[..., Any])
 

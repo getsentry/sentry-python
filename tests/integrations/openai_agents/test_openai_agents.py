@@ -1,55 +1,52 @@
 import asyncio
-import pytest
-from unittest.mock import MagicMock, patch
-import os
 import json
 import logging
-import httpx
-
-import sentry_sdk
-from sentry_sdk import start_span
-from sentry_sdk.consts import SPANDATA, OP
-from sentry_sdk.integrations.logging import LoggingIntegration
-from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
-from sentry_sdk.integrations.openai_agents.utils import _set_input_data, safe_serialize
-from sentry_sdk.utils import parse_version, package_version
-
-from openai import AsyncOpenAI, InternalServerError
-from agents.models.openai_responses import OpenAIResponsesModel
-
+import os
 from unittest import mock
+from unittest.mock import MagicMock, patch
 
 import agents
+import httpx
+import pytest
 from agents import (
     Agent,
     ModelResponse,
-    Usage,
     ModelSettings,
+    Usage,
 )
+from agents.exceptions import MaxTurnsExceeded, ModelBehaviorError
 from agents.items import (
     McpCall,
+    ResponseFunctionToolCall,
     ResponseOutputMessage,
     ResponseOutputText,
-    ResponseFunctionToolCall,
 )
+from agents.models.openai_responses import OpenAIResponsesModel
 from agents.tool import HostedMCPTool
-from agents.exceptions import MaxTurnsExceeded, ModelBehaviorError
 from agents.version import __version__ as OPENAI_AGENTS_VERSION
+from openai import AsyncOpenAI, InternalServerError
+
+import sentry_sdk
+from sentry_sdk import start_span
+from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
+from sentry_sdk.integrations.openai_agents.utils import _set_input_data, safe_serialize
+from sentry_sdk.utils import package_version, parse_version
 
 OPENAI_VERSION = package_version("openai")
 
 from openai.types.responses import (
+    Response,
+    ResponseCompletedEvent,
     ResponseCreatedEvent,
     ResponseTextDeltaEvent,
-    ResponseCompletedEvent,
-    Response,
     ResponseUsage,
 )
 from openai.types.responses.response_usage import (
     InputTokensDetails,
     OutputTokensDetails,
 )
-
 
 test_run_config = agents.RunConfig(tracing_disabled=True)
 
@@ -3761,8 +3758,8 @@ def test_openai_agents_message_role_mapping(
 
     get_response_kwargs = {"input": [test_message]}
 
-    from sentry_sdk.integrations.openai_agents.utils import _set_input_data
     from sentry_sdk import start_span
+    from sentry_sdk.integrations.openai_agents.utils import _set_input_data
 
     with start_span(op="test") as span:
         _set_input_data(span, get_response_kwargs)

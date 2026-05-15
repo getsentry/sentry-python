@@ -2,28 +2,25 @@ import logging
 import sys
 from datetime import datetime, timezone
 from fnmatch import fnmatch
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.client import BaseClient
+from sentry_sdk.integrations import Integration
 from sentry_sdk.logger import _log_level_to_otel
 from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    current_stacktrace,
+    event_from_exception,
+    has_logs_enabled,
     safe_repr,
     to_string,
-    event_from_exception,
-    current_stacktrace,
-    capture_internal_exceptions,
-    has_logs_enabled,
 )
-from sentry_sdk.integrations import Integration
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
     from logging import LogRecord
-    from typing import Any
-    from typing import Dict
-    from typing import Optional
+    from typing import Any, Dict, Optional
 
 DEFAULT_LEVEL = logging.INFO
 DEFAULT_EVENT_LEVEL = logging.ERROR

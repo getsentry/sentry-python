@@ -13,9 +13,10 @@ SET_COMMANDS = ("set", "setex")
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from typing import Any, Optional, Union
+
     from sentry_sdk.integrations.redis import RedisIntegration
     from sentry_sdk.tracing import Span
-    from typing import Any, Optional, Union
 
 
 def _get_op(name: str) -> "Optional[str]":

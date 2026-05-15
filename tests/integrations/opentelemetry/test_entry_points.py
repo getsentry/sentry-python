@@ -3,6 +3,7 @@ import os
 from unittest.mock import patch
 
 from opentelemetry import propagate
+
 from sentry_sdk.integrations.opentelemetry import SentryPropagator
 
 

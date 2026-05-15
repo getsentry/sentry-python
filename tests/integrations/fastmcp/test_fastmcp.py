@@ -21,11 +21,13 @@ to properly trigger Sentry instrumentation and span creation. This ensures
 accurate testing of the integration's behavior in real MCP Server scenarios.
 """
 
-import anyio
 import asyncio
 import json
-import pytest
 from unittest import mock
+
+import anyio
+import pytest
+
 import sentry_sdk
 
 try:
@@ -37,12 +39,12 @@ except ImportError:
             return super(AsyncMock, self).__call__(*args, **kwargs)
 
 
-from sentry_sdk import start_transaction
-from sentry_sdk.consts import SPANDATA, OP
-from sentry_sdk.integrations.mcp import MCPIntegration
-
 from mcp.server.sse import SseServerTransport
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+
+from sentry_sdk import start_transaction
+from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.integrations.mcp import MCPIntegration
 
 try:
     from fastmcp.prompts import Message
@@ -50,9 +52,9 @@ except ImportError:
     Message = None
 
 
+from starlette.applications import Starlette
 from starlette.responses import Response
 from starlette.routing import Mount, Route
-from starlette.applications import Starlette
 
 # Try to import both FastMCP implementations
 try:

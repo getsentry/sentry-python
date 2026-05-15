@@ -1,17 +1,17 @@
 import concurrent.futures as cf
 import sys
 from contextlib import contextmanager
-from statsig import statsig
-from statsig.statsig_user import StatsigUser
 from random import random
 from unittest.mock import Mock
-from sentry_sdk import start_span, start_transaction
-from tests.conftest import ApproxDict
 
 import pytest
+from statsig import statsig
+from statsig.statsig_user import StatsigUser
 
 import sentry_sdk
+from sentry_sdk import start_span, start_transaction
 from sentry_sdk.integrations.statsig import StatsigIntegration
+from tests.conftest import ApproxDict
 
 
 @contextmanager

@@ -4,16 +4,16 @@ from unittest import mock
 from unittest.mock import MagicMock
 
 import pytest
-from opentelemetry.trace import SpanKind, SpanContext, Status, StatusCode
+from opentelemetry.trace import SpanContext, SpanKind, Status, StatusCode
 
 import sentry_sdk
 from sentry_sdk.integrations.opentelemetry.span_processor import (
     SentrySpanProcessor,
     link_trace_context_to_error_event,
 )
-from sentry_sdk.utils import Dsn
 from sentry_sdk.tracing import Span, Transaction
 from sentry_sdk.tracing_utils import extract_sentrytrace_data
+from sentry_sdk.utils import Dsn
 
 
 def test_is_sentry_span():

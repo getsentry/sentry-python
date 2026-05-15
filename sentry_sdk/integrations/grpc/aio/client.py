@@ -1,4 +1,4 @@
-from typing import Callable, Union, AsyncIterable, Any
+from typing import Any, AsyncIterable, Callable, Union
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
@@ -7,15 +7,15 @@ from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 try:
-    from grpc.aio import (
-        UnaryUnaryClientInterceptor,
-        UnaryStreamClientInterceptor,
-        ClientCallDetails,
-        UnaryUnaryCall,
-        UnaryStreamCall,
-        Metadata,
-    )
     from google.protobuf.message import Message
+    from grpc.aio import (
+        ClientCallDetails,
+        Metadata,
+        UnaryStreamCall,
+        UnaryStreamClientInterceptor,
+        UnaryUnaryCall,
+        UnaryUnaryClientInterceptor,
+    )
 except ImportError:
     raise DidNotEnable("grpcio is not installed")
 

@@ -1,7 +1,8 @@
-import pytest
 import random
 import time
 from unittest import mock
+
+import pytest
 
 
 def _run_contextvar_threaded_test():
@@ -9,7 +10,6 @@ def _run_contextvar_threaded_test():
 
     # Need to explicitly call _get_contextvars because the SDK has already
     # decided upon gevent on import.
-
     from sentry_sdk import utils
 
     _, ContextVar = utils._get_contextvars()  # noqa: N806

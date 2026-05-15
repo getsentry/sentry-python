@@ -1,5 +1,5 @@
-from contextlib import contextmanager
 import json
+from contextlib import contextmanager
 from copy import deepcopy
 
 import sentry_sdk
@@ -18,13 +18,8 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Dict
-    from typing import Iterator
-    from typing import Mapping
-    from typing import MutableMapping
-    from typing import Optional
-    from typing import Union
+    from typing import Any, Dict, Iterator, Mapping, MutableMapping, Optional, Union
+
     from sentry_sdk._types import Event, HttpStatusCodeRange
 
 

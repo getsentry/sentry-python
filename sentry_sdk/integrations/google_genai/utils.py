@@ -1,28 +1,30 @@
 import copy
-import json
 import inspect
+import json
 from functools import wraps
-from .consts import ORIGIN, TOOL_ATTRIBUTES_MAP, GEN_AI_SYSTEM
-from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
+from itertools import chain
 from typing import (
     TYPE_CHECKING,
-    Iterable,
     Any,
     Callable,
+    Dict,
+    Iterable,
     List,
     Optional,
-    Union,
     TypedDict,
-    Dict,
+    Union,
 )
 
+from google.genai.types import Content, GenerateContentConfig, Part, PartDict
+
 import sentry_sdk
+from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from sentry_sdk.ai.utils import (
-    set_data_normalized,
-    truncate_and_annotate_messages,
-    normalize_message_roles,
-    transform_google_content_part,
     get_modality_from_mime_type,
+    normalize_message_roles,
+    set_data_normalized,
+    transform_google_content_part,
+    truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.scope import should_send_default_pii
@@ -31,21 +33,22 @@ from sentry_sdk.utils import (
     event_from_exception,
     safe_serialize,
 )
-from google.genai.types import GenerateContentConfig, Part, Content, PartDict
-from itertools import chain
+
+from .consts import GEN_AI_SYSTEM, ORIGIN, TOOL_ATTRIBUTES_MAP
 
 if TYPE_CHECKING:
-    from sentry_sdk.tracing import Span
-    from sentry_sdk._types import TextPart
     from google.genai.types import (
-        GenerateContentResponse,
         ContentListUnion,
-        ContentUnionDict,
-        Tool,
-        Model,
-        EmbedContentResponse,
         ContentUnion,
+        ContentUnionDict,
+        EmbedContentResponse,
+        GenerateContentResponse,
+        Model,
+        Tool,
     )
+
+    from sentry_sdk._types import TextPart
+    from sentry_sdk.tracing import Span
 
 _is_PIL_available = False
 try:

@@ -1,20 +1,21 @@
+from typing import TYPE_CHECKING
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 
 from ..consts import SPAN_ORIGIN
 from ..utils import (
+    _create_mcp_execute_tool_spans,
     _set_agent_data,
     _set_input_data,
     _set_output_data,
     _set_usage_data,
-    _create_mcp_execute_tool_spans,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from agents import Agent
     from typing import Any, Optional
+
+    from agents import Agent
 
 
 def ai_client_span(

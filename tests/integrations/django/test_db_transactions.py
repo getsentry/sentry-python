@@ -1,10 +1,10 @@
-import os
-import pytest
 import itertools
+import os
 from datetime import datetime
 
-from django.db import connections
+import pytest
 from django.contrib.auth.models import User
+from django.db import connections
 
 try:
     from django.urls import reverse
@@ -16,9 +16,8 @@ from werkzeug.test import Client
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA, SPANNAME
 from sentry_sdk.integrations.django import DjangoIntegration
-
-from tests.integrations.django.utils import pytest_mark_django_db_decorator
 from tests.integrations.django.myapp.wsgi import application
+from tests.integrations.django.utils import pytest_mark_django_db_decorator
 
 
 @pytest.fixture

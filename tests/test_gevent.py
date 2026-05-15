@@ -2,10 +2,10 @@ import logging
 import pickle
 from datetime import datetime, timezone
 
+import pytest
+
 import sentry_sdk
 from sentry_sdk._compat import PY37, PY38
-
-import pytest
 from tests.conftest import CapturingServer
 
 pytest.importorskip("gevent")

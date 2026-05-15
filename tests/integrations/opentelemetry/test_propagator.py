@@ -1,8 +1,7 @@
-import pytest
-
 from unittest import mock
 from unittest.mock import MagicMock
 
+import pytest
 from opentelemetry.context import get_current
 from opentelemetry.trace import (
     SpanContext,

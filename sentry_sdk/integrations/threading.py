@@ -1,26 +1,22 @@
 import sys
 import warnings
+from concurrent.futures import Future, ThreadPoolExecutor
 from functools import wraps
 from threading import Thread, current_thread
-from concurrent.futures import ThreadPoolExecutor, Future
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import use_isolation_scope, use_scope
 from sentry_sdk.utils import (
-    event_from_exception,
     capture_internal_exceptions,
+    event_from_exception,
     logger,
     reraise,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import TypeVar
-    from typing import Callable
-    from typing import Optional
+    from typing import Any, Callable, Optional, TypeVar
 
     from sentry_sdk._types import ExcInfo
 

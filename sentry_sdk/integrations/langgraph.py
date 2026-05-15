@@ -3,15 +3,14 @@ from typing import Any, Callable, List, Optional
 
 import sentry_sdk
 from sentry_sdk.ai.utils import (
-    set_data_normalized,
     normalize_message_roles,
+    set_data_normalized,
     truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import safe_serialize
-
 
 try:
     from langgraph.graph import StateGraph
