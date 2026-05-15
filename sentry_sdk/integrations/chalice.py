@@ -17,7 +17,7 @@ try:
     from chalice import Chalice, ChaliceViewError
     from chalice import __version__ as CHALICE_VERSION
     from chalice.app import (  # type: ignore
-        EventSourceHandler as ChaliceEventSourceHandler,  
+        EventSourceHandler as ChaliceEventSourceHandler,
     )
 except ImportError:
     raise DidNotEnable("Chalice is not installed")

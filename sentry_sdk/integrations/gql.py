@@ -14,7 +14,7 @@ try:
         Transport,
     )
     from gql.transport.exceptions import (  # type: ignore[import-not-found]
-        TransportQueryError,  
+        TransportQueryError,
     )
     from graphql import (
         DocumentNode,

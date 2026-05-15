@@ -78,7 +78,7 @@ except ImportError:
 
 try:
     from langchain_google_vertexai import (  # type: ignore[import-not-found]
-        VertexAIEmbeddings,  
+        VertexAIEmbeddings,
     )
 except ImportError:
     VertexAIEmbeddings = None
@@ -95,14 +95,14 @@ except ImportError:
 
 try:
     from langchain_mistralai import (  # type: ignore[import-not-found]
-        MistralAIEmbeddings,  
+        MistralAIEmbeddings,
     )
 except ImportError:
     MistralAIEmbeddings = None
 
 try:
     from langchain_huggingface import (  # type: ignore[import-not-found]
-        HuggingFaceEmbeddings,  
+        HuggingFaceEmbeddings,
     )
 except ImportError:
     HuggingFaceEmbeddings = None

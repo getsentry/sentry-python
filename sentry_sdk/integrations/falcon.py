@@ -44,7 +44,7 @@ _FALCON_UNSET: "Optional[object]" = None
 if FALCON3:  # falcon.request._UNSET is only available in Falcon 3.0+
     with capture_internal_exceptions():
         from falcon.request import (  # type: ignore[import-not-found, no-redef]
-            _UNSET as _FALCON_UNSET,  
+            _UNSET as _FALCON_UNSET,
         )
 
 

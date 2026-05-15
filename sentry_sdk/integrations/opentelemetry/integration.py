@@ -18,7 +18,7 @@ except ImportError:
 
 try:
     from opentelemetry.instrumentation.django import (  # type: ignore[import-not-found]
-        DjangoInstrumentor,  
+        DjangoInstrumentor,
     )
 except ImportError:
     DjangoInstrumentor = None

@@ -25,7 +25,7 @@ try:
     from mcp.server.lowlevel import Server  # type: ignore[import-not-found]
     from mcp.server.lowlevel.server import request_ctx  # type: ignore[import-not-found]
     from mcp.server.streamable_http import (  # type: ignore[import-not-found]
-        StreamableHTTPServerTransport,  
+        StreamableHTTPServerTransport,
     )
 except ImportError:
     raise DidNotEnable("MCP SDK not installed")
