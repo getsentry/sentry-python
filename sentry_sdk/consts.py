@@ -404,6 +404,12 @@ class SPANDATA:
     Example: template.cache.some_item.867da7e2af8e6b2f3aa7213a4080edb3
     """
 
+    CLIENT_ADDRESS = "client.address"
+    """
+    Client address of the network connection - IP address or Unix domain socket name.
+    Example: "10.1.2.80"
+    """
+
     CODE_FILEPATH = "code.filepath"
     """
     .. deprecated::
@@ -819,10 +825,23 @@ class SPANDATA:
     Example: GET
     """
 
+    HTTP_REQUEST_HEADER = "http.request.header"
+    """
+    Prefix for HTTP request header attributes. The header name (lowercased) is
+    appended to form the full attribute key.
+    Example: "http.request.header.content-type"
+    """
+
     HTTP_REQUEST_METHOD = "http.request.method"
     """
     The HTTP method used.
     Example: GET
+    """
+
+    HTTP_REQUEST_BODY_DATA = "http.request.body.data"
+    """
+    The HTTP request body data as string.
+    Example: "[{\"role\": \"user\", \"message\": \"hello\"}]"
     """
 
     HTTP_QUERY = "http.query"
@@ -861,6 +880,12 @@ class SPANDATA:
     MESSAGING_SYSTEM = "messaging.system"
     """
     The messaging system's name, e.g. `kafka`, `aws_sqs`
+    """
+
+    NETWORK_PROTOCOL_NAME = "network.protocol.name"
+    """
+    The application layer protocol name used for the network connection.
+    Example: "http", "https"
     """
 
     NETWORK_PEER_ADDRESS = "network.peer.address"
@@ -940,6 +965,12 @@ class SPANDATA:
     """
     Label identifying a thread from where the span originated. This should be a string.
     Example: "MainThread"
+    """
+
+    USER_IP_ADDRESS = "user.ip_address"
+    """
+    The IP address of the user that triggered the request.
+    Example: "10.1.2.80"
     """
 
     URL_FULL = "url.full"
