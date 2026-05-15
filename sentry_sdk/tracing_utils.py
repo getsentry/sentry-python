@@ -325,7 +325,7 @@ def add_source(
         except Exception:
             lineno = None
         if lineno is not None:
-            if isinstance(span, LegacySpan):
+            if isinstance(span, Span):
                 span.set_data(SPANDATA.CODE_LINENO, lineno)
             else:
                 span.set_attribute("code.line.number", lineno)
@@ -335,7 +335,7 @@ def add_source(
         except Exception:
             namespace = None
         if namespace is not None:
-            if isinstance(span, LegacySpan):
+            if isinstance(span, Span):
                 span.set_data(SPANDATA.CODE_NAMESPACE, namespace)
             else:
                 span.set_attribute(SPANDATA.CODE_NAMESPACE, namespace)
@@ -349,7 +349,7 @@ def add_source(
             else:
                 in_app_path = filepath
 
-            if isinstance(span, LegacySpan):
+            if isinstance(span, Span):
                 span.set_data(SPANDATA.CODE_FILEPATH, in_app_path)
             else:
                 if in_app_path is not None:
@@ -361,7 +361,7 @@ def add_source(
             code_function = None
 
         if code_function is not None:
-            if isinstance(span, LegacySpan):
+            if isinstance(span, Span):
                 span.set_data(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
             else:
                 span.set_attribute(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
@@ -377,9 +377,9 @@ def add_query_source(
     if not client.is_active():
         return
 
-    if isinstance(span, LegacySpan):
+    if isinstance(span, Span):
         # In the StreamedSpan case, we need to add the extra span information before
-        # the span finishes, so it's expected that this will be None. In the LegacySpan case,
+        # the span finishes, so it's expected that this will be None. In the Span case,
         # it should already be finished.
         if span.timestamp is None:
             return
@@ -423,9 +423,9 @@ def add_http_request_source(
     if not client.is_active():
         return
 
-    if isinstance(span, LegacySpan):
+    if isinstance(span, Span):
         # In the StreamedSpan case, we need to add the extra span information before
-        # the span finishes, so it's expected that this will be None. In the LegacySpan case,
+        # the span finishes, so it's expected that this will be None. In the Span case,
         # it should already be finished.
         if span.timestamp is None:
             return
@@ -1723,7 +1723,7 @@ from sentry_sdk.tracing import (
     SENTRY_TRACE_HEADER_NAME,
 )
 from sentry_sdk.tracing import (
-    Span as LegacySpan,
+    Span
 )
 
 if TYPE_CHECKING:
