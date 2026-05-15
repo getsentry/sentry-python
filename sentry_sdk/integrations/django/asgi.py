@@ -17,6 +17,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -180,12 +181,23 @@ def wrap_async_view(callback: "Any") -> "Any":
         if not integration or not integration.middleware_spans:
             return await callback(request, *args, **kwargs)
 
-        with sentry_sdk.start_span(
-            op=OP.VIEW_RENDER,
-            name=request.resolver_match.view_name,
-            origin=DjangoIntegration.origin,
-        ):
-            return await callback(request, *args, **kwargs)
+        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+        if span_streaming:
+            with sentry_sdk.traces.start_span(
+                name=request.resolver_match.view_name,
+                attributes={
+                    "sentry.op": OP.VIEW_RENDER,
+                    "sentry.origin": DjangoIntegration.origin,
+                },
+            ):
+                return await callback(request, *args, **kwargs)
+        else:
+            with sentry_sdk.start_span(
+                op=OP.VIEW_RENDER,
+                name=request.resolver_match.view_name,
+                origin=DjangoIntegration.origin,
+            ):
+                return await callback(request, *args, **kwargs)
 
     return sentry_wrapped_callback
 

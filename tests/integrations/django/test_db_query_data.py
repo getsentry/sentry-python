@@ -13,10 +13,13 @@ except ImportError:
 
 from werkzeug.test import Client
 
+import sentry_sdk
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import DjangoIntegration
-from sentry_sdk.tracing_utils import record_sql_queries
+from sentry_sdk.tracing_utils import (
+    record_sql_queries,
+)
 from tests.conftest import unpack_werkzeug_response
 from tests.integrations.django.myapp.wsgi import application
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
@@ -29,13 +32,21 @@ def client():
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
-def test_query_source_disabled(sentry_init, client, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_query_source_disabled(
+    sentry_init,
+    client,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
     sentry_options = {
         "integrations": [DjangoIntegration()],
         "send_default_pii": True,
         "traces_sample_rate": 1.0,
         "enable_db_query_source": False,
         "db_query_source_threshold_ms": 0,
+        "_experiments": {"trace_lifecycle": "stream" if span_streaming else "static"},
     }
 
     sentry_init(**sentry_options)
@@ -46,36 +57,70 @@ def test_query_source_disabled(sentry_init, client, capture_events):
     # trigger Django to open a new connection by marking the existing one as None.
     connections["postgres"].connection = None
 
-    events = capture_events()
+    if span_streaming:
+        items = capture_items("span")
 
-    _, status, _ = unpack_werkzeug_response(client.get(reverse("postgres_select_orm")))
-    assert status == "200 OK"
+        _, status, _ = unpack_werkzeug_response(
+            client.get(reverse("postgres_select_orm"))
+        )
+        assert status == "200 OK"
 
-    (event,) = events
-    for span in event["spans"]:
-        if span.get("op") == "db" and "auth_user" in span.get("description"):
-            data = span.get("data", {})
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
 
-            assert SPANDATA.CODE_LINENO not in data
-            assert SPANDATA.CODE_NAMESPACE not in data
-            assert SPANDATA.CODE_FILEPATH not in data
-            assert SPANDATA.CODE_FUNCTION not in data
-            break
+        for span in spans:
+            if span["attributes"].get("sentry.op") == "db" and "auth_user" in span.get(
+                "name"
+            ):
+                attributes = span.get("attributes", {})
+
+                assert SPANDATA.CODE_LINE_NUMBER not in attributes
+                assert SPANDATA.CODE_NAMESPACE not in attributes
+                assert SPANDATA.CODE_FILE_PATH not in attributes
+                assert SPANDATA.CODE_FUNCTION not in attributes
+                break
+        else:
+            raise AssertionError("No db span found")
     else:
-        raise AssertionError("No db span found")
+        events = capture_events()
+
+        _, status, _ = unpack_werkzeug_response(
+            client.get(reverse("postgres_select_orm"))
+        )
+        assert status == "200 OK"
+
+        (event,) = events
+        for span in event["spans"]:
+            if span.get("op") == "db" and "auth_user" in span.get("description"):
+                data = span.get("data", {})
+
+                assert SPANDATA.CODE_LINENO not in data
+                assert SPANDATA.CODE_NAMESPACE not in data
+                assert SPANDATA.CODE_FILEPATH not in data
+                assert SPANDATA.CODE_FUNCTION not in data
+                break
+        else:
+            raise AssertionError("No db span found")
 
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
 @pytest.mark.parametrize("enable_db_query_source", [None, True])
+@pytest.mark.parametrize("span_streaming", [True, False])
 def test_query_source_enabled(
-    sentry_init, client, capture_events, enable_db_query_source
+    sentry_init,
+    client,
+    capture_events,
+    capture_items,
+    enable_db_query_source,
+    span_streaming,
 ):
     sentry_options = {
         "integrations": [DjangoIntegration()],
         "send_default_pii": True,
         "traces_sample_rate": 1.0,
         "db_query_source_threshold_ms": 0,
+        "_experiments": {"trace_lifecycle": "stream" if span_streaming else "static"},
     }
 
     if enable_db_query_source is not None:
@@ -89,35 +134,69 @@ def test_query_source_enabled(
     # trigger Django to open a new connection by marking the existing one as None.
     connections["postgres"].connection = None
 
-    events = capture_events()
+    if span_streaming:
+        items = capture_items("span")
 
-    _, status, _ = unpack_werkzeug_response(client.get(reverse("postgres_select_orm")))
-    assert status == "200 OK"
+        _, status, _ = unpack_werkzeug_response(
+            client.get(reverse("postgres_select_orm"))
+        )
+        assert status == "200 OK"
 
-    (event,) = events
-    for span in event["spans"]:
-        if span.get("op") == "db" and "auth_user" in span.get("description"):
-            data = span.get("data", {})
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
 
-            assert SPANDATA.CODE_LINENO in data
-            assert SPANDATA.CODE_NAMESPACE in data
-            assert SPANDATA.CODE_FILEPATH in data
-            assert SPANDATA.CODE_FUNCTION in data
+        for span in spans:
+            if span["attributes"].get("sentry.op") == "db" and "auth_user" in span.get(
+                "name"
+            ):
+                attributes = span.get("attributes", {})
 
-            break
+                assert SPANDATA.CODE_LINE_NUMBER in attributes
+                assert SPANDATA.CODE_NAMESPACE in attributes
+                assert SPANDATA.CODE_FILE_PATH in attributes
+                assert SPANDATA.CODE_FUNCTION in attributes
+                break
+        else:
+            raise AssertionError("No db span found")
     else:
-        raise AssertionError("No db span found")
+        events = capture_events()
+
+        _, status, _ = unpack_werkzeug_response(
+            client.get(reverse("postgres_select_orm"))
+        )
+        assert status == "200 OK"
+
+        (event,) = events
+        for span in event["spans"]:
+            if span.get("op") == "db" and "auth_user" in span.get("description"):
+                data = span.get("data", {})
+
+                assert SPANDATA.CODE_LINENO in data
+                assert SPANDATA.CODE_NAMESPACE in data
+                assert SPANDATA.CODE_FILEPATH in data
+                assert SPANDATA.CODE_FUNCTION in data
+                break
+        else:
+            raise AssertionError("No db span found")
 
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
-def test_query_source(sentry_init, client, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_query_source(
+    sentry_init,
+    client,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     if "postgres" not in connections:
@@ -126,45 +205,94 @@ def test_query_source(sentry_init, client, capture_events):
     # trigger Django to open a new connection by marking the existing one as None.
     connections["postgres"].connection = None
 
-    events = capture_events()
+    if span_streaming:
+        items = capture_items("span")
 
-    _, status, _ = unpack_werkzeug_response(client.get(reverse("postgres_select_orm")))
-    assert status == "200 OK"
+        _, status, _ = unpack_werkzeug_response(
+            client.get(reverse("postgres_select_orm"))
+        )
+        assert status == "200 OK"
 
-    (event,) = events
-    for span in event["spans"]:
-        if span.get("op") == "db" and "auth_user" in span.get("description"):
-            data = span.get("data", {})
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
 
-            assert SPANDATA.CODE_LINENO in data
-            assert SPANDATA.CODE_NAMESPACE in data
-            assert SPANDATA.CODE_FILEPATH in data
-            assert SPANDATA.CODE_FUNCTION in data
+        for span in spans:
+            if span["attributes"].get("sentry.op") == "db" and "auth_user" in span.get(
+                "name"
+            ):
+                attributes = span.get("attributes", {})
 
-            assert type(data.get(SPANDATA.CODE_LINENO)) == int
-            assert data.get(SPANDATA.CODE_LINENO) > 0
+                assert SPANDATA.CODE_LINE_NUMBER in attributes
+                assert SPANDATA.CODE_NAMESPACE in attributes
+                assert SPANDATA.CODE_FILE_PATH in attributes
+                assert SPANDATA.CODE_FUNCTION in attributes
 
-            assert (
-                data.get(SPANDATA.CODE_NAMESPACE)
-                == "tests.integrations.django.myapp.views"
-            )
-            assert data.get(SPANDATA.CODE_FILEPATH).endswith(
-                "tests/integrations/django/myapp/views.py"
-            )
+                assert type(attributes.get(SPANDATA.CODE_LINE_NUMBER)) == int
+                assert attributes.get(SPANDATA.CODE_LINE_NUMBER) > 0
 
-            is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
-            assert is_relative_path
+                assert (
+                    attributes.get(SPANDATA.CODE_NAMESPACE)
+                    == "tests.integrations.django.myapp.views"
+                )
+                assert attributes.get(SPANDATA.CODE_FILE_PATH).endswith(
+                    "tests/integrations/django/myapp/views.py"
+                )
 
-            assert data.get(SPANDATA.CODE_FUNCTION) == "postgres_select_orm"
+                is_relative_path = attributes.get(SPANDATA.CODE_FILE_PATH)[0] != os.sep
+                assert is_relative_path
 
-            break
+                assert attributes.get(SPANDATA.CODE_FUNCTION) == "postgres_select_orm"
+                break
+        else:
+            raise AssertionError("No db span found")
     else:
-        raise AssertionError("No db span found")
+        events = capture_events()
+
+        _, status, _ = unpack_werkzeug_response(
+            client.get(reverse("postgres_select_orm"))
+        )
+        assert status == "200 OK"
+
+        (event,) = events
+        for span in event["spans"]:
+            if span.get("op") == "db" and "auth_user" in span.get("description"):
+                data = span.get("data", {})
+
+                assert SPANDATA.CODE_LINENO in data
+                assert SPANDATA.CODE_NAMESPACE in data
+                assert SPANDATA.CODE_FILEPATH in data
+                assert SPANDATA.CODE_FUNCTION in data
+
+                assert type(data.get(SPANDATA.CODE_LINENO)) == int
+                assert data.get(SPANDATA.CODE_LINENO) > 0
+
+                assert (
+                    data.get(SPANDATA.CODE_NAMESPACE)
+                    == "tests.integrations.django.myapp.views"
+                )
+                assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+                    "tests/integrations/django/myapp/views.py"
+                )
+
+                is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+                assert is_relative_path
+
+                assert data.get(SPANDATA.CODE_FUNCTION) == "postgres_select_orm"
+                break
+        else:
+            raise AssertionError("No db span found")
 
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
-def test_query_source_with_module_in_search_path(sentry_init, client, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_query_source_with_module_in_search_path(
+    sentry_init,
+    client,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
     """
     Test that query source is relative to the path of the module it ran in
     """
@@ -176,6 +304,7 @@ def test_query_source_with_module_in_search_path(sentry_init, client, capture_ev
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     if "postgres" not in connections:
@@ -184,41 +313,84 @@ def test_query_source_with_module_in_search_path(sentry_init, client, capture_ev
     # trigger Django to open a new connection by marking the existing one as None.
     connections["postgres"].connection = None
 
-    events = capture_events()
+    if span_streaming:
+        items = capture_items("span")
 
-    _, status, _ = unpack_werkzeug_response(
-        client.get(reverse("postgres_select_slow_from_supplement"))
-    )
-    assert status == "200 OK"
+        _, status, _ = unpack_werkzeug_response(
+            client.get(reverse("postgres_select_slow_from_supplement"))
+        )
+        assert status == "200 OK"
 
-    (event,) = events
-    for span in event["spans"]:
-        if span.get("op") == "db" and "auth_user" in span.get("description"):
-            data = span.get("data", {})
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
 
-            assert SPANDATA.CODE_LINENO in data
-            assert SPANDATA.CODE_NAMESPACE in data
-            assert SPANDATA.CODE_FILEPATH in data
-            assert SPANDATA.CODE_FUNCTION in data
+        for span in spans:
+            if span["attributes"].get("sentry.op") == "db" and "auth_user" in span.get(
+                "name"
+            ):
+                attributes = span.get("attributes", {})
 
-            assert type(data.get(SPANDATA.CODE_LINENO)) == int
-            assert data.get(SPANDATA.CODE_LINENO) > 0
-            assert data.get(SPANDATA.CODE_NAMESPACE) == "django_helpers.views"
-            assert data.get(SPANDATA.CODE_FILEPATH) == "django_helpers/views.py"
+                assert SPANDATA.CODE_LINE_NUMBER in attributes
+                assert SPANDATA.CODE_NAMESPACE in attributes
+                assert SPANDATA.CODE_FILE_PATH in attributes
+                assert SPANDATA.CODE_FUNCTION in attributes
 
-            is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
-            assert is_relative_path
+                assert type(attributes.get(SPANDATA.CODE_LINE_NUMBER)) == int
+                assert attributes.get(SPANDATA.CODE_LINE_NUMBER) > 0
+                assert attributes.get(SPANDATA.CODE_NAMESPACE) == "django_helpers.views"
+                assert (
+                    attributes.get(SPANDATA.CODE_FILE_PATH) == "django_helpers/views.py"
+                )
 
-            assert data.get(SPANDATA.CODE_FUNCTION) == "postgres_select_orm"
+                is_relative_path = attributes.get(SPANDATA.CODE_FILE_PATH)[0] != os.sep
+                assert is_relative_path
 
-            break
+                assert attributes.get(SPANDATA.CODE_FUNCTION) == "postgres_select_orm"
+                break
+        else:
+            raise AssertionError("No db span found")
     else:
-        raise AssertionError("No db span found")
+        events = capture_events()
+
+        _, status, _ = unpack_werkzeug_response(
+            client.get(reverse("postgres_select_slow_from_supplement"))
+        )
+        assert status == "200 OK"
+
+        (event,) = events
+        for span in event["spans"]:
+            if span.get("op") == "db" and "auth_user" in span.get("description"):
+                data = span.get("data", {})
+
+                assert SPANDATA.CODE_LINENO in data
+                assert SPANDATA.CODE_NAMESPACE in data
+                assert SPANDATA.CODE_FILEPATH in data
+                assert SPANDATA.CODE_FUNCTION in data
+
+                assert type(data.get(SPANDATA.CODE_LINENO)) == int
+                assert data.get(SPANDATA.CODE_LINENO) > 0
+                assert data.get(SPANDATA.CODE_NAMESPACE) == "django_helpers.views"
+                assert data.get(SPANDATA.CODE_FILEPATH) == "django_helpers/views.py"
+
+                is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+                assert is_relative_path
+
+                assert data.get(SPANDATA.CODE_FUNCTION) == "postgres_select_orm"
+                break
+        else:
+            raise AssertionError("No db span found")
 
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
-def test_query_source_with_in_app_exclude(sentry_init, client, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_query_source_with_in_app_exclude(
+    sentry_init,
+    client,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
@@ -226,6 +398,7 @@ def test_query_source_with_in_app_exclude(sentry_init, client, capture_events):
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
         in_app_exclude=["tests.integrations.django.myapp.views"],
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     if "postgres" not in connections:
@@ -234,54 +407,112 @@ def test_query_source_with_in_app_exclude(sentry_init, client, capture_events):
     # trigger Django to open a new connection by marking the existing one as None.
     connections["postgres"].connection = None
 
-    events = capture_events()
+    if span_streaming:
+        items = capture_items("span")
 
-    _, status, _ = unpack_werkzeug_response(client.get(reverse("postgres_select_orm")))
-    assert status == "200 OK"
+        _, status, _ = unpack_werkzeug_response(
+            client.get(reverse("postgres_select_orm"))
+        )
+        assert status == "200 OK"
 
-    (event,) = events
-    for span in event["spans"]:
-        if span.get("op") == "db" and "auth_user" in span.get("description"):
-            data = span.get("data", {})
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
 
-            assert SPANDATA.CODE_LINENO in data
-            assert SPANDATA.CODE_NAMESPACE in data
-            assert SPANDATA.CODE_FILEPATH in data
-            assert SPANDATA.CODE_FUNCTION in data
+        for span in spans:
+            if span["attributes"].get("sentry.op") == "db" and "auth_user" in span.get(
+                "name"
+            ):
+                attributes = span.get("attributes", {})
 
-            assert type(data.get(SPANDATA.CODE_LINENO)) == int
-            assert data.get(SPANDATA.CODE_LINENO) > 0
+                assert SPANDATA.CODE_LINE_NUMBER in attributes
+                assert SPANDATA.CODE_NAMESPACE in attributes
+                assert SPANDATA.CODE_FILE_PATH in attributes
+                assert SPANDATA.CODE_FUNCTION in attributes
 
-            if DJANGO_VERSION >= (1, 11):
-                assert (
-                    data.get(SPANDATA.CODE_NAMESPACE)
-                    == "tests.integrations.django.myapp.settings"
-                )
-                assert data.get(SPANDATA.CODE_FILEPATH).endswith(
-                    "tests/integrations/django/myapp/settings.py"
-                )
-                assert data.get(SPANDATA.CODE_FUNCTION) == "middleware"
-            else:
-                assert (
-                    data.get(SPANDATA.CODE_NAMESPACE)
-                    == "tests.integrations.django.test_db_query_data"
-                )
-                assert data.get(SPANDATA.CODE_FILEPATH).endswith(
-                    "tests/integrations/django/test_db_query_data.py"
-                )
-                assert (
-                    data.get(SPANDATA.CODE_FUNCTION)
-                    == "test_query_source_with_in_app_exclude"
-                )
+                assert type(attributes.get(SPANDATA.CODE_LINE_NUMBER)) == int
+                assert attributes.get(SPANDATA.CODE_LINE_NUMBER) > 0
 
-            break
+                if DJANGO_VERSION >= (1, 11):
+                    assert (
+                        attributes.get(SPANDATA.CODE_NAMESPACE)
+                        == "tests.integrations.django.myapp.settings"
+                    )
+                    assert attributes.get(SPANDATA.CODE_FILE_PATH).endswith(
+                        "tests/integrations/django/myapp/settings.py"
+                    )
+                    assert attributes.get(SPANDATA.CODE_FUNCTION) == "middleware"
+                else:
+                    assert (
+                        attributes.get(SPANDATA.CODE_NAMESPACE)
+                        == "tests.integrations.django.test_db_query_data"
+                    )
+                    assert attributes.get(SPANDATA.CODE_FILE_PATH).endswith(
+                        "tests/integrations/django/test_db_query_data.py"
+                    )
+                    assert (
+                        attributes.get(SPANDATA.CODE_FUNCTION)
+                        == "test_query_source_with_in_app_exclude"
+                    )
+                break
+        else:
+            raise AssertionError("No db span found")
     else:
-        raise AssertionError("No db span found")
+        events = capture_events()
+
+        _, status, _ = unpack_werkzeug_response(
+            client.get(reverse("postgres_select_orm"))
+        )
+        assert status == "200 OK"
+
+        (event,) = events
+        for span in event["spans"]:
+            if span.get("op") == "db" and "auth_user" in span.get("description"):
+                data = span.get("data", {})
+
+                assert SPANDATA.CODE_LINENO in data
+                assert SPANDATA.CODE_NAMESPACE in data
+                assert SPANDATA.CODE_FILEPATH in data
+                assert SPANDATA.CODE_FUNCTION in data
+
+                assert type(data.get(SPANDATA.CODE_LINENO)) == int
+                assert data.get(SPANDATA.CODE_LINENO) > 0
+
+                if DJANGO_VERSION >= (1, 11):
+                    assert (
+                        data.get(SPANDATA.CODE_NAMESPACE)
+                        == "tests.integrations.django.myapp.settings"
+                    )
+                    assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+                        "tests/integrations/django/myapp/settings.py"
+                    )
+                    assert data.get(SPANDATA.CODE_FUNCTION) == "middleware"
+                else:
+                    assert (
+                        data.get(SPANDATA.CODE_NAMESPACE)
+                        == "tests.integrations.django.test_db_query_data"
+                    )
+                    assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+                        "tests/integrations/django/test_db_query_data.py"
+                    )
+                    assert (
+                        data.get(SPANDATA.CODE_FUNCTION)
+                        == "test_query_source_with_in_app_exclude"
+                    )
+                break
+        else:
+            raise AssertionError("No db span found")
 
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
-def test_query_source_with_in_app_include(sentry_init, client, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_query_source_with_in_app_include(
+    sentry_init,
+    client,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
@@ -289,6 +520,7 @@ def test_query_source_with_in_app_include(sentry_init, client, capture_events):
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
         in_app_include=["django"],
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     if "postgres" not in connections:
@@ -297,228 +529,430 @@ def test_query_source_with_in_app_include(sentry_init, client, capture_events):
     # trigger Django to open a new connection by marking the existing one as None.
     connections["postgres"].connection = None
 
-    events = capture_events()
+    if span_streaming:
+        items = capture_items("span")
 
-    _, status, _ = unpack_werkzeug_response(client.get(reverse("postgres_select_orm")))
-    assert status == "200 OK"
-
-    (event,) = events
-    for span in event["spans"]:
-        if span.get("op") == "db" and "auth_user" in span.get("description"):
-            data = span.get("data", {})
-
-            assert SPANDATA.CODE_LINENO in data
-            assert SPANDATA.CODE_NAMESPACE in data
-            assert SPANDATA.CODE_FILEPATH in data
-            assert SPANDATA.CODE_FUNCTION in data
-
-            assert type(data.get(SPANDATA.CODE_LINENO)) == int
-            assert data.get(SPANDATA.CODE_LINENO) > 0
-
-            assert data.get(SPANDATA.CODE_NAMESPACE) == "django.db.models.sql.compiler"
-            assert data.get(SPANDATA.CODE_FILEPATH).endswith(
-                "django/db/models/sql/compiler.py"
-            )
-            assert data.get(SPANDATA.CODE_FUNCTION) == "execute_sql"
-            break
-    else:
-        raise AssertionError("No db span found")
-
-
-@pytest.mark.forked
-@pytest_mark_django_db_decorator(transaction=True)
-def test_no_query_source_if_duration_too_short(sentry_init, client, capture_events):
-    sentry_init(
-        integrations=[DjangoIntegration()],
-        send_default_pii=True,
-        traces_sample_rate=1.0,
-        enable_db_query_source=True,
-        db_query_source_threshold_ms=100,
-    )
-
-    if "postgres" not in connections:
-        pytest.skip("postgres tests disabled")
-
-    # trigger Django to open a new connection by marking the existing one as None.
-    connections["postgres"].connection = None
-
-    events = capture_events()
-
-    class fake_record_sql_queries:  # noqa: N801
-        def __init__(self, *args, **kwargs):
-            with record_sql_queries(*args, **kwargs) as span:
-                self.span = span
-
-            self.span.start_timestamp = datetime(2024, 1, 1, microsecond=0)
-            self.span.timestamp = datetime(2024, 1, 1, microsecond=99999)
-
-        def __enter__(self):
-            return self.span
-
-        def __exit__(self, type, value, traceback):
-            pass
-
-    with mock.patch(
-        "sentry_sdk.integrations.django.record_sql_queries",
-        fake_record_sql_queries,
-    ):
         _, status, _ = unpack_werkzeug_response(
             client.get(reverse("postgres_select_orm"))
         )
+        assert status == "200 OK"
 
-    assert status == "200 OK"
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
 
-    (event,) = events
-    for span in event["spans"]:
-        if span.get("op") == "db" and "auth_user" in span.get("description"):
-            data = span.get("data", {})
+        for span in spans:
+            if span["attributes"].get("sentry.op") == "db" and "auth_user" in span.get(
+                "name"
+            ):
+                attributes = span.get("attributes", {})
 
-            assert SPANDATA.CODE_LINENO not in data
-            assert SPANDATA.CODE_NAMESPACE not in data
-            assert SPANDATA.CODE_FILEPATH not in data
-            assert SPANDATA.CODE_FUNCTION not in data
+                assert SPANDATA.CODE_LINE_NUMBER in attributes
+                assert SPANDATA.CODE_NAMESPACE in attributes
+                assert SPANDATA.CODE_FILE_PATH in attributes
+                assert SPANDATA.CODE_FUNCTION in attributes
 
-            break
-    else:
-        raise AssertionError("No db span found")
+                assert type(attributes.get(SPANDATA.CODE_LINE_NUMBER)) == int
+                assert attributes.get(SPANDATA.CODE_LINE_NUMBER) > 0
 
-
-@pytest.mark.forked
-@pytest_mark_django_db_decorator(transaction=True)
-def test_query_source_if_duration_over_threshold(sentry_init, client, capture_events):
-    sentry_init(
-        integrations=[DjangoIntegration()],
-        send_default_pii=True,
-        traces_sample_rate=1.0,
-        enable_db_query_source=True,
-        db_query_source_threshold_ms=100,
-    )
-
-    if "postgres" not in connections:
-        pytest.skip("postgres tests disabled")
-
-    # trigger Django to open a new connection by marking the existing one as None.
-    connections["postgres"].connection = None
-
-    events = capture_events()
-
-    class fake_record_sql_queries:  # noqa: N801
-        def __init__(self, *args, **kwargs):
-            with record_sql_queries(*args, **kwargs) as span:
-                self.span = span
-
-            self.span.start_timestamp = datetime(2024, 1, 1, microsecond=0)
-            self.span.timestamp = datetime(2024, 1, 1, microsecond=101000)
-
-        def __enter__(self):
-            return self.span
-
-        def __exit__(self, type, value, traceback):
-            pass
-
-    with mock.patch(
-        "sentry_sdk.integrations.django.record_sql_queries",
-        fake_record_sql_queries,
-    ):
-        _, status, _ = unpack_werkzeug_response(
-            client.get(reverse("postgres_select_orm"))
-        )
-
-    assert status == "200 OK"
-
-    (event,) = events
-    for span in event["spans"]:
-        if span.get("op") == "db" and "auth_user" in span.get("description"):
-            data = span.get("data", {})
-
-            assert SPANDATA.CODE_LINENO in data
-            assert SPANDATA.CODE_NAMESPACE in data
-            assert SPANDATA.CODE_FILEPATH in data
-            assert SPANDATA.CODE_FUNCTION in data
-
-            assert type(data.get(SPANDATA.CODE_LINENO)) == int
-            assert data.get(SPANDATA.CODE_LINENO) > 0
-
-            assert (
-                data.get(SPANDATA.CODE_NAMESPACE)
-                == "tests.integrations.django.myapp.views"
-            )
-            assert data.get(SPANDATA.CODE_FILEPATH).endswith(
-                "tests/integrations/django/myapp/views.py"
-            )
-
-            is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
-            assert is_relative_path
-
-            assert data.get(SPANDATA.CODE_FUNCTION) == "postgres_select_orm"
-            break
-    else:
-        raise AssertionError("No db span found")
-
-
-@pytest.mark.forked
-@pytest_mark_django_db_decorator(transaction=True)
-def test_db_span_origin_execute(sentry_init, client, capture_events):
-    sentry_init(
-        integrations=[DjangoIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    if "postgres" not in connections:
-        pytest.skip("postgres tests disabled")
-
-    # trigger Django to open a new connection by marking the existing one as None.
-    connections["postgres"].connection = None
-
-    events = capture_events()
-
-    client.get(reverse("postgres_select_orm"))
-
-    (event,) = events
-
-    assert event["contexts"]["trace"]["origin"] == "auto.http.django"
-
-    for span in event["spans"]:
-        if span["op"] == "db":
-            assert span["origin"] == "auto.db.django"
+                assert (
+                    attributes.get(SPANDATA.CODE_NAMESPACE)
+                    == "django.db.models.sql.compiler"
+                )
+                assert attributes.get(SPANDATA.CODE_FILE_PATH).endswith(
+                    "django/db/models/sql/compiler.py"
+                )
+                assert attributes.get(SPANDATA.CODE_FUNCTION) == "execute_sql"
+                break
         else:
-            assert span["origin"] == "auto.http.django"
+            raise AssertionError("No db span found")
+    else:
+        events = capture_events()
+
+        _, status, _ = unpack_werkzeug_response(
+            client.get(reverse("postgres_select_orm"))
+        )
+        assert status == "200 OK"
+
+        (event,) = events
+        for span in event["spans"]:
+            if span.get("op") == "db" and "auth_user" in span.get("description"):
+                data = span.get("data", {})
+
+                assert SPANDATA.CODE_LINENO in data
+                assert SPANDATA.CODE_NAMESPACE in data
+                assert SPANDATA.CODE_FILEPATH in data
+                assert SPANDATA.CODE_FUNCTION in data
+
+                assert type(data.get(SPANDATA.CODE_LINENO)) == int
+                assert data.get(SPANDATA.CODE_LINENO) > 0
+
+                assert (
+                    data.get(SPANDATA.CODE_NAMESPACE) == "django.db.models.sql.compiler"
+                )
+                assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+                    "django/db/models/sql/compiler.py"
+                )
+                assert data.get(SPANDATA.CODE_FUNCTION) == "execute_sql"
+                break
+        else:
+            raise AssertionError("No db span found")
 
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
-def test_db_span_origin_executemany(sentry_init, client, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_no_query_source_if_duration_too_short(
+    sentry_init,
+    client,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
     sentry_init(
         integrations=[DjangoIntegration()],
+        send_default_pii=True,
         traces_sample_rate=1.0,
+        enable_db_query_source=True,
+        db_query_source_threshold_ms=100,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-
-    events = capture_events()
 
     if "postgres" not in connections:
         pytest.skip("postgres tests disabled")
 
-    with start_transaction(name="test_transaction"):
-        from django.db import connection, transaction
+    # trigger Django to open a new connection by marking the existing one as None.
+    connections["postgres"].connection = None
 
-        cursor = connection.cursor()
+    class fake_record_sql_queries:  # noqa: N801
+        def __init__(self, *args, **kwargs):
+            with record_sql_queries(*args, **kwargs) as span:
+                self.span = span
 
-        query = """UPDATE auth_user SET username = %s where id = %s;"""
-        query_list = (
-            (
-                "test1",
-                1,
-            ),
-            (
-                "test2",
-                2,
-            ),
-        )
-        cursor.executemany(query, query_list)
+            if span_streaming:
+                self.span._start_timestamp = datetime(2024, 1, 1, microsecond=0)
+                self.span._end_timestamp = datetime(2024, 1, 1, microsecond=99999)
+            else:
+                self.span.start_timestamp = datetime(2024, 1, 1, microsecond=0)
+                self.span.timestamp = datetime(2024, 1, 1, microsecond=99999)
 
-        transaction.commit()
+        def __enter__(self):
+            return self.span
 
-    (event,) = events
+        def __exit__(self, type, value, traceback):
+            pass
 
-    assert event["contexts"]["trace"]["origin"] == "manual"
-    assert event["spans"][0]["origin"] == "auto.db.django"
+    if span_streaming:
+        items = capture_items("span")
+
+        with mock.patch(
+            "sentry_sdk.integrations.django.record_sql_queries",
+            fake_record_sql_queries,
+        ):
+            _, status, _ = unpack_werkzeug_response(
+                client.get(reverse("postgres_select_orm"))
+            )
+
+        assert status == "200 OK"
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+
+        for span in spans:
+            if span["attributes"].get("sentry.op") == "db" and "auth_user" in span.get(
+                "name"
+            ):
+                attributes = span.get("attributes", {})
+
+                assert SPANDATA.CODE_LINE_NUMBER not in attributes
+                assert SPANDATA.CODE_NAMESPACE not in attributes
+                assert SPANDATA.CODE_FILE_PATH not in attributes
+                assert SPANDATA.CODE_FUNCTION not in attributes
+                break
+        else:
+            raise AssertionError("No db span found")
+    else:
+        events = capture_events()
+
+        with mock.patch(
+            "sentry_sdk.integrations.django.record_sql_queries",
+            fake_record_sql_queries,
+        ):
+            _, status, _ = unpack_werkzeug_response(
+                client.get(reverse("postgres_select_orm"))
+            )
+
+        assert status == "200 OK"
+
+        (event,) = events
+        for span in event["spans"]:
+            if span.get("op") == "db" and "auth_user" in span.get("description"):
+                data = span.get("data", {})
+
+                assert SPANDATA.CODE_LINENO not in data
+                assert SPANDATA.CODE_NAMESPACE not in data
+                assert SPANDATA.CODE_FILEPATH not in data
+                assert SPANDATA.CODE_FUNCTION not in data
+                break
+        else:
+            raise AssertionError("No db span found")
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_query_source_if_duration_over_threshold(
+    sentry_init,
+    client,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=True,
+        traces_sample_rate=1.0,
+        enable_db_query_source=True,
+        db_query_source_threshold_ms=100,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    # trigger Django to open a new connection by marking the existing one as None.
+    connections["postgres"].connection = None
+
+    class fake_record_sql_queries:  # noqa: N801
+        def __init__(self, *args, **kwargs):
+            if span_streaming:
+                with record_sql_queries(*args, **kwargs) as span:
+                    self.span = span
+
+                self.span._start_timestamp = datetime(2024, 1, 1, microsecond=0)
+                self.span._end_timestamp = datetime(2024, 1, 1, microsecond=101000)
+            else:
+                with record_sql_queries(*args, **kwargs) as span:
+                    self.span = span
+
+                self.span.start_timestamp = datetime(2024, 1, 1, microsecond=0)
+                self.span.timestamp = datetime(2024, 1, 1, microsecond=101000)
+
+        def __enter__(self):
+            return self.span
+
+        def __exit__(self, type, value, traceback):
+            pass
+
+    if span_streaming:
+        items = capture_items("span")
+
+        with mock.patch(
+            "sentry_sdk.integrations.django.record_sql_queries",
+            fake_record_sql_queries,
+        ):
+            _, status, _ = unpack_werkzeug_response(
+                client.get(reverse("postgres_select_orm"))
+            )
+
+        assert status == "200 OK"
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+
+        for span in spans:
+            if span["attributes"].get("sentry.op") == "db" and "auth_user" in span.get(
+                "name"
+            ):
+                attributes = span.get("attributes", {})
+
+                assert SPANDATA.CODE_LINE_NUMBER in attributes
+                assert SPANDATA.CODE_NAMESPACE in attributes
+                assert SPANDATA.CODE_FILE_PATH in attributes
+                assert SPANDATA.CODE_FUNCTION in attributes
+
+                assert type(attributes.get(SPANDATA.CODE_LINE_NUMBER)) == int
+                assert attributes.get(SPANDATA.CODE_LINE_NUMBER) > 0
+
+                assert (
+                    attributes.get(SPANDATA.CODE_NAMESPACE)
+                    == "tests.integrations.django.myapp.views"
+                )
+                assert attributes.get(SPANDATA.CODE_FILE_PATH).endswith(
+                    "tests/integrations/django/myapp/views.py"
+                )
+
+                is_relative_path = attributes.get(SPANDATA.CODE_FILE_PATH)[0] != os.sep
+                assert is_relative_path
+
+                assert attributes.get(SPANDATA.CODE_FUNCTION) == "postgres_select_orm"
+                break
+        else:
+            raise AssertionError("No db span found")
+    else:
+        events = capture_events()
+
+        with mock.patch(
+            "sentry_sdk.integrations.django.record_sql_queries",
+            fake_record_sql_queries,
+        ):
+            _, status, _ = unpack_werkzeug_response(
+                client.get(reverse("postgres_select_orm"))
+            )
+
+        assert status == "200 OK"
+
+        (event,) = events
+        for span in event["spans"]:
+            if span.get("op") == "db" and "auth_user" in span.get("description"):
+                data = span.get("data", {})
+
+                assert SPANDATA.CODE_LINENO in data
+                assert SPANDATA.CODE_NAMESPACE in data
+                assert SPANDATA.CODE_FILEPATH in data
+                assert SPANDATA.CODE_FUNCTION in data
+
+                assert type(data.get(SPANDATA.CODE_LINENO)) == int
+                assert data.get(SPANDATA.CODE_LINENO) > 0
+
+                assert (
+                    data.get(SPANDATA.CODE_NAMESPACE)
+                    == "tests.integrations.django.myapp.views"
+                )
+                assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+                    "tests/integrations/django/myapp/views.py"
+                )
+
+                is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+                assert is_relative_path
+
+                assert data.get(SPANDATA.CODE_FUNCTION) == "postgres_select_orm"
+                break
+        else:
+            raise AssertionError("No db span found")
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_db_span_origin_execute(
+    sentry_init,
+    client,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    # trigger Django to open a new connection by marking the existing one as None.
+    connections["postgres"].connection = None
+
+    if span_streaming:
+        items = capture_items("span")
+
+        client.get(reverse("postgres_select_orm"))
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+
+        assert spans[1]["attributes"]["sentry.origin"] == "auto.http.django"
+
+        for span in spans:
+            if span["attributes"]["sentry.op"] == "db":
+                assert span["attributes"]["sentry.origin"] == "auto.db.django"
+            else:
+                assert span["attributes"]["sentry.origin"] == "auto.http.django"
+    else:
+        events = capture_events()
+
+        client.get(reverse("postgres_select_orm"))
+
+        (event,) = events
+
+        assert event["contexts"]["trace"]["origin"] == "auto.http.django"
+
+        for span in event["spans"]:
+            if span["op"] == "db":
+                assert span["origin"] == "auto.db.django"
+            else:
+                assert span["origin"] == "auto.http.django"
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator(transaction=True)
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_db_span_origin_executemany(
+    sentry_init,
+    client,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
+
+    if "postgres" not in connections:
+        pytest.skip("postgres tests disabled")
+
+    if span_streaming:
+        items = capture_items("span")
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            from django.db import connection, transaction
+
+            cursor = connection.cursor()
+
+            query = """UPDATE auth_user SET username = %s where id = %s;"""
+            query_list = (
+                (
+                    "test1",
+                    1,
+                ),
+                (
+                    "test2",
+                    2,
+                ),
+            )
+            cursor.executemany(query, query_list)
+
+            transaction.commit()
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+
+        assert spans[1]["attributes"]["sentry.origin"] == "manual"
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.db.django"
+    else:
+        events = capture_events()
+        with start_transaction(name="test_transaction"):
+            from django.db import connection, transaction
+
+            cursor = connection.cursor()
+
+            query = """UPDATE auth_user SET username = %s where id = %s;"""
+            query_list = (
+                (
+                    "test1",
+                    1,
+                ),
+                (
+                    "test2",
+                    2,
+                ),
+            )
+            cursor.executemany(query, query_list)
+
+            transaction.commit()
+
+        (event,) = events
+
+        assert event["contexts"]["trace"]["origin"] == "manual"
+        assert event["spans"][0]["origin"] == "auto.db.django"

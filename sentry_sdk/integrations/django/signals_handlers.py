@@ -4,8 +4,9 @@ from typing import TYPE_CHECKING
 from django.dispatch import Signal
 
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.django import DJANGO_VERSION
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -62,13 +63,28 @@ def patch_signals() -> None:
             @wraps(receiver)
             def wrapper(*args: "Any", **kwargs: "Any") -> "Any":
                 signal_name = _get_receiver_name(receiver)
-                with sentry_sdk.start_span(
-                    op=OP.EVENT_DJANGO,
-                    name=signal_name,
-                    origin=DjangoIntegration.origin,
-                ) as span:
-                    span.set_data("signal", signal_name)
-                    return receiver(*args, **kwargs)
+
+                span_streaming = has_span_streaming_enabled(
+                    sentry_sdk.get_client().options
+                )
+                if span_streaming:
+                    with sentry_sdk.traces.start_span(
+                        name=signal_name,
+                        attributes={
+                            "sentry.op": OP.EVENT_DJANGO,
+                            "sentry.origin": DjangoIntegration.origin,
+                        },
+                    ) as span:
+                        span.set_attribute(SPANDATA.CODE_FUNCTION_NAME, signal_name)
+                        return receiver(*args, **kwargs)
+                else:
+                    with sentry_sdk.start_span(
+                        op=OP.EVENT_DJANGO,
+                        name=signal_name,
+                        origin=DjangoIntegration.origin,
+                    ) as span:
+                        span.set_data("signal", signal_name)
+                        return receiver(*args, **kwargs)
 
             return wrapper
 

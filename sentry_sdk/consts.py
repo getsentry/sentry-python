@@ -863,6 +863,12 @@ class SPANDATA:
     The messaging system's name, e.g. `kafka`, `aws_sqs`
     """
 
+    MIDDLEWARE_NAME = "middleware.name"
+    """
+    The name of the middleware.
+    Example: "AuthenticationMiddleware"
+    """
+
     NETWORK_PEER_ADDRESS = "network.peer.address"
     """
     Peer address of the network connection - IP address or Unix domain socket name.

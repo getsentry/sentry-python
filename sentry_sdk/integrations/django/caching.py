@@ -8,6 +8,7 @@ from urllib3.util import parse_url as urlparse
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.redis.utils import _get_safe_key, _key_as_string
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -58,56 +59,111 @@ def _patch_cache_method(
         op = OP.CACHE_PUT if is_set_operation else OP.CACHE_GET
         description = _get_span_description(method_name, args, kwargs)
 
-        with sentry_sdk.start_span(
-            op=op,
-            name=description,
-            origin=DjangoIntegration.origin,
-        ) as span:
-            value = original_method(*args, **kwargs)
+        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+        if span_streaming:
+            with sentry_sdk.traces.start_span(
+                name=description,
+                attributes={
+                    "sentry.op": op,
+                    "sentry.origin": DjangoIntegration.origin,
+                },
+            ) as span:
+                value = original_method(*args, **kwargs)
 
-            with capture_internal_exceptions():
-                if address is not None:
-                    span.set_data(SPANDATA.NETWORK_PEER_ADDRESS, address)
+                with capture_internal_exceptions():
+                    if address is not None:
+                        span.set_attribute(SPANDATA.NETWORK_PEER_ADDRESS, address)
 
-                if port is not None:
-                    span.set_data(SPANDATA.NETWORK_PEER_PORT, port)
+                    if port is not None:
+                        span.set_attribute(SPANDATA.NETWORK_PEER_PORT, port)
 
-                key = _get_safe_key(method_name, args, kwargs)
-                if key is not None:
-                    span.set_data(SPANDATA.CACHE_KEY, key)
+                    key = _get_safe_key(method_name, args, kwargs)
+                    if key is not None:
+                        span.set_attribute(SPANDATA.CACHE_KEY, key)
 
-                item_size = None
-                if is_get_many_method:
-                    if value != {}:
-                        item_size = len(str(value))
-                        span.set_data(SPANDATA.CACHE_HIT, True)
-                    else:
-                        span.set_data(SPANDATA.CACHE_HIT, False)
-                elif is_get_method:
-                    default_value = None
-                    if len(args) >= 2:
-                        default_value = args[1]
-                    elif "default" in kwargs:
-                        default_value = kwargs["default"]
+                    item_size = None
+                    if is_get_many_method:
+                        if value != {}:
+                            item_size = len(str(value))
+                            span.set_attribute(SPANDATA.CACHE_HIT, True)
+                        else:
+                            span.set_attribute(SPANDATA.CACHE_HIT, False)
+                    elif is_get_method:
+                        default_value = None
+                        if len(args) >= 2:
+                            default_value = args[1]
+                        elif "default" in kwargs:
+                            default_value = kwargs["default"]
 
-                    if value != default_value:
-                        item_size = len(str(value))
-                        span.set_data(SPANDATA.CACHE_HIT, True)
-                    else:
-                        span.set_data(SPANDATA.CACHE_HIT, False)
-                else:  # TODO: We don't handle `get_or_set` which we should
-                    arg_count = len(args)
-                    if arg_count >= 2:
-                        # 'set' command
-                        item_size = len(str(args[1]))
-                    elif arg_count == 1:
-                        # 'set_many' command
-                        item_size = len(str(args[0]))
+                        if value != default_value:
+                            item_size = len(str(value))
+                            span.set_attribute(SPANDATA.CACHE_HIT, True)
+                        else:
+                            span.set_attribute(SPANDATA.CACHE_HIT, False)
+                    else:  # TODO: We don't handle `get_or_set` which we should
+                        arg_count = len(args)
+                        if arg_count >= 2:
+                            # 'set' command
+                            item_size = len(str(args[1]))
+                        elif arg_count == 1:
+                            # 'set_many' command
+                            item_size = len(str(args[0]))
 
-                if item_size is not None:
-                    span.set_data(SPANDATA.CACHE_ITEM_SIZE, item_size)
+                    if item_size is not None:
+                        span.set_attribute(SPANDATA.CACHE_ITEM_SIZE, item_size)
 
-            return value
+                return value
+        else:
+            with sentry_sdk.start_span(
+                op=op,
+                name=description,
+                origin=DjangoIntegration.origin,
+            ) as span:
+                value = original_method(*args, **kwargs)
+
+                with capture_internal_exceptions():
+                    if address is not None:
+                        span.set_data(SPANDATA.NETWORK_PEER_ADDRESS, address)
+
+                    if port is not None:
+                        span.set_data(SPANDATA.NETWORK_PEER_PORT, port)
+
+                    key = _get_safe_key(method_name, args, kwargs)
+                    if key is not None:
+                        span.set_data(SPANDATA.CACHE_KEY, key)
+
+                    item_size = None
+                    if is_get_many_method:
+                        if value != {}:
+                            item_size = len(str(value))
+                            span.set_data(SPANDATA.CACHE_HIT, True)
+                        else:
+                            span.set_data(SPANDATA.CACHE_HIT, False)
+                    elif is_get_method:
+                        default_value = None
+                        if len(args) >= 2:
+                            default_value = args[1]
+                        elif "default" in kwargs:
+                            default_value = kwargs["default"]
+
+                        if value != default_value:
+                            item_size = len(str(value))
+                            span.set_data(SPANDATA.CACHE_HIT, True)
+                        else:
+                            span.set_data(SPANDATA.CACHE_HIT, False)
+                    else:  # TODO: We don't handle `get_or_set` which we should
+                        arg_count = len(args)
+                        if arg_count >= 2:
+                            # 'set' command
+                            item_size = len(str(args[1]))
+                        elif arg_count == 1:
+                            # 'set_many' command
+                            item_size = len(str(args[0]))
+
+                    if item_size is not None:
+                        span.set_data(SPANDATA.CACHE_ITEM_SIZE, item_size)
+
+                return value
 
     @functools.wraps(original_method)
     def sentry_method(*args: "Any", **kwargs: "Any") -> "Any":

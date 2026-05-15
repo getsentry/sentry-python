@@ -183,6 +183,7 @@ class SentryWsgiMiddleware:
                                         SegmentSource.COMPONENT.value,
                                         SegmentSource.ROUTE.value,
                                         SegmentSource.CUSTOM.value,
+                                        SegmentSource.URL.value,
                                     ]
                                 )
                                 if not already_set:

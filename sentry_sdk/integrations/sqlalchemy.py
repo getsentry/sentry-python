@@ -4,7 +4,7 @@ from sentry_sdk.traces import SpanStatus, StreamedSpan
 from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import (
     add_query_source,
-    record_sql_queries_supporting_streaming,
+    record_sql_queries,
 )
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -49,7 +49,7 @@ def _before_cursor_execute(
     executemany: bool,
     *args: "Any",
 ) -> None:
-    ctx_mgr = record_sql_queries_supporting_streaming(
+    ctx_mgr = record_sql_queries(
         cursor,
         statement,
         parameters,
