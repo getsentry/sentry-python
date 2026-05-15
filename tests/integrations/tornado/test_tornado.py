@@ -176,6 +176,7 @@ def test_transactions(
         assert server_segment["name"] == expected_handler
         assert server_segment["attributes"]["sentry.span.source"] == "component"
         assert server_segment["attributes"]["http.request.method"] == "POST"
+        assert server_segment["attributes"]["http.request.body.data"] == "heyoo"
         assert server_segment["attributes"]["http.response.status_code"] == code
         assert server_segment["status"] == ("ok" if code == 200 else "error")
         assert client_segment["trace_id"] == server_segment["trace_id"]
