@@ -5,7 +5,7 @@ from inspect import isawaitable
 
 import sentry_sdk
 from sentry_sdk.consts import OP
-from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import TransactionSource
@@ -38,6 +38,8 @@ except ImportError:
 try:
     from strawberry.extensions.tracing import (
         SentryTracingExtension as StrawberrySentryAsyncExtension,
+    )
+    from strawberry.extensions.tracing import (
         SentryTracingExtensionSync as StrawberrySentrySyncExtension,
     )
 except ImportError:
@@ -48,9 +50,11 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Generator, List, Optional
+
     from graphql import GraphQLError, GraphQLResolveInfo
     from strawberry.http import GraphQLHTTPResponse
     from strawberry.types import ExecutionContext
+
     from sentry_sdk._types import Event, EventProcessor
 
 

@@ -1,9 +1,8 @@
 import os
-
-import pytest
 from datetime import datetime
 from unittest import mock
 
+import pytest
 from django import VERSION as DJANGO_VERSION
 from django.db import connections
 
@@ -18,10 +17,9 @@ from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.tracing_utils import record_sql_queries
-
 from tests.conftest import unpack_werkzeug_response
-from tests.integrations.django.utils import pytest_mark_django_db_decorator
 from tests.integrations.django.myapp.wsgi import application
+from tests.integrations.django.utils import pytest_mark_django_db_decorator
 
 
 @pytest.fixture

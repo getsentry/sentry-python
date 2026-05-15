@@ -14,17 +14,19 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.ai.utils import _set_span_data_attribute, get_start_span_function
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations._wsgi_common import nullcontext
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import safe_serialize
-from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.integrations._wsgi_common import nullcontext
 
 try:
     from mcp.server.lowlevel import Server  # type: ignore[import-not-found]
     from mcp.server.lowlevel.server import request_ctx  # type: ignore[import-not-found]
-    from mcp.server.streamable_http import StreamableHTTPServerTransport  # type: ignore[import-not-found]
+    from mcp.server.streamable_http import (  # type: ignore[import-not-found]
+        StreamableHTTPServerTransport,
+    )
 except ImportError:
     raise DidNotEnable("MCP SDK not installed")
 
@@ -35,11 +37,12 @@ except ImportError:
 
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Optional, Tuple, Union, ContextManager
+    from typing import Any, Callable, ContextManager, Optional, Tuple, Union
 
-    from sentry_sdk.tracing import Span
-    from sentry_sdk.traces import StreamedSpan
     from starlette.types import Receive, Scope, Send  # type: ignore[import-not-found]
+
+    from sentry_sdk.traces import StreamedSpan
+    from sentry_sdk.tracing import Span
 
 
 class MCPIntegration(Integration):

@@ -1,9 +1,9 @@
 import json
 import os
-import pytest
 import shutil
 import uuid
 
+import pytest
 import ray
 
 import sentry_sdk

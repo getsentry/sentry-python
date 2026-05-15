@@ -1,11 +1,11 @@
-import sentry_sdk
 from contextvars import ContextVar
+from typing import TYPE_CHECKING
+
+import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing_utils import set_span_errored
 from sentry_sdk.utils import event_from_exception, safe_serialize
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Optional

@@ -1,15 +1,8 @@
-from sentry_sdk.integrations.opentelemetry.integration import (
-    OpenTelemetryIntegration,
-)
-from opentelemetry import trace
-from sentry_sdk.scope import global_event_processors
-
-
-import pytest
-
 from unittest import mock
 from unittest.mock import MagicMock
 
+import pytest
+from opentelemetry import trace
 from opentelemetry.context import get_current
 from opentelemetry.trace import (
     SpanContext,
@@ -22,8 +15,12 @@ from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
 )
+from sentry_sdk.integrations.opentelemetry.integration import (
+    OpenTelemetryIntegration,
+)
 from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
 from sentry_sdk.integrations.opentelemetry.span_processor import SentrySpanProcessor
+from sentry_sdk.scope import global_event_processors
 from sentry_sdk.tracing_utils import Baggage
 
 

@@ -2,15 +2,15 @@ import concurrent.futures as cf
 import sys
 from random import random
 from unittest import mock
-from UnleashClient import UnleashClient
 
 import pytest
+from UnleashClient import UnleashClient
 
 import sentry_sdk
-from sentry_sdk.integrations.unleash import UnleashIntegration
 from sentry_sdk import start_span, start_transaction
-from tests.integrations.unleash.testutils import mock_unleash_client
+from sentry_sdk.integrations.unleash import UnleashIntegration
 from tests.conftest import ApproxDict
+from tests.integrations.unleash.testutils import mock_unleash_client
 
 
 def test_is_enabled(sentry_init, capture_events, uninstall_integration):

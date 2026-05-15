@@ -1,25 +1,24 @@
 import gzip
 import json
 import os
-import shutil
-import subprocess
-import requests
-import sys
-import time
-import threading
-import socket
 import platform
+import shutil
+import socket
+import subprocess
+import sys
+import threading
+import time
 
+import requests
+import uvicorn
 from aws_cdk import (
     CfnResource,
     Stack,
 )
 from constructs import Construct
 from fastapi import FastAPI, Request
-import uvicorn
 
-from scripts.build_aws_lambda_layer import build_packaged_zip, DIST_PATH
-
+from scripts.build_aws_lambda_layer import DIST_PATH, build_packaged_zip
 
 LAMBDA_FUNCTION_DIR = "./tests/integrations/aws_lambda/lambda_functions/"
 LAMBDA_FUNCTION_WITH_EMBEDDED_SDK_DIR = (

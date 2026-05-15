@@ -1,11 +1,12 @@
 from typing import TYPE_CHECKING
 
 from sentry_sdk._batcher import Batcher
-from sentry_sdk.utils import serialize_attribute
 from sentry_sdk.envelope import Item, PayloadRef
+from sentry_sdk.utils import serialize_attribute
 
 if TYPE_CHECKING:
     from typing import Any
+
     from sentry_sdk._types import Log
 
 

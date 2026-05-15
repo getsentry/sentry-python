@@ -1,10 +1,10 @@
 # NOTE: this is the logger sentry exposes to users, not some generic logger.
 import functools
 import time
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import sentry_sdk
-from sentry_sdk.utils import format_attribute, capture_internal_exceptions
+from sentry_sdk.utils import capture_internal_exceptions, format_attribute
 
 if TYPE_CHECKING:
     from sentry_sdk._types import Attributes

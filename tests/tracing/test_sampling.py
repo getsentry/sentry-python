@@ -5,7 +5,7 @@ from unittest import mock
 import pytest
 
 import sentry_sdk
-from sentry_sdk import start_span, start_transaction, capture_exception
+from sentry_sdk import capture_exception, start_span, start_transaction
 from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import logger
 

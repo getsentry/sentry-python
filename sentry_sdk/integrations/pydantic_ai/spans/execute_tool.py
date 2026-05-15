@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.utils import safe_serialize
@@ -5,10 +7,9 @@ from sentry_sdk.utils import safe_serialize
 from ..consts import SPAN_ORIGIN
 from ..utils import _set_agent_data, _should_send_prompts
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from typing import Any, Optional
+
     from pydantic_ai._tool_manager import ToolDefinition  # type: ignore
 
 

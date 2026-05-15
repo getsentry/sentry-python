@@ -1,14 +1,15 @@
-import base64
-import sys
-import json
-import inspect
 import asyncio
+import base64
+import inspect
+import json
 import os
+import sys
 from unittest import mock
 
 import django
 import pytest
 from channels.testing import HttpCommunicator
+
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.django.asgi import _asgi_middleware_mixin_factory

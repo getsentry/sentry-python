@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.redis.consts import SPAN_ORIGIN
@@ -14,11 +16,10 @@ from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import capture_internal_exceptions
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import Any, Optional, Union
+
     from sentry_sdk.traces import StreamedSpan
 
 

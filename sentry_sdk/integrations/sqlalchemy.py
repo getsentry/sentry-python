@@ -1,5 +1,7 @@
-from sentry_sdk.consts import SPANSTATUS, SPANDATA
-from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
+from sentry_sdk.consts import SPANDATA, SPANSTATUS
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
+from sentry_sdk.traces import SpanStatus, StreamedSpan
+from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import (
     add_query_source,
     record_sql_queries_supporting_streaming,
@@ -9,23 +11,18 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     parse_version,
 )
-from sentry_sdk.traces import StreamedSpan, SpanStatus
-from sentry_sdk.tracing import Span
 
 try:
+    from sqlalchemy import __version__ as SQLALCHEMY_VERSION  # type: ignore
     from sqlalchemy.engine import Engine  # type: ignore
     from sqlalchemy.event import listen  # type: ignore
-    from sqlalchemy import __version__ as SQLALCHEMY_VERSION  # type: ignore
 except ImportError:
     raise DidNotEnable("SQLAlchemy not installed.")
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import ContextManager
-    from typing import Optional
-    from typing import Union
+    from typing import Any, ContextManager, Optional, Union
 
 
 class SqlalchemyIntegration(Integration):

@@ -1,14 +1,13 @@
-import pytest
 from decimal import DivisionByZero
 
-from sentry_sdk import start_transaction
-from sentry_sdk.integrations.huey import HueyIntegration
-from sentry_sdk.utils import parse_version
-
+import pytest
 from huey import __version__ as HUEY_VERSION
 from huey.api import MemoryHuey, Result
 from huey.exceptions import RetryTask
 
+from sentry_sdk import start_transaction
+from sentry_sdk.integrations.huey import HueyIntegration
+from sentry_sdk.utils import parse_version
 
 HUEY_VERSION = parse_version(HUEY_VERSION)
 

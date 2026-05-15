@@ -1,17 +1,16 @@
 from __future__ import annotations
+
 import functools
-
-import pytest
-
-from sentry_sdk import capture_message
-from sentry_sdk.integrations.starlite import StarliteIntegration
-
 from typing import Any, Dict
 
-from starlite import AbstractMiddleware, LoggingConfig, Starlite, get, Controller
+import pytest
+from starlite import AbstractMiddleware, Controller, LoggingConfig, Starlite, get
 from starlite.middleware import LoggingMiddlewareConfig, RateLimitConfig
 from starlite.middleware.session.memory_backend import MemoryBackendConfig
 from starlite.testing import TestClient
+
+from sentry_sdk import capture_message
+from sentry_sdk.integrations.starlite import StarliteIntegration
 
 
 def starlite_app_factory(middleware=None, debug=True, exception_handlers=None):

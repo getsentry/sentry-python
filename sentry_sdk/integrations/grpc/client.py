@@ -1,20 +1,20 @@
+from typing import TYPE_CHECKING
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any, Callable, Iterator, Iterable, Union
+    from typing import Any, Callable, Iterable, Iterator, Union
 
 try:
     import grpc
-    from grpc import ClientCallDetails, Call
+    from google.protobuf.message import Message
+    from grpc import Call, ClientCallDetails
     from grpc._interceptor import _UnaryOutcome
     from grpc.aio._interceptor import UnaryStreamCall
-    from google.protobuf.message import Message
 except ImportError:
     raise DidNotEnable("grpcio is not installed")
 

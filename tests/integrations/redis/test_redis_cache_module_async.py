@@ -14,10 +14,9 @@ if FakeRedisAsync is None:
         allow_module_level=True,
     )
 
+import sentry_sdk
 from sentry_sdk.integrations.redis import RedisIntegration
 from sentry_sdk.utils import parse_version
-import sentry_sdk
-
 
 FAKEREDIS_VERSION = parse_version(fakeredis.__version__)
 

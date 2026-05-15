@@ -5,33 +5,29 @@ import sys
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from os import environ
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
+from sentry_sdk.integrations import Integration
+from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
     AnnotatedValue,
+    TimeoutThread,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
     logger,
-    TimeoutThread,
     reraise,
 )
-from sentry_sdk.integrations import Integration
-from sentry_sdk.integrations._wsgi_common import _filter_headers
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import TypeVar
-    from typing import Callable
-    from typing import Optional
+    from typing import Any, Callable, Optional, TypeVar
 
-    from sentry_sdk._types import EventProcessor, Event, Hint
+    from sentry_sdk._types import Event, EventProcessor, Hint
 
     F = TypeVar("F", bound=Callable[..., Any])
 
