@@ -13,8 +13,8 @@ try:
         AsyncTransport,
         Transport,
     )
-    from gql.transport.exceptions import (
-        TransportQueryError,  # type: ignore[import-not-found]
+    from gql.transport.exceptions import (  # type: ignore[import-not-found]
+        TransportQueryError,  
     )
     from graphql import (
         DocumentNode,

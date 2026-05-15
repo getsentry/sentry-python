@@ -77,8 +77,8 @@ except ImportError:
     AzureOpenAIEmbeddings = None
 
 try:
-    from langchain_google_vertexai import (
-        VertexAIEmbeddings,  # type: ignore[import-not-found]
+    from langchain_google_vertexai import (  # type: ignore[import-not-found]
+        VertexAIEmbeddings,  
     )
 except ImportError:
     VertexAIEmbeddings = None
@@ -94,15 +94,15 @@ except ImportError:
     CohereEmbeddings = None
 
 try:
-    from langchain_mistralai import (
-        MistralAIEmbeddings,  # type: ignore[import-not-found]
+    from langchain_mistralai import (  # type: ignore[import-not-found]
+        MistralAIEmbeddings,  
     )
 except ImportError:
     MistralAIEmbeddings = None
 
 try:
-    from langchain_huggingface import (
-        HuggingFaceEmbeddings,  # type: ignore[import-not-found]
+    from langchain_huggingface import (  # type: ignore[import-not-found]
+        HuggingFaceEmbeddings,  
     )
 except ImportError:
     HuggingFaceEmbeddings = None

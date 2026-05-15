@@ -32,8 +32,8 @@ else:
 try:
     from clickhouse_driver import VERSION  # type: ignore[import-not-found]
     from clickhouse_driver.client import Client  # type: ignore[import-not-found]
-    from clickhouse_driver.connection import (
-        Connection,  # type: ignore[import-not-found]
+    from clickhouse_driver.connection import (  # type: ignore[import-not-found]
+        Connection,  
     )
 
 except ImportError:
