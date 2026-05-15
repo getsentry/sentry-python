@@ -11,6 +11,7 @@ from sentry_sdk.integrations.opentelemetry.span_processor import (
     SentrySpanProcessor,
     link_trace_context_to_error_event,
 )
+from sentry_sdk.scope import global_event_processors
 from sentry_sdk.tracing import Span, Transaction
 from sentry_sdk.tracing_utils import extract_sentrytrace_data
 from sentry_sdk.utils import Dsn
@@ -621,3 +622,14 @@ def test_pruning_old_spans_on_end():
     span_processor.on_end(otel_span)
     assert sorted(list(span_processor.otel_span_map.keys())) == ["111111111abcdef"]
     assert sorted(list(span_processor.open_spans.values())) == [{"111111111abcdef"}]
+
+
+def test_no_memory_leak():
+    span_processor_1 = SentrySpanProcessor()
+    cnt_before = len(global_event_processors)
+
+    span_processor_2 = SentrySpanProcessor()
+
+    cnt_after = len(global_event_processors)
+    assert span_processor_1 is span_processor_2
+    assert cnt_before == cnt_after
