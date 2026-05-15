@@ -355,7 +355,7 @@ async def test_formdata_request_body(sentry_init, capture_events):
     client = TestClient(starlette_app)
     client.post(
         "/body/form",
-        content=BODY_FORM.encode("utf-8"),
+        data=BODY_FORM.encode("utf-8"),
         headers={
             "content-type": "multipart/form-data; boundary=fd721ef49ea403a6",
         },
@@ -393,7 +393,7 @@ async def test_request_body_too_big(sentry_init, capture_events):
     client = TestClient(starlette_app)
     client.post(
         "/body/form",
-        content=BODY_FORM.encode("utf-8"),
+        data=BODY_FORM.encode("utf-8"),
         headers={
             "content-type": "multipart/form-data; boundary=fd721ef49ea403a6",
             "cookie": "yummy_cookie=choco; tasty_cookie=strawberry",
@@ -1604,7 +1604,7 @@ async def test_malformed_json_request_body(sentry_init, capture_events):
     client = TestClient(starlette_app)
     client.post(
         "/body/raw",
-        content="{invalid json".encode("utf-8"),
+        data="{invalid json".encode("utf-8"),
         headers={"content-type": "application/json"},
     )
 
