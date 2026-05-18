@@ -504,7 +504,7 @@ def _get_cached_request_body_attribute(
 
     formdata_body = getattr(request, "_form", None)
     if formdata_body is None:
-        return
+        return None
 
     form_data = {}
     for key, val in formdata_body.items():
