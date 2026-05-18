@@ -140,11 +140,12 @@ Annotated = Union[AnnotatedValue, T]
 if TYPE_CHECKING:
     from collections.abc import Container, MutableMapping, Sequence
     from datetime import datetime
-    from sentry_sdk.traces import StreamedSpan
     from types import TracebackType
     from typing import Any, Callable, Dict, Mapping, NotRequired, Optional, Type
 
     from typing_extensions import Literal, TypedDict
+
+    from sentry_sdk.traces import StreamedSpan
 
     class SDKInfo(TypedDict):
         name: str
