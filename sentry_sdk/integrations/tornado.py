@@ -14,7 +14,7 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import NoOpStreamedSpan, SegmentSource, StreamedSpan
+from sentry_sdk.traces import SegmentSource, StreamedSpan
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -102,7 +102,7 @@ class TornadoIntegration(Integration):
         RequestHandler.log_exception = sentry_log_exception
 
 
-_DEFAULT_TRANSACTION_NAME = "generic Tornado request"
+_DEFAULT_ROOT_SPAN_NAME = "generic Tornado request"
 
 
 @contextlib.contextmanager
@@ -131,7 +131,7 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
             scope.set_custom_sampling_context({"tornado_request": self.request})
 
             span_ctx = sentry_sdk.traces.start_span(
-                name=_DEFAULT_TRANSACTION_NAME,
+                name=_DEFAULT_ROOT_SPAN_NAME,
                 attributes={
                     "sentry.op": OP.HTTP_SERVER,
                     "sentry.origin": TornadoIntegration.origin,
@@ -147,7 +147,7 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
                 # fallback transaction in case there is no route.
                 # sentry_urldispatcher_resolve is responsible for
                 # setting a transaction name later.
-                name=_DEFAULT_TRANSACTION_NAME,
+                name=_DEFAULT_ROOT_SPAN_NAME,
                 source=TransactionSource.ROUTE,
                 origin=TornadoIntegration.origin,
             )
@@ -160,9 +160,7 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
             try:
                 yield
             finally:
-                if isinstance(span, StreamedSpan) and not isinstance(
-                    span, NoOpStreamedSpan
-                ):
+                if type(span) is StreamedSpan:
                     with capture_internal_exceptions():
                         for attr, value in _get_request_attributes(
                             self.request
