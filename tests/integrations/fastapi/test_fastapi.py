@@ -4,7 +4,6 @@ import logging
 import os
 import threading
 import warnings
-from typing import Annotated
 from unittest import mock
 
 import fastapi
@@ -14,6 +13,7 @@ from fastapi import Body, FastAPI, File, Form, HTTPException, Request, UploadFil
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.testclient import TestClient
 from starlette.responses import JSONResponse
+from typing_extensions import Annotated
 
 import sentry_sdk
 from sentry_sdk import capture_message
