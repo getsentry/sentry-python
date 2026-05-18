@@ -141,6 +141,7 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
                     "sentry.origin": DramatiqIntegration.origin,
                     "sentry.span.source": SegmentSource.TASK.value,
                 },
+                parent_span=None,
             )
             message._sentry_span_ctx = span
             span.__enter__()
