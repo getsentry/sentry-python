@@ -1236,7 +1236,7 @@ class _Client(BaseClient):
 
         elif ty == "span":
             # We need a reference to the segment span in the batcher to populate
-            # the DSC
+            # the dynamic sampling context (DSC)
             serialized["_segment_span"] = telemetry._segment  # type: ignore
             batcher = self.span_batcher
 
