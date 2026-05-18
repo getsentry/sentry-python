@@ -179,31 +179,6 @@ def _create_streaming_wrapper(
     return wrapper
 
 
-def _create_streaming_events_wrapper(
-    original_func: "Callable[..., Any]",
-) -> "Callable[..., Any]":
-    """
-    Wraps run_stream_events method - no span needed as it delegates to run().
-
-    Note: run_stream_events internally calls self.run() with an event_stream_handler,
-    so the invoke_agent span will be created by the run() wrapper.
-    """
-
-    @wraps(original_func)
-    async def wrapper(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
-        # Just call the original generator - it will call run() which has the instrumentation
-        try:
-            async for event in original_func(self, *args, **kwargs):
-                yield event
-        except Exception as exc:
-            exc_info = sys.exc_info()
-            with capture_internal_exceptions():
-                _capture_exception(exc)
-            reraise(*exc_info)
-
-    return wrapper
-
-
 def _patch_agent_run() -> None:
     """
     Patches the Agent run methods to create spans for agent execution.
@@ -215,13 +190,9 @@ def _patch_agent_run() -> None:
     # Store original methods
     original_run = Agent.run
     original_run_stream = Agent.run_stream
-    original_run_stream_events = Agent.run_stream_events
 
     # Wrap and apply patches for non-streaming methods
     Agent.run = _create_run_wrapper(original_run, is_streaming=False)
 
     # Wrap and apply patches for streaming methods
     Agent.run_stream = _create_streaming_wrapper(original_run_stream)
-    Agent.run_stream_events = _create_streaming_events_wrapper(
-        original_run_stream_events
-    )
