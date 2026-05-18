@@ -1,27 +1,34 @@
-import sys
 import json
+import sys
 import time
-from functools import wraps
 from collections.abc import Iterable
+from functools import wraps
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk import consts
-from sentry_sdk.ai.monitoring import record_token_usage
-from sentry_sdk.ai.utils import (
-    set_data_normalized,
-    normalize_message_roles,
-    truncate_and_annotate_messages,
-    truncate_and_annotate_embedding_inputs,
+from sentry_sdk.ai._openai_completions_api import (
+    _get_system_instructions as _get_system_instructions_completions,
+)
+from sentry_sdk.ai._openai_completions_api import (
+    _get_text_items,
+    _transform_system_instructions,
 )
 from sentry_sdk.ai._openai_completions_api import (
     _is_system_instruction as _is_system_instruction_completions,
-    _get_system_instructions as _get_system_instructions_completions,
-    _transform_system_instructions,
-    _get_text_items,
+)
+from sentry_sdk.ai._openai_responses_api import (
+    _get_system_instructions as _get_system_instructions_responses,
 )
 from sentry_sdk.ai._openai_responses_api import (
     _is_system_instruction as _is_system_instruction_responses,
-    _get_system_instructions as _get_system_instructions_responses,
+)
+from sentry_sdk.ai.monitoring import record_token_usage
+from sentry_sdk.ai.utils import (
+    normalize_message_roles,
+    set_data_normalized,
+    truncate_and_annotate_embedding_inputs,
+    truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -29,34 +36,33 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    safe_serialize,
     reraise,
+    safe_serialize,
 )
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import (
         Any,
+        AsyncIterator,
+        Callable,
+        Iterable,
+        Iterator,
         List,
         Optional,
-        Callable,
-        AsyncIterator,
-        Iterator,
         Union,
-        Iterable,
     )
-    from sentry_sdk.tracing import Span
-    from sentry_sdk._types import TextPart
 
-    from openai.types.responses.response_usage import ResponseUsage
+    from openai import Omit
+    from openai.types import CompletionUsage
     from openai.types.responses import (
         ResponseInputParam,
-        SequenceNotStr,
         ResponseStreamEvent,
+        SequenceNotStr,
     )
-    from openai.types import CompletionUsage
-    from openai import Omit
+    from openai.types.responses.response_usage import ResponseUsage
+
+    from sentry_sdk._types import TextPart
+    from sentry_sdk.tracing import Span
 
 try:
     try:
@@ -69,15 +75,14 @@ try:
     except ImportError:
         Omit = None
 
-    from openai.resources.chat.completions import Completions, AsyncCompletions
-    from openai.resources import Embeddings, AsyncEmbeddings
-
-    from openai import Stream, AsyncStream
+    from openai import AsyncStream, Stream
+    from openai.resources import AsyncEmbeddings, Embeddings
+    from openai.resources.chat.completions import AsyncCompletions, Completions
 
     if TYPE_CHECKING:
         from openai.types.chat import (
-            ChatCompletionMessageParam,
             ChatCompletionChunk,
+            ChatCompletionMessageParam,
         )
 except ImportError:
     raise DidNotEnable("OpenAI not installed")
@@ -85,7 +90,7 @@ except ImportError:
 RESPONSES_API_ENABLED = True
 try:
     # responses API support was introduced in v1.66.0
-    from openai.resources.responses import Responses, AsyncResponses
+    from openai.resources.responses import AsyncResponses, Responses
     from openai.types.responses.response_completed_event import ResponseCompletedEvent
 except ImportError:
     RESPONSES_API_ENABLED = False

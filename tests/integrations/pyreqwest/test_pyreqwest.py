@@ -4,8 +4,8 @@ from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
 from unittest import mock
-import pytest
 
+import pytest
 from pyreqwest.client import ClientBuilder, SyncClientBuilder
 from pyreqwest.simple.request import pyreqwest_get as async_pyreqwest_get
 from pyreqwest.simple.sync_request import pyreqwest_get as sync_pyreqwest_get

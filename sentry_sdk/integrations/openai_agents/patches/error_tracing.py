@@ -1,9 +1,8 @@
 from functools import wraps
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.tracing_utils import set_span_errored
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any

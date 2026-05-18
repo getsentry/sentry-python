@@ -4,8 +4,8 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.utils import capture_internal_exceptions, reraise
 from sentry_sdk.tracing_utils import set_span_errored
+from sentry_sdk.utils import capture_internal_exceptions, reraise
 
 from ..spans import agent_workflow_span, end_invoke_agent_span
 from ..utils import _capture_exception

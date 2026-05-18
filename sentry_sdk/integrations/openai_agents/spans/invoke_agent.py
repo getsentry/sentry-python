@@ -1,8 +1,10 @@
+from typing import TYPE_CHECKING
+
 import sentry_sdk
 from sentry_sdk.ai.utils import (
     get_start_span_function,
-    set_data_normalized,
     normalize_message_roles,
+    set_data_normalized,
     truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
@@ -12,11 +14,10 @@ from sentry_sdk.utils import safe_serialize
 from ..consts import SPAN_ORIGIN
 from ..utils import _set_agent_data, _set_usage_data
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    import agents
     from typing import Any, Optional
+
+    import agents
 
 
 def invoke_agent_span(

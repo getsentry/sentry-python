@@ -1,8 +1,8 @@
 import sys
+
 import pytest
 
 from sentry_sdk.utils import event_from_exception
-
 
 try:
     # Python 3.11

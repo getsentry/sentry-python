@@ -2,14 +2,13 @@ import re
 from typing import TYPE_CHECKING
 from unittest import mock
 
-from sentry_sdk.utils import safe_serialize
 import pytest
 import responses
 from huggingface_hub import InferenceClient
 
 import sentry_sdk
 from sentry_sdk.integrations.huggingface_hub import HuggingfaceHubIntegration
-from sentry_sdk.utils import package_version
+from sentry_sdk.utils import package_version, safe_serialize
 
 try:
     from huggingface_hub.utils._errors import HfHubHTTPError

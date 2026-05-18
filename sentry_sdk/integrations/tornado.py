@@ -1,43 +1,39 @@
-import weakref
 import contextlib
+import weakref
 from inspect import iscoroutinefunction
 
 import sentry_sdk
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
-from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import TransactionSource
-from sentry_sdk.utils import (
-    HAS_REAL_CONTEXTVARS,
-    CONTEXTVARS_ERROR_MESSAGE,
-    ensure_integration_enabled,
-    event_from_exception,
-    capture_internal_exceptions,
-    transaction_from_function,
-)
-from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import (
     RequestExtractor,
     _filter_headers,
     _is_json_content_type,
 )
 from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.tracing import TransactionSource
+from sentry_sdk.utils import (
+    CONTEXTVARS_ERROR_MESSAGE,
+    HAS_REAL_CONTEXTVARS,
+    capture_internal_exceptions,
+    ensure_integration_enabled,
+    event_from_exception,
+    transaction_from_function,
+)
 
 try:
     from tornado import version_info as TORNADO_VERSION
-    from tornado.web import RequestHandler, HTTPError
     from tornado.gen import coroutine
+    from tornado.web import HTTPError, RequestHandler
 except ImportError:
     raise DidNotEnable("Tornado not installed")
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Optional
-    from typing import Dict
-    from typing import Callable
-    from typing import Generator
+    from typing import Any, Callable, Dict, Generator, Optional
 
     from sentry_sdk._types import Event, EventProcessor
 

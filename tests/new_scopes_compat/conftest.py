@@ -1,4 +1,5 @@
 import pytest
+
 import sentry_sdk
 
 

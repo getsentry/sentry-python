@@ -1,12 +1,11 @@
 import pytest
+from fakeredis.aioredis import FakeRedis
 
 import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
 from tests.conftest import ApproxDict
-
-from fakeredis.aioredis import FakeRedis
 
 
 @pytest.mark.asyncio

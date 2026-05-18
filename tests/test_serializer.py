@@ -6,8 +6,8 @@ from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH, MAX_DATABAG_DEPTH, serialize
 
 try:
-    from hypothesis import given
     import hypothesis.strategies as st
+    from hypothesis import given
 except ImportError:
     pass
 else:

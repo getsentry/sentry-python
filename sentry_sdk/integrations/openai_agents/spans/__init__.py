@@ -3,7 +3,7 @@ from .ai_client import ai_client_span, update_ai_client_span  # noqa: F401
 from .execute_tool import execute_tool_span, update_execute_tool_span  # noqa: F401
 from .handoff import handoff_span  # noqa: F401
 from .invoke_agent import (
+    end_invoke_agent_span,  # noqa: F401
     invoke_agent_span,  # noqa: F401
     update_invoke_agent_span,  # noqa: F401
-    end_invoke_agent_span,  # noqa: F401
 )

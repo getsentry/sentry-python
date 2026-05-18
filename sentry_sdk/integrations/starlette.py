@@ -8,6 +8,7 @@ from json import JSONDecodeError
 from typing import TYPE_CHECKING
 
 import sentry_sdk
+from sentry_sdk._types import OVER_SIZE_LIMIT_SUBSTITUTE
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
@@ -22,8 +23,7 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import _get_current_streamed_span
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import StreamedSpan, _get_current_streamed_span
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TransactionSource,
@@ -37,7 +37,6 @@ from sentry_sdk.utils import (
     parse_version,
     transaction_from_function,
 )
-from sentry_sdk._types import OVER_SIZE_LIMIT_SUBSTITUTE
 
 if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable, Container, Dict, Optional, Tuple, Union

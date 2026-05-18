@@ -1,6 +1,7 @@
-import pytest
-from unittest import mock
 import json
+from unittest import mock
+
+import pytest
 
 try:
     from unittest.mock import AsyncMock
@@ -21,8 +22,8 @@ from anthropic.types.message_delta_event import MessageDeltaEvent
 from anthropic.types.message_start_event import MessageStartEvent
 
 try:
-    from anthropic.types import ErrorResponse, OverloadedError
     from anthropic import APIStatusError
+    from anthropic.types import ErrorResponse, OverloadedError
 except ImportError:
     ErrorResponse = None
     OverloadedError = None
@@ -54,19 +55,18 @@ try:
 except ImportError:
     from anthropic.types.content_block import ContentBlock as TextBlock
 
-from sentry_sdk import start_transaction, start_span
+from sentry_sdk import start_span, start_transaction
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
+from sentry_sdk.ai.utils import transform_content_part, transform_message_content
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.anthropic import (
     AnthropicIntegration,
-    _set_output_data,
     _collect_ai_data,
-    _transform_anthropic_content_block,
     _RecordedUsage,
+    _set_output_data,
+    _transform_anthropic_content_block,
 )
-from sentry_sdk.ai.utils import transform_content_part, transform_message_content
 from sentry_sdk.utils import package_version
-
 
 ANTHROPIC_VERSION = package_version("anthropic")
 

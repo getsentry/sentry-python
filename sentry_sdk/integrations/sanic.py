@@ -1,46 +1,42 @@
 import sys
 import weakref
 from inspect import isawaitable
+from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
 import sentry_sdk
 from sentry_sdk import continue_trace
 from sentry_sdk.consts import OP
-from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
+    CONTEXTVARS_ERROR_MESSAGE,
+    HAS_REAL_CONTEXTVARS,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    HAS_REAL_CONTEXTVARS,
-    CONTEXTVARS_ERROR_MESSAGE,
     parse_version,
     reraise,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from collections.abc import Container
-    from typing import Any
-    from typing import Callable
-    from typing import Optional
-    from typing import Union
-    from typing import Dict
+    from typing import Any, Callable, Dict, Optional, Union
 
     from sanic.request import Request, RequestParameters
     from sanic.response import BaseHTTPResponse
-
-    from sentry_sdk._types import Event, EventProcessor, ExcInfo, Hint
     from sanic.router import Route
 
+    from sentry_sdk._types import Event, EventProcessor, ExcInfo, Hint
+
 try:
-    from sanic import Sanic, __version__ as SANIC_VERSION
+    from sanic import Sanic
+    from sanic import __version__ as SANIC_VERSION
     from sanic.exceptions import SanicException
-    from sanic.router import Router
     from sanic.handlers import ErrorHandler
+    from sanic.router import Router
 except ImportError:
     raise DidNotEnable("Sanic not installed")
 

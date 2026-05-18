@@ -1,5 +1,5 @@
 import json
-from typing import List, Optional, Any, Iterator
+from typing import Any, Iterator, List, Optional
 from unittest import mock
 from unittest.mock import Mock, patch
 
@@ -12,37 +12,39 @@ try:
     from langchain_openai import ChatOpenAI, OpenAI
 except ImportError:
     # Langchain < 0.2
-    from langchain_community.llms import OpenAI
     from langchain_community.chat_models import ChatOpenAI
+    from langchain_community.llms import OpenAI
 
 from langchain_core.callbacks import BaseCallbackManager, CallbackManagerForLLMRun
-from langchain_core.messages import BaseMessage, AIMessageChunk
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import AIMessageChunk, BaseMessage
 from langchain_core.outputs import ChatGenerationChunk, ChatResult
 from langchain_core.runnables import RunnableConfig
-from langchain_core.language_models.chat_models import BaseChatModel
 
 import sentry_sdk
 from sentry_sdk import start_transaction
-from sentry_sdk.utils import package_version
 from sentry_sdk.integrations.langchain import (
     LangchainIntegration,
     SentryLangchainCallback,
     _transform_langchain_content_block,
     _transform_langchain_message_content,
 )
+from sentry_sdk.utils import package_version
 
 try:
     # langchain v1+
-    from langchain.tools import tool
     from langchain.agents import create_agent
-    from langchain_classic.agents import AgentExecutor, create_openai_tools_agent  # type: ignore[import-not-found]
+    from langchain.tools import tool
+    from langchain_classic.agents import (  # type: ignore[import-not-found]
+        AgentExecutor,
+        create_openai_tools_agent,
+    )
 except ImportError:
     # langchain <v1
-    from langchain.agents import tool, AgentExecutor, create_openai_tools_agent
+    from langchain.agents import AgentExecutor, create_openai_tools_agent, tool
 
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, SystemMessage
-
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from openai.types.chat.chat_completion_chunk import (
     ChatCompletionChunk,
     Choice,
@@ -50,14 +52,11 @@ from openai.types.chat.chat_completion_chunk import (
     ChoiceDeltaToolCall,
     ChoiceDeltaToolCallFunction,
 )
-
 from openai.types.completion import Completion
 from openai.types.completion_choice import CompletionChoice
-
 from openai.types.completion_usage import (
     CompletionUsage,
 )
-
 from openai.types.responses import (
     ResponseUsage,
 )
@@ -2993,7 +2992,7 @@ def test_langchain_message_role_normalization_units():
 
 def test_langchain_message_truncation(sentry_init, capture_events):
     """Test that large messages are truncated properly in Langchain integration."""
-    from langchain_core.outputs import LLMResult, Generation
+    from langchain_core.outputs import Generation, LLMResult
 
     sentry_init(
         integrations=[LangchainIntegration(include_prompts=True)],
@@ -3807,7 +3806,7 @@ def test_langchain_embeddings_multiple_providers(
 ):
     """Test that embeddings work with different providers."""
     try:
-        from langchain_openai import OpenAIEmbeddings, AzureOpenAIEmbeddings
+        from langchain_openai import AzureOpenAIEmbeddings, OpenAIEmbeddings
     except ImportError:
         pytest.skip("langchain_openai not installed")
 

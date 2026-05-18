@@ -1,23 +1,23 @@
 import sys
+from typing import TYPE_CHECKING
 
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
+from sentry_sdk.tracing_utils import set_span_errored
 from sentry_sdk.utils import capture_internal_exceptions, reraise
+
 from ..spans import (
-    invoke_agent_span,
     end_invoke_agent_span,
     handoff_span,
+    invoke_agent_span,
 )
-from sentry_sdk.tracing_utils import set_span_errored
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Optional, Callable, Awaitable
-
-    from sentry_sdk.tracing import Span
+    from typing import Any, Awaitable, Callable, Optional
 
     from agents.run_internal.run_steps import SingleStepResult
+
+    from sentry_sdk.tracing import Span
 
 try:
     import agents

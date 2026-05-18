@@ -15,12 +15,12 @@ The tests mock the MCP server components and request context to verify
 that the integration properly instruments MCP handlers with Sentry spans.
 """
 
-import anyio
 import asyncio
-
-import pytest
 import json
 from unittest import mock
+
+import anyio
+import pytest
 
 try:
     from unittest.mock import AsyncMock
@@ -32,25 +32,25 @@ except ImportError:
 
 
 from mcp.server.lowlevel import Server
+from mcp.server.lowlevel.helper_types import ReadResourceContents
 from mcp.server.lowlevel.server import request_ctx
 from mcp.types import GetPromptResult, PromptMessage, TextContent
-from mcp.server.lowlevel.helper_types import ReadResourceContents
 
 try:
     from mcp.server.lowlevel.server import request_ctx
 except ImportError:
     request_ctx = None
 
-import sentry_sdk
-from sentry_sdk import start_transaction
-from sentry_sdk.consts import SPANDATA, OP
-from sentry_sdk.integrations.mcp import MCPIntegration
-
 from mcp.server.sse import SseServerTransport
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
-from starlette.routing import Mount, Route
 from starlette.applications import Starlette
 from starlette.responses import Response
+from starlette.routing import Mount, Route
+
+import sentry_sdk
+from sentry_sdk import start_transaction
+from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.integrations.mcp import MCPIntegration
 
 
 def _experiments_for(span_streaming):

@@ -212,6 +212,7 @@ select = [
     "E",   # pycodestyle errors (same as flake8 default)
     "W",   # pycodestyle warnings (same as flake8 default)
     "F",   # Pyflakes (same as flake8 default)
+    "I",
     # Note: B and N rules are NOT enabled by default in flake8
     # They were only active through the plugins, which may not have been fully enabled
 ]

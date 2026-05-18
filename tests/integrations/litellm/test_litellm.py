@@ -1,10 +1,11 @@
+import asyncio
 import base64
 import json
-import pytest
 import time
-import asyncio
-from unittest import mock
 from datetime import datetime
+from unittest import mock
+
+import pytest
 
 try:
     from unittest.mock import AsyncMock
@@ -20,30 +21,30 @@ try:
 except ImportError:
     pytest.skip("litellm not installed", allow_module_level=True)
 
-from sentry_sdk import start_transaction
-from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
-from sentry_sdk.integrations.litellm import (
-    LiteLLMIntegration,
-    _convert_message_parts,
-    _input_callback,
-    _success_callback,
-    _failure_callback,
-)
-from sentry_sdk.utils import package_version
-
-from openai import OpenAI, AsyncOpenAI
-from openai.types import CompletionUsage
-
 from concurrent.futures import ThreadPoolExecutor
 
 import litellm.utils as litellm_utils
-from litellm.litellm_core_utils import streaming_handler
-from litellm.litellm_core_utils import thread_pool_executor
-from litellm.litellm_core_utils import litellm_logging
+from litellm.litellm_core_utils import (
+    litellm_logging,
+    streaming_handler,
+    thread_pool_executor,
+)
 from litellm.litellm_core_utils.logging_worker import GLOBAL_LOGGING_WORKER
-from litellm.llms.custom_httpx.http_handler import HTTPHandler, AsyncHTTPHandler
+from litellm.llms.custom_httpx.http_handler import AsyncHTTPHandler, HTTPHandler
+from openai import AsyncOpenAI, OpenAI
+from openai.types import CompletionUsage
 
+from sentry_sdk import start_transaction
+from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
+from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.integrations.litellm import (
+    LiteLLMIntegration,
+    _convert_message_parts,
+    _failure_callback,
+    _input_callback,
+    _success_callback,
+)
+from sentry_sdk.utils import package_version
 
 LITELLM_VERSION = package_version("litellm")
 

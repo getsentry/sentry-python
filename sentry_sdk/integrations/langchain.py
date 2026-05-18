@@ -1,6 +1,6 @@
 import itertools
-import sys
 import json
+import sys
 import warnings
 from collections import OrderedDict
 from functools import wraps
@@ -13,8 +13,8 @@ from sentry_sdk.ai.utils import (
     get_start_span_function,
     normalize_message_roles,
     set_data_normalized,
-    truncate_and_annotate_messages,
     transform_content_part,
+    truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -35,8 +35,8 @@ if TYPE_CHECKING:
     )
     from uuid import UUID
 
-    from sentry_sdk.tracing import Span
     from sentry_sdk._types import TextPart
+    from sentry_sdk.tracing import Span
 
 
 try:
@@ -77,7 +77,9 @@ except ImportError:
     AzureOpenAIEmbeddings = None
 
 try:
-    from langchain_google_vertexai import VertexAIEmbeddings  # type: ignore[import-not-found]
+    from langchain_google_vertexai import (  # type: ignore[import-not-found]
+        VertexAIEmbeddings,
+    )
 except ImportError:
     VertexAIEmbeddings = None
 
@@ -92,12 +94,16 @@ except ImportError:
     CohereEmbeddings = None
 
 try:
-    from langchain_mistralai import MistralAIEmbeddings  # type: ignore[import-not-found]
+    from langchain_mistralai import (  # type: ignore[import-not-found]
+        MistralAIEmbeddings,
+    )
 except ImportError:
     MistralAIEmbeddings = None
 
 try:
-    from langchain_huggingface import HuggingFaceEmbeddings  # type: ignore[import-not-found]
+    from langchain_huggingface import (  # type: ignore[import-not-found]
+        HuggingFaceEmbeddings,
+    )
 except ImportError:
     HuggingFaceEmbeddings = None
 

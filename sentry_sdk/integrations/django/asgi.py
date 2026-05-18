@@ -9,12 +9,12 @@ Since this file contains `async def` it is conditionally imported in
 import asyncio
 import functools
 import inspect
+from typing import TYPE_CHECKING
 
 from django.core.handlers.wsgi import WSGIRequest
 
 import sentry_sdk
 from sentry_sdk.consts import OP
-
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
@@ -22,10 +22,8 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any, Callable, Union, TypeVar
+    from typing import Any, Callable, TypeVar, Union
 
     from django.core.handlers.asgi import ASGIRequest
     from django.http.response import HttpResponse

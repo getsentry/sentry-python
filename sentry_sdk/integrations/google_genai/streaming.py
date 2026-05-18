@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, List, TypedDict, Optional
+from typing import TYPE_CHECKING, Any, List, Optional, TypedDict
 
 from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import SPANDATA
@@ -6,17 +6,19 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     safe_serialize,
 )
+
 from .utils import (
-    extract_tool_calls,
-    extract_finish_reasons,
-    extract_contents_text,
-    extract_usage_data,
     UsageData,
+    extract_contents_text,
+    extract_finish_reasons,
+    extract_tool_calls,
+    extract_usage_data,
 )
 
 if TYPE_CHECKING:
-    from sentry_sdk.tracing import Span
     from google.genai.types import GenerateContentResponse
+
+    from sentry_sdk.tracing import Span
 
 
 class AccumulatedResponse(TypedDict):

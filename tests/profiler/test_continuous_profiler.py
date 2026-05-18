@@ -8,13 +8,13 @@ import pytest
 import sentry_sdk
 from sentry_sdk.consts import VERSION
 from sentry_sdk.profiler.continuous_profiler import (
-    is_profile_session_sampled,
     get_profiler_id,
+    is_profile_session_sampled,
     setup_continuous_profiler,
-    start_profiler,
     start_profile_session,
-    stop_profiler,
+    start_profiler,
     stop_profile_session,
+    stop_profiler,
 )
 from tests.conftest import ApproxDict
 

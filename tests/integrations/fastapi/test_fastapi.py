@@ -1,15 +1,15 @@
 import json
 import logging
-import pytest
 import threading
 import warnings
 from unittest import mock
 
 import fastapi
+import pytest
 import starlette
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.testclient import TestClient
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.testclient import TestClient
 
 import sentry_sdk
 from sentry_sdk import capture_message
@@ -18,7 +18,6 @@ from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
 from sentry_sdk.utils import parse_version
-
 
 FASTAPI_VERSION = parse_version(fastapi.__version__)
 STARLETTE_VERSION = parse_version(starlette.__version__)
