@@ -145,7 +145,7 @@ if TYPE_CHECKING:
 
     from typing_extensions import Literal, TypedDict
 
-    from sentry_sdk.traces import StreamedSpan
+    import sentry_sdk
 
     class SDKInfo(TypedDict):
         name: str
@@ -332,7 +332,7 @@ if TYPE_CHECKING:
             "start_timestamp": float,
             "end_timestamp": NotRequired[float],
             "attributes": NotRequired[Attributes],
-            "_segment_span": NotRequired[StreamedSpan],
+            "_segment_span": NotRequired["sentry_sdk.traces.StreamedSpan"],
         },
     )
 
