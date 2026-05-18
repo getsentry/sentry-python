@@ -4,15 +4,16 @@ from functools import wraps
 from typing import TYPE_CHECKING
 
 import sentry_sdk
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import StreamedSpan, _get_current_streamed_span
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import transaction_from_function
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict
+    from typing import Any, Awaitable, Callable, Dict
 
     from sentry_sdk._types import Event
 
@@ -20,7 +21,7 @@ try:
     from sentry_sdk.integrations.starlette import (
         StarletteIntegration,
         StarletteRequestExtractor,
-        _set_request_body_data_on_streaming_segment,
+        _get_cached_request_body_attribute,
     )
 except DidNotEnable:
     raise DidNotEnable("Starlette is not installed")
@@ -75,6 +76,66 @@ def _set_transaction_name_and_source(
     scope.set_transaction_name(name, source=source)
 
 
+async def _wrap_async_handler(
+    handler: "Callable[..., Awaitable[Any]]", *args: "Any", **kwargs: "Any"
+) -> "Any":
+    """
+    Wraps an asynchronous handler function to attach request info to errors and the server segment span.
+    The request body cached on the Starlette Request object is attached to streamed spans, but consuming the request body in the event
+    processor can still cause application hangs.
+    """
+    client = sentry_sdk.get_client()
+    integration = client.get_integration(FastApiIntegration)
+    if integration is None:
+        return await handler(*args, **kwargs)
+
+    request = args[0]
+
+    _set_transaction_name_and_source(
+        sentry_sdk.get_current_scope(), integration.transaction_style, request
+    )
+    sentry_scope = sentry_sdk.get_isolation_scope()
+    extractor = StarletteRequestExtractor(request)
+    info = await extractor.extract_request_info()
+
+    def _make_request_event_processor(
+        req: "Any", integration: "Any"
+    ) -> "Callable[[Event, Dict[str, Any]], Event]":
+        def event_processor(event: "Event", hint: "Dict[str, Any]") -> "Event":
+            # Extract information from request
+            request_info = event.get("request", {})
+            if info:
+                if "cookies" in info and should_send_default_pii():
+                    request_info["cookies"] = info["cookies"]
+                if "data" in info:
+                    request_info["data"] = info["data"]
+            event["request"] = deepcopy(request_info)
+
+            return event
+
+        return event_processor
+
+    sentry_scope._name = FastApiIntegration.identifier
+    sentry_scope.add_event_processor(
+        _make_request_event_processor(request, integration)
+    )
+
+    try:
+        return await handler(*args, **kwargs)
+    finally:
+        current_span = _get_current_streamed_span()
+
+        if type(current_span) is StreamedSpan:
+            request_body = _get_cached_request_body_attribute(
+                client=client, request=request
+            )
+            if request_body:
+                current_span._segment.set_attribute(
+                    SPANDATA.HTTP_REQUEST_BODY_DATA,
+                    request_body,
+                )
+
+
 def patch_get_request_handler() -> None:
     old_get_request_handler = fastapi.routing.get_request_handler
 
@@ -113,46 +174,7 @@ def patch_get_request_handler() -> None:
         old_app = old_get_request_handler(*args, **kwargs)
 
         async def _sentry_app(*args: "Any", **kwargs: "Any") -> "Any":
-            client = sentry_sdk.get_client()
-            integration = client.get_integration(FastApiIntegration)
-            if integration is None:
-                return await old_app(*args, **kwargs)
-
-            request = args[0]
-
-            _set_transaction_name_and_source(
-                sentry_sdk.get_current_scope(), integration.transaction_style, request
-            )
-            sentry_scope = sentry_sdk.get_isolation_scope()
-            extractor = StarletteRequestExtractor(request)
-            info = await extractor.extract_request_info()
-
-            def _make_request_event_processor(
-                req: "Any", integration: "Any"
-            ) -> "Callable[[Event, Dict[str, Any]], Event]":
-                def event_processor(event: "Event", hint: "Dict[str, Any]") -> "Event":
-                    # Extract information from request
-                    request_info = event.get("request", {})
-                    if info:
-                        if "cookies" in info and should_send_default_pii():
-                            request_info["cookies"] = info["cookies"]
-                        if "data" in info:
-                            request_info["data"] = info["data"]
-                    event["request"] = deepcopy(request_info)
-
-                    return event
-
-                return event_processor
-
-            sentry_scope._name = FastApiIntegration.identifier
-            sentry_scope.add_event_processor(
-                _make_request_event_processor(request, integration)
-            )
-
-            if has_span_streaming_enabled(client.options):
-                _set_request_body_data_on_streaming_segment(info)
-
-            return await old_app(*args, **kwargs)
+            return await _wrap_async_handler(old_app, *args, **kwargs)
 
         return _sentry_app
 
