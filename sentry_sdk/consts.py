@@ -819,6 +819,12 @@ class SPANDATA:
     Example: GET
     """
 
+    HTTP_REQUEST_BODY_DATA = "http.request.body.data"
+    """
+    HTTP request body data. Can be given as string or structural data of any format.
+    Example: "[{\"role\": \"user\", \"message\": \"hello\"}]"
+    """
+
     HTTP_REQUEST_METHOD = "http.request.method"
     """
     The HTTP method used.
