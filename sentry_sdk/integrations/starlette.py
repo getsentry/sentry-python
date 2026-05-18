@@ -47,9 +47,9 @@ try:
     import starlette  # type: ignore
     from starlette import __version__ as STARLETTE_VERSION
     from starlette.applications import Starlette  # type: ignore
-    from starlette.datastructures import (
+    from starlette.datastructures import (  # type: ignore
         FormData,
-        UploadFile,  # type: ignore
+        UploadFile,
     )
     from starlette.middleware import Middleware  # type: ignore
     from starlette.middleware.authentication import (  # type: ignore
@@ -561,7 +561,9 @@ def _serialize_cached_request_body_attribute(
     return json.dumps(form_data)
 
 
-async def _wrap_async_handler(handler, *args: "Any", **kwargs: "Any") -> "Any":
+async def _wrap_async_handler(
+    handler: "Callable[..., Awaitable[Any]]", *args: "Any", **kwargs: "Any"
+) -> "Any":
     """
     Wraps an asynchronous handler function to attach request info to the server segment span.
     The request body cached on the ASGI scope is attached to streamed spans, but consuming the request body in the event
