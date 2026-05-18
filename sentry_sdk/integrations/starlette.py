@@ -503,14 +503,14 @@ def _patch_json_request_body_accessor() -> None:
     _original_json = Request.json
 
     @functools.wraps(_original_json)
-    async def sentry_json(self: "Request", *args: "Any", **kwargs: "Any") -> "Any":
+    async def wrapped_json(self: "Request", *args: "Any", **kwargs: "Any") -> "Any":
         request_json = await _original_json(self, *args, **kwargs)
         self.scope.setdefault("state", {})[_SCOPE_STATE_JSON_REQUEST_BODY_KEY] = (
             request_json
         )
         return request_json
 
-    Request.json = sentry_json
+    Request.json = wrapped_json
 
 
 def _patch_formdata_request_body_accessor() -> None:
@@ -518,17 +518,22 @@ def _patch_formdata_request_body_accessor() -> None:
     Caches request body data on the ASGI scope, so that the body can be attached to telemetry after the request handler runs.
     Without the cache, consuming the stream can cause the application to hang.
     """
-    _original_form = Request.form
+    if not hasattr(Request, "_get_form"):
+        return
+
+    _original_form = Request._get_form
 
     @functools.wraps(_original_form)
-    async def sentry_form(self: "Request", *args: "Any", **kwargs: "Any") -> "FormData":
+    async def wrapped_form(
+        self: "Request", *args: "Any", **kwargs: "Any"
+    ) -> "FormData":
         request_formdata = await _original_form(self, *args, **kwargs)
         self.scope.setdefault("state", {})[_SCOPE_STATE_FORMDATA_REQUEST_BODY_KEY] = (
             request_formdata
         )
         return request_formdata
 
-    Request.form = sentry_form
+    Request._get_form = wrapped_form
 
 
 def _serialize_cached_request_body_attribute(
