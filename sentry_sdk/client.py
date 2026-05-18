@@ -1214,7 +1214,7 @@ class _Client(BaseClient):
                 # Spans can't be dropped in before_send_span by design. They can
                 # be altered though (e.g. to sanitize). Only allow changes to
                 # name and attributes.
-                if isinstance(serialized, dict) and serialized and "name" in serialized:
+                if isinstance(serialized, dict) and "name" in serialized:
                     telemetry.name = serialized["name"]  # type: ignore[typeddict-item]
                     telemetry._attributes = {}
                     for k, v in (serialized.get("attributes") or {}).items():
