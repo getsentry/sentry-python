@@ -537,14 +537,19 @@ def _serialize_cached_request_body_attribute(
     """
     Returns a stringified JSON representation of the request body if the request body is cached on the ASGI scope and within size bounds.
     """
+    scope_state = request.scope.get("state", {})
     if (
         "content-length" not in request.headers
-        or _SCOPE_STATE_JSON_REQUEST_BODY_KEY not in request.scope["state"]
-        and _SCOPE_STATE_FORMDATA_REQUEST_BODY_KEY not in request.scope["state"]
+        or _SCOPE_STATE_JSON_REQUEST_BODY_KEY not in scope_state
+        and _SCOPE_STATE_FORMDATA_REQUEST_BODY_KEY not in scope_state
     ):
         return None
 
-    content_length = int(request.headers["content-length"])
+    try:
+        content_length = int(request.headers["content-length"])
+    except ValueError:
+        return None
+
     if content_length and not request_body_within_bounds(client, content_length):
         return OVER_SIZE_LIMIT_SUBSTITUTE
 
