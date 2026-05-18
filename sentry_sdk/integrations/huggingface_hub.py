@@ -5,7 +5,11 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.ai.monitoring import record_token_usage
-from sentry_sdk.ai.utils import _set_span_data_attribute, set_data_normalized
+from sentry_sdk.ai.utils import (
+    _set_span_data_attribute,
+    get_start_span_function,
+    set_data_normalized,
+)
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
@@ -97,7 +101,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                 },
             )
         else:
-            span = sentry_sdk.start_span(
+            span = get_start_span_function()(
                 op=op,
                 name=f"{operation_name} {model}",
                 origin=HuggingfaceHubIntegration.origin,

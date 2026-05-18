@@ -25,6 +25,7 @@ from sentry_sdk.ai._openai_responses_api import (
 )
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import (
+    get_start_span_function,
     normalize_message_roles,
     set_data_normalized,
     truncate_and_annotate_embedding_inputs,
@@ -713,7 +714,7 @@ def _new_sync_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
 
     model = kwargs.get("model")
 
-    span = sentry_sdk.start_span(
+    span = get_start_span_function()(
         op=consts.OP.GEN_AI_CHAT,
         name=f"chat {model}",
         origin=OpenAIIntegration.origin,
@@ -781,7 +782,7 @@ async def _new_async_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") ->
 
     model = kwargs.get("model")
 
-    span = sentry_sdk.start_span(
+    span = get_start_span_function()(
         op=consts.OP.GEN_AI_CHAT,
         name=f"chat {model}",
         origin=OpenAIIntegration.origin,
@@ -1177,7 +1178,7 @@ def _new_sync_embeddings_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
 
     model = kwargs.get("model")
 
-    with sentry_sdk.start_span(
+    with get_start_span_function()(
         op=consts.OP.GEN_AI_EMBEDDINGS,
         name=f"embeddings {model}",
         origin=OpenAIIntegration.origin,
@@ -1209,7 +1210,7 @@ async def _new_async_embeddings_create(
 
     model = kwargs.get("model")
 
-    with sentry_sdk.start_span(
+    with get_start_span_function()(
         op=consts.OP.GEN_AI_EMBEDDINGS,
         name=f"embeddings {model}",
         origin=OpenAIIntegration.origin,
@@ -1263,7 +1264,7 @@ def _new_sync_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any"
 
     model = kwargs.get("model")
 
-    span = sentry_sdk.start_span(
+    span = get_start_span_function()(
         op=consts.OP.GEN_AI_RESPONSES,
         name=f"responses {model}",
         origin=OpenAIIntegration.origin,
@@ -1321,7 +1322,7 @@ async def _new_async_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -
 
     model = kwargs.get("model")
 
-    span = sentry_sdk.start_span(
+    span = get_start_span_function()(
         op=consts.OP.GEN_AI_RESPONSES,
         name=f"responses {model}",
         origin=OpenAIIntegration.origin,
