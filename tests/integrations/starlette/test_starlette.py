@@ -21,13 +21,7 @@ from starlette.exceptions import HTTPException
 from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
-from starlette.requests import Request
 from starlette.testclient import TestClient
-
-try:
-    from starlette.middleware.exceptions import ExceptionMiddleware
-except ImportError:
-    from starlette.exceptions import ExceptionMiddleware
 
 import sentry_sdk
 from sentry_sdk import capture_message, get_baggage, get_traceparent
@@ -279,31 +273,6 @@ class SamplePartialReceiveSendMiddleware:
         await self.app(scope, partial_receive, partial_send)
 
 
-@pytest.fixture(autouse=True)
-def reset_starlette_integration(uninstall_integration):
-    original_request_json = Request.json
-    original_request_form = Request.form
-    original_starlette_call = starlette.applications.Starlette.__call__
-    original_request_response = starlette.routing.request_response
-    original_middleware_init = Middleware.__init__
-    original_authentication_call = AuthenticationMiddleware.__call__
-    original_exception_middleware_init = ExceptionMiddleware.__init__
-    original_exception_middleware_call = ExceptionMiddleware.__call__
-
-    yield
-
-    Request.json = original_request_json
-    Request.form = original_request_form
-    starlette.applications.Starlette.__call__ = original_starlette_call
-    starlette.routing.request_response = original_request_response
-    Middleware.__init__ = original_middleware_init
-    AuthenticationMiddleware.__call__ = original_authentication_call
-    ExceptionMiddleware.__init__ = original_exception_middleware_init
-    ExceptionMiddleware.__call__ = original_exception_middleware_call
-
-    uninstall_integration("starlette")
-
-
 @pytest.mark.asyncio
 @pytest.mark.parametrize("span_streaming", [True, False])
 async def test_request_info_json_body(
@@ -375,10 +344,6 @@ async def test_request_info_json_body(
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif(
-    STARLETTE_VERSION < (0, 24),
-    reason="Patched `_get_form()` was added in version 0.24 with https://github.com/Kludex/starlette/commit/c568b55dff8be94b9c917e186e512ab53d7310e1",
-)
 @pytest.mark.parametrize("span_streaming", [True, False])
 async def test_formdata_request_body(
     sentry_init, capture_events, capture_items, span_streaming
@@ -460,10 +425,6 @@ async def test_formdata_request_body(
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif(
-    STARLETTE_VERSION < (0, 24),
-    reason="Patched `_get_form()` was added in version 0.24 with https://github.com/Kludex/starlette/commit/c568b55dff8be94b9c917e186e512ab53d7310e1",
-)
 @pytest.mark.parametrize("span_streaming", [True, False])
 async def test_request_body_too_big(
     sentry_init, capture_events, capture_items, span_streaming

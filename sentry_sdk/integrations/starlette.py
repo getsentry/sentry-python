@@ -48,7 +48,6 @@ try:
     from starlette import __version__ as STARLETTE_VERSION
     from starlette.applications import Starlette  # type: ignore
     from starlette.datastructures import (  # type: ignore
-        FormData,
         UploadFile,
     )
     from starlette.middleware import Middleware  # type: ignore
@@ -91,9 +90,6 @@ else:
 _DEFAULT_TRANSACTION_NAME = "generic Starlette request"
 
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
-
-_SCOPE_STATE_JSON_REQUEST_BODY_KEY = "sentry_sdk.json_request_body"
-_SCOPE_STATE_FORMDATA_REQUEST_BODY_KEY = "sentry_sdk.formdata_request_body"
 
 
 class StarletteIntegration(Integration):
@@ -152,16 +148,6 @@ class StarletteIntegration(Integration):
 
         if version >= (0, 24):
             patch_templates()
-
-    def setup_once_with_options(
-        self: "StarletteIntegration", options: "Optional[dict[str, Any]]" = None
-    ) -> None:
-        is_span_streaming_enabled = has_span_streaming_enabled(options)
-        if not is_span_streaming_enabled:
-            return
-
-        _patch_json_request_body_accessor()
-        _patch_formdata_request_body_accessor()
 
 
 def _enable_span_for_middleware(middleware_class: "Any") -> type:
@@ -495,61 +481,13 @@ def _is_async_callable(obj: "Any") -> bool:
     )
 
 
-def _patch_json_request_body_accessor() -> None:
-    """
-    Caches request body data on the ASGI scope, so that the body can be attached to telemetry after the request handler runs.
-    Without the cache, consuming the stream causes applications to hang when middleware or handlers consume the raw
-    `receive()` callable exposed by Starlette.
-    """
-    _original_json = Request.json
-
-    @functools.wraps(_original_json)
-    async def wrapped_json(self: "Request", *args: "Any", **kwargs: "Any") -> "Any":
-        request_json = await _original_json(self, *args, **kwargs)
-        self.scope.setdefault("state", {})[_SCOPE_STATE_JSON_REQUEST_BODY_KEY] = (
-            request_json
-        )
-        return request_json
-
-    Request.json = wrapped_json
-
-
-def _patch_formdata_request_body_accessor() -> None:
-    """
-    Caches request body data on the ASGI scope, so that the body can be attached to telemetry after the request handler runs.
-    Without the cache, consuming the stream causes applications to hang when middleware or handlers consume the raw
-    `receive()` callable exposed by Starlette.
-    """
-    if not hasattr(Request, "_get_form"):
-        return
-
-    _original_form = Request._get_form
-
-    @functools.wraps(_original_form)
-    async def wrapped_form(
-        self: "Request", *args: "Any", **kwargs: "Any"
-    ) -> "FormData":
-        request_formdata = await _original_form(self, *args, **kwargs)
-        self.scope.setdefault("state", {})[_SCOPE_STATE_FORMDATA_REQUEST_BODY_KEY] = (
-            request_formdata
-        )
-        return request_formdata
-
-    Request._get_form = wrapped_form
-
-
-def _serialize_cached_request_body_attribute(
+def _get_cached_request_body_attribute(
     client: "sentry_sdk.client.BaseClient", request: "Request"
 ) -> "Optional[str]":
     """
-    Returns a stringified JSON representation of the request body if the request body is cached on the ASGI scope and within size bounds.
+    Returns a stringified JSON representation of the request body if the request body is cached and within size bounds.
     """
-    scope_state = request.scope.get("state", {})
-    if (
-        "content-length" not in request.headers
-        or _SCOPE_STATE_JSON_REQUEST_BODY_KEY not in scope_state
-        and _SCOPE_STATE_FORMDATA_REQUEST_BODY_KEY not in scope_state
-    ):
+    if "content-length" not in request.headers:
         return None
 
     try:
@@ -560,13 +498,16 @@ def _serialize_cached_request_body_attribute(
     if content_length and not request_body_within_bounds(client, content_length):
         return OVER_SIZE_LIMIT_SUBSTITUTE
 
-    if _SCOPE_STATE_JSON_REQUEST_BODY_KEY in request.scope["state"]:
-        return json.dumps(request.scope["state"][_SCOPE_STATE_JSON_REQUEST_BODY_KEY])
+    json_body = getattr(request, "_json", None)
+    if json_body is not None:
+        return json.dumps(json_body)
 
-    form = request.scope["state"][_SCOPE_STATE_FORMDATA_REQUEST_BODY_KEY]
+    formdata_body = getattr(request, "_form", None)
+    if formdata_body is None:
+        return
 
     form_data = {}
-    for key, val in form.items():
+    for key, val in formdata_body.items():
         is_file = isinstance(val, UploadFile)
         form_data[key] = val if not is_file else "[Unparsable]"
 
@@ -627,13 +568,13 @@ async def _wrap_async_handler(
         current_span = _get_current_streamed_span()
 
         if type(current_span) is StreamedSpan:
-            serialized_request_body = _serialize_cached_request_body_attribute(
+            request_body = _get_cached_request_body_attribute(
                 client=client, request=request
             )
-            if serialized_request_body:
+            if request_body:
                 current_span._segment.set_attribute(
                     SPANDATA.HTTP_REQUEST_BODY_DATA,
-                    serialized_request_body,
+                    request_body,
                 )
 
 
