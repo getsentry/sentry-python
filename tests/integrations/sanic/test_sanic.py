@@ -6,15 +6,15 @@ import sys
 from unittest.mock import Mock
 
 import pytest
+from sanic import Sanic, request, response
+from sanic import __version__ as SANIC_VERSION_RAW
+from sanic.exceptions import SanicException
+from sanic.response import HTTPResponse
 
 import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.sanic import SanicIntegration
 from sentry_sdk.tracing import TransactionSource
-
-from sanic import Sanic, request, response, __version__ as SANIC_VERSION_RAW
-from sanic.response import HTTPResponse
-from sanic.exceptions import SanicException
 
 try:
     from sanic_testing import TestManager
@@ -29,7 +29,7 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Container
+    from collections.abc import Container, Iterable
     from typing import Any, Optional
 
 SANIC_VERSION = tuple(map(int, SANIC_VERSION_RAW.split(".")))

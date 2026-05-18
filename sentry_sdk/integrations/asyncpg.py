@@ -54,7 +54,6 @@ class AsyncPGIntegration(Integration):
         asyncpg.Connection.prepare = _wrap_connection_method(asyncpg.Connection.prepare)
 
         BaseCursor._bind_exec = _wrap_cursor_method(BaseCursor._bind_exec)
-        BaseCursor._bind = _wrap_cursor_method(BaseCursor._bind)
         BaseCursor._exec = _wrap_cursor_method(BaseCursor._exec)
 
         asyncpg.connect_utils._connect_addr = _wrap_connect_addr(
@@ -146,7 +145,16 @@ def _wrap_connection_method(
         params_list = args[2] if len(args) > 2 else None
         with _record(None, query, params_list, executemany=executemany) as span:
             _set_db_data(span, args[0])
+
             res = await f(*args, **kwargs)
+
+            if isinstance(span, StreamedSpan):
+                with capture_internal_exceptions():
+                    add_query_source(span)
+
+        if not isinstance(span, StreamedSpan):
+            with capture_internal_exceptions():
+                add_query_source(span)
 
         return res
 
@@ -173,6 +181,14 @@ def _wrap_cursor_method(
         ) as span:
             _set_db_data(span, cursor._connection)
             res = await f(*args, **kwargs)
+
+            if isinstance(span, StreamedSpan):
+                with capture_internal_exceptions():
+                    add_query_source(span)
+
+        if not isinstance(span, StreamedSpan):
+            with capture_internal_exceptions():
+                add_query_source(span)
 
         return res
 

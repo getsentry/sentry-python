@@ -1,19 +1,16 @@
-from abc import ABC, abstractmethod
 import asyncio
 import os
 import threading
-
+from abc import ABC, abstractmethod
 from time import sleep, time
-from sentry_sdk._queue import Queue, FullError
-from sentry_sdk.utils import logger, mark_sentry_task_internal
-from sentry_sdk.consts import DEFAULT_QUEUE_SIZE
-
 from typing import TYPE_CHECKING
 
+from sentry_sdk._queue import FullError, Queue
+from sentry_sdk.consts import DEFAULT_QUEUE_SIZE
+from sentry_sdk.utils import logger, mark_sentry_task_internal
+
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Optional
-    from typing import Callable
+    from typing import Any, Callable, Optional
 
 
 _TERMINATOR = object()

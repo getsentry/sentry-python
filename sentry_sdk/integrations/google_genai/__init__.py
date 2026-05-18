@@ -9,30 +9,29 @@ from typing import (
 
 import sentry_sdk
 from sentry_sdk.ai.utils import get_start_span_function
-from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.tracing import SPANSTATUS
 
-
 try:
-    from google.genai.models import Models, AsyncModels
+    from google.genai.models import AsyncModels, Models
 except ImportError:
     raise DidNotEnable("google-genai not installed")
 
 
-from .consts import IDENTIFIER, ORIGIN, GEN_AI_SYSTEM
+from .consts import GEN_AI_SYSTEM, IDENTIFIER, ORIGIN
+from .streaming import (
+    accumulate_streaming_response,
+    set_span_data_for_streaming_response,
+)
 from .utils import (
-    set_span_data_for_request,
-    set_span_data_for_response,
     _capture_exception,
-    prepare_generate_content_args,
     prepare_embed_content_args,
+    prepare_generate_content_args,
     set_span_data_for_embed_request,
     set_span_data_for_embed_response,
-)
-from .streaming import (
-    set_span_data_for_streaming_response,
-    accumulate_streaming_response,
+    set_span_data_for_request,
+    set_span_data_for_response,
 )
 
 

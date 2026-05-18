@@ -35,10 +35,7 @@ SUCH DAMAGE.
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Dict
-    from typing import Iterator
-    from typing import Tuple
-    from typing import Optional
+    from typing import Dict, Iterator, Optional, Tuple
 
 
 #

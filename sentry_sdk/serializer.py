@@ -1,7 +1,8 @@
-import sys
 import math
+import sys
 from collections.abc import Mapping, Sequence, Set
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sentry_sdk.utils import (
     AnnotatedValue,
@@ -12,19 +13,9 @@ from sentry_sdk.utils import (
     strip_string,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from types import TracebackType
-
-    from typing import Any
-    from typing import Callable
-    from typing import ContextManager
-    from typing import Dict
-    from typing import List
-    from typing import Optional
-    from typing import Type
-    from typing import Union
+    from typing import Any, Callable, ContextManager, Dict, List, Optional, Type, Union
 
     from sentry_sdk._types import NotImplementedType
 

@@ -1,5 +1,5 @@
 import json
-from typing import List, Optional, Any, Iterator
+from typing import Any, Iterator, List, Optional
 from unittest import mock
 from unittest.mock import Mock, patch
 
@@ -12,37 +12,39 @@ try:
     from langchain_openai import ChatOpenAI, OpenAI
 except ImportError:
     # Langchain < 0.2
-    from langchain_community.llms import OpenAI
     from langchain_community.chat_models import ChatOpenAI
+    from langchain_community.llms import OpenAI
 
 from langchain_core.callbacks import BaseCallbackManager, CallbackManagerForLLMRun
-from langchain_core.messages import BaseMessage, AIMessageChunk
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import AIMessageChunk, BaseMessage
 from langchain_core.outputs import ChatGenerationChunk, ChatResult
 from langchain_core.runnables import RunnableConfig
-from langchain_core.language_models.chat_models import BaseChatModel
 
 import sentry_sdk
 from sentry_sdk import start_transaction
-from sentry_sdk.utils import package_version
 from sentry_sdk.integrations.langchain import (
     LangchainIntegration,
     SentryLangchainCallback,
     _transform_langchain_content_block,
     _transform_langchain_message_content,
 )
+from sentry_sdk.utils import package_version
 
 try:
     # langchain v1+
-    from langchain.tools import tool
     from langchain.agents import create_agent
-    from langchain_classic.agents import AgentExecutor, create_openai_tools_agent  # type: ignore[import-not-found]
+    from langchain.tools import tool
+    from langchain_classic.agents import (  # type: ignore[import-not-found]
+        AgentExecutor,
+        create_openai_tools_agent,
+    )
 except ImportError:
     # langchain <v1
-    from langchain.agents import tool, AgentExecutor, create_openai_tools_agent
+    from langchain.agents import AgentExecutor, create_openai_tools_agent, tool
 
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, SystemMessage
-
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from openai.types.chat.chat_completion_chunk import (
     ChatCompletionChunk,
     Choice,
@@ -50,14 +52,11 @@ from openai.types.chat.chat_completion_chunk import (
     ChoiceDeltaToolCall,
     ChoiceDeltaToolCallFunction,
 )
-
 from openai.types.completion import Completion
 from openai.types.completion_choice import CompletionChoice
-
 from openai.types.completion_usage import (
     CompletionUsage,
 )
-
 from openai.types.responses import (
     ResponseUsage,
 )
@@ -577,6 +576,9 @@ def test_langchain_create_agent(
             agent.invoke(
                 {
                     "messages": [
+                        HumanMessage(
+                            content="Message demonstrating the absence of truncation."
+                        ),
                         HumanMessage(content="How many letters in the word eudca"),
                     ],
                 },
@@ -605,6 +607,19 @@ def test_langchain_create_agent(
                 chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
                 == "Hello, how can I help you?"
             )
+
+            assert json.loads(
+                chat_spans[0]["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            ) == [
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {
+                    "role": "user",
+                    "content": "How many letters in the word eudca",
+                },
+            ]
 
             param_id = request.node.callspec.id
             if "string" in param_id:
@@ -1343,7 +1358,16 @@ def test_langchain_openai_tools_agent(
             "send",
             side_effect=[tool_response, final_response],
         ) as _, start_transaction():
-            list(agent_executor.stream({"input": "How many letters in the word eudca"}))
+            list(
+                agent_executor.stream(
+                    {
+                        "input": [
+                            "Message demonstrating the absence of truncation.",
+                            "How many letters in the word eudca",
+                        ]
+                    }
+                )
+            )
 
         tx = next(item.payload for item in items if item.type == "transaction")
         assert tx["type"] == "transaction"
@@ -1388,6 +1412,15 @@ def test_langchain_openai_tools_agent(
         assert "5" in chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
         assert "word" in tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_INPUT]
         assert 5 == int(tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_OUTPUT])
+
+        assert json.loads(
+            chat_spans[0]["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        ) == [
+            {
+                "role": "user",
+                "content": "['Message demonstrating the absence of truncation.', 'How many letters in the word eudca']",
+            }
+        ]
 
         param_id = request.node.callspec.id
         if "string" in param_id:
@@ -2011,7 +2044,12 @@ def test_langchain_openai_tools_agent_stream(
         ) as _, start_transaction():
             list(
                 agent_executor.stream(
-                    {"input": "How many letters in the word eudca"},
+                    {
+                        "input": [
+                            "Message demonstrating the absence of truncation.",
+                            "How many letters in the word eudca",
+                        ]
+                    },
                     {"run_name": "my-snazzy-pipeline"},
                 )
             )
@@ -2064,6 +2102,15 @@ def test_langchain_openai_tools_agent_stream(
         assert "5" in chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
         assert "word" in tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_INPUT]
         assert 5 == int(tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_OUTPUT])
+
+        assert json.loads(
+            chat_spans[0]["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        ) == [
+            {
+                "role": "user",
+                "content": "['Message demonstrating the absence of truncation.', 'How many letters in the word eudca']",
+            }
+        ]
 
         param_id = request.node.callspec.id
         if "string" in param_id:
@@ -2943,22 +2990,16 @@ def test_langchain_message_role_normalization_units():
     assert normalized[5] == "string message"  # String message unchanged
 
 
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
-def test_langchain_message_truncation(
-    sentry_init,
-    capture_events,
-    capture_items,
-    stream_gen_ai_spans,
-):
+def test_langchain_message_truncation(sentry_init, capture_events):
     """Test that large messages are truncated properly in Langchain integration."""
-    from langchain_core.outputs import LLMResult, Generation
+    from langchain_core.outputs import Generation, LLMResult
 
     sentry_init(
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
     )
+    events = capture_events()
 
     callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
 
@@ -2976,101 +3017,48 @@ def test_langchain_message_truncation(
         "small message 5",
     ]
 
-    if stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    with start_transaction():
+        callback.on_llm_start(
+            serialized=serialized,
+            prompts=prompts,
+            run_id=run_id,
+            name="my_pipeline",
+            invocation_params={
+                "temperature": 0.7,
+                "max_tokens": 100,
+                "model": "gpt-3.5-turbo",
+            },
+        )
 
-        with start_transaction():
-            callback.on_llm_start(
-                serialized=serialized,
-                prompts=prompts,
-                run_id=run_id,
-                name="my_pipeline",
-                invocation_params={
-                    "temperature": 0.7,
-                    "max_tokens": 100,
-                    "model": "gpt-3.5-turbo",
-                },
-            )
+        response = LLMResult(
+            generations=[[Generation(text="The response")]],
+            llm_output={
+                "token_usage": {
+                    "total_tokens": 25,
+                    "prompt_tokens": 10,
+                    "completion_tokens": 15,
+                }
+            },
+        )
+        callback.on_llm_end(response=response, run_id=run_id)
 
-            response = LLMResult(
-                generations=[[Generation(text="The response")]],
-                llm_output={
-                    "token_usage": {
-                        "total_tokens": 25,
-                        "prompt_tokens": 10,
-                        "completion_tokens": 15,
-                    }
-                },
-            )
-            callback.on_llm_end(response=response, run_id=run_id)
+    assert len(events) > 0
+    tx = events[0]
+    assert tx["type"] == "transaction"
 
-        tx = next(item.payload for item in items if item.type == "transaction")
-        assert tx["type"] == "transaction"
+    llm_spans = [
+        span
+        for span in tx.get("spans", [])
+        if span.get("op") == "gen_ai.text_completion"
+    ]
+    assert len(llm_spans) > 0
 
-        spans = [item.payload for item in items if item.type == "span"]
-        llm_spans = [
-            span
-            for span in spans
-            if span["attributes"].get("sentry.op") == "gen_ai.text_completion"
-        ]
+    llm_span = llm_spans[0]
+    assert llm_span["data"]["gen_ai.operation.name"] == "text_completion"
+    assert llm_span["data"][SPANDATA.GEN_AI_FUNCTION_ID] == "my_pipeline"
 
-        assert len(llm_spans) > 0
-
-        llm_span = llm_spans[0]
-
-        assert llm_span["attributes"]["gen_ai.operation.name"] == "text_completion"
-        assert llm_span["attributes"][SPANDATA.GEN_AI_FUNCTION_ID] == "my_pipeline"
-
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in llm_span["attributes"]
-        messages_data = llm_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-    else:
-        events = capture_events()
-
-        with start_transaction():
-            callback.on_llm_start(
-                serialized=serialized,
-                prompts=prompts,
-                run_id=run_id,
-                name="my_pipeline",
-                invocation_params={
-                    "temperature": 0.7,
-                    "max_tokens": 100,
-                    "model": "gpt-3.5-turbo",
-                },
-            )
-
-            response = LLMResult(
-                generations=[[Generation(text="The response")]],
-                llm_output={
-                    "token_usage": {
-                        "total_tokens": 25,
-                        "prompt_tokens": 10,
-                        "completion_tokens": 15,
-                    }
-                },
-            )
-            callback.on_llm_end(response=response, run_id=run_id)
-
-        assert len(events) > 0
-        tx = events[0]
-        assert tx["type"] == "transaction"
-
-        llm_spans = [
-            span
-            for span in tx.get("spans", [])
-            if span.get("op") == "gen_ai.text_completion"
-        ]
-
-        assert len(llm_spans) > 0
-
-        llm_span = llm_spans[0]
-
-        assert llm_span["data"]["gen_ai.operation.name"] == "text_completion"
-        assert llm_span["data"][SPANDATA.GEN_AI_FUNCTION_ID] == "my_pipeline"
-
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in llm_span["data"]
-        messages_data = llm_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in llm_span["data"]
+    messages_data = llm_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
     assert isinstance(messages_data, str)
 
     parsed_messages = json.loads(messages_data)
@@ -3818,7 +3806,7 @@ def test_langchain_embeddings_multiple_providers(
 ):
     """Test that embeddings work with different providers."""
     try:
-        from langchain_openai import OpenAIEmbeddings, AzureOpenAIEmbeddings
+        from langchain_openai import AzureOpenAIEmbeddings, OpenAIEmbeddings
     except ImportError:
         pytest.skip("langchain_openai not installed")
 

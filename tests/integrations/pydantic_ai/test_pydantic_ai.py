@@ -1,10 +1,15 @@
 import asyncio
 import json
-import pytest
+from typing import Annotated
 from unittest.mock import MagicMock
 
-from typing import Annotated
+import pytest
 from pydantic import Field
+from pydantic_ai import Agent
+from pydantic_ai.exceptions import ModelRetry, UnexpectedModelBehavior
+from pydantic_ai.messages import BinaryContent, ImageUrl, UserPromptPart
+from pydantic_ai.models.function import FunctionModel
+from pydantic_ai.usage import RequestUsage
 
 import sentry_sdk
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
@@ -12,11 +17,6 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.pydantic_ai import PydanticAIIntegration
 from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
 from sentry_sdk.integrations.pydantic_ai.spans.utils import _set_usage_data
-from pydantic_ai import Agent
-from pydantic_ai.messages import BinaryContent, ImageUrl, UserPromptPart
-from pydantic_ai.usage import RequestUsage
-from pydantic_ai.exceptions import ModelRetry, UnexpectedModelBehavior
-from pydantic_ai.models.function import FunctionModel
 
 
 @pytest.fixture
@@ -76,7 +76,9 @@ async def test_agent_run_async(
     if stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
-        result = await test_agent.run("Test input")
+        result = await test_agent.run(
+            ["Message demonstrating the absence of truncation.", "Test input"]
+        )
 
         assert result is not None
         assert result.output is not None
@@ -102,7 +104,23 @@ async def test_agent_run_async(
         assert "chat" in chat_span["name"]
         assert chat_span["attributes"]["gen_ai.operation.name"] == "chat"
         assert chat_span["attributes"]["gen_ai.response.streaming"] is False
-        assert "gen_ai.request.messages" in chat_span["attributes"]
+        assert json.loads(
+            chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        ) == [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Message demonstrating the absence of truncation.",
+                    },
+                    {
+                        "type": "text",
+                        "text": "Test input",
+                    },
+                ],
+            }
+        ]
         assert "gen_ai.usage.input_tokens" in chat_span["attributes"]
         assert "gen_ai.usage.output_tokens" in chat_span["attributes"]
     else:
@@ -275,7 +293,9 @@ def test_agent_run_sync(
     if stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
-        result = test_agent.run_sync("Test input")
+        result = test_agent.run_sync(
+            ["Message demonstrating the absence of truncation.", "Test input"]
+        )
 
         assert result is not None
         assert result.output is not None
@@ -394,7 +414,9 @@ async def test_agent_run_stream(
     if stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
-        async with test_agent.run_stream("Test input") as result:
+        async with test_agent.run_stream(
+            ["Message demonstrating the absence of truncation.", "Test input"]
+        ) as result:
             # Consume the stream
             async for _ in result.stream_output():
                 pass
@@ -416,7 +438,23 @@ async def test_agent_run_stream(
         # Verify streaming flag is True for streaming
         for chat_span in chat_spans:
             assert chat_span["attributes"]["gen_ai.response.streaming"] is True
-            assert "gen_ai.request.messages" in chat_span["attributes"]
+            assert json.loads(
+                chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            ) == [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        },
+                        {
+                            "type": "text",
+                            "text": "Test input",
+                        },
+                    ],
+                }
+            ]
             assert "gen_ai.usage.input_tokens" in chat_span["attributes"]
             # Streaming responses should still have output data
             assert (
@@ -479,7 +517,9 @@ async def test_agent_run_stream_events(
     if stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
-        async for _ in test_agent.run_stream_events("Test input"):
+        async for _ in test_agent.run_stream_events(
+            ["Message demonstrating the absence of truncation.", "Test input"]
+        ):
             pass
 
         # Verify transaction
@@ -1709,9 +1749,11 @@ async def test_mcp_tool_execution_spans(
     pytest.importorskip("mcp")
 
     from unittest.mock import MagicMock
-    from pydantic_ai.mcp import MCPServerStdio
+
     from pydantic_ai import Agent
+    from pydantic_ai.mcp import MCPServerStdio
     from pydantic_ai.toolsets.combined import CombinedToolset
+
     import sentry_sdk
 
     # Create mock MCP server
@@ -1787,8 +1829,8 @@ async def test_mcp_tool_execution_spans(
 
             # Create a mock tool that simulates an MCP tool from CombinedToolset
             from pydantic_ai._run_context import RunContext
-            from pydantic_ai.result import RunUsage
             from pydantic_ai.models.test import TestModel
+            from pydantic_ai.result import RunUsage
             from pydantic_ai.toolsets.combined import _CombinedToolsetTool
 
             ctx = RunContext(
@@ -1838,8 +1880,8 @@ async def test_mcp_tool_execution_spans(
 
             # Create a mock tool that simulates an MCP tool from CombinedToolset
             from pydantic_ai._run_context import RunContext
-            from pydantic_ai.result import RunUsage
             from pydantic_ai.models.test import TestModel
+            from pydantic_ai.result import RunUsage
             from pydantic_ai.toolsets.combined import _CombinedToolsetTool
 
             ctx = RunContext(
@@ -2189,6 +2231,7 @@ async def test_model_name_extraction_with_callable(sentry_init, capture_items):
     Test model name extraction when model has a callable name() method.
     """
     from unittest.mock import MagicMock
+
     from sentry_sdk.integrations.pydantic_ai.utils import _get_model_name
 
     sentry_init(
@@ -2215,6 +2258,7 @@ async def test_model_name_extraction_fallback_to_str(sentry_init, capture_items)
     Test model name extraction falls back to str() when no name attribute exists.
     """
     from unittest.mock import MagicMock
+
     from sentry_sdk.integrations.pydantic_ai.utils import _get_model_name
 
     sentry_init(
@@ -2241,8 +2285,9 @@ async def test_model_settings_object_style(sentry_init, capture_items):
     """
     Test that object-style model settings (non-dict) are handled correctly.
     """
-    import sentry_sdk
     from unittest.mock import MagicMock
+
+    import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.utils import _set_model_data
 
     sentry_init(
@@ -2662,8 +2707,9 @@ async def test_model_response_without_parts(sentry_init, capture_items):
     """
     Test handling of model response without parts attribute.
     """
-    import sentry_sdk
     from unittest.mock import MagicMock
+
+    import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_output_data
 
     sentry_init(
@@ -2722,8 +2768,9 @@ async def test_available_tools_error_handling(sentry_init, capture_items):
     """
     Test that _set_available_tools handles errors gracefully.
     """
-    import sentry_sdk
     from unittest.mock import MagicMock
+
+    import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.utils import _set_available_tools
 
     sentry_init(
@@ -2777,8 +2824,9 @@ async def test_set_usage_data_with_partial_fields(sentry_init, capture_items):
     """
     Test that _set_usage_data handles usage with only some fields.
     """
-    import sentry_sdk
     from unittest.mock import MagicMock
+
+    import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_usage_data
 
     sentry_init(
@@ -2865,8 +2913,9 @@ async def test_message_parts_with_list_content(sentry_init, capture_items):
     """
     Test that message parts with list content are handled correctly.
     """
-    import sentry_sdk
     from unittest.mock import MagicMock
+
+    import sentry_sdk
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -2900,8 +2949,9 @@ async def test_output_data_with_text_and_tool_calls(sentry_init, capture_items):
     """
     Test that _set_output_data handles both text and tool calls in response.
     """
-    import sentry_sdk
     from unittest.mock import MagicMock
+
+    import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_output_data
 
     sentry_init(
@@ -2939,8 +2989,9 @@ async def test_output_data_error_handling(sentry_init, capture_items):
     """
     Test that _set_output_data handles errors in formatting gracefully.
     """
-    import sentry_sdk
     from unittest.mock import MagicMock
+
+    import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_output_data
 
     sentry_init(
@@ -2971,9 +3022,11 @@ async def test_message_with_system_prompt_part(sentry_init, capture_items):
     """
     Test that SystemPromptPart is handled with correct role.
     """
-    import sentry_sdk
     from unittest.mock import MagicMock
+
     from pydantic_ai import messages
+
+    import sentry_sdk
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -3007,8 +3060,9 @@ async def test_message_with_instructions(sentry_init, capture_items):
     """
     Test that messages with instructions field are handled correctly.
     """
-    import sentry_sdk
     from unittest.mock import MagicMock
+
+    import sentry_sdk
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -3068,8 +3122,9 @@ async def test_set_output_data_without_prompts(sentry_init, capture_items):
     """
     Test that _set_output_data respects _should_send_prompts().
     """
-    import sentry_sdk
     from unittest.mock import MagicMock
+
+    import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_output_data
 
     sentry_init(
@@ -3098,6 +3153,7 @@ async def test_get_model_name_with_exception_in_callable(sentry_init, capture_it
     Test that _get_model_name handles exceptions in name() callable.
     """
     from unittest.mock import MagicMock
+
     from sentry_sdk.integrations.pydantic_ai.utils import _get_model_name
 
     sentry_init(
@@ -3159,8 +3215,9 @@ async def test_set_model_data_with_system(sentry_init, capture_items):
     """
     Test that _set_model_data captures system from model.
     """
-    import sentry_sdk
     from unittest.mock import MagicMock
+
+    import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.utils import _set_model_data
 
     sentry_init(
@@ -3190,8 +3247,9 @@ async def test_set_model_data_from_agent_scope(sentry_init, capture_items):
     """
     Test that _set_model_data retrieves model from agent in scope when not passed.
     """
-    import sentry_sdk
     from unittest.mock import MagicMock
+
+    import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.utils import _set_model_data
 
     sentry_init(
@@ -3299,8 +3357,9 @@ async def test_set_agent_data_from_scope(sentry_init, capture_items):
     """
     Test that _set_agent_data retrieves agent from scope when not passed.
     """
-    import sentry_sdk
     from unittest.mock import MagicMock
+
+    import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.utils import _set_agent_data
 
     sentry_init(
@@ -3331,8 +3390,9 @@ async def test_set_agent_data_without_name(sentry_init, capture_items):
     """
     Test that _set_agent_data handles agent without name attribute.
     """
-    import sentry_sdk
     from unittest.mock import MagicMock
+
+    import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.utils import _set_agent_data
 
     sentry_init(
@@ -3361,8 +3421,9 @@ async def test_set_available_tools_without_toolset(sentry_init, capture_items):
     """
     Test that _set_available_tools handles agent without toolset.
     """
-    import sentry_sdk
     from unittest.mock import MagicMock
+
+    import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.utils import _set_available_tools
 
     sentry_init(
@@ -3391,8 +3452,9 @@ async def test_set_available_tools_with_schema(sentry_init, capture_items):
     """
     Test that _set_available_tools extracts tool schema correctly.
     """
-    import sentry_sdk
     from unittest.mock import MagicMock
+
+    import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.utils import _set_available_tools
 
     sentry_init(
@@ -3607,8 +3669,9 @@ async def test_invoke_agent_span_with_callable_instruction(sentry_init, capture_
     """
     Test that invoke_agent_span skips callable instructions correctly.
     """
-    import sentry_sdk
     from unittest.mock import MagicMock
+
+    import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.spans.invoke_agent import invoke_agent_span
 
     sentry_init(
@@ -3640,8 +3703,9 @@ async def test_invoke_agent_span_with_string_instructions(sentry_init, capture_i
     """
     Test that invoke_agent_span handles string instructions (not list).
     """
-    import sentry_sdk
     from unittest.mock import MagicMock
+
+    import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.spans.invoke_agent import invoke_agent_span
 
     sentry_init(
@@ -3696,8 +3760,9 @@ async def test_ai_client_span_gets_agent_from_scope(sentry_init, capture_items):
     """
     Test that ai_client_span gets agent from scope when not passed.
     """
-    import sentry_sdk
     from unittest.mock import MagicMock
+
+    import sentry_sdk
     from sentry_sdk.integrations.pydantic_ai.spans.ai_client import ai_client_span
 
     sentry_init(

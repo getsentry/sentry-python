@@ -1,6 +1,7 @@
 import sys
 
 import pytest
+
 from sentry_sdk.types import Event, Hint
 
 

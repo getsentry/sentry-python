@@ -410,12 +410,6 @@ async def test_cursor_manual(sentry_init, capture_events) -> None:
             "message": "SELECT * FROM users WHERE dob > $1",
             "type": "default",
         },
-        {
-            "category": "query",
-            "data": {"db.cursor": mock.ANY},
-            "message": "SELECT * FROM users WHERE dob > $1",
-            "type": "default",
-        },
         {"category": "query", "data": {}, "message": "COMMIT;", "type": "default"},
     ]
 
@@ -553,7 +547,7 @@ async def test_query_source_disabled(
 
     if span_streaming:
         items = capture_items("span")
-        with sentry_sdk.traces.start_span(name="test_transaction"):
+        with sentry_sdk.traces.start_span(name="test_segment"):
             conn: Connection = await connect(PG_CONNECTION_URI)
 
             await conn.execute(
@@ -571,7 +565,7 @@ async def test_query_source_disabled(
         insert_span = spans[1]
         segment = spans[2]
 
-        assert segment["name"] == "test_transaction"
+        assert segment["name"] == "test_segment"
         assert insert_span["name"].startswith("INSERT INTO")
         assert connect_span["name"] == "connect"
         data = insert_span.get("attributes", {})
@@ -619,7 +613,7 @@ async def test_query_source_enabled(
 
     if span_streaming:
         items = capture_items("span")
-        with sentry_sdk.traces.start_span(name="test_transaction"):
+        with sentry_sdk.traces.start_span(name="test_segment"):
             conn: Connection = await connect(PG_CONNECTION_URI)
 
             await conn.execute(
@@ -637,7 +631,7 @@ async def test_query_source_enabled(
         insert_span = spans[1]
         segment = spans[2]
 
-        assert segment["name"] == "test_transaction"
+        assert segment["name"] == "test_segment"
         assert insert_span["name"].startswith("INSERT INTO")
         assert connect_span["name"] == "connect"
         data = insert_span.get("attributes", {})
@@ -682,7 +676,7 @@ async def test_query_source(sentry_init, capture_events, capture_items, span_str
 
     if span_streaming:
         items = capture_items("span")
-        with sentry_sdk.traces.start_span(name="test_transaction"):
+        with sentry_sdk.traces.start_span(name="test_segment"):
             conn: Connection = await connect(PG_CONNECTION_URI)
 
             await conn.execute(
@@ -700,7 +694,7 @@ async def test_query_source(sentry_init, capture_events, capture_items, span_str
         insert_span = spans[1]
         segment = spans[2]
 
-        assert segment["name"] == "test_transaction"
+        assert segment["name"] == "test_segment"
         assert insert_span["name"].startswith("INSERT INTO")
         assert connect_span["name"] == "connect"
         data = insert_span.get("attributes", {})
@@ -743,7 +737,10 @@ async def test_query_source(sentry_init, capture_events, capture_items, span_str
 
 
 @pytest.mark.asyncio
-async def test_query_source_with_module_in_search_path(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_query_source_with_module_in_search_path(
+    sentry_init, capture_events, capture_items, span_streaming
+):
     """
     Test that query source is relative to the path of the module it ran in
     """
@@ -752,40 +749,71 @@ async def test_query_source_with_module_in_search_path(sentry_init, capture_even
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
     )
-
-    events = capture_events()
 
     from asyncpg_helpers.helpers import execute_query_in_connection
 
-    with start_transaction(name="test_transaction", sampled=True):
-        conn: Connection = await connect(PG_CONNECTION_URI)
+    if span_streaming:
+        items = capture_items("span")
+        with sentry_sdk.traces.start_span(name="test_segment"):
+            conn: Connection = await connect(PG_CONNECTION_URI)
 
-        await execute_query_in_connection(
-            "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
-            conn,
-        )
+            await execute_query_in_connection(
+                "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
+                conn,
+            )
 
-        await conn.close()
+            await conn.close()
+        sentry_sdk.flush()
 
-    (event,) = events
+        spans = [item.payload for item in items]
 
-    span = event["spans"][-1]
-    assert span["description"].startswith("INSERT INTO")
+        assert len(spans) == 3
 
-    data = span.get("data", {})
+        connect_span = spans[0]
+        insert_span = spans[1]
+        segment = spans[2]
 
-    assert SPANDATA.CODE_LINENO in data
+        assert segment["name"] == "test_segment"
+        assert insert_span["name"].startswith("INSERT INTO")
+        assert connect_span["name"] == "connect"
+        data = insert_span.get("attributes", {})
+    else:
+        events = capture_events()
+
+        with start_transaction(name="test_transaction", sampled=True):
+            conn: Connection = await connect(PG_CONNECTION_URI)
+
+            await execute_query_in_connection(
+                "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
+                conn,
+            )
+
+            await conn.close()
+
+        (event,) = events
+
+        span = event["spans"][-1]
+        assert span["description"].startswith("INSERT INTO")
+        data = span.get("data", {})
+
+    lineno_key = "code.line.number" if span_streaming else SPANDATA.CODE_LINENO
+    filepath_key = "code.file.path" if span_streaming else SPANDATA.CODE_FILEPATH
+
+    assert lineno_key in data
+    assert filepath_key in data
     assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FILEPATH in data
     assert SPANDATA.CODE_FUNCTION in data
 
-    assert type(data.get(SPANDATA.CODE_LINENO)) == int
-    assert data.get(SPANDATA.CODE_LINENO) > 0
+    assert type(data.get(lineno_key)) == int
+    assert data.get(lineno_key) > 0
+    assert data.get(filepath_key) == "asyncpg_helpers/helpers.py"
     assert data.get(SPANDATA.CODE_NAMESPACE) == "asyncpg_helpers.helpers"
-    assert data.get(SPANDATA.CODE_FILEPATH) == "asyncpg_helpers/helpers.py"
 
-    is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+    is_relative_path = data.get(filepath_key)[0] != os.sep
     assert is_relative_path
 
     assert data.get(SPANDATA.CODE_FUNCTION) == "execute_query_in_connection"
@@ -820,7 +848,7 @@ async def test_no_query_source_if_duration_too_short(
                 span._timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
             yield span
 
-        with sentry_sdk.traces.start_span(name="test_transaction"):
+        with sentry_sdk.traces.start_span(name="test_segment"):
             conn: Connection = await connect(PG_CONNECTION_URI)
 
             with mock.patch(
@@ -842,7 +870,7 @@ async def test_no_query_source_if_duration_too_short(
         insert_span = spans[1]
         segment = spans[2]
 
-        assert segment["name"] == "test_transaction"
+        assert segment["name"] == "test_segment"
         assert insert_span["name"].startswith("INSERT INTO")
         assert connect_span["name"] == "connect"
         data = insert_span.get("attributes", {})
@@ -957,7 +985,7 @@ async def test_span_origin(sentry_init, capture_events, capture_items, span_stre
 
     if span_streaming:
         items = capture_items("span")
-        with sentry_sdk.traces.start_span(name="test_transaction"):
+        with sentry_sdk.traces.start_span(name="test_segment"):
             conn: Connection = await connect(PG_CONNECTION_URI)
 
             await conn.execute("SELECT 1")
@@ -974,7 +1002,7 @@ async def test_span_origin(sentry_init, capture_events, capture_items, span_stre
         select2_span = spans[2]
         segment = spans[3]
 
-        assert segment["name"] == "test_transaction"
+        assert segment["name"] == "test_segment"
         assert connect_span["name"] == "connect"
         assert select1_span["name"] == "SELECT 1"
         assert select2_span["name"] == "SELECT 2"
@@ -1016,7 +1044,7 @@ async def test_multiline_query_description_normalized(
 
     if span_streaming:
         items = capture_items("span")
-        with sentry_sdk.traces.start_span(name="test_transaction"):
+        with sentry_sdk.traces.start_span(name="test_segment"):
             conn: Connection = await connect(PG_CONNECTION_URI)
             await conn.execute(
                 """
@@ -1040,7 +1068,7 @@ async def test_multiline_query_description_normalized(
         select_span = spans[1]
         segment = spans[2]
 
-        assert segment["name"] == "test_transaction"
+        assert segment["name"] == "test_segment"
         assert connect_span["name"] == "connect"
         assert select_span["name"] == "SELECT id, name FROM users WHERE name = 'Alice'"
     else:
@@ -1116,6 +1144,195 @@ async def test_before_send_transaction_sees_normalized_description(
     assert spans[0]["description"] == "filtered"
 
 
+def _assert_query_source(span, span_streaming, expected_function):
+    if span_streaming:
+        data = span.get("attributes", {})
+        lineno_key = "code.line.number"
+        filepath_key = "code.file.path"
+    else:
+        data = span.get("data", {})
+        lineno_key = SPANDATA.CODE_LINENO
+        filepath_key = SPANDATA.CODE_FILEPATH
+
+    assert lineno_key in data
+    assert filepath_key in data
+    assert SPANDATA.CODE_NAMESPACE in data
+    assert SPANDATA.CODE_FUNCTION in data
+
+    assert type(data.get(lineno_key)) == int
+    assert data.get(lineno_key) > 0
+    assert data[SPANDATA.CODE_NAMESPACE] == "tests.integrations.asyncpg.test_asyncpg"
+    assert data.get(filepath_key).endswith("tests/integrations/asyncpg/test_asyncpg.py")
+    assert data.get(filepath_key)[0] != os.sep
+    assert data[SPANDATA.CODE_FUNCTION] == expected_function
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_query_source_execute(
+    sentry_init, capture_events, capture_items, span_streaming
+):
+    sentry_init(
+        integrations=[AsyncPGIntegration()],
+        traces_sample_rate=1.0,
+        enable_db_query_source=True,
+        db_query_source_threshold_ms=0,
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
+
+    if span_streaming:
+        items = capture_items("span")
+        with sentry_sdk.traces.start_span(name="test_segment"):
+            conn: Connection = await connect(PG_CONNECTION_URI)
+            await conn.execute(
+                "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
+                "Alice",
+                "pw",
+                datetime.date(1990, 12, 25),
+            )
+            await conn.close()
+        sentry_sdk.flush()
+
+        spans = [item.payload for item in items]
+        assert len(spans) == 3
+
+        connect_span = spans[0]
+        query_span = spans[1]
+        segment = spans[2]
+
+        assert connect_span["name"] == "connect"
+        assert query_span["name"].startswith("INSERT INTO")
+        assert segment["name"] == "test_segment"
+        assert segment["is_segment"] is True
+    else:
+        events = capture_events()
+        with start_transaction(name="test_transaction", sampled=True):
+            conn: Connection = await connect(PG_CONNECTION_URI)
+            await conn.execute(
+                "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
+                "Alice",
+                "pw",
+                datetime.date(1990, 12, 25),
+            )
+            await conn.close()
+
+        (event,) = events
+        spans = event["spans"]
+        assert len(spans) == 2
+        assert spans[0]["description"] == "connect"
+        assert spans[1]["description"].startswith("INSERT INTO")
+        query_span = spans[1]
+
+    _assert_query_source(query_span, span_streaming, "test_query_source_execute")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_query_source_executemany(
+    sentry_init, capture_events, capture_items, span_streaming
+):
+    sentry_init(
+        integrations=[AsyncPGIntegration()],
+        traces_sample_rate=1.0,
+        enable_db_query_source=True,
+        db_query_source_threshold_ms=0,
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
+
+    if span_streaming:
+        items = capture_items("span")
+        with sentry_sdk.traces.start_span(name="test_segment"):
+            conn: Connection = await connect(PG_CONNECTION_URI)
+            await conn.executemany(
+                "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
+                [("Bob", "secret_pw", datetime.date(1984, 3, 1))],
+            )
+            await conn.close()
+        sentry_sdk.flush()
+
+        spans = [item.payload for item in items]
+        assert len(spans) == 3
+
+        connect_span = spans[0]
+        query_span = spans[1]
+        segment = spans[2]
+
+        assert connect_span["name"] == "connect"
+        assert query_span["name"].startswith("INSERT INTO")
+        assert segment["name"] == "test_segment"
+    else:
+        events = capture_events()
+        with start_transaction(name="test_transaction", sampled=True):
+            conn: Connection = await connect(PG_CONNECTION_URI)
+            await conn.executemany(
+                "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
+                [("Bob", "secret_pw", datetime.date(1984, 3, 1))],
+            )
+            await conn.close()
+
+        (event,) = events
+        spans = event["spans"]
+        assert len(spans) == 2
+        assert spans[0]["description"] == "connect"
+        assert spans[1]["description"].startswith("INSERT INTO")
+        query_span = spans[1]
+
+    _assert_query_source(query_span, span_streaming, "test_query_source_executemany")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_query_source_prepare(
+    sentry_init, capture_events, capture_items, span_streaming
+):
+    sentry_init(
+        integrations=[AsyncPGIntegration()],
+        traces_sample_rate=1.0,
+        enable_db_query_source=True,
+        db_query_source_threshold_ms=0,
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
+
+    if span_streaming:
+        items = capture_items("span")
+        with sentry_sdk.traces.start_span(name="test_segment"):
+            conn: Connection = await connect(PG_CONNECTION_URI)
+            await conn.prepare("SELECT * FROM users WHERE name = $1")
+            await conn.close()
+        sentry_sdk.flush()
+
+        spans = [item.payload for item in items]
+        assert len(spans) == 3
+        connect_span = spans[0]
+        query_span = spans[1]
+        segment = spans[2]
+
+        assert connect_span["name"] == "connect"
+        assert query_span["name"] == "SELECT * FROM users WHERE name = $1"
+        assert segment["name"] == "test_segment"
+    else:
+        events = capture_events()
+        with start_transaction(name="test_transaction", sampled=True):
+            conn: Connection = await connect(PG_CONNECTION_URI)
+            await conn.prepare("SELECT * FROM users WHERE name = $1")
+            await conn.close()
+
+        (event,) = events
+        spans = event["spans"]
+        assert len(spans) == 2
+        assert spans[0]["description"] == "connect"
+        assert spans[1]["description"] == "SELECT * FROM users WHERE name = $1"
+        query_span = spans[1]
+
+    _assert_query_source(query_span, span_streaming, "test_query_source_prepare")
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("span_streaming", [True, False])
 async def test_cursor__bind_exec_creates_spans(
@@ -1128,6 +1345,8 @@ async def test_cursor__bind_exec_creates_spans(
     sentry_init(
         integrations=[AsyncPGIntegration()],
         traces_sample_rate=1.0,
+        enable_db_query_source=True,
+        db_query_source_threshold_ms=0,
         _experiments={
             "trace_lifecycle": "stream" if span_streaming else "static",
         },
@@ -1135,7 +1354,7 @@ async def test_cursor__bind_exec_creates_spans(
 
     if span_streaming:
         items = capture_items("span")
-        with sentry_sdk.traces.start_span(name="test_transaction"):
+        with sentry_sdk.traces.start_span(name="test_segment"):
             conn: Connection = await connect(PG_CONNECTION_URI)
 
             await conn.executemany(
@@ -1175,7 +1394,7 @@ async def test_cursor__bind_exec_creates_spans(
         assert begin_span["name"] == "BEGIN;"
         assert bind_exec_span["name"] == "SELECT * FROM users WHERE dob > $1"
         assert commit_span["name"] == "COMMIT;"
-        assert segment["name"] == "test_transaction"
+        assert segment["name"] == "test_segment"
 
         assert bind_exec_span["attributes"]["sentry.origin"] == "auto.db.asyncpg"
         assert bind_exec_span["attributes"]["sentry.op"] == "db"
@@ -1235,14 +1454,20 @@ async def test_cursor__bind_exec_creates_spans(
         assert bind_exec_span["data"]["db.name"] == PG_NAME
         assert bind_exec_span["data"]["db.user"] == PG_USER
 
+    _assert_query_source(
+        bind_exec_span,
+        span_streaming,
+        "test_cursor__bind_exec_creates_spans",
+    )
+
 
 @pytest.mark.asyncio
-async def test_cursor__bind_and__exec_methods_create_spans(
-    sentry_init, capture_events
-) -> None:
+async def test_cursor__exec_methods_create_spans(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
         traces_sample_rate=1.0,
+        enable_db_query_source=True,
+        db_query_source_threshold_ms=0,
     )
     events = capture_events()
 
@@ -1258,7 +1483,6 @@ async def test_cursor__bind_and__exec_methods_create_spans(
         )
 
         async with conn.transaction():
-            # This exercises the `_bind` patch and the `cursor` patch
             cur = await conn.cursor(
                 "SELECT * FROM users WHERE dob > $1", datetime.date(1970, 1, 1)
             )
@@ -1270,15 +1494,14 @@ async def test_cursor__bind_and__exec_methods_create_spans(
 
     (event,) = events
 
-    assert len(event["spans"]) == 7
+    assert len(event["spans"]) == 6
 
     connect_span = event["spans"][0]
     executemany_span = event["spans"][1]
     begin_span = event["spans"][2]
-    cursor_creation_and_bind_span = event["spans"][3]
-    fetchrow_span_1 = event["spans"][4]
-    fetchrow_span_2 = event["spans"][5]
-    commit_span = event["spans"][6]
+    fetchrow_span_1 = event["spans"][3]
+    fetchrow_span_2 = event["spans"][4]
+    commit_span = event["spans"][5]
 
     assert connect_span["description"] == "connect"
     assert (
@@ -1287,15 +1510,16 @@ async def test_cursor__bind_and__exec_methods_create_spans(
     )
     assert begin_span["description"] == "BEGIN;"
     assert fetchrow_span_1["description"] == "SELECT * FROM users WHERE dob > $1"
-    assert (
-        cursor_creation_and_bind_span["description"]
-        == "SELECT * FROM users WHERE dob > $1"
-    )
     assert fetchrow_span_2["description"] == "SELECT * FROM users WHERE dob > $1"
     assert commit_span["description"] == "COMMIT;"
 
-    for span in (cursor_creation_and_bind_span, fetchrow_span_1, fetchrow_span_2):
+    for span in (fetchrow_span_1, fetchrow_span_2):
         assert span["data"]["db.cursor"] is not None
         assert span["data"]["db.system"] == "postgresql"
         assert span["data"]["db.driver.name"] == "asyncpg"
         assert span["origin"] == "auto.db.asyncpg"
+        _assert_query_source(
+            span,
+            False,
+            "test_cursor__exec_methods_create_spans",
+        )

@@ -9,7 +9,6 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
 from tests.conftest import ApproxDict
 
-
 MOCK_CONNECTION_POOL = mock.MagicMock()
 MOCK_CONNECTION_POOL.connection_kwargs = {
     "host": "localhost",

@@ -1,5 +1,6 @@
-import sentry_sdk
 import pytest
+
+import sentry_sdk
 
 
 def test_standalone_span_iter_headers(sentry_init):

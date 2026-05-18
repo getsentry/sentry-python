@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable
@@ -5,15 +7,14 @@ from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from typing import Callable, Optional
+
     from google.protobuf.message import Message
 
 try:
     import grpc
-    from grpc import ServicerContext, HandlerCallDetails, RpcMethodHandler
+    from grpc import HandlerCallDetails, RpcMethodHandler, ServicerContext
 except ImportError:
     raise DidNotEnable("grpcio is not installed")
 

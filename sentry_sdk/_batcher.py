@@ -1,15 +1,15 @@
 import os
 import random
 import threading
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, TypeVar, Generic
 import weakref
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING, Generic, TypeVar
 
-from sentry_sdk.utils import format_timestamp
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
+from sentry_sdk.utils import format_timestamp
 
 if TYPE_CHECKING:
-    from typing import Optional, Callable, Any
+    from typing import Any, Callable, Optional
 
 T = TypeVar("T")
 

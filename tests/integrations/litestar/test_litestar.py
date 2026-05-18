@@ -1,15 +1,11 @@
 from __future__ import annotations
+
 import functools
-
-from litestar.exceptions import HTTPException
-import pytest
-
-from sentry_sdk import capture_message
-from sentry_sdk.integrations.litestar import LitestarIntegration
-
 from typing import Any
 
-from litestar import Litestar, get, Controller
+import pytest
+from litestar import Controller, Litestar, get
+from litestar.exceptions import HTTPException
 from litestar.logging.config import LoggingConfig
 from litestar.middleware import AbstractMiddleware
 from litestar.middleware.logging import LoggingMiddlewareConfig
@@ -17,6 +13,8 @@ from litestar.middleware.rate_limit import RateLimitConfig
 from litestar.middleware.session.server_side import ServerSideSessionConfig
 from litestar.testing import TestClient
 
+from sentry_sdk import capture_message
+from sentry_sdk.integrations.litestar import LitestarIntegration
 from tests.integrations.conftest import parametrize_test_configurable_status_codes
 
 

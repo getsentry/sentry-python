@@ -1,4 +1,5 @@
 import json
+
 import pytest
 
 from sentry_sdk.utils import package_version
@@ -8,22 +9,28 @@ try:
 except ImportError:
     NOT_GIVEN = None
 try:
-    from openai import omit
-    from openai import Omit
+    from openai import Omit, omit
 except ImportError:
     omit = None
     Omit = None
 
-from openai import AsyncOpenAI, OpenAI, AsyncStream, Stream, OpenAIError
+from openai import AsyncOpenAI, AsyncStream, OpenAI, OpenAIError, Stream
 from openai.types import CompletionUsage, CreateEmbeddingResponse, Embedding
-from openai.types.chat import ChatCompletionMessage, ChatCompletionChunk
+from openai.types.chat import ChatCompletionChunk, ChatCompletionMessage
 from openai.types.chat.chat_completion import Choice
-from openai.types.chat.chat_completion_chunk import ChoiceDelta, Choice as DeltaChoice
+from openai.types.chat.chat_completion_chunk import Choice as DeltaChoice
+from openai.types.chat.chat_completion_chunk import ChoiceDelta
 from openai.types.create_embedding_response import Usage as EmbeddingTokenUsage
 
 SKIP_RESPONSES_TESTS = False
 
 try:
+    from openai.types.responses import (
+        Response,
+        ResponseOutputMessage,
+        ResponseOutputText,
+        ResponseUsage,
+    )
     from openai.types.responses.response_completed_event import ResponseCompletedEvent
     from openai.types.responses.response_created_event import ResponseCreatedEvent
     from openai.types.responses.response_text_delta_event import ResponseTextDeltaEvent
@@ -31,25 +38,19 @@ try:
         InputTokensDetails,
         OutputTokensDetails,
     )
-    from openai.types.responses import (
-        Response,
-        ResponseUsage,
-        ResponseOutputMessage,
-        ResponseOutputText,
-    )
 except ImportError:
     SKIP_RESPONSES_TESTS = True
 
+from unittest import mock  # python 3.3 and above
+
 from sentry_sdk import start_transaction
-from sentry_sdk.consts import SPANDATA, OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.openai import (
     OpenAIIntegration,
     _calculate_completions_token_usage,
     _calculate_responses_token_usage,
 )
 from sentry_sdk.utils import safe_serialize
-
-from unittest import mock  # python 3.3 and above
 
 try:
     from unittest.mock import AsyncMock
@@ -239,6 +240,10 @@ def test_nonstreaming_chat_completion_no_prompts(
                     "role": "system",
                     "content": "You are a helpful assistant.",
                 },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"role": "user", "content": "hello"},
             ],
             id="blocks",
@@ -251,6 +256,10 @@ def test_nonstreaming_chat_completion_no_prompts(
                         {"type": "text", "text": "You are a helpful assistant."},
                         {"type": "text", "text": "Be concise and clear."},
                     ],
+                },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
                 },
                 {"role": "user", "content": "hello"},
             ],
@@ -265,6 +274,10 @@ def test_nonstreaming_chat_completion_no_prompts(
                             {"type": "text", "text": "You are a helpful assistant."},
                             {"type": "text", "text": "Be concise and clear."},
                         ],
+                    },
+                    {
+                        "role": "user",
+                        "content": "Message demonstrating the absence of truncation.",
                     },
                     {"role": "user", "content": "hello"},
                 ]
@@ -360,6 +373,10 @@ def test_nonstreaming_chat_completion(
             ]
 
         assert "hello" in span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert (
+            "Message demonstrating the absence of truncation."
+            in span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        )
         assert "the model response" in span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
         assert span["attributes"]["gen_ai.usage.output_tokens"] == 10
@@ -558,6 +575,10 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
                     "role": "system",
                     "content": "You are a helpful assistant.",
                 },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"role": "user", "content": "hello"},
             ],
             id="blocks",
@@ -570,6 +591,10 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
                         {"type": "text", "text": "You are a helpful assistant."},
                         {"type": "text", "text": "Be concise and clear."},
                     ],
+                },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
                 },
                 {"role": "user", "content": "hello"},
             ],
@@ -584,6 +609,10 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
                             {"type": "text", "text": "You are a helpful assistant."},
                             {"type": "text", "text": "Be concise and clear."},
                         ],
+                    },
+                    {
+                        "role": "user",
+                        "content": "Message demonstrating the absence of truncation.",
                     },
                     {"role": "user", "content": "hello"},
                 ]
@@ -676,6 +705,10 @@ async def test_nonstreaming_chat_completion_async(
             ]
 
         assert "hello" in span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert (
+            "Message demonstrating the absence of truncation."
+            in span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        )
         assert "the model response" in span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
         assert span["attributes"]["gen_ai.usage.output_tokens"] == 10
@@ -1353,6 +1386,10 @@ async def test_streaming_chat_completion_async_with_usage_in_stream(
                     "role": "system",
                     "content": "You are a helpful assistant.",
                 },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"role": "user", "content": "hello"},
             ],
             id="blocks",
@@ -1365,6 +1402,10 @@ async def test_streaming_chat_completion_async_with_usage_in_stream(
                         {"type": "text", "text": "You are a helpful assistant."},
                         {"type": "text", "text": "Be concise and clear."},
                     ],
+                },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
                 },
                 {"role": "user", "content": "hello"},
             ],
@@ -1379,6 +1420,10 @@ async def test_streaming_chat_completion_async_with_usage_in_stream(
                             {"type": "text", "text": "You are a helpful assistant."},
                             {"type": "text", "text": "Be concise and clear."},
                         ],
+                    },
+                    {
+                        "role": "user",
+                        "content": "Message demonstrating the absence of truncation.",
                     },
                     {"role": "user", "content": "hello"},
                 ]
@@ -1517,6 +1562,10 @@ def test_streaming_chat_completion(
 
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
+        assert (
+            "Message demonstrating the absence of truncation."
+            in span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        )
         assert "hello" in span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         assert "hello world" in span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
@@ -1525,12 +1574,12 @@ def test_streaming_chat_completion(
 
             if "blocks" in param_id:
                 assert span["attributes"]["gen_ai.usage.output_tokens"] == 2
-                assert span["attributes"]["gen_ai.usage.input_tokens"] == 7
-                assert span["attributes"]["gen_ai.usage.total_tokens"] == 9
+                assert span["attributes"]["gen_ai.usage.input_tokens"] == 15
+                assert span["attributes"]["gen_ai.usage.total_tokens"] == 17
             else:
                 assert span["attributes"]["gen_ai.usage.output_tokens"] == 2
-                assert span["attributes"]["gen_ai.usage.input_tokens"] == 12
-                assert span["attributes"]["gen_ai.usage.total_tokens"] == 14
+                assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
+                assert span["attributes"]["gen_ai.usage.total_tokens"] == 22
 
         except ImportError:
             pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
@@ -1600,12 +1649,12 @@ def test_streaming_chat_completion(
 
             if "blocks" in param_id:
                 assert span["data"]["gen_ai.usage.output_tokens"] == 2
-                assert span["data"]["gen_ai.usage.input_tokens"] == 7
-                assert span["data"]["gen_ai.usage.total_tokens"] == 9
+                assert span["data"]["gen_ai.usage.input_tokens"] == 15
+                assert span["data"]["gen_ai.usage.total_tokens"] == 17
             else:
                 assert span["data"]["gen_ai.usage.output_tokens"] == 2
-                assert span["data"]["gen_ai.usage.input_tokens"] == 12
-                assert span["data"]["gen_ai.usage.total_tokens"] == 14
+                assert span["data"]["gen_ai.usage.input_tokens"] == 20
+                assert span["data"]["gen_ai.usage.total_tokens"] == 22
 
         except ImportError:
             pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
@@ -1819,6 +1868,10 @@ async def test_streaming_chat_completion_async_no_prompts(
                     "role": "system",
                     "content": "You are a helpful assistant.",
                 },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"role": "user", "content": "hello"},
             ],
             id="blocks",
@@ -1831,6 +1884,10 @@ async def test_streaming_chat_completion_async_no_prompts(
                         {"type": "text", "text": "You are a helpful assistant."},
                         {"type": "text", "text": "Be concise and clear."},
                     ],
+                },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
                 },
                 {"role": "user", "content": "hello"},
             ],
@@ -1845,6 +1902,10 @@ async def test_streaming_chat_completion_async_no_prompts(
                             {"type": "text", "text": "You are a helpful assistant."},
                             {"type": "text", "text": "Be concise and clear."},
                         ],
+                    },
+                    {
+                        "role": "user",
+                        "content": "Message demonstrating the absence of truncation.",
                     },
                     {"role": "user", "content": "hello"},
                 ]
@@ -1989,6 +2050,10 @@ async def test_streaming_chat_completion_async(
                 },
             ]
 
+        assert (
+            "Message demonstrating the absence of truncation."
+            in span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        )
         assert "hello" in span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
         assert "hello world" in span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
@@ -1997,12 +2062,12 @@ async def test_streaming_chat_completion_async(
 
             if "blocks" in param_id:
                 assert span["attributes"]["gen_ai.usage.output_tokens"] == 2
-                assert span["attributes"]["gen_ai.usage.input_tokens"] == 7
-                assert span["attributes"]["gen_ai.usage.total_tokens"] == 9
+                assert span["attributes"]["gen_ai.usage.input_tokens"] == 15
+                assert span["attributes"]["gen_ai.usage.total_tokens"] == 17
             else:
                 assert span["attributes"]["gen_ai.usage.output_tokens"] == 2
-                assert span["attributes"]["gen_ai.usage.input_tokens"] == 12
-                assert span["attributes"]["gen_ai.usage.total_tokens"] == 14
+                assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
+                assert span["attributes"]["gen_ai.usage.total_tokens"] == 22
 
         except ImportError:
             pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
@@ -2074,12 +2139,12 @@ async def test_streaming_chat_completion_async(
 
                 if "blocks" in param_id:
                     assert span["data"]["gen_ai.usage.output_tokens"] == 2
-                    assert span["data"]["gen_ai.usage.input_tokens"] == 7
-                    assert span["data"]["gen_ai.usage.total_tokens"] == 9
+                    assert span["data"]["gen_ai.usage.input_tokens"] == 15
+                    assert span["data"]["gen_ai.usage.total_tokens"] == 17
                 else:
                     assert span["data"]["gen_ai.usage.output_tokens"] == 2
-                    assert span["data"]["gen_ai.usage.input_tokens"] == 12
-                    assert span["data"]["gen_ai.usage.total_tokens"] == 14
+                    assert span["data"]["gen_ai.usage.input_tokens"] == 20
+                    assert span["data"]["gen_ai.usage.total_tokens"] == 22
 
             except ImportError:
                 pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
@@ -3718,6 +3783,10 @@ def test_ai_client_span_responses_api_no_pii(
                     "role": "system",
                     "content": "You are a helpful assistant.",
                 },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"role": "user", "content": "hello"},
             ],
             id="blocks_no_type",
@@ -3728,6 +3797,11 @@ def test_ai_client_span_responses_api_no_pii(
                     "type": "message",
                     "role": "system",
                     "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
                 },
                 {"type": "message", "role": "user", "content": "hello"},
             ],
@@ -3742,6 +3816,10 @@ def test_ai_client_span_responses_api_no_pii(
                         {"type": "text", "text": "Be concise and clear."},
                     ],
                 },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"role": "user", "content": "hello"},
             ],
             id="parts_no_type",
@@ -3755,6 +3833,11 @@ def test_ai_client_span_responses_api_no_pii(
                         {"type": "text", "text": "You are a helpful assistant."},
                         {"type": "text", "text": "Be concise and clear."},
                     ],
+                },
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
                 },
                 {"type": "message", "role": "user", "content": "hello"},
             ],
@@ -3862,7 +3945,13 @@ def test_ai_client_span_responses_api(
                         [{"type": "text", "content": "You are a helpful assistant."}]
                     ),
                     "gen_ai.request.messages": safe_serialize(
-                        [{"role": "user", "content": "hello"}]
+                        [
+                            {
+                                "role": "user",
+                                "content": "Message demonstrating the absence of truncation.",
+                            },
+                            {"role": "user", "content": "hello"},
+                        ]
                     ),
                 }
             )
@@ -3879,7 +3968,13 @@ def test_ai_client_span_responses_api(
                         ]
                     ),
                     "gen_ai.request.messages": safe_serialize(
-                        [{"role": "user", "content": "hello"}]
+                        [
+                            {
+                                "role": "user",
+                                "content": "Message demonstrating the absence of truncation.",
+                            },
+                            {"role": "user", "content": "hello"},
+                        ]
                     ),
                 }
             )
@@ -3892,7 +3987,14 @@ def test_ai_client_span_responses_api(
                         [{"type": "text", "content": "You are a helpful assistant."}]
                     ),
                     "gen_ai.request.messages": safe_serialize(
-                        [{"type": "message", "role": "user", "content": "hello"}]
+                        [
+                            {
+                                "type": "message",
+                                "role": "user",
+                                "content": "Message demonstrating the absence of truncation.",
+                            },
+                            {"type": "message", "role": "user", "content": "hello"},
+                        ]
                     ),
                 }
             )
@@ -3909,7 +4011,14 @@ def test_ai_client_span_responses_api(
                         ]
                     ),
                     "gen_ai.request.messages": safe_serialize(
-                        [{"type": "message", "role": "user", "content": "hello"}]
+                        [
+                            {
+                                "type": "message",
+                                "role": "user",
+                                "content": "Message demonstrating the absence of truncation.",
+                            },
+                            {"type": "message", "role": "user", "content": "hello"},
+                        ]
                     ),
                 }
             )
@@ -3925,7 +4034,13 @@ def test_ai_client_span_responses_api(
                         ]
                     ),
                     "gen_ai.request.messages": safe_serialize(
-                        [{"role": "user", "content": "hello"}]
+                        [
+                            {
+                                "role": "user",
+                                "content": "Message demonstrating the absence of truncation.",
+                            },
+                            {"role": "user", "content": "hello"},
+                        ]
                     ),
                 }
             )
@@ -3943,7 +4058,13 @@ def test_ai_client_span_responses_api(
                         ]
                     ),
                     "gen_ai.request.messages": safe_serialize(
-                        [{"role": "user", "content": "hello"}]
+                        [
+                            {
+                                "role": "user",
+                                "content": "Message demonstrating the absence of truncation.",
+                            },
+                            {"role": "user", "content": "hello"},
+                        ]
                     ),
                 }
             )
@@ -3957,7 +4078,14 @@ def test_ai_client_span_responses_api(
                         ]
                     ),
                     "gen_ai.request.messages": safe_serialize(
-                        [{"type": "message", "role": "user", "content": "hello"}]
+                        [
+                            {
+                                "type": "message",
+                                "role": "user",
+                                "content": "Message demonstrating the absence of truncation.",
+                            },
+                            {"type": "message", "role": "user", "content": "hello"},
+                        ]
                     ),
                 }
             )
@@ -3975,7 +4103,14 @@ def test_ai_client_span_responses_api(
                         ]
                     ),
                     "gen_ai.request.messages": safe_serialize(
-                        [{"type": "message", "role": "user", "content": "hello"}]
+                        [
+                            {
+                                "type": "message",
+                                "role": "user",
+                                "content": "Message demonstrating the absence of truncation.",
+                            },
+                            {"type": "message", "role": "user", "content": "hello"},
+                        ]
                     ),
                 }
             )
@@ -4330,6 +4465,10 @@ def test_error_in_responses_api(
                     "role": "system",
                     "content": "You are a helpful assistant.",
                 },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"role": "user", "content": "hello"},
             ],
             id="blocks_no_type",
@@ -4340,6 +4479,11 @@ def test_error_in_responses_api(
                     "type": "message",
                     "role": "system",
                     "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
                 },
                 {"type": "message", "role": "user", "content": "hello"},
             ],
@@ -4354,6 +4498,10 @@ def test_error_in_responses_api(
                         {"type": "text", "text": "Be concise and clear."},
                     ],
                 },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"role": "user", "content": "hello"},
             ],
             id="parts_no_type",
@@ -4367,6 +4515,11 @@ def test_error_in_responses_api(
                         {"type": "text", "text": "You are a helpful assistant."},
                         {"type": "text", "text": "Be concise and clear."},
                     ],
+                },
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
                 },
                 {"type": "message", "role": "user", "content": "hello"},
             ],
@@ -4474,7 +4627,13 @@ async def test_ai_client_span_responses_async_api(
                         [{"type": "text", "content": "You are a helpful assistant."}]
                     ),
                     "gen_ai.request.messages": safe_serialize(
-                        [{"role": "user", "content": "hello"}]
+                        [
+                            {
+                                "role": "user",
+                                "content": "Message demonstrating the absence of truncation.",
+                            },
+                            {"role": "user", "content": "hello"},
+                        ]
                     ),
                 }
             )
@@ -4491,7 +4650,13 @@ async def test_ai_client_span_responses_async_api(
                         ]
                     ),
                     "gen_ai.request.messages": safe_serialize(
-                        [{"role": "user", "content": "hello"}]
+                        [
+                            {
+                                "role": "user",
+                                "content": "Message demonstrating the absence of truncation.",
+                            },
+                            {"role": "user", "content": "hello"},
+                        ]
                     ),
                 }
             )
@@ -4504,7 +4669,14 @@ async def test_ai_client_span_responses_async_api(
                         [{"type": "text", "content": "You are a helpful assistant."}]
                     ),
                     "gen_ai.request.messages": safe_serialize(
-                        [{"type": "message", "role": "user", "content": "hello"}]
+                        [
+                            {
+                                "type": "message",
+                                "role": "user",
+                                "content": "Message demonstrating the absence of truncation.",
+                            },
+                            {"type": "message", "role": "user", "content": "hello"},
+                        ]
                     ),
                 }
             )
@@ -4521,7 +4693,14 @@ async def test_ai_client_span_responses_async_api(
                         ]
                     ),
                     "gen_ai.request.messages": safe_serialize(
-                        [{"type": "message", "role": "user", "content": "hello"}]
+                        [
+                            {
+                                "type": "message",
+                                "role": "user",
+                                "content": "Message demonstrating the absence of truncation.",
+                            },
+                            {"type": "message", "role": "user", "content": "hello"},
+                        ]
                     ),
                 }
             )
@@ -4537,7 +4716,13 @@ async def test_ai_client_span_responses_async_api(
                         ]
                     ),
                     "gen_ai.request.messages": safe_serialize(
-                        [{"role": "user", "content": "hello"}]
+                        [
+                            {
+                                "role": "user",
+                                "content": "Message demonstrating the absence of truncation.",
+                            },
+                            {"role": "user", "content": "hello"},
+                        ]
                     ),
                 }
             )
@@ -4555,7 +4740,13 @@ async def test_ai_client_span_responses_async_api(
                         ]
                     ),
                     "gen_ai.request.messages": safe_serialize(
-                        [{"role": "user", "content": "hello"}]
+                        [
+                            {
+                                "role": "user",
+                                "content": "Message demonstrating the absence of truncation.",
+                            },
+                            {"role": "user", "content": "hello"},
+                        ]
                     ),
                 }
             )
@@ -4569,7 +4760,14 @@ async def test_ai_client_span_responses_async_api(
                         ]
                     ),
                     "gen_ai.request.messages": safe_serialize(
-                        [{"type": "message", "role": "user", "content": "hello"}]
+                        [
+                            {
+                                "type": "message",
+                                "role": "user",
+                                "content": "Message demonstrating the absence of truncation.",
+                            },
+                            {"type": "message", "role": "user", "content": "hello"},
+                        ]
                     ),
                 }
             )
@@ -4587,7 +4785,14 @@ async def test_ai_client_span_responses_async_api(
                         ]
                     ),
                     "gen_ai.request.messages": safe_serialize(
-                        [{"type": "message", "role": "user", "content": "hello"}]
+                        [
+                            {
+                                "type": "message",
+                                "role": "user",
+                                "content": "Message demonstrating the absence of truncation.",
+                            },
+                            {"type": "message", "role": "user", "content": "hello"},
+                        ]
                     ),
                 }
             )
@@ -4812,6 +5017,10 @@ async def test_ai_client_span_responses_async_api(
                     "role": "system",
                     "content": "You are a helpful assistant.",
                 },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"role": "user", "content": "hello"},
             ],
             id="blocks_no_type",
@@ -4822,6 +5031,11 @@ async def test_ai_client_span_responses_async_api(
                     "type": "message",
                     "role": "system",
                     "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
                 },
                 {"type": "message", "role": "user", "content": "hello"},
             ],
@@ -4836,6 +5050,10 @@ async def test_ai_client_span_responses_async_api(
                         {"type": "text", "text": "Be concise and clear."},
                     ],
                 },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"role": "user", "content": "hello"},
             ],
             id="parts_no_type",
@@ -4849,6 +5067,11 @@ async def test_ai_client_span_responses_async_api(
                         {"type": "text", "text": "You are a helpful assistant."},
                         {"type": "text", "text": "Be concise and clear."},
                     ],
+                },
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
                 },
                 {"type": "message", "role": "user", "content": "hello"},
             ],
@@ -4974,7 +5197,13 @@ async def test_ai_client_span_streaming_responses_async_api(
                         [{"type": "text", "content": "You are a helpful assistant."}]
                     ),
                     "gen_ai.request.messages": safe_serialize(
-                        [{"role": "user", "content": "hello"}]
+                        [
+                            {
+                                "role": "user",
+                                "content": "Message demonstrating the absence of truncation.",
+                            },
+                            {"role": "user", "content": "hello"},
+                        ]
                     ),
                 }
             )
@@ -4991,7 +5220,13 @@ async def test_ai_client_span_streaming_responses_async_api(
                         ]
                     ),
                     "gen_ai.request.messages": safe_serialize(
-                        [{"role": "user", "content": "hello"}]
+                        [
+                            {
+                                "role": "user",
+                                "content": "Message demonstrating the absence of truncation.",
+                            },
+                            {"role": "user", "content": "hello"},
+                        ]
                     ),
                 }
             )
@@ -5004,7 +5239,14 @@ async def test_ai_client_span_streaming_responses_async_api(
                         [{"type": "text", "content": "You are a helpful assistant."}]
                     ),
                     "gen_ai.request.messages": safe_serialize(
-                        [{"type": "message", "role": "user", "content": "hello"}]
+                        [
+                            {
+                                "type": "message",
+                                "role": "user",
+                                "content": "Message demonstrating the absence of truncation.",
+                            },
+                            {"type": "message", "role": "user", "content": "hello"},
+                        ]
                     ),
                 }
             )
@@ -5021,7 +5263,14 @@ async def test_ai_client_span_streaming_responses_async_api(
                         ]
                     ),
                     "gen_ai.request.messages": safe_serialize(
-                        [{"type": "message", "role": "user", "content": "hello"}]
+                        [
+                            {
+                                "type": "message",
+                                "role": "user",
+                                "content": "Message demonstrating the absence of truncation.",
+                            },
+                            {"type": "message", "role": "user", "content": "hello"},
+                        ]
                     ),
                 }
             )
@@ -5037,7 +5286,13 @@ async def test_ai_client_span_streaming_responses_async_api(
                         ]
                     ),
                     "gen_ai.request.messages": safe_serialize(
-                        [{"role": "user", "content": "hello"}]
+                        [
+                            {
+                                "role": "user",
+                                "content": "Message demonstrating the absence of truncation.",
+                            },
+                            {"role": "user", "content": "hello"},
+                        ]
                     ),
                 }
             )
@@ -5055,7 +5310,13 @@ async def test_ai_client_span_streaming_responses_async_api(
                         ]
                     ),
                     "gen_ai.request.messages": safe_serialize(
-                        [{"role": "user", "content": "hello"}]
+                        [
+                            {
+                                "role": "user",
+                                "content": "Message demonstrating the absence of truncation.",
+                            },
+                            {"role": "user", "content": "hello"},
+                        ]
                     ),
                 }
             )
@@ -5069,7 +5330,14 @@ async def test_ai_client_span_streaming_responses_async_api(
                         ]
                     ),
                     "gen_ai.request.messages": safe_serialize(
-                        [{"type": "message", "role": "user", "content": "hello"}]
+                        [
+                            {
+                                "type": "message",
+                                "role": "user",
+                                "content": "Message demonstrating the absence of truncation.",
+                            },
+                            {"type": "message", "role": "user", "content": "hello"},
+                        ]
                     ),
                 }
             )
@@ -5087,7 +5355,14 @@ async def test_ai_client_span_streaming_responses_async_api(
                         ]
                     ),
                     "gen_ai.request.messages": safe_serialize(
-                        [{"type": "message", "role": "user", "content": "hello"}]
+                        [
+                            {
+                                "type": "message",
+                                "role": "user",
+                                "content": "Message demonstrating the absence of truncation.",
+                            },
+                            {"type": "message", "role": "user", "content": "hello"},
+                        ]
                     ),
                 }
             )
@@ -5835,20 +6110,16 @@ def test_openai_message_role_mapping(
     assert stored_messages[0]["role"] == expected_role
 
 
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_openai_message_truncation(
     sentry_init,
     capture_events,
-    capture_items,
     nonstreaming_chat_completions_model_response,
-    stream_gen_ai_spans,
 ):
     """Test that large messages are truncated properly in OpenAI integration."""
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
     )
 
     client = OpenAI(api_key="z")
@@ -5876,45 +6147,24 @@ def test_openai_message_truncation(
         {"role": "user", "content": large_content},
     ]
 
-    if stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    events = capture_events()
 
-        with start_transaction(name="openai tx"):
-            client.chat.completions.create(
-                model="some-model",
-                messages=large_messages,
-            )
+    with start_transaction(name="openai tx"):
+        client.chat.completions.create(
+            model="some-model",
+            messages=large_messages,
+        )
 
-        span = next(item.payload for item in items if item.type == "span")
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
+    (event,) = events
+    span = event["spans"][0]
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
 
-        messages_data = span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        assert isinstance(messages_data, str)
+    messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+    assert isinstance(messages_data, str)
 
-        parsed_messages = json.loads(messages_data)
-        assert isinstance(parsed_messages, list)
-        assert len(parsed_messages) <= len(large_messages)
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-    else:
-        events = capture_events()
-
-        with start_transaction(name="openai tx"):
-            client.chat.completions.create(
-                model="some-model",
-                messages=large_messages,
-            )
-
-        (event,) = events
-        span = event["spans"][0]
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
-
-        messages_data = span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-        assert isinstance(messages_data, str)
-
-        parsed_messages = json.loads(messages_data)
-        assert isinstance(parsed_messages, list)
-        assert len(parsed_messages) <= len(large_messages)
+    parsed_messages = json.loads(messages_data)
+    assert isinstance(parsed_messages, list)
+    assert len(parsed_messages) <= len(large_messages)
 
     meta_path = event["_meta"]
     span_meta = meta_path["spans"]["0"]["data"]

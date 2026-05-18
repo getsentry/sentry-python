@@ -10,21 +10,21 @@ except ImportError:
     raise DidNotEnable("pydantic-ai not installed")
 
 
+from typing import TYPE_CHECKING
+
 from .patches import (
     _patch_agent_run,
     _patch_graph_nodes,
     _patch_tool_execution,
 )
-
 from .spans.ai_client import ai_client_span, update_ai_client_span
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any
+
     from pydantic_ai import ModelRequestContext, RunContext
-    from pydantic_ai.messages import ModelResponse  # type: ignore
     from pydantic_ai.capabilities import Hooks  # type: ignore
+    from pydantic_ai.messages import ModelResponse  # type: ignore
 
 
 def register_hooks(hooks: "Hooks") -> None:

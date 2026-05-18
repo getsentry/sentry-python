@@ -1,14 +1,15 @@
+from typing import TYPE_CHECKING, Dict, List, cast
+
 from sentry_sdk.utils import (
-    capture_internal_exceptions,
     AnnotatedValue,
+    capture_internal_exceptions,
     iter_event_frames,
 )
 
-from typing import TYPE_CHECKING, cast, List, Dict
-
 if TYPE_CHECKING:
-    from sentry_sdk._types import Event
     from typing import Optional
+
+    from sentry_sdk._types import Event
 
 
 DEFAULT_DENYLIST = [

@@ -1,23 +1,20 @@
 import functools
 from typing import TYPE_CHECKING
-from sentry_sdk.integrations.redis.utils import _get_safe_key, _key_as_string
-from urllib3.util import parse_url as urlparse
 
 from django import VERSION as DJANGO_VERSION
 from django.core.cache import CacheHandler
+from urllib3.util import parse_url as urlparse
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.integrations.redis.utils import _get_safe_key, _key_as_string
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
 )
 
-
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import Optional
+    from typing import Any, Callable, Optional
 
 
 METHODS_TO_INSTRUMENT = [

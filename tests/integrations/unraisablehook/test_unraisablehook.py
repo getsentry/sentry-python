@@ -1,9 +1,8 @@
-import pytest
-import sys
 import subprocess
-
+import sys
 from textwrap import dedent
 
+import pytest
 
 TEST_PARAMETERS = [
     ("", "HttpTransport"),
