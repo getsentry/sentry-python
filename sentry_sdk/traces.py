@@ -37,10 +37,10 @@ if TYPE_CHECKING:
         Callable,
         Iterator,
         Optional,
-        overload,
         ParamSpec,
         TypeVar,
         Union,
+        overload,
     )
 
     from sentry_sdk._types import Attributes, AttributeValue

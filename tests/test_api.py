@@ -1,29 +1,27 @@
-import pytest
-
 import re
 from unittest import mock
+
+import pytest
 
 import sentry_sdk
 from sentry_sdk import (
     capture_exception,
+    configure_scope,
     continue_trace,
     get_baggage,
     get_client,
+    get_current_scope,
     get_current_span,
+    get_global_scope,
+    get_isolation_scope,
     get_traceparent,
     is_initialized,
-    start_transaction,
-    set_tags,
-    configure_scope,
     push_scope,
-    get_global_scope,
-    get_current_scope,
-    get_isolation_scope,
+    set_tags,
+    start_transaction,
 )
-
-from sentry_sdk.tracing import Span
-
 from sentry_sdk.client import Client, NonRecordingClient
+from sentry_sdk.tracing import Span
 from tests.conftest import TestTransportWithOptions
 
 

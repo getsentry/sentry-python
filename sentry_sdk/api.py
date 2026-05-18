@@ -1,43 +1,43 @@
 import inspect
 import warnings
 from contextlib import contextmanager
+from typing import TYPE_CHECKING
 
-from sentry_sdk import tracing_utils, Client
+from sentry_sdk import Client, tracing_utils
 from sentry_sdk._init_implementation import init
 from sentry_sdk.consts import INSTRUMENTER
-from sentry_sdk.scope import Scope, _ScopeManager, new_scope, isolation_scope
+from sentry_sdk.crons import monitor
+from sentry_sdk.scope import Scope, _ScopeManager, isolation_scope, new_scope
 from sentry_sdk.traces import StreamedSpan, _get_current_streamed_span
 from sentry_sdk.tracing import NoOpSpan, Transaction, trace
-from sentry_sdk.crons import monitor
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
-
-    from typing import Any
-    from typing import Dict
-    from typing import Generator
-    from typing import Optional
-    from typing import overload
-    from typing import Callable
-    from typing import TypeVar
-    from typing import ContextManager
-    from typing import Union
+    from typing import (
+        Any,
+        Callable,
+        ContextManager,
+        Dict,
+        Generator,
+        Optional,
+        TypeVar,
+        Union,
+        overload,
+    )
 
     from typing_extensions import Unpack
 
-    from sentry_sdk.client import BaseClient
     from sentry_sdk._types import (
-        Event,
-        Hint,
         Breadcrumb,
         BreadcrumbHint,
+        Event,
         ExcInfo,
-        MeasurementUnit,
+        Hint,
         LogLevelStr,
+        MeasurementUnit,
         SamplingContext,
     )
+    from sentry_sdk.client import BaseClient
     from sentry_sdk.traces import StreamedSpan
     from sentry_sdk.tracing import Span, TransactionKwargs
 

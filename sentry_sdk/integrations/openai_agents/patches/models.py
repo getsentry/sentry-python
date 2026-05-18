@@ -1,24 +1,23 @@
 import copy
 import time
 from functools import wraps
-
-from sentry_sdk.integrations import DidNotEnable
-
-from ..spans import ai_client_span, update_ai_client_span
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.utils import logger
+from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
 from sentry_sdk.tracing_utils import (
-    should_propagate_trace,
     add_sentry_baggage_to_headers,
+    should_propagate_trace,
 )
+from sentry_sdk.utils import logger
 
-from typing import TYPE_CHECKING
+from ..spans import ai_client_span, update_ai_client_span
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional
+
     from sentry_sdk.tracing import Span
 
 try:

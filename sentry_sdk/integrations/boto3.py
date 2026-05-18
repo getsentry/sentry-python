@@ -1,10 +1,11 @@
 from functools import partial
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
-from sentry_sdk.tracing import Span
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -12,22 +13,16 @@ from sentry_sdk.utils import (
     parse_version,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Dict
-    from typing import Optional
-    from typing import Type
-    from typing import Union
+    from typing import Any, Dict, Optional, Type, Union
 
     from botocore.model import ServiceId
 
 try:
     from botocore import __version__ as BOTOCORE_VERSION
+    from botocore.awsrequest import AWSRequest
     from botocore.client import BaseClient
     from botocore.response import StreamingBody
-    from botocore.awsrequest import AWSRequest
 except ImportError:
     raise DidNotEnable("botocore is not installed")
 

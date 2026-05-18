@@ -1,11 +1,10 @@
-import sys
 import logging
+import sys
 
-from sentry_sdk import capture_exception, capture_event, start_transaction, start_span
-from sentry_sdk.utils import event_from_exception
+from sentry_sdk import capture_event, capture_exception, start_span, start_transaction
 from sentry_sdk.scrubber import EventScrubber
+from sentry_sdk.utils import event_from_exception
 from tests.conftest import ApproxDict
-
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -87,6 +86,42 @@ def test_ip_address_not_scrubbed_when_pii_enabled(sentry_init, capture_events):
             "COOKIE": {"": {"rem": [["!config", "s"]]}},
         }
     }
+
+
+def test_user_ip_address_removed_when_pii_disabled(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    try:
+        1 / 0
+    except ZeroDivisionError:
+        ev, _hint = event_from_exception(sys.exc_info())
+        ev["user"] = {"id": "42", "ip_address": "127.0.0.1"}
+
+        capture_event(ev)
+
+    (event,) = events
+
+    assert event["user"] == {"id": "42"}
+    assert "user" not in event.get("_meta", {})
+
+
+def test_user_ip_address_not_removed_when_pii_enabled(sentry_init, capture_events):
+    sentry_init(send_default_pii=True)
+    events = capture_events()
+
+    try:
+        1 / 0
+    except ZeroDivisionError:
+        ev, _hint = event_from_exception(sys.exc_info())
+        ev["user"] = {"id": "42", "ip_address": "127.0.0.1"}
+
+        capture_event(ev)
+
+    (event,) = events
+
+    assert event["user"] == {"id": "42", "ip_address": "127.0.0.1"}
+    assert "user" not in event.get("_meta", {})
 
 
 def test_stack_var_scrubbing(sentry_init, capture_events):

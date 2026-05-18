@@ -1,11 +1,12 @@
 from typing import TYPE_CHECKING
 
 from sentry_sdk._batcher import Batcher
-from sentry_sdk.utils import serialize_attribute
 from sentry_sdk.envelope import Item, PayloadRef
+from sentry_sdk.utils import serialize_attribute
 
 if TYPE_CHECKING:
     from typing import Any
+
     from sentry_sdk._types import Log
 
 
@@ -45,7 +46,12 @@ class LogBatcher(Batcher["Log"]):
             headers={
                 "item_count": 1,
             },
-            payload=PayloadRef(json={"items": [self._to_transport_format(item)]}),
+            payload=PayloadRef(
+                json={
+                    "version": 2,
+                    "items": [self._to_transport_format(item)],
+                }
+            ),
         )
 
         self._record_lost_func(

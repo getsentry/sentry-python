@@ -109,7 +109,7 @@ class SentryPropagator(TextMapPropagator):
 
         span_id = trace.format_span_id(current_span_context.span_id)
 
-        span_map = SentrySpanProcessor().otel_span_map
+        span_map = SentrySpanProcessor.otel_span_map
         sentry_span = span_map.get(span_id, None)
         if not sentry_span:
             return

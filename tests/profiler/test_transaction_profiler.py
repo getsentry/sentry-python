@@ -1,6 +1,5 @@
 import inspect
 import os
-import sentry_sdk
 import sys
 import threading
 import time
@@ -10,7 +9,9 @@ from unittest import mock
 
 import pytest
 
+import sentry_sdk
 from sentry_sdk import start_transaction
+from sentry_sdk._lru_cache import LRUCache
 from sentry_sdk.profiler.transaction_profiler import (
     GeventScheduler,
     Profile,
@@ -24,7 +25,6 @@ from sentry_sdk.profiler.utils import (
     frame_id,
     get_frame_name,
 )
-from sentry_sdk._lru_cache import LRUCache
 
 try:
     import gevent

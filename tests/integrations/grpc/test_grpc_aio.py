@@ -1,15 +1,16 @@
 import asyncio
+from typing import Optional
+from unittest import mock
 
 import grpc
 import pytest
 import pytest_asyncio
-from unittest import mock
 
 import sentry_sdk
 from sentry_sdk import start_span, start_transaction
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.grpc import GRPCIntegration
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from tests.conftest import ApproxDict
 from tests.integrations.grpc.grpc_test_service_pb2 import gRPCTestMessage
 from tests.integrations.grpc.grpc_test_service_pb2_grpc import (
@@ -17,8 +18,6 @@ from tests.integrations.grpc.grpc_test_service_pb2_grpc import (
     gRPCTestServiceServicer,
     gRPCTestServiceStub,
 )
-
-from typing import Optional
 
 
 @pytest_asyncio.fixture(scope="function")

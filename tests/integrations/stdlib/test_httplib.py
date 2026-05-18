@@ -1,22 +1,21 @@
+import datetime
 import os
 import socket
-import datetime
 import time
 from http.client import HTTPConnection, HTTPSConnection
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socket import SocketIO
 from threading import Thread
+from unittest import mock
 from urllib.error import HTTPError
 from urllib.request import urlopen
-from unittest import mock
 
 import pytest
 
 import sentry_sdk
-from sentry_sdk import capture_message, start_transaction, continue_trace
+from sentry_sdk import capture_message, continue_trace, start_transaction
 from sentry_sdk.consts import MATCH_ALL, SPANDATA
 from sentry_sdk.integrations.stdlib import StdlibIntegration
-
 from tests.conftest import ApproxDict, create_mock_http_server, get_free_port
 
 PORT = create_mock_http_server()

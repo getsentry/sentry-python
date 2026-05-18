@@ -11,7 +11,7 @@ from sentry_sdk.integrations import (
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import TransactionSource, SOURCE_FOR_STYLE
+from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
 from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
@@ -19,12 +19,12 @@ from sentry_sdk.utils import (
 )
 
 try:
-    from litestar import Request, Litestar  # type: ignore
+    from litestar import Litestar, Request  # type: ignore
+    from litestar.data_extractors import ConnectionDataExtractor  # type: ignore
+    from litestar.exceptions import HTTPException  # type: ignore
     from litestar.handlers.base import BaseRouteHandler  # type: ignore
     from litestar.middleware import DefineMiddleware  # type: ignore
     from litestar.routes.http import HTTPRoute  # type: ignore
-    from litestar.data_extractors import ConnectionDataExtractor  # type: ignore
-    from litestar.exceptions import HTTPException  # type: ignore
 except ImportError:
     raise DidNotEnable("Litestar is not installed")
 
@@ -32,18 +32,22 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Optional, Union
-    from litestar.types.asgi_types import ASGIApp  # type: ignore
+
+    from litestar.middleware import MiddlewareProtocol
     from litestar.types import (  # type: ignore
         HTTPReceiveMessage,
         HTTPScope,
         Message,
         Middleware,
         Receive,
-        Scope as LitestarScope,
         Send,
         WebSocketReceiveMessage,
     )
-    from litestar.middleware import MiddlewareProtocol
+    from litestar.types import (
+        Scope as LitestarScope,
+    )
+    from litestar.types.asgi_types import ASGIApp  # type: ignore
+
     from sentry_sdk._types import Event, Hint
 
 _DEFAULT_TRANSACTION_NAME = "generic Litestar request"

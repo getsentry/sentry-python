@@ -3,6 +3,7 @@ Create spans from Django middleware invocations
 """
 
 from functools import wraps
+from typing import TYPE_CHECKING
 
 from django import VERSION as DJANGO_VERSION
 
@@ -10,17 +11,12 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.utils import (
     ContextVar,
-    transaction_from_function,
     capture_internal_exceptions,
+    transaction_from_function,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import Optional
-    from typing import TypeVar
+    from typing import Any, Callable, Optional, TypeVar
 
     from sentry_sdk.tracing import Span
 

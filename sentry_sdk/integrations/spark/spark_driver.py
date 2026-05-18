@@ -1,15 +1,15 @@
+from typing import TYPE_CHECKING
+
 import sentry_sdk
 from sentry_sdk.integrations import Integration
 from sentry_sdk.utils import capture_internal_exceptions, ensure_integration_enabled
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Optional
+    from typing import Any, Optional
+
+    from pyspark import SparkContext
 
     from sentry_sdk._types import Event, Hint
-    from pyspark import SparkContext
 
 
 class SparkIntegration(Integration):

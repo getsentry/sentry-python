@@ -1,13 +1,13 @@
 import concurrent.futures as cf
-import sys
 import copy
+import sys
 import threading
 
 import pytest
 
 import sentry_sdk
-from sentry_sdk.feature_flags import add_feature_flag, FlagBuffer
 from sentry_sdk import start_span, start_transaction
+from sentry_sdk.feature_flags import FlagBuffer, add_feature_flag
 from tests.conftest import ApproxDict
 
 

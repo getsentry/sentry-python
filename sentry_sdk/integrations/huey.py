@@ -1,5 +1,6 @@
 import sys
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.api import continue_trace, get_baggage, get_traceparent
@@ -12,25 +13,23 @@ from sentry_sdk.tracing import (
     TransactionSource,
 )
 from sentry_sdk.utils import (
+    SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    SENSITIVE_DATA_SUBSTITUTE,
     reraise,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any, Callable, Optional, Union, TypeVar
+    from typing import Any, Callable, Optional, TypeVar, Union
 
-    from sentry_sdk._types import EventProcessor, Event, Hint
+    from sentry_sdk._types import Event, EventProcessor, Hint
     from sentry_sdk.utils import ExcInfo
 
     F = TypeVar("F", bound=Callable[..., Any])
 
 try:
-    from huey.api import Huey, Result, ResultGroup, Task, PeriodicTask
+    from huey.api import Huey, PeriodicTask, Result, ResultGroup, Task
     from huey.exceptions import CancelExecution, RetryTask, TaskLockedException
 except ImportError:
     raise DidNotEnable("Huey is not installed")

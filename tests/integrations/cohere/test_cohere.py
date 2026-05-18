@@ -1,15 +1,14 @@
 import json
+from unittest import mock  # python 3.3 and above
 
 import httpx
 import pytest
-from cohere import Client, ChatMessage
+from cohere import ChatMessage, Client
+from httpx import Client as HTTPXClient
 
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.cohere import CohereIntegration
-
-from unittest import mock  # python 3.3 and above
-from httpx import Client as HTTPXClient
 
 
 @pytest.mark.parametrize(

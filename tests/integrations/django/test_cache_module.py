@@ -17,7 +17,6 @@ from sentry_sdk.integrations.django.caching import _get_span_description
 from tests.integrations.django.myapp.wsgi import application
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
 
-
 DJANGO_VERSION = DJANGO_VERSION[:2]
 
 

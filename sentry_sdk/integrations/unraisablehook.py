@@ -1,17 +1,15 @@
 import sys
+from typing import TYPE_CHECKING
 
 import sentry_sdk
+from sentry_sdk.integrations import Integration
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
 )
-from sentry_sdk.integrations import Integration
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Callable
-    from typing import Any
+    from typing import Any, Callable
 
 
 class UnraisablehookIntegration(Integration):

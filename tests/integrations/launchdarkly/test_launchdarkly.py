@@ -3,16 +3,15 @@ import sys
 
 import ldclient
 import pytest
-
 from ldclient import LDClient
 from ldclient.config import Config
 from ldclient.context import Context
 from ldclient.integrations.test_data import TestData
 
 import sentry_sdk
+from sentry_sdk import start_span, start_transaction
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.launchdarkly import LaunchDarklyIntegration
-from sentry_sdk import start_span, start_transaction
 from tests.conftest import ApproxDict
 
 

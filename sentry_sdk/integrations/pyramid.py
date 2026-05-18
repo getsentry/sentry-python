@@ -4,7 +4,7 @@ import sys
 import weakref
 
 import sentry_sdk
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
@@ -25,17 +25,15 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from typing import Any, Callable, Dict, Optional
+
     from pyramid.response import Response
-    from typing import Any
-    from sentry_sdk.integrations.wsgi import _ScopedResponse
-    from typing import Callable
-    from typing import Dict
-    from typing import Optional
     from webob.cookies import RequestCookies
     from webob.request import _FieldStorageWithFile
 
-    from sentry_sdk.utils import ExcInfo
     from sentry_sdk._types import Event, EventProcessor
+    from sentry_sdk.integrations.wsgi import _ScopedResponse
+    from sentry_sdk.utils import ExcInfo
 
 
 if getattr(Request, "authenticated_userid", None):
