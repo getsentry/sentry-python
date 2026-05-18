@@ -144,7 +144,6 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
                 parent_span=None,
             )
             message._sentry_span_ctx = span
-            span.__enter__()
         else:
             transaction = continue_trace(
                 sentry_headers,
