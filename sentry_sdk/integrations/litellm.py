@@ -18,12 +18,17 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import event_from_exception
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Optional
+    from typing import Any, Dict, List
     from datetime import datetime
 
 try:
     import litellm  # type: ignore[import-not-found]
     from litellm import input_callback, success_callback, failure_callback
+    from litellm.types.llms.openai import (  # type: ignore[import-not-found]
+        ResponseAPIUsage,
+        ResponseCompletedEvent,
+        ResponsesAPIResponse,
+    )
 except ImportError:
     raise DidNotEnable("LiteLLM not installed")
 
@@ -38,23 +43,6 @@ def _get_metadata_dict(kwargs: "Dict[str, Any]") -> "Dict[str, Any]":
         metadata = {}
         litellm_params["metadata"] = metadata
     return metadata
-
-
-def _read_usage_field(usage: "Any", *names: str) -> "Optional[int]":
-    """Read the first non-None field from a usage container.
-
-    The usage object can be either a typed Pydantic model (attribute access) or
-    a plain dict (litellm hands us a dict for the assembled async-streaming
-    response), so we try both shapes.
-    """
-    for name in names:
-        if isinstance(usage, dict):
-            value = usage.get(name)
-        else:
-            value = getattr(usage, name, None)
-        if value is not None:
-            return value
-    return None
 
 
 def _convert_message_parts(messages: "List[Dict[str, Any]]") -> "List[Dict[str, Any]]":
@@ -82,6 +70,48 @@ def _convert_message_parts(messages: "List[Dict[str, Any]]") -> "List[Dict[str, 
                     transformed.append(item)
             message["content"] = transformed
     return messages
+
+
+def _record_responses_conversation_id(
+    span: "Any", complete_input: "Dict[str, Any]"
+) -> None:
+    """Set the conversation id on the span when the Responses API request carries one."""
+    conversation = complete_input.get("conversation")
+    if conversation is None:
+        return
+
+    if isinstance(conversation, str):
+        conversation_id = conversation
+    elif isinstance(conversation, dict):
+        conversation_id = conversation.get("id")
+    else:
+        conversation_id = None
+
+    if conversation_id is not None:
+        set_data_normalized(span, SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id)
+
+
+def _record_responses_input_messages(
+    span: "Any", scope: "Any", responses_input: "Any"
+) -> None:
+    """Record the request messages for a Responses API call."""
+    if not responses_input:
+        return
+
+    # `input` is either a string or a list of message dicts (same shape as
+    # the OpenAI Responses API).
+    if isinstance(responses_input, str):
+        input_messages = [responses_input]
+    else:
+        input_messages = list(responses_input)
+    normalized = normalize_message_roles(input_messages)  # type: ignore[arg-type]
+    messages_data = truncate_and_annotate_messages(normalized, span, scope)
+    if messages_data is not None:
+        span.set_data(
+            SPANDATA.GEN_AI_REQUEST_MESSAGES,
+            messages_data,
+            unpack=False,
+        )
 
 
 def _input_callback(kwargs: "Dict[str, Any]") -> None:
@@ -157,36 +187,9 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
         complete_input = (kwargs.get("additional_args") or {}).get(
             "complete_input_dict"
         ) or {}
-        conversation = complete_input.get("conversation")
-        if conversation is not None:
-            conversation_id: "Optional[str]" = None
-            if isinstance(conversation, str):
-                conversation_id = conversation
-            elif isinstance(conversation, dict):
-                conversation_id = conversation.get("id")
-            if conversation_id is not None:
-                set_data_normalized(
-                    span, SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id
-                )
-
+        _record_responses_conversation_id(span, complete_input)
         if record_prompts:
-            # `input` is either a string or a list of message dicts (same
-            # shape as OpenAI Responses API).
-            responses_input = kwargs.get("input")
-            if responses_input:
-                if isinstance(responses_input, str):
-                    input_messages = [responses_input]
-                else:
-                    input_messages = list(responses_input)
-                normalized = normalize_message_roles(input_messages)  # type: ignore[arg-type]
-                messages_data = truncate_and_annotate_messages(normalized, span, scope)
-                if messages_data is not None:
-                    set_data_normalized(
-                        span,
-                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                        messages_data,
-                        unpack=False,
-                    )
+            _record_responses_input_messages(span, scope, kwargs.get("input"))
 
     else:
         # Chat completions.
@@ -223,6 +226,103 @@ async def _async_input_callback(kwargs: "Dict[str, Any]") -> None:
     return _input_callback(kwargs)
 
 
+def _record_chat_response_messages(span: "Any", response: "Any") -> None:
+    """Record response.text from a Chat Completions response."""
+    response_messages = []
+    for choice in response.choices:
+        message = getattr(choice, "message", None)
+        if message is None:
+            continue
+        if hasattr(message, "model_dump"):
+            response_messages.append(message.model_dump())
+        elif hasattr(message, "dict"):
+            response_messages.append(message.dict())
+        else:
+            # Fallback for basic message objects
+            msg = {}
+            if hasattr(message, "role"):
+                msg["role"] = message.role
+            if hasattr(message, "content"):
+                msg["content"] = message.content
+            if hasattr(message, "tool_calls"):
+                msg["tool_calls"] = message.tool_calls
+            response_messages.append(msg)
+
+    if response_messages:
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, response_messages)
+
+
+def _record_responses_output(span: "Any", response: "ResponsesAPIResponse") -> None:
+    """Record response text and tool calls from a Responses API response."""
+    output_text = []  # type: List[Any]
+    tool_calls = []  # type: List[Any]
+    for output in response.output:
+        output_type = getattr(output, "type", None)
+        if output_type == "function_call":
+            if hasattr(output, "model_dump"):
+                tool_calls.append(output.model_dump())
+            elif hasattr(output, "dict"):
+                tool_calls.append(output.dict())
+        elif output_type == "message":
+            for content_item in getattr(output, "content", []) or []:
+                text = getattr(content_item, "text", None)
+                if text is not None:
+                    output_text.append(text)
+                elif hasattr(content_item, "model_dump"):
+                    output_text.append(content_item.model_dump())
+                elif hasattr(content_item, "dict"):
+                    output_text.append(content_item.dict())
+
+    if tool_calls:
+        set_data_normalized(
+            span,
+            SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+            tool_calls,
+            unpack=False,
+        )
+    if output_text:
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_text)
+
+
+def _record_token_usage_from_response(span: "Any", response: "Any") -> None:
+    """Record token usage. The shape of ``usage`` depends on the litellm
+    processing pipeline rather than the API path:
+
+    - ``ResponseAPIUsage``: raw Responses API usage (``input_tokens`` /
+      ``output_tokens``). Seen when litellm has not yet normalized the value.
+    - ``dict``: chat-style dict (``prompt_tokens`` / ``completion_tokens``).
+      litellm assembles streaming Responses API usage as a dict.
+    - Otherwise: chat-style Pydantic ``Usage`` (``prompt_tokens`` /
+      ``completion_tokens``). Used for Chat Completions, Embeddings, and
+      non-streaming Responses API after litellm's post-processing.
+    """
+    usage = getattr(response, "usage", None)
+    if usage is None:
+        return
+
+    if isinstance(usage, ResponseAPIUsage):
+        record_token_usage(
+            span,
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+            total_tokens=usage.total_tokens,
+        )
+    elif isinstance(usage, dict):
+        record_token_usage(
+            span,
+            input_tokens=usage.get("prompt_tokens"),
+            output_tokens=usage.get("completion_tokens"),
+            total_tokens=usage.get("total_tokens"),
+        )
+    else:
+        record_token_usage(
+            span,
+            input_tokens=getattr(usage, "prompt_tokens", None),
+            output_tokens=getattr(usage, "completion_tokens", None),
+            total_tokens=getattr(usage, "total_tokens", None),
+        )
+
+
 def _success_callback(
     kwargs: "Dict[str, Any]",
     response: "Any",
@@ -237,9 +337,8 @@ def _success_callback(
       - Responses API (non-streaming): ResponsesAPIResponse with ``.output[]``
         items (``message`` / ``function_call``) and ``.usage`` carrying
         ``input_tokens`` / ``output_tokens``.
-      - Responses API (streaming): a ResponseCompletedEvent wrapper
-        ``{type: "response.completed", response: ResponsesAPIResponse}``,
-        which we unwrap below.
+      - Responses API (streaming): a ResponseCompletedEvent wrapping a
+        ``ResponsesAPIResponse``, which we unwrap below.
       - Embeddings: CreateEmbeddingResponse with ``.usage`` only (no choices
         or output).
     """
@@ -255,9 +354,7 @@ def _success_callback(
 
     # Streaming Responses API: unwrap the ResponseCompletedEvent so the rest of
     # the function sees the assembled ResponsesAPIResponse directly.
-    if getattr(response, "type", None) == "response.completed" and hasattr(
-        response, "response"
-    ):
+    if isinstance(response, ResponseCompletedEvent):
         response = response.response
 
     try:
@@ -265,84 +362,13 @@ def _success_callback(
         if hasattr(response, "model"):
             set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
 
-        # Response content: structure depends on the API shape. Embeddings have
-        # neither ``choices`` nor ``output``, so we just skip this block.
         if should_send_default_pii() and integration.include_prompts:
-            if hasattr(response, "choices"):
-                # Chat Completions API.
-                response_messages = []
-                for choice in response.choices:
-                    if hasattr(choice, "message"):
-                        if hasattr(choice.message, "model_dump"):
-                            response_messages.append(choice.message.model_dump())
-                        elif hasattr(choice.message, "dict"):
-                            response_messages.append(choice.message.dict())
-                        else:
-                            # Fallback for basic message objects
-                            msg = {}
-                            if hasattr(choice.message, "role"):
-                                msg["role"] = choice.message.role
-                            if hasattr(choice.message, "content"):
-                                msg["content"] = choice.message.content
-                            if hasattr(choice.message, "tool_calls"):
-                                msg["tool_calls"] = choice.message.tool_calls
-                            response_messages.append(msg)
+            if isinstance(response, ResponsesAPIResponse):
+                _record_responses_output(span, response)
+            elif hasattr(response, "choices"):
+                _record_chat_response_messages(span, response)
 
-                if response_messages:
-                    set_data_normalized(
-                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, response_messages
-                    )
-            elif hasattr(response, "output"):
-                # Responses API: split message text from function-call items.
-                output_text: "List[Any]" = []
-                tool_calls: "List[Any]" = []
-                for output in response.output:
-                    output_type = getattr(output, "type", None)
-                    if output_type == "function_call":
-                        if hasattr(output, "model_dump"):
-                            tool_calls.append(output.model_dump())
-                        elif hasattr(output, "dict"):
-                            tool_calls.append(output.dict())
-                    elif output_type == "message":
-                        for content_item in getattr(output, "content", []) or []:
-                            text = getattr(content_item, "text", None)
-                            if text is not None:
-                                output_text.append(text)
-                            elif hasattr(content_item, "model_dump"):
-                                output_text.append(content_item.model_dump())
-                            elif hasattr(content_item, "dict"):
-                                output_text.append(content_item.dict())
-
-                if tool_calls:
-                    set_data_normalized(
-                        span,
-                        SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-                        tool_calls,
-                        unpack=False,
-                    )
-                if output_text:
-                    set_data_normalized(
-                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_text
-                    )
-
-        # Token usage field names differ across APIs:
-        #   Chat Completions / Embeddings: prompt_tokens / completion_tokens
-        #   Responses API (non-streaming): input_tokens  / output_tokens
-        #   Responses API (streaming):     prompt_tokens / completion_tokens
-        #     (litellm normalizes to chat-completion names when assembling the
-        #      streaming response). For the async-streaming variant, the
-        #      assembled `usage` is a plain dict, not a Pydantic model — hence
-        #      `_read_usage_field` supports both shapes.
-        if hasattr(response, "usage"):
-            usage = response.usage
-            record_token_usage(
-                span,
-                input_tokens=_read_usage_field(usage, "prompt_tokens", "input_tokens"),
-                output_tokens=_read_usage_field(
-                    usage, "completion_tokens", "output_tokens"
-                ),
-                total_tokens=_read_usage_field(usage, "total_tokens"),
-            )
+        _record_token_usage_from_response(span, response)
 
     finally:
         is_streaming = kwargs.get("stream")
