@@ -518,7 +518,7 @@ async def _wrap_async_handler(
     handler: "Callable[..., Awaitable[Any]]", *args: "Any", **kwargs: "Any"
 ) -> "Any":
     """
-    Wraps an asynchronous handler function to attach request info to the server segment span.
+    Wraps an asynchronous handler function to attach request info to errors and the server segment span.
     The request body cached on the Starlette Request object is attached to streamed spans, but consuming the request body in the event
     processor can still cause application hangs.
     """
