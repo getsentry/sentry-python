@@ -42,16 +42,6 @@ BODY_FORM = """--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="usern
     "{{image_data}}", str(base64.b64encode(open(PICTURE, "rb").read()))
 )
 
-FORM_RECEIVE_MESSAGES = [
-    {"type": "http.request", "body": BODY_FORM.encode("utf-8")},
-    {"type": "http.disconnect"},
-]
-
-JSON_RECEIVE_MESSAGES = [
-    {"type": "http.request", "body": json.dumps(BODY_JSON).encode("utf-8")},
-    {"type": "http.disconnect"},
-]
-
 PARSED_FORM = starlette.datastructures.FormData(
     [
         ("username", "Jane"),
@@ -65,27 +55,6 @@ PARSED_FORM = starlette.datastructures.FormData(
         ),
     ]
 )
-
-# Dummy ASGI scope for creating mock Starlette requests
-SCOPE = {
-    "client": ("172.29.0.10", 34784),
-    "headers": [
-        [b"host", b"example.com"],
-        [b"user-agent", b"Mozilla/5.0 Gecko/20100101 Firefox/60.0"],
-        [b"content-type", b"application/json"],
-        [b"accept-language", b"en-US,en;q=0.5"],
-        [b"accept-encoding", b"gzip, deflate, br"],
-        [b"upgrade-insecure-requests", b"1"],
-        [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
-    ],
-    "http_version": "0.0",
-    "method": "GET",
-    "path": "/path",
-    "query_string": b"qs=hello",
-    "scheme": "http",
-    "server": ("172.28.0.10", 8000),
-    "type": "http",
-}
 
 
 async def _mock_receive(msg):
@@ -364,9 +333,7 @@ async def test_formdata_request_body(sentry_init, capture_events):
     assert event["request"]["data"]["username"] == PARSED_FORM["username"]
     assert event["request"]["data"]["password"] == "[Filtered]"
     assert event["request"]["data"]["photo"] == ""
-    assert transaction_event["_meta"]["request"]["data"]["photo"] == {
-        "": {"rem": [["!raw", "x"]]}
-    }
+    assert event["_meta"]["request"]["data"]["photo"] == {"": {"rem": [["!raw", "x"]]}}
 
     assert transaction_event["request"]["data"].keys() == PARSED_FORM.keys()
     assert transaction_event["request"]["data"]["username"] == PARSED_FORM["username"]
