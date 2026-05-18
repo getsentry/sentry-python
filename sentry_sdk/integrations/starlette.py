@@ -519,7 +519,7 @@ async def _wrap_async_handler(
 ) -> "Any":
     """
     Wraps an asynchronous handler function to attach request info to the server segment span.
-    The request body cached on the ASGI scope is attached to streamed spans, but consuming the request body in the event
+    The request body cached on the Starlette Request object is attached to streamed spans, but consuming the request body in the event
     processor can still cause application hangs.
     """
     client = sentry_sdk.get_client()
