@@ -8,7 +8,7 @@ from json import JSONDecodeError
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     DidNotEnable,
@@ -37,6 +37,7 @@ from sentry_sdk.utils import (
     parse_version,
     transaction_from_function,
 )
+from sentry_sdk._types import OVER_SIZE_LIMIT_SUBSTITUTE
 
 if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable, Container, Dict, Optional, Tuple, Union
@@ -88,6 +89,9 @@ else:
 _DEFAULT_TRANSACTION_NAME = "generic Starlette request"
 
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
+
+_SCOPE_STATE_JSON_REQUEST_BODY_KEY = "sentry_sdk.json_request_body"
+_SCOPE_STATE_FORMDATA_REQUEST_BODY_KEY = "sentry_sdk.formdata_request_body"
 
 
 class StarletteIntegration(Integration):
@@ -146,6 +150,16 @@ class StarletteIntegration(Integration):
 
         if version >= (0, 24):
             patch_templates()
+
+    def setup_once_with_options(
+        self: "StarletteIntegration", options: "Optional[dict[str, Any]]" = None
+    ) -> None:
+        is_span_streaming_enabled = has_span_streaming_enabled(options)
+        if not is_span_streaming_enabled:
+            return
+
+        _patch_json_request_body_accessor()
+        _patch_formdata_request_body_accessor()
 
 
 def _enable_span_for_middleware(middleware_class: "Any") -> type:
@@ -479,6 +493,131 @@ def _is_async_callable(obj: "Any") -> bool:
     )
 
 
+def _patch_json_request_body_accessor():
+    """
+    Caches request body data on the ASGI scope, so that the body can be attached to telemetry after the request handler runs.
+    Without the cache, consuming the stream can cause the application to hang.
+    """
+    _original_json = Request.json
+
+    @functools.wraps(_original_json)
+    async def sentry_json(self: "Request"):
+        request_json = await _original_json(self)
+        self.scope["state"][_SCOPE_STATE_JSON_REQUEST_BODY_KEY] = request_json
+        return request_json
+
+    Request.json = sentry_json
+
+
+def _patch_formdata_request_body_accessor():
+    """
+    Caches request body data on the ASGI scope, so that the body can be attached to telemetry after the request handler runs.
+    Without the cache, consuming the stream can cause the application to hang.
+    """
+    _original_form = Request.form
+
+    @functools.wraps(_original_form)
+    async def sentry_form(self: "Request"):
+        print("wrapped form")
+        request_formdata = await _original_form(self)
+        self.scope["state"][_SCOPE_STATE_FORMDATA_REQUEST_BODY_KEY] = request_formdata
+        return request_formdata
+
+    Request.form = sentry_form
+
+
+def _serialize_cached_request_body_attribute(
+    client: "sentry_sdk.client.BaseClient", request: "Request"
+) -> "Optional[str]":
+    """
+    Returns a stringified JSON representation of the request body if the request body is cached on the ASGI scope and within size bounds.
+    """
+    if (
+        "content-length" not in request.headers
+        or _SCOPE_STATE_JSON_REQUEST_BODY_KEY not in request.scope["state"]
+        and _SCOPE_STATE_FORMDATA_REQUEST_BODY_KEY not in request.scope["state"]
+    ):
+        return None
+
+    content_length = int(request.headers["content-length"])
+    if content_length and not request_body_within_bounds(client, content_length):
+        return OVER_SIZE_LIMIT_SUBSTITUTE
+
+    if _SCOPE_STATE_JSON_REQUEST_BODY_KEY in request.scope["state"]:
+        return json.dumps(request.scope["state"][_SCOPE_STATE_JSON_REQUEST_BODY_KEY])
+
+    form = request.scope["state"][_SCOPE_STATE_FORMDATA_REQUEST_BODY_KEY]
+
+    form_data = {}
+    for key, val in form.items():
+        is_file = isinstance(val, UploadFile)
+        form_data[key] = val if not is_file else "[Unparsable]"
+
+    return json.dumps(form_data)
+
+
+async def _wrap_async_handler(handler, *args, **kwargs):
+    """
+    Wraps an asynchronous handler function to attach request info to the server segment span.
+    The request body cached on the ASGI scope is attached to streamed spans, but consuming the request body in the event
+    processor can still cause application hangs.
+    """
+    client = sentry_sdk.get_client()
+    integration = client.get_integration(StarletteIntegration)
+    if integration is None:
+        return await handler(*args, **kwargs)
+
+    request = args[0]
+
+    _set_transaction_name_and_source(
+        sentry_sdk.get_current_scope(),
+        integration.transaction_style,
+        request,
+    )
+
+    sentry_scope = sentry_sdk.get_isolation_scope()
+    extractor = StarletteRequestExtractor(request)
+
+    info = await extractor.extract_request_info()
+
+    def _make_request_event_processor(
+        req: "Any", integration: "Any"
+    ) -> "Callable[[Event, dict[str, Any]], Event]":
+        def event_processor(event: "Event", hint: "Dict[str, Any]") -> "Event":
+            # Add info from request to event
+            request_info = event.get("request", {})
+            if info:
+                if "cookies" in info:
+                    request_info["cookies"] = info["cookies"]
+                if "data" in info:
+                    request_info["data"] = info["data"]
+            event["request"] = deepcopy(request_info)
+
+            return event
+
+        return event_processor
+
+    sentry_scope._name = StarletteIntegration.identifier
+    sentry_scope.add_event_processor(
+        _make_request_event_processor(request, integration)
+    )
+
+    try:
+        return await handler(*args, **kwargs)
+    finally:
+        current_span = _get_current_streamed_span()
+
+        if type(current_span) is StreamedSpan:
+            serialized_request_body = _serialize_cached_request_body_attribute(
+                client=client, request=request
+            )
+            if serialized_request_body:
+                current_span._segment.set_attribute(
+                    SPANDATA.HTTP_REQUEST_BODY_DATA,
+                    serialized_request_body,
+                )
+
+
 def patch_request_response() -> None:
     old_request_response = starlette.routing.request_response
 
@@ -489,51 +628,7 @@ def patch_request_response() -> None:
         if is_coroutine:
 
             async def _sentry_async_func(*args: "Any", **kwargs: "Any") -> "Any":
-                client = sentry_sdk.get_client()
-                integration = client.get_integration(StarletteIntegration)
-                if integration is None:
-                    return await old_func(*args, **kwargs)
-
-                request = args[0]
-
-                _set_transaction_name_and_source(
-                    sentry_sdk.get_current_scope(),
-                    integration.transaction_style,
-                    request,
-                )
-
-                sentry_scope = sentry_sdk.get_isolation_scope()
-                extractor = StarletteRequestExtractor(request)
-                info = await extractor.extract_request_info()
-
-                def _make_request_event_processor(
-                    req: "Any", integration: "Any"
-                ) -> "Callable[[Event, dict[str, Any]], Event]":
-                    def event_processor(
-                        event: "Event", hint: "Dict[str, Any]"
-                    ) -> "Event":
-                        # Add info from request to event
-                        request_info = event.get("request", {})
-                        if info:
-                            if "cookies" in info:
-                                request_info["cookies"] = info["cookies"]
-                            if "data" in info:
-                                request_info["data"] = info["data"]
-                        event["request"] = deepcopy(request_info)
-
-                        return event
-
-                    return event_processor
-
-                sentry_scope._name = StarletteIntegration.identifier
-                sentry_scope.add_event_processor(
-                    _make_request_event_processor(request, integration)
-                )
-
-                if has_span_streaming_enabled(client.options):
-                    _set_request_body_data_on_streaming_segment(info)
-
-                return await old_func(*args, **kwargs)
+                return await _wrap_async_handler(old_func, *args, **kwargs)
 
             func = _sentry_async_func
 
