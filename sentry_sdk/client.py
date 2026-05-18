@@ -34,7 +34,7 @@ from sentry_sdk.profiler.transaction_profiler import (
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.serializer import serialize
 from sentry_sdk.sessions import SessionFlusher
-from sentry_sdk.traces import SpanStatus
+from sentry_sdk.traces import SpanStatus, StreamedSpan
 from sentry_sdk.tracing import trace
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.transport import (
