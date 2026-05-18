@@ -3,6 +3,7 @@ from typing import Any, Callable, List, Optional
 
 import sentry_sdk
 from sentry_sdk.ai.utils import (
+    get_start_span_function,
     normalize_message_roles,
     set_data_normalized,
     truncate_and_annotate_messages,
@@ -159,7 +160,7 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
             f"invoke_agent {graph_name}".strip() if graph_name else "invoke_agent"
         )
 
-        with sentry_sdk.start_span(
+        with get_start_span_function()(
             op=OP.GEN_AI_INVOKE_AGENT,
             name=span_name,
             origin=LanggraphIntegration.origin,
@@ -219,7 +220,7 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
             f"invoke_agent {graph_name}".strip() if graph_name else "invoke_agent"
         )
 
-        with sentry_sdk.start_span(
+        with get_start_span_function()(
             op=OP.GEN_AI_INVOKE_AGENT,
             name=span_name,
             origin=LanggraphIntegration.origin,
