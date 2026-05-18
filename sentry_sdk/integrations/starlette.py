@@ -47,7 +47,10 @@ try:
     import starlette  # type: ignore
     from starlette import __version__ as STARLETTE_VERSION
     from starlette.applications import Starlette  # type: ignore
-    from starlette.datastructures import UploadFile  # type: ignore
+    from starlette.datastructures import (
+        FormData,
+        UploadFile,  # type: ignore
+    )
     from starlette.middleware import Middleware  # type: ignore
     from starlette.middleware.authentication import (  # type: ignore
         AuthenticationMiddleware,
@@ -492,7 +495,7 @@ def _is_async_callable(obj: "Any") -> bool:
     )
 
 
-def _patch_json_request_body_accessor():
+def _patch_json_request_body_accessor() -> None:
     """
     Caches request body data on the ASGI scope, so that the body can be attached to telemetry after the request handler runs.
     Without the cache, consuming the stream can cause the application to hang.
@@ -500,15 +503,17 @@ def _patch_json_request_body_accessor():
     _original_json = Request.json
 
     @functools.wraps(_original_json)
-    async def sentry_json(self: "Request"):
-        request_json = await _original_json(self)
-        self.scope["state"][_SCOPE_STATE_JSON_REQUEST_BODY_KEY] = request_json
+    async def sentry_json(self: "Request", *args: "Any", **kwargs: "Any") -> "Any":
+        request_json = await _original_json(self, *args, **kwargs)
+        self.scope.setdefault("state", {})[_SCOPE_STATE_JSON_REQUEST_BODY_KEY] = (
+            request_json
+        )
         return request_json
 
     Request.json = sentry_json
 
 
-def _patch_formdata_request_body_accessor():
+def _patch_formdata_request_body_accessor() -> None:
     """
     Caches request body data on the ASGI scope, so that the body can be attached to telemetry after the request handler runs.
     Without the cache, consuming the stream can cause the application to hang.
@@ -516,10 +521,11 @@ def _patch_formdata_request_body_accessor():
     _original_form = Request.form
 
     @functools.wraps(_original_form)
-    async def sentry_form(self: "Request"):
-        print("wrapped form")
-        request_formdata = await _original_form(self)
-        self.scope["state"][_SCOPE_STATE_FORMDATA_REQUEST_BODY_KEY] = request_formdata
+    async def sentry_form(self: "Request", *args: "Any", **kwargs: "Any") -> "FormData":
+        request_formdata = await _original_form(self, *args, **kwargs)
+        self.scope.setdefault("state", {})[_SCOPE_STATE_FORMDATA_REQUEST_BODY_KEY] = (
+            request_formdata
+        )
         return request_formdata
 
     Request.form = sentry_form
@@ -555,7 +561,7 @@ def _serialize_cached_request_body_attribute(
     return json.dumps(form_data)
 
 
-async def _wrap_async_handler(handler, *args, **kwargs):
+async def _wrap_async_handler(handler, *args: "Any", **kwargs: "Any") -> "Any":
     """
     Wraps an asynchronous handler function to attach request info to the server segment span.
     The request body cached on the ASGI scope is attached to streamed spans, but consuming the request body in the event
