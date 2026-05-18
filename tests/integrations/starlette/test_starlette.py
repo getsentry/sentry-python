@@ -375,6 +375,10 @@ async def test_request_info_json_body(
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    STARLETTE_VERSION < (0, 24),
+    reason="Patched `_get_form()` was added in version 0.24 with https://github.com/Kludex/starlette/commit/c568b55dff8be94b9c917e186e512ab53d7310e1",
+)
 @pytest.mark.parametrize("span_streaming", [True, False])
 async def test_formdata_request_body(
     sentry_init, capture_events, capture_items, span_streaming
@@ -456,6 +460,10 @@ async def test_formdata_request_body(
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(
+    STARLETTE_VERSION < (0, 24),
+    reason="Patched `_get_form()` was added in version 0.24 with https://github.com/Kludex/starlette/commit/c568b55dff8be94b9c917e186e512ab53d7310e1",
+)
 @pytest.mark.parametrize("span_streaming", [True, False])
 async def test_request_body_too_big(
     sentry_init, capture_events, capture_items, span_streaming
