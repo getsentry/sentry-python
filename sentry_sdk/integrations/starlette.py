@@ -498,9 +498,8 @@ def _get_cached_request_body_attribute(
     if content_length and not request_body_within_bounds(client, content_length):
         return OVER_SIZE_LIMIT_SUBSTITUTE
 
-    json_body = getattr(request, "_json", None)
-    if json_body is not None:
-        return json.dumps(json_body)
+    if hasattr(request, "_json"):
+        return json.dumps(request._json)
 
     formdata_body = getattr(request, "_form", None)
     if formdata_body is None:
