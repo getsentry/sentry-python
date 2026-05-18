@@ -498,7 +498,8 @@ def _is_async_callable(obj: "Any") -> bool:
 def _patch_json_request_body_accessor() -> None:
     """
     Caches request body data on the ASGI scope, so that the body can be attached to telemetry after the request handler runs.
-    Without the cache, consuming the stream can cause the application to hang.
+    Without the cache, consuming the stream causes applications to hang when middleware or handlers consume the raw
+    `receive()` callable exposed by Starlette.
     """
     _original_json = Request.json
 
@@ -516,7 +517,8 @@ def _patch_json_request_body_accessor() -> None:
 def _patch_formdata_request_body_accessor() -> None:
     """
     Caches request body data on the ASGI scope, so that the body can be attached to telemetry after the request handler runs.
-    Without the cache, consuming the stream can cause the application to hang.
+    Without the cache, consuming the stream causes applications to hang when middleware or handlers consume the raw
+    `receive()` callable exposed by Starlette.
     """
     if not hasattr(Request, "_get_form"):
         return
