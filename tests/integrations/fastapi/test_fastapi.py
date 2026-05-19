@@ -13,7 +13,6 @@ from fastapi import Body, FastAPI, File, Form, HTTPException, Request, UploadFil
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.testclient import TestClient
 from starlette.responses import JSONResponse
-from typing_extensions import Annotated
 
 import sentry_sdk
 from sentry_sdk import capture_message
@@ -104,9 +103,9 @@ def fastapi_app_factory():
 
     @app.post("/body/form")
     async def body_form(
-        username: Annotated[str, Form()],
-        password: Annotated[str, Form()],
-        photo: Annotated[UploadFile, File()],
+        username: str = Form(...),
+        password: str = Form(...),
+        photo: UploadFile = File(...),
     ):
         capture_message("hi")
         return {"status": "ok"}
