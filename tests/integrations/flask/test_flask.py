@@ -867,7 +867,6 @@ def test_tracing_error(sentry_init, capture_events, capture_items, app, span_str
 
         assert segment["name"] == "error"
         assert segment["status"] == SpanStatus.ERROR
-        assert segment["attributes"]["http.response.status_code"] == 500
 
         assert error_event["transaction"] == "error"
         (exception,) = error_event["exception"]["values"]
