@@ -1,5 +1,7 @@
+import base64
 import json
 import logging
+import os
 import threading
 import warnings
 from unittest import mock
@@ -7,7 +9,7 @@ from unittest import mock
 import fastapi
 import pytest
 import starlette
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Body, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.testclient import TestClient
 
@@ -21,6 +23,28 @@ from sentry_sdk.utils import parse_version
 
 FASTAPI_VERSION = parse_version(fastapi.__version__)
 STARLETTE_VERSION = parse_version(starlette.__version__)
+
+PICTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "photo.jpg")
+
+BODY_JSON = {"some": "json", "for": "testing", "nested": {"numbers": 123}}
+
+BODY_FORM = """--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="username"\r\n\r\nJane\r\n--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="password"\r\n\r\nhello123\r\n--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="photo"; filename="photo.jpg"\r\nContent-Type: image/jpg\r\nContent-Transfer-Encoding: base64\r\n\r\n{{image_data}}\r\n--fd721ef49ea403a6--\r\n""".replace(
+    "{{image_data}}", str(base64.b64encode(open(PICTURE, "rb").read()))
+)
+
+PARSED_FORM = starlette.datastructures.FormData(
+    [
+        ("username", "Jane"),
+        ("password", "hello123"),
+        (
+            "photo",
+            starlette.datastructures.UploadFile(
+                filename="photo.jpg",
+                file=open(PICTURE, "rb"),
+            ),
+        ),
+    ]
+)
 
 from tests.integrations.conftest import parametrize_test_configurable_status_codes
 from tests.integrations.starlette import test_starlette
@@ -70,7 +94,135 @@ def fastapi_app_factory():
             "active": str(threading.current_thread().ident),
         }
 
+    @app.post("/body/json")
+    async def body_json(payload: dict = Body(...)):
+        capture_message("hi")
+        return {"status": "ok"}
+
+    @app.post("/body/form")
+    async def body_form(
+        username: str = Form(...),
+        password: str = Form(...),
+        photo: UploadFile = File(...),
+    ):
+        capture_message("hi")
+        return {"status": "ok"}
+
     return app
+
+
+@pytest.mark.asyncio
+async def test_request_info_json_body(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        integrations=[StarletteIntegration()],
+    )
+
+    app = fastapi_app_factory()
+    client = TestClient(app)
+
+    events = capture_events()
+
+    client.post(
+        "/body/json",
+        json=BODY_JSON,
+        headers={
+            "cookie": "yummy_cookie=choco; tasty_cookie=strawberry",
+        },
+    )
+
+    (event, transaction_event) = events
+
+    assert event["request"]["cookies"] == {
+        "tasty_cookie": "strawberry",
+        "yummy_cookie": "choco",
+    }
+    assert event["request"]["data"] == BODY_JSON
+
+    assert transaction_event["request"]["cookies"] == {
+        "tasty_cookie": "strawberry",
+        "yummy_cookie": "choco",
+    }
+    assert transaction_event["request"]["data"] == BODY_JSON
+
+
+@pytest.mark.asyncio
+async def test_formdata_request_body(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        max_request_body_size="always",
+        integrations=[StarletteIntegration()],
+    )
+
+    app = fastapi_app_factory()
+    client = TestClient(app)
+
+    events = capture_events()
+
+    client.post(
+        "/body/form",
+        data=BODY_FORM.encode("utf-8"),
+        headers={
+            "content-type": "multipart/form-data; boundary=fd721ef49ea403a6",
+        },
+    )
+
+    (event, transaction_event) = events
+    assert event["request"]["data"].keys() == PARSED_FORM.keys()
+    assert event["request"]["data"]["username"] == PARSED_FORM["username"]
+    assert event["request"]["data"]["password"] == "[Filtered]"
+    assert event["request"]["data"]["photo"] == ""
+    assert event["_meta"]["request"]["data"]["photo"] == {"": {"rem": [["!raw", "x"]]}}
+
+    assert transaction_event["request"]["data"].keys() == PARSED_FORM.keys()
+    assert transaction_event["request"]["data"]["username"] == PARSED_FORM["username"]
+    assert transaction_event["request"]["data"]["password"] == "[Filtered]"
+    assert transaction_event["request"]["data"]["photo"] == ""
+    assert transaction_event["_meta"]["request"]["data"]["photo"] == {
+        "": {"rem": [["!raw", "x"]]}
+    }
+
+
+@pytest.mark.asyncio
+async def test_request_body_too_big(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        integrations=[StarletteIntegration()],
+    )
+
+    app = fastapi_app_factory()
+    client = TestClient(app)
+
+    events = capture_events()
+
+    client.post(
+        "/body/form",
+        data=BODY_FORM.encode("utf-8"),
+        headers={
+            "content-type": "multipart/form-data; boundary=fd721ef49ea403a6",
+            "cookie": "yummy_cookie=choco; tasty_cookie=strawberry",
+        },
+    )
+
+    (event, transaction_event) = events
+    assert event["request"]["cookies"] == {
+        "tasty_cookie": "strawberry",
+        "yummy_cookie": "choco",
+    }
+    # Because request is too big only the AnnotatedValue is extracted.
+    assert event["_meta"]["request"]["data"] == {"": {"rem": [["!config", "x"]]}}
+
+    assert transaction_event["request"]["cookies"] == {
+        "tasty_cookie": "strawberry",
+        "yummy_cookie": "choco",
+    }
+    # Because request is too big only the AnnotatedValue is extracted.
+    assert transaction_event["_meta"]["request"]["data"] == {
+        "": {"rem": [["!config", "x"]]}
+    }
 
 
 @pytest.mark.asyncio
