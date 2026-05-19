@@ -152,7 +152,7 @@ class SentryAsyncExtension(SchemaExtension):
         return hashlib.md5(query.encode("utf-8")).hexdigest()
 
     def on_operation(self) -> "Generator[None, None, None]":
-        self._operation_name = self.execution_context.operation_name
+        operation_name = self.execution_context.operation_name
 
         operation_type = "query"
         op = OP.GRAPHQL_QUERY
@@ -168,13 +168,13 @@ class SentryAsyncExtension(SchemaExtension):
             op = OP.GRAPHQL_SUBSCRIPTION
 
         description = operation_type
-        if self._operation_name:
-            description += " {}".format(self._operation_name)
+        if operation_name:
+            description += " {}".format(operation_name)
 
         sentry_sdk.add_breadcrumb(
             category="graphql.operation",
             data={
-                "operation_name": self._operation_name,
+                "operation_name": operation_name,
                 "operation_type": operation_type,
             },
         )
@@ -183,31 +183,31 @@ class SentryAsyncExtension(SchemaExtension):
         event_processor = _make_request_event_processor(self.execution_context)
         scope.add_event_processor(event_processor)
 
-        self.graphql_span = sentry_sdk.start_span(
+        graphql_span = sentry_sdk.start_span(
             op=op,
             name=description,
             origin=StrawberryIntegration.origin,
         )
-        self.graphql_span.__enter__()
+        graphql_span.__enter__()
 
-        self.graphql_span.set_data("graphql.operation.type", operation_type)
-        self.graphql_span.set_data("graphql.operation.name", self._operation_name)
+        graphql_span.set_data("graphql.operation.type", operation_type)
+        graphql_span.set_data("graphql.operation.name", operation_name)
         if should_send_default_pii():
-            self.graphql_span.set_data("graphql.document", self.execution_context.query)
-        self.graphql_span.set_data("graphql.resource_name", self._resource_name)
+            graphql_span.set_data("graphql.document", self.execution_context.query)
+        graphql_span.set_data("graphql.resource_name", self._resource_name)
 
         yield
 
-        transaction = self.graphql_span.containing_transaction
+        transaction = graphql_span.containing_transaction
         if transaction and self.execution_context.operation_name:
             transaction.name = self.execution_context.operation_name
             transaction.source = TransactionSource.COMPONENT
             transaction.op = op
 
-        self.graphql_span.__exit__(None, None, None)
+        graphql_span.__exit__(None, None, None)
 
     def on_validate(self) -> "Generator[None, None, None]":
-        self.validation_span = sentry_sdk.start_span(
+        validation_span = sentry_sdk.start_span(
             op=OP.GRAPHQL_VALIDATE,
             name="validation",
             origin=StrawberryIntegration.origin,
@@ -215,10 +215,10 @@ class SentryAsyncExtension(SchemaExtension):
 
         yield
 
-        self.validation_span.finish()
+        validation_span.finish()
 
     def on_parse(self) -> "Generator[None, None, None]":
-        self.parsing_span = sentry_sdk.start_span(
+        parsing_span = sentry_sdk.start_span(
             op=OP.GRAPHQL_PARSE,
             name="parsing",
             origin=StrawberryIntegration.origin,
@@ -226,7 +226,7 @@ class SentryAsyncExtension(SchemaExtension):
 
         yield
 
-        self.parsing_span.finish()
+        parsing_span.finish()
 
     def should_skip_tracing(
         self,
