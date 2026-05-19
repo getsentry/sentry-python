@@ -934,25 +934,19 @@ def test_no_query_source_if_duration_too_short(
 
             class fake_record_sql_queries:  # noqa: N801
                 def __init__(self, *args, **kwargs):
-                    with record_sql_queries_supporting_streaming(
+                    self._ctx_mgr = record_sql_queries_supporting_streaming(
                         *args, **kwargs
-                    ) as span:
-                        self.span = span
-
-                    if span_streaming:
-                        self.span._start_timestamp = datetime(2024, 1, 1, microsecond=0)
-                        self.span._end_timestamp = datetime(
-                            2024, 1, 1, microsecond=99999
-                        )
-                    else:
-                        self.span.start_timestamp = datetime(2024, 1, 1, microsecond=0)
-                        self.span.timestamp = datetime(2024, 1, 1, microsecond=99999)
+                    )
 
                 def __enter__(self):
+                    self.span = self._ctx_mgr.__enter__()
+                    self.span._start_timestamp = datetime(2024, 1, 1, microsecond=0)
+                    self.span._end_timestamp = datetime(2024, 1, 1, microsecond=99999)
                     return self.span
 
                 def __exit__(self, type, value, traceback):
-                    pass
+                    self.span._end_timestamp = None
+                    self._ctx_mgr.__exit__(type, value, traceback)
 
             with mock.patch(
                 "sentry_sdk.integrations.sqlalchemy.record_sql_queries_supporting_streaming",
@@ -1000,25 +994,18 @@ def test_no_query_source_if_duration_too_short(
 
             class fake_record_sql_queries:  # noqa: N801
                 def __init__(self, *args, **kwargs):
-                    with record_sql_queries_supporting_streaming(
+                    self._ctx_mgr = record_sql_queries_supporting_streaming(
                         *args, **kwargs
-                    ) as span:
-                        self.span = span
-
-                    if span_streaming:
-                        self.span._start_timestamp = datetime(2024, 1, 1, microsecond=0)
-                        self.span._end_timestamp = datetime(
-                            2024, 1, 1, microsecond=99999
-                        )
-                    else:
-                        self.span.start_timestamp = datetime(2024, 1, 1, microsecond=0)
-                        self.span.timestamp = datetime(2024, 1, 1, microsecond=99999)
+                    )
 
                 def __enter__(self):
+                    self.span = self._ctx_mgr.__enter__()
+                    self.span.start_timestamp = datetime(2024, 1, 1, microsecond=0)
                     return self.span
 
                 def __exit__(self, type, value, traceback):
-                    pass
+                    self._ctx_mgr.__exit__(type, value, traceback)
+                    self.span.timestamp = datetime(2024, 1, 1, microsecond=99999)
 
             with mock.patch(
                 "sentry_sdk.integrations.sqlalchemy.record_sql_queries_supporting_streaming",
@@ -1159,19 +1146,18 @@ def test_query_source_if_duration_over_threshold(
 
             class fake_record_sql_queries:  # noqa: N801
                 def __init__(self, *args, **kwargs):
-                    with record_sql_queries_supporting_streaming(
+                    self._ctx_mgr = record_sql_queries_supporting_streaming(
                         *args, **kwargs
-                    ) as span:
-                        self.span = span
-
-                    self.span.start_timestamp = datetime(2024, 1, 1, microsecond=0)
-                    self.span.timestamp = datetime(2024, 1, 1, microsecond=101000)
+                    )
 
                 def __enter__(self):
+                    self.span = self._ctx_mgr.__enter__()
+                    self.span.start_timestamp = datetime(2024, 1, 1, microsecond=0)
                     return self.span
 
                 def __exit__(self, type, value, traceback):
-                    pass
+                    self._ctx_mgr.__exit__(type, value, traceback)
+                    self.span.timestamp = datetime(2024, 1, 1, microsecond=101000)
 
             with mock.patch(
                 "sentry_sdk.integrations.sqlalchemy.record_sql_queries_supporting_streaming",
