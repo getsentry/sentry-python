@@ -884,8 +884,7 @@ class SPANDATA:
 
     MIDDLEWARE_NAME = "middleware.name"
     """
-    The name of the middleware.
-    Example: "AuthenticationMiddleware"
+    The middleware's name, e.g. `AuthenticationMiddleware`
     """
 
     NETWORK_PROTOCOL_NAME = "network.protocol.name"
