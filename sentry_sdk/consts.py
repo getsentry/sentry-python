@@ -2,11 +2,7 @@ import itertools
 from enum import Enum
 from typing import TYPE_CHECKING
 
-# up top to prevent circular import due to integration import
-# This is more or less an arbitrary large-ish value for now, so that we allow
-# pretty long strings (like LLM prompts), but still have *some* upper limit
-# until we verify that removing the trimming completely is safe.
-DEFAULT_MAX_VALUE_LENGTH = 100_000
+DEFAULT_MAX_VALUE_LENGTH = None
 
 DEFAULT_MAX_STACK_FRAMES = 100
 DEFAULT_ADD_FULL_STACK = False
@@ -56,6 +52,7 @@ if TYPE_CHECKING:
         Log,
         Metric,
         ProfilerMode,
+        SpanJSON,
         TracesSampler,
         TransactionProcessor,
     )
@@ -85,6 +82,9 @@ if TYPE_CHECKING:
             "before_send_metric": Optional[Callable[[Metric, Hint], Optional[Metric]]],
             "trace_lifecycle": Optional[Literal["static", "stream"]],
             "ignore_spans": Optional[IgnoreSpansConfig],
+            "before_send_span": Optional[
+                Callable[[SpanJSON, Hint], Optional[SpanJSON]]
+            ],
             "suppress_asgi_chained_exceptions": Optional[bool],
         },
         total=False,
@@ -402,6 +402,12 @@ class SPANDATA:
     """
     The key of the requested data.
     Example: template.cache.some_item.867da7e2af8e6b2f3aa7213a4080edb3
+    """
+
+    CLIENT_ADDRESS = "client.address"
+    """
+    Client address of the network connection - IP address or Unix domain socket name.
+    Example: "10.1.2.80"
     """
 
     CODE_FILEPATH = "code.filepath"
@@ -819,10 +825,23 @@ class SPANDATA:
     Example: GET
     """
 
+    HTTP_REQUEST_HEADER = "http.request.header"
+    """
+    Prefix for HTTP request header attributes. The header name (lowercased) is
+    appended to form the full attribute key.
+    Example: "http.request.header.content-type"
+    """
+
     HTTP_REQUEST_METHOD = "http.request.method"
     """
     The HTTP method used.
     Example: GET
+    """
+
+    HTTP_REQUEST_BODY_DATA = "http.request.body.data"
+    """
+    The HTTP request body data as string.
+    Example: "[{\"role\": \"user\", \"message\": \"hello\"}]"
     """
 
     HTTP_QUERY = "http.query"
@@ -867,6 +886,12 @@ class SPANDATA:
     """
     The name of the middleware.
     Example: "AuthenticationMiddleware"
+    """
+
+    NETWORK_PROTOCOL_NAME = "network.protocol.name"
+    """
+    The application layer protocol name used for the network connection.
+    Example: "http", "https"
     """
 
     NETWORK_PEER_ADDRESS = "network.peer.address"
@@ -946,6 +971,12 @@ class SPANDATA:
     """
     Label identifying a thread from where the span originated. This should be a string.
     Example: "MainThread"
+    """
+
+    USER_IP_ADDRESS = "user.ip_address"
+    """
+    The IP address of the user that triggered the request.
+    Example: "10.1.2.80"
     """
 
     URL_FULL = "url.full"
@@ -1204,7 +1235,7 @@ class ClientConstructor:
         ],
         functions_to_trace: "Sequence[Dict[str, str]]" = [],  # noqa: B006
         event_scrubber: "Optional[sentry_sdk.scrubber.EventScrubber]" = None,
-        max_value_length: int = DEFAULT_MAX_VALUE_LENGTH,
+        max_value_length: "Optional[int]" = DEFAULT_MAX_VALUE_LENGTH,
         enable_backpressure_handling: bool = True,
         error_sampler: "Optional[Callable[[Event, Hint], Union[float, bool]]]" = None,
         enable_db_query_source: bool = True,

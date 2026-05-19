@@ -2164,7 +2164,7 @@ def test_bad_chat_completion(
     )
 
     if stream_gen_ai_spans:
-        items = capture_items("event")
+        items = capture_items("event", "transaction")
 
         client = OpenAI(api_key="z")
         client.chat.completions._post = mock.Mock(
@@ -2177,6 +2177,7 @@ def test_bad_chat_completion(
             )
 
         (event,) = (item.payload for item in items if item.type == "event")
+        (transaction,) = (item.payload for item in items if item.type == "transaction")
     else:
         events = capture_events()
 
@@ -2190,9 +2191,10 @@ def test_bad_chat_completion(
                 messages=[{"role": "system", "content": "hello"}],
             )
 
-        (event,) = events
+        (event, transaction) = events
 
     assert event["level"] == "error"
+    assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
@@ -2266,7 +2268,7 @@ async def test_bad_chat_completion_async(
         side_effect=OpenAIError("API rate limit reached")
     )
     if stream_gen_ai_spans:
-        items = capture_items("event")
+        items = capture_items("event", "transaction")
 
         with pytest.raises(OpenAIError):
             await client.chat.completions.create(
@@ -2274,6 +2276,7 @@ async def test_bad_chat_completion_async(
             )
 
         (event,) = (item.payload for item in items if item.type == "event")
+        (transaction,) = (item.payload for item in items if item.type == "transaction")
     else:
         events = capture_events()
 
@@ -2282,9 +2285,10 @@ async def test_bad_chat_completion_async(
                 model="some-model", messages=[{"role": "system", "content": "hello"}]
             )
 
-        (event,) = events
+        (event, transaction) = events
 
     assert event["level"] == "error"
+    assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
@@ -2834,21 +2838,23 @@ def test_embeddings_create_raises_error(
     )
 
     if stream_gen_ai_spans:
-        items = capture_items("event")
+        items = capture_items("event", "transaction")
 
         with pytest.raises(OpenAIError):
             client.embeddings.create(input="hello", model="text-embedding-3-large")
 
         (event,) = (item.payload for item in items if item.type == "event")
+        (transaction,) = (item.payload for item in items if item.type == "transaction")
     else:
         events = capture_events()
 
         with pytest.raises(OpenAIError):
             client.embeddings.create(input="hello", model="text-embedding-3-large")
 
-        (event,) = events
+        (event, transaction) = events
 
     assert event["level"] == "error"
+    assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
@@ -2879,7 +2885,7 @@ async def test_embeddings_create_raises_error_async(
     )
 
     if stream_gen_ai_spans:
-        items = capture_items("event")
+        items = capture_items("event", "transaction")
 
         with pytest.raises(OpenAIError):
             await client.embeddings.create(
@@ -2887,6 +2893,7 @@ async def test_embeddings_create_raises_error_async(
             )
 
         (event,) = (item.payload for item in items if item.type == "event")
+        (transaction,) = (item.payload for item in items if item.type == "transaction")
     else:
         events = capture_events()
 
@@ -2895,9 +2902,10 @@ async def test_embeddings_create_raises_error_async(
                 input="hello", model="text-embedding-3-large"
             )
 
-        (event,) = events
+        (event, transaction) = events
 
     assert event["level"] == "error"
+    assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])

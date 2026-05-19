@@ -40,7 +40,6 @@ from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE, Annotated, AnnotatedVal
 from sentry_sdk.consts import (
     DEFAULT_ADD_FULL_STACK,
     DEFAULT_MAX_STACK_FRAMES,
-    DEFAULT_MAX_VALUE_LENGTH,
     EndpointType,
 )
 
@@ -76,6 +75,7 @@ if TYPE_CHECKING:
         Log,
         Metric,
         SerializedAttributeValue,
+        SpanJSON,
     )
 
     P = ParamSpec("P")
@@ -753,7 +753,7 @@ def single_exception_from_error_tuple(
     if client_options is None:
         include_local_variables = True
         include_source_context = True
-        max_value_length = DEFAULT_MAX_VALUE_LENGTH  # fallback
+        max_value_length = None  # fallback
         custom_repr = None
     else:
         include_local_variables = client_options["include_local_variables"]
@@ -1267,11 +1267,8 @@ def _get_size_in_bytes(value: str) -> "Optional[int]":
 def strip_string(
     value: str, max_length: "Optional[int]" = None
 ) -> "Union[AnnotatedValue, str]":
-    if not value:
+    if not value or max_length is None:
         return value
-
-    if max_length is None:
-        max_length = DEFAULT_MAX_VALUE_LENGTH
 
     byte_size = _get_size_in_bytes(value)
     text_size = len(value)
@@ -2109,6 +2106,15 @@ def get_before_send_metric(
     return options.get("before_send_metric") or options["_experiments"].get(
         "before_send_metric"
     )
+
+
+def get_before_send_span(
+    options: "Optional[dict[str, Any]]",
+) -> "Optional[Callable[[SpanJSON, Hint], Optional[SpanJSON]]]":
+    if options is None:
+        return None
+
+    return options["_experiments"].get("before_send_span")
 
 
 def format_attribute(val: "Any") -> "AttributeValue":
