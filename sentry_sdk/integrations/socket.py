@@ -118,14 +118,14 @@ def _patch_getaddrinfo() -> None:
                     span.set_attribute(
                         SPANDATA.SERVER_ADDRESS, host.decode(errors="replace")
                     )
+
                 if isinstance(port, int):
                     span.set_attribute(SPANDATA.SERVER_PORT, port)
-                elif isinstance(port, str):
-                    span.set_attribute(SPANDATA.SERVER_PORT, port)
-                elif isinstance(port, bytes):
-                    span.set_attribute(
-                        SPANDATA.SERVER_PORT, port.decode(errors="replace")
-                    )
+                elif port is not None:
+                    try:
+                        span.set_attribute(SPANDATA.SERVER_PORT, int(port))
+                    except (ValueError, TypeError):
+                        pass
 
                 return real_getaddrinfo(host, port, family, type, proto, flags)
         else:
