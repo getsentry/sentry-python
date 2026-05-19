@@ -486,9 +486,8 @@ def _get_cached_request_body_attribute(
     if content_length and not request_body_within_bounds(client, content_length):
         return OVER_SIZE_LIMIT_SUBSTITUTE
 
-    json_body = getattr(request, "_json", None)
-    if json_body is not None:
-        return json.dumps(json_body)
+    if hasattr(request, "_json"):
+        return json.dumps(request._json)
 
     formdata_body = getattr(request, "_form", None)
     if formdata_body is None:
@@ -506,7 +505,7 @@ async def _wrap_async_handler(
     handler: "Callable[..., Awaitable[Any]]", *args: "Any", **kwargs: "Any"
 ) -> "Any":
     """
-    Wraps an asynchronous handler function to attach request info to the server segment span.
+    Wraps an asynchronous handler function to attach request info to errors and the server segment span.
     The request body cached on the Starlette Request object is attached to streamed spans, but consuming the request body in the event
     processor can still cause application hangs.
     """

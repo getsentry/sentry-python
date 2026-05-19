@@ -12,7 +12,6 @@ import starlette
 from fastapi import Body, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.testclient import TestClient
-from starlette.responses import JSONResponse
 
 import sentry_sdk
 from sentry_sdk import capture_message
@@ -109,12 +108,6 @@ def fastapi_app_factory():
     ):
         capture_message("hi")
         return {"status": "ok"}
-
-    @app.post("/body/raw")
-    async def body_raw(request: Request):
-        await request.body()
-        capture_message("hi")
-        return JSONResponse({"status": "ok"})
 
     return app
 
