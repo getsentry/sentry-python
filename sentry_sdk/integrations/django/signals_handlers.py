@@ -73,9 +73,9 @@ def patch_signals() -> None:
                         attributes={
                             "sentry.op": OP.EVENT_DJANGO,
                             "sentry.origin": DjangoIntegration.origin,
+                            SPANDATA.CODE_FUNCTION_NAME: signal_name,
                         },
                     ) as span:
-                        span.set_attribute(SPANDATA.CODE_FUNCTION_NAME, signal_name)
                         return receiver(*args, **kwargs)
                 else:
                     with sentry_sdk.start_span(
