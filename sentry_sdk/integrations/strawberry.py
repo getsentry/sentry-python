@@ -119,9 +119,9 @@ def _patch_schema_init() -> None:
         ]
 
         # add our extension
-        extensions.append(
+        extensions = [
             SentryAsyncExtension if should_use_async_extension else SentrySyncExtension
-        )
+        ] + extensions
 
         kwargs["extensions"] = extensions
 
@@ -263,7 +263,7 @@ class SentryAsyncExtension(SchemaExtension):
 
         field_path = "{}.{}".format(info.parent_type, info.field_name)
 
-        with self.graphql_span.start_child(
+        with sentry_sdk.start_span(
             op=OP.GRAPHQL_RESOLVE,
             name="resolving {}".format(field_path),
             origin=StrawberryIntegration.origin,
@@ -290,7 +290,7 @@ class SentrySyncExtension(SentryAsyncExtension):
 
         field_path = "{}.{}".format(info.parent_type, info.field_name)
 
-        with self.graphql_span.start_child(
+        with sentry_sdk.start_span(
             op=OP.GRAPHQL_RESOLVE,
             name="resolving {}".format(field_path),
             origin=StrawberryIntegration.origin,
