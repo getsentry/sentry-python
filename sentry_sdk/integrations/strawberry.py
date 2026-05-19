@@ -207,7 +207,7 @@ class SentryAsyncExtension(SchemaExtension):
         self.graphql_span.__exit__(None, None, None)
 
     def on_validate(self) -> "Generator[None, None, None]":
-        self.validation_span = self.graphql_span.start_child(
+        self.validation_span = sentry_sdk.start_span(
             op=OP.GRAPHQL_VALIDATE,
             name="validation",
             origin=StrawberryIntegration.origin,
@@ -218,7 +218,7 @@ class SentryAsyncExtension(SchemaExtension):
         self.validation_span.finish()
 
     def on_parse(self) -> "Generator[None, None, None]":
-        self.parsing_span = self.graphql_span.start_child(
+        self.parsing_span = sentry_sdk.start_span(
             op=OP.GRAPHQL_PARSE,
             name="parsing",
             origin=StrawberryIntegration.origin,
