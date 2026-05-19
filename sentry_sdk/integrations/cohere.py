@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from sentry_sdk import consts
 from sentry_sdk.ai.monitoring import record_token_usage
-from sentry_sdk.ai.utils import set_data_normalized
+from sentry_sdk.ai.utils import get_start_span_function, set_data_normalized
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.tracing_utils import set_span_errored
 
@@ -142,7 +142,7 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
 
         message = kwargs.get("message")
 
-        span = sentry_sdk.start_span(
+        span = get_start_span_function()(
             op=consts.OP.COHERE_CHAT_COMPLETIONS_CREATE,
             name="cohere.client.Chat",
             origin=CohereIntegration.origin,
@@ -225,7 +225,7 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
         if integration is None:
             return f(*args, **kwargs)
 
-        with sentry_sdk.start_span(
+        with get_start_span_function()(
             op=consts.OP.COHERE_EMBEDDINGS_CREATE,
             name="Cohere Embedding Creation",
             origin=CohereIntegration.origin,
