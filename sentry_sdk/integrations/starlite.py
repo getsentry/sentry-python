@@ -6,6 +6,7 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
@@ -141,16 +142,34 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
         receive: "Receive",
         send: "Send",
     ) -> None:
-        if sentry_sdk.get_client().get_integration(StarliteIntegration) is None:
+        client = sentry_sdk.get_client()
+        if client.get_integration(StarliteIntegration) is None:
             return await old_call(self, scope, receive, send)
 
         middleware_name = self.__class__.__name__
-        with sentry_sdk.start_span(
-            op=OP.MIDDLEWARE_STARLITE,
-            name=middleware_name,
-            origin=StarliteIntegration.origin,
+        is_span_streaming_enabled = has_span_streaming_enabled(client.options)
+
+        def _start_middleware_span(op: str, name: str) -> "Any":
+            if is_span_streaming_enabled:
+                return sentry_sdk.traces.start_span(
+                    name=name,
+                    attributes={
+                        "sentry.op": op,
+                        "sentry.origin": StarliteIntegration.origin,
+                        "starlite.middleware_name": middleware_name,
+                    },
+                )
+            return sentry_sdk.start_span(
+                op=op,
+                name=name,
+                origin=StarliteIntegration.origin,
+            )
+
+        with _start_middleware_span(
+            op=OP.MIDDLEWARE_STARLITE, name=middleware_name
         ) as middleware_span:
-            middleware_span.set_tag("starlite.middleware_name", middleware_name)
+            if not is_span_streaming_enabled:
+                middleware_span.set_tag("starlite.middleware_name", middleware_name)
 
             # Creating spans for the "receive" callback
             async def _sentry_receive(
@@ -158,12 +177,12 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
             ) -> "Union[HTTPReceiveMessage, WebSocketReceiveMessage]":
                 if sentry_sdk.get_client().get_integration(StarliteIntegration) is None:
                     return await receive(*args, **kwargs)
-                with sentry_sdk.start_span(
+                with _start_middleware_span(
                     op=OP.MIDDLEWARE_STARLITE_RECEIVE,
                     name=getattr(receive, "__qualname__", str(receive)),
-                    origin=StarliteIntegration.origin,
                 ) as span:
-                    span.set_tag("starlite.middleware_name", middleware_name)
+                    if not is_span_streaming_enabled:
+                        span.set_tag("starlite.middleware_name", middleware_name)
                     return await receive(*args, **kwargs)
 
             receive_name = getattr(receive, "__name__", str(receive))
@@ -174,12 +193,12 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
             async def _sentry_send(message: "Message") -> None:
                 if sentry_sdk.get_client().get_integration(StarliteIntegration) is None:
                     return await send(message)
-                with sentry_sdk.start_span(
+                with _start_middleware_span(
                     op=OP.MIDDLEWARE_STARLITE_SEND,
                     name=getattr(send, "__qualname__", str(send)),
-                    origin=StarliteIntegration.origin,
                 ) as span:
-                    span.set_tag("starlite.middleware_name", middleware_name)
+                    if not is_span_streaming_enabled:
+                        span.set_tag("starlite.middleware_name", middleware_name)
                     return await send(message)
 
             send_name = getattr(send, "__name__", str(send))
