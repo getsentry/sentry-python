@@ -64,7 +64,6 @@ def test_view_exceptions(
     exceptions = capture_exceptions()
     if span_streaming:
         items = capture_items("event")
-
         client.get(reverse("view_exc"))
 
         (error,) = exceptions
@@ -73,7 +72,6 @@ def test_view_exceptions(
         (event,) = (item.payload for item in items if item.type == "event")
     else:
         events = capture_events()
-
         client.get(reverse("view_exc"))
 
         (error,) = exceptions
@@ -213,7 +211,6 @@ def test_request_captured(
         assert content == b"ok"
 
         (event,) = events
-
         assert event["transaction"] == "/message"
         assert event["request"] == {
             "cookies": {},
@@ -240,7 +237,6 @@ def test_transaction_with_class_view(
     )
     if span_streaming:
         items = capture_items("event")
-
         content, status, headers = unpack_werkzeug_response(
             client.head(reverse("classbased"))
         )
@@ -249,7 +245,6 @@ def test_transaction_with_class_view(
         (event,) = (item.payload for item in items if item.type == "event")
     else:
         events = capture_events()
-
         content, status, headers = unpack_werkzeug_response(
             client.head(reverse("classbased"))
         )
@@ -388,7 +383,6 @@ def test_trace_from_headers_if_performance_enabled(
 
     if span_streaming:
         items = capture_items("event", "span")
-
         client.head(
             reverse("view_exc_with_msg"), headers={"sentry-trace": sentry_trace_header}
         )
@@ -414,7 +408,6 @@ def test_trace_from_headers_if_performance_enabled(
         assert spans[3]["trace_id"] == trace_id
     else:
         events = capture_events()
-
         client.head(
             reverse("view_exc_with_msg"), headers={"sentry-trace": sentry_trace_header}
         )
@@ -457,7 +450,6 @@ def test_trace_from_headers_if_performance_disabled(
 
     if span_streaming:
         items = capture_items("event")
-
         client.head(
             reverse("view_exc_with_msg"), headers={"sentry-trace": sentry_trace_header}
         )
@@ -468,7 +460,6 @@ def test_trace_from_headers_if_performance_disabled(
         ) = (item.payload for item in items if item.type == "event")
     else:
         events = capture_events()
-
         client.head(
             reverse("view_exc_with_msg"), headers={"sentry-trace": sentry_trace_header}
         )
@@ -502,7 +493,6 @@ def test_user_captured(
     )
     if span_streaming:
         items = capture_items("event")
-
         content, status, headers = unpack_werkzeug_response(
             client.get(reverse("mylogin"))
         )
@@ -519,7 +509,6 @@ def test_user_captured(
         (event,) = (item.payload for item in items if item.type == "event")
     else:
         events = capture_events()
-
         content, status, headers = unpack_werkzeug_response(
             client.get(reverse("mylogin"))
         )
@@ -640,14 +629,12 @@ def test_custom_error_handler_request_context(
     )
     if span_streaming:
         items = capture_items("event")
-
         content, status, headers = unpack_werkzeug_response(client.post("/404"))
         assert status.lower() == "404 not found"
 
         (event,) = (item.payload for item in items if item.type == "event")
     else:
         events = capture_events()
-
         content, status, headers = unpack_werkzeug_response(client.post("/404"))
         assert status.lower() == "404 not found"
 
@@ -762,7 +749,6 @@ def test_sql_dict_query_params(
 
     if span_streaming:
         items = capture_items("event")
-
         sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
         with pytest.raises(ProgrammingError):
@@ -776,7 +762,6 @@ def test_sql_dict_query_params(
         (event,) = (item.payload for item in items if item.type == "event")
     else:
         events = capture_events()
-
         sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
         with pytest.raises(ProgrammingError):
@@ -816,7 +801,6 @@ def test_response_trace(
     )
     if span_streaming:
         items = capture_items("span")
-
         content, status, headers = unpack_werkzeug_response(
             client.get(reverse("rest_json_response"))
         )
@@ -831,7 +815,6 @@ def test_response_trace(
         )
     else:
         events = capture_events()
-
         content, status, headers = unpack_werkzeug_response(
             client.get(reverse("rest_json_response"))
         )
@@ -933,7 +916,6 @@ def test_sql_psycopg2_placeholders(
 
     if span_streaming:
         items = capture_items("event")
-
         sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
         with pytest.raises(DataError):
@@ -957,7 +939,6 @@ def test_sql_psycopg2_placeholders(
         (event,) = (item.payload for item in items if item.type == "event")
     else:
         events = capture_events()
-
         sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
         with pytest.raises(DataError):
@@ -1103,7 +1084,6 @@ def test_django_connect_breadcrumbs(
 
         # trigger recording of event.
         capture_message("HI")
-
         (event,) = (item.payload for item in items if item.type == "event")
     else:
         events = capture_events()
@@ -1113,7 +1093,6 @@ def test_django_connect_breadcrumbs(
 
         # trigger recording of event.
         capture_message("HI")
-
         (event,) = events
 
     for crumb in event["breadcrumbs"]["values"]:
@@ -1295,7 +1274,6 @@ def test_request_body(
     )
     if span_streaming:
         items = capture_items("event")
-
         content, status, headers = unpack_werkzeug_response(
             client.post(reverse("post_echo"), data=b"heyooo", content_type="text/plain")
         )
@@ -1325,7 +1303,6 @@ def test_request_body(
         (event,) = (item.payload for item in items if item.type == "event")
     else:
         events = capture_events()
-
         content, status, headers = unpack_werkzeug_response(
             client.post(reverse("post_echo"), data=b"heyooo", content_type="text/plain")
         )
