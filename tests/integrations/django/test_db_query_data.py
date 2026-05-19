@@ -632,7 +632,7 @@ def test_no_query_source_if_duration_too_short(
 
             if span_streaming:
                 self.span._start_timestamp = datetime(2024, 1, 1, microsecond=0)
-                self.span._end_timestamp = datetime(2024, 1, 1, microsecond=101000)
+                self.span._end_timestamp = datetime(2024, 1, 1, microsecond=99999)
 
             return self.span
 
@@ -641,11 +641,11 @@ def test_no_query_source_if_duration_too_short(
                 self.span._end_timestamp = None
                 self._ctx_mgr.__exit__(type, value, traceback)
                 self.span._start_timestamp = datetime(2024, 1, 1, microsecond=0)
-                self.span._end_timestamp = datetime(2024, 1, 1, microsecond=101000)
+                self.span._end_timestamp = datetime(2024, 1, 1, microsecond=99999)
                 return
 
             self.span.start_timestamp = datetime(2024, 1, 1, microsecond=0)
-            self.span.timestamp = datetime(2024, 1, 1, microsecond=101000)
+            self.span.timestamp = datetime(2024, 1, 1, microsecond=99999)
             self._ctx_mgr.__exit__(type, value, traceback)
 
     if span_streaming:
