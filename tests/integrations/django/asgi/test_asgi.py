@@ -228,11 +228,13 @@ async def test_active_thread_id(
 
         data = json.loads(response["body"])
 
-        spans = [item for item in items if item.type == "span"]
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
 
         for span in spans:
-            trace_context = span["contexts"]["trace"]
-            assert str(data["active"]) == trace_context["attributes"]["thread.id"]
+            if span["is_segment"] is False:
+                continue
+            assert str(data["active"]) == span["attributes"]["thread.id"]
     else:
         with mock.patch(
             "sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0
