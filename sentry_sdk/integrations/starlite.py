@@ -1,7 +1,7 @@
 from copy import deepcopy
 
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
@@ -156,7 +156,7 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                     attributes={
                         "sentry.op": op,
                         "sentry.origin": StarliteIntegration.origin,
-                        "starlite.middleware_name": middleware_name,
+                        SPANDATA.MIDDLEWARE_NAME: middleware_name,
                     },
                 )
             return sentry_sdk.start_span(

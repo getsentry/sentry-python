@@ -882,6 +882,11 @@ class SPANDATA:
     The messaging system's name, e.g. `kafka`, `aws_sqs`
     """
 
+    MIDDLEWARE_NAME = "middleware.name"
+    """
+    The middleware's name, e.g. `AuthenticationMiddleware`
+    """
+
     NETWORK_PROTOCOL_NAME = "network.protocol.name"
     """
     The application layer protocol name used for the network connection.

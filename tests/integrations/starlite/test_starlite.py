@@ -162,7 +162,7 @@ def test_middleware_spans(sentry_init, capture_events, capture_items, span_strea
             assert span["name"] in expected
             assert span["name"] not in found
             found.add(span["name"])
-            assert span["name"] == span["attributes"]["starlite.middleware_name"]
+            assert span["name"] == span["attributes"]["middleware.name"]
     else:
         (_, transaction_event) = events
 
@@ -246,7 +246,7 @@ def test_middleware_callback_spans(
                 expected_span["op"] == actual_span["attributes"]["sentry.op"]
                 and expected_span["description"] == actual_span["name"]
                 and expected_span["tags"]["starlite.middleware_name"]
-                == actual_span["attributes"]["starlite.middleware_name"]
+                == actual_span["attributes"]["middleware.name"]
             )
 
         for expected_span in expected_starlite_spans:
@@ -377,7 +377,7 @@ def test_middleware_partial_receive_send(
                 expected_span["op"] == actual_span["attributes"]["sentry.op"]
                 and actual_span["name"].startswith(expected_span["description"])
                 and expected_span["tags"]["starlite.middleware_name"]
-                == actual_span["attributes"]["starlite.middleware_name"]
+                == actual_span["attributes"]["middleware.name"]
             )
 
         for expected_span in expected_starlite_spans:
