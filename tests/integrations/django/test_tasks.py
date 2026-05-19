@@ -206,8 +206,8 @@ def test_task_error_reporting(
         with sentry_sdk.traces.start_span(name="custom parent"):
             result = failing_task.enqueue()
 
-            with pytest.raises(ValueError, match="Task failed"):
-                _ = result.return_value
+        with pytest.raises(ValueError, match="Task failed"):
+            _ = result.return_value
 
         sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
@@ -229,8 +229,8 @@ def test_task_error_reporting(
         with sentry_sdk.start_transaction(name="test_transaction"):
             result = failing_task.enqueue()
 
-            with pytest.raises(ValueError, match="Task failed"):
-                _ = result.return_value
+        with pytest.raises(ValueError, match="Task failed"):
+            _ = result.return_value
 
         assert len(events) == 2
         transaction_event = events[-1]
