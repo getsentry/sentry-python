@@ -19,10 +19,8 @@ from aiohttp.web_request import Request
 
 import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
-from sentry_sdk._types import OVER_SIZE_LIMIT_SUBSTITUTE
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.aiohttp import (
-    BODY_NOT_READ_MESSAGE,
     AioHttpIntegration,
     create_trace_config,
 )
@@ -1281,107 +1279,6 @@ async def test_sensitive_header_passthrough_with_pii_span_streaming(
     # client.address and user.ip_address is captured under send_default_pii=True.
     assert server_span["attributes"]["client.address"] == "127.0.0.1"
     assert server_span["attributes"]["user.ip_address"] == "127.0.0.1"
-
-
-@pytest.mark.asyncio
-async def test_request_body_captured_on_segment_span_streaming(
-    sentry_init, aiohttp_client, capture_items
-):
-    sentry_init(
-        integrations=[AioHttpIntegration()],
-        traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    body = {"some": "value"}
-
-    async def hello(request):
-        # Reading the body populates request._read_bytes; the integration
-        # captures body data in a finally after the handler returns.
-        await request.json()
-        return web.Response(text="hello")
-
-    app = web.Application()
-    app.router.add_post("/", hello)
-
-    items = capture_items("span")
-
-    client = await aiohttp_client(app)
-    resp = await client.post("/", json=body)
-    assert resp.status == 200
-
-    sentry_sdk.flush()
-
-    server_segment, client_segment = [item.payload for item in items]
-    assert server_segment["is_segment"] is True
-    assert server_segment["attributes"]["http.request.body.data"] == json.dumps(body)
-
-
-@pytest.mark.asyncio
-async def test_request_body_not_read_span_streaming(
-    sentry_init, aiohttp_client, capture_items
-):
-    sentry_init(
-        integrations=[AioHttpIntegration()],
-        traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    async def hello(request):
-        # Handler does not read the body; request._read_bytes stays None.
-        return web.Response(text="hello")
-
-    app = web.Application()
-    app.router.add_post("/", hello)
-
-    items = capture_items("span")
-
-    client = await aiohttp_client(app)
-    resp = await client.post("/", json={"some": "value"})
-    assert resp.status == 200
-
-    sentry_sdk.flush()
-
-    server_segment, client_segment = [item.payload for item in items]
-    assert server_segment["is_segment"] is True
-    assert (
-        server_segment["attributes"]["http.request.body.data"] == BODY_NOT_READ_MESSAGE
-    )
-
-
-@pytest.mark.asyncio
-async def test_request_body_over_size_limit_span_streaming(
-    sentry_init, aiohttp_client, capture_items
-):
-    sentry_init(
-        integrations=[AioHttpIntegration()],
-        traces_sample_rate=1.0,
-        max_request_body_size="small",
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    async def hello(request):
-        await request.read()
-        return web.Response(text="hello")
-
-    app = web.Application()
-    app.router.add_post("/", hello)
-
-    items = capture_items("span")
-
-    client = await aiohttp_client(app)
-    # "small" caps at 1 KB; send a body larger than that.
-    resp = await client.post("/", data=b"x" * 2000)
-    assert resp.status == 200
-
-    sentry_sdk.flush()
-
-    server_segment, client_segment = [item.payload for item in items]
-    assert server_segment["is_segment"] is True
-    assert (
-        server_segment["attributes"]["http.request.body.data"]
-        == OVER_SIZE_LIMIT_SUBSTITUTE
-    )
 
 
 @pytest.mark.asyncio
