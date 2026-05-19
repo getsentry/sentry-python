@@ -29,11 +29,6 @@ from sentry_sdk import (
     capture_message,
     set_tag,
 )
-from sentry_sdk._types import (
-    OVER_SIZE_LIMIT_SUBSTITUTE,
-    SENSITIVE_DATA_SUBSTITUTE,
-    UNPARSABLE_RAW_DATA_SUBSTITUTE,
-)
 from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
@@ -90,6 +85,7 @@ def test_has_context(sentry_init, app, capture_events):
     assert event["request"]["url"] == "http://localhost/message"
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize(
     "url,transaction_style,expected_transaction,expected_source",
     [
@@ -99,8 +95,7 @@ def test_has_context(sentry_init, app, capture_events):
         ("/message/123456", "url", "/message/<int:message_id>", "route"),
     ],
 )
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_transaction_style(
+def test_transaction_or_segment_style(
     sentry_init,
     app,
     capture_events,
@@ -116,7 +111,7 @@ def test_transaction_style(
             flask_sentry.FlaskIntegration(transaction_style=transaction_style)
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"} if span_streaming else {},
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     if span_streaming:
@@ -130,18 +125,15 @@ def test_transaction_style(
 
     if span_streaming:
         sentry_sdk.flush()
-
-        assert len(items) == 1
-
-        span = items[0].payload
-
-        assert span["is_segment"] is True
-        assert span["name"] == expected_transaction
-        assert span["attributes"]["sentry.span.source"] == expected_source
+        spans = [i.payload for i in items if i.type == "span"]
+        assert len(spans) == 1
+        (segment,) = spans
+        assert segment["name"] == expected_transaction
+        assert segment["attributes"]["sentry.span.source"] == expected_source
     else:
-        message_event, transaction_event = events
-        assert transaction_event["transaction"] == expected_transaction
-        assert transaction_event["transaction_info"] == {"source": expected_source}
+        (_, event) = events
+        assert event["transaction"] == expected_transaction
+        assert event["transaction_info"] == {"source": expected_source}
 
 
 @pytest.mark.parametrize("debug", (True, False))
@@ -406,18 +398,13 @@ def test_flask_medium_formdata_request(sentry_init, capture_events, app):
     assert len(event["request"]["data"]["foo"]) == DEFAULT_MAX_VALUE_LENGTH
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_flask_formdata_request_appear_in_segment_or_transaction_body(
-    sentry_init, capture_events, capture_items, app, span_streaming
+def test_flask_formdata_request_appear_transaction_body(
+    sentry_init, capture_events, app
 ):
     """
-    Test that ensures that transaction/segment request data contains body, even if no exception was raised
+    Test that ensures that transaction request data contains body, even if no exception was raised
     """
-    sentry_init(
-        integrations=[flask_sentry.FlaskIntegration()],
-        traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"} if span_streaming else {},
-    )
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()], traces_sample_rate=1.0)
 
     data = {"username": "sentry-user", "age": "26"}
 
@@ -435,29 +422,17 @@ def test_flask_formdata_request_appear_in_segment_or_transaction_body(
         capture_message("hi")
         return "ok"
 
-    if span_streaming:
-        items = capture_items("event", "span")
-    else:
-        events = capture_events()
+    events = capture_events()
 
     client = app.test_client()
     response = client.post("/", data=data)
     assert response.status_code == 200
 
-    if span_streaming:
-        sentry_sdk.flush()
+    event, transaction_event = events
 
-        spans = [i for i in items if i.type == "span"]
-        assert len(spans) == 1
-        span = spans[0].payload
-
-        assert span["attributes"]["http.request.body.data"] == json.dumps(data)
-    else:
-        event, transaction_event = events
-
-        assert "request" in transaction_event
-        assert "data" in transaction_event["request"]
-        assert transaction_event["request"]["data"] == data
+    assert "request" in transaction_event
+    assert "data" in transaction_event["request"]
+    assert transaction_event["request"]["data"] == data
 
 
 @pytest.mark.parametrize("input_char", ["a", b"a"])
@@ -801,7 +776,7 @@ def test_tracing_success(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[flask_sentry.FlaskIntegration()],
-        _experiments={"trace_lifecycle": "stream"} if span_streaming else {},
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     @app.before_request
@@ -825,23 +800,23 @@ def test_tracing_success(
 
     if span_streaming:
         sentry_sdk.flush()
-
-        spans = [i for i in items if i.type == "span"]
-        message_events = [i for i in items if i.type == "event"]
+        spans = [i.payload for i in items if i.type == "span"]
+        message_events = [i.payload for i in items if i.type == "event"]
 
         assert len(spans) == 1
-        span = spans[0].payload
-        assert span["is_segment"] is True
-        assert span["name"] == "hi_tx"
-        assert span["status"] == SpanStatus.OK
-        assert span["attributes"]["sentry.op"] == "http.server"
-        assert span["attributes"]["sentry.origin"] == "auto.http.flask"
-
         assert len(message_events) == 1
-        assert message_events[0].payload["message"] == "hi"
-        assert message_events[0].payload["transaction"] == "hi_tx"
-        assert message_events[0].payload["tags"]["view"] == "yes"
-        assert message_events[0].payload["tags"]["before_request"] == "yes"
+
+        (segment,) = spans
+        (message_event,) = message_events
+
+        assert segment["name"] == "hi_tx"
+        assert segment["status"] == SpanStatus.OK
+        assert segment["attributes"]["sentry.origin"] == "auto.http.flask"
+
+        assert message_event["message"] == "hi"
+        assert message_event["transaction"] == "hi_tx"
+        assert message_event["tags"]["view"] == "yes"
+        assert message_event["tags"]["before_request"] == "yes"
     else:
         message_event, transaction_event = events
 
@@ -862,7 +837,7 @@ def test_tracing_error(sentry_init, capture_events, capture_items, app, span_str
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[flask_sentry.FlaskIntegration()],
-        _experiments={"trace_lifecycle": "stream"} if span_streaming else {},
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     if span_streaming:
@@ -881,20 +856,21 @@ def test_tracing_error(sentry_init, capture_events, capture_items, app, span_str
 
     if span_streaming:
         sentry_sdk.flush()
-
-        spans = [i for i in items if i.type == "span"]
-        error_events = [i for i in items if i.type == "event"]
+        spans = [i.payload for i in items if i.type == "span"]
+        error_events = [i.payload for i in items if i.type == "event"]
 
         assert len(spans) == 1
-        span = spans[0].payload
-        assert span["is_segment"] is True
-        assert span["name"] == "error"
-        assert span["status"] == SpanStatus.ERROR
-        assert span["attributes"]["sentry.op"] == "http.server"
-        assert span["attributes"]["sentry.origin"] == "auto.http.flask"
         assert len(error_events) == 1
-        assert error_events[0].payload["transaction"] == "error"
-        (exception,) = error_events[0].payload["exception"]["values"]
+
+        (segment,) = spans
+        (error_event,) = error_events
+
+        assert segment["name"] == "error"
+        assert segment["status"] == SpanStatus.ERROR
+        assert segment["attributes"]["http.response.status_code"] == 500
+
+        assert error_event["transaction"] == "error"
+        (exception,) = error_event["exception"]["values"]
         assert exception["type"] == "ZeroDivisionError"
     else:
         error_event, transaction_event = events
@@ -1024,84 +1000,62 @@ def test_request_not_modified_by_reference(sentry_init, capture_events, app):
     assert event["request"]["headers"]["Proxy-Authorization"] == "[Filtered]"
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_response_status_code_ok(
-    sentry_init, capture_envelopes, capture_items, app, span_streaming
+def test_response_status_code_ok_in_transaction_context(
+    sentry_init, capture_envelopes, app
 ):
     """
-    Tests that the response status code is added to the transaction/span.
+    Tests that the response status code is added to the transaction context.
     This also works for when there is an Exception during the request, but somehow the test flask app doesn't seem to trigger that.
     """
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         traces_sample_rate=1.0,
         release="demo-release",
-        _experiments={"trace_lifecycle": "stream"} if span_streaming else {},
     )
 
-    if span_streaming:
-        items = capture_items("span")
-    else:
-        envelopes = capture_envelopes()
+    envelopes = capture_envelopes()
 
     client = app.test_client()
     client.get("/message")
 
     sentry_sdk.get_client().flush()
 
-    if span_streaming:
-        assert len(items) == 1
-        span = items[0].payload
-        assert span["attributes"]["http.response.status_code"] == 200
-        assert span["status"] == SpanStatus.OK
-    else:
-        (_, transaction_envelope, _) = envelopes
-        transaction = transaction_envelope.get_transaction_event()
+    (_, transaction_envelope, _) = envelopes
+    transaction = transaction_envelope.get_transaction_event()
 
-        assert transaction["type"] == "transaction"
-        assert len(transaction["contexts"]) > 0
-        assert "response" in transaction["contexts"].keys(), (
-            "Response context not found in transaction"
-        )
-        assert transaction["contexts"]["response"]["status_code"] == 200
+    assert transaction["type"] == "transaction"
+    assert len(transaction["contexts"]) > 0
+    assert "response" in transaction["contexts"].keys(), (
+        "Response context not found in transaction"
+    )
+    assert transaction["contexts"]["response"]["status_code"] == 200
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_response_status_code_not_found(
-    sentry_init, capture_envelopes, capture_items, app, span_streaming
+def test_response_status_code_not_found_in_transaction_context(
+    sentry_init, capture_envelopes, app
 ):
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         traces_sample_rate=1.0,
         release="demo-release",
-        _experiments={"trace_lifecycle": "stream"} if span_streaming else {},
     )
 
-    if span_streaming:
-        items = capture_items("span")
-    else:
-        envelopes = capture_envelopes()
+    envelopes = capture_envelopes()
 
     client = app.test_client()
     client.get("/not-existing-route")
 
     sentry_sdk.get_client().flush()
 
-    if span_streaming:
-        assert len(items) == 1
-        span = items[0].payload
-        assert span["attributes"]["http.response.status_code"] == 404
-        assert span["status"] == SpanStatus.ERROR
-    else:
-        (transaction_envelope, _) = envelopes
-        transaction = transaction_envelope.get_transaction_event()
+    (transaction_envelope, _) = envelopes
+    transaction = transaction_envelope.get_transaction_event()
 
-        assert transaction["type"] == "transaction"
-        assert len(transaction["contexts"]) > 0
-        assert "response" in transaction["contexts"].keys(), (
-            "Response context not found in transaction"
-        )
-        assert transaction["contexts"]["response"]["status_code"] == 404
+    assert transaction["type"] == "transaction"
+    assert len(transaction["contexts"]) > 0
+    assert "response" in transaction["contexts"].keys(), (
+        "Response context not found in transaction"
+    )
+    assert transaction["contexts"]["response"]["status_code"] == 404
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -1109,7 +1063,7 @@ def test_span_origin(sentry_init, app, capture_events, capture_items, span_strea
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"} if span_streaming else {},
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     if span_streaming:
@@ -1122,17 +1076,17 @@ def test_span_origin(sentry_init, app, capture_events, capture_items, span_strea
 
     if span_streaming:
         sentry_sdk.flush()
-
-        assert len(items) == 1
-        span = items[0].payload
-        assert span["attributes"]["sentry.origin"] == "auto.http.flask"
+        spans = [i.payload for i in items if i.type == "span"]
+        assert len(spans) == 1
+        (segment,) = spans
+        assert segment["attributes"]["sentry.origin"] == "auto.http.flask"
     else:
         (_, event) = events
         assert event["contexts"]["trace"]["origin"] == "auto.http.flask"
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-def test_http_method_default(
+def test_transaction_or_segment_http_method_default(
     sentry_init,
     app,
     capture_events,
@@ -1140,12 +1094,12 @@ def test_http_method_default(
     span_streaming,
 ):
     """
-    By default OPTIONS and HEAD requests do not create a transaction/segment.
+    By default OPTIONS and HEAD requests do not create a transaction or segment.
     """
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[flask_sentry.FlaskIntegration()],
-        _experiments={"trace_lifecycle": "stream"} if span_streaming else {},
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     if span_streaming:
@@ -1165,18 +1119,18 @@ def test_http_method_default(
 
     if span_streaming:
         sentry_sdk.flush()
-
-        assert len(items) == 1
-        span = items[0].payload
-        assert span["attributes"]["http.request.method"] == "GET"
+        spans = [i.payload for i in items if i.type == "span"]
+        assert len(spans) == 1
+        (segment,) = spans
+        assert segment["attributes"]["http.request.method"] == "GET"
     else:
-        assert len(events) == 1
         (event,) = events
+        assert len(events) == 1
         assert event["request"]["method"] == "GET"
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-def test_http_method_custom(
+def test_transaction_or_segment_http_method_custom(
     sentry_init,
     app,
     capture_events,
@@ -1196,7 +1150,7 @@ def test_http_method_custom(
                 )  # capitalization does not matter
             )  # case does not matter
         ],
-        _experiments={"trace_lifecycle": "stream"} if span_streaming else {},
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     if span_streaming:
@@ -1216,279 +1170,13 @@ def test_http_method_custom(
 
     if span_streaming:
         sentry_sdk.flush()
-
-        assert len(items) == 2
-        assert items[0].payload["attributes"]["http.request.method"] == "OPTIONS"
-        assert items[1].payload["attributes"]["http.request.method"] == "HEAD"
+        spans = [i.payload for i in items if i.type == "span"]
+        assert len(spans) == 2
+        (options_segment, head_segment) = spans
+        assert options_segment["attributes"]["http.request.method"] == "OPTIONS"
+        assert head_segment["attributes"]["http.request.method"] == "HEAD"
     else:
         assert len(events) == 2
         (event1, event2) = events
         assert event1["request"]["method"] == "OPTIONS"
         assert event2["request"]["method"] == "HEAD"
-
-
-def test_request_body_captured_on_segment_span_streaming(
-    sentry_init, capture_items, app
-):
-    sentry_init(
-        integrations=[flask_sentry.FlaskIntegration()],
-        traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    body = {"key": "value"}
-
-    @app.route("/body", methods=["POST"])
-    def body_endpoint():
-        request.get_json()
-        return "ok"
-
-    items = capture_items("span")
-
-    client = app.test_client()
-    response = client.post("/body", json=body)
-    assert response.status_code == 200
-
-    sentry_sdk.flush()
-
-    assert len(items) == 1
-    span = items[0].payload
-    assert span["attributes"]["http.request.body.data"] == json.dumps(body)
-
-
-def test_request_body_not_read_span_streaming(sentry_init, capture_items, app):
-    sentry_init(
-        integrations=[flask_sentry.FlaskIntegration()],
-        traces_sample_rate=1.0,
-        max_request_body_size="never",
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    @app.route("/body", methods=["POST"])
-    def body_endpoint():
-        request.get_json()
-        return "ok"
-
-    items = capture_items("span")
-
-    client = app.test_client()
-    response = client.post("/body", json={"key": "value"})
-    assert response.status_code == 200
-
-    sentry_sdk.flush()
-
-    assert len(items) == 1
-    span = items[0].payload
-    assert span["attributes"]["http.request.body.data"] == json.dumps(
-        OVER_SIZE_LIMIT_SUBSTITUTE
-    )
-
-
-def test_request_body_over_size_limit_span_streaming(sentry_init, capture_items, app):
-    sentry_init(
-        integrations=[flask_sentry.FlaskIntegration()],
-        traces_sample_rate=1.0,
-        max_request_body_size="small",
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    @app.route("/body", methods=["POST"])
-    def body_endpoint():
-        request.get_data()
-        return "ok"
-
-    items = capture_items("span")
-
-    client = app.test_client()
-    response = client.post("/body", data=b"x" * 2000)
-    assert response.status_code == 200
-
-    sentry_sdk.flush()
-
-    assert len(items) == 1
-    span = items[0].payload
-    assert span["attributes"]["http.request.body.data"] == json.dumps(
-        OVER_SIZE_LIMIT_SUBSTITUTE
-    )
-
-
-def test_request_body_raw_data_substituted_span_streaming(
-    sentry_init, capture_items, app
-):
-    sentry_init(
-        integrations=[flask_sentry.FlaskIntegration()],
-        traces_sample_rate=1.0,
-        max_request_body_size="always",
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    @app.route("/body", methods=["POST"])
-    def body_endpoint():
-        request.get_data()
-        return "ok"
-
-    items = capture_items("span")
-
-    client = app.test_client()
-    response = client.post(
-        "/body", data=b"some raw bytes", content_type="application/octet-stream"
-    )
-    assert response.status_code == 200
-
-    sentry_sdk.flush()
-
-    assert len(items) == 1
-    span = items[0].payload
-    assert span["attributes"]["http.request.body.data"] == json.dumps(
-        UNPARSABLE_RAW_DATA_SUBSTITUTE
-    )
-
-
-def test_sensitive_header_scrubbing_span_streaming(sentry_init, capture_items, app):
-    sentry_init(
-        integrations=[flask_sentry.FlaskIntegration()],
-        traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    items = capture_items("span")
-
-    client = app.test_client()
-    response = client.get(
-        "/message",
-        headers={
-            "Authorization": "Bearer secret-token",
-            "X-Custom-Header": "passthrough",
-        },
-    )
-    assert response.status_code == 200
-
-    sentry_sdk.flush()
-
-    assert len(items) == 1
-    span = items[0].payload
-    assert (
-        span["attributes"]["http.request.header.authorization"]
-        == SENSITIVE_DATA_SUBSTITUTE
-    )
-    assert span["attributes"]["http.request.header.x-custom-header"] == "passthrough"
-
-
-def test_request_body_captured_when_route_ignores_body_span_streaming(
-    sentry_init, capture_items, app
-):
-    """
-    When the route handler never reads the request body, the SDK should
-    still capture it in _request_finished via request.get_data().
-    """
-    sentry_init(
-        integrations=[flask_sentry.FlaskIntegration()],
-        traces_sample_rate=1.0,
-        max_request_body_size="always",
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    body = {"key": "value"}
-
-    @app.route("/ignore-body", methods=["POST"])
-    def ignore_body_endpoint():
-        return "ok"
-
-    items = capture_items("span")
-
-    client = app.test_client()
-    response = client.post("/ignore-body", json=body)
-    assert response.status_code == 200
-
-    sentry_sdk.flush()
-
-    assert len(items) == 1
-    span = items[0].payload
-    assert span["attributes"]["http.request.body.data"] == json.dumps(body)
-
-
-def test_client_disconnected_handled_gracefully_span_streaming(
-    sentry_init, capture_items, app
-):
-    from unittest.mock import patch
-
-    from werkzeug.exceptions import ClientDisconnected
-
-    sentry_init(
-        integrations=[flask_sentry.FlaskIntegration()],
-        traces_sample_rate=1.0,
-        max_request_body_size="always",
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    @app.route("/disconnect", methods=["POST"])
-    def disconnect_endpoint():
-        # Simulate a client that disconnected: patch get_data so that
-        # when _request_finished tries to read the body it raises.
-        request._cached_data = None
-        request.__dict__.pop("form", None)
-        patch.object(
-            type(request._get_current_object()),
-            "get_data",
-            side_effect=ClientDisconnected(),
-        ).start()
-        return "ok"
-
-    items = capture_items("span")
-
-    client = app.test_client()
-    try:
-        response = client.post(
-            "/disconnect",
-            data=b'{"key": "value"}',
-            content_type="application/json",
-        )
-        assert response.status_code == 200
-    finally:
-        patch.stopall()
-
-    sentry_sdk.flush()
-
-    assert len(items) == 1
-    span = items[0].payload
-    assert "http.request.body.data" not in span.get("attributes", {})
-
-
-def test_wsgi_input_direct_read_does_not_hang_span_streaming(
-    sentry_init, capture_items, app
-):
-    """
-    Regression test: reading wsgi.input directly must not hang when span streaming is enabled.
-    The SDK must not consume wsgi.input before user code runs.
-    """
-    sentry_init(
-        integrations=[flask_sentry.FlaskIntegration()],
-        traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
-        max_request_body_size="always",
-    )
-
-    @app.route("/raw-wsgi", methods=["POST"])
-    def raw_wsgi_endpoint():
-        content_length = int(request.environ.get("CONTENT_LENGTH", 0))
-        body = request.environ["wsgi.input"].read(content_length)
-        return {"size": len(body), "body": body.decode("utf-8", errors="replace")}
-
-    items = capture_items("span")
-
-    client = app.test_client()
-    response = client.post(
-        "/raw-wsgi", data=b"hello from test", content_type="text/plain"
-    )
-    assert response.status_code == 200
-    assert response.get_json()["body"] == "hello from test"
-
-    sentry_sdk.flush()
-
-    assert len(items) == 1
-    span = items[0].payload
-
-    # The SDK should not have captured the body since the user read wsgi.input
-    # directly (bypassing Werkzeug's cache). This is an acceptable trade-off
-    # vs. consuming the stream and causing user applications to hang.
-    assert "http.request.body.data" not in span.get("attributes", {})
