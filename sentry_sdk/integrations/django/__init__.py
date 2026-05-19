@@ -645,8 +645,13 @@ def install_sql_hook() -> None:
             _set_db_data(span, self)
             result = real_execute(self, sql, params)
 
-        with capture_internal_exceptions():
-            add_query_source(span)
+            if isinstance(span, StreamedSpan):
+                with capture_internal_exceptions():
+                    add_query_source(span)
+
+        if not isinstance(span, StreamedSpan):
+            with capture_internal_exceptions():
+                add_query_source(span)
 
         return result
 
@@ -666,8 +671,13 @@ def install_sql_hook() -> None:
 
             result = real_executemany(self, sql, param_list)
 
-        with capture_internal_exceptions():
-            add_query_source(span)
+            if isinstance(span, StreamedSpan):
+                with capture_internal_exceptions():
+                    add_query_source(span)
+
+        if not isinstance(span, StreamedSpan):
+            with capture_internal_exceptions():
+                add_query_source(span)
 
         return result
 
