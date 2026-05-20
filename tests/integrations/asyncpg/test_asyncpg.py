@@ -58,6 +58,23 @@ CRUMBS_CONNECT = {
     "message": "connect",
     "type": "default",
 }
+CRUMBS_CONNECT_STREAMING = {
+    "category": "query",
+    "data": ApproxDict(
+        {
+            "sentry.op": "db",
+            "sentry.origin": "auto.db.asyncpg",
+            "db.system.name": "postgresql",
+            "db.namespace": PG_NAME,
+            "db.user": PG_USER,
+            "db.driver.name": "asyncpg",
+            "server.address": PG_HOST,
+            "server.port": PG_PORT,
+        }
+    ),
+    "message": "connect",
+    "type": "default",
+}
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -124,7 +141,10 @@ async def test_connect(
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
 
-    assert event["breadcrumbs"]["values"] == [CRUMBS_CONNECT]
+    expected_crumbs_connect = (
+        CRUMBS_CONNECT_STREAMING if span_streaming else CRUMBS_CONNECT
+    )
+    assert event["breadcrumbs"]["values"] == [expected_crumbs_connect]
 
 
 @pytest.mark.asyncio
@@ -176,8 +196,11 @@ async def test_execute(
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
 
+    expected_crumbs_connect = (
+        CRUMBS_CONNECT_STREAMING if span_streaming else CRUMBS_CONNECT
+    )
     assert event["breadcrumbs"]["values"] == [
-        CRUMBS_CONNECT,
+        expected_crumbs_connect,
         {
             "category": "query",
             "data": {},
@@ -245,8 +268,11 @@ async def test_execute_many(
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
 
+    expected_crumbs_connect = (
+        CRUMBS_CONNECT_STREAMING if span_streaming else CRUMBS_CONNECT
+    )
     assert event["breadcrumbs"]["values"] == [
-        CRUMBS_CONNECT,
+        expected_crumbs_connect,
         {
             "category": "query",
             "data": {"db.executemany": True},
@@ -1398,11 +1424,11 @@ async def test_cursor__bind_exec_creates_spans(
 
         assert bind_exec_span["attributes"]["sentry.origin"] == "auto.db.asyncpg"
         assert bind_exec_span["attributes"]["sentry.op"] == "db"
-        assert bind_exec_span["attributes"]["db.system"] == "postgresql"
+        assert bind_exec_span["attributes"]["db.system.name"] == "postgresql"
         assert bind_exec_span["attributes"]["db.driver.name"] == "asyncpg"
         assert bind_exec_span["attributes"]["server.address"] == PG_HOST
         assert bind_exec_span["attributes"]["server.port"] == PG_PORT
-        assert bind_exec_span["attributes"]["db.name"] == PG_NAME
+        assert bind_exec_span["attributes"]["db.namespace"] == PG_NAME
         assert bind_exec_span["attributes"]["db.user"] == PG_USER
     else:
         events = capture_events()
