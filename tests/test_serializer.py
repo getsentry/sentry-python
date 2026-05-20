@@ -180,3 +180,39 @@ def test_max_value_length(body_normalizer):
     result = body_normalizer(data, max_value_length=max_value_length)
 
     assert len(result["key"]) == max_value_length
+
+
+def test_serialize_local_vars():
+    # This was added to make sure we don't try to iterate over instances of
+    # custom classes with an __iter__ method due to potential side effects
+    class Custom:
+        def __init__(self, items):
+            self.items = items
+
+        def __len__(self):
+            return self.items.__len__()
+
+        def __getitem__(self, item):
+            return self.items.__getitem__(item)
+
+        def __iter__(self):
+            raise ValueError
+
+    local_vars = {
+        "str": "123",
+        "bytes": b"123",
+        "list": [1, 2, 3],
+        "set": {1, 2, 3},
+        "frozenset": frozenset([1, 2, 3]),
+        "custom": Custom([1, 2, 3]),
+    }
+
+    result = serialize(local_vars, is_vars=True)
+    assert result["str"] == "'123'"
+    assert result["bytes"] == "b'123'"
+    assert result["list"] == ["1", "2", "3"]
+    assert result["set"] == ["1", "2", "3"]
+    assert result["frozenset"] == ["1", "2", "3"]
+    assert result["custom"].startswith(
+        "<tests.test_serializer.test_serialize_local_vars.<locals>.Custom object at"
+    )
