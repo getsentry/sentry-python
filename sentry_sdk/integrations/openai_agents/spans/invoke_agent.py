@@ -9,7 +9,7 @@ from sentry_sdk.ai.utils import (
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import safe_serialize
+from sentry_sdk.utils import capture_internal_exceptions, safe_serialize
 
 from ..consts import SPAN_ORIGIN
 from ..utils import _set_agent_data, _set_usage_data
@@ -85,37 +85,64 @@ def invoke_agent_span(
 
 
 def update_invoke_agent_span(
-    context: "agents.RunContextWrapper", agent: "agents.Agent", output: "Any"
+    span: "sentry_sdk.tracing.Span",
+    context: "agents.RunContextWrapper",
+    agent: "agents.Agent",
+    output: "Any" = None,
 ) -> None:
-    span = getattr(context, "_sentry_agent_span", None)
+    # Add aggregated usage data from context_wrapper
+    if hasattr(context, "usage"):
+        _set_usage_data(span, context.usage)
 
-    if span:
-        # Add aggregated usage data from context_wrapper
-        if hasattr(context, "usage"):
-            _set_usage_data(span, context.usage)
+    if should_send_default_pii():
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output, unpack=False)
 
-        if should_send_default_pii():
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_RESPONSE_TEXT, output, unpack=False
+    # Add conversation ID from agent
+    conv_id = getattr(agent, "_sentry_conversation_id", None)
+    if conv_id:
+        span.set_data(SPANDATA.GEN_AI_CONVERSATION_ID, conv_id)
+
+
+class _AgentInvocationSpanContext:
+    """
+    Sets accumulated data on the Invoke Agent span and finishes the span on exit.
+    Is a no-op if the context wrapper has no span set, i.e., when the span has already been finished.
+    """
+
+    def __init__(
+        self,
+        context_wrapper: "agents.RunContextWrapper",
+        agent: "agents.Agent",
+        output: "Optional[Any]" = None,
+    ) -> None:
+        self._context_wrapper = context_wrapper
+        self._agent = agent
+        self._output = output
+
+    def __enter__(self) -> "_AgentInvocationSpanContext":
+        return self
+
+    def __exit__(
+        self,
+        exc_type: "Optional[type[BaseException]]",
+        exc_val: "Optional[BaseException]",
+        exc_tb: "Optional[Any]",
+    ) -> None:
+        with capture_internal_exceptions():
+            # Clear the stored agent
+            if hasattr(self._context_wrapper, "_sentry_current_agent"):
+                delattr(self._context_wrapper, "_sentry_current_agent")
+
+            span = getattr(self._context_wrapper, "_sentry_agent_span", None)
+            if not span:
+                return
+
+            update_invoke_agent_span(
+                span=span,
+                context=self._context_wrapper,
+                agent=self._agent,
+                output=self._output,
             )
 
-        # Add conversation ID from agent
-        conv_id = getattr(agent, "_sentry_conversation_id", None)
-        if conv_id:
-            span.set_data(SPANDATA.GEN_AI_CONVERSATION_ID, conv_id)
-
-        span.__exit__(None, None, None)
-        delattr(context, "_sentry_agent_span")
-
-
-def end_invoke_agent_span(
-    context_wrapper: "agents.RunContextWrapper",
-    agent: "agents.Agent",
-    output: "Optional[Any]" = None,
-) -> None:
-    """End the agent invocation span"""
-    # Clear the stored agent
-    if hasattr(context_wrapper, "_sentry_current_agent"):
-        delattr(context_wrapper, "_sentry_current_agent")
-
-    update_invoke_agent_span(context_wrapper, agent, output)
+            span.__exit__(exc_type, exc_val, exc_tb)
+            delattr(self._context_wrapper, "_sentry_agent_span")
