@@ -118,10 +118,6 @@ async def _run_single_turn(
     except Exception:
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
-            span = getattr(context_wrapper, "_sentry_agent_span", None)
-            if not span:
-                return
-
             update_invoke_agent_span(span=span, context=context_wrapper, agent=agent)
 
             span.__exit__(*exc_info)
@@ -231,14 +227,12 @@ async def _execute_handoffs(
     if not agent or not context_wrapper or not _has_active_agent_span(context_wrapper):
         # Call original method with all parameters
         try:
-            result = await original_execute_handoffs(*args, **kwargs)
+            return await original_execute_handoffs(*args, **kwargs)
         except Exception:
             exc_info = sys.exc_info()
             with capture_internal_exceptions():
                 _close_streaming_workflow_span(agent)
             reraise(*exc_info)
-
-        return result
 
     with _AgentInvocationSpanContext(
         context_wrapper=context_wrapper,
