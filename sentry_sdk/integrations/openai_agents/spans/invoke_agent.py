@@ -9,13 +9,13 @@ from sentry_sdk.ai.utils import (
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import capture_internal_exceptions, safe_serialize
+from sentry_sdk.utils import safe_serialize
 
 from ..consts import SPAN_ORIGIN
 from ..utils import _set_agent_data, _set_usage_data
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Any
 
     import agents
 
@@ -101,48 +101,3 @@ def update_invoke_agent_span(
     conv_id = getattr(agent, "_sentry_conversation_id", None)
     if conv_id:
         span.set_data(SPANDATA.GEN_AI_CONVERSATION_ID, conv_id)
-
-
-class _AgentInvocationSpanContext:
-    """
-    Sets accumulated data on the Invoke Agent span and finishes the span on exit.
-    Is a no-op if the context wrapper has no span set, i.e., when the span has already been finished.
-    """
-
-    def __init__(
-        self,
-        context_wrapper: "agents.RunContextWrapper",
-        agent: "agents.Agent",
-        output: "Optional[Any]" = None,
-    ) -> None:
-        self._context_wrapper = context_wrapper
-        self._agent = agent
-        self._output = output
-
-    def __enter__(self) -> "_AgentInvocationSpanContext":
-        return self
-
-    def __exit__(
-        self,
-        exc_type: "Optional[type[BaseException]]",
-        exc_val: "Optional[BaseException]",
-        exc_tb: "Optional[Any]",
-    ) -> None:
-        with capture_internal_exceptions():
-            # Clear the stored agent
-            if hasattr(self._context_wrapper, "_sentry_current_agent"):
-                delattr(self._context_wrapper, "_sentry_current_agent")
-
-            span = getattr(self._context_wrapper, "_sentry_agent_span", None)
-            if not span:
-                return
-
-            update_invoke_agent_span(
-                span=span,
-                context=self._context_wrapper,
-                agent=self._agent,
-                output=self._output,
-            )
-
-            span.__exit__(exc_type, exc_val, exc_tb)
-            delattr(self._context_wrapper, "_sentry_agent_span")
