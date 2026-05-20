@@ -69,7 +69,6 @@ def _maybe_start_agent_span(
                 update_invoke_agent_span(
                     span=span, context=context_wrapper, agent=agent
                 )
-
                 span.__exit__(None, None, None)
                 delattr(context_wrapper, "_sentry_agent_span")
 
@@ -118,7 +117,6 @@ async def _run_single_turn(
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
             update_invoke_agent_span(span=span, context=context_wrapper, agent=agent)
-
             span.__exit__(*exc_info)
             delattr(context_wrapper, "_sentry_agent_span")
         reraise(*exc_info)
