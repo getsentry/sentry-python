@@ -211,9 +211,9 @@ def _wrap_connect_addr(
             span_attributes = {
                 "sentry.op": OP.DB,
                 "sentry.origin": AsyncPGIntegration.origin,
-                SPANDATA.DB_SYSTEM: "postgresql",
+                SPANDATA.DB_SYSTEM_NAME: "postgresql",
                 SPANDATA.DB_USER: user,
-                SPANDATA.DB_NAME: database,
+                SPANDATA.DB_NAMESPACE: database,
                 SPANDATA.DB_DRIVER_NAME: "asyncpg",
             }
             if addr:
@@ -261,23 +261,40 @@ def _wrap_connect_addr(
 
 
 def _set_db_data(span: "Union[Span, StreamedSpan]", conn: "Any") -> None:
-    set_value = span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
-
-    set_value(SPANDATA.DB_SYSTEM, "postgresql")
-    set_value(SPANDATA.DB_DRIVER_NAME, "asyncpg")
-
     addr = conn._addr
-    if addr:
-        try:
-            set_value(SPANDATA.SERVER_ADDRESS, addr[0])
-            set_value(SPANDATA.SERVER_PORT, addr[1])
-        except IndexError:
-            pass
-
     database = conn._params.database
-    if database:
-        set_value(SPANDATA.DB_NAME, database)
-
     user = conn._params.user
-    if user:
-        set_value(SPANDATA.DB_USER, user)
+
+    if isinstance(span, StreamedSpan):
+        span.set_attribute(SPANDATA.DB_SYSTEM_NAME, "postgresql")
+        span.set_attribute(SPANDATA.DB_DRIVER_NAME, "asyncpg")
+        if addr:
+            try:
+                span.set_attribute(SPANDATA.SERVER_ADDRESS, addr[0])
+                span.set_attribute(SPANDATA.SERVER_PORT, addr[1])
+            except IndexError:
+                pass
+
+        if database:
+            span.set_attribute(SPANDATA.DB_NAMESPACE, database)
+
+        if user:
+            span.set_attribute(SPANDATA.DB_USER, user)
+    else:
+        # Remove this else block once we've completely migrated to streamed spans
+        # The use of deprecated attributes here is to ensure backwards compatibility
+        span.set_data(SPANDATA.DB_SYSTEM, "postgresql")
+        span.set_data(SPANDATA.DB_DRIVER_NAME, "asyncpg")
+
+        if addr:
+            try:
+                span.set_data(SPANDATA.SERVER_ADDRESS, addr[0])
+                span.set_data(SPANDATA.SERVER_PORT, addr[1])
+            except IndexError:
+                pass
+
+        if database:
+            span.set_data(SPANDATA.DB_NAME, database)
+
+        if user:
+            span.set_data(SPANDATA.DB_USER, user)
