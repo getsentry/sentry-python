@@ -174,7 +174,6 @@ class SentryWsgiMiddleware:
                             )
                         except BaseException:
                             reraise(*_capture_exception())
-
         finally:
             _wsgi_middleware_applied.set(False)
 
