@@ -53,7 +53,7 @@ def add_global_repr_processor(processor: "ReprProcessor") -> None:
     global_repr_processors.append(processor)
 
 
-sequence_types: "List[type]" = [tuple, list, set]
+sequence_types: "List[type]" = [tuple, list, set, frozenset]
 
 
 def add_repr_sequence_type(ty: type) -> None:
