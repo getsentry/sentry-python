@@ -2561,8 +2561,6 @@ def test_span_status_error(
         assert transaction["spans"][0]["status"] == "internal_error"
         assert transaction["spans"][0]["tags"]["status"] == "internal_error"
 
-    assert transaction["contexts"]["trace"]["status"] == "internal_error"
-
 
 def test_manual_callback_no_duplication(sentry_init):
     """

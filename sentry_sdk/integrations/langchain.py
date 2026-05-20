@@ -19,7 +19,7 @@ from sentry_sdk.ai.utils import (
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing_utils import _get_value, set_span_errored
+from sentry_sdk.tracing_utils import _get_value
 from sentry_sdk.utils import capture_internal_exceptions, logger
 
 if TYPE_CHECKING:
@@ -273,11 +273,10 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             span_data = self.span_map[run_id]
             span = span_data.span
-            set_span_errored(span)
 
             sentry_sdk.capture_exception(error, span.scope)
 
-            span.__exit__(None, None, None)
+            span.__exit__(type(error), error, error.__traceback__)
             del self.span_map[run_id]
 
     def _normalize_langchain_message(self, message: "BaseMessage") -> "Any":
@@ -1112,13 +1111,13 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
                     and integration.include_prompts
                 ):
                     set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+
+                span.__exit__(None, None, None)
             except Exception:
                 exc_info = sys.exc_info()
-                set_span_errored(span)
+                with capture_internal_exceptions():
+                    span.__exit__(*exc_info)
                 raise
-            finally:
-                # Ensure cleanup happens even if iterator is abandoned or fails
-                span.__exit__(*exc_info)
 
         async def new_iterator_async() -> "AsyncIterator[Any]":
             exc_info: "tuple[Any, Any, Any]" = (None, None, None)
@@ -1137,9 +1136,12 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
                     and integration.include_prompts
                 ):
                     set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+
+                span.__exit__(None, None, None)
             except Exception:
                 exc_info = sys.exc_info()
-                set_span_errored(span)
+                with capture_internal_exceptions():
+                    span.__exit__(*exc_info)
                 raise
             finally:
                 # Ensure cleanup happens even if iterator is abandoned or fails
