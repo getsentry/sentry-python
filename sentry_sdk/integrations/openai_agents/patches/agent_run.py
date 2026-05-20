@@ -66,13 +66,13 @@ def _maybe_start_agent_span(
         current_agent = _get_current_agent(context_wrapper)
         if current_agent and current_agent != agent:
             span = getattr(context_wrapper, "_sentry_agent_span", None)
-            if not span:
-                return
+            if span:
+                update_invoke_agent_span(
+                    span=span, context=context_wrapper, agent=agent
+                )
 
-            update_invoke_agent_span(span=span, context=context_wrapper, agent=agent)
-
-            span.__exit__(None, None, None)
-            delattr(context_wrapper, "_sentry_agent_span")
+                span.__exit__(None, None, None)
+                delattr(context_wrapper, "_sentry_agent_span")
 
     # Store the agent on the context wrapper so we can access it later
     context_wrapper._sentry_current_agent = agent
