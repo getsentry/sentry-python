@@ -1143,9 +1143,6 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
                 with capture_internal_exceptions():
                     span.__exit__(*exc_info)
                 raise
-            finally:
-                # Ensure cleanup happens even if iterator is abandoned or fails
-                span.__exit__(*exc_info)
 
         if str(type(result)) == "<class 'async_generator'>":
             result = new_iterator_async()
