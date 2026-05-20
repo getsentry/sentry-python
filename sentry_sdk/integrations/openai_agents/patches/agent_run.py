@@ -114,7 +114,7 @@ async def _run_single_turn(
         return await original_run_single_turn(*args, **kwargs)
 
     try:
-        return await original_run_single_turn(*args, **kwargs)
+        result = await original_run_single_turn(*args, **kwargs)
     except Exception:
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
@@ -123,6 +123,8 @@ async def _run_single_turn(
             span.__exit__(*exc_info)
             delattr(context_wrapper, "_sentry_agent_span")
         reraise(*exc_info)
+
+    return result
 
 
 async def _run_single_turn_streamed(
@@ -193,12 +195,14 @@ async def _run_single_turn_streamed(
         agent=agent,
     ):
         try:
-            return await original_run_single_turn_streamed(*args, **kwargs)
+            result = await original_run_single_turn_streamed(*args, **kwargs)
         except Exception:
             exc_info = sys.exc_info()
             with capture_internal_exceptions():
                 _close_streaming_workflow_span(agent)
             reraise(*exc_info)
+
+    return result
 
 
 async def _execute_handoffs(
