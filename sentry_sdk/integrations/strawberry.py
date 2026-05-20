@@ -225,13 +225,13 @@ class SentryAsyncExtension(SchemaExtension):
 
         yield
 
-        if type(graphql_span) is StreamedSpan:
+        if isinstance(graphql_span, StreamedSpan):
             if execution_context.operation_name:
                 segment = graphql_span._segment
                 segment.set_attribute("sentry.span.source", TransactionSource.COMPONENT)
                 segment.set_attribute("sentry.op", op)
                 segment.name = execution_context.operation_name
-        elif type(graphql_span) is Span:
+        elif isinstance(graphql_span, Span):
             transaction = graphql_span.containing_transaction
             if transaction and execution_context.operation_name:
                 transaction.name = execution_context.operation_name
@@ -261,7 +261,7 @@ class SentryAsyncExtension(SchemaExtension):
 
         yield
 
-        if is_span_streaming_enabled and type(validation_span) is StreamedSpan:
+        if is_span_streaming_enabled and isinstance(validation_span, StreamedSpan):
             validation_span.end()
         else:
             validation_span.finish()
@@ -287,7 +287,7 @@ class SentryAsyncExtension(SchemaExtension):
 
         yield
 
-        if is_span_streaming_enabled and type(parsing_span) is StreamedSpan:
+        if is_span_streaming_enabled and isinstance(parsing_span, StreamedSpan):
             parsing_span.end()
         else:
             parsing_span.finish()
