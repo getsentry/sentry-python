@@ -141,7 +141,9 @@ async def test_connect(
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
 
-    expected_crumbs_connect = CRUMBS_CONNECT_STREAMING if span_streaming else CRUMBS_CONNECT
+    expected_crumbs_connect = (
+        CRUMBS_CONNECT_STREAMING if span_streaming else CRUMBS_CONNECT
+    )
     assert event["breadcrumbs"]["values"] == [expected_crumbs_connect]
 
 
@@ -194,7 +196,9 @@ async def test_execute(
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
 
-    expected_crumbs_connect = CRUMBS_CONNECT_STREAMING if span_streaming else CRUMBS_CONNECT
+    expected_crumbs_connect = (
+        CRUMBS_CONNECT_STREAMING if span_streaming else CRUMBS_CONNECT
+    )
     assert event["breadcrumbs"]["values"] == [
         expected_crumbs_connect,
         {
@@ -264,7 +268,9 @@ async def test_execute_many(
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
 
-    expected_crumbs_connect = CRUMBS_CONNECT_STREAMING if span_streaming else CRUMBS_CONNECT
+    expected_crumbs_connect = (
+        CRUMBS_CONNECT_STREAMING if span_streaming else CRUMBS_CONNECT
+    )
     assert event["breadcrumbs"]["values"] == [
         expected_crumbs_connect,
         {
