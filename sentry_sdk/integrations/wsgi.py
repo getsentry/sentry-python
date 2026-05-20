@@ -174,25 +174,6 @@ class SentryWsgiMiddleware:
                             )
                         except BaseException:
                             reraise(*_capture_exception())
-                        finally:
-                            if isinstance(span, StreamedSpan):
-                                already_set = (
-                                    span.name != _DEFAULT_TRANSACTION_NAME
-                                    and span.get_attributes().get("sentry.span.source")
-                                    in [
-                                        SegmentSource.COMPONENT.value,
-                                        SegmentSource.ROUTE.value,
-                                        SegmentSource.CUSTOM.value,
-                                        SegmentSource.URL.value,
-                                    ]
-                                )
-                                if not already_set:
-                                    with capture_internal_exceptions():
-                                        span.name = _DEFAULT_TRANSACTION_NAME
-                                        span.set_attribute(
-                                            "sentry.span.source",
-                                            SegmentSource.ROUTE.value,
-                                        )
         finally:
             _wsgi_middleware_applied.set(False)
 
