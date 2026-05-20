@@ -4,10 +4,9 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.tracing_utils import set_span_errored
 from sentry_sdk.utils import capture_internal_exceptions, reraise
 
-from ..spans import agent_workflow_span, end_invoke_agent_span
+from ..spans import agent_workflow_span, update_invoke_agent_span
 from ..utils import _capture_exception
 
 try:
@@ -66,8 +65,14 @@ def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., A
                                 invoke_agent_span is not None
                                 and invoke_agent_span.timestamp is None
                             ):
-                                set_span_errored(invoke_agent_span)
-                                end_invoke_agent_span(context_wrapper, agent)
+                                update_invoke_agent_span(
+                                    span=invoke_agent_span,
+                                    context=context_wrapper,
+                                    agent=agent,
+                                )
+
+                                invoke_agent_span.__exit__(*exc_info)
+                                delattr(context_wrapper, "_sentry_agent_span")
                     reraise(*exc_info)
                 except Exception as exc:
                     exc_info = sys.exc_info()
@@ -78,7 +83,20 @@ def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., A
                         _capture_exception(exc)
                     reraise(*exc_info)
 
-                end_invoke_agent_span(run_result.context_wrapper, agent)
+                invoke_agent_span = getattr(
+                    run_result.context_wrapper, "_sentry_agent_span", None
+                )
+                if not invoke_agent_span:
+                    return run_result
+
+                update_invoke_agent_span(
+                    span=invoke_agent_span,
+                    context=run_result.context_wrapper,
+                    agent=agent,
+                )
+
+                invoke_agent_span.__exit__(None, None, None)
+                delattr(run_result.context_wrapper, "_sentry_agent_span")
                 return run_result
 
     return wrapper

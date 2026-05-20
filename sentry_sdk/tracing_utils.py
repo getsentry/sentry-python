@@ -20,7 +20,7 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS, SPANTEMPLATE
+from sentry_sdk.consts import OP, SPANDATA, SPANTEMPLATE
 from sentry_sdk.utils import (
     _is_external_source,
     _is_in_project_root,
@@ -1151,33 +1151,6 @@ def get_current_span(
     scope = scope or sentry_sdk.get_current_scope()
     current_span = scope.span
     return current_span
-
-
-def set_span_errored(span: "Optional[Union[Span, StreamedSpan]]" = None) -> None:
-    """
-    Set the status of the current or given span to INTERNAL_ERROR.
-    Also sets the status of the transaction (root span) to INTERNAL_ERROR.
-    """
-    from sentry_sdk.traces import SpanStatus, StreamedSpan, _get_current_streamed_span
-
-    client = sentry_sdk.get_client()
-
-    if not span:
-        span = (
-            _get_current_streamed_span()
-            if has_span_streaming_enabled(client.options)
-            else sentry_sdk.get_current_span()
-        )
-
-    if span is not None:
-        if isinstance(span, Span):
-            span.set_status(SPANSTATUS.INTERNAL_ERROR)
-            if span.containing_transaction is not None:
-                span.containing_transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
-        elif isinstance(span, StreamedSpan):
-            span.status = SpanStatus.ERROR
-            if span._segment is not None:
-                span._segment.status = SpanStatus.ERROR
 
 
 def _generate_sample_rand(
