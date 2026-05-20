@@ -327,6 +327,7 @@ class SentryAsyncExtension(SchemaExtension):
 
         field_path = "{}.{}".format(info.parent_type, info.field_name)
 
+<<<<<<< HEAD
         client = sentry_sdk.get_client()
         is_span_streaming_enabled = has_span_streaming_enabled(client.options)
         if is_span_streaming_enabled:
@@ -339,6 +340,8 @@ class SentryAsyncExtension(SchemaExtension):
             ):
                 return await self._resolve(_next, root, info, *args, **kwargs)
 
+=======
+>>>>>>> master
         with sentry_sdk.start_span(
             op=OP.GRAPHQL_RESOLVE,
             name="resolving {}".format(field_path),
@@ -366,6 +369,7 @@ class SentrySyncExtension(SentryAsyncExtension):
 
         field_path = "{}.{}".format(info.parent_type, info.field_name)
 
+<<<<<<< HEAD
         client = sentry_sdk.get_client()
         is_span_streaming_enabled = has_span_streaming_enabled(client.options)
         if is_span_streaming_enabled:
@@ -378,6 +382,8 @@ class SentrySyncExtension(SentryAsyncExtension):
             ):
                 return _next(root, info, *args, **kwargs)
 
+=======
+>>>>>>> master
         with sentry_sdk.start_span(
             op=OP.GRAPHQL_RESOLVE,
             name="resolving {}".format(field_path),

@@ -12,7 +12,7 @@ from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import (
     add_query_source,
     has_span_streaming_enabled,
-    record_sql_queries_supporting_streaming,
+    record_sql_queries,
 )
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -82,7 +82,7 @@ def _wrap_execute(f: "Callable[..., Awaitable[T]]") -> "Callable[..., Awaitable[
             return await f(*args, **kwargs)
 
         query = _normalize_query(args[1])
-        with record_sql_queries_supporting_streaming(
+        with record_sql_queries(
             cursor=None,
             query=query,
             params_list=None,
@@ -123,7 +123,7 @@ def _record(
     param_style = "pyformat" if params_list else None
 
     query = _normalize_query(query)
-    with record_sql_queries_supporting_streaming(
+    with record_sql_queries(
         cursor=cursor,
         query=query,
         params_list=params_list,
@@ -170,7 +170,7 @@ def _wrap_cursor_method(
 
         cursor = args[0]
         query = _normalize_query(cursor._query)
-        with record_sql_queries_supporting_streaming(
+        with record_sql_queries(
             cursor=cursor,
             query=query,
             params_list=None,

@@ -3,6 +3,8 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import OP
+from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 if TYPE_CHECKING:
     from typing import Any
@@ -30,12 +32,23 @@ def patch_views() -> None:
     old_render = SimpleTemplateResponse.render
 
     def sentry_patched_render(self: "SimpleTemplateResponse") -> "Any":
-        with sentry_sdk.start_span(
-            op=OP.VIEW_RESPONSE_RENDER,
-            name="serialize response",
-            origin=DjangoIntegration.origin,
-        ):
-            return old_render(self)
+        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+        if span_streaming:
+            with sentry_sdk.traces.start_span(
+                name="serialize response",
+                attributes={
+                    "sentry.op": OP.VIEW_RESPONSE_RENDER,
+                    "sentry.origin": DjangoIntegration.origin,
+                },
+            ):
+                return old_render(self)
+        else:
+            with sentry_sdk.start_span(
+                op=OP.VIEW_RESPONSE_RENDER,
+                name="serialize response",
+                origin=DjangoIntegration.origin,
+            ):
+                return old_render(self)
 
     @functools.wraps(old_make_view_atomic)
     def sentry_patched_make_view_atomic(
@@ -72,9 +85,17 @@ def _wrap_sync_view(callback: "Any") -> "Any":
 
     @functools.wraps(callback)
     def sentry_wrapped_callback(request: "Any", *args: "Any", **kwargs: "Any") -> "Any":
+        client = sentry_sdk.get_client()
+        span_streaming = has_span_streaming_enabled(client.options)
         current_scope = sentry_sdk.get_current_scope()
-        if current_scope.transaction is not None:
-            current_scope.transaction.update_active_thread()
+        if span_streaming:
+            current_span = current_scope.streamed_span
+            if type(current_span) is StreamedSpan:
+                segment = current_span._segment
+                segment._update_active_thread()
+        else:
+            if current_scope.transaction is not None:
+                current_scope.transaction.update_active_thread()
 
         sentry_scope = sentry_sdk.get_isolation_scope()
         # set the active thread id to the handler thread for sync views
@@ -82,15 +103,25 @@ def _wrap_sync_view(callback: "Any") -> "Any":
         if sentry_scope.profile is not None:
             sentry_scope.profile.update_active_thread_id()
 
-        integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
+        integration = client.get_integration(DjangoIntegration)
         if not integration or not integration.middleware_spans:
             return callback(request, *args, **kwargs)
 
-        with sentry_sdk.start_span(
-            op=OP.VIEW_RENDER,
-            name=request.resolver_match.view_name,
-            origin=DjangoIntegration.origin,
-        ):
-            return callback(request, *args, **kwargs)
+        if span_streaming:
+            with sentry_sdk.traces.start_span(
+                name=request.resolver_match.view_name,
+                attributes={
+                    "sentry.op": OP.VIEW_RENDER,
+                    "sentry.origin": DjangoIntegration.origin,
+                },
+            ):
+                return callback(request, *args, **kwargs)
+        else:
+            with sentry_sdk.start_span(
+                op=OP.VIEW_RENDER,
+                name=request.resolver_match.view_name,
+                origin=DjangoIntegration.origin,
+            ):
+                return callback(request, *args, **kwargs)
 
     return sentry_wrapped_callback
