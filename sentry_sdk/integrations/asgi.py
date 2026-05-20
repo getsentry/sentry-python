@@ -367,27 +367,6 @@ class SentryAsgiMiddleware:
                                 self._capture_request_exception(exc)
                             reraise(*exc_info)
 
-                        finally:
-                            if isinstance(span, StreamedSpan):
-                                already_set = (
-                                    span is not None
-                                    and span.name != _DEFAULT_TRANSACTION_NAME
-                                    and span.get_attributes().get("sentry.span.source")
-                                    in [
-                                        SegmentSource.COMPONENT.value,
-                                        SegmentSource.ROUTE.value,
-                                        SegmentSource.CUSTOM.value,
-                                    ]
-                                )
-                                with capture_internal_exceptions():
-                                    if not already_set:
-                                        name, source = (
-                                            self._get_segment_name_and_source(
-                                                self.transaction_style, scope
-                                            )
-                                        )
-                                        span.name = name
-                                        span.set_attribute("sentry.span.source", source)
         finally:
             _asgi_middleware_applied.set(False)
 
