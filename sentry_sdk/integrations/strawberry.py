@@ -225,7 +225,7 @@ class SentryAsyncExtension(SchemaExtension):
 
         yield
 
-        if isinstance(graphql_span, StreamedSpan):
+        if type(graphql_span) is StreamedSpan:
             if execution_context.operation_name:
                 segment = graphql_span._segment
                 segment.set_attribute("sentry.span.source", TransactionSource.COMPONENT)
