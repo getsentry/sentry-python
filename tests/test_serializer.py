@@ -1,4 +1,5 @@
 import re
+from array import array
 
 import pytest
 
@@ -204,6 +205,7 @@ def test_serialize_local_vars():
         "list": [1, 2, 3],
         "set": {1, 2, 3},
         "frozenset": frozenset([1, 2, 3]),
+        "array": array("l", [1, 2, 3]),
         "custom": Custom([1, 2, 3]),
     }
 
@@ -211,8 +213,9 @@ def test_serialize_local_vars():
     assert result["str"] == "'123'"
     assert result["bytes"] == "b'123'"
     assert result["list"] == ["1", "2", "3"]
-    assert result["set"] == ["1", "2", "3"]
-    assert result["frozenset"] == ["1", "2", "3"]
+    assert sorted(result["set"]) == ["1", "2", "3"]
+    assert sorted(result["frozenset"]) == ["1", "2", "3"]
+    assert result["array"] == ["1", "2", "3"]
     assert result["custom"].startswith(
         "<tests.test_serializer.test_serialize_local_vars.<locals>.Custom object at"
     )
