@@ -272,7 +272,7 @@ async def _execute_final_output(
 
     if not agent or not context_wrapper or not _has_active_agent_span(context_wrapper):
         try:
-            result = await original_execute_final_output(*args, **kwargs)
+            return await original_execute_final_output(*args, **kwargs)
         finally:
             with capture_internal_exceptions():
                 # For streaming, close the workflow span (non-streaming uses context manager in _create_run_wrapper)
