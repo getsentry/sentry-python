@@ -116,9 +116,13 @@ async def _run_single_turn(
     except Exception:
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
-            update_invoke_agent_span(span=span, context=context_wrapper, agent=agent)
-            span.__exit__(*exc_info)
-            delattr(context_wrapper, "_sentry_agent_span")
+            span = getattr(context_wrapper, "_sentry_agent_span", None)
+            if span:
+                update_invoke_agent_span(
+                    span=span, context=context_wrapper, agent=agent
+                )
+                span.__exit__(*exc_info)
+                delattr(context_wrapper, "_sentry_agent_span")
         reraise(*exc_info)
 
     return result
@@ -192,9 +196,13 @@ async def _run_single_turn_streamed(
     except Exception:
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
-            update_invoke_agent_span(span=span, context=context_wrapper, agent=agent)
-            span.__exit__(*exc_info)
-            delattr(context_wrapper, "_sentry_agent_span")
+            span = getattr(context_wrapper, "_sentry_agent_span", None)
+            if span:
+                update_invoke_agent_span(
+                    span=span, context=context_wrapper, agent=agent
+                )
+                span.__exit__(*exc_info)
+                delattr(context_wrapper, "_sentry_agent_span")
             _close_streaming_workflow_span(agent)
         reraise(*exc_info)
 
