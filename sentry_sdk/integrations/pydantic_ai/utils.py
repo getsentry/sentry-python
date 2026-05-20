@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing_utils import set_span_errored
 from sentry_sdk.utils import event_from_exception, safe_serialize
 
 if TYPE_CHECKING:
@@ -207,8 +206,6 @@ def _set_available_tools(span: "sentry_sdk.tracing.Span", agent: "Any") -> None:
 
 
 def _capture_exception(exc: "Any", handled: bool = False) -> None:
-    set_span_errored()
-
     event, hint = event_from_exception(
         exc,
         client_options=sentry_sdk.get_client().options,
