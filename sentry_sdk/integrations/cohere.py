@@ -6,7 +6,6 @@ from sentry_sdk import consts
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import get_start_span_function, set_data_normalized
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.tracing_utils import set_span_errored
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Iterator
@@ -83,8 +82,6 @@ class CohereIntegration(Integration):
 
 
 def _capture_exception(exc: "Any") -> None:
-    set_span_errored()
-
     event, hint = event_from_exception(
         exc,
         client_options=sentry_sdk.get_client().options,
@@ -154,7 +151,7 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
             exc_info = sys.exc_info()
             with capture_internal_exceptions():
                 _capture_exception(e)
-                span.__exit__(None, None, None)
+                span.__exit__(*exc_info)
             reraise(*exc_info)
 
         with capture_internal_exceptions():
