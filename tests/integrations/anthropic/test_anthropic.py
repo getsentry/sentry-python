@@ -3299,7 +3299,19 @@ def test_exception_message_create(
         side_effect=AnthropicError("API rate limit reached")
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("event", "transaction")
+
+        with pytest.raises(AnthropicError):
+            client.messages.create(
+                model="some-model",
+                messages=[{"role": "system", "content": "I'm throwing an exception"}],
+                max_tokens=1024,
+            )
+
+        (event,) = (item.payload for item in items if item.type == "event")
+        assert event["level"] == "error"
+    elif stream_gen_ai_spans:
         items = capture_items("event", "transaction")
 
         with pytest.raises(AnthropicError):
@@ -3313,6 +3325,7 @@ def test_exception_message_create(
         assert event["level"] == "error"
 
         (transaction,) = (item.payload for item in items if item.type == "transaction")
+        assert transaction["contexts"]["trace"]["status"] == "internal_error"
     else:
         events = capture_events()
 
@@ -3325,8 +3338,7 @@ def test_exception_message_create(
 
         (event, transaction) = events
         assert event["level"] == "error"
-
-    assert transaction["contexts"]["trace"]["status"] == "internal_error"
+        assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -3482,7 +3494,19 @@ async def test_exception_message_create_async(
         side_effect=AnthropicError("API rate limit reached")
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("event", "transaction")
+
+        with pytest.raises(AnthropicError):
+            await client.messages.create(
+                model="some-model",
+                messages=[{"role": "system", "content": "I'm throwing an exception"}],
+                max_tokens=1024,
+            )
+
+        (event,) = (item.payload for item in items if item.type == "event")
+        assert event["level"] == "error"
+    elif stream_gen_ai_spans:
         items = capture_items("event", "transaction")
 
         with pytest.raises(AnthropicError):
@@ -3496,6 +3520,7 @@ async def test_exception_message_create_async(
         assert event["level"] == "error"
 
         (transaction,) = (item.payload for item in items if item.type == "transaction")
+        assert transaction["contexts"]["trace"]["status"] == "internal_error"
     else:
         events = capture_events()
 
@@ -3508,7 +3533,7 @@ async def test_exception_message_create_async(
 
         (event, transaction) = events
         assert event["level"] == "error"
-    assert transaction["contexts"]["trace"]["status"] == "internal_error"
+        assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -3657,13 +3682,11 @@ def test_collect_ai_data_with_input_json_delta(span_streaming):
     ANTHROPIC_VERSION < (0, 27),
     reason="Versions <0.27.0 do not include InputJSONDelta.",
 )
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_set_output_data_with_input_json_delta(sentry_init, span_streaming):
+def test_set_output_data_with_input_json_delta(sentry_init):
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     with start_transaction(name="test"):
@@ -3788,14 +3811,12 @@ def test_anthropic_message_role_mapping(
     assert stored_messages[0]["role"] == expected_role
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_anthropic_message_truncation(sentry_init, capture_events, span_streaming):
+def test_anthropic_message_truncation(sentry_init, capture_events):
     """Test that large messages are truncated properly in Anthropic integration."""
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
     events = capture_events()
 
@@ -3842,16 +3863,12 @@ def test_anthropic_message_truncation(sentry_init, capture_events, span_streamin
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("span_streaming", [True, False])
-async def test_anthropic_message_truncation_async(
-    sentry_init, capture_events, span_streaming
-):
+async def test_anthropic_message_truncation_async(sentry_init, capture_events):
     """Test that large messages are truncated properly in Anthropic integration."""
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
     events = capture_events()
 
@@ -5324,14 +5341,12 @@ def test_transform_message_content_list_anthropic(span_streaming):
 # Integration tests for binary data in messages
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_message_with_base64_image(sentry_init, capture_events, span_streaming):
+def test_message_with_base64_image(sentry_init, capture_events):
     """Test that messages with base64 images are properly captured."""
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
     events = capture_events()
     client = Anthropic(api_key="z")
@@ -5520,14 +5535,12 @@ def test_message_with_file_image(
     }
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_message_with_base64_pdf(sentry_init, capture_events, span_streaming):
+def test_message_with_base64_pdf(sentry_init, capture_events):
     """Test that messages with base64-encoded PDF documents are properly captured."""
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
     events = capture_events()
     client = Anthropic(api_key="z")
@@ -5710,14 +5723,12 @@ def test_message_with_file_document(
     }
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_message_with_mixed_content(sentry_init, capture_events, span_streaming):
+def test_message_with_mixed_content(sentry_init, capture_events):
     """Test that messages with mixed content (text, images, documents) are properly captured."""
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
     events = capture_events()
     client = Anthropic(api_key="z")
@@ -5795,16 +5806,12 @@ def test_message_with_mixed_content(sentry_init, capture_events, span_streaming)
     }
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_message_with_multiple_images_different_formats(
-    sentry_init, capture_events, span_streaming
-):
+def test_message_with_multiple_images_different_formats(sentry_init, capture_events):
     """Test that messages with multiple images of different source types are handled."""
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
     events = capture_events()
     client = Anthropic(api_key="z")
