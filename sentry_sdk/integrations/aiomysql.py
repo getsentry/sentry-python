@@ -18,9 +18,11 @@ from sentry_sdk.utils import (
 )
 
 try:
-    import aiomysql  # type: ignore[import-untyped]
-    from aiomysql.connection import Connection  # type: ignore[import-untyped]
-    from aiomysql.cursors import Cursor  # type: ignore[import-untyped]
+    import aiomysql  # type: ignore[import-untyped,import-not-found]
+    from aiomysql.connection import (
+        Connection,  # type: ignore[import-untyped,import-not-found]
+    )
+    from aiomysql.cursors import Cursor  # type: ignore[import-untyped,import-not-found]
 except ImportError:
     raise DidNotEnable("aiomysql not installed.")
 
@@ -172,7 +174,7 @@ def _wrap_connect(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
             return await f(self)
 
         if has_span_streaming_enabled(client.options):
-            span_attributes = {
+            span_attributes: dict[str, Any] = {
                 "sentry.op": OP.DB,
                 "sentry.origin": AioMySQLIntegration.origin,
                 SPANDATA.DB_SYSTEM: "mysql",
