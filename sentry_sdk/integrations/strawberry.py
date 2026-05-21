@@ -258,12 +258,14 @@ class SentryAsyncExtension(SchemaExtension):
                 origin=StrawberryIntegration.origin,
             )
 
-        yield
-
-        if isinstance(validation_span, StreamedSpan):
-            validation_span.end()
-        else:
-            validation_span.finish()
+        # If an exception is raised during validation, we still need to close the span
+        try:
+            yield
+        finally:
+            if isinstance(validation_span, StreamedSpan):
+                validation_span.end()
+            else:
+                validation_span.finish()
 
     def on_parse(self) -> "Generator[None, None, None]":
         client = sentry_sdk.get_client()
@@ -284,12 +286,14 @@ class SentryAsyncExtension(SchemaExtension):
                 origin=StrawberryIntegration.origin,
             )
 
-        yield
-
-        if isinstance(parsing_span, StreamedSpan):
-            parsing_span.end()
-        else:
-            parsing_span.finish()
+        # If an exception is raised during parsing, we still need to close the span
+        try:
+            yield
+        finally:
+            if isinstance(parsing_span, StreamedSpan):
+                parsing_span.end()
+            else:
+                parsing_span.finish()
 
     def should_skip_tracing(
         self,
