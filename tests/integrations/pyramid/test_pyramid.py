@@ -526,7 +526,9 @@ def test_tracing_error(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-def test_span_origin(sentry_init, capture_events, capture_items, get_client, span_streaming):
+def test_span_origin(
+    sentry_init, capture_events, capture_items, get_client, span_streaming
+):
     sentry_init(
         integrations=[PyramidIntegration()],
         traces_sample_rate=1.0,
