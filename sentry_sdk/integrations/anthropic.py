@@ -450,9 +450,9 @@ def _set_common_input_data(
         client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
         messages_data = (
-            role_normalized_messages
+            truncate_and_annotate_messages(role_normalized_messages, span, scope)
             if should_truncate_gen_ai_input(client.options)
-            else truncate_and_annotate_messages(role_normalized_messages, span, scope)
+            else role_normalized_messages
         )
         if messages_data is not None:
             set_data_normalized(
