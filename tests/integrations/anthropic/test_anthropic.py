@@ -5139,8 +5139,7 @@ def test_system_prompt_with_complex_structure(
 # Tests for transform_content_part (shared) and _transform_anthropic_content_block helper functions
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_transform_content_part_anthropic_base64_image(span_streaming):
+def test_transform_content_part_anthropic_base64_image():
     """Test that base64 encoded images are transformed to blob format."""
     content_block = {
         "type": "image",
@@ -5161,8 +5160,7 @@ def test_transform_content_part_anthropic_base64_image(span_streaming):
     }
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_transform_content_part_anthropic_url_image(span_streaming):
+def test_transform_content_part_anthropic_url_image():
     """Test that URL-referenced images are transformed to uri format."""
     content_block = {
         "type": "image",
@@ -5182,8 +5180,7 @@ def test_transform_content_part_anthropic_url_image(span_streaming):
     }
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_transform_content_part_anthropic_file_image(span_streaming):
+def test_transform_content_part_anthropic_file_image():
     """Test that file_id-referenced images are transformed to file format."""
     content_block = {
         "type": "image",
@@ -5203,8 +5200,7 @@ def test_transform_content_part_anthropic_file_image(span_streaming):
     }
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_transform_content_part_anthropic_base64_document(span_streaming):
+def test_transform_content_part_anthropic_base64_document():
     """Test that base64 encoded PDFs are transformed to blob format."""
     content_block = {
         "type": "document",
@@ -5225,8 +5221,7 @@ def test_transform_content_part_anthropic_base64_document(span_streaming):
     }
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_transform_content_part_anthropic_url_document(span_streaming):
+def test_transform_content_part_anthropic_url_document():
     """Test that URL-referenced documents are transformed to uri format."""
     content_block = {
         "type": "document",
@@ -5246,8 +5241,7 @@ def test_transform_content_part_anthropic_url_document(span_streaming):
     }
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_transform_content_part_anthropic_file_document(span_streaming):
+def test_transform_content_part_anthropic_file_document():
     """Test that file_id-referenced documents are transformed to file format."""
     content_block = {
         "type": "document",
@@ -5268,8 +5262,7 @@ def test_transform_content_part_anthropic_file_document(span_streaming):
     }
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_transform_anthropic_content_block_text_document(span_streaming):
+def test_transform_anthropic_content_block_text_document():
     """Test that plain text documents are transformed correctly (Anthropic-specific)."""
     content_block = {
         "type": "document",
@@ -5289,8 +5282,7 @@ def test_transform_anthropic_content_block_text_document(span_streaming):
     }
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_transform_content_part_text_block(span_streaming):
+def test_transform_content_part_text_block():
     """Test that regular text blocks return None (not transformed)."""
     content_block = {
         "type": "text",
@@ -5303,15 +5295,13 @@ def test_transform_content_part_text_block(span_streaming):
     assert result is None
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_transform_message_content_string(span_streaming):
+def test_transform_message_content_string():
     """Test that string content is returned as-is."""
     result = transform_message_content("Hello, world!")
     assert result == "Hello, world!"
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_transform_message_content_list_anthropic(span_streaming):
+def test_transform_message_content_list_anthropic():
     """Test that list content with Anthropic format is transformed correctly."""
     content = [
         {"type": "text", "text": "Hello!"},
