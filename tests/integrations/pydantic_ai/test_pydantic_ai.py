@@ -1,5 +1,6 @@
 import asyncio
 import json
+from contextlib import asynccontextmanager
 from typing import Annotated
 from unittest.mock import MagicMock
 
@@ -17,6 +18,21 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.pydantic_ai import PydanticAIIntegration
 from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
 from sentry_sdk.integrations.pydantic_ai.spans.utils import _set_usage_data
+
+
+@asynccontextmanager
+async def consume_stream_events(agent, prompt):
+    """Handle both v1 (async iterator) and v2 (async context manager) APIs."""
+    result = agent.run_stream_events(prompt)
+    if hasattr(result, "__aenter__"):
+        async with result as events:
+            async for _ in events:
+                pass
+            yield
+    else:
+        async for _ in result:
+            pass
+        yield
 
 
 @pytest.fixture
@@ -517,8 +533,9 @@ async def test_agent_run_stream_events(
     if stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
-        async for _ in test_agent.run_stream_events(
-            ["Message demonstrating the absence of truncation.", "Test input"]
+        async with consume_stream_events(
+            test_agent,
+            ["Message demonstrating the absence of truncation.", "Test input"],
         ):
             pass
 
@@ -541,7 +558,7 @@ async def test_agent_run_stream_events(
     else:
         events = capture_events()
 
-        async for _ in test_agent.run_stream_events("Test input"):
+        async with consume_stream_events(test_agent, "Test input"):
             pass
 
         (transaction,) = events
@@ -1751,16 +1768,30 @@ async def test_mcp_tool_execution_spans(
     from unittest.mock import MagicMock
 
     from pydantic_ai import Agent
-    from pydantic_ai.mcp import MCPServerStdio
     from pydantic_ai.toolsets.combined import CombinedToolset
 
     import sentry_sdk
 
+    try:
+        from pydantic_ai.mcp import MCPServerStdio
+    except ImportError:
+        from pydantic_ai.mcp import MCPToolset, StdioTransport
+
+        MCPServerStdio = None
+
     # Create mock MCP server
-    mock_server = MCPServerStdio(
-        command="python",
-        args=["-m", "test_server"],
-    )
+    if MCPServerStdio is not None:
+        mock_server = MCPServerStdio(
+            command="python",
+            args=["-m", "test_server"],
+        )
+    else:
+        mock_server = MCPToolset(
+            StdioTransport(
+                command="python",
+                args=["-m", "test_server"],
+            )
+        )
 
     # Mock the server's internal methods
     mock_server._client = MagicMock()

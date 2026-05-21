@@ -151,13 +151,14 @@ def update_invoke_agent_span(span: "sentry_sdk.tracing.Span", result: "Any") -> 
         )
 
     # Set token usage data if available
-    if hasattr(result, "usage") and callable(result.usage):
+    if hasattr(result, "usage"):
         try:
-            usage = result.usage()
+            usage = result.usage
+            if callable(usage):
+                usage = usage()
             if usage:
                 _set_usage_data(span, usage)
         except Exception:
-            # If usage() call fails, continue without setting usage data
             pass
 
     # Set model name from response if available
