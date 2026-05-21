@@ -93,7 +93,8 @@ def _wrap_generate_content_stream(f: "Callable[..., Any]") -> "Callable[..., Any
             )
 
             set_on_span = chat_span.set_data
-        chat_span.__enter__()
+            chat_span.__enter__()
+
         set_on_span(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
         set_on_span(SPANDATA.GEN_AI_SYSTEM, GEN_AI_SYSTEM)
         set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
@@ -168,7 +169,8 @@ def _wrap_async_generate_content_stream(
             )
 
             set_on_span = chat_span.set_data
-        chat_span.__enter__()
+            chat_span.__enter__()
+
         set_on_span(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
         set_on_span(SPANDATA.GEN_AI_SYSTEM, GEN_AI_SYSTEM)
         set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
