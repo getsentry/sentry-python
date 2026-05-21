@@ -19,7 +19,6 @@ from ..utils import (
 from .utils import (
     _serialize_binary_content_item,
     _serialize_image_url_item,
-    _set_usage_data,
 )
 
 if TYPE_CHECKING:
@@ -149,16 +148,6 @@ def update_invoke_agent_span(span: "sentry_sdk.tracing.Span", result: "Any") -> 
         set_data_normalized(
             span, SPANDATA.GEN_AI_RESPONSE_TEXT, str(output), unpack=False
         )
-
-    # Set token usage data if available
-    if hasattr(result, "usage") and callable(result.usage):
-        try:
-            usage = result.usage()
-            if usage:
-                _set_usage_data(span, usage)
-        except Exception:
-            # If usage() call fails, continue without setting usage data
-            pass
 
     # Set model name from response if available
     if hasattr(result, "response"):
