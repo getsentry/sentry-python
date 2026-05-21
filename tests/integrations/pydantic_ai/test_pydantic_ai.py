@@ -19,7 +19,7 @@ from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messa
 from sentry_sdk.integrations.pydantic_ai.spans.utils import _set_usage_data
 from sentry_sdk.utils import package_version
 
-PYDANTIC_VERSION = package_version("pydantic-ai")
+PYDANTIC_AI_VERSION = package_version("pydantic-ai")
 
 
 @pytest.fixture
@@ -520,7 +520,7 @@ async def test_agent_run_stream_events(
     if stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
-        if PYDANTIC_VERSION > (2,):
+        if PYDANTIC_AI_VERSION > (2,):
             async with test_agent.run_stream_events(
                 ["Message demonstrating the absence of truncation.", "Test input"]
             ) as stream_events:
@@ -551,7 +551,7 @@ async def test_agent_run_stream_events(
     else:
         events = capture_events()
 
-        if PYDANTIC_VERSION > (2,):
+        if PYDANTIC_AI_VERSION > (2,):
             async with test_agent.run_stream_events("Test input") as stream_events:
                 async for _ in stream_events:
                     pass
