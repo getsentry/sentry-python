@@ -18,11 +18,11 @@ from sentry_sdk.utils import (
 )
 
 try:
-    import aiomysql  # type: ignore[import-untyped,import-not-found]
+    import aiomysql  # type: ignore[import-not-found]
     from aiomysql.connection import (
-        Connection,  # type: ignore[import-untyped,import-not-found]
+        Connection,  # type: ignore[import-not-found]
     )
-    from aiomysql.cursors import Cursor  # type: ignore[import-untyped,import-not-found]
+    from aiomysql.cursors import Cursor  # type: ignore[import-not-found]
 except ImportError:
     raise DidNotEnable("aiomysql not installed.")
 
