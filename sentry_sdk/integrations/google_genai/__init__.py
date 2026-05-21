@@ -152,7 +152,7 @@ def _wrap_async_generate_content_stream(
         _model, contents, model_name = prepare_generate_content_args(args, kwargs)
 
         if has_span_streaming_enabled(client.options):
-            chat_span = get_start_span_function()(
+            chat_span = sentry_sdk.traces.start_span(
                 name=f"chat {model_name}",
                 attributes={
                     "sentry.op": OP.GEN_AI_CHAT,
