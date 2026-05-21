@@ -50,7 +50,7 @@ TEST_SUITE_CONFIG = {
     "aiomysql": {
         "package": "aiomysql",
         "deps": {
-            "*": ["pytest-asyncio"],
+            "*": ["pytest-asyncio", "cryptography"],
         },
         "python": ">=3.7",
     },
