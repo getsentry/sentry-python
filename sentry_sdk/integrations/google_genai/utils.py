@@ -29,7 +29,10 @@ from sentry_sdk.ai.utils import (
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
+from sentry_sdk.tracing_utils import (
+    has_span_streaming_enabled,
+    should_truncate_gen_ai_input,
+)
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -921,9 +924,9 @@ def set_span_data_for_request(
             client = sentry_sdk.get_client()
             scope = sentry_sdk.get_current_scope()
             messages_data = (
-                normalized_messages
-                if client.options.get("stream_gen_ai_spans", False)
-                else truncate_and_annotate_messages(normalized_messages, span, scope)
+                truncate_and_annotate_messages(normalized_messages, span, scope)
+                if should_truncate_gen_ai_input(client.options)
+                else normalized_messages
             )
             if messages_data is not None:
                 set_data_normalized(
