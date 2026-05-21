@@ -224,7 +224,7 @@ def _create_mcp_execute_tool_spans(
         if output.__class__.__name__ == "McpCall":
             with sentry_sdk.start_span(
                 op=OP.GEN_AI_EXECUTE_TOOL,
-                description=f"execute_tool {output.name}",
+                name=f"execute_tool {output.name}",
                 start_timestamp=span.start_timestamp,
             ) as execute_tool_span:
                 execute_tool_span.set_data(SPANDATA.GEN_AI_TOOL_NAME, output.name)
