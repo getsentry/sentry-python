@@ -580,7 +580,8 @@ def _set_output_data(
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
     )
-    set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, model)
+    if model is not None:
+        set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, model)
     if response_id is not None:
         set_on_span(SPANDATA.GEN_AI_RESPONSE_ID, response_id)
     if finish_reason is not None:
