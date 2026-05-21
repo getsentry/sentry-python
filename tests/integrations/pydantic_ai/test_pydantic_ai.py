@@ -526,7 +526,6 @@ async def test_agent_run_stream_events(
             ) as events:
                 async for _ in events:
                     pass
-                yield
         else:
             async for _ in test_agent.run_stream_events(
                 ["Message demonstrating the absence of truncation.", "Test input"]
