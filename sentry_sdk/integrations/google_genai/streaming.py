@@ -130,10 +130,13 @@ def set_span_data_for_streaming_response(
             safe_serialize(accumulated_response["tool_calls"]),
         )
 
-    if accumulated_response.get("id"):
-        set_on_span(SPANDATA.GEN_AI_RESPONSE_ID, accumulated_response["id"])
-    if accumulated_response.get("model"):
-        set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, accumulated_response["model"])
+    response_id = accumulated_response.get("id")
+    if response_id is not None:
+        set_on_span(SPANDATA.GEN_AI_RESPONSE_ID, response_id)
+
+    response_model = accumulated_response.get("model")
+    if response_model is not None:
+        set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
 
     if accumulated_response["usage_metadata"] is None:
         return

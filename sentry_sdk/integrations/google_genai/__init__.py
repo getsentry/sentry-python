@@ -303,7 +303,7 @@ def _wrap_async_generate_content(f: "Callable[..., Any]") -> "Callable[..., Any]
                     response = await f(self, *args, **kwargs)
                 except Exception as exc:
                     _capture_exception(exc)
-                    chat_span.set_status(SPANSTATUS.INTERNAL_ERROR)
+                    chat_span.status = SpanStatus.ERROR
                     raise
 
                 set_span_data_for_response(chat_span, integration, response)

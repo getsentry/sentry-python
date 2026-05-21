@@ -1053,7 +1053,10 @@ def prepare_embed_content_args(
 
 
 def set_span_data_for_embed_request(
-    span: "Span", integration: "Any", contents: "Any", kwargs: "dict[str, Any]"
+    span: "Union[Span, StreamedSpan]",
+    integration: "Any",
+    contents: "Any",
+    kwargs: "dict[str, Any]",
 ) -> None:
     """Set span data for embedding request."""
     # Include input contents if PII is allowed
