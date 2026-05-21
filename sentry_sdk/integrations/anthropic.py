@@ -562,7 +562,8 @@ def _set_output_data(
 ) -> None:
     """
     Set output data for the span based on the AI response."""
-    span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, model)
+    if model is not None:
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, model)
     if response_id is not None:
         span.set_data(SPANDATA.GEN_AI_RESPONSE_ID, response_id)
     if finish_reason is not None:
