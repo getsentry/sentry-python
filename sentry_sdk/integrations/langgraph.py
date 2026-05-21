@@ -3,15 +3,15 @@ from typing import Any, Callable, List, Optional
 
 import sentry_sdk
 from sentry_sdk.ai.utils import (
-    set_data_normalized,
+    get_start_span_function,
     normalize_message_roles,
+    set_data_normalized,
     truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import safe_serialize
-
 
 try:
     from langgraph.graph import StateGraph
@@ -160,7 +160,7 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
             f"invoke_agent {graph_name}".strip() if graph_name else "invoke_agent"
         )
 
-        with sentry_sdk.start_span(
+        with get_start_span_function()(
             op=OP.GEN_AI_INVOKE_AGENT,
             name=span_name,
             origin=LanggraphIntegration.origin,
@@ -181,9 +181,15 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 input_messages = _parse_langgraph_messages(args[0])
                 if input_messages:
                     normalized_input_messages = normalize_message_roles(input_messages)
+
+                    client = sentry_sdk.get_client()
                     scope = sentry_sdk.get_current_scope()
-                    messages_data = truncate_and_annotate_messages(
-                        normalized_input_messages, span, scope
+                    messages_data = (
+                        normalized_input_messages
+                        if client.options.get("stream_gen_ai_spans", False)
+                        else truncate_and_annotate_messages(
+                            normalized_input_messages, span, scope
+                        )
                     )
                     if messages_data is not None:
                         set_data_normalized(
@@ -214,7 +220,7 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
             f"invoke_agent {graph_name}".strip() if graph_name else "invoke_agent"
         )
 
-        with sentry_sdk.start_span(
+        with get_start_span_function()(
             op=OP.GEN_AI_INVOKE_AGENT,
             name=span_name,
             origin=LanggraphIntegration.origin,
@@ -234,9 +240,15 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 input_messages = _parse_langgraph_messages(args[0])
                 if input_messages:
                     normalized_input_messages = normalize_message_roles(input_messages)
+
+                    client = sentry_sdk.get_client()
                     scope = sentry_sdk.get_current_scope()
-                    messages_data = truncate_and_annotate_messages(
-                        normalized_input_messages, span, scope
+                    messages_data = (
+                        normalized_input_messages
+                        if client.options.get("stream_gen_ai_spans", False)
+                        else truncate_and_annotate_messages(
+                            normalized_input_messages, span, scope
+                        )
                     )
                     if messages_data is not None:
                         set_data_normalized(

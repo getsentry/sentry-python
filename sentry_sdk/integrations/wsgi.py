@@ -11,9 +11,9 @@ from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
     nullcontext,
 )
-from sentry_sdk.scope import should_send_default_pii, use_isolation_scope, Scope
+from sentry_sdk.scope import Scope, should_send_default_pii, use_isolation_scope
 from sentry_sdk.sessions import track_session
-from sentry_sdk.traces import StreamedSpan, SegmentSource
+from sentry_sdk.traces import SegmentSource, StreamedSpan
 from sentry_sdk.tracing import Span, TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -174,24 +174,6 @@ class SentryWsgiMiddleware:
                             )
                         except BaseException:
                             reraise(*_capture_exception())
-                        finally:
-                            if isinstance(span, StreamedSpan):
-                                already_set = (
-                                    span.name != _DEFAULT_TRANSACTION_NAME
-                                    and span.get_attributes().get("sentry.span.source")
-                                    in [
-                                        SegmentSource.COMPONENT.value,
-                                        SegmentSource.ROUTE.value,
-                                        SegmentSource.CUSTOM.value,
-                                    ]
-                                )
-                                if not already_set:
-                                    with capture_internal_exceptions():
-                                        span.name = _DEFAULT_TRANSACTION_NAME
-                                        span.set_attribute(
-                                            "sentry.span.source",
-                                            SegmentSource.ROUTE.value,
-                                        )
         finally:
             _wsgi_middleware_applied.set(False)
 

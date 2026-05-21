@@ -1,6 +1,6 @@
 import itertools
-import sys
 import json
+import sys
 import warnings
 from collections import OrderedDict
 from functools import wraps
@@ -13,13 +13,13 @@ from sentry_sdk.ai.utils import (
     get_start_span_function,
     normalize_message_roles,
     set_data_normalized,
-    truncate_and_annotate_messages,
     transform_content_part,
+    truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing_utils import _get_value, set_span_errored
+from sentry_sdk.tracing_utils import _get_value
 from sentry_sdk.utils import capture_internal_exceptions, logger
 
 if TYPE_CHECKING:
@@ -35,8 +35,8 @@ if TYPE_CHECKING:
     )
     from uuid import UUID
 
-    from sentry_sdk.tracing import Span
     from sentry_sdk._types import TextPart
+    from sentry_sdk.tracing import Span
 
 
 try:
@@ -61,7 +61,8 @@ except ImportError:
     try:
         # <v1
         from langchain.agents import AgentExecutor
-    except ImportError:
+    # Catch TypeError due to changes in type hint evaluation order: https://github.com/pydantic/pydantic/issues/13036
+    except (ImportError, TypeError):
         AgentExecutor = None
 
 
@@ -77,7 +78,9 @@ except ImportError:
     AzureOpenAIEmbeddings = None
 
 try:
-    from langchain_google_vertexai import VertexAIEmbeddings  # type: ignore[import-not-found]
+    from langchain_google_vertexai import (  # type: ignore[import-not-found]
+        VertexAIEmbeddings,
+    )
 except ImportError:
     VertexAIEmbeddings = None
 
@@ -92,12 +95,16 @@ except ImportError:
     CohereEmbeddings = None
 
 try:
-    from langchain_mistralai import MistralAIEmbeddings  # type: ignore[import-not-found]
+    from langchain_mistralai import (  # type: ignore[import-not-found]
+        MistralAIEmbeddings,
+    )
 except ImportError:
     MistralAIEmbeddings = None
 
 try:
-    from langchain_huggingface import HuggingFaceEmbeddings  # type: ignore[import-not-found]
+    from langchain_huggingface import (  # type: ignore[import-not-found]
+        HuggingFaceEmbeddings,
+    )
 except ImportError:
     HuggingFaceEmbeddings = None
 
@@ -266,11 +273,10 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             span_data = self.span_map[run_id]
             span = span_data.span
-            set_span_errored(span)
 
             sentry_sdk.capture_exception(error, span.scope)
 
-            span.__exit__(None, None, None)
+            span.__exit__(type(error), error, error.__traceback__)
             del self.span_map[run_id]
 
     def _normalize_langchain_message(self, message: "BaseMessage") -> "Any":
@@ -374,9 +380,15 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     }
                     for prompt in prompts
                 ]
+
+                client = sentry_sdk.get_client()
                 scope = sentry_sdk.get_current_scope()
-                messages_data = truncate_and_annotate_messages(
-                    normalized_messages, span, scope
+                messages_data = (
+                    normalized_messages
+                    if client.options.get("stream_gen_ai_spans", False)
+                    else truncate_and_annotate_messages(
+                        normalized_messages, span, scope
+                    )
                 )
                 if messages_data is not None:
                     set_data_normalized(
@@ -463,9 +475,15 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                             self._normalize_langchain_message(message)
                         )
                 normalized_messages = normalize_message_roles(normalized_messages)
+
+                client = sentry_sdk.get_client()
                 scope = sentry_sdk.get_current_scope()
-                messages_data = truncate_and_annotate_messages(
-                    normalized_messages, span, scope
+                messages_data = (
+                    normalized_messages
+                    if client.options.get("stream_gen_ai_spans", False)
+                    else truncate_and_annotate_messages(
+                        normalized_messages, span, scope
+                    )
                 )
                 if messages_data is not None:
                     set_data_normalized(
@@ -992,9 +1010,15 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
                 and integration.include_prompts
             ):
                 normalized_messages = normalize_message_roles([input])
+
+                client = sentry_sdk.get_client()
                 scope = sentry_sdk.get_current_scope()
-                messages_data = truncate_and_annotate_messages(
-                    normalized_messages, span, scope
+                messages_data = (
+                    normalized_messages
+                    if client.options.get("stream_gen_ai_spans", False)
+                    else truncate_and_annotate_messages(
+                        normalized_messages, span, scope
+                    )
                 )
                 if messages_data is not None:
                     set_data_normalized(
@@ -1049,9 +1073,13 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
             and integration.include_prompts
         ):
             normalized_messages = normalize_message_roles([input])
+
+            client = sentry_sdk.get_client()
             scope = sentry_sdk.get_current_scope()
-            messages_data = truncate_and_annotate_messages(
-                normalized_messages, span, scope
+            messages_data = (
+                normalized_messages
+                if client.options.get("stream_gen_ai_spans", False)
+                else truncate_and_annotate_messages(normalized_messages, span, scope)
             )
             if messages_data is not None:
                 set_data_normalized(
@@ -1083,13 +1111,13 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
                     and integration.include_prompts
                 ):
                     set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+
+                span.__exit__(None, None, None)
             except Exception:
                 exc_info = sys.exc_info()
-                set_span_errored(span)
+                with capture_internal_exceptions():
+                    span.__exit__(*exc_info)
                 raise
-            finally:
-                # Ensure cleanup happens even if iterator is abandoned or fails
-                span.__exit__(*exc_info)
 
         async def new_iterator_async() -> "AsyncIterator[Any]":
             exc_info: "tuple[Any, Any, Any]" = (None, None, None)
@@ -1108,13 +1136,13 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
                     and integration.include_prompts
                 ):
                     set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+
+                span.__exit__(None, None, None)
             except Exception:
                 exc_info = sys.exc_info()
-                set_span_errored(span)
+                with capture_internal_exceptions():
+                    span.__exit__(*exc_info)
                 raise
-            finally:
-                # Ensure cleanup happens even if iterator is abandoned or fails
-                span.__exit__(*exc_info)
 
         if str(type(result)) == "<class 'async_generator'>":
             result = new_iterator_async()

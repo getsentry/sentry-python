@@ -10,16 +10,6 @@ import warnings
 from unittest import mock
 
 import pytest
-
-import sentry_sdk
-from sentry_sdk import capture_message, get_baggage, get_traceparent
-from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.integrations.starlette import (
-    StarletteIntegration,
-    StarletteRequestExtractor,
-)
-from sentry_sdk.utils import parse_version
-
 import starlette
 from starlette.authentication import (
     AuthCredentials,
@@ -32,8 +22,16 @@ from starlette.middleware import Middleware
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.testclient import TestClient
-from tests.integrations.conftest import parametrize_test_configurable_status_codes
 
+import sentry_sdk
+from sentry_sdk import capture_message, get_baggage, get_traceparent
+from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+from sentry_sdk.integrations.starlette import (
+    StarletteIntegration,
+    StarletteRequestExtractor,
+)
+from sentry_sdk.utils import parse_version
+from tests.integrations.conftest import parametrize_test_configurable_status_codes
 
 STARLETTE_VERSION = parse_version(starlette.__version__)
 

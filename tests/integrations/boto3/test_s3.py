@@ -9,7 +9,6 @@ from tests.conftest import ApproxDict
 from tests.integrations.boto3 import read_fixture
 from tests.integrations.boto3.aws_mock import MockResponse
 
-
 session = boto3.Session(
     aws_access_key_id="-",
     aws_secret_access_key="-",

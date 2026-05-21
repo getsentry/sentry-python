@@ -1,31 +1,29 @@
 import sys
 from functools import wraps
+from typing import TYPE_CHECKING
 
 from sentry_sdk import consts
 from sentry_sdk.ai.monitoring import record_token_usage
+from sentry_sdk.ai.utils import get_start_span_function, set_data_normalized
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.ai.utils import set_data_normalized
-
-from typing import TYPE_CHECKING
-
-from sentry_sdk.tracing_utils import set_span_errored
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Iterator
+
     from sentry_sdk.tracing import Span
 
 import sentry_sdk
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception, reraise
 
 try:
-    from cohere.client import Client
-    from cohere.base_client import BaseCohere
     from cohere import (
         ChatStreamEndEvent,
         NonStreamedChatResponse,
     )
+    from cohere.base_client import BaseCohere
+    from cohere.client import Client
 
     if TYPE_CHECKING:
         from cohere import StreamedChatResponse
@@ -84,8 +82,6 @@ class CohereIntegration(Integration):
 
 
 def _capture_exception(exc: "Any") -> None:
-    set_span_errored()
-
     event, hint = event_from_exception(
         exc,
         client_options=sentry_sdk.get_client().options,
@@ -143,7 +139,7 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
 
         message = kwargs.get("message")
 
-        span = sentry_sdk.start_span(
+        span = get_start_span_function()(
             op=consts.OP.COHERE_CHAT_COMPLETIONS_CREATE,
             name="cohere.client.Chat",
             origin=CohereIntegration.origin,
@@ -155,7 +151,7 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
             exc_info = sys.exc_info()
             with capture_internal_exceptions():
                 _capture_exception(e)
-                span.__exit__(None, None, None)
+                span.__exit__(*exc_info)
             reraise(*exc_info)
 
         with capture_internal_exceptions():
@@ -226,7 +222,7 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
         if integration is None:
             return f(*args, **kwargs)
 
-        with sentry_sdk.start_span(
+        with get_start_span_function()(
             op=consts.OP.COHERE_EMBEDDINGS_CREATE,
             name="Cohere Embedding Creation",
             origin=CohereIntegration.origin,

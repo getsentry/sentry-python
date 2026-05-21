@@ -9,9 +9,9 @@ import pytest
 import sentry_sdk
 from sentry_sdk import (
     capture_message,
+    continue_trace,
     start_span,
     start_transaction,
-    continue_trace,
 )
 from sentry_sdk.consts import SPANSTATUS
 from sentry_sdk.transport import Transport

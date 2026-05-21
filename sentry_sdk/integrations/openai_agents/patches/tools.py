@@ -1,13 +1,12 @@
 from functools import wraps
+from typing import TYPE_CHECKING
 
 from sentry_sdk.integrations import DidNotEnable
 
 from ..spans import execute_tool_span, update_execute_tool_span
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any, Callable, Awaitable
+    from typing import Any, Awaitable, Callable
 
 try:
     import agents

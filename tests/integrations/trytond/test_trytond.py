@@ -2,14 +2,12 @@ import json
 import unittest.mock
 
 import pytest
-
 import trytond
+from trytond.exceptions import LoginException
 from trytond.exceptions import TrytonException as TrytondBaseException
 from trytond.exceptions import UserError as TrytondUserError
 from trytond.exceptions import UserWarning as TrytondUserWarning
-from trytond.exceptions import LoginException
 from trytond.wsgi import app as trytond_app
-
 from werkzeug.test import Client
 
 from sentry_sdk.integrations.trytond import TrytondWSGIIntegration

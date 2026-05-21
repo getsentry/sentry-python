@@ -1,16 +1,14 @@
 import uuid
 
-import pytest
-
 import fakeredis
+import pytest
 from fakeredis import FakeStrictRedis
 
+import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
 from sentry_sdk.integrations.redis.utils import _get_safe_key, _key_as_string
 from sentry_sdk.utils import parse_version
-import sentry_sdk
-
 
 FAKEREDIS_VERSION = parse_version(fakeredis.__version__)
 

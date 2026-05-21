@@ -16,7 +16,7 @@ from sentry_sdk.integrations._wsgi_common import (
     request_body_within_bounds,
 )
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.scope import should_send_default_pii, Scope
+from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.sessions import track_session
 from sentry_sdk.traces import (
     SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE,
@@ -201,60 +201,41 @@ class AioHttpIntegration(Integration):
 
                     with span_ctx as span:
                         try:
-                            try:
-                                response = await old_handle(self, request)
-                            except HTTPException as e:
-                                if isinstance(span, StreamedSpan) and not isinstance(
-                                    span, NoOpStreamedSpan
-                                ):
-                                    span.set_attribute(
-                                        "http.response.status_code", e.status_code
-                                    )
-
-                                    if e.status_code >= 400:
-                                        span.status = SpanStatus.ERROR.value
-                                    else:
-                                        span.status = SpanStatus.OK.value
-                                else:
-                                    # Since a NoOpStreamedSpan can end up here, we have to guard against it
-                                    # so this only gets set in the legacy transaction approach.
-                                    if not isinstance(span, NoOpStreamedSpan):
-                                        span.set_http_status(e.status_code)
-
-                                if (
-                                    e.status_code
-                                    in integration._failed_request_status_codes
-                                ):
-                                    _capture_exception()
-                                raise
-                            except (asyncio.CancelledError, ConnectionResetError):
-                                if isinstance(span, StreamedSpan):
-                                    span.status = SpanStatus.ERROR.value
-                                else:
-                                    span.set_status(SPANSTATUS.CANCELLED)
-                                raise
-                            except Exception:
-                                # This will probably map to a 500 but seems like we
-                                # have no way to tell. Do not set span status.
-                                reraise(*_capture_exception())
-                        finally:
-                            # The handler has had a chance to read the body, so
-                            # request._read_bytes may now be populated. Capture
-                            # body data on the segment regardless of outcome.
+                            response = await old_handle(self, request)
+                        except HTTPException as e:
                             if isinstance(span, StreamedSpan) and not isinstance(
                                 span, NoOpStreamedSpan
                             ):
-                                with capture_internal_exceptions():
-                                    raw_data = get_aiohttp_request_data(request)
-                                    body_data = (
-                                        raw_data.value
-                                        if isinstance(raw_data, AnnotatedValue)
-                                        else raw_data
-                                    )
-                                    if body_data is not None:
-                                        span._segment.set_attribute(
-                                            "http.request.body.data", body_data
-                                        )
+                                span.set_attribute(
+                                    "http.response.status_code", e.status_code
+                                )
+
+                                if e.status_code >= 400:
+                                    span.status = SpanStatus.ERROR.value
+                                else:
+                                    span.status = SpanStatus.OK.value
+                            else:
+                                # Since a NoOpStreamedSpan can end up here, we have to guard against it
+                                # so this only gets set in the legacy transaction approach.
+                                if not isinstance(span, NoOpStreamedSpan):
+                                    span.set_http_status(e.status_code)
+
+                            if (
+                                e.status_code
+                                in integration._failed_request_status_codes
+                            ):
+                                _capture_exception()
+                            raise
+                        except (asyncio.CancelledError, ConnectionResetError):
+                            if isinstance(span, StreamedSpan):
+                                span.status = SpanStatus.ERROR.value
+                            else:
+                                span.set_status(SPANSTATUS.CANCELLED)
+                            raise
+                        except Exception:
+                            # This will probably map to a 500 but seems like we
+                            # have no way to tell. Do not set span status.
+                            reraise(*_capture_exception())
 
                         try:
                             # A valid response handler will return a valid response with a status. But, if the handler

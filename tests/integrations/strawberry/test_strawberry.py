@@ -1,5 +1,6 @@
-import pytest
 from typing import AsyncGenerator, Optional
+
+import pytest
 
 strawberry = pytest.importorskip("strawberry")
 pytest.importorskip("fastapi")
@@ -17,9 +18,9 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.flask import FlaskIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
 from sentry_sdk.integrations.strawberry import (
-    StrawberryIntegration,
     SentryAsyncExtension,
     SentrySyncExtension,
+    StrawberryIntegration,
 )
 from tests.conftest import ApproxDict
 

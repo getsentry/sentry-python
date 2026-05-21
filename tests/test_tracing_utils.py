@@ -1,11 +1,12 @@
-import pytest
 from dataclasses import asdict, dataclass
-from typing import Optional, List
+from typing import List, Optional
+
+import pytest
 
 from sentry_sdk.tracing_utils import (
+    Baggage,
     _should_be_included,
     _should_continue_trace,
-    Baggage,
 )
 from tests.conftest import TestTransportWithOptions
 

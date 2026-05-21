@@ -1,5 +1,7 @@
+from typing import TYPE_CHECKING
+
 import sentry_sdk
-from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
@@ -10,12 +12,8 @@ from sentry_sdk.utils import (
     parse_version,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Dict
-    from typing import Optional
+    from typing import Any, Dict, Optional
 
     from sentry_sdk._types import Event, EventProcessor
 
@@ -24,7 +22,6 @@ if TYPE_CHECKING:
 
 try:
     import falcon  # type: ignore
-
     from falcon import __version__ as FALCON_VERSION
 except ImportError:
     raise DidNotEnable("Falcon not installed")
@@ -46,7 +43,9 @@ except ImportError:
 _FALCON_UNSET: "Optional[object]" = None
 if FALCON3:  # falcon.request._UNSET is only available in Falcon 3.0+
     with capture_internal_exceptions():
-        from falcon.request import _UNSET as _FALCON_UNSET  # type: ignore[import-not-found, no-redef]
+        from falcon.request import (  # type: ignore[import-not-found, no-redef]
+            _UNSET as _FALCON_UNSET,
+        )
 
 
 class FalconRequestExtractor(RequestExtractor):

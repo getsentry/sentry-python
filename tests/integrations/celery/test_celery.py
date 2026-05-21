@@ -1,19 +1,19 @@
 import threading
-import kombu
 from unittest import mock
 
+import kombu
 import pytest
-from celery import Celery, VERSION
+from celery import VERSION, Celery
 from celery.bin import worker
 
 import sentry_sdk
-from sentry_sdk import start_transaction, get_current_span
-from sentry_sdk.traces import _get_current_streamed_span
+from sentry_sdk import get_current_span, start_transaction
 from sentry_sdk.integrations.celery import (
     CeleryIntegration,
     _wrap_task_run,
 )
 from sentry_sdk.integrations.celery.beat import _get_headers
+from sentry_sdk.traces import _get_current_streamed_span
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 from tests.conftest import ApproxDict
 
@@ -507,18 +507,18 @@ def test_newrelic_interference(init_celery, newrelic_order, celery_invocation):
     def instrument_newrelic():
         try:
             # older newrelic versions
+            import celery.app.trace as celery_trace_module
             from newrelic.hooks.application_celery import (
                 instrument_celery_execute_trace,
             )
-            import celery.app.trace as celery_trace_module
 
             assert hasattr(celery_trace_module, "build_tracer")
             instrument_celery_execute_trace(celery_trace_module)
 
         except ImportError:
             # newer newrelic versions
-            from newrelic.hooks.application_celery import instrument_celery_app_base
             import celery.app as celery_app_module
+            from newrelic.hooks.application_celery import instrument_celery_app_base
 
             assert hasattr(celery_app_module, "Celery")
             assert hasattr(celery_app_module.Celery, "send_task")

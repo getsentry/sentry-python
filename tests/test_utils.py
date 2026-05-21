@@ -1,40 +1,40 @@
-import threading
 import re
 import sys
-from datetime import timedelta, datetime, timezone
+import threading
+from datetime import datetime, timedelta, timezone
 from unittest import mock
 
 import pytest
 
 import sentry_sdk
-from sentry_sdk.integrations import Integration
 from sentry_sdk._queue import Queue
+from sentry_sdk.integrations import Integration
 from sentry_sdk.utils import (
     Components,
     Dsn,
+    _get_installed_modules,
     datetime_from_isoformat,
+    ensure_integration_enabled,
     env_to_bool,
+    exc_info_from_error,
     format_timestamp,
     get_current_thread_meta,
     get_default_release,
     get_error_message,
     get_git_revision,
+    get_lines_from_file,
+    is_sentry_url,
     is_valid_sample_rate,
     logger,
     match_regex_list,
+    package_version,
     parse_url,
     parse_version,
+    safe_serialize,
     safe_str,
     sanitize_url,
     serialize_frame,
-    is_sentry_url,
-    _get_installed_modules,
-    ensure_integration_enabled,
     to_string,
-    exc_info_from_error,
-    get_lines_from_file,
-    package_version,
-    safe_serialize,
 )
 
 

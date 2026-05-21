@@ -4,35 +4,35 @@ This script populates tox.ini automatically using release data from PyPI.
 See scripts/populate_tox/README.md for more info.
 """
 
-import re
 import functools
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import time
-from dataclasses import dataclass
 from bisect import bisect_left
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone  # noqa: F401
 from importlib.metadata import PackageMetadata, distributions
-from packaging.specifiers import SpecifierSet
-from packaging.version import Version
 from pathlib import Path
 from typing import Optional, Union
+
+from packaging.specifiers import SpecifierSet
+from packaging.version import Version
 
 # Adding the scripts directory to PATH. This is necessary in order to be able
 # to import stuff from the split_tox_gh_actions script
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import requests
-from jinja2 import Environment, FileSystemLoader
-from sentry_sdk.integrations import _MIN_VERSIONS
-
 from config import TEST_SUITE_CONFIG
+from jinja2 import Environment, FileSystemLoader
 from split_tox_gh_actions.split_tox_gh_actions import GROUPS
 
+from sentry_sdk.integrations import _MIN_VERSIONS
 
 # Set CUTOFF this to a datetime to ignore packages older than CUTOFF
 CUTOFF = None

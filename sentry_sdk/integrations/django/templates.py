@@ -1,21 +1,17 @@
 import functools
+from typing import TYPE_CHECKING
 
+from django import VERSION as DJANGO_VERSION
 from django.template import TemplateSyntaxError
 from django.utils.safestring import mark_safe
-from django import VERSION as DJANGO_VERSION
 
 import sentry_sdk
 from sentry_sdk.consts import OP
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import ensure_integration_enabled
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Dict
-    from typing import Optional
-    from typing import Iterator
-    from typing import Tuple
+    from typing import Any, Dict, Iterator, Optional, Tuple
 
 try:
     # support Django 1.9
@@ -58,6 +54,7 @@ def _get_template_name_description(template_name: str) -> str:
 
 def patch_templates() -> None:
     from django.template.response import SimpleTemplateResponse
+
     from sentry_sdk.integrations.django import DjangoIntegration
 
     real_rendered_content = SimpleTemplateResponse.rendered_content
@@ -65,13 +62,24 @@ def patch_templates() -> None:
     @property  # type: ignore
     @ensure_integration_enabled(DjangoIntegration, real_rendered_content.fget)
     def rendered_content(self: "SimpleTemplateResponse") -> str:
-        with sentry_sdk.start_span(
-            op=OP.TEMPLATE_RENDER,
-            name=_get_template_name_description(self.template_name),
-            origin=DjangoIntegration.origin,
-        ) as span:
-            span.set_data("context", self.context_data)
-            return real_rendered_content.fget(self)
+        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+        if span_streaming:
+            with sentry_sdk.traces.start_span(
+                name=_get_template_name_description(self.template_name),
+                attributes={
+                    "sentry.op": OP.TEMPLATE_RENDER,
+                    "sentry.origin": DjangoIntegration.origin,
+                },
+            ) as span:
+                return real_rendered_content.fget(self)
+        else:
+            with sentry_sdk.start_span(
+                op=OP.TEMPLATE_RENDER,
+                name=_get_template_name_description(self.template_name),
+                origin=DjangoIntegration.origin,
+            ) as span:
+                span.set_data("context", self.context_data)
+                return real_rendered_content.fget(self)
 
     SimpleTemplateResponse.rendered_content = rendered_content
 
@@ -97,13 +105,26 @@ def patch_templates() -> None:
                 sentry_sdk.get_current_scope().trace_propagation_meta()
             )
 
-        with sentry_sdk.start_span(
-            op=OP.TEMPLATE_RENDER,
-            name=_get_template_name_description(template_name),
-            origin=DjangoIntegration.origin,
-        ) as span:
-            span.set_data("context", context)
-            return real_render(request, template_name, context, *args, **kwargs)
+        client = sentry_sdk.get_client()
+        span_streaming = has_span_streaming_enabled(client.options)
+
+        if span_streaming:
+            with sentry_sdk.traces.start_span(
+                name=_get_template_name_description(template_name),
+                attributes={
+                    "sentry.op": OP.TEMPLATE_RENDER,
+                    "sentry.origin": DjangoIntegration.origin,
+                },
+            ) as span:
+                return real_render(request, template_name, context, *args, **kwargs)
+        else:
+            with sentry_sdk.start_span(
+                op=OP.TEMPLATE_RENDER,
+                name=_get_template_name_description(template_name),
+                origin=DjangoIntegration.origin,
+            ) as span:
+                span.set_data("context", context)
+                return real_render(request, template_name, context, *args, **kwargs)
 
     django.shortcuts.render = render
 

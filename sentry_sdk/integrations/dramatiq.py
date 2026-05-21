@@ -1,29 +1,31 @@
 import json
+from typing import TypeVar
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANSTATUS
 from sentry_sdk.api import continue_trace, get_baggage, get_traceparent
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.consts import OP, SPANSTATUS
+from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import request_body_within_bounds
+from sentry_sdk.traces import SegmentSource
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
     TransactionSource,
 )
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
     event_from_exception,
 )
-from typing import TypeVar
 
 R = TypeVar("R")
 
 try:
     from dramatiq.broker import Broker
-    from dramatiq.middleware import Middleware, default_middleware
     from dramatiq.errors import Retry
     from dramatiq.message import Message
+    from dramatiq.middleware import Middleware, default_middleware
 except ImportError:
     raise DidNotEnable("Dramatiq is not installed")
 
@@ -31,6 +33,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Optional, Union
+
     from sentry_sdk._types import Event, Hint
 
 
@@ -113,7 +116,8 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
         }
 
     def before_process_message(self, broker: "Broker", message: "Message[R]") -> None:
-        integration = sentry_sdk.get_client().get_integration(DramatiqIntegration)
+        client = sentry_sdk.get_client()
+        integration = client.get_integration(DramatiqIntegration)
         if integration is None:
             return
 
@@ -128,21 +132,35 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
             # start new trace in case of retrying
             sentry_headers = {}
 
-        transaction = continue_trace(
-            sentry_headers,
-            name=message.actor_name,
-            op=OP.QUEUE_TASK_DRAMATIQ,
-            source=TransactionSource.TASK,
-            origin=DramatiqIntegration.origin,
-        )
-        transaction.set_status(SPANSTATUS.OK)
-        sentry_sdk.start_transaction(
-            transaction,
-            name=message.actor_name,
-            op=OP.QUEUE_TASK_DRAMATIQ,
-            source=TransactionSource.TASK,
-        )
-        transaction.__enter__()
+        if has_span_streaming_enabled(client.options):
+            sentry_sdk.traces.continue_trace(sentry_headers)
+            span = sentry_sdk.traces.start_span(
+                name=message.actor_name,
+                attributes={
+                    "sentry.op": OP.QUEUE_TASK_DRAMATIQ,
+                    "sentry.origin": DramatiqIntegration.origin,
+                    "sentry.span.source": SegmentSource.TASK.value,
+                },
+                parent_span=None,
+            )
+            message._sentry_span_ctx = span
+        else:
+            transaction = continue_trace(
+                sentry_headers,
+                name=message.actor_name,
+                op=OP.QUEUE_TASK_DRAMATIQ,
+                source=TransactionSource.TASK,
+                origin=DramatiqIntegration.origin,
+            )
+            transaction.set_status(SPANSTATUS.OK)
+            sentry_sdk.start_transaction(
+                transaction,
+                name=message.actor_name,
+                op=OP.QUEUE_TASK_DRAMATIQ,
+                source=TransactionSource.TASK,
+            )
+            transaction.__enter__()
+            message._sentry_span_ctx = transaction
 
     def after_process_message(
         self,
@@ -160,8 +178,8 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
         throws = message.options.get("throws") or actor.options.get("throws")
 
         scope_manager = message._scope_manager
-        transaction = sentry_sdk.get_current_scope().transaction
-        if not transaction:
+        span_ctx = getattr(message, "_sentry_span_ctx", None)
+        if span_ctx is None:
             return None
 
         is_event_capture_required = (
@@ -171,7 +189,7 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
         )
         if not is_event_capture_required:
             # normal transaction finish
-            transaction.__exit__(None, None, None)
+            span_ctx.__exit__(None, None, None)
             scope_manager.__exit__(None, None, None)
             return
 
@@ -185,7 +203,7 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
         )
         sentry_sdk.capture_event(event, hint=hint)
         # transaction error
-        transaction.__exit__(type(exception), exception, None)
+        span_ctx.__exit__(type(exception), exception, None)
         scope_manager.__exit__(type(exception), exception, None)
 
     after_skip_message = after_process_message

@@ -9,11 +9,11 @@ docker run --rm --name some-mysql -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=
 The tests use the following credentials to establish a database connection.
 """
 
-from contextlib import contextmanager
 import datetime
 import os
-from unittest import mock
 import warnings
+from contextlib import contextmanager
+from unittest import mock
 
 import aiomysql
 import pytest
@@ -253,7 +253,9 @@ async def test_execute_many_non_insert(sentry_init, capture_events) -> None:
     # Should have: connect + INSERT*2 + single executemany span (no double-recording)
     crumbs = event["breadcrumbs"]["values"]
     query_crumbs = [c for c in crumbs if c["category"] == "query"]
-    executemany_crumbs = [c for c in query_crumbs if c.get("data", {}).get("db.executemany")]
+    executemany_crumbs = [
+        c for c in query_crumbs if c.get("data", {}).get("db.executemany")
+    ]
     # Only ONE executemany breadcrumb — no duplicates from internal execute calls
     assert len(executemany_crumbs) == 1
     assert "UPDATE users SET password = %s" in executemany_crumbs[0]["message"]
@@ -540,8 +542,7 @@ async def test_query_source(sentry_init, capture_events):
     assert type(data.get(SPANDATA.CODE_LINENO)) == int
     assert data.get(SPANDATA.CODE_LINENO) > 0
     assert (
-        data.get(SPANDATA.CODE_NAMESPACE)
-        == "tests.integrations.aiomysql.test_aiomysql"
+        data.get(SPANDATA.CODE_NAMESPACE) == "tests.integrations.aiomysql.test_aiomysql"
     )
     assert data.get(SPANDATA.CODE_FILEPATH).endswith(
         "tests/integrations/aiomysql/test_aiomysql.py"
@@ -647,8 +648,7 @@ async def test_query_source_if_duration_over_threshold(sentry_init, capture_even
     assert type(data.get(SPANDATA.CODE_LINENO)) == int
     assert data.get(SPANDATA.CODE_LINENO) > 0
     assert (
-        data.get(SPANDATA.CODE_NAMESPACE)
-        == "tests.integrations.aiomysql.test_aiomysql"
+        data.get(SPANDATA.CODE_NAMESPACE) == "tests.integrations.aiomysql.test_aiomysql"
     )
     assert data.get(SPANDATA.CODE_FILEPATH).endswith(
         "tests/integrations/aiomysql/test_aiomysql.py"

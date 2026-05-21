@@ -23,8 +23,9 @@ except ImportError:
         return url("^{}$".format(path), *args, **kwargs)
 
 
-from . import views
 from django_helpers import views as helper_views
+
+from . import views
 
 urlpatterns = [
     path("view-exc", views.view_exc, name="view_exc"),

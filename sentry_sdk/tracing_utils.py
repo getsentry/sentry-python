@@ -4,12 +4,12 @@ import inspect
 import os
 import re
 import sys
+import uuid
 import warnings
 from collections.abc import Mapping, MutableMapping
 from datetime import datetime, timedelta, timezone
 from random import Random
 from urllib.parse import quote, unquote
-import uuid
 
 try:
     from re import Pattern
@@ -17,37 +17,29 @@ except ImportError:
     # 3.6
     from typing import Pattern
 
+from typing import TYPE_CHECKING
+
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS, SPANTEMPLATE
+from sentry_sdk.consts import OP, SPANDATA, SPANTEMPLATE
 from sentry_sdk.utils import (
+    _is_external_source,
+    _is_in_project_root,
+    _module_in_list,
     capture_internal_exceptions,
     filename_for_module,
+    is_sentry_url,
+    is_valid_sample_rate,
     logger,
     match_regex_list,
     qualname_from_function,
     safe_repr,
     to_string,
     try_convert,
-    is_sentry_url,
-    is_valid_sample_rate,
-    _is_external_source,
-    _is_in_project_root,
-    _module_in_list,
 )
-from sentry_sdk.tracing import Span as LegacySpan
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Dict
-    from typing import Generator
-    from typing import Optional
-    from typing import Union
-    from typing import Iterator
-    from typing import Tuple
-
     from types import FrameType
+    from typing import Any, Dict, Generator, Iterator, Optional, Tuple, Union
 
     from sentry_sdk._types import Attributes
 
@@ -126,54 +118,6 @@ def has_span_streaming_enabled(options: "Optional[dict[str, Any]]") -> bool:
 
 @contextlib.contextmanager
 def record_sql_queries(
-    cursor: "Any",
-    query: "Any",
-    params_list: "Any",
-    paramstyle: "Optional[str]",
-    executemany: bool,
-    record_cursor_repr: bool = False,
-    span_origin: str = "manual",
-) -> "Generator[sentry_sdk.tracing.Span, None, None]":
-    # TODO: Bring back capturing of params by default
-    if sentry_sdk.get_client().options["_experiments"].get("record_sql_params", False):
-        if not params_list or params_list == [None]:
-            params_list = None
-
-        if paramstyle == "pyformat":
-            paramstyle = "format"
-    else:
-        params_list = None
-        paramstyle = None
-
-    query = _format_sql(cursor, query)
-
-    data = {}
-    if params_list is not None:
-        data["db.params"] = params_list
-    if paramstyle is not None:
-        data["db.paramstyle"] = paramstyle
-    if executemany:
-        data["db.executemany"] = True
-    if record_cursor_repr and cursor is not None:
-        data["db.cursor"] = cursor
-
-    with capture_internal_exceptions():
-        sentry_sdk.add_breadcrumb(message=query, category="query", data=data)
-
-    with sentry_sdk.start_span(
-        op=OP.DB,
-        name=query,
-        origin=span_origin,
-    ) as span:
-        for k, v in data.items():
-            span.set_data(k, v)
-        yield span
-
-
-# Mirrors record_sql_queries() temporarily so the Django and asyncpg integrations don't crash with span streaming enabled.
-# Once both are ported, remove record_sql_queries() and rename record_sql_queries_supporting_streaming() to record_sql_queries().
-@contextlib.contextmanager
-def record_sql_queries_supporting_streaming(
     cursor: "Any",
     query: "Any",
     params_list: "Any",
@@ -333,7 +277,7 @@ def add_source(
         except Exception:
             lineno = None
         if lineno is not None:
-            if isinstance(span, LegacySpan):
+            if isinstance(span, Span):
                 span.set_data(SPANDATA.CODE_LINENO, lineno)
             else:
                 span.set_attribute("code.line.number", lineno)
@@ -343,7 +287,7 @@ def add_source(
         except Exception:
             namespace = None
         if namespace is not None:
-            if isinstance(span, LegacySpan):
+            if isinstance(span, Span):
                 span.set_data(SPANDATA.CODE_NAMESPACE, namespace)
             else:
                 span.set_attribute(SPANDATA.CODE_NAMESPACE, namespace)
@@ -357,7 +301,7 @@ def add_source(
             else:
                 in_app_path = filepath
 
-            if isinstance(span, LegacySpan):
+            if isinstance(span, Span):
                 span.set_data(SPANDATA.CODE_FILEPATH, in_app_path)
             else:
                 if in_app_path is not None:
@@ -369,7 +313,7 @@ def add_source(
             code_function = None
 
         if code_function is not None:
-            if isinstance(span, LegacySpan):
+            if isinstance(span, Span):
                 span.set_data(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
             else:
                 span.set_attribute(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
@@ -385,9 +329,9 @@ def add_query_source(
     if not client.is_active():
         return
 
-    if isinstance(span, LegacySpan):
+    if isinstance(span, Span):
         # In the StreamedSpan case, we need to add the extra span information before
-        # the span finishes, so it's expected that this will be None. In the LegacySpan case,
+        # the span finishes, so it's expected that this will be None. In the Span case,
         # it should already be finished.
         if span.timestamp is None:
             return
@@ -431,9 +375,9 @@ def add_http_request_source(
     if not client.is_active():
         return
 
-    if isinstance(span, LegacySpan):
+    if isinstance(span, Span):
         # In the StreamedSpan case, we need to add the extra span information before
-        # the span finishes, so it's expected that this will be None. In the LegacySpan case,
+        # the span finishes, so it's expected that this will be None. In the Span case,
         # it should already be finished.
         if span.timestamp is None:
             return
@@ -1209,33 +1153,6 @@ def get_current_span(
     return current_span
 
 
-def set_span_errored(span: "Optional[Union[Span, StreamedSpan]]" = None) -> None:
-    """
-    Set the status of the current or given span to INTERNAL_ERROR.
-    Also sets the status of the transaction (root span) to INTERNAL_ERROR.
-    """
-    from sentry_sdk.traces import StreamedSpan, SpanStatus, _get_current_streamed_span
-
-    client = sentry_sdk.get_client()
-
-    if not span:
-        span = (
-            _get_current_streamed_span()
-            if has_span_streaming_enabled(client.options)
-            else sentry_sdk.get_current_span()
-        )
-
-    if span is not None:
-        if isinstance(span, Span):
-            span.set_status(SPANSTATUS.INTERNAL_ERROR)
-            if span.containing_transaction is not None:
-                span.containing_transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
-        elif isinstance(span, StreamedSpan):
-            span.status = SpanStatus.ERROR
-            if span._segment is not None:
-                span._segment.status = SpanStatus.ERROR
-
-
 def _generate_sample_rand(
     trace_id: "Optional[str]",
     *,
@@ -1718,16 +1635,18 @@ def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
 
 
 # Circular imports
+from sentry_sdk.traces import (
+    LOW_QUALITY_SEGMENT_SOURCES,
+    StreamedSpan,
+)
+from sentry_sdk.traces import (
+    start_span as start_streaming_span,
+)
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     LOW_QUALITY_TRANSACTION_SOURCES,
     SENTRY_TRACE_HEADER_NAME,
     Span,
-)
-from sentry_sdk.traces import (
-    LOW_QUALITY_SEGMENT_SOURCES,
-    StreamedSpan,
-    start_span as start_streaming_span,
 )
 
 if TYPE_CHECKING:

@@ -1,8 +1,8 @@
 import subprocess
 import sys
 from textwrap import dedent
-import pytest
 
+import pytest
 from typer.testing import CliRunner
 
 runner = CliRunner()

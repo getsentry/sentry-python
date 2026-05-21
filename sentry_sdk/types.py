@@ -19,9 +19,9 @@ if TYPE_CHECKING:
         EventDataCategory,
         Hint,
         Log,
+        Metric,
         MonitorConfig,
         SamplingContext,
-        Metric,
     )
 else:
     from typing import Any

@@ -12,11 +12,10 @@ from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import (
     add_query_source,
     has_span_streaming_enabled,
-    record_sql_queries_supporting_streaming,
+    record_sql_queries,
 )
 from sentry_sdk.utils import (
     capture_internal_exceptions,
-    ensure_integration_enabled,
     parse_version,
 )
 
@@ -52,8 +51,11 @@ class AsyncPGIntegration(Integration):
         asyncpg.Connection._executemany = _wrap_connection_method(
             asyncpg.Connection._executemany, executemany=True
         )
-        asyncpg.Connection.cursor = _wrap_cursor_creation(asyncpg.Connection.cursor)
         asyncpg.Connection.prepare = _wrap_connection_method(asyncpg.Connection.prepare)
+
+        BaseCursor._bind_exec = _wrap_cursor_method(BaseCursor._bind_exec)
+        BaseCursor._exec = _wrap_cursor_method(BaseCursor._exec)
+
         asyncpg.connect_utils._connect_addr = _wrap_connect_addr(
             asyncpg.connect_utils._connect_addr
         )
@@ -80,7 +82,7 @@ def _wrap_execute(f: "Callable[..., Awaitable[T]]") -> "Callable[..., Awaitable[
             return await f(*args, **kwargs)
 
         query = _normalize_query(args[1])
-        with record_sql_queries_supporting_streaming(
+        with record_sql_queries(
             cursor=None,
             query=query,
             params_list=None,
@@ -121,7 +123,7 @@ def _record(
     param_style = "pyformat" if params_list else None
 
     query = _normalize_query(query)
-    with record_sql_queries_supporting_streaming(
+    with record_sql_queries(
         cursor=cursor,
         query=query,
         params_list=params_list,
@@ -143,27 +145,50 @@ def _wrap_connection_method(
         params_list = args[2] if len(args) > 2 else None
         with _record(None, query, params_list, executemany=executemany) as span:
             _set_db_data(span, args[0])
+
             res = await f(*args, **kwargs)
+
+            if isinstance(span, StreamedSpan):
+                with capture_internal_exceptions():
+                    add_query_source(span)
+
+        if not isinstance(span, StreamedSpan):
+            with capture_internal_exceptions():
+                add_query_source(span)
 
         return res
 
     return _inner
 
 
-def _wrap_cursor_creation(f: "Callable[..., T]") -> "Callable[..., T]":
-    @ensure_integration_enabled(AsyncPGIntegration, f)
-    def _inner(*args: "Any", **kwargs: "Any") -> "T":  # noqa: N807
-        query = args[1]
-        params_list = args[2] if len(args) > 2 else None
+def _wrap_cursor_method(
+    f: "Callable[..., Awaitable[T]]",
+) -> "Callable[..., Awaitable[T]]":
+    async def _inner(*args: "Any", **kwargs: "Any") -> "T":
+        if sentry_sdk.get_client().get_integration(AsyncPGIntegration) is None:
+            return await f(*args, **kwargs)
 
-        with _record(
-            None,
-            query,
-            params_list,
+        cursor = args[0]
+        query = _normalize_query(cursor._query)
+        with record_sql_queries(
+            cursor=cursor,
+            query=query,
+            params_list=None,
+            paramstyle=None,
             executemany=False,
+            record_cursor_repr=True,
+            span_origin=AsyncPGIntegration.origin,
         ) as span:
-            _set_db_data(span, args[0])
-            res = f(*args, **kwargs)
+            _set_db_data(span, cursor._connection)
+            res = await f(*args, **kwargs)
+
+            if isinstance(span, StreamedSpan):
+                with capture_internal_exceptions():
+                    add_query_source(span)
+
+        if not isinstance(span, StreamedSpan):
+            with capture_internal_exceptions():
+                add_query_source(span)
 
         return res
 
@@ -186,9 +211,9 @@ def _wrap_connect_addr(
             span_attributes = {
                 "sentry.op": OP.DB,
                 "sentry.origin": AsyncPGIntegration.origin,
-                SPANDATA.DB_SYSTEM: "postgresql",
+                SPANDATA.DB_SYSTEM_NAME: "postgresql",
                 SPANDATA.DB_USER: user,
-                SPANDATA.DB_NAME: database,
+                SPANDATA.DB_NAMESPACE: database,
                 SPANDATA.DB_DRIVER_NAME: "asyncpg",
             }
             if addr:
@@ -236,23 +261,40 @@ def _wrap_connect_addr(
 
 
 def _set_db_data(span: "Union[Span, StreamedSpan]", conn: "Any") -> None:
-    set_value = span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
-
-    set_value(SPANDATA.DB_SYSTEM, "postgresql")
-    set_value(SPANDATA.DB_DRIVER_NAME, "asyncpg")
-
     addr = conn._addr
-    if addr:
-        try:
-            set_value(SPANDATA.SERVER_ADDRESS, addr[0])
-            set_value(SPANDATA.SERVER_PORT, addr[1])
-        except IndexError:
-            pass
-
     database = conn._params.database
-    if database:
-        set_value(SPANDATA.DB_NAME, database)
-
     user = conn._params.user
-    if user:
-        set_value(SPANDATA.DB_USER, user)
+
+    if isinstance(span, StreamedSpan):
+        span.set_attribute(SPANDATA.DB_SYSTEM_NAME, "postgresql")
+        span.set_attribute(SPANDATA.DB_DRIVER_NAME, "asyncpg")
+        if addr:
+            try:
+                span.set_attribute(SPANDATA.SERVER_ADDRESS, addr[0])
+                span.set_attribute(SPANDATA.SERVER_PORT, addr[1])
+            except IndexError:
+                pass
+
+        if database:
+            span.set_attribute(SPANDATA.DB_NAMESPACE, database)
+
+        if user:
+            span.set_attribute(SPANDATA.DB_USER, user)
+    else:
+        # Remove this else block once we've completely migrated to streamed spans
+        # The use of deprecated attributes here is to ensure backwards compatibility
+        span.set_data(SPANDATA.DB_SYSTEM, "postgresql")
+        span.set_data(SPANDATA.DB_DRIVER_NAME, "asyncpg")
+
+        if addr:
+            try:
+                span.set_data(SPANDATA.SERVER_ADDRESS, addr[0])
+                span.set_data(SPANDATA.SERVER_PORT, addr[1])
+            except IndexError:
+                pass
+
+        if database:
+            span.set_data(SPANDATA.DB_NAME, database)
+
+        if user:
+            span.set_data(SPANDATA.DB_USER, user)

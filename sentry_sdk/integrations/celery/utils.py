@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from typing import Tuple
+
     from sentry_sdk._types import MonitorConfigScheduleUnit
 
 

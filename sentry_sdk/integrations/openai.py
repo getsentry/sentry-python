@@ -1,27 +1,35 @@
-import sys
 import json
+import sys
 import time
-from functools import wraps
 from collections.abc import Iterable
+from functools import wraps
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk import consts
-from sentry_sdk.ai.monitoring import record_token_usage
-from sentry_sdk.ai.utils import (
-    set_data_normalized,
-    normalize_message_roles,
-    truncate_and_annotate_messages,
-    truncate_and_annotate_embedding_inputs,
+from sentry_sdk.ai._openai_completions_api import (
+    _get_system_instructions as _get_system_instructions_completions,
+)
+from sentry_sdk.ai._openai_completions_api import (
+    _get_text_items,
+    _transform_system_instructions,
 )
 from sentry_sdk.ai._openai_completions_api import (
     _is_system_instruction as _is_system_instruction_completions,
-    _get_system_instructions as _get_system_instructions_completions,
-    _transform_system_instructions,
-    _get_text_items,
+)
+from sentry_sdk.ai._openai_responses_api import (
+    _get_system_instructions as _get_system_instructions_responses,
 )
 from sentry_sdk.ai._openai_responses_api import (
     _is_system_instruction as _is_system_instruction_responses,
-    _get_system_instructions as _get_system_instructions_responses,
+)
+from sentry_sdk.ai.monitoring import record_token_usage
+from sentry_sdk.ai.utils import (
+    get_start_span_function,
+    normalize_message_roles,
+    set_data_normalized,
+    truncate_and_annotate_embedding_inputs,
+    truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -29,34 +37,33 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    safe_serialize,
     reraise,
+    safe_serialize,
 )
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import (
         Any,
+        AsyncIterator,
+        Callable,
+        Iterable,
+        Iterator,
         List,
         Optional,
-        Callable,
-        AsyncIterator,
-        Iterator,
         Union,
-        Iterable,
     )
-    from sentry_sdk.tracing import Span
-    from sentry_sdk._types import TextPart
 
-    from openai.types.responses.response_usage import ResponseUsage
+    from openai import Omit
+    from openai.types import CompletionUsage
     from openai.types.responses import (
         ResponseInputParam,
-        SequenceNotStr,
         ResponseStreamEvent,
+        SequenceNotStr,
     )
-    from openai.types import CompletionUsage
-    from openai import Omit
+    from openai.types.responses.response_usage import ResponseUsage
+
+    from sentry_sdk._types import TextPart
+    from sentry_sdk.tracing import Span
 
 try:
     try:
@@ -69,15 +76,14 @@ try:
     except ImportError:
         Omit = None
 
-    from openai.resources.chat.completions import Completions, AsyncCompletions
-    from openai.resources import Embeddings, AsyncEmbeddings
-
-    from openai import Stream, AsyncStream
+    from openai import AsyncStream, Stream
+    from openai.resources import AsyncEmbeddings, Embeddings
+    from openai.resources.chat.completions import AsyncCompletions, Completions
 
     if TYPE_CHECKING:
         from openai.types.chat import (
-            ChatCompletionMessageParam,
             ChatCompletionChunk,
+            ChatCompletionMessageParam,
         )
 except ImportError:
     raise DidNotEnable("OpenAI not installed")
@@ -85,7 +91,7 @@ except ImportError:
 RESPONSES_API_ENABLED = True
 try:
     # responses API support was introduced in v1.66.0
-    from openai.resources.responses import Responses, AsyncResponses
+    from openai.resources.responses import AsyncResponses, Responses
     from openai.types.responses.response_completed_event import ResponseCompletedEvent
 except ImportError:
     RESPONSES_API_ENABLED = False
@@ -398,8 +404,13 @@ def _set_responses_api_input_data(
 
     if isinstance(messages, str):
         normalized_messages = normalize_message_roles([messages])  # type: ignore
+        client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
-        messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
+        messages_data = (
+            normalized_messages
+            if client.options.get("stream_gen_ai_spans", False)
+            else truncate_and_annotate_messages(normalized_messages, span, scope)
+        )
         if messages_data is not None:
             set_data_normalized(
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
@@ -413,8 +424,13 @@ def _set_responses_api_input_data(
     ]
     if len(non_system_messages) > 0:
         normalized_messages = normalize_message_roles(non_system_messages)
+        client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
-        messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
+        messages_data = (
+            normalized_messages
+            if client.options.get("stream_gen_ai_spans", False)
+            else truncate_and_annotate_messages(normalized_messages, span, scope)
+        )
         if messages_data is not None:
             set_data_normalized(
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
@@ -472,8 +488,13 @@ def _set_completions_api_input_data(
 
     if isinstance(messages, str):
         normalized_messages = normalize_message_roles([messages])  # type: ignore
+        client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
-        messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
+        messages_data = (
+            normalized_messages
+            if client.options.get("stream_gen_ai_spans", False)
+            else truncate_and_annotate_messages(normalized_messages, span, scope)
+        )
         if messages_data is not None:
             set_data_normalized(
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
@@ -503,8 +524,13 @@ def _set_completions_api_input_data(
     ]
     if len(non_system_messages) > 0:
         normalized_messages = normalize_message_roles(non_system_messages)
+        client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
-        messages_data = truncate_and_annotate_messages(normalized_messages, span, scope)
+        messages_data = (
+            normalized_messages
+            if client.options.get("stream_gen_ai_spans", False)
+            else truncate_and_annotate_messages(normalized_messages, span, scope)
+        )
         if messages_data is not None:
             set_data_normalized(
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
@@ -539,9 +565,14 @@ def _set_embeddings_input_data(
         set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
 
         normalized_messages = normalize_message_roles([messages])  # type: ignore
+        client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
-        messages_data = truncate_and_annotate_embedding_inputs(
-            normalized_messages, span, scope
+        messages_data = (
+            normalized_messages
+            if client.options.get("stream_gen_ai_spans", False)
+            else truncate_and_annotate_embedding_inputs(
+                normalized_messages, span, scope
+            )
         )
         if messages_data is not None:
             set_data_normalized(
@@ -560,9 +591,14 @@ def _set_embeddings_input_data(
 
     if len(messages) > 0:
         normalized_messages = normalize_message_roles(messages)
+        client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
-        messages_data = truncate_and_annotate_embedding_inputs(
-            normalized_messages, span, scope
+        messages_data = (
+            normalized_messages
+            if client.options.get("stream_gen_ai_spans", False)
+            else truncate_and_annotate_embedding_inputs(
+                normalized_messages, span, scope
+            )
         )
         if messages_data is not None:
             set_data_normalized(
@@ -678,7 +714,7 @@ def _new_sync_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
 
     model = kwargs.get("model")
 
-    span = sentry_sdk.start_span(
+    span = get_start_span_function()(
         op=consts.OP.GEN_AI_CHAT,
         name=f"chat {model}",
         origin=OpenAIIntegration.origin,
@@ -746,7 +782,7 @@ async def _new_async_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") ->
 
     model = kwargs.get("model")
 
-    span = sentry_sdk.start_span(
+    span = get_start_span_function()(
         op=consts.OP.GEN_AI_CHAT,
         name=f"chat {model}",
         origin=OpenAIIntegration.origin,
@@ -1142,7 +1178,7 @@ def _new_sync_embeddings_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
 
     model = kwargs.get("model")
 
-    with sentry_sdk.start_span(
+    with get_start_span_function()(
         op=consts.OP.GEN_AI_EMBEDDINGS,
         name=f"embeddings {model}",
         origin=OpenAIIntegration.origin,
@@ -1174,7 +1210,7 @@ async def _new_async_embeddings_create(
 
     model = kwargs.get("model")
 
-    with sentry_sdk.start_span(
+    with get_start_span_function()(
         op=consts.OP.GEN_AI_EMBEDDINGS,
         name=f"embeddings {model}",
         origin=OpenAIIntegration.origin,
@@ -1228,7 +1264,7 @@ def _new_sync_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any"
 
     model = kwargs.get("model")
 
-    span = sentry_sdk.start_span(
+    span = get_start_span_function()(
         op=consts.OP.GEN_AI_RESPONSES,
         name=f"responses {model}",
         origin=OpenAIIntegration.origin,
@@ -1286,7 +1322,7 @@ async def _new_async_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -
 
     model = kwargs.get("model")
 
-    span = sentry_sdk.start_span(
+    span = get_start_span_function()(
         op=consts.OP.GEN_AI_RESPONSES,
         name=f"responses {model}",
         origin=OpenAIIntegration.origin,

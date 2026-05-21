@@ -1,15 +1,14 @@
 import json
+from unittest import mock  # python 3.3 and above
 
 import httpx
 import pytest
-from cohere import Client, ChatMessage
+from cohere import ChatMessage, Client
+from httpx import Client as HTTPXClient
 
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.cohere import CohereIntegration
-
-from unittest import mock  # python 3.3 and above
-from httpx import Client as HTTPXClient
 
 
 @pytest.mark.parametrize(
@@ -163,8 +162,9 @@ def test_bad_chat(sentry_init, capture_events):
     with pytest.raises(httpx.HTTPError):
         client.chat(model="some-model", message="hello")
 
-    (event,) = events
+    (event, transaction) = events
     assert event["level"] == "error"
+    assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
 
 def test_span_status_error(sentry_init, capture_events):
@@ -183,7 +183,6 @@ def test_span_status_error(sentry_init, capture_events):
     assert error["level"] == "error"
     assert transaction["spans"][0]["status"] == "internal_error"
     assert transaction["spans"][0]["tags"]["status"] == "internal_error"
-    assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
 
 @pytest.mark.parametrize(
