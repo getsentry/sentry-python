@@ -116,6 +116,15 @@ def has_span_streaming_enabled(options: "Optional[dict[str, Any]]") -> bool:
     return (options.get("_experiments") or {}).get("trace_lifecycle") == "stream"
 
 
+def should_truncate_gen_ai_input(options: "Optional[dict[str, Any]]") -> bool:
+    if options is None:
+        return False
+
+    return options.get("stream_gen_ai_spans", False) or has_span_streaming_enabled(
+        options
+    )
+
+
 @contextlib.contextmanager
 def record_sql_queries(
     cursor: "Any",
