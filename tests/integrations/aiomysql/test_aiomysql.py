@@ -22,7 +22,7 @@ import pytest_asyncio
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.aiomysql import AioMySQLIntegration
-from sentry_sdk.tracing_utils import record_sql_queries_supporting_streaming
+from sentry_sdk.tracing_utils import record_sql_queries
 from tests.conftest import ApproxDict
 
 MYSQL_HOST = os.getenv("SENTRY_PYTHON_TEST_MYSQL_HOST", "localhost")
@@ -570,7 +570,7 @@ async def test_no_query_source_if_duration_too_short(sentry_init, capture_events
 
         @contextmanager
         def fake_record_sql_queries(*args, **kwargs):
-            with record_sql_queries_supporting_streaming(*args, **kwargs) as span:
+            with record_sql_queries(*args, **kwargs) as span:
                 pass
             span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
             span.timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
@@ -578,7 +578,7 @@ async def test_no_query_source_if_duration_too_short(sentry_init, capture_events
 
         async with conn.cursor() as cur:
             with mock.patch(
-                "sentry_sdk.integrations.aiomysql.record_sql_queries_supporting_streaming",
+                "sentry_sdk.integrations.aiomysql.record_sql_queries",
                 fake_record_sql_queries,
             ):
                 await cur.execute(
@@ -616,7 +616,7 @@ async def test_query_source_if_duration_over_threshold(sentry_init, capture_even
 
         @contextmanager
         def fake_record_sql_queries(*args, **kwargs):
-            with record_sql_queries_supporting_streaming(*args, **kwargs) as span:
+            with record_sql_queries(*args, **kwargs) as span:
                 pass
             span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
             span.timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
@@ -624,7 +624,7 @@ async def test_query_source_if_duration_over_threshold(sentry_init, capture_even
 
         async with conn.cursor() as cur:
             with mock.patch(
-                "sentry_sdk.integrations.aiomysql.record_sql_queries_supporting_streaming",
+                "sentry_sdk.integrations.aiomysql.record_sql_queries",
                 fake_record_sql_queries,
             ):
                 await cur.execute(
