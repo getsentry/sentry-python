@@ -14,8 +14,9 @@ HUEY_VERSION = parse_version(HUEY_VERSION)
 try:
     from huey.api import chord, group
 except ImportError:
-      chord = None
-      group = None
+    chord = None
+    group = None
+
 
 @pytest.fixture
 def init_huey(sentry_init):
