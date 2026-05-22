@@ -14,8 +14,7 @@
 
 [tox]
 requires =
-    # This version introduced using pip 24.1 which does not work with older Celery and HTTPX versions.
-    virtualenv<20.26.3
+    tox-uv
 envlist =
     # === Common ===
     {py3.6,py3.7,py3.8,py3.9,py3.10,py3.11,py3.12,py3.13,py3.14,py3.14t}-common
@@ -167,14 +166,20 @@ deps =
 
     {% endfor %}
 
+    # === Compatibility overrides ===
+    # These replace the old `pip install` workaround commands that pip-backed tox used.
+    # tox-uv does not seed pip into venvs, so all installs must go through deps.
+
+    ; https://github.com/pallets/flask/issues/4455
+    {py3.7,py3.8,py3.9,py3.10,py3.11}-flask-v{1}: itsdangerous>=0.24,<2.0
+    {py3.7,py3.8,py3.9,py3.10,py3.11}-flask-v{1}: markupsafe<2.0.0
+    {py3.7,py3.8,py3.9,py3.10,py3.11}-flask-v{1}: jinja2<3.1.1
+
 setenv =
     PYTHONDONTWRITEBYTECODE=1
     OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
     COVERAGE_FILE=.coverage-sentry-{envname}
     py3.6: COVERAGE_RCFILE=.coveragerc36
-    # Lowest version to support free-threading
-    # https://discuss.python.org/t/announcement-pip-24-1-release/56281
-    py3.14t: VIRTUALENV_PIP=24.1
 
     django: DJANGO_SETTINGS_MODULE=tests.integrations.django.myapp.settings
     spark-v{3.0.3,3.5.6}: JAVA_HOME=/usr/lib/jvm/temurin-11-jdk-amd64
@@ -237,11 +242,6 @@ basepython =
     ruff: python3.14
 
 commands =
-    {py3.7,py3.8}-boto3: pip install urllib3<2.0.0
-
-    ; https://github.com/pallets/flask/issues/4455
-    {py3.7,py3.8,py3.9,py3.10,py3.11}-flask-v{1}: pip install "itsdangerous>=0.24,<2.0" "markupsafe<2.0.0" "jinja2<3.1.1"
-
     ; Running `pytest` as an executable suffers from an import error
     ; when loading tests in scenarios. In particular, django fails to
     ; load the settings from the test module.
