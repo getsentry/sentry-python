@@ -55,6 +55,7 @@ def get_test_agent_with_settings():
     return inner
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_agent_run_async(
@@ -63,6 +64,7 @@ async def test_agent_run_async(
     capture_items,
     get_test_agent,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that the integration creates spans for async agent runs.
@@ -72,11 +74,60 @@ async def test_agent_run_async(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     test_agent = get_test_agent()
 
-    if stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        result = await test_agent.run(
+            ["Message demonstrating the absence of truncation.", "Test input"]
+        )
+
+        assert result is not None
+        assert result.output is not None
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+
+        assert spans[1]["name"] == "invoke_agent test_agent"
+        assert spans[1]["attributes"]["sentry.origin"] == "auto.ai.pydantic_ai"
+
+        assert spans[1]["attributes"]["sentry.op"] == "gen_ai.invoke_agent"
+
+        # Find child span types (invoke_agent is the transaction, not a child span)
+        chat_spans = [
+            s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        ]
+        assert len(chat_spans) >= 1
+
+        # Check chat span
+        chat_span = chat_spans[0]
+        assert "chat" in chat_span["name"]
+        assert chat_span["attributes"]["gen_ai.operation.name"] == "chat"
+        assert chat_span["attributes"]["gen_ai.response.streaming"] is False
+        assert json.loads(
+            chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        ) == [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Message demonstrating the absence of truncation.",
+                    },
+                    {
+                        "type": "text",
+                        "text": "Test input",
+                    },
+                ],
+            }
+        ]
+        assert "gen_ai.usage.input_tokens" in chat_span["attributes"]
+        assert "gen_ai.usage.output_tokens" in chat_span["attributes"]
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         result = await test_agent.run(
@@ -95,6 +146,7 @@ async def test_agent_run_async(
         # The transaction itself should have invoke_agent data
         assert transaction["contexts"]["trace"]["op"] == "gen_ai.invoke_agent"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         # Find child span types (invoke_agent is the transaction, not a child span)
         chat_spans = [
@@ -158,6 +210,7 @@ async def test_agent_run_async(
         assert "gen_ai.usage.output_tokens" in chat_span["data"]
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_agent_run_async_model_error(
@@ -165,11 +218,13 @@ async def test_agent_run_async_model_error(
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     def failing_model(messages, info):
@@ -180,7 +235,7 @@ async def test_agent_run_async_model_error(
         name="test_agent",
     )
 
-    if stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("event", "transaction", "span")
 
         with pytest.raises(RuntimeError, match="model exploded"):
@@ -189,6 +244,21 @@ async def test_agent_run_async_model_error(
         (error,) = (item.payload for item in items if item.type == "event")
         assert error["level"] == "error"
 
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert len(spans) == 2
+
+        assert spans[0]["status"] == "error"
+    elif stream_gen_ai_spans:
+        items = capture_items("event", "transaction", "span")
+
+        with pytest.raises(RuntimeError, match="model exploded"):
+            await agent.run("Test input")
+
+        (error,) = (item.payload for item in items if item.type == "event")
+        assert error["level"] == "error"
+
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert len(spans) == 1
 
@@ -208,6 +278,7 @@ async def test_agent_run_async_model_error(
         assert spans[0]["status"] == "internal_error"
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_agent_run_sync(
     sentry_init,
@@ -215,6 +286,7 @@ def test_agent_run_sync(
     capture_items,
     get_test_agent,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that the integration creates spans for sync agent runs.
@@ -224,11 +296,40 @@ def test_agent_run_sync(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     test_agent = get_test_agent()
 
-    if stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        result = test_agent.run_sync(
+            ["Message demonstrating the absence of truncation.", "Test input"]
+        )
+
+        assert result is not None
+        assert result.output is not None
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+
+        # Find span types
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+
+        assert spans[1]["name"] == "invoke_agent test_agent"
+        assert spans[1]["attributes"]["sentry.origin"] == "auto.ai.pydantic_ai"
+
+        chat_spans = [
+            s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        ]
+        assert len(chat_spans) >= 1
+
+        # Verify streaming flag is False for sync
+        for chat_span in chat_spans:
+            assert chat_span["attributes"]["gen_ai.response.streaming"] is False
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         result = test_agent.run_sync(
@@ -246,6 +347,7 @@ def test_agent_run_sync(
         assert transaction["contexts"]["trace"]["origin"] == "auto.ai.pydantic_ai"
 
         # Find span types
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
@@ -279,17 +381,20 @@ def test_agent_run_sync(
             assert chat_span["data"]["gen_ai.response.streaming"] is False
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_agent_run_sync_model_error(
     sentry_init,
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     def failing_model(messages, info):
@@ -300,7 +405,7 @@ def test_agent_run_sync_model_error(
         name="test_agent",
     )
 
-    if stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("event", "transaction", "span")
 
         with pytest.raises(RuntimeError, match="model exploded"):
@@ -309,6 +414,21 @@ def test_agent_run_sync_model_error(
         (error,) = (item.payload for item in items if item.type == "event")
         assert error["level"] == "error"
 
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert len(spans) == 2
+
+        assert spans[0]["status"] == "error"
+    elif stream_gen_ai_spans:
+        items = capture_items("event", "transaction", "span")
+
+        with pytest.raises(RuntimeError, match="model exploded"):
+            agent.run_sync("Test input")
+
+        (error,) = (item.payload for item in items if item.type == "event")
+        assert error["level"] == "error"
+
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert len(spans) == 1
 
@@ -328,6 +448,7 @@ def test_agent_run_sync_model_error(
         assert spans[0]["status"] == "internal_error"
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_agent_run_stream(
@@ -336,6 +457,7 @@ async def test_agent_run_stream(
     capture_items,
     get_test_agent,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that the integration creates spans for streaming agent runs.
@@ -345,11 +467,59 @@ async def test_agent_run_stream(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     test_agent = get_test_agent()
 
-    if stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        async with test_agent.run_stream(
+            ["Message demonstrating the absence of truncation.", "Test input"]
+        ) as result:
+            # Consume the stream
+            async for _ in result.stream_output():
+                pass
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+
+        assert spans[1]["name"] == "invoke_agent test_agent"
+        assert spans[1]["attributes"]["sentry.origin"] == "auto.ai.pydantic_ai"
+
+        chat_spans = [
+            s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        ]
+        assert len(chat_spans) >= 1
+
+        # Verify streaming flag is True for streaming
+        for chat_span in chat_spans:
+            assert chat_span["attributes"]["gen_ai.response.streaming"] is True
+            assert json.loads(
+                chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            ) == [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        },
+                        {
+                            "type": "text",
+                            "text": "Test input",
+                        },
+                    ],
+                }
+            ]
+            assert "gen_ai.usage.input_tokens" in chat_span["attributes"]
+            # Streaming responses should still have output data
+            assert (
+                "gen_ai.response.text" in chat_span["attributes"]
+                or "gen_ai.response.model" in chat_span["attributes"]
+            )
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         async with test_agent.run_stream(
@@ -367,6 +537,7 @@ async def test_agent_run_stream(
         assert transaction["contexts"]["trace"]["origin"] == "auto.ai.pydantic_ai"
 
         # Find chat spans
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
@@ -430,6 +601,7 @@ async def test_agent_run_stream(
             )
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_agent_run_stream_events(
@@ -438,6 +610,7 @@ async def test_agent_run_stream_events(
     capture_items,
     get_test_agent,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that run_stream_events creates spans (it uses run internally, so non-streaming).
@@ -447,12 +620,41 @@ async def test_agent_run_stream_events(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     # Consume all events
     test_agent = get_test_agent()
 
-    if stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        if PYDANTIC_AI_VERSION > (2,):
+            async with test_agent.run_stream_events(
+                ["Message demonstrating the absence of truncation.", "Test input"]
+            ) as stream_events:
+                async for _ in stream_events:
+                    pass
+        else:
+            async for _ in test_agent.run_stream_events(
+                ["Message demonstrating the absence of truncation.", "Test input"]
+            ):
+                pass
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+
+        assert spans[1]["name"] == "invoke_agent test_agent"
+
+        chat_spans = [
+            s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
+        ]
+        assert len(chat_spans) >= 1
+
+        # run_stream_events uses run() internally, so streaming should be False
+        for chat_span in chat_spans:
+            assert chat_span["attributes"]["gen_ai.response.streaming"] is False
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         if PYDANTIC_AI_VERSION > (2,):
@@ -474,6 +676,7 @@ async def test_agent_run_stream_events(
         assert transaction["transaction"] == "invoke_agent test_agent"
 
         # Find chat spans
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
@@ -509,6 +712,7 @@ async def test_agent_run_stream_events(
             assert chat_span["data"]["gen_ai.response.streaming"] is False
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_agent_with_tools(
@@ -517,6 +721,7 @@ async def test_agent_with_tools(
     capture_items,
     get_test_agent,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that tool execution creates execute_tool spans.
@@ -526,6 +731,7 @@ async def test_agent_with_tools(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     test_agent = get_test_agent()
@@ -535,13 +741,14 @@ async def test_agent_with_tools(
         """Add two numbers together."""
         return a + b
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         result = await test_agent.run("What is 5 + 3?")
 
         assert result is not None
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
 
         # Find child span types (invoke_agent is the transaction, not a child span)
@@ -606,6 +813,7 @@ async def test_agent_with_tools(
             assert "add_numbers" in available_tools_str
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "handled_tool_call_exceptions",
@@ -619,6 +827,7 @@ async def test_agent_with_tool_model_retry(
     get_test_agent,
     handled_tool_call_exceptions,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that a handled exception is captured when a tool raises ModelRetry.
@@ -632,6 +841,7 @@ async def test_agent_with_tool_model_retry(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     retries = 0
@@ -647,7 +857,7 @@ async def test_agent_with_tool_model_retry(
             raise ModelRetry(message="Try again with the same arguments.")
         return a + b
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("event", "transaction", "span")
 
         result = await test_agent.run("What is 5 + 3?")
@@ -659,6 +869,7 @@ async def test_agent_with_tool_model_retry(
             assert error["level"] == "error"
             assert error["exception"]["values"][0]["mechanism"]["handled"]
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         # Find child span types (invoke_agent is the transaction, not a child span)
         chat_spans = [
@@ -745,6 +956,7 @@ async def test_agent_with_tool_model_retry(
             assert "add_numbers" in available_tools_str
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "handled_tool_call_exceptions",
@@ -758,6 +970,7 @@ async def test_agent_with_tool_validation_error(
     get_test_agent,
     handled_tool_call_exceptions,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that a handled exception is captured when a tool has unsatisfiable constraints.
@@ -771,6 +984,7 @@ async def test_agent_with_tool_validation_error(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     test_agent = get_test_agent()
@@ -780,7 +994,7 @@ async def test_agent_with_tool_validation_error(
         """Add two numbers together."""
         return a + b
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("event", "transaction", "span")
 
         result = None
@@ -798,6 +1012,7 @@ async def test_agent_with_tool_validation_error(
             assert error["level"] == "error"
             assert error["exception"]["values"][0]["mechanism"]["handled"]
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
@@ -874,6 +1089,7 @@ async def test_agent_with_tool_validation_error(
             assert "add_numbers" in available_tools_str
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_agent_with_tools_streaming(
@@ -882,6 +1098,7 @@ async def test_agent_with_tools_streaming(
     capture_items,
     get_test_agent,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that tool execution works correctly with streaming.
@@ -891,6 +1108,7 @@ async def test_agent_with_tools_streaming(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     test_agent = get_test_agent()
@@ -900,13 +1118,14 @@ async def test_agent_with_tools_streaming(
         """Multiply two numbers."""
         return a * b
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         async with test_agent.run_stream("What is 7 times 8?") as result:
             async for _ in result.stream_output():
                 pass
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
 
         # Find span types
@@ -959,6 +1178,7 @@ async def test_agent_with_tools_streaming(
         assert "gen_ai.tool.output" in tool_span["data"]
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_model_settings(
@@ -967,6 +1187,7 @@ async def test_model_settings(
     capture_items,
     get_test_agent_with_settings,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that model settings are captured in spans.
@@ -975,15 +1196,17 @@ async def test_model_settings(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     test_agent_with_settings = get_test_agent_with_settings()
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         await test_agent_with_settings.run("Test input")
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
 
         # Find chat span
@@ -1016,6 +1239,7 @@ async def test_model_settings(
         assert chat_span["data"].get("gen_ai.request.top_p") == 0.9
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
@@ -1034,6 +1258,7 @@ async def test_system_prompt_attribute(
     send_default_pii,
     include_prompts,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that system prompts are included as the first message.
@@ -1049,13 +1274,15 @@ async def test_system_prompt_attribute(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         await agent.run("Hello")
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
 
         # The transaction IS the invoke_agent span, check for messages in chat spans instead
@@ -1104,6 +1331,7 @@ async def test_system_prompt_attribute(
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span["data"]
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_error_handling(
@@ -1111,6 +1339,7 @@ async def test_error_handling(
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test error handling in agent execution.
@@ -1126,9 +1355,21 @@ async def test_error_handling(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    if stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        # Simple run that should succeed
+        await agent.run("Hello")
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+
+        assert spans[1]["is_segment"] is True
+        assert spans[1]["status"] != "error"  # Could be None or some other status
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         # Simple run that should succeed
@@ -1136,6 +1377,11 @@ async def test_error_handling(
 
         # At minimum, we should have a transaction
         transaction = next(item.payload for item in items if item.type == "transaction")
+
+        assert transaction["transaction"] == "invoke_agent test_error"
+        # Transaction should complete successfully (status key may not exist if no error)
+        trace_status = transaction["contexts"]["trace"].get("status")
+        assert trace_status != "error"  # Could be None or some other status
     else:
         events = capture_events()
 
@@ -1146,12 +1392,13 @@ async def test_error_handling(
         assert len(events) >= 1
         transaction = [e for e in events if e.get("type") == "transaction"][0]
 
-    assert transaction["transaction"] == "invoke_agent test_error"
-    # Transaction should complete successfully (status key may not exist if no error)
-    trace_status = transaction["contexts"]["trace"].get("status")
-    assert trace_status != "error"  # Could be None or some other status
+        assert transaction["transaction"] == "invoke_agent test_error"
+        # Transaction should complete successfully (status key may not exist if no error)
+        trace_status = transaction["contexts"]["trace"].get("status")
+        assert trace_status != "error"  # Could be None or some other status
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_without_pii(
@@ -1160,6 +1407,7 @@ async def test_without_pii(
     capture_items,
     get_test_agent,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that PII is not captured when send_default_pii is False.
@@ -1169,14 +1417,16 @@ async def test_without_pii(
         traces_sample_rate=1.0,
         send_default_pii=False,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         test_agent = get_test_agent()
         await test_agent.run("Sensitive input")
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
 
         # Find child spans (invoke_agent is the transaction, not a child span)
@@ -1206,6 +1456,7 @@ async def test_without_pii(
             assert "gen_ai.response.text" not in span["data"]
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_without_pii_tools(
@@ -1214,6 +1465,7 @@ async def test_without_pii_tools(
     capture_items,
     get_test_agent,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that tool input/output are not captured when send_default_pii is False.
@@ -1223,6 +1475,7 @@ async def test_without_pii_tools(
         traces_sample_rate=1.0,
         send_default_pii=False,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     test_agent = get_test_agent()
@@ -1232,11 +1485,12 @@ async def test_without_pii_tools(
         """A tool with sensitive data."""
         return f"Processed: {data}"
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         await test_agent.run("Use sensitive tool with private data")
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
 
         # Find tool spans
@@ -1267,6 +1521,7 @@ async def test_without_pii_tools(
             assert "gen_ai.tool.output" not in tool_span["data"]
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_multiple_agents_concurrent(
@@ -1275,6 +1530,7 @@ async def test_multiple_agents_concurrent(
     capture_items,
     get_test_agent,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that multiple agents can run concurrently without interfering.
@@ -1283,6 +1539,7 @@ async def test_multiple_agents_concurrent(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     test_agent = get_test_agent()
@@ -1290,7 +1547,21 @@ async def test_multiple_agents_concurrent(
     async def run_agent(input_text):
         return await test_agent.run(input_text)
 
-    if stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        # Run 3 agents concurrently
+        results = await asyncio.gather(*[run_agent(f"Input {i}") for i in range(3)])
+
+        assert len(results) == 3
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        for span in spans:
+            if span["is_segment"] is False:
+                continue
+            assert span["name"] == "invoke_agent test_agent"
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         # Run 3 agents concurrently
@@ -1320,6 +1591,7 @@ async def test_multiple_agents_concurrent(
             assert len(transaction["spans"]) >= 1
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_message_history(
@@ -1327,6 +1599,7 @@ async def test_message_history(
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that full conversation history is captured in chat spans.
@@ -1341,6 +1614,7 @@ async def test_message_history(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     # Second message with history
@@ -1356,7 +1630,7 @@ async def test_message_history(
         ),
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         # First message
@@ -1364,12 +1638,8 @@ async def test_message_history(
 
         await agent.run("What is my name?", message_history=history)
 
-        # We should have 2 transactions
-        events = [item.payload for item in items if item.type == "transaction"]
-
-        # Check the second transaction has the full history
-        second_transaction = events[1]
-        spans = second_transaction["spans"]
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
@@ -1404,6 +1674,7 @@ async def test_message_history(
                 assert len(messages_data) > 1
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_gen_ai_system(
@@ -1412,6 +1683,7 @@ async def test_gen_ai_system(
     capture_items,
     get_test_agent,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that gen_ai.system is set from the model.
@@ -1420,15 +1692,17 @@ async def test_gen_ai_system(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     test_agent = get_test_agent()
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         await test_agent.run("Test input")
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
 
         # Find chat span
@@ -1459,6 +1733,7 @@ async def test_gen_ai_system(
         assert chat_span["data"]["gen_ai.system"] == "test"
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_include_prompts_false(
@@ -1467,6 +1742,7 @@ async def test_include_prompts_false(
     capture_items,
     get_test_agent,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that prompts are not captured when include_prompts=False.
@@ -1476,15 +1752,17 @@ async def test_include_prompts_false(
         traces_sample_rate=1.0,
         send_default_pii=True,  # Even with PII enabled, prompts should not be captured
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     test_agent = get_test_agent()
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         await test_agent.run("Sensitive prompt")
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
 
         # Find child spans (invoke_agent is the transaction, not a child span)
@@ -1513,6 +1791,7 @@ async def test_include_prompts_false(
             assert "gen_ai.response.text" not in span["data"]
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_include_prompts_true(
@@ -1521,6 +1800,7 @@ async def test_include_prompts_true(
     capture_items,
     get_test_agent,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that prompts are captured when include_prompts=True (default).
@@ -1530,15 +1810,17 @@ async def test_include_prompts_true(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     test_agent = get_test_agent()
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         await test_agent.run("Test prompt")
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
 
         # Find child spans (invoke_agent is the transaction, not a child span)
@@ -1567,6 +1849,7 @@ async def test_include_prompts_true(
             assert "gen_ai.request.messages" in chat_span["data"]
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_include_prompts_false_with_tools(
@@ -1575,6 +1858,7 @@ async def test_include_prompts_false_with_tools(
     capture_items,
     get_test_agent,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that tool input/output are not captured when include_prompts=False.
@@ -1584,6 +1868,7 @@ async def test_include_prompts_false_with_tools(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     test_agent = get_test_agent()
@@ -1593,11 +1878,12 @@ async def test_include_prompts_false_with_tools(
         """A test tool."""
         return value * 2
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         await test_agent.run("Use the test tool with value 5")
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
 
         # Find tool spans
@@ -1628,6 +1914,7 @@ async def test_include_prompts_false_with_tools(
             assert "gen_ai.tool.output" not in tool_span["data"]
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_include_prompts_requires_pii(
@@ -1636,6 +1923,7 @@ async def test_include_prompts_requires_pii(
     capture_items,
     get_test_agent,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that include_prompts requires send_default_pii=True.
@@ -1645,15 +1933,17 @@ async def test_include_prompts_requires_pii(
         traces_sample_rate=1.0,
         send_default_pii=False,  # PII disabled
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     test_agent = get_test_agent()
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         await test_agent.run("Test prompt")
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
 
         # Find child spans (invoke_agent is the transaction, not a child span)
@@ -1840,6 +2130,7 @@ async def test_context_isolation_concurrent_agents(sentry_init, get_test_agent):
 # ==================== Additional Coverage Tests ====================
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_invoke_agent_with_list_user_prompt(
@@ -1847,6 +2138,7 @@ async def test_invoke_agent_with_list_user_prompt(
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that invoke_agent span handles list user prompts correctly.
@@ -1861,15 +2153,40 @@ async def test_invoke_agent_with_list_user_prompt(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    if stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        # Use a list as user prompt
+        await agent.run(["First part", "Second part"])
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+
+        # Check that the invoke_agent transaction has messages data
+        # The invoke_agent is the transaction itself
+        if "gen_ai.request.messages" in spans[0]["attributes"]:
+            messages_str = spans[0]["attributes"]["gen_ai.request.messages"]
+            assert "First part" in messages_str
+            assert "Second part" in messages_str
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         # Use a list as user prompt
         await agent.run(["First part", "Second part"])
 
         (transaction,) = [item.payload for item in items if item.type == "transaction"]
+
+        # Check that the invoke_agent transaction has messages data
+        # The invoke_agent is the transaction itself
+        if "gen_ai.request.messages" in transaction["contexts"]["trace"]["data"]:
+            messages_str = transaction["contexts"]["trace"]["data"][
+                "gen_ai.request.messages"
+            ]
+            assert "First part" in messages_str
+            assert "Second part" in messages_str
     else:
         events = capture_events()
 
@@ -1878,16 +2195,17 @@ async def test_invoke_agent_with_list_user_prompt(
 
         (transaction,) = events
 
-    # Check that the invoke_agent transaction has messages data
-    # The invoke_agent is the transaction itself
-    if "gen_ai.request.messages" in transaction["contexts"]["trace"]["data"]:
-        messages_str = transaction["contexts"]["trace"]["data"][
-            "gen_ai.request.messages"
-        ]
-        assert "First part" in messages_str
-        assert "Second part" in messages_str
+        # Check that the invoke_agent transaction has messages data
+        # The invoke_agent is the transaction itself
+        if "gen_ai.request.messages" in transaction["contexts"]["trace"]["data"]:
+            messages_str = transaction["contexts"]["trace"]["data"][
+                "gen_ai.request.messages"
+            ]
+            assert "First part" in messages_str
+            assert "Second part" in messages_str
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
@@ -1906,6 +2224,7 @@ async def test_invoke_agent_with_instructions(
     send_default_pii,
     include_prompts,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that invoke_agent span handles instructions correctly.
@@ -1927,13 +2246,15 @@ async def test_invoke_agent_with_instructions(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         await agent.run("Test input")
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
 
         # The transaction IS the invoke_agent span, check for messages in chat spans instead
@@ -2069,6 +2390,7 @@ async def test_model_settings_object_style(sentry_init, capture_items):
     assert transaction is not None
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_usage_data_partial(
@@ -2076,6 +2398,7 @@ async def test_usage_data_partial(
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that usage data is correctly handled when only some fields are present.
@@ -2089,13 +2412,15 @@ async def test_usage_data_partial(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         await agent.run("Test input")
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
 
         chat_spans = [
@@ -2119,6 +2444,7 @@ async def test_usage_data_partial(
     assert chat_span is not None
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_agent_data_from_scope(
@@ -2126,6 +2452,7 @@ async def test_agent_data_from_scope(
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that agent data can be retrieved from Sentry scope when not passed directly.
@@ -2140,9 +2467,20 @@ async def test_agent_data_from_scope(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    if stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        # The integration automatically sets agent in scope during execution
+        await agent.run("Test input")
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+
+        assert spans[1]["name"] == "invoke_agent test_scope_agent"
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         # The integration automatically sets agent in scope during execution
@@ -2150,6 +2488,9 @@ async def test_agent_data_from_scope(
 
         # Verify agent name is capture
         (transaction,) = (item.payload for item in items if item.type == "transaction")
+
+        # Verify agent name is captured
+        assert transaction["transaction"] == "invoke_agent test_scope_agent"
     else:
         events = capture_events()
 
@@ -2159,10 +2500,11 @@ async def test_agent_data_from_scope(
         # Verify agent name is capture
         (transaction,) = events
 
-    # Verify agent name is captured
-    assert transaction["transaction"] == "invoke_agent test_scope_agent"
+        # Verify agent name is captured
+        assert transaction["transaction"] == "invoke_agent test_scope_agent"
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_available_tools_without_description(
@@ -2171,6 +2513,7 @@ async def test_available_tools_without_description(
     capture_items,
     get_test_agent,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that available tools are captured even when description is missing.
@@ -2179,6 +2522,7 @@ async def test_available_tools_without_description(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     test_agent = get_test_agent()
@@ -2188,11 +2532,12 @@ async def test_available_tools_without_description(
         # No docstring = no description
         return x * 2
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         await test_agent.run("Use the tool with 5")
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
 
         chat_spans = [
@@ -2219,6 +2564,7 @@ async def test_available_tools_without_description(
                 assert "tool_without_desc" in tools_str
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_output_with_tool_calls(
@@ -2227,6 +2573,7 @@ async def test_output_with_tool_calls(
     capture_items,
     get_test_agent,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that tool calls in model response are captured correctly.
@@ -2236,6 +2583,7 @@ async def test_output_with_tool_calls(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     test_agent = get_test_agent()
@@ -2245,11 +2593,12 @@ async def test_output_with_tool_calls(
         """Calculate something."""
         return value + 10
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         await test_agent.run("Use calc_tool with 5")
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
 
         chat_spans = [
@@ -2284,6 +2633,7 @@ async def test_output_with_tool_calls(
             assert "gen_ai.operation.name" in chat_span["data"]
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_message_formatting_with_different_parts(
@@ -2291,6 +2641,7 @@ async def test_message_formatting_with_different_parts(
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that different message part types are handled correctly in ai_client span.
@@ -2307,6 +2658,7 @@ async def test_message_formatting_with_different_parts(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     # Create message history with different part types
@@ -2320,11 +2672,12 @@ async def test_message_formatting_with_different_parts(
         ),
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         await agent.run("What did I say?", message_history=history)
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
 
         chat_spans = [
@@ -2415,6 +2768,7 @@ async def test_update_ai_client_span_with_none_response(sentry_init, capture_ite
     assert transaction is not None
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_agent_without_name(
@@ -2422,6 +2776,7 @@ async def test_agent_without_name(
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that agent without a name is handled correctly.
@@ -2433,15 +2788,28 @@ async def test_agent_without_name(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    if stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        await agent.run("Test input")
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+
+        assert "invoke_agent" in spans[1]["name"]
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         await agent.run("Test input")
 
         # Should still create transaction, just with default name
         (transaction,) = (item.payload for item in items if item.type == "transaction")
+
+        # Transaction name should be "invoke_agent agent" or similar default
+        assert "invoke_agent" in transaction["transaction"]
     else:
         events = capture_events()
 
@@ -2452,8 +2820,8 @@ async def test_agent_without_name(
         # Should still create transaction, just with default name
         assert transaction["type"] == "transaction"
 
-    # Transaction name should be "invoke_agent agent" or similar default
-    assert "invoke_agent" in transaction["transaction"]
+        # Transaction name should be "invoke_agent agent" or similar default
+        assert "invoke_agent" in transaction["transaction"]
 
 
 @pytest.mark.asyncio
@@ -2606,6 +2974,7 @@ async def test_set_usage_data_with_partial_fields(sentry_init, capture_items):
     assert transaction is not None
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_message_parts_with_tool_return(
@@ -2613,6 +2982,7 @@ async def test_message_parts_with_tool_return(
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that ToolReturnPart messages are handled correctly.
@@ -2634,14 +3004,16 @@ async def test_message_parts_with_tool_return(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         # Run with history containing tool return
         await agent.run("Use test_tool with 5")
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
 
         chat_spans = [
@@ -3563,6 +3935,7 @@ def _find_binary_content(messages_data, expected_modality, expected_mime_type):
     return False
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_binary_content_encoding_image(
@@ -3570,6 +3943,7 @@ async def test_binary_content_encoding_image(
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """Test that BinaryContent with image data is properly encoded in messages."""
     sentry_init(
@@ -3577,9 +3951,36 @@ async def test_binary_content_encoding_image(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    if stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("span")
+
+        with sentry_sdk.traces.start_span(
+            name="test", attributes={"sentry.op": "test"}
+        ):
+            span = sentry_sdk.traces.start_span(
+                name="custom span", attributes={"sentry.op": "test_span"}
+            )
+            binary_content = BinaryContent(
+                data=b"fake_image_data_12345", media_type="image/png"
+            )
+            user_part = UserPromptPart(content=["Look at this image:", binary_content])
+            mock_msg = MagicMock()
+            mock_msg.parts = [user_part]
+            mock_msg.instructions = None
+
+            _set_input_messages(span, [mock_msg])
+            span.finish()
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+
+        span_data = spans[0]["attributes"]
+        messages_data = _get_messages_from_span(span_data)
+        assert _find_binary_content(messages_data, "image", "image/png")
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with sentry_sdk.start_transaction(op="test", name="test"):
@@ -3596,6 +3997,9 @@ async def test_binary_content_encoding_image(
             span.finish()
 
         (event,) = (item.payload for item in items if item.type == "transaction")
+        span_data = event["spans"][0]["data"]
+        messages_data = _get_messages_from_span(span_data)
+        assert _find_binary_content(messages_data, "image", "image/png")
     else:
         events = capture_events()
 
@@ -3613,11 +4017,12 @@ async def test_binary_content_encoding_image(
             span.finish()
 
         (event,) = events
-    span_data = event["spans"][0]["data"]
-    messages_data = _get_messages_from_span(span_data)
-    assert _find_binary_content(messages_data, "image", "image/png")
+        span_data = event["spans"][0]["data"]
+        messages_data = _get_messages_from_span(span_data)
+        assert _find_binary_content(messages_data, "image", "image/png")
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_binary_content_encoding_mixed_content(
@@ -3625,6 +4030,7 @@ async def test_binary_content_encoding_mixed_content(
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """Test that BinaryContent mixed with text content is properly handled."""
     sentry_init(
@@ -3632,9 +4038,47 @@ async def test_binary_content_encoding_mixed_content(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    if stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("span")
+
+        with sentry_sdk.traces.start_span(
+            name="test", attributes={"sentry.op": "test"}
+        ):
+            span = sentry_sdk.traces.start_span(
+                name="custom span", attributes={"sentry.op": "test_span"}
+            )
+            binary_content = BinaryContent(
+                data=b"fake_image_bytes", media_type="image/jpeg"
+            )
+            user_part = UserPromptPart(
+                content=["Here is an image:", binary_content, "What do you see?"]
+            )
+            mock_msg = MagicMock()
+            mock_msg.parts = [user_part]
+            mock_msg.instructions = None
+
+            _set_input_messages(span, [mock_msg])
+            span.finish()
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+
+        span_data = spans[0]["attributes"]
+        messages_data = _get_messages_from_span(span_data)
+
+        # Verify both text and binary content are present
+        found_text = any(
+            content_item.get("type") == "text"
+            for msg in messages_data
+            if "content" in msg
+            for content_item in msg["content"]
+        )
+        assert found_text, "Text content should be found"
+        assert _find_binary_content(messages_data, "image", "image/jpeg")
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with sentry_sdk.start_transaction(op="test", name="test"):
@@ -3653,6 +4097,18 @@ async def test_binary_content_encoding_mixed_content(
             span.finish()
 
         (event,) = (item.payload for item in items if item.type == "transaction")
+        span_data = event["spans"][0]["data"]
+        messages_data = _get_messages_from_span(span_data)
+
+        # Verify both text and binary content are present
+        found_text = any(
+            content_item.get("type") == "text"
+            for msg in messages_data
+            if "content" in msg
+            for content_item in msg["content"]
+        )
+        assert found_text, "Text content should be found"
+        assert _find_binary_content(messages_data, "image", "image/jpeg")
     else:
         events = capture_events()
 
@@ -3672,21 +4128,21 @@ async def test_binary_content_encoding_mixed_content(
             span.finish()
 
         (event,) = events
+        span_data = event["spans"][0]["data"]
+        messages_data = _get_messages_from_span(span_data)
 
-    span_data = event["spans"][0]["data"]
-    messages_data = _get_messages_from_span(span_data)
-
-    # Verify both text and binary content are present
-    found_text = any(
-        content_item.get("type") == "text"
-        for msg in messages_data
-        if "content" in msg
-        for content_item in msg["content"]
-    )
-    assert found_text, "Text content should be found"
-    assert _find_binary_content(messages_data, "image", "image/jpeg")
+        # Verify both text and binary content are present
+        found_text = any(
+            content_item.get("type") == "text"
+            for msg in messages_data
+            if "content" in msg
+            for content_item in msg["content"]
+        )
+        assert found_text, "Text content should be found"
+        assert _find_binary_content(messages_data, "image", "image/jpeg")
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_binary_content_in_agent_run(
@@ -3694,6 +4150,7 @@ async def test_binary_content_in_agent_run(
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """Test that BinaryContent in actual agent run is properly captured in spans."""
     agent = Agent("test", name="test_binary_agent")
@@ -3703,17 +4160,19 @@ async def test_binary_content_in_agent_run(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     binary_content = BinaryContent(
         data=b"fake_image_data_for_testing", media_type="image/png"
     )
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         await agent.run(["Analyze this image:", binary_content])
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
@@ -3744,6 +4203,7 @@ async def test_binary_content_in_agent_run(
             )
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_set_usage_data_with_cache_tokens(
@@ -3751,15 +4211,42 @@ async def test_set_usage_data_with_cache_tokens(
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """Test that cache_read_tokens and cache_write_tokens are tracked."""
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    if stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        with sentry_sdk.traces.start_span(
+            name="test", attributes={"sentry.op": "test"}
+        ):
+            span = sentry_sdk.traces.start_span(
+                name="custom span", attributes={"sentry.op": "test_span"}
+            )
+            usage = RequestUsage(
+                input_tokens=100,
+                output_tokens=50,
+                cache_read_tokens=80,
+                cache_write_tokens=20,
+            )
+            _set_usage_data(span, usage)
+            span.finish()
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+
+        assert spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
+        assert (
+            spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
+        )
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with sentry_sdk.start_transaction(op="test", name="test"):
@@ -3774,6 +4261,9 @@ async def test_set_usage_data_with_cache_tokens(
             span.finish()
 
         (event,) = (item.payload for item in items if item.type == "transaction")
+        (span_data,) = event["spans"]
+        assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
+        assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
     else:
         events = capture_events()
 
@@ -3789,12 +4279,12 @@ async def test_set_usage_data_with_cache_tokens(
             span.finish()
 
         (event,) = events
+        (span_data,) = event["spans"]
+        assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
+        assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
 
-    (span_data,) = event["spans"]
-    assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
-    assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
 
-
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "url,image_url_kwargs,expected_content",
@@ -3845,6 +4335,7 @@ def test_image_url_base64_content_in_span(
     image_url_kwargs,
     expected_content,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     from sentry_sdk.integrations.pydantic_ai.spans.ai_client import ai_client_span
 
@@ -3853,13 +4344,16 @@ def test_image_url_base64_content_in_span(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     found_image = False
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
-        with sentry_sdk.start_transaction(op="test", name="test"):
+        with sentry_sdk.traces.start_span(
+            name="test", attributes={"sentry.op": "test"}
+        ):
             image_url = ImageUrl(url=url, **image_url_kwargs)
             user_part = UserPromptPart(content=["Look at this image:", image_url])
             mock_msg = MagicMock()
@@ -3869,6 +4363,7 @@ def test_image_url_base64_content_in_span(
             span = ai_client_span([mock_msg], None, None, None)
             span.finish()
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
@@ -3912,6 +4407,7 @@ def test_image_url_base64_content_in_span(
     assert found_image, "Image content item should be found in messages data"
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
@@ -3951,25 +4447,28 @@ async def test_invoke_agent_image_url(
     image_url_kwargs,
     expected_content,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     agent = Agent("test", name="test_image_url_agent")
 
     image_url = ImageUrl(url=url, **image_url_kwargs)
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         await agent.run([image_url, "Describe this image"])
 
         found_image = False
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
@@ -4006,6 +4505,7 @@ async def test_invoke_agent_image_url(
     assert found_image, "Image content item should be found in messages data"
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_tool_description_in_execute_tool_span(
@@ -4013,6 +4513,7 @@ async def test_tool_description_in_execute_tool_span(
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that tool description from the tool's docstring is included in execute_tool spans.
@@ -4033,14 +4534,16 @@ async def test_tool_description_in_execute_tool_span(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         result = await agent.run("What is 5 times 3?")
         assert result is not None
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
 
         tool_spans = [

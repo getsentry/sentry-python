@@ -8,6 +8,7 @@ from sentry_sdk.ai.utils import (
     truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 from ..consts import SPAN_ORIGIN
 from ..utils import (
@@ -44,13 +45,24 @@ def invoke_agent_span(
     if agent and getattr(agent, "name", None):
         name = agent.name
 
-    span = get_start_span_function()(
-        op=OP.GEN_AI_INVOKE_AGENT,
-        name=f"invoke_agent {name}",
-        origin=SPAN_ORIGIN,
-    )
+    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+    if span_streaming:
+        span = sentry_sdk.traces.start_span(
+            name=f"invoke_agent {name}",
+            attributes={
+                "sentry.op": OP.GEN_AI_INVOKE_AGENT,
+                "sentry.origin": SPAN_ORIGIN,
+                SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
+            },
+        )
+    else:
+        span = get_start_span_function()(
+            op=OP.GEN_AI_INVOKE_AGENT,
+            name=f"invoke_agent {name}",
+            origin=SPAN_ORIGIN,
+        )
 
-    span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
 
     _set_agent_data(span, agent)
     _set_model_data(span, model, model_settings)
