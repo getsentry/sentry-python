@@ -20,7 +20,7 @@ def execute_tool_span(
     tool_args: "Any",
     agent: "Any",
     tool_definition: "Optional[ToolDefinition]" = None,
-) -> "sentry_sdk.tracing.Span":
+) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
     """Create a span for tool execution.
 
     Args:

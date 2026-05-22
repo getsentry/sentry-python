@@ -117,7 +117,9 @@ def _get_model_name(model_obj: "Any") -> "Optional[str]":
 
 
 def _set_model_data(
-    span: "sentry_sdk.tracing.Span", model: "Any", model_settings: "Any"
+    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
+    model: "Any",
+    model_settings: "Any",
 ) -> None:
     """Set model-related data on a span.
 

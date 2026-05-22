@@ -261,7 +261,7 @@ def _set_output_data(
 
 def ai_client_span(
     messages: "Any", agent: "Any", model: "Any", model_settings: "Any"
-) -> "sentry_sdk.tracing.Span":
+) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
     """Create a span for an AI client call (model request).
 
     Args:

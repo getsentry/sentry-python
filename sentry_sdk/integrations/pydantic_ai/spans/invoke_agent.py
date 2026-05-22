@@ -23,7 +23,7 @@ from .utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, Union
 
 try:
     from pydantic_ai.messages import BinaryContent, ImageUrl  # type: ignore
@@ -38,7 +38,7 @@ def invoke_agent_span(
     model: "Any",
     model_settings: "Any",
     is_streaming: bool = False,
-) -> "sentry_sdk.tracing.Span":
+) -> "Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]":
     """Create a span for invoking the agent."""
     # Determine agent name for span
     name = "agent"
