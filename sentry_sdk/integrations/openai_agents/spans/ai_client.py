@@ -31,7 +31,7 @@ def ai_client_span(
 
     span = sentry_sdk.start_span(
         op=OP.GEN_AI_CHAT,
-        description=f"chat {model_name}",
+        name=f"chat {model_name}",
         origin=SPAN_ORIGIN,
     )
     # TODO-anton: remove hardcoded stuff and replace something that also works for embedding and so on
