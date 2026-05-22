@@ -653,7 +653,6 @@ def _sentry_patched_create_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
             name=f"chat {model}".strip(),
             origin=AnthropicIntegration.origin,
         )
-
         span.__enter__()
 
     _set_create_input_data(span, kwargs, integration)
@@ -750,7 +749,6 @@ async def _sentry_patched_create_async(
             name=f"chat {model}".strip(),
             origin=AnthropicIntegration.origin,
         )
-
         span.__enter__()
 
     _set_create_input_data(span, kwargs, integration)
@@ -994,9 +992,9 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
                 name="chat" if self._model is None else f"chat {self._model}".strip(),
                 origin=AnthropicIntegration.origin,
             )
+            span.__enter__()
 
             span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
-            span.__enter__()
 
         _set_common_input_data(
             span=span,
@@ -1101,9 +1099,9 @@ def _wrap_async_message_stream_manager_aenter(f: "Any") -> "Any":
                 name="chat" if self._model is None else f"chat {self._model}".strip(),
                 origin=AnthropicIntegration.origin,
             )
+            span.__enter__()
 
             span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
-            span.__enter__()
 
         _set_common_input_data(
             span=span,
