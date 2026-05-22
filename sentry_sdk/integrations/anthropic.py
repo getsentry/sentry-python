@@ -18,6 +18,7 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
     should_truncate_gen_ai_input,
@@ -83,7 +84,6 @@ if TYPE_CHECKING:
     )
 
     from sentry_sdk._types import TextPart
-    from sentry_sdk.tracing import Span
 
 
 class _RecordedUsage:
