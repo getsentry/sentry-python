@@ -314,7 +314,7 @@ def ai_client_span(
 
 
 def update_ai_client_span(
-    span: "sentry_sdk.tracing.Span", model_response: "Any"
+    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]", model_response: "Any"
 ) -> None:
     """Update the AI client span with response data."""
     if not span:

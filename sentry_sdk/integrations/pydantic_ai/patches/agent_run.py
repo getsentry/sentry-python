@@ -37,7 +37,7 @@ class _StreamingContextManagerWrapper:
         self.model_settings = model_settings
         self.is_streaming = is_streaming
         self._isolation_scope: "Any" = None
-        self._span: "Optional[sentry_sdk.tracing.Span]" = None
+        self._span: "Optional[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]" = None
         self._result: "Any" = None
 
     async def __aenter__(self) -> "Any":
