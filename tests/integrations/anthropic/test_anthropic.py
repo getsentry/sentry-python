@@ -3,6 +3,8 @@ from unittest import mock
 
 import pytest
 
+import sentry_sdk
+
 try:
     from unittest.mock import AsyncMock
 except ImportError:
@@ -81,6 +83,7 @@ EXAMPLE_MESSAGE = Message(
 )
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
@@ -98,12 +101,14 @@ def test_nonstreaming_create_message(
     send_default_pii,
     include_prompts,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     client = Anthropic(api_key="z")
@@ -120,7 +125,7 @@ def test_nonstreaming_create_message(
         },
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="anthropic"):
@@ -137,6 +142,7 @@ def test_nonstreaming_create_message(
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert len(spans) == 1
         (span,) = spans
@@ -225,6 +231,7 @@ def test_nonstreaming_create_message(
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
@@ -243,12 +250,14 @@ async def test_nonstreaming_create_message_async(
     send_default_pii,
     include_prompts,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[AnthropicIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     client = AsyncAnthropic(api_key="z")
@@ -265,7 +274,7 @@ async def test_nonstreaming_create_message_async(
         },
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="anthropic"):
@@ -282,6 +291,7 @@ async def test_nonstreaming_create_message_async(
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert len(spans) == 1
         (span,) = spans
@@ -366,6 +376,7 @@ async def test_nonstreaming_create_message_async(
         )
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
@@ -385,6 +396,7 @@ def test_streaming_create_message(
     get_model_response,
     server_side_event_chunks,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     client = Anthropic(api_key="z")
 
@@ -430,6 +442,7 @@ def test_streaming_create_message(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     messages = [
@@ -443,7 +456,7 @@ def test_streaming_create_message(
         },
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with mock.patch.object(
@@ -461,6 +474,7 @@ def test_streaming_create_message(
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         span = next(
             span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
@@ -552,6 +566,7 @@ def test_streaming_create_message(
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_streaming_create_message_close(
     sentry_init,
@@ -560,6 +575,7 @@ def test_streaming_create_message_close(
     get_model_response,
     server_side_event_chunks,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     client = Anthropic(api_key="z")
 
@@ -605,6 +621,7 @@ def test_streaming_create_message_close(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     messages = [
@@ -614,7 +631,7 @@ def test_streaming_create_message_close(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with mock.patch.object(
@@ -634,6 +651,7 @@ def test_streaming_create_message_close(
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         span = next(
             span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
@@ -705,6 +723,7 @@ def test_streaming_create_message_close(
         )
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.skipif(
     ANTHROPIC_VERSION < (0, 41),
@@ -717,6 +736,7 @@ def test_streaming_create_message_api_error(
     get_model_response,
     server_side_event_chunks,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     client = Anthropic(api_key="z")
 
@@ -757,6 +777,7 @@ def test_streaming_create_message_api_error(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     messages = [
@@ -766,7 +787,7 @@ def test_streaming_create_message_api_error(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with pytest.raises(APIStatusError), mock.patch.object(
@@ -783,6 +804,7 @@ def test_streaming_create_message_api_error(
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         span = next(
             span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
@@ -858,6 +880,7 @@ def test_streaming_create_message_api_error(
     assert event["contexts"]["trace"]["status"] == "internal_error"
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
@@ -877,6 +900,7 @@ def test_stream_messages(
     get_model_response,
     server_side_event_chunks,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     client = Anthropic(api_key="z")
 
@@ -922,6 +946,7 @@ def test_stream_messages(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     messages = [
@@ -935,7 +960,7 @@ def test_stream_messages(
         },
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with mock.patch.object(
@@ -953,6 +978,7 @@ def test_stream_messages(
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         span = next(
             span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
@@ -1043,6 +1069,7 @@ def test_stream_messages(
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_stream_messages_close(
     sentry_init,
@@ -1051,6 +1078,7 @@ def test_stream_messages_close(
     get_model_response,
     server_side_event_chunks,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     client = Anthropic(api_key="z")
 
@@ -1096,6 +1124,7 @@ def test_stream_messages_close(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     messages = [
@@ -1105,7 +1134,7 @@ def test_stream_messages_close(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with mock.patch.object(
@@ -1129,6 +1158,7 @@ def test_stream_messages_close(
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         span = next(
             span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
@@ -1204,6 +1234,7 @@ def test_stream_messages_close(
         )
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.skipif(
     ANTHROPIC_VERSION < (0, 41),
@@ -1216,6 +1247,7 @@ def test_stream_messages_api_error(
     get_model_response,
     server_side_event_chunks,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     client = Anthropic(api_key="z")
 
@@ -1256,6 +1288,7 @@ def test_stream_messages_api_error(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     messages = [
@@ -1265,7 +1298,7 @@ def test_stream_messages_api_error(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with pytest.raises(APIStatusError), mock.patch.object(
@@ -1283,6 +1316,7 @@ def test_stream_messages_api_error(
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         span = next(
             span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
@@ -1358,6 +1392,7 @@ def test_stream_messages_api_error(
     assert event["contexts"]["trace"]["status"] == "internal_error"
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
@@ -1379,6 +1414,7 @@ async def test_streaming_create_message_async(
     async_iterator,
     server_side_event_chunks,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     client = AsyncAnthropic(api_key="z")
 
@@ -1427,6 +1463,7 @@ async def test_streaming_create_message_async(
         default_integrations=False,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     messages = [
@@ -1440,7 +1477,7 @@ async def test_streaming_create_message_async(
         },
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with mock.patch.object(
@@ -1458,6 +1495,7 @@ async def test_streaming_create_message_async(
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert len(spans) == 1
         (span,) = spans
@@ -1549,6 +1587,7 @@ async def test_streaming_create_message_async(
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_streaming_create_message_async_close(
@@ -1559,6 +1598,7 @@ async def test_streaming_create_message_async_close(
     async_iterator,
     server_side_event_chunks,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     client = AsyncAnthropic(api_key="z")
 
@@ -1606,6 +1646,7 @@ async def test_streaming_create_message_async_close(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     messages = [
@@ -1615,7 +1656,7 @@ async def test_streaming_create_message_async_close(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with mock.patch.object(
@@ -1634,6 +1675,7 @@ async def test_streaming_create_message_async_close(
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         span = next(
             span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
@@ -1704,6 +1746,7 @@ async def test_streaming_create_message_async_close(
         )
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.skipif(
     ANTHROPIC_VERSION < (0, 41),
@@ -1718,6 +1761,7 @@ async def test_streaming_create_message_async_api_error(
     async_iterator,
     server_side_event_chunks,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     client = AsyncAnthropic(api_key="z")
 
@@ -1760,6 +1804,7 @@ async def test_streaming_create_message_async_api_error(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     messages = [
@@ -1769,7 +1814,7 @@ async def test_streaming_create_message_async_api_error(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with pytest.raises(APIStatusError), mock.patch.object(
@@ -1787,6 +1832,7 @@ async def test_streaming_create_message_async_api_error(
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         span = next(
             span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
@@ -1862,6 +1908,7 @@ async def test_streaming_create_message_async_api_error(
     assert event["contexts"]["trace"]["status"] == "internal_error"
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
@@ -1883,6 +1930,7 @@ async def test_stream_message_async(
     async_iterator,
     server_side_event_chunks,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     client = AsyncAnthropic(api_key="z")
 
@@ -1930,6 +1978,7 @@ async def test_stream_message_async(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     messages = [
@@ -1943,7 +1992,7 @@ async def test_stream_message_async(
         },
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with mock.patch.object(
@@ -1962,6 +2011,7 @@ async def test_stream_message_async(
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert len(spans) == 1
         (span,) = spans
@@ -2049,6 +2099,7 @@ async def test_stream_message_async(
         )
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.skipif(
     ANTHROPIC_VERSION < (0, 41),
@@ -2063,6 +2114,7 @@ async def test_stream_messages_async_api_error(
     async_iterator,
     server_side_event_chunks,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     client = AsyncAnthropic(api_key="z")
 
@@ -2105,6 +2157,7 @@ async def test_stream_messages_async_api_error(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     messages = [
@@ -2114,7 +2167,7 @@ async def test_stream_messages_async_api_error(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with pytest.raises(APIStatusError), mock.patch.object(
@@ -2133,6 +2186,7 @@ async def test_stream_messages_async_api_error(
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         span = next(
             span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
@@ -2209,6 +2263,7 @@ async def test_stream_messages_async_api_error(
     assert event["contexts"]["trace"]["status"] == "internal_error"
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_stream_messages_async_close(
@@ -2219,6 +2274,7 @@ async def test_stream_messages_async_close(
     async_iterator,
     server_side_event_chunks,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     client = AsyncAnthropic(api_key="z")
 
@@ -2266,6 +2322,7 @@ async def test_stream_messages_async_close(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     messages = [
@@ -2275,7 +2332,7 @@ async def test_stream_messages_async_close(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with mock.patch.object(
@@ -2302,6 +2359,7 @@ async def test_stream_messages_async_close(
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         span = next(
             span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
@@ -2380,6 +2438,7 @@ async def test_stream_messages_async_close(
         )
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.skipif(
     ANTHROPIC_VERSION < (0, 27),
@@ -2403,6 +2462,7 @@ def test_streaming_create_message_with_input_json_delta(
     get_model_response,
     server_side_event_chunks,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     client = Anthropic(api_key="z")
 
@@ -2478,6 +2538,7 @@ def test_streaming_create_message_with_input_json_delta(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     messages = [
@@ -2487,7 +2548,7 @@ def test_streaming_create_message_with_input_json_delta(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with mock.patch.object(
@@ -2505,6 +2566,7 @@ def test_streaming_create_message_with_input_json_delta(
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert len(spans) == 1
         (span,) = spans
@@ -2582,6 +2644,7 @@ def test_streaming_create_message_with_input_json_delta(
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.skipif(
     ANTHROPIC_VERSION < (0, 27),
@@ -2605,6 +2668,7 @@ def test_stream_messages_with_input_json_delta(
     get_model_response,
     server_side_event_chunks,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     client = Anthropic(api_key="z")
 
@@ -2680,6 +2744,7 @@ def test_stream_messages_with_input_json_delta(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     messages = [
@@ -2689,7 +2754,7 @@ def test_stream_messages_with_input_json_delta(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with mock.patch.object(
@@ -2707,6 +2772,7 @@ def test_stream_messages_with_input_json_delta(
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert len(spans) == 1
         (span,) = spans
@@ -2783,6 +2849,7 @@ def test_stream_messages_with_input_json_delta(
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.skipif(
@@ -2808,6 +2875,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
     async_iterator,
     server_side_event_chunks,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     client = AsyncAnthropic(api_key="z")
     response = get_model_response(
@@ -2888,6 +2956,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     messages = [
@@ -2897,7 +2966,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with mock.patch.object(
@@ -2915,6 +2984,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert len(spans) == 1
         (span,) = spans
@@ -2993,6 +3063,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.skipif(
@@ -3018,6 +3089,7 @@ async def test_stream_message_with_input_json_delta_async(
     async_iterator,
     server_side_event_chunks,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     client = AsyncAnthropic(api_key="z")
     response = get_model_response(
@@ -3098,6 +3170,7 @@ async def test_stream_message_with_input_json_delta_async(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     messages = [
@@ -3107,7 +3180,7 @@ async def test_stream_message_with_input_json_delta_async(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with mock.patch.object(
@@ -3126,6 +3199,7 @@ async def test_stream_message_with_input_json_delta_async(
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert len(spans) == 1
         (span,) = spans
@@ -3204,17 +3278,20 @@ async def test_stream_message_with_input_json_delta_async(
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_exception_message_create(
     sentry_init,
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     client = Anthropic(api_key="z")
@@ -3222,7 +3299,19 @@ def test_exception_message_create(
         side_effect=AnthropicError("API rate limit reached")
     )
 
-    if stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("event", "transaction")
+
+        with pytest.raises(AnthropicError):
+            client.messages.create(
+                model="some-model",
+                messages=[{"role": "system", "content": "I'm throwing an exception"}],
+                max_tokens=1024,
+            )
+
+        (event,) = (item.payload for item in items if item.type == "event")
+        assert event["level"] == "error"
+    elif stream_gen_ai_spans:
         items = capture_items("event", "transaction")
 
         with pytest.raises(AnthropicError):
@@ -3236,6 +3325,7 @@ def test_exception_message_create(
         assert event["level"] == "error"
 
         (transaction,) = (item.payload for item in items if item.type == "transaction")
+        assert transaction["contexts"]["trace"]["status"] == "internal_error"
     else:
         events = capture_events()
 
@@ -3248,23 +3338,25 @@ def test_exception_message_create(
 
         (event, transaction) = events
         assert event["level"] == "error"
+        assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
-    assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
-
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_span_status_error(
     sentry_init,
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("event", "span")
 
         with start_transaction(name="anthropic"):
@@ -3284,6 +3376,7 @@ def test_span_status_error(
         (error,) = (item.payload for item in items if item.type == "event")
         assert error["level"] == "error"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert spans[0]["status"] == "error"
         assert spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
@@ -3313,6 +3406,7 @@ def test_span_status_error(
         assert transaction["spans"][0]["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_span_status_error_async(
@@ -3320,13 +3414,15 @@ async def test_span_status_error_async(
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("event", "span")
 
         with start_transaction(name="anthropic"):
@@ -3346,6 +3442,7 @@ async def test_span_status_error_async(
         (error,) = (item.payload for item in items if item.type == "event")
         assert error["level"] == "error"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert spans[0]["status"] == "error"
         assert spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
@@ -3375,6 +3472,7 @@ async def test_span_status_error_async(
         assert transaction["spans"][0]["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_exception_message_create_async(
@@ -3382,11 +3480,13 @@ async def test_exception_message_create_async(
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     client = AsyncAnthropic(api_key="z")
@@ -3394,7 +3494,19 @@ async def test_exception_message_create_async(
         side_effect=AnthropicError("API rate limit reached")
     )
 
-    if stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("event", "transaction")
+
+        with pytest.raises(AnthropicError):
+            await client.messages.create(
+                model="some-model",
+                messages=[{"role": "system", "content": "I'm throwing an exception"}],
+                max_tokens=1024,
+            )
+
+        (event,) = (item.payload for item in items if item.type == "event")
+        assert event["level"] == "error"
+    elif stream_gen_ai_spans:
         items = capture_items("event", "transaction")
 
         with pytest.raises(AnthropicError):
@@ -3408,6 +3520,7 @@ async def test_exception_message_create_async(
         assert event["level"] == "error"
 
         (transaction,) = (item.payload for item in items if item.type == "transaction")
+        assert transaction["contexts"]["trace"]["status"] == "internal_error"
     else:
         events = capture_events()
 
@@ -3420,20 +3533,23 @@ async def test_exception_message_create_async(
 
         (event, transaction) = events
         assert event["level"] == "error"
-    assert transaction["contexts"]["trace"]["status"] == "internal_error"
+        assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_span_origin(
     sentry_init,
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     client = Anthropic(api_key="z")
@@ -3446,7 +3562,7 @@ def test_span_origin(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="anthropic"):
@@ -3455,6 +3571,7 @@ def test_span_origin(
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["contexts"]["trace"]["origin"] == "manual"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.anthropic"
         assert spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
@@ -3472,6 +3589,7 @@ def test_span_origin(
         assert event["spans"][0]["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_span_origin_async(
@@ -3479,11 +3597,13 @@ async def test_span_origin_async(
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     client = AsyncAnthropic(api_key="z")
@@ -3496,7 +3616,7 @@ async def test_span_origin_async(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="anthropic"):
@@ -3507,6 +3627,7 @@ async def test_span_origin_async(
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["contexts"]["trace"]["origin"] == "manual"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.anthropic"
         assert spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM] == "anthropic"
@@ -3531,7 +3652,8 @@ async def test_span_origin_async(
     ANTHROPIC_VERSION < (0, 27),
     reason="Versions <0.27.0 do not include InputJSONDelta.",
 )
-def test_collect_ai_data_with_input_json_delta():
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_collect_ai_data_with_input_json_delta(span_streaming):
     event = ContentBlockDeltaEvent(
         delta=InputJSONDelta(partial_json="test", type="input_json_delta"),
         index=0,
@@ -3592,6 +3714,7 @@ def test_set_output_data_with_input_json_delta(sentry_init):
 
 
 # Test messages with mixed roles including "ai" that should be mapped to "assistant"
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "test_message,expected_role",
@@ -3615,6 +3738,7 @@ def test_anthropic_message_role_mapping(
     test_message,
     expected_role,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """Test that Anthropic integration properly maps message roles like 'ai' to 'assistant'"""
     sentry_init(
@@ -3622,6 +3746,7 @@ def test_anthropic_message_role_mapping(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     client = Anthropic(api_key="z")
@@ -3642,7 +3767,7 @@ def test_anthropic_message_role_mapping(
 
     test_messages = [test_message]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="anthropic tx"):
@@ -3650,6 +3775,7 @@ def test_anthropic_message_role_mapping(
                 model="claude-3-opus", max_tokens=10, messages=test_messages
             )
 
+        sentry_sdk.flush()
         span = next(item.payload for item in items if item.type == "span")
 
         # Verify that the span was created correctly
@@ -3788,6 +3914,7 @@ async def test_anthropic_message_truncation_async(sentry_init, capture_events):
     assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
@@ -3805,6 +3932,7 @@ def test_nonstreaming_create_message_with_system_prompt(
     send_default_pii,
     include_prompts,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """Test that system prompts are properly captured in GEN_AI_REQUEST_MESSAGES."""
     sentry_init(
@@ -3812,6 +3940,7 @@ def test_nonstreaming_create_message_with_system_prompt(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     client = Anthropic(api_key="z")
@@ -3824,7 +3953,7 @@ def test_nonstreaming_create_message_with_system_prompt(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="anthropic"):
@@ -3844,6 +3973,7 @@ def test_nonstreaming_create_message_with_system_prompt(
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert len(spans) == 1
         (span,) = spans
@@ -3944,6 +4074,7 @@ def test_nonstreaming_create_message_with_system_prompt(
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
@@ -3962,6 +4093,7 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
     send_default_pii,
     include_prompts,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """Test that system prompts are properly captured in GEN_AI_REQUEST_MESSAGES (async)."""
     sentry_init(
@@ -3969,6 +4101,7 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     client = AsyncAnthropic(api_key="z")
@@ -3981,7 +4114,7 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="anthropic"):
@@ -4001,6 +4134,7 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert len(spans) == 1
         (span,) = spans
@@ -4101,6 +4235,7 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
@@ -4120,6 +4255,7 @@ def test_streaming_create_message_with_system_prompt(
     get_model_response,
     server_side_event_chunks,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """Test that system prompts are properly captured in streaming mode."""
     client = Anthropic(api_key="z")
@@ -4166,6 +4302,7 @@ def test_streaming_create_message_with_system_prompt(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     messages = [
@@ -4175,7 +4312,7 @@ def test_streaming_create_message_with_system_prompt(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with mock.patch.object(
@@ -4197,6 +4334,7 @@ def test_streaming_create_message_with_system_prompt(
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert len(spans) == 1
         (span,) = spans
@@ -4298,6 +4436,7 @@ def test_streaming_create_message_with_system_prompt(
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
@@ -4317,6 +4456,7 @@ def test_stream_messages_with_system_prompt(
     get_model_response,
     server_side_event_chunks,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """Test that system prompts are properly captured in streaming mode."""
     client = Anthropic(api_key="z")
@@ -4363,6 +4503,7 @@ def test_stream_messages_with_system_prompt(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     messages = [
@@ -4372,7 +4513,7 @@ def test_stream_messages_with_system_prompt(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with mock.patch.object(
@@ -4391,6 +4532,7 @@ def test_stream_messages_with_system_prompt(
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert len(spans) == 1
         (span,) = spans
@@ -4484,6 +4626,7 @@ def test_stream_messages_with_system_prompt(
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
@@ -4505,6 +4648,7 @@ async def test_stream_message_with_system_prompt_async(
     async_iterator,
     server_side_event_chunks,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """Test that system prompts are properly captured in streaming mode (async)."""
     client = AsyncAnthropic(api_key="z")
@@ -4553,6 +4697,7 @@ async def test_stream_message_with_system_prompt_async(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     messages = [
@@ -4562,7 +4707,7 @@ async def test_stream_message_with_system_prompt_async(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with mock.patch.object(
@@ -4582,6 +4727,7 @@ async def test_stream_message_with_system_prompt_async(
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert len(spans) == 1
         (span,) = spans
@@ -4679,6 +4825,7 @@ async def test_stream_message_with_system_prompt_async(
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
@@ -4700,6 +4847,7 @@ async def test_streaming_create_message_with_system_prompt_async(
     async_iterator,
     server_side_event_chunks,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """Test that system prompts are properly captured in streaming mode (async)."""
     client = AsyncAnthropic(api_key="z")
@@ -4748,6 +4896,7 @@ async def test_streaming_create_message_with_system_prompt_async(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     messages = [
@@ -4757,7 +4906,7 @@ async def test_streaming_create_message_with_system_prompt_async(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with mock.patch.object(
@@ -4779,6 +4928,7 @@ async def test_streaming_create_message_with_system_prompt_async(
         (event,) = (item.payload for item in items if item.type == "transaction")
         assert event["transaction"] == "anthropic"
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert len(spans) == 1
         (span,) = spans
@@ -4879,12 +5029,14 @@ async def test_streaming_create_message_with_system_prompt_async(
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_system_prompt_with_complex_structure(
     sentry_init,
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """Test that complex system prompt structures (list of text blocks) are properly captured."""
     sentry_init(
@@ -4892,6 +5044,7 @@ def test_system_prompt_with_complex_structure(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     client = Anthropic(api_key="z")
@@ -4910,7 +5063,7 @@ def test_system_prompt_with_complex_structure(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="anthropic"):
@@ -4920,6 +5073,7 @@ def test_system_prompt_with_complex_structure(
 
         assert response == EXAMPLE_MESSAGE
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert len(spans) == 1
         (span,) = spans
@@ -5228,12 +5382,14 @@ def test_message_with_base64_image(sentry_init, capture_events):
     }
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_message_with_url_image(
     sentry_init,
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """Test that messages with URL-referenced images are properly captured."""
     sentry_init(
@@ -5241,6 +5397,7 @@ def test_message_with_url_image(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     client = Anthropic(api_key="z")
@@ -5262,12 +5419,13 @@ def test_message_with_url_image(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="anthropic"):
             client.messages.create(max_tokens=1024, messages=messages, model="model")
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         (span,) = spans
 
@@ -5295,12 +5453,14 @@ def test_message_with_url_image(
     }
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_message_with_file_image(
     sentry_init,
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """Test that messages with file_id-referenced images are properly captured."""
     sentry_init(
@@ -5308,6 +5468,7 @@ def test_message_with_file_image(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     client = Anthropic(api_key="z")
@@ -5330,12 +5491,13 @@ def test_message_with_file_image(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="anthropic"):
             client.messages.create(max_tokens=1024, messages=messages, model="model")
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         (span,) = spans
 
@@ -5408,12 +5570,14 @@ def test_message_with_base64_pdf(sentry_init, capture_events):
     }
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_message_with_url_pdf(
     sentry_init,
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """Test that messages with URL-referenced PDF documents are properly captured."""
     sentry_init(
@@ -5421,6 +5585,7 @@ def test_message_with_url_pdf(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     client = Anthropic(api_key="z")
@@ -5442,12 +5607,13 @@ def test_message_with_url_pdf(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="anthropic"):
             client.messages.create(max_tokens=1024, messages=messages, model="model")
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         (span,) = spans
 
@@ -5475,12 +5641,14 @@ def test_message_with_url_pdf(
     }
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_message_with_file_document(
     sentry_init,
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """Test that messages with file_id-referenced documents are properly captured."""
     sentry_init(
@@ -5488,6 +5656,7 @@ def test_message_with_file_document(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     client = Anthropic(api_key="z")
@@ -5510,12 +5679,13 @@ def test_message_with_file_document(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="anthropic"):
             client.messages.create(max_tokens=1024, messages=messages, model="model")
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         (span,) = spans
 
@@ -5701,12 +5871,14 @@ def test_message_with_multiple_images_different_formats(sentry_init, capture_eve
     assert content[3] == {"type": "text", "text": "Compare these three images."}
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_binary_content_not_stored_when_pii_disabled(
     sentry_init,
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """Test that binary content is not stored when send_default_pii is False."""
     sentry_init(
@@ -5714,6 +5886,7 @@ def test_binary_content_not_stored_when_pii_disabled(
         traces_sample_rate=1.0,
         send_default_pii=False,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     client = Anthropic(api_key="z")
@@ -5736,12 +5909,13 @@ def test_binary_content_not_stored_when_pii_disabled(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="anthropic"):
             client.messages.create(max_tokens=1024, messages=messages, model="model")
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         (span,) = spans
 
@@ -5761,12 +5935,14 @@ def test_binary_content_not_stored_when_pii_disabled(
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_binary_content_not_stored_when_prompts_disabled(
     sentry_init,
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """Test that binary content is not stored when include_prompts is False."""
     sentry_init(
@@ -5774,6 +5950,7 @@ def test_binary_content_not_stored_when_prompts_disabled(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     client = Anthropic(api_key="z")
@@ -5796,12 +5973,13 @@ def test_binary_content_not_stored_when_prompts_disabled(
         }
     ]
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="anthropic"):
             client.messages.create(max_tokens=1024, messages=messages, model="model")
 
+        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         (span,) = spans
 
@@ -5821,18 +5999,21 @@ def test_binary_content_not_stored_when_prompts_disabled(
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_cache_tokens_nonstreaming(
     sentry_init,
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """Test cache read/write tokens are tracked for non-streaming responses."""
     sentry_init(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     client = Anthropic(api_key="z")
@@ -5853,7 +6034,7 @@ def test_cache_tokens_nonstreaming(
         )
     )
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="anthropic"):
@@ -5863,6 +6044,7 @@ def test_cache_tokens_nonstreaming(
                 model="claude-3-5-sonnet-20241022",
             )
 
+        sentry_sdk.flush()
         (span,) = (item.payload for item in items if item.type == "span")
         # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
@@ -5889,12 +6071,14 @@ def test_cache_tokens_nonstreaming(
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_input_tokens_include_cache_write_nonstreaming(
     sentry_init,
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that gen_ai.usage.input_tokens includes cache_write tokens (non-streaming).
@@ -5911,6 +6095,7 @@ def test_input_tokens_include_cache_write_nonstreaming(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     client = Anthropic(api_key="z")
@@ -5931,7 +6116,7 @@ def test_input_tokens_include_cache_write_nonstreaming(
         )
     )
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="anthropic"):
@@ -5941,6 +6126,7 @@ def test_input_tokens_include_cache_write_nonstreaming(
                 model="claude-sonnet-4-20250514",
             )
 
+        sentry_sdk.flush()
         (span,) = (item.payload for item in items if item.type == "span")
 
         # input_tokens should be total: 19 (non-cached) + 2846 (cache_write) = 2865
@@ -5971,12 +6157,14 @@ def test_input_tokens_include_cache_write_nonstreaming(
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 2846
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_input_tokens_include_cache_read_nonstreaming(
     sentry_init,
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that gen_ai.usage.input_tokens includes cache_read tokens (non-streaming).
@@ -5993,6 +6181,7 @@ def test_input_tokens_include_cache_read_nonstreaming(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     client = Anthropic(api_key="z")
@@ -6013,7 +6202,7 @@ def test_input_tokens_include_cache_read_nonstreaming(
         )
     )
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="anthropic"):
@@ -6023,6 +6212,7 @@ def test_input_tokens_include_cache_read_nonstreaming(
                 model="claude-sonnet-4-20250514",
             )
 
+        sentry_sdk.flush()
         (span,) = [item.payload for item in items if item.type == "span"]
 
         # input_tokens should be total: 19 (non-cached) + 2846 (cache_read) = 2865
@@ -6051,6 +6241,7 @@ def test_input_tokens_include_cache_read_nonstreaming(
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 0
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_input_tokens_include_cache_read_streaming(
     sentry_init,
@@ -6059,6 +6250,7 @@ def test_input_tokens_include_cache_read_streaming(
     get_model_response,
     server_side_event_chunks,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that gen_ai.usage.input_tokens includes cache_read tokens (streaming).
@@ -6099,9 +6291,10 @@ def test_input_tokens_include_cache_read_streaming(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with mock.patch.object(
@@ -6117,6 +6310,7 @@ def test_input_tokens_include_cache_read_streaming(
             ):
                 pass
 
+        sentry_sdk.flush()
         (span,) = (item.payload for item in items if item.type == "span")
 
         # input_tokens should be total: 19 + 2846 = test_stream_messages_input_tokens_include_cache_read_streaming
@@ -6151,6 +6345,7 @@ def test_input_tokens_include_cache_read_streaming(
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 0
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_stream_messages_input_tokens_include_cache_read_streaming(
     sentry_init,
@@ -6159,6 +6354,7 @@ def test_stream_messages_input_tokens_include_cache_read_streaming(
     get_model_response,
     server_side_event_chunks,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that gen_ai.usage.input_tokens includes cache_read tokens (streaming).
@@ -6198,9 +6394,10 @@ def test_stream_messages_input_tokens_include_cache_read_streaming(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with mock.patch.object(
@@ -6215,6 +6412,7 @@ def test_stream_messages_input_tokens_include_cache_read_streaming(
             for event in stream:
                 pass
 
+        sentry_sdk.flush()
         (span,) = (item.payload for item in items if item.type == "span")
 
         # input_tokens should be total: 19 + 2846 = 2865
@@ -6248,12 +6446,14 @@ def test_stream_messages_input_tokens_include_cache_read_streaming(
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 0
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_input_tokens_unchanged_without_caching(
     sentry_init,
     capture_events,
     capture_items,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that input_tokens is unchanged when there are no cached tokens.
@@ -6265,6 +6465,7 @@ def test_input_tokens_unchanged_without_caching(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     client = Anthropic(api_key="z")
@@ -6283,7 +6484,7 @@ def test_input_tokens_unchanged_without_caching(
         )
     )
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="anthropic"):
@@ -6293,6 +6494,7 @@ def test_input_tokens_unchanged_without_caching(
                 model="claude-sonnet-4-20250514",
             )
 
+        sentry_sdk.flush()
         (span,) = (item.payload for item in items if item.type == "span")
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 20
@@ -6313,6 +6515,7 @@ def test_input_tokens_unchanged_without_caching(
         assert span["data"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 32  # 20 + 12
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_cache_tokens_streaming(
     sentry_init,
@@ -6321,6 +6524,7 @@ def test_cache_tokens_streaming(
     get_model_response,
     server_side_event_chunks,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """Test cache tokens are tracked for streaming responses."""
     client = Anthropic(api_key="z")
@@ -6357,9 +6561,10 @@ def test_cache_tokens_streaming(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with mock.patch.object(
@@ -6375,6 +6580,7 @@ def test_cache_tokens_streaming(
             ):
                 pass
 
+        sentry_sdk.flush()
         (span,) = (item.payload for item in items if item.type == "span")
         # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
@@ -6407,6 +6613,7 @@ def test_cache_tokens_streaming(
         assert span["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_stream_messages_cache_tokens(
     sentry_init,
@@ -6415,6 +6622,7 @@ def test_stream_messages_cache_tokens(
     get_model_response,
     server_side_event_chunks,
     stream_gen_ai_spans,
+    span_streaming,
 ):
     """Test cache tokens are tracked for streaming responses."""
     client = Anthropic(api_key="z")
@@ -6451,9 +6659,10 @@ def test_stream_messages_cache_tokens(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    if stream_gen_ai_spans:
+    if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with mock.patch.object(
@@ -6468,6 +6677,7 @@ def test_stream_messages_cache_tokens(
             for event in stream:
                 pass
 
+        sentry_sdk.flush()
         (span,) = (item.payload for item in items if item.type == "span")
         # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200

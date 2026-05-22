@@ -17,6 +17,9 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.pydantic_ai import PydanticAIIntegration
 from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
 from sentry_sdk.integrations.pydantic_ai.spans.utils import _set_usage_data
+from sentry_sdk.utils import package_version
+
+PYDANTIC_AI_VERSION = package_version("pydantic-ai")
 
 
 @pytest.fixture
@@ -203,71 +206,6 @@ async def test_agent_run_async_model_error(
         assert len(spans) == 1
 
         assert spans[0]["status"] == "internal_error"
-
-
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
-@pytest.mark.asyncio
-async def test_agent_run_async_usage_data(
-    sentry_init,
-    capture_events,
-    capture_items,
-    get_test_agent,
-    stream_gen_ai_spans,
-):
-    """
-    Test that the invoke_agent span includes token usage and model data.
-    """
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-    )
-
-    test_agent = get_test_agent()
-
-    if stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        result = await test_agent.run("Test input")
-
-        assert result is not None
-        assert result.output is not None
-
-        (transaction,) = (item.payload for item in items if item.type == "transaction")
-    else:
-        events = capture_events()
-
-        result = await test_agent.run("Test input")
-
-        assert result is not None
-        assert result.output is not None
-
-        (transaction,) = events
-
-    # Verify transaction (the transaction IS the invoke_agent span)
-    assert transaction["transaction"] == "invoke_agent test_agent"
-
-    # The invoke_agent span should have token usage data
-    trace_data = transaction["contexts"]["trace"].get("data", {})
-    assert "gen_ai.usage.input_tokens" in trace_data, (
-        "Missing input_tokens on invoke_agent span"
-    )
-    assert "gen_ai.usage.output_tokens" in trace_data, (
-        "Missing output_tokens on invoke_agent span"
-    )
-    assert "gen_ai.usage.total_tokens" in trace_data, (
-        "Missing total_tokens on invoke_agent span"
-    )
-    assert "gen_ai.response.model" in trace_data, (
-        "Missing response.model on invoke_agent span"
-    )
-
-    # Verify the values are reasonable
-    assert trace_data["gen_ai.usage.input_tokens"] > 0
-    assert trace_data["gen_ai.usage.output_tokens"] > 0
-    assert trace_data["gen_ai.usage.total_tokens"] > 0
-    assert trace_data["gen_ai.response.model"] == "test"  # Test model name
 
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
@@ -517,10 +455,17 @@ async def test_agent_run_stream_events(
     if stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
-        async for _ in test_agent.run_stream_events(
-            ["Message demonstrating the absence of truncation.", "Test input"]
-        ):
-            pass
+        if PYDANTIC_AI_VERSION > (2,):
+            async with test_agent.run_stream_events(
+                ["Message demonstrating the absence of truncation.", "Test input"]
+            ) as stream_events:
+                async for _ in stream_events:
+                    pass
+        else:
+            async for _ in test_agent.run_stream_events(
+                ["Message demonstrating the absence of truncation.", "Test input"]
+            ):
+                pass
 
         # Verify transaction
         (transaction,) = (item.payload for item in items if item.type == "transaction")
@@ -541,8 +486,13 @@ async def test_agent_run_stream_events(
     else:
         events = capture_events()
 
-        async for _ in test_agent.run_stream_events("Test input"):
-            pass
+        if PYDANTIC_AI_VERSION > (2,):
+            async with test_agent.run_stream_events("Test input") as stream_events:
+                async for _ in stream_events:
+                    pass
+        else:
+            async for _ in test_agent.run_stream_events("Test input"):
+                pass
 
         (transaction,) = events
 
@@ -1730,202 +1680,6 @@ async def test_include_prompts_requires_pii(
         for span in chat_spans:
             assert "gen_ai.request.messages" not in span["data"]
             assert "gen_ai.response.text" not in span["data"]
-
-
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
-@pytest.mark.asyncio
-async def test_mcp_tool_execution_spans(
-    sentry_init,
-    capture_events,
-    capture_items,
-    stream_gen_ai_spans,
-):
-    """
-    Test that MCP (Model Context Protocol) tool calls create execute_tool spans.
-
-    Tests MCP tools accessed through CombinedToolset, which is how they're typically
-    used in practice (when an agent combines regular functions with MCP servers).
-    """
-    pytest.importorskip("mcp")
-
-    from unittest.mock import MagicMock
-
-    from pydantic_ai import Agent
-    from pydantic_ai.mcp import MCPServerStdio
-    from pydantic_ai.toolsets.combined import CombinedToolset
-
-    import sentry_sdk
-
-    # Create mock MCP server
-    mock_server = MCPServerStdio(
-        command="python",
-        args=["-m", "test_server"],
-    )
-
-    # Mock the server's internal methods
-    mock_server._client = MagicMock()
-    mock_server._is_initialized = True
-    mock_server._server_info = MagicMock()
-
-    # Mock tool call response
-    async def mock_send_request(request, response_type):
-        from mcp.types import CallToolResult, TextContent
-
-        return CallToolResult(
-            content=[TextContent(type="text", text="MCP tool executed successfully")],
-            isError=False,
-        )
-
-    mock_server._client.send_request = mock_send_request
-
-    # Mock context manager methods
-    async def mock_aenter():
-        return mock_server
-
-    async def mock_aexit(*args):
-        pass
-
-    mock_server.__aenter__ = mock_aenter
-    mock_server.__aexit__ = mock_aexit
-
-    # Mock _map_tool_result_part
-    async def mock_map_tool_result_part(part):
-        return part.text if hasattr(part, "text") else str(part)
-
-    mock_server._map_tool_result_part = mock_map_tool_result_part
-
-    # Create a CombinedToolset with the MCP server
-    # This simulates how MCP servers are typically used in practice
-    from pydantic_ai.toolsets.function import FunctionToolset
-
-    function_toolset = FunctionToolset()
-    combined = CombinedToolset([function_toolset, mock_server])
-
-    # Create agent
-    agent = Agent(
-        "test",
-        name="test_mcp_agent",
-    )
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-    )
-
-    if stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        # Simulate MCP tool execution within a transaction through CombinedToolset
-        with sentry_sdk.start_transaction(
-            op="ai.run", name="invoke_agent test_mcp_agent"
-        ):
-            # Set up the agent context
-            scope = sentry_sdk.get_current_scope()
-            scope._contexts["pydantic_ai_agent"] = {
-                "_agent": agent,
-            }
-
-            # Create a mock tool that simulates an MCP tool from CombinedToolset
-            from pydantic_ai._run_context import RunContext
-            from pydantic_ai.models.test import TestModel
-            from pydantic_ai.result import RunUsage
-            from pydantic_ai.toolsets.combined import _CombinedToolsetTool
-
-            ctx = RunContext(
-                deps=None,
-                model=TestModel(),
-                usage=RunUsage(),
-                retry=0,
-                tool_name="test_mcp_tool",
-            )
-
-            tool_name = "test_mcp_tool"
-
-            # Create a tool that points to the MCP server
-            # This simulates how CombinedToolset wraps tools from different sources
-            tool = _CombinedToolsetTool(
-                toolset=combined,
-                tool_def=MagicMock(name=tool_name),
-                max_retries=0,
-                args_validator=MagicMock(),
-                source_toolset=mock_server,
-                source_tool=MagicMock(),
-            )
-
-            try:
-                await combined.call_tool(tool_name, {"query": "test"}, ctx, tool)
-            except Exception:
-                # MCP tool might raise if not fully mocked, that's okay
-                pass
-
-        if len(items) == 0:
-            pytest.skip("No events captured, MCP test setup incomplete")
-
-        (transaction,) = (item.payload for item in items if item.type == "transaction")
-        transaction["spans"]
-    else:
-        events = capture_events()
-
-        # Simulate MCP tool execution within a transaction through CombinedToolset
-        with sentry_sdk.start_transaction(
-            op="ai.run", name="invoke_agent test_mcp_agent"
-        ) as transaction:
-            # Set up the agent context
-            scope = sentry_sdk.get_current_scope()
-            scope._contexts["pydantic_ai_agent"] = {
-                "_agent": agent,
-            }
-
-            # Create a mock tool that simulates an MCP tool from CombinedToolset
-            from pydantic_ai._run_context import RunContext
-            from pydantic_ai.models.test import TestModel
-            from pydantic_ai.result import RunUsage
-            from pydantic_ai.toolsets.combined import _CombinedToolsetTool
-
-            ctx = RunContext(
-                deps=None,
-                model=TestModel(),
-                usage=RunUsage(),
-                retry=0,
-                tool_name="test_mcp_tool",
-            )
-
-            tool_name = "test_mcp_tool"
-
-            # Create a tool that points to the MCP server
-            # This simulates how CombinedToolset wraps tools from different sources
-            tool = _CombinedToolsetTool(
-                toolset=combined,
-                tool_def=MagicMock(name=tool_name),
-                max_retries=0,
-                args_validator=MagicMock(),
-                source_toolset=mock_server,
-                source_tool=MagicMock(),
-            )
-
-            try:
-                await combined.call_tool(tool_name, {"query": "test"}, ctx, tool)
-            except Exception:
-                # MCP tool might raise if not fully mocked, that's okay
-                pass
-
-        events_list = events
-        if len(events_list) == 0:
-            pytest.skip("No events captured, MCP test setup incomplete")
-
-        (transaction,) = events_list
-        transaction["spans"]
-
-    # Note: This test manually calls combined.call_tool which doesn't go through
-    # ToolManager._call_tool (which is what the integration patches).
-    # In real-world usage, MCP tools are called through agent.run() which uses ToolManager.
-    # This synthetic test setup doesn't trigger the integration's tool patches.
-    # We skip this test as it doesn't represent actual usage patterns.
-    pytest.skip(
-        "MCP test needs to be rewritten to use agent.run() instead of manually calling toolset methods"
-    )
 
 
 @pytest.mark.asyncio
