@@ -8,6 +8,8 @@ from sentry_sdk.ai.utils import (
     truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 from ..consts import SPAN_ORIGIN
 from ..utils import (
@@ -22,7 +24,7 @@ from .utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, Union
 
 try:
     from pydantic_ai.messages import BinaryContent, ImageUrl  # type: ignore
@@ -37,20 +39,31 @@ def invoke_agent_span(
     model: "Any",
     model_settings: "Any",
     is_streaming: bool = False,
-) -> "sentry_sdk.tracing.Span":
+) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
     """Create a span for invoking the agent."""
     # Determine agent name for span
     name = "agent"
     if agent and getattr(agent, "name", None):
         name = agent.name
 
-    span = get_start_span_function()(
-        op=OP.GEN_AI_INVOKE_AGENT,
-        name=f"invoke_agent {name}",
-        origin=SPAN_ORIGIN,
-    )
+    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+    if span_streaming:
+        span = sentry_sdk.traces.start_span(
+            name=f"invoke_agent {name}",
+            attributes={
+                "sentry.op": OP.GEN_AI_INVOKE_AGENT,
+                "sentry.origin": SPAN_ORIGIN,
+                SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
+            },
+        )
+    else:
+        span = get_start_span_function()(
+            op=OP.GEN_AI_INVOKE_AGENT,
+            name=f"invoke_agent {name}",
+            origin=SPAN_ORIGIN,
+        )
 
-    span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
 
     _set_agent_data(span, agent)
     _set_model_data(span, model, model_settings)
@@ -135,7 +148,10 @@ def invoke_agent_span(
     return span
 
 
-def update_invoke_agent_span(span: "sentry_sdk.tracing.Span", result: "Any") -> None:
+def update_invoke_agent_span(
+    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
+    result: "Any",
+) -> None:
     """Update and close the invoke agent span."""
     if not span or not result:
         return
@@ -154,7 +170,12 @@ def update_invoke_agent_span(span: "sentry_sdk.tracing.Span", result: "Any") -> 
         try:
             response = result.response
             if hasattr(response, "model_name") and response.model_name:
-                span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)
+                if isinstance(span, StreamedSpan):
+                    span.set_attribute(
+                        SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name
+                    )
+                else:
+                    span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)
         except Exception:
             # If response access fails, continue without setting model name
             pass

@@ -4,10 +4,11 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.utils import event_from_exception, safe_serialize
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Any, Optional, Union
 
 
 # Store the current agent context in a contextvar for re-entrant safety
@@ -68,7 +69,9 @@ def _should_send_prompts() -> bool:
     return getattr(integration, "include_prompts", False)
 
 
-def _set_agent_data(span: "sentry_sdk.tracing.Span", agent: "Any") -> None:
+def _set_agent_data(
+    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]", agent: "Any"
+) -> None:
     """Set agent-related data on a span.
 
     Args:
@@ -82,7 +85,10 @@ def _set_agent_data(span: "sentry_sdk.tracing.Span", agent: "Any") -> None:
         agent_obj = get_current_agent()
 
     if agent_obj and hasattr(agent_obj, "name") and agent_obj.name:
-        span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_obj.name)
+        if isinstance(span, StreamedSpan):
+            span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, agent_obj.name)
+        else:
+            span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_obj.name)
 
 
 def _get_model_name(model_obj: "Any") -> "Optional[str]":
@@ -111,7 +117,9 @@ def _get_model_name(model_obj: "Any") -> "Optional[str]":
 
 
 def _set_model_data(
-    span: "sentry_sdk.tracing.Span", model: "Any", model_settings: "Any"
+    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
+    model: "Any",
+    model_settings: "Any",
 ) -> None:
     """Set model-related data on a span.
 
@@ -128,15 +136,19 @@ def _set_model_data(
     if not model_obj and agent_obj and hasattr(agent_obj, "model"):
         model_obj = agent_obj.model
 
+    set_on_span = (
+        span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
+    )
+
     if model_obj:
         # Set system from model
         if hasattr(model_obj, "system"):
-            span.set_data(SPANDATA.GEN_AI_SYSTEM, model_obj.system)
+            set_on_span(SPANDATA.GEN_AI_SYSTEM, model_obj.system)
 
         # Set model name
         model_name = _get_model_name(model_obj)
         if model_name:
-            span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
+            set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
 
     # Extract model settings
     settings = model_settings
@@ -157,17 +169,19 @@ def _set_model_data(
             for setting_name, spandata_key in settings_map.items():
                 value = settings.get(setting_name)
                 if value is not None:
-                    span.set_data(spandata_key, value)
+                    set_on_span(spandata_key, value)
         else:
             # Fallback for object-style settings
             for setting_name, spandata_key in settings_map.items():
                 if hasattr(settings, setting_name):
                     value = getattr(settings, setting_name)
                     if value is not None:
-                        span.set_data(spandata_key, value)
+                        set_on_span(spandata_key, value)
 
 
-def _set_available_tools(span: "sentry_sdk.tracing.Span", agent: "Any") -> None:
+def _set_available_tools(
+    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]", agent: "Any"
+) -> None:
     """Set available tools data on a span from an agent's function toolset.
 
     Args:
@@ -197,9 +211,14 @@ def _set_available_tools(span: "sentry_sdk.tracing.Span", agent: "Any") -> None:
                 tools.append(tool_info)
 
         if tools:
-            span.set_data(
-                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
-            )
+            if isinstance(span, StreamedSpan):
+                span.set_attribute(
+                    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
+                )
+            else:
+                span.set_data(
+                    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
+                )
     except Exception:
         # If we can't extract tools, just skip it
         pass
