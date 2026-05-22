@@ -8,7 +8,9 @@ from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import TransactionSource
+from sentry_sdk.traces import SegmentSource
+from sentry_sdk.tracing import Span, TransactionSource
+from sentry_sdk.tracing_utils import StreamedSpan, has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -183,50 +185,111 @@ class SentryAsyncExtension(SchemaExtension):
         event_processor = _make_request_event_processor(self.execution_context)
         scope.add_event_processor(event_processor)
 
-        graphql_span = sentry_sdk.start_span(
-            op=op,
-            name=description,
-            origin=StrawberryIntegration.origin,
-        )
-        graphql_span.__enter__()
+        client = sentry_sdk.get_client()
+        is_span_streaming_enabled = has_span_streaming_enabled(client.options)
+        if is_span_streaming_enabled:
+            additional_attributes: "dict[str, Any]" = {}
 
-        graphql_span.set_data("graphql.operation.type", operation_type)
-        graphql_span.set_data("graphql.operation.name", operation_name)
-        if should_send_default_pii():
-            graphql_span.set_data("graphql.document", self.execution_context.query)
-        graphql_span.set_data("graphql.resource_name", self._resource_name)
+            if should_send_default_pii():
+                additional_attributes["graphql.document"] = self.execution_context.query
+
+            if operation_name:
+                additional_attributes["graphql.operation.name"] = operation_name
+
+            graphql_span = sentry_sdk.traces.start_span(
+                name=description,
+                attributes={
+                    "sentry.origin": StrawberryIntegration.origin,
+                    "sentry.op": op,
+                    "graphql.operation.type": operation_type,
+                    **additional_attributes,
+                },
+            )
+        else:
+            graphql_span = sentry_sdk.start_span(
+                op=op,
+                name=description,
+                origin=StrawberryIntegration.origin,
+            )
+            graphql_span.__enter__()
+
+        if type(graphql_span) is Span:
+            if should_send_default_pii():
+                graphql_span.set_data("graphql.document", self.execution_context.query)
+
+            graphql_span.set_data("graphql.operation.type", operation_type)
+            graphql_span.set_data("graphql.operation.name", operation_name)
+            # This attribute is being removed in streamed spans
+            graphql_span.set_data("graphql.resource_name", self._resource_name)
 
         yield
 
-        transaction = graphql_span.containing_transaction
-        if transaction and self.execution_context.operation_name:
-            transaction.name = self.execution_context.operation_name
-            transaction.source = TransactionSource.COMPONENT
-            transaction.op = op
+        if type(graphql_span) is StreamedSpan:
+            if self.execution_context.operation_name:
+                segment = graphql_span._segment
+                segment.set_attribute("sentry.span.source", SegmentSource.COMPONENT)
+                segment.set_attribute("sentry.op", op)
+                segment.name = self.execution_context.operation_name
+        elif isinstance(graphql_span, Span):
+            transaction = graphql_span.containing_transaction
+            if transaction and self.execution_context.operation_name:
+                transaction.name = self.execution_context.operation_name
+                transaction.source = TransactionSource.COMPONENT
+                transaction.op = op
 
         graphql_span.__exit__(None, None, None)
 
     def on_validate(self) -> "Generator[None, None, None]":
-        validation_span = sentry_sdk.start_span(
-            op=OP.GRAPHQL_VALIDATE,
-            name="validation",
-            origin=StrawberryIntegration.origin,
-        )
+        client = sentry_sdk.get_client()
+        is_span_streaming_enabled = has_span_streaming_enabled(client.options)
+
+        if is_span_streaming_enabled:
+            validation_span = sentry_sdk.traces.start_span(
+                name="validation",
+                attributes={
+                    "sentry.op": OP.GRAPHQL_VALIDATE,
+                    "sentry.origin": StrawberryIntegration.origin,
+                },
+            )
+        else:
+            validation_span = sentry_sdk.start_span(
+                op=OP.GRAPHQL_VALIDATE,
+                name="validation",
+                origin=StrawberryIntegration.origin,
+            )
 
         yield
 
-        validation_span.finish()
+        if isinstance(validation_span, StreamedSpan):
+            validation_span.end()
+        else:
+            validation_span.finish()
 
     def on_parse(self) -> "Generator[None, None, None]":
-        parsing_span = sentry_sdk.start_span(
-            op=OP.GRAPHQL_PARSE,
-            name="parsing",
-            origin=StrawberryIntegration.origin,
-        )
+        client = sentry_sdk.get_client()
+        is_span_streaming_enabled = has_span_streaming_enabled(client.options)
+
+        if is_span_streaming_enabled:
+            parsing_span = sentry_sdk.traces.start_span(
+                name="parsing",
+                attributes={
+                    "sentry.op": OP.GRAPHQL_PARSE,
+                    "sentry.origin": StrawberryIntegration.origin,
+                },
+            )
+        else:
+            parsing_span = sentry_sdk.start_span(
+                op=OP.GRAPHQL_PARSE,
+                name="parsing",
+                origin=StrawberryIntegration.origin,
+            )
 
         yield
 
-        parsing_span.finish()
+        if isinstance(parsing_span, StreamedSpan):
+            parsing_span.end()
+        else:
+            parsing_span.finish()
 
     def should_skip_tracing(
         self,
@@ -263,6 +326,18 @@ class SentryAsyncExtension(SchemaExtension):
 
         field_path = "{}.{}".format(info.parent_type, info.field_name)
 
+        client = sentry_sdk.get_client()
+        is_span_streaming_enabled = has_span_streaming_enabled(client.options)
+        if is_span_streaming_enabled:
+            with sentry_sdk.traces.start_span(
+                name=f"resolving {field_path}",
+                attributes={
+                    "sentry.origin": StrawberryIntegration.origin,
+                    "sentry.op": OP.GRAPHQL_RESOLVE,
+                },
+            ):
+                return await self._resolve(_next, root, info, *args, **kwargs)
+
         with sentry_sdk.start_span(
             op=OP.GRAPHQL_RESOLVE,
             name="resolving {}".format(field_path),
@@ -289,6 +364,18 @@ class SentrySyncExtension(SentryAsyncExtension):
             return _next(root, info, *args, **kwargs)
 
         field_path = "{}.{}".format(info.parent_type, info.field_name)
+
+        client = sentry_sdk.get_client()
+        is_span_streaming_enabled = has_span_streaming_enabled(client.options)
+        if is_span_streaming_enabled:
+            with sentry_sdk.traces.start_span(
+                name=f"resolving {field_path}",
+                attributes={
+                    "sentry.origin": StrawberryIntegration.origin,
+                    "sentry.op": OP.GRAPHQL_RESOLVE,
+                },
+            ):
+                return _next(root, info, *args, **kwargs)
 
         with sentry_sdk.start_span(
             op=OP.GRAPHQL_RESOLVE,
