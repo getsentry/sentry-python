@@ -8,6 +8,7 @@ from sentry_sdk.ai.utils import (
     truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 from ..consts import SPAN_ORIGIN
@@ -38,7 +39,7 @@ def invoke_agent_span(
     model: "Any",
     model_settings: "Any",
     is_streaming: bool = False,
-) -> "Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]":
+) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
     """Create a span for invoking the agent."""
     # Determine agent name for span
     name = "agent"
@@ -148,7 +149,7 @@ def invoke_agent_span(
 
 
 def update_invoke_agent_span(
-    span: "Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]",
+    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
     result: "Any",
 ) -> None:
     """Update and close the invoke agent span."""
@@ -169,7 +170,12 @@ def update_invoke_agent_span(
         try:
             response = result.response
             if hasattr(response, "model_name") and response.model_name:
-                span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)
+                if isinstance(span, StreamedSpan):
+                    span.set_attribute(
+                        SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name
+                    )
+                else:
+                    span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)
         except Exception:
             # If response access fails, continue without setting model name
             pass
