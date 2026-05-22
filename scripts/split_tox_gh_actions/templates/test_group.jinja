@@ -69,7 +69,7 @@
 
       - name: Setup Test Env
         run: |
-          pip install "coverage[toml]" tox
+          python -m pip install "coverage[toml]" tox tox-uv
       - name: Erase coverage
         run: |
           coverage erase
