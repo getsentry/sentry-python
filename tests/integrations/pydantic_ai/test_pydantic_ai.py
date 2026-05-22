@@ -90,7 +90,7 @@ async def test_agent_run_async(
         assert result.output is not None
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert spans[1]["name"] == "invoke_agent test_agent"
         assert spans[1]["attributes"]["sentry.origin"] == "auto.ai.pydantic_ai"
@@ -235,7 +235,7 @@ async def test_agent_run_async_model_error(
     )
 
     if span_streaming:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("event", "span")
 
         with pytest.raises(RuntimeError, match="model exploded"):
             await agent.run("Test input")
@@ -310,11 +310,7 @@ def test_agent_run_sync(
         assert result.output is not None
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-
-        # Find span types
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert spans[1]["name"] == "invoke_agent test_agent"
         assert spans[1]["attributes"]["sentry.origin"] == "auto.ai.pydantic_ai"
@@ -403,7 +399,7 @@ def test_agent_run_sync_model_error(
     )
 
     if span_streaming:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("event", "span")
 
         with pytest.raises(RuntimeError, match="model exploded"):
             agent.run_sync("Test input")
@@ -479,7 +475,7 @@ async def test_agent_run_stream(
                 pass
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert spans[1]["name"] == "invoke_agent test_agent"
         assert spans[1]["attributes"]["sentry.origin"] == "auto.ai.pydantic_ai"
@@ -637,7 +633,7 @@ async def test_agent_run_stream_events(
                 pass
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert spans[-1]["name"] == "invoke_agent test_agent"
 
@@ -1359,7 +1355,7 @@ async def test_error_handling(
         await agent.run("Hello")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert spans[1]["is_segment"] is True
         assert spans[1]["status"] != "error"  # Could be None or some other status
@@ -1550,7 +1546,7 @@ async def test_multiple_agents_concurrent(
         assert len(results) == 3
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         for span in spans:
             if span["is_segment"] is False:
                 continue
@@ -2157,7 +2153,7 @@ async def test_invoke_agent_with_list_user_prompt(
         await agent.run(["First part", "Second part"])
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         # Check that the invoke_agent transaction has messages data
         # The invoke_agent is the transaction itself
@@ -2471,7 +2467,7 @@ async def test_agent_data_from_scope(
         await agent.run("Test input")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert spans[1]["name"] == "invoke_agent test_scope_agent"
     elif stream_gen_ai_spans:
@@ -2791,7 +2787,7 @@ async def test_agent_without_name(
         await agent.run("Test input")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert "invoke_agent" in spans[1]["name"]
     elif stream_gen_ai_spans:
@@ -3969,7 +3965,7 @@ async def test_binary_content_encoding_image(
             span.finish()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         span_data = spans[0]["attributes"]
         messages_data = _get_messages_from_span(span_data)
@@ -4058,7 +4054,7 @@ async def test_binary_content_encoding_mixed_content(
             span.finish()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         span_data = spans[0]["attributes"]
         messages_data = _get_messages_from_span(span_data)
@@ -4234,7 +4230,7 @@ async def test_set_usage_data_with_cache_tokens(
             span.finish()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
         assert (
