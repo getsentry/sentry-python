@@ -147,7 +147,10 @@ def invoke_agent_span(
     return span
 
 
-def update_invoke_agent_span(span: "sentry_sdk.tracing.Span", result: "Any") -> None:
+def update_invoke_agent_span(
+    span: "Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]",
+    result: "Any",
+) -> None:
     """Update and close the invoke agent span."""
     if not span or not result:
         return
