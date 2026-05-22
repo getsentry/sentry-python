@@ -654,7 +654,7 @@ def _sentry_patched_create_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
             origin=AnthropicIntegration.origin,
         )
 
-    span.__enter__()
+        span.__enter__()
 
     _set_create_input_data(span, kwargs, integration)
 
@@ -751,7 +751,7 @@ async def _sentry_patched_create_async(
             origin=AnthropicIntegration.origin,
         )
 
-    span.__enter__()
+        span.__enter__()
 
     _set_create_input_data(span, kwargs, integration)
 
@@ -985,10 +985,9 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
                 attributes={
                     "sentry.op": OP.GEN_AI_CHAT,
                     "sentry.origin": AnthropicIntegration.origin,
+                    SPANDATA.GEN_AI_RESPONSE_STREAMING: True,
                 },
             )
-
-            set_on_span = span.set_attribute
         else:
             span = get_start_span_function()(
                 op=OP.GEN_AI_CHAT,
@@ -996,10 +995,9 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
                 origin=AnthropicIntegration.origin,
             )
 
-            set_on_span = span.set_data
-        span.__enter__()
+            span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+            span.__enter__()
 
-        set_on_span(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
         _set_common_input_data(
             span=span,
             integration=integration,
@@ -1094,10 +1092,9 @@ def _wrap_async_message_stream_manager_aenter(f: "Any") -> "Any":
                 attributes={
                     "sentry.op": OP.GEN_AI_CHAT,
                     "sentry.origin": AnthropicIntegration.origin,
+                    SPANDATA.GEN_AI_RESPONSE_STREAMING: True,
                 },
             )
-
-            set_on_span = span.set_attribute
         else:
             span = get_start_span_function()(
                 op=OP.GEN_AI_CHAT,
@@ -1105,10 +1102,9 @@ def _wrap_async_message_stream_manager_aenter(f: "Any") -> "Any":
                 origin=AnthropicIntegration.origin,
             )
 
-            set_on_span = span.set_data
-        span.__enter__()
+            span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+            span.__enter__()
 
-        set_on_span(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
         _set_common_input_data(
             span=span,
             integration=integration,
