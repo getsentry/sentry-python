@@ -13,6 +13,13 @@ TEST_SUITE_CONFIG = {
         },
         "python": ">=3.7",
     },
+    "aiomysql": {
+        "package": "aiomysql",
+        "deps": {
+            "*": ["pytest-asyncio", "cryptography"],
+        },
+        "python": ">=3.7",
+    },
     "anthropic": {
         "package": "anthropic",
         "deps": {
@@ -44,13 +51,6 @@ TEST_SUITE_CONFIG = {
         "package": "asyncpg",
         "deps": {
             "*": ["pytest-asyncio"],
-        },
-        "python": ">=3.7",
-    },
-    "aiomysql": {
-        "package": "aiomysql",
-        "deps": {
-            "*": ["pytest-asyncio", "cryptography"],
         },
         "python": ">=3.7",
     },
