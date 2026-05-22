@@ -146,7 +146,6 @@ async def test_agent_run_async(
         # The transaction itself should have invoke_agent data
         assert transaction["contexts"]["trace"]["op"] == "gen_ai.invoke_agent"
 
-        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         # Find child span types (invoke_agent is the transaction, not a child span)
         chat_spans = [
@@ -258,7 +257,6 @@ async def test_agent_run_async_model_error(
         (error,) = (item.payload for item in items if item.type == "event")
         assert error["level"] == "error"
 
-        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert len(spans) == 1
 
@@ -347,7 +345,6 @@ def test_agent_run_sync(
         assert transaction["contexts"]["trace"]["origin"] == "auto.ai.pydantic_ai"
 
         # Find span types
-        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
@@ -428,7 +425,6 @@ def test_agent_run_sync_model_error(
         (error,) = (item.payload for item in items if item.type == "event")
         assert error["level"] == "error"
 
-        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert len(spans) == 1
 
@@ -537,7 +533,6 @@ async def test_agent_run_stream(
         assert transaction["contexts"]["trace"]["origin"] == "auto.ai.pydantic_ai"
 
         # Find chat spans
-        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
@@ -676,7 +671,6 @@ async def test_agent_run_stream_events(
         assert transaction["transaction"] == "invoke_agent test_agent"
 
         # Find chat spans
-        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
