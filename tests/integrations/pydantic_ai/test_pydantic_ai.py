@@ -639,8 +639,7 @@ async def test_agent_run_stream_events(
         sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
 
-        print("spans are", spans)
-        assert spans[1]["name"] == "invoke_agent test_agent"
+        assert spans[-1]["name"] == "invoke_agent test_agent"
 
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
