@@ -680,9 +680,9 @@ def _create_tool_span(
             attributes={
                 "sentry.op": OP.GEN_AI_EXECUTE_TOOL,
                 "sentry.origin": ORIGIN,
+                SPANDATA.GEN_AI_TOOL_NAME: tool_name,
             },
         )
-        span.set_attribute(SPANDATA.GEN_AI_TOOL_NAME, tool_name)
         if tool_doc:
             span.set_attribute(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool_doc)
         return span

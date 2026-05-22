@@ -81,25 +81,26 @@ def _wrap_generate_content_stream(f: "Callable[..., Any]") -> "Callable[..., Any
                 attributes={
                     "sentry.op": OP.GEN_AI_CHAT,
                     "sentry.origin": ORIGIN,
+                    SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+                    SPANDATA.GEN_AI_SYSTEM: GEN_AI_SYSTEM,
+                    SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
+                    SPANDATA.GEN_AI_RESPONSE_STREAMING: True,
                 },
             )
-
-            set_on_span = chat_span.set_attribute
         else:
             chat_span = get_start_span_function()(
                 op=OP.GEN_AI_CHAT,
                 name=f"chat {model_name}",
                 origin=ORIGIN,
             )
-
-            set_on_span = chat_span.set_data
             chat_span.__enter__()
 
-        set_on_span(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
-        set_on_span(SPANDATA.GEN_AI_SYSTEM, GEN_AI_SYSTEM)
-        set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
+            chat_span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+            chat_span.set_data(SPANDATA.GEN_AI_SYSTEM, GEN_AI_SYSTEM)
+            chat_span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
+            chat_span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+
         set_span_data_for_request(chat_span, integration, model_name, contents, kwargs)
-        set_on_span(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
         try:
             stream = f(self, *args, **kwargs)
@@ -157,25 +158,26 @@ def _wrap_async_generate_content_stream(
                 attributes={
                     "sentry.op": OP.GEN_AI_CHAT,
                     "sentry.origin": ORIGIN,
+                    SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+                    SPANDATA.GEN_AI_SYSTEM: GEN_AI_SYSTEM,
+                    SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
+                    SPANDATA.GEN_AI_RESPONSE_STREAMING: True,
                 },
             )
-
-            set_on_span = chat_span.set_attribute
         else:
             chat_span = get_start_span_function()(
                 op=OP.GEN_AI_CHAT,
                 name=f"chat {model_name}",
                 origin=ORIGIN,
             )
-
-            set_on_span = chat_span.set_data
             chat_span.__enter__()
 
-        set_on_span(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
-        set_on_span(SPANDATA.GEN_AI_SYSTEM, GEN_AI_SYSTEM)
-        set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
+            chat_span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+            chat_span.set_data(SPANDATA.GEN_AI_SYSTEM, GEN_AI_SYSTEM)
+            chat_span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
+            chat_span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+
         set_span_data_for_request(chat_span, integration, model_name, contents, kwargs)
-        set_on_span(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
         try:
             stream = await f(self, *args, **kwargs)
@@ -229,11 +231,11 @@ def _wrap_generate_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 attributes={
                     "sentry.op": OP.GEN_AI_CHAT,
                     "sentry.origin": ORIGIN,
+                    SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+                    SPANDATA.GEN_AI_SYSTEM: GEN_AI_SYSTEM,
+                    SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
                 },
             ) as chat_span:
-                chat_span.set_attribute(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
-                chat_span.set_attribute(SPANDATA.GEN_AI_SYSTEM, GEN_AI_SYSTEM)
-                chat_span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
                 set_span_data_for_request(
                     chat_span, integration, model_name, contents, kwargs
                 )
@@ -293,11 +295,11 @@ def _wrap_async_generate_content(f: "Callable[..., Any]") -> "Callable[..., Any]
                 attributes={
                     "sentry.op": OP.GEN_AI_CHAT,
                     "sentry.origin": ORIGIN,
+                    SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+                    SPANDATA.GEN_AI_SYSTEM: GEN_AI_SYSTEM,
+                    SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
                 },
             ) as chat_span:
-                chat_span.set_attribute(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
-                chat_span.set_attribute(SPANDATA.GEN_AI_SYSTEM, GEN_AI_SYSTEM)
-                chat_span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
                 set_span_data_for_request(
                     chat_span, integration, model_name, contents, kwargs
                 )
@@ -353,11 +355,11 @@ def _wrap_embed_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 attributes={
                     "sentry.op": OP.GEN_AI_EMBEDDINGS,
                     "sentry.origin": ORIGIN,
+                    SPANDATA.GEN_AI_OPERATION_NAME: "embeddings",
+                    SPANDATA.GEN_AI_SYSTEM: GEN_AI_SYSTEM,
+                    SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
                 },
             ) as span:
-                span.set_attribute(SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
-                span.set_attribute(SPANDATA.GEN_AI_SYSTEM, GEN_AI_SYSTEM)
-                span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
                 set_span_data_for_embed_request(span, integration, contents, kwargs)
 
                 try:
@@ -413,11 +415,11 @@ def _wrap_async_embed_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 attributes={
                     "sentry.op": OP.GEN_AI_EMBEDDINGS,
                     "sentry.origin": ORIGIN,
+                    SPANDATA.GEN_AI_OPERATION_NAME: "embeddings",
+                    SPANDATA.GEN_AI_SYSTEM: GEN_AI_SYSTEM,
+                    SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
                 },
             ) as span:
-                span.set_attribute(SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
-                span.set_attribute(SPANDATA.GEN_AI_SYSTEM, GEN_AI_SYSTEM)
-                span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
                 set_span_data_for_embed_request(span, integration, contents, kwargs)
 
                 try:
