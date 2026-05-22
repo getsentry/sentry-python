@@ -199,6 +199,8 @@ def _wrap_connect(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
                     )
                 res = await f(self)
         else:
+            connect_data = _get_connect_data(self)
+
             with sentry_sdk.start_span(
                 op=OP.DB,
                 name="connect",
@@ -210,13 +212,30 @@ def _wrap_connect(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
                     sentry_sdk.add_breadcrumb(
                         message="connect",
                         category="query",
-                        data=span._data,
+                        data=connect_data,
                     )
                 res = await f(self)
 
         return res
 
     return _inner
+
+
+def _get_connect_data(conn: Any) -> dict[str, Any]:
+    data: dict[str, Any] = {SPANDATA.DB_SYSTEM: "mysql"}
+    host = getattr(conn, "host", None)
+    if host is not None:
+        data[SPANDATA.SERVER_ADDRESS] = host
+    port = getattr(conn, "port", None)
+    if port is not None:
+        data[SPANDATA.SERVER_PORT] = port
+    database = getattr(conn, "db", None)
+    if database is not None:
+        data[SPANDATA.DB_NAME] = database
+    user = getattr(conn, "user", None)
+    if user is not None:
+        data[SPANDATA.DB_USER] = user
+    return data
 
 
 def _set_db_data(span: Any, conn: Any) -> None:
