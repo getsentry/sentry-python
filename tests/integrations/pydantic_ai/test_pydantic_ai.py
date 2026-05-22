@@ -4338,13 +4338,7 @@ def test_image_url_base64_content_in_span(
     if span_streaming or stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
-        ctx = (
-            sentry_sdk.traces.start_span(name="test", attributes={"sentry.op": "test"})
-            if span_streaming
-            else sentry_sdk.start_transaction(op="test", name="test")
-        )
-
-        with ctx:
+        with sentry_sdk.start_transaction(op="test", name="test"):
             image_url = ImageUrl(url=url, **image_url_kwargs)
             user_part = UserPromptPart(content=["Look at this image:", image_url])
             mock_msg = MagicMock()
