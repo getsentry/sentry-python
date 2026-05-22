@@ -97,7 +97,6 @@ async def test_agent_run_async(
 
         assert spans[1]["attributes"]["sentry.op"] == "gen_ai.invoke_agent"
 
-        # Find child span types (invoke_agent is the transaction, not a child span)
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
@@ -2155,8 +2154,6 @@ async def test_invoke_agent_with_list_user_prompt(
         sentry_sdk.flush()
         spans = [item.payload for item in items]
 
-        # Check that the invoke_agent transaction has messages data
-        # The invoke_agent is the transaction itself
         if "gen_ai.request.messages" in spans[0]["attributes"]:
             messages_str = spans[0]["attributes"]["gen_ai.request.messages"]
             assert "First part" in messages_str
