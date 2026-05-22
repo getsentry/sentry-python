@@ -647,8 +647,6 @@ def _sentry_patched_create_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
                 "sentry.origin": AnthropicIntegration.origin,
             },
         )
-
-        set_on_span = span.set_attribute
     else:
         span = get_start_span_function()(
             op=OP.GEN_AI_CHAT,
@@ -656,7 +654,6 @@ def _sentry_patched_create_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
             origin=AnthropicIntegration.origin,
         )
 
-        set_on_span = span.set_data
     span.__enter__()
 
     _set_create_input_data(span, kwargs, integration)
@@ -712,10 +709,8 @@ def _sentry_patched_create_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
                 response_id=getattr(result, "id", None),
                 finish_reason=getattr(result, "stop_reason", None),
             )
-            span.__exit__(None, None, None)
-        else:
-            set_on_span("unknown_response", True)
-            span.__exit__(None, None, None)
+
+        span.__exit__(None, None, None)
 
     return result
 
@@ -749,8 +744,6 @@ async def _sentry_patched_create_async(
                 "sentry.origin": AnthropicIntegration.origin,
             },
         )
-
-        set_on_span = span.set_attribute
     else:
         span = get_start_span_function()(
             op=OP.GEN_AI_CHAT,
@@ -758,7 +751,6 @@ async def _sentry_patched_create_async(
             origin=AnthropicIntegration.origin,
         )
 
-        set_on_span = span.set_data
     span.__enter__()
 
     _set_create_input_data(span, kwargs, integration)
@@ -814,10 +806,8 @@ async def _sentry_patched_create_async(
                 response_id=getattr(result, "id", None),
                 finish_reason=getattr(result, "stop_reason", None),
             )
-            span.__exit__(None, None, None)
-        else:
-            set_on_span("unknown_response", True)
-            span.__exit__(None, None, None)
+
+        span.__exit__(None, None, None)
 
     return result
 
