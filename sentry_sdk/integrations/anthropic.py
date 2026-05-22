@@ -708,6 +708,8 @@ def _sentry_patched_create_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
                 response_id=getattr(result, "id", None),
                 finish_reason=getattr(result, "stop_reason", None),
             )
+        elif not span_streaming:
+            span.set_data("unknown_response", True)
 
         span.__exit__(None, None, None)
 
@@ -804,6 +806,8 @@ async def _sentry_patched_create_async(
                 response_id=getattr(result, "id", None),
                 finish_reason=getattr(result, "stop_reason", None),
             )
+        elif not span_streaming:
+            span.set_data("unknown_response", True)
 
         span.__exit__(None, None, None)
 
