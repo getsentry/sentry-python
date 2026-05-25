@@ -7,10 +7,8 @@ from huey.exceptions import RetryTask
 
 import sentry_sdk
 from sentry_sdk import start_transaction
-from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.huey import HueyIntegration
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SegmentSource, SpanStatus
 from sentry_sdk.utils import parse_version
 
