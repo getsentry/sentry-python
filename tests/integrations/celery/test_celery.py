@@ -1,3 +1,4 @@
+import inspect
 import threading
 from unittest import mock
 
@@ -1192,6 +1193,47 @@ def test_user_custom_headers_accessible_in_task(span_streaming, init_celery):
         assert received_headers.get(key) == value, (
             f"Custom header {key!r} not found in task.request.headers"
         )
+
+
+def test_wrap_task_run_preserves_signature(init_celery):
+    """
+    ``_wrap_task_run`` replaces ``Task.apply_async`` (and
+    ``Celery.send_task``) with a wrapper declared as
+    ``def apply_async(*args, **kwargs)``. ``@functools.wraps`` copies
+    ``__wrapped__``, so ``inspect.signature`` resolves through it, but
+    other introspection tools (e.g. ``inspect.getcallargs``) do not
+    follow ``__wrapped__`` and would otherwise see the wrapper's bare
+    ``(*args, **kwargs)``.
+
+    Setting ``wrapper.__signature__ = inspect.signature(f)`` keeps the
+    wrapped function's signature visible regardless of how callers
+    inspect the wrapper. This mirrors PR #3178, which applied the same
+    fix to the ``sentry_sdk.tracing.trace`` decorator.
+    """
+    from celery.app.task import Task
+
+    init_celery()
+
+    wrapped = getattr(Task.apply_async, "__wrapped__", None)
+    assert wrapped is not None, (
+        "_wrap_task_run did not run; Task.apply_async has no __wrapped__"
+    )
+
+    expected_sig = inspect.signature(wrapped)
+
+    # ``inspect.signature`` follows ``__wrapped__``, so this passes either
+    # way; included as a sanity check that the wrapped signature is the
+    # one we expect to be preserved.
+    assert inspect.signature(Task.apply_async) == expected_sig
+
+    # ``inspect.getcallargs`` does NOT follow ``__wrapped__``; it inspects
+    # the wrapper's own ``__code__`` unless ``__signature__`` is set. The
+    # fix makes ``getcallargs`` see the wrapped function's parameter
+    # names instead of {'args': (...), 'kwargs': {}}.
+    callargs = inspect.getcallargs(Task.apply_async, None, (1, 2), {})
+    assert "self" in callargs
+    assert callargs["args"] == (1, 2)
+    assert callargs["kwargs"] == {}
 
 
 @pytest.mark.skip(reason="placeholder so that forked test does not come last")

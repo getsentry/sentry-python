@@ -1,3 +1,4 @@
+import inspect
 import sys
 from collections.abc import Mapping
 from functools import wraps
@@ -308,6 +309,16 @@ def _wrap_task_run(f: "F") -> "F":
                 kwarg_headers, span, integration.monitor_beat_tasks
             )
             return f(*args, **kwargs)
+
+    # Preserve the wrapped function's signature on the wrapper so that
+    # tools that inspect the wrapper (e.g. ``mock.patch(..., autospec=True)``
+    # or IDE introspection) see the original ``apply_async`` signature
+    # rather than the wrapper's bare ``(*args, **kwargs)``. Mirrors the
+    # ``__signature__`` override added in #3178 for the ``trace`` decorator.
+    try:
+        apply_async.__signature__ = inspect.signature(f)  # type: ignore[attr-defined]
+    except (TypeError, ValueError):
+        pass
 
     return apply_async  # type: ignore
 
