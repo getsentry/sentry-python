@@ -158,6 +158,24 @@ def test_task_retry(capture_events, capture_items, init_huey, has_span_streaming
         assert execute_span["name"] == "retry_task"
         assert execute_span["status"] == SpanStatus.OK
         assert len(huey) == 1
+
+        task = huey.dequeue()
+        huey.execute(task)
+
+        sentry_sdk.get_client().flush()
+
+        all_payloads = [i.payload for i in items]
+        task_spans = [
+            p
+            for p in all_payloads
+            if p["attributes"]["sentry.op"] == OP.QUEUE_TASK_HUEY
+        ]
+        assert len(task_spans) == 2
+        retry_span = task_spans[1]
+        assert retry_span["is_segment"]
+        assert retry_span["name"] == "retry_task"
+        assert retry_span["status"] == SpanStatus.OK
+        assert len(huey) == 0
     else:
         events = capture_events()
         result = execute_huey_task(huey, retry_task, context)
