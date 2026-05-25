@@ -25,11 +25,11 @@ except ImportError:
 
 @pytest.fixture
 def init_huey(sentry_init):
-    def inner(has_span_streaming=None, send_default_pii=True):
+    def inner(has_span_streaming=None):
         sentry_init(
             integrations=[HueyIntegration()],
             traces_sample_rate=1.0,
-            send_default_pii=send_default_pii,
+            send_default_pii=True,
             _experiments={"trace_lifecycle": "stream"} if has_span_streaming else {},
         )
 
@@ -281,15 +281,12 @@ def test_span_origin_consumer(init_huey, capture_events):
     assert event["contexts"]["trace"]["origin"] == "auto.queue.huey"
 
 
-@pytest.mark.parametrize("pii_enabled", [True, False])
 @pytest.mark.parametrize("has_span_streaming", [True, False])
 @pytest.mark.skipif(HUEY_VERSION < (3, 0), reason="group was added in 3.0")
 def test_huey_enqueue_group(
-    init_huey, capture_events, capture_items, pii_enabled, has_span_streaming
+    init_huey, capture_events, capture_items, has_span_streaming
 ):
-    huey = init_huey(
-        has_span_streaming=has_span_streaming, send_default_pii=pii_enabled
-    )
+    huey = init_huey(has_span_streaming=has_span_streaming)
 
     @huey.task()
     def task1():
@@ -360,25 +357,6 @@ def test_huey_enqueue_group(
         assert task1_execute_span["attributes"]["messaging.message.id"] is not None
         assert task1_execute_span["attributes"]["messaging.message.retry.count"] == 0
 
-        if pii_enabled:
-            assert (
-                task1_execute_span["attributes"]["messaging.message.args"]
-                != SENSITIVE_DATA_SUBSTITUTE
-            )
-            assert (
-                task1_execute_span["attributes"]["messaging.message.kwargs"]
-                != SENSITIVE_DATA_SUBSTITUTE
-            )
-        else:
-            assert (
-                task1_execute_span["attributes"]["messaging.message.args"]
-                == SENSITIVE_DATA_SUBSTITUTE
-            )
-            assert (
-                task1_execute_span["attributes"]["messaging.message.kwargs"]
-                == SENSITIVE_DATA_SUBSTITUTE
-            )
-
         assert task2_execute_span["name"] == "task2"
         assert task2_execute_span["status"] == "ok"
         assert task2_execute_span["parent_span_id"] == task2_enqueue_span["span_id"]
@@ -388,25 +366,6 @@ def test_huey_enqueue_group(
         assert (
             task2_execute_span["attributes"]["sentry.span.source"] == SegmentSource.TASK
         )
-
-        if pii_enabled:
-            assert (
-                task2_execute_span["attributes"]["messaging.message.args"]
-                != SENSITIVE_DATA_SUBSTITUTE
-            )
-            assert (
-                task2_execute_span["attributes"]["messaging.message.kwargs"]
-                != SENSITIVE_DATA_SUBSTITUTE
-            )
-        else:
-            assert (
-                task2_execute_span["attributes"]["messaging.message.args"]
-                == SENSITIVE_DATA_SUBSTITUTE
-            )
-            assert (
-                task2_execute_span["attributes"]["messaging.message.kwargs"]
-                == SENSITIVE_DATA_SUBSTITUTE
-            )
 
     else:
         events = capture_events()
@@ -450,15 +409,12 @@ def test_huey_enqueue_group(
             assert consumer_event["tags"]["huey_task_retry"] is False
 
 
-@pytest.mark.parametrize("pii_enabled", [True, False])
 @pytest.mark.parametrize("has_span_streaming", [True, False])
 @pytest.mark.skipif(HUEY_VERSION < (3, 0), reason="chord was added in 3.0")
 def test_huey_enqueue_chord(
-    init_huey, capture_events, capture_items, pii_enabled, has_span_streaming
+    init_huey, capture_events, capture_items, has_span_streaming
 ):
-    huey = init_huey(
-        has_span_streaming=has_span_streaming, send_default_pii=pii_enabled
-    )
+    huey = init_huey(has_span_streaming=has_span_streaming)
 
     @huey.task()
     def task1():
@@ -514,25 +470,6 @@ def test_huey_enqueue_chord(
         assert (
             task1_execute_span["attributes"]["sentry.span.source"] == SegmentSource.TASK
         )
-        if pii_enabled:
-            assert (
-                task1_execute_span["attributes"]["messaging.message.args"]
-                != SENSITIVE_DATA_SUBSTITUTE
-            )
-            assert (
-                task1_execute_span["attributes"]["messaging.message.kwargs"]
-                != SENSITIVE_DATA_SUBSTITUTE
-            )
-        else:
-            assert (
-                task1_execute_span["attributes"]["messaging.message.args"]
-                == SENSITIVE_DATA_SUBSTITUTE
-            )
-            assert (
-                task1_execute_span["attributes"]["messaging.message.kwargs"]
-                == SENSITIVE_DATA_SUBSTITUTE
-            )
-
         # chord callback (task2) is enqueued during task1's execution
         assert task2_enqueue_span["name"] == "task2"
         assert task2_enqueue_span["status"] == "ok"
@@ -550,26 +487,6 @@ def test_huey_enqueue_chord(
         assert (
             task2_execute_span["attributes"]["sentry.span.source"] == SegmentSource.TASK
         )
-
-        if pii_enabled:
-            assert (
-                task2_execute_span["attributes"]["messaging.message.args"]
-                != SENSITIVE_DATA_SUBSTITUTE
-            )
-            assert (
-                task2_execute_span["attributes"]["messaging.message.kwargs"]
-                != SENSITIVE_DATA_SUBSTITUTE
-            )
-        else:
-            assert (
-                task2_execute_span["attributes"]["messaging.message.args"]
-                == SENSITIVE_DATA_SUBSTITUTE
-            )
-            assert (
-                task2_execute_span["attributes"]["messaging.message.kwargs"]
-                == SENSITIVE_DATA_SUBSTITUTE
-            )
-
     else:
         events = capture_events()
         with start_transaction() as transaction:

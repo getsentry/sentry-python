@@ -211,12 +211,6 @@ def patch_execute() -> None:
                         "messaging.message.system": "huey",
                         "messaging.message.retry.count": (task.default_retries or 0)
                         - task.retries,
-                        "messaging.message.args": task.args
-                        if should_send_default_pii()
-                        else SENSITIVE_DATA_SUBSTITUTE,
-                        "messaging.message.kwargs": task.kwargs
-                        if should_send_default_pii()
-                        else SENSITIVE_DATA_SUBSTITUTE,
                     },
                 )
             else:
