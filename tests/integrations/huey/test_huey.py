@@ -3,7 +3,7 @@ from decimal import DivisionByZero
 import pytest
 from huey import __version__ as HUEY_VERSION
 from huey.api import MemoryHuey, Result
-from huey.exceptions import RetryTask
+from huey.exceptions import CancelExecution, RetryTask
 
 import sentry_sdk
 from sentry_sdk import start_transaction
@@ -93,13 +93,12 @@ def test_task_transaction_or_segment(
         sentry_sdk.get_client().flush()
 
         payloads = [i.payload for i in items]
-        (execute_span,) = [
-            # Searching for this span specifically because this is what has the raised exception
-            p
-            for p in payloads
-            if p["attributes"]["sentry.op"] == OP.QUEUE_TASK_HUEY
-        ]
+        assert len(payloads) == 2
+        enqueue_span, execute_span = payloads
+
+        assert enqueue_span["attributes"]["sentry.op"] == OP.QUEUE_SUBMIT_HUEY
         assert execute_span["is_segment"]
+        assert execute_span["attributes"]["sentry.op"] == OP.QUEUE_TASK_HUEY
         assert execute_span["name"] == "division"
         assert execute_span["status"] == (
             SpanStatus.ERROR if task_fails else SpanStatus.OK
@@ -148,15 +147,21 @@ def test_task_retry(capture_events, capture_items, init_huey, has_span_streaming
         sentry_sdk.get_client().flush()
 
         payloads = [i.payload for i in items]
-        (execute_span,) = [
-            # Searching for this span specifically because this is what has the raised exception
-            p
-            for p in payloads
-            if p["attributes"]["sentry.op"] == OP.QUEUE_TASK_HUEY
-        ]
+        assert len(payloads) == 3
+
+        enqueue_span, re_enqueue_span, execute_span = payloads
+
+        assert enqueue_span["attributes"]["sentry.op"] == OP.QUEUE_SUBMIT_HUEY
+        assert enqueue_span["is_segment"]
+
+        assert re_enqueue_span["attributes"]["sentry.op"] == OP.QUEUE_SUBMIT_HUEY
+        assert not re_enqueue_span["is_segment"]
+
+        assert execute_span["attributes"]["sentry.op"] == OP.QUEUE_TASK_HUEY
         assert execute_span["is_segment"]
         assert execute_span["name"] == "retry_task"
         assert execute_span["status"] == SpanStatus.OK
+
         assert len(huey) == 1
 
         task = huey.dequeue()
@@ -165,13 +170,10 @@ def test_task_retry(capture_events, capture_items, init_huey, has_span_streaming
         sentry_sdk.get_client().flush()
 
         all_payloads = [i.payload for i in items]
-        task_spans = [
-            p
-            for p in all_payloads
-            if p["attributes"]["sentry.op"] == OP.QUEUE_TASK_HUEY
-        ]
-        assert len(task_spans) == 2
-        retry_span = task_spans[1]
+
+        assert len(all_payloads) == 4
+        retry_span = all_payloads[3]
+
         assert retry_span["is_segment"]
         assert retry_span["name"] == "retry_task"
         assert retry_span["status"] == SpanStatus.OK
@@ -194,10 +196,50 @@ def test_task_retry(capture_events, capture_items, init_huey, has_span_streaming
         assert len(huey) == 0
 
 
+@pytest.mark.parametrize(
+    "has_span_streaming", [True, False], ids=["streaming", "no_streaming"]
+)
+def test_task_cancel_does_not_override_status(
+    capture_events, capture_items, init_huey, has_span_streaming
+):
+    huey = init_huey(has_span_streaming=has_span_streaming)
+
+    @huey.task()
+    def cancel_task():
+        raise CancelExecution()
+
+    if has_span_streaming:
+        items = capture_items("span")
+        execute_huey_task(huey, cancel_task)
+        sentry_sdk.get_client().flush()
+
+        payloads = [i.payload for i in items]
+        assert len(payloads) == 2
+        enqueue_span, execute_span = payloads
+
+        assert enqueue_span["attributes"]["sentry.op"] == OP.QUEUE_SUBMIT_HUEY
+        assert execute_span["attributes"]["sentry.op"] == OP.QUEUE_TASK_HUEY
+        assert execute_span["is_segment"]
+        assert execute_span["name"] == "cancel_task"
+        assert execute_span["status"] == SpanStatus.OK
+    else:
+        events = capture_events()
+        execute_huey_task(huey, cancel_task)
+
+        (event,) = events
+        assert event["transaction"] == "cancel_task"
+        assert event["contexts"]["trace"]["status"] == "aborted"
+
+
 @pytest.mark.parametrize("lock_name", ["lock.a", "lock.b"], ids=["locked", "unlocked"])
+@pytest.mark.parametrize(
+    "has_span_streaming", [True, False], ids=["streaming", "no_streaming"]
+)
 @pytest.mark.skipif(HUEY_VERSION < (2, 5), reason="is_locked was added in 2.5")
-def test_task_lock(capture_events, init_huey, lock_name):
-    huey = init_huey()
+def test_task_lock(
+    capture_events, capture_items, init_huey, lock_name, has_span_streaming
+):
+    huey = init_huey(has_span_streaming=has_span_streaming)
 
     task_lock_name = "lock.a"
     should_be_locked = task_lock_name == lock_name
@@ -207,19 +249,39 @@ def test_task_lock(capture_events, init_huey, lock_name):
     def maybe_locked_task():
         pass
 
-    events = capture_events()
+    if has_span_streaming:
+        items = capture_items("span")
+        with huey.lock_task(lock_name):
+            assert huey.is_locked(task_lock_name) == should_be_locked
+            execute_huey_task(huey, maybe_locked_task)
+        sentry_sdk.get_client().flush()
 
-    with huey.lock_task(lock_name):
-        assert huey.is_locked(task_lock_name) == should_be_locked
-        result = execute_huey_task(huey, maybe_locked_task)
+        payloads = [i.payload for i in items]
+        assert len(payloads) == 2
+        enqueue_span, execute_span = payloads
 
-    (event,) = events
+        assert enqueue_span["attributes"]["sentry.op"] == OP.QUEUE_SUBMIT_HUEY
+        assert execute_span["attributes"]["sentry.op"] == OP.QUEUE_TASK_HUEY
 
-    assert event["transaction"] == "maybe_locked_task"
-    assert event["tags"]["huey_task_id"] == result.task.id
-    assert (
-        event["contexts"]["trace"]["status"] == "aborted" if should_be_locked else "ok"
-    )
+        assert execute_span["is_segment"]
+        assert execute_span["name"] == "maybe_locked_task"
+        assert execute_span["status"] == SpanStatus.OK
+    else:
+        events = capture_events()
+
+        with huey.lock_task(lock_name):
+            assert huey.is_locked(task_lock_name) == should_be_locked
+            result = execute_huey_task(huey, maybe_locked_task)
+
+        (event,) = events
+
+        assert event["transaction"] == "maybe_locked_task"
+        assert event["tags"]["huey_task_id"] == result.task.id
+        assert (
+            event["contexts"]["trace"]["status"] == "aborted"
+            if should_be_locked
+            else "ok"
+        )
     assert len(huey) == 0
 
 

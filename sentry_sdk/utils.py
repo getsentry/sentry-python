@@ -32,6 +32,13 @@ try:
 except ImportError:
     AIOHttpHttpException = None
 
+try:
+    from huey.exceptions import CancelExecution, RetryTask, TaskLockedException
+
+    HueyControlFlowExceptions = (CancelExecution, RetryTask, TaskLockedException)
+except ImportError:
+    HueyControlFlowExceptions = None
+
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -1992,6 +1999,12 @@ def should_be_treated_as_error(ty: "Any", value: "Any") -> bool:
     # Because they have to be raised and handled by the framework, we need this check so
     # that we don't accidentally overwrite a status of "ok" with "error" here.
     if AIOHttpHttpException and isinstance(value, AIOHttpHttpException):
+        return False
+
+    # Huey also has exceptions that are raised for control flow reasons, not
+    # because there's an actual error. This check, similar to the aiohttp one above,
+    # is to prevent accidentally overwriting a status of "ok" with "error"
+    if HueyControlFlowExceptions and isinstance(value, HueyControlFlowExceptions):
         return False
 
     return True
