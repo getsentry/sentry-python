@@ -5,8 +5,13 @@ from huey import __version__ as HUEY_VERSION
 from huey.api import MemoryHuey, Result
 from huey.exceptions import RetryTask
 
+import sentry_sdk
 from sentry_sdk import start_transaction
+from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.huey import HueyIntegration
+from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import SegmentSource, SpanStatus
 from sentry_sdk.utils import parse_version
 
 HUEY_VERSION = parse_version(HUEY_VERSION)
@@ -20,11 +25,12 @@ except ImportError:
 
 @pytest.fixture
 def init_huey(sentry_init):
-    def inner():
+    def inner(has_span_streaming=None, send_default_pii=True):
         sentry_init(
             integrations=[HueyIntegration()],
             traces_sample_rate=1.0,
-            send_default_pii=True,
+            send_default_pii=send_default_pii,
+            _experiments={"trace_lifecycle": "stream"} if has_span_streaming else {},
         )
 
         return MemoryHuey(name="sentry_sdk")
@@ -69,39 +75,67 @@ def test_task_result(init_huey):
 
 
 @pytest.mark.parametrize("task_fails", [True, False], ids=["error", "success"])
-def test_task_transaction(capture_events, init_huey, task_fails):
-    huey = init_huey()
+@pytest.mark.parametrize(
+    "has_span_streaming", [True, False], ids=["streaming", "no_streaming"]
+)
+def test_task_transaction_or_segment(
+    capture_events, capture_items, init_huey, task_fails, has_span_streaming
+):
+    huey = init_huey(has_span_streaming=has_span_streaming)
 
     @huey.task()
     def division(a, b):
         return a / b
 
-    events = capture_events()
-    execute_huey_task(
-        huey, division, 1, int(not task_fails), exceptions=(DivisionByZero,)
-    )
+    if has_span_streaming:
+        items = capture_items("span")
+        execute_huey_task(
+            huey, division, 1, int(not task_fails), exceptions=(DivisionByZero,)
+        )
+        sentry_sdk.get_client().flush()
 
-    if task_fails:
-        error_event = events.pop(0)
-        assert error_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
-        assert error_event["exception"]["values"][0]["mechanism"]["type"] == "huey"
-
-    (event,) = events
-    assert event["type"] == "transaction"
-    assert event["transaction"] == "division"
-    assert event["transaction_info"] == {"source": "task"}
-
-    if task_fails:
-        assert event["contexts"]["trace"]["status"] == "internal_error"
+        payloads = [i.payload for i in items]
+        (execute_span,) = [
+            # Searching for this span specifically because this is what has the raised exception
+            p
+            for p in payloads
+            if p["attributes"]["sentry.op"] == OP.QUEUE_TASK_HUEY
+        ]
+        assert execute_span["is_segment"]
+        assert execute_span["name"] == "division"
+        assert execute_span["status"] == (
+            SpanStatus.ERROR if task_fails else SpanStatus.OK
+        )
     else:
-        assert event["contexts"]["trace"]["status"] == "ok"
+        events = capture_events()
+        execute_huey_task(
+            huey, division, 1, int(not task_fails), exceptions=(DivisionByZero,)
+        )
 
-    assert "huey_task_id" in event["tags"]
-    assert "huey_task_retry" in event["tags"]
+        if task_fails:
+            error_event = events.pop(0)
+            assert error_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
+            assert error_event["exception"]["values"][0]["mechanism"]["type"] == "huey"
+
+        (event,) = events
+        assert event["type"] == "transaction"
+        assert event["transaction"] == "division"
+        assert event["transaction_info"] == {"source": "task"}
+
+        if task_fails:
+            assert event["contexts"]["trace"]["status"] == "internal_error"
+        else:
+            assert event["contexts"]["trace"]["status"] == "ok"
+
+        assert "huey_task_id" in event["tags"]
+        assert "huey_task_retry" in event["tags"]
 
 
-def test_task_retry(capture_events, init_huey):
-    huey = init_huey()
+@pytest.mark.parametrize(
+    "has_span_streaming", [True, False], ids=["streaming", "no_streaming"]
+)
+def test_task_retry(capture_events, capture_items, init_huey, has_span_streaming):
+    huey = init_huey(has_span_streaming=has_span_streaming)
     context = {"retry": True}
 
     @huey.task()
@@ -110,21 +144,38 @@ def test_task_retry(capture_events, init_huey):
             context["retry"] = False
             raise RetryTask()
 
-    events = capture_events()
-    result = execute_huey_task(huey, retry_task, context)
-    (event,) = events
+    if has_span_streaming:
+        items = capture_items("span")
+        execute_huey_task(huey, retry_task, context)
+        sentry_sdk.get_client().flush()
 
-    assert event["transaction"] == "retry_task"
-    assert event["tags"]["huey_task_id"] == result.task.id
-    assert len(huey) == 1
+        payloads = [i.payload for i in items]
+        (execute_span,) = [
+            # Searching for this span specifically because this is what has the raised exception
+            p
+            for p in payloads
+            if p["attributes"]["sentry.op"] == OP.QUEUE_TASK_HUEY
+        ]
+        assert execute_span["is_segment"]
+        assert execute_span["name"] == "retry_task"
+        assert execute_span["status"] == SpanStatus.OK
+        assert len(huey) == 1
+    else:
+        events = capture_events()
+        result = execute_huey_task(huey, retry_task, context)
+        (event,) = events
 
-    task = huey.dequeue()
-    huey.execute(task)
-    (event, _) = events
+        assert event["transaction"] == "retry_task"
+        assert event["tags"]["huey_task_id"] == result.task.id
+        assert len(huey) == 1
 
-    assert event["transaction"] == "retry_task"
-    assert event["tags"]["huey_task_id"] == result.task.id
-    assert len(huey) == 0
+        task = huey.dequeue()
+        huey.execute(task)
+        (event, _) = events
+
+        assert event["transaction"] == "retry_task"
+        assert event["tags"]["huey_task_id"] == result.task.id
+        assert len(huey) == 0
 
 
 @pytest.mark.parametrize("lock_name", ["lock.a", "lock.b"], ids=["locked", "unlocked"])
@@ -230,11 +281,15 @@ def test_span_origin_consumer(init_huey, capture_events):
     assert event["contexts"]["trace"]["origin"] == "auto.queue.huey"
 
 
+@pytest.mark.parametrize("pii_enabled", [True, False])
+@pytest.mark.parametrize("has_span_streaming", [True, False])
 @pytest.mark.skipif(HUEY_VERSION < (3, 0), reason="group was added in 3.0")
-def test_huey_enqueue_group(init_huey, capture_events):
-    huey = init_huey()
-
-    events = capture_events()
+def test_huey_enqueue_group(
+    init_huey, capture_events, capture_items, pii_enabled, has_span_streaming
+):
+    huey = init_huey(
+        has_span_streaming=has_span_streaming, send_default_pii=pii_enabled
+    )
 
     @huey.task()
     def task1():
@@ -244,51 +299,166 @@ def test_huey_enqueue_group(init_huey, capture_events):
     def task2():
         pass
 
-    with start_transaction() as transaction:
+    if has_span_streaming:
+        items = capture_items("span")
+
         huey.enqueue(group([task1.s(), task2.s()]))
 
-    for _ in range(2):
-        task = huey.dequeue()
-        huey.execute(task)
+        for _ in range(2):
+            task = huey.dequeue()
+            huey.execute(task)
 
-    assert len(events) == 3
+        sentry_sdk.get_client().flush()
+        assert len(items) == 5
 
-    # Assert enqueue spans were successfully recorded
-    producer_event = events[0]
-    assert producer_event["type"] == "transaction"
-    assert producer_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
-    assert producer_event["contexts"]["trace"]["origin"] == "manual"
+        (
+            task1_enqueue_span,
+            task2_enqueue_span,
+            group_span,
+            task1_execute_span,
+            task2_execute_span,
+        ) = [i.payload for i in items]
 
-    spans = producer_event["spans"]
-    assert len(spans) == 3
-    assert spans[0]["op"] == "queue.submit.huey"
-    assert spans[0]["description"] == "Huey Task Group"
-    assert spans[1]["op"] == "queue.submit.huey"
-    assert spans[1]["description"] == "task1"
-    assert spans[2]["op"] == "queue.submit.huey"
-    assert spans[2]["description"] == "task2"
+        assert group_span["is_segment"]
+        assert not task1_enqueue_span["is_segment"]
+        assert not task2_enqueue_span["is_segment"]
+        assert task1_execute_span["is_segment"]
+        assert task2_execute_span["is_segment"]
 
-    # Consumer transaction assertions (one per task)
-    consumer_events = events[1:]
-    for _, (consumer_event, expected_name) in enumerate(
-        zip(consumer_events, ["task1", "task2"])
-    ):
-        assert consumer_event["type"] == "transaction"
-        assert consumer_event["transaction"] == expected_name
-        assert consumer_event["transaction_info"] == {"source": "task"}
-        assert consumer_event["contexts"]["trace"]["op"] == "queue.task.huey"
-        assert consumer_event["contexts"]["trace"]["origin"] == "auto.queue.huey"
-        assert consumer_event["contexts"]["trace"]["status"] == "ok"
-        assert consumer_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
-        assert "huey_task_id" in consumer_event["tags"]
-        assert consumer_event["tags"]["huey_task_retry"] is False
+        assert group_span["name"] == "Huey Task Group"
+        assert group_span["status"] == "ok"
+        assert group_span["attributes"]["sentry.op"] == "queue.submit.huey"
+        assert group_span["attributes"]["sentry.origin"] == "auto.queue.huey"
+
+        assert task1_enqueue_span["name"] == "task1"
+        assert task1_enqueue_span["status"] == "ok"
+        assert task1_enqueue_span["parent_span_id"] == group_span["span_id"]
+        assert (
+            task1_enqueue_span["attributes"]["sentry.segment.name"] == "Huey Task Group"
+        )
+        assert task1_enqueue_span["attributes"]["sentry.op"] == "queue.submit.huey"
+        assert task1_enqueue_span["attributes"]["sentry.origin"] == "auto.queue.huey"
+
+        assert task2_enqueue_span["name"] == "task2"
+        assert task2_enqueue_span["status"] == "ok"
+        assert task2_enqueue_span["parent_span_id"] == group_span["span_id"]
+        assert (
+            task2_enqueue_span["attributes"]["sentry.segment.name"] == "Huey Task Group"
+        )
+        assert task2_enqueue_span["attributes"]["sentry.op"] == "queue.submit.huey"
+        assert task2_enqueue_span["attributes"]["sentry.origin"] == "auto.queue.huey"
+
+        assert task1_execute_span["name"] == "task1"
+        assert task1_execute_span["status"] == "ok"
+        assert task1_execute_span["attributes"]["messaging.message.system"] == "huey"
+        assert task1_execute_span["parent_span_id"] == task1_enqueue_span["span_id"]
+        assert task1_execute_span["attributes"]["sentry.op"] == "queue.task.huey"
+        assert task1_execute_span["attributes"]["sentry.origin"] == "auto.queue.huey"
+        assert (
+            task1_execute_span["attributes"]["sentry.span.source"] == SegmentSource.TASK
+        )
+        assert task1_execute_span["attributes"]["messaging.message.id"] is not None
+        assert task1_execute_span["attributes"]["messaging.message.retry.count"] == 0
+
+        if pii_enabled:
+            assert (
+                task1_execute_span["attributes"]["messaging.message.args"]
+                != SENSITIVE_DATA_SUBSTITUTE
+            )
+            assert (
+                task1_execute_span["attributes"]["messaging.message.kwargs"]
+                != SENSITIVE_DATA_SUBSTITUTE
+            )
+        else:
+            assert (
+                task1_execute_span["attributes"]["messaging.message.args"]
+                == SENSITIVE_DATA_SUBSTITUTE
+            )
+            assert (
+                task1_execute_span["attributes"]["messaging.message.kwargs"]
+                == SENSITIVE_DATA_SUBSTITUTE
+            )
+
+        assert task2_execute_span["name"] == "task2"
+        assert task2_execute_span["status"] == "ok"
+        assert task2_execute_span["parent_span_id"] == task2_enqueue_span["span_id"]
+        assert task2_execute_span["attributes"]["messaging.message.system"] == "huey"
+        assert task2_execute_span["attributes"]["sentry.op"] == "queue.task.huey"
+        assert task2_execute_span["attributes"]["sentry.origin"] == "auto.queue.huey"
+        assert (
+            task2_execute_span["attributes"]["sentry.span.source"] == SegmentSource.TASK
+        )
+
+        if pii_enabled:
+            assert (
+                task2_execute_span["attributes"]["messaging.message.args"]
+                != SENSITIVE_DATA_SUBSTITUTE
+            )
+            assert (
+                task2_execute_span["attributes"]["messaging.message.kwargs"]
+                != SENSITIVE_DATA_SUBSTITUTE
+            )
+        else:
+            assert (
+                task2_execute_span["attributes"]["messaging.message.args"]
+                == SENSITIVE_DATA_SUBSTITUTE
+            )
+            assert (
+                task2_execute_span["attributes"]["messaging.message.kwargs"]
+                == SENSITIVE_DATA_SUBSTITUTE
+            )
+
+    else:
+        events = capture_events()
+        with start_transaction() as transaction:
+            huey.enqueue(group([task1.s(), task2.s()]))
+
+        for _ in range(2):
+            task = huey.dequeue()
+            huey.execute(task)
+
+        assert len(events) == 3
+
+        # Assert enqueue spans were successfully recorded
+        producer_event = events[0]
+        assert producer_event["type"] == "transaction"
+        assert producer_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+        assert producer_event["contexts"]["trace"]["origin"] == "manual"
+
+        spans = producer_event["spans"]
+        assert len(spans) == 3
+        assert spans[0]["op"] == "queue.submit.huey"
+        assert spans[0]["description"] == "Huey Task Group"
+        assert spans[1]["op"] == "queue.submit.huey"
+        assert spans[1]["description"] == "task1"
+        assert spans[2]["op"] == "queue.submit.huey"
+        assert spans[2]["description"] == "task2"
+
+        # Consumer transaction assertions (one per task)
+        consumer_events = events[1:]
+        for consumer_event, expected_name in zip(consumer_events, ["task1", "task2"]):
+            assert consumer_event["type"] == "transaction"
+            assert consumer_event["transaction"] == expected_name
+            assert consumer_event["transaction_info"] == {"source": "task"}
+            assert consumer_event["contexts"]["trace"]["op"] == "queue.task.huey"
+            assert consumer_event["contexts"]["trace"]["origin"] == "auto.queue.huey"
+            assert consumer_event["contexts"]["trace"]["status"] == "ok"
+            assert (
+                consumer_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+            )
+            assert "huey_task_id" in consumer_event["tags"]
+            assert consumer_event["tags"]["huey_task_retry"] is False
 
 
+@pytest.mark.parametrize("pii_enabled", [True, False])
+@pytest.mark.parametrize("has_span_streaming", [True, False])
 @pytest.mark.skipif(HUEY_VERSION < (3, 0), reason="chord was added in 3.0")
-def test_huey_enqueue_chord(init_huey, capture_events):
-    huey = init_huey()
-
-    events = capture_events()
+def test_huey_enqueue_chord(
+    init_huey, capture_events, capture_items, pii_enabled, has_span_streaming
+):
+    huey = init_huey(
+        has_span_streaming=has_span_streaming, send_default_pii=pii_enabled
+    )
 
     @huey.task()
     def task1():
@@ -298,44 +468,153 @@ def test_huey_enqueue_chord(init_huey, capture_events):
     def task2(results):
         pass
 
-    with start_transaction() as transaction:
+    if has_span_streaming:
+        items = capture_items("span")
         huey.enqueue(chord([task1.s()], task2.s()))
 
-    for _ in range(2):
-        task = huey.dequeue()
-        huey.execute(task)
+        for _ in range(2):
+            task = huey.dequeue()
+            huey.execute(task)
 
-    assert len(events) == 3
+        sentry_sdk.get_client().flush()
+        assert len(items) == 5
 
-    # Enqueue spans
-    producer_event = events[0]
-    assert producer_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
-    assert producer_event["contexts"]["trace"]["origin"] == "manual"
+        (
+            task1_enqueue_span,
+            chord_span,
+            task2_enqueue_span,
+            task1_execute_span,
+            task2_execute_span,
+        ) = [i.payload for i in items]
 
-    spans = producer_event["spans"]
-    assert len(spans) == 2
-    assert spans[0]["op"] == "queue.submit.huey"
-    assert spans[0]["description"] == "Huey Chord"
-    assert spans[1]["op"] == "queue.submit.huey"
-    assert spans[1]["description"] == "task1"
+        assert chord_span["is_segment"]
+        assert not task1_enqueue_span["is_segment"]
+        assert not task2_enqueue_span["is_segment"]
+        assert task1_execute_span["is_segment"]
+        assert task2_execute_span["is_segment"]
 
-    task1_event = events[1]
-    # Confirm the first task enqueued the chord callback
-    task1_spans = task1_event["spans"]
-    assert len(task1_spans) == 1
-    assert task1_spans[0]["op"] == "queue.submit.huey"
-    assert task1_spans[0]["description"] == "task2"
+        assert chord_span["name"] == "Huey Chord"
+        assert chord_span["status"] == "ok"
+        assert chord_span["attributes"]["sentry.op"] == "queue.submit.huey"
+        assert chord_span["attributes"]["sentry.origin"] == "auto.queue.huey"
 
-    consumer_events = events[1:]
-    for _, (consumer_event, expected_name) in enumerate(
-        zip(consumer_events, ["task1", "task2"])
-    ):
-        assert consumer_event["type"] == "transaction"
-        assert consumer_event["transaction"] == expected_name
-        assert consumer_event["transaction_info"] == {"source": "task"}
-        assert consumer_event["contexts"]["trace"]["op"] == "queue.task.huey"
-        assert consumer_event["contexts"]["trace"]["origin"] == "auto.queue.huey"
-        assert consumer_event["contexts"]["trace"]["status"] == "ok"
-        assert consumer_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
-        assert "huey_task_id" in consumer_event["tags"]
-        assert consumer_event["tags"]["huey_task_retry"] is False
+        assert task1_enqueue_span["name"] == "task1"
+        assert task1_enqueue_span["status"] == "ok"
+        assert task1_enqueue_span["parent_span_id"] == chord_span["span_id"]
+        assert task1_enqueue_span["attributes"]["sentry.segment.name"] == "Huey Chord"
+        assert task1_enqueue_span["attributes"]["sentry.op"] == "queue.submit.huey"
+        assert task1_enqueue_span["attributes"]["sentry.origin"] == "auto.queue.huey"
+
+        assert task1_execute_span["name"] == "task1"
+        assert task1_execute_span["status"] == "ok"
+        assert task1_execute_span["attributes"]["messaging.message.system"] == "huey"
+        assert task1_execute_span["parent_span_id"] == task1_enqueue_span["span_id"]
+        assert task1_execute_span["attributes"]["sentry.op"] == "queue.task.huey"
+        assert task1_execute_span["attributes"]["sentry.origin"] == "auto.queue.huey"
+        assert (
+            task1_execute_span["attributes"]["sentry.span.source"] == SegmentSource.TASK
+        )
+        if pii_enabled:
+            assert (
+                task1_execute_span["attributes"]["messaging.message.args"]
+                != SENSITIVE_DATA_SUBSTITUTE
+            )
+            assert (
+                task1_execute_span["attributes"]["messaging.message.kwargs"]
+                != SENSITIVE_DATA_SUBSTITUTE
+            )
+        else:
+            assert (
+                task1_execute_span["attributes"]["messaging.message.args"]
+                == SENSITIVE_DATA_SUBSTITUTE
+            )
+            assert (
+                task1_execute_span["attributes"]["messaging.message.kwargs"]
+                == SENSITIVE_DATA_SUBSTITUTE
+            )
+
+        # chord callback (task2) is enqueued during task1's execution
+        assert task2_enqueue_span["name"] == "task2"
+        assert task2_enqueue_span["status"] == "ok"
+        assert task2_enqueue_span["parent_span_id"] == task1_execute_span["span_id"]
+        assert task2_enqueue_span["attributes"]["sentry.segment.name"] == "task1"
+        assert task2_enqueue_span["attributes"]["sentry.op"] == "queue.submit.huey"
+        assert task2_enqueue_span["attributes"]["sentry.origin"] == "auto.queue.huey"
+
+        assert task2_execute_span["name"] == "task2"
+        assert task2_execute_span["status"] == "ok"
+        assert task2_execute_span["parent_span_id"] == task2_enqueue_span["span_id"]
+        assert task2_execute_span["attributes"]["messaging.message.system"] == "huey"
+        assert task2_execute_span["attributes"]["sentry.op"] == "queue.task.huey"
+        assert task2_execute_span["attributes"]["sentry.origin"] == "auto.queue.huey"
+        assert (
+            task2_execute_span["attributes"]["sentry.span.source"] == SegmentSource.TASK
+        )
+
+        if pii_enabled:
+            assert (
+                task2_execute_span["attributes"]["messaging.message.args"]
+                != SENSITIVE_DATA_SUBSTITUTE
+            )
+            assert (
+                task2_execute_span["attributes"]["messaging.message.kwargs"]
+                != SENSITIVE_DATA_SUBSTITUTE
+            )
+        else:
+            assert (
+                task2_execute_span["attributes"]["messaging.message.args"]
+                == SENSITIVE_DATA_SUBSTITUTE
+            )
+            assert (
+                task2_execute_span["attributes"]["messaging.message.kwargs"]
+                == SENSITIVE_DATA_SUBSTITUTE
+            )
+
+    else:
+        events = capture_events()
+        with start_transaction() as transaction:
+            huey.enqueue(chord([task1.s()], task2.s()))
+
+        for _ in range(2):
+            task = huey.dequeue()
+            huey.execute(task)
+
+        assert len(events) == 3
+
+        # Enqueue spans
+        producer_event = events[0]
+        assert producer_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+        assert producer_event["contexts"]["trace"]["origin"] == "manual"
+
+        spans = producer_event["spans"]
+        assert len(spans) == 2
+        assert spans[0]["op"] == "queue.submit.huey"
+        assert spans[0]["description"] == "Huey Chord"
+        assert spans[1]["op"] == "queue.submit.huey"
+        assert spans[1]["description"] == "task1"
+
+        task1_event = events[1]
+        # Confirm the first task enqueued the chord callback
+        assert len(task1_event["spans"]) == 1
+        assert task1_event["spans"][0]["op"] == "queue.submit.huey"
+        assert task1_event["spans"][0]["description"] == "task2"
+        assert task1_event["type"] == "transaction"
+        assert task1_event["transaction"] == "task1"
+        assert task1_event["transaction_info"] == {"source": "task"}
+        assert task1_event["contexts"]["trace"]["op"] == "queue.task.huey"
+        assert task1_event["contexts"]["trace"]["origin"] == "auto.queue.huey"
+        assert task1_event["contexts"]["trace"]["status"] == "ok"
+        assert task1_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+        assert "huey_task_id" in task1_event["tags"]
+        assert task1_event["tags"]["huey_task_retry"] is False
+
+        task2_event = events[2]
+        assert task2_event["type"] == "transaction"
+        assert task2_event["transaction"] == "task2"
+        assert task2_event["transaction_info"] == {"source": "task"}
+        assert task2_event["contexts"]["trace"]["op"] == "queue.task.huey"
+        assert task2_event["contexts"]["trace"]["origin"] == "auto.queue.huey"
+        assert task2_event["contexts"]["trace"]["status"] == "ok"
+        assert task2_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+        assert "huey_task_id" in task2_event["tags"]
+        assert task2_event["tags"]["huey_task_retry"] is False
