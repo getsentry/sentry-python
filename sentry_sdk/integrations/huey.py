@@ -212,6 +212,7 @@ def patch_execute() -> None:
                         "messaging.message.retry.count": (task.default_retries or 0)
                         - task.retries,
                     },
+                    parent_span=None,
                 )
             else:
                 transaction = continue_trace(
