@@ -178,10 +178,11 @@ deps =
     {py3.6,py3.7,py3.8}-flask-v1.1.4: jinja2<3.1.1
 
     ; Install the SDK in deps so uv resolves runtime deps together with
-    ; everything above in a single pass
-    ; py3.6/py3.7 lack PEP 660 support so no editable.
-    !py3.6-!py3.7: -e .
-    {py3.6,py3.7}: .
+    ; everything above in a single pass.
+    ; uv only supports PEP 660 editables; py3.6's max setuptools (~59) predates
+    ; PEP 660, so fall back to a non-editable install there.
+    !py3.6: -e .
+    py3.6: .
 
 setenv =
     PYTHONDONTWRITEBYTECODE=1
