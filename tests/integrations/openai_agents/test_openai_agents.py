@@ -945,7 +945,7 @@ async def test_client_span_custom_model(
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
-def test_agent_invocation_span_sync_no_pii(
+async def test_agent_invocation_span_sync_no_pii(
     sentry_init,
     capture_events,
     capture_items,
@@ -1172,7 +1172,7 @@ def test_agent_invocation_span_sync_no_pii(
         ),
     ],
 )
-def test_agent_invocation_span_sync(
+async def test_agent_invocation_span_sync(
     sentry_init,
     capture_events,
     capture_items,
