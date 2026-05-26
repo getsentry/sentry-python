@@ -441,17 +441,13 @@ def _set_response_attributes(
     if not (should_send_default_pii() and integration.include_prompts):
         return
 
-    set_on_span = (
-        span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
-    )
-
     llm_response_text = _extract_llm_response_text(new_messages)
     if llm_response_text:
-        set_on_span(SPANDATA.GEN_AI_RESPONSE_TEXT, llm_response_text)
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, llm_response_text)
     elif new_messages:
-        set_on_span(SPANDATA.GEN_AI_RESPONSE_TEXT, new_messages)
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, new_messages)
     else:
-        set_on_span(SPANDATA.GEN_AI_RESPONSE_TEXT, result)
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, result)
 
     tool_calls = _extract_tool_calls(new_messages)
     if tool_calls:
