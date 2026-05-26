@@ -53,6 +53,7 @@ TEST_SUITE_CONFIG = {
         "num_versions": 2,
         "deps": {
             "*": ["dill"],
+            ">=2.73": ["betterproto==2.0.0b6"],
         },
     },
     "boto3": {
@@ -71,6 +72,7 @@ TEST_SUITE_CONFIG = {
         "package": "celery",
         "deps": {
             "*": ["newrelic<10.17.0", "redis"],
+            "py3.6": ["newrelic<8"],
             "py3.7": ["importlib-metadata<5.0"],
         },
     },
@@ -150,6 +152,9 @@ TEST_SUITE_CONFIG = {
     "gql": {
         "package": "gql[all]",
         "num_versions": 2,
+        "deps": {
+            "==4.3.0b2": ["graphql-core>=3.3.0a3"],
+        },
     },
     "google_genai": {
         "package": "google-genai",
@@ -268,6 +273,7 @@ TEST_SUITE_CONFIG = {
         "package": "fastmcp",
         "deps": {
             "*": ["pytest-asyncio"],
+            "==3.4.0b1": ["fastmcp-slim==3.4.0b1"],
         },
     },
     "openai-base": {
@@ -313,7 +319,11 @@ TEST_SUITE_CONFIG = {
         "package": "pydantic-ai",
         "deps": {
             "*": ["pytest-asyncio"],
-            "==2.0.0b3": ["pydantic-ai-slim==2.0.0b3"],
+            "==2.0.0b3": [
+                "pydantic-ai-slim==2.0.0b3",
+                "pydantic-graph==2.0.0b3",
+                "pydantic-evals==2.0.0b3",
+            ],
         },
         "python": ">=3.10",
     },
