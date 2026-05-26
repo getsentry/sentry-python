@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.utils import capture_internal_exceptions, reraise
 
 from ..spans import (
@@ -108,7 +109,13 @@ async def _run_single_turn(
         context_wrapper, agent, should_run_agent_start_hooks, kwargs
     )
 
-    if span is None or span.timestamp is not None:
+    if (
+        span is None
+        or isinstance(span, StreamedSpan)
+        and span.end_timestamp is not None
+        or not isinstance(span, StreamedSpan)
+        and span.timestamp is not None
+    ):
         return await original_run_single_turn(*args, **kwargs)
 
     try:
@@ -188,7 +195,13 @@ async def _run_single_turn_streamed(
         is_streaming=True,
     )
 
-    if span is None or span.timestamp is not None:
+    if (
+        span is None
+        or isinstance(span, StreamedSpan)
+        and span.end_timestamp is not None
+        or not isinstance(span, StreamedSpan)
+        and span.timestamp is not None
+    ):
         return await original_run_single_turn_streamed(*args, **kwargs)
 
     try:

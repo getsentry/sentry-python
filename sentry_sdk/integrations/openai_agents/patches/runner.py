@@ -4,6 +4,7 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.utils import capture_internal_exceptions, reraise
 
 from ..spans import agent_workflow_span, update_invoke_agent_span
@@ -43,9 +44,15 @@ def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., A
                 conversation_id = kwargs.get("conversation_id")
                 if conversation_id:
                     agent._sentry_conversation_id = conversation_id
-                    workflow_span.set_data(
-                        SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id
-                    )
+
+                    if isinstance(workflow_span, StreamedSpan):
+                        workflow_span.set_attribute(
+                            SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id
+                        )
+                    else:
+                        workflow_span.set_data(
+                            SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id
+                        )
 
                 args = (agent, *args[1:])
                 try:
