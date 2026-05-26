@@ -69,7 +69,7 @@ jobs:
         uses: getsentry/action-clickhouse-in-ci@5dc8a6a50d689bd6051db0241f34849e5a36490b # v1.7
       - name: Setup Test Env
         run: |
-          pip install "coverage[toml]" tox
+          python -m pip install "coverage[toml]" tox tox-uv
       - name: Erase coverage
         run: |
           coverage erase
