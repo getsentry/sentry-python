@@ -302,7 +302,6 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         origin: str,
     ) -> "WatchedSpan":
         watched_span: "Optional[WatchedSpan]" = None
-        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if parent_id:
             parent_span: "Optional[WatchedSpan]" = self.span_map.get(parent_id)
             if parent_span:
@@ -317,7 +316,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                             },
                         )
                     )
-                    if span_streaming
+                    if isinstance(parent_span, StreamedSpan)
                     else WatchedSpan(
                         parent_span.span.start_child(op=op, name=name, origin=origin)
                     )
@@ -325,6 +324,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 parent_span.children.append(watched_span)
 
         if watched_span is None:
+            span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
             watched_span = (
                 WatchedSpan(
                     sentry_sdk.traces.start_span(
@@ -933,7 +933,7 @@ def _simplify_langchain_tools(tools: "Any") -> "Optional[List[Any]]":
     return simplified_tools if simplified_tools else None
 
 
-def _set_tools_on_span(span: "Span", tools: "Any") -> None:
+def _set_tools_on_span(span: "Union[Span, StreamedSpan]", tools: "Any") -> None:
     """Set available tools data on a span if tools are provided."""
     if tools is not None:
         simplified_tools = _simplify_langchain_tools(tools)

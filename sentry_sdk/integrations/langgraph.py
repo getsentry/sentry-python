@@ -11,6 +11,7 @@ from sentry_sdk.ai.utils import (
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import safe_serialize
 
 try:
@@ -151,7 +152,8 @@ def _wrap_state_graph_compile(f: "Callable[..., Any]") -> "Callable[..., Any]":
 def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
     @wraps(f)
     def new_invoke(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
-        integration = sentry_sdk.get_client().get_integration(LanggraphIntegration)
+        client = sentry_sdk.get_client()
+        integration = client.get_integration(LanggraphIntegration)
         if integration is None:
             return f(self, *args, **kwargs)
 
@@ -160,50 +162,101 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
             f"invoke_agent {graph_name}".strip() if graph_name else "invoke_agent"
         )
 
-        with get_start_span_function()(
-            op=OP.GEN_AI_INVOKE_AGENT,
-            name=span_name,
-            origin=LanggraphIntegration.origin,
-        ) as span:
-            if graph_name:
-                span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, graph_name)
-                span.set_data(SPANDATA.GEN_AI_AGENT_NAME, graph_name)
+        if has_span_streaming_enabled(client.options):
+            with sentry_sdk.traces.start_span(
+                name=span_name,
+                attributes={
+                    "sentry.op": OP.GEN_AI_INVOKE_AGENT,
+                    "sentry.origin": LanggraphIntegration.origin,
+                    SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
+                },
+            ) as span:
+                if graph_name:
+                    span.set_attribute(SPANDATA.GEN_AI_PIPELINE_NAME, graph_name)
+                    span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, graph_name)
 
-            span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
-
-            # Store input messages to later compare with output
-            input_messages = None
-            if (
-                len(args) > 0
-                and should_send_default_pii()
-                and integration.include_prompts
-            ):
-                input_messages = _parse_langgraph_messages(args[0])
-                if input_messages:
-                    normalized_input_messages = normalize_message_roles(input_messages)
-
-                    client = sentry_sdk.get_client()
-                    scope = sentry_sdk.get_current_scope()
-                    messages_data = (
-                        normalized_input_messages
-                        if client.options.get("stream_gen_ai_spans", False)
-                        else truncate_and_annotate_messages(
-                            normalized_input_messages, span, scope
-                        )
-                    )
-                    if messages_data is not None:
-                        set_data_normalized(
-                            span,
-                            SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                            messages_data,
-                            unpack=False,
+                # Store input messages to later compare with output
+                input_messages = None
+                if (
+                    len(args) > 0
+                    and should_send_default_pii()
+                    and integration.include_prompts
+                ):
+                    input_messages = _parse_langgraph_messages(args[0])
+                    if input_messages:
+                        normalized_input_messages = normalize_message_roles(
+                            input_messages
                         )
 
-            result = f(self, *args, **kwargs)
+                        client = sentry_sdk.get_client()
+                        scope = sentry_sdk.get_current_scope()
+                        messages_data = (
+                            normalized_input_messages
+                            if client.options.get("stream_gen_ai_spans", False)
+                            else truncate_and_annotate_messages(
+                                normalized_input_messages, span, scope
+                            )
+                        )
+                        if messages_data is not None:
+                            set_data_normalized(
+                                span,
+                                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                                messages_data,
+                                unpack=False,
+                            )
 
-            _set_response_attributes(span, input_messages, result, integration)
+                result = f(self, *args, **kwargs)
 
-            return result
+                _set_response_attributes(span, input_messages, result, integration)
+
+                return result
+        else:
+            with get_start_span_function()(
+                op=OP.GEN_AI_INVOKE_AGENT,
+                name=span_name,
+                origin=LanggraphIntegration.origin,
+            ) as span:
+                if graph_name:
+                    span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, graph_name)
+                    span.set_data(SPANDATA.GEN_AI_AGENT_NAME, graph_name)
+
+                span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+
+                # Store input messages to later compare with output
+                input_messages = None
+                if (
+                    len(args) > 0
+                    and should_send_default_pii()
+                    and integration.include_prompts
+                ):
+                    input_messages = _parse_langgraph_messages(args[0])
+                    if input_messages:
+                        normalized_input_messages = normalize_message_roles(
+                            input_messages
+                        )
+
+                        client = sentry_sdk.get_client()
+                        scope = sentry_sdk.get_current_scope()
+                        messages_data = (
+                            normalized_input_messages
+                            if client.options.get("stream_gen_ai_spans", False)
+                            else truncate_and_annotate_messages(
+                                normalized_input_messages, span, scope
+                            )
+                        )
+                        if messages_data is not None:
+                            set_data_normalized(
+                                span,
+                                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                                messages_data,
+                                unpack=False,
+                            )
+
+                result = f(self, *args, **kwargs)
+
+                _set_response_attributes(span, input_messages, result, integration)
+
+                return result
 
     return new_invoke
 
