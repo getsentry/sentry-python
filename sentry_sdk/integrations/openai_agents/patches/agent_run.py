@@ -116,10 +116,8 @@ async def _run_single_turn(
 
     if (
         span is None
-        or isinstance(span, StreamedSpan)
-        and span.end_timestamp is not None
-        or not isinstance(span, StreamedSpan)
-        and span.timestamp is not None
+        or (isinstance(span, StreamedSpan) and span.end_timestamp is not None)
+        or (not isinstance(span, StreamedSpan) and span.timestamp is not None)
     ):
         return await original_run_single_turn(*args, **kwargs)
 
@@ -202,10 +200,8 @@ async def _run_single_turn_streamed(
 
     if (
         span is None
-        or isinstance(span, StreamedSpan)
-        and span.end_timestamp is not None
-        or not isinstance(span, StreamedSpan)
-        and span.timestamp is not None
+        or (isinstance(span, StreamedSpan) and span.end_timestamp is not None)
+        or (not isinstance(span, StreamedSpan) and span.timestamp is not None)
     ):
         return await original_run_single_turn_streamed(*args, **kwargs)
 
