@@ -4,6 +4,7 @@ import uuid
 
 import pytest
 from django import VERSION as DJANGO_VERSION
+from django.core.cache import cache
 from werkzeug.test import Client
 
 try:
@@ -540,6 +541,56 @@ def test_cache_spans_templatetag(
         )
         assert second_event["spans"][0]["data"]["cache.hit"]
         assert second_event["spans"][0]["data"]["cache.item_size"] == 51
+
+
+@pytest.mark.forked
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_cache_spans_add(
+    sentry_init,
+    capture_events,
+    capture_items,
+    use_django_caching,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[
+            DjangoIntegration(
+                cache_spans=True,
+                middleware_spans=False,
+                signals_spans=False,
+            )
+        ],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
+
+    if span_streaming:
+        items = capture_items("span")
+
+        with sentry_sdk.start_transaction(name="cache-add", op="test"):
+            assert cache.add("cache-add-key", "value")
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert len(spans) == 1
+        assert spans[0]["attributes"]["sentry.op"] == "cache.put"
+        assert spans[0]["name"] == "cache-add-key"
+        assert spans[0]["attributes"]["cache.key"] == ["cache-add-key"]
+        assert spans[0]["attributes"]["cache.item_size"] == 5
+    else:
+        events = capture_events()
+
+        with sentry_sdk.start_transaction(name="cache-add", op="test"):
+            assert cache.add("cache-add-key", "value")
+
+        sentry_sdk.flush()
+        assert len(events) == 1
+        spans = events[0]["spans"]
+        assert len(spans) == 1
+        assert spans[0]["op"] == "cache.put"
+        assert spans[0]["description"] == "cache-add-key"
+        assert spans[0]["data"]["cache.key"] == ["cache-add-key"]
+        assert spans[0]["data"]["cache.item_size"] == 5
 
 
 @pytest.mark.parametrize(
