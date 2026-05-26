@@ -32,7 +32,6 @@ if django.VERSION >= (3, 0):
 
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 0), reason="Django ASGI support shipped in 3.0"
 )
@@ -140,7 +139,6 @@ async def test_basic(
 
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -192,7 +190,6 @@ async def test_async_views(
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
 @pytest.mark.parametrize("middleware_spans", [False, True])
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -269,7 +266,6 @@ async def test_active_thread_id(
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -312,7 +308,6 @@ async def test_async_views_concurrent_execution(sentry_init, settings):
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -359,7 +354,6 @@ async def test_async_middleware_that_is_function_concurrent_execution(
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -447,7 +441,6 @@ async def test_async_middleware_spans(
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -505,7 +498,6 @@ async def test_has_trace_if_performance_enabled(
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -556,7 +548,6 @@ async def test_has_trace_if_performance_disabled(
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -619,7 +610,6 @@ async def test_trace_from_headers_if_performance_enabled(
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
