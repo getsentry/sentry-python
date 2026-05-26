@@ -143,7 +143,7 @@ TEST_SUITE_CONFIG = {
     "flask": {
         "package": "flask",
         "deps": {
-            "*": ["flask-login", "werkzeug"],
+            "*": ["flask-login", "werkzeug", "blinker"],
             "<2.0": ["werkzeug<2.1.0", "markupsafe<2.1.0"],
         },
     },

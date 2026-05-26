@@ -69,6 +69,8 @@ envlist =
     {% endfor %}
 
 [testenv]
+; SDK is installed via deps below to resolve all deps at once (tox-uv limitation)
+package = skip
 deps =
     # if you change requirements-testing.txt and your change is not being reflected
     # in what's installed by tox (when running tox locally), try running tox
@@ -175,6 +177,12 @@ deps =
     {py3.6,py3.7,py3.8}-flask-v1.1.4: markupsafe<2.0.0
     {py3.6,py3.7,py3.8}-flask-v1.1.4: jinja2<3.1.1
 
+    ; Install the SDK in deps so uv resolves runtime deps together with
+    ; everything above in a single pass
+    ; py3.6/py3.7 lack PEP 660 support so no editable.
+    !py3.6-!py3.7: -e .
+    {py3.6,py3.7}: .
+
 setenv =
     PYTHONDONTWRITEBYTECODE=1
     OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
@@ -213,17 +221,6 @@ passenv =
     SENTRY_PYTHON_TEST_POSTGRES_PASSWORD
     SENTRY_PYTHON_TEST_POSTGRES_NAME
     TESTPATH
-
-; PEP 660 editable installs need setuptools>=64 (Python 3.8+), so fall
-; back to a non-editable install for the py3.6/py3.7 envs.
-usedevelop =
-    !py3.6-!py3.7: true
-
-extras =
-    bottle: bottle
-    falcon: falcon
-    flask: flask
-    pymongo: pymongo
 
 basepython =
     py3.6: python3.6
