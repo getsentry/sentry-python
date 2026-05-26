@@ -5,7 +5,6 @@ from sentry_sdk.consts import OP, SPANDATA
 
 from ..consts import SPAN_ORIGIN
 from ..utils import (
-    _create_mcp_execute_tool_spans,
     _set_agent_data,
     _set_input_data,
     _set_output_data,
@@ -55,7 +54,6 @@ def update_ai_client_span(
 
     if hasattr(response, "output") and response.output:
         _set_output_data(span, response)
-        _create_mcp_execute_tool_spans(span, response)
 
     if response_model is not None:
         span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
