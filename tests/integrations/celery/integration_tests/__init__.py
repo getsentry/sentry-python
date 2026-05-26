@@ -1,3 +1,4 @@
+import faulthandler
 import os
 import signal
 import sys
@@ -65,6 +66,12 @@ def run_beat(celery_app, runtime_seconds=1, loglevel="warning", quiet=True):
     Run Celery Beat that immediately starts tasks.
     The Celery Beat instance is automatically terminated after `runtime_seconds`.
     """
+    # If anything below wedges this (forked) child process, dump all of its
+    # thread stacks to stderr and exit, so a future hang surfaces a diagnosis
+    # in the CI log instead of just stalling pytest-forked's waitpid in the
+    # parent. Generous budget: kill_beat itself can wait up to ~30s for the
+    # pidfile, plus runtime_seconds, plus celery beat shutdown.
+    faulthandler.dump_traceback_later(45, exit=True)
     logger.info("Starting Celery Beat...")
     pid_file = os.path.join(tempfile.mkdtemp(), f"celery-beat-{os.getpid()}.pid")
 
@@ -80,4 +87,7 @@ def run_beat(celery_app, runtime_seconds=1, loglevel="warning", quiet=True):
         quiet=quiet,
         pidfile=pid_file,
     )
-    beat_instance.run()
+    try:
+        beat_instance.run()
+    finally:
+        faulthandler.cancel_dump_traceback_later()
