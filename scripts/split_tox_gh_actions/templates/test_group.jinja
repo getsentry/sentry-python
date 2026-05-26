@@ -8,14 +8,14 @@
         python-version: [{{ py_versions|join(",") }}]
         os: [ubuntu-22.04]
 
-    {% if needs_docker %}
+    {% if needs_docker or needs_postgres or needs_redis %}
     services:
+      {% if needs_docker %}
       docker:
         image: docker:dind  # Required for Docker network management
         options: --privileged  # Required for Docker-in-Docker operations
-    {% endif %}
-    {% if needs_postgres %}
-    services:
+      {% endif %}
+      {% if needs_postgres %}
       postgres:
         image: postgres
         env:
@@ -29,6 +29,18 @@
         # Maps tcp port 5432 on service container to the host
         ports:
           - 5432:5432
+      {% endif %}
+      {% if needs_redis %}
+      redis:
+        image: redis
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+      {% endif %}
     {% endif %}
     env:
       # 3.6/3.7 run in the python:X.Y container; tell uv to use that system Python.
@@ -37,6 +49,9 @@
       SENTRY_PYTHON_TEST_POSTGRES_HOST: {% raw %}${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'postgres' || 'localhost' }}{% endraw %}
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
+      {% endif %}
+      {% if needs_redis %}
+      SENTRY_PYTHON_TEST_REDIS_HOST: {% raw %}${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'redis' || 'localhost' }}{% endraw %}
       {% endif %}
     container: {% raw %}${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && format('python:{0}', matrix.python-version) || null }}{% endraw %}
     steps:
@@ -47,11 +62,6 @@
       {% if needs_clickhouse %}
       - name: "Setup ClickHouse Server"
         uses: getsentry/action-clickhouse-in-ci@5dc8a6a50d689bd6051db0241f34849e5a36490b # v1.7
-      {% endif %}
-
-      {% if needs_redis %}
-      - name: Start Redis
-        uses: supercharge/redis-github-action@87f27ff1ab2d9e62db54b11ee5e7f78ff18f8933 # v2
       {% endif %}
 
       {% if needs_java %}
