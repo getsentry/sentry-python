@@ -34,6 +34,13 @@ try:
 except ImportError:
     raise DidNotEnable("Huey is not installed")
 
+try:
+    from huey.api import chord as HueyChord
+    from huey.api import group as HueyGroup
+except ImportError:
+    HueyChord = None
+    HueyGroup = None
+
 
 HUEY_CONTROL_FLOW_EXCEPTIONS = (CancelExecution, RetryTask, TaskLockedException)
 
@@ -53,22 +60,37 @@ def patch_enqueue() -> None:
 
     @ensure_integration_enabled(HueyIntegration, old_enqueue)
     def _sentry_enqueue(
-        self: "Huey", task: "Task"
+        self: "Huey", item: "Union[Task, HueyGroup, HueyChord]"
     ) -> "Optional[Union[Result, ResultGroup]]":
+        if HueyChord is not None and isinstance(item, HueyChord):
+            span_name = "Huey Chord"
+        elif HueyGroup is not None and isinstance(item, HueyGroup):
+            span_name = "Huey Task Group"
+        else:
+            span_name = item.name
+
         with sentry_sdk.start_span(
             op=OP.QUEUE_SUBMIT_HUEY,
-            name=task.name,
+            name=span_name,
             origin=HueyIntegration.origin,
         ):
-            if not isinstance(task, PeriodicTask):
+            if (
+                not isinstance(item, PeriodicTask)
+                and not (HueyGroup is not None and isinstance(item, HueyGroup))
+                and not (HueyChord is not None and isinstance(item, HueyChord))
+            ):
                 # Attach trace propagation data to task kwargs. We do
                 # not do this for periodic tasks, as these don't
                 # really have an originating transaction.
-                task.kwargs["sentry_headers"] = {
+                # Additionally, we do not do this for Huey groups or chords, as enqueue will
+                # recursively call this method for each task within the list, resulting
+                # in the trace propagation data being attached to each task individually
+                # (which we want)
+                item.kwargs["sentry_headers"] = {
                     BAGGAGE_HEADER_NAME: get_baggage(),
                     SENTRY_TRACE_HEADER_NAME: get_traceparent(),
                 }
-            return old_enqueue(self, task)
+            return old_enqueue(self, item)
 
     Huey.enqueue = _sentry_enqueue
 

@@ -11,6 +11,12 @@ from sentry_sdk.utils import parse_version
 
 HUEY_VERSION = parse_version(HUEY_VERSION)
 
+try:
+    from huey.api import chord, group
+except ImportError:
+    chord = None
+    group = None
+
 
 @pytest.fixture
 def init_huey(sentry_init):
@@ -222,3 +228,114 @@ def test_span_origin_consumer(init_huey, capture_events):
     (event,) = events
 
     assert event["contexts"]["trace"]["origin"] == "auto.queue.huey"
+
+
+@pytest.mark.skipif(HUEY_VERSION < (3, 0), reason="group was added in 3.0")
+def test_huey_enqueue_group(init_huey, capture_events):
+    huey = init_huey()
+
+    events = capture_events()
+
+    @huey.task()
+    def task1():
+        pass
+
+    @huey.task()
+    def task2():
+        pass
+
+    with start_transaction() as transaction:
+        huey.enqueue(group([task1.s(), task2.s()]))
+
+    for _ in range(2):
+        task = huey.dequeue()
+        huey.execute(task)
+
+    assert len(events) == 3
+
+    # Assert enqueue spans were successfully recorded
+    producer_event = events[0]
+    assert producer_event["type"] == "transaction"
+    assert producer_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+    assert producer_event["contexts"]["trace"]["origin"] == "manual"
+
+    spans = producer_event["spans"]
+    assert len(spans) == 3
+    assert spans[0]["op"] == "queue.submit.huey"
+    assert spans[0]["description"] == "Huey Task Group"
+    assert spans[1]["op"] == "queue.submit.huey"
+    assert spans[1]["description"] == "task1"
+    assert spans[2]["op"] == "queue.submit.huey"
+    assert spans[2]["description"] == "task2"
+
+    # Consumer transaction assertions (one per task)
+    consumer_events = events[1:]
+    for _, (consumer_event, expected_name) in enumerate(
+        zip(consumer_events, ["task1", "task2"])
+    ):
+        assert consumer_event["type"] == "transaction"
+        assert consumer_event["transaction"] == expected_name
+        assert consumer_event["transaction_info"] == {"source": "task"}
+        assert consumer_event["contexts"]["trace"]["op"] == "queue.task.huey"
+        assert consumer_event["contexts"]["trace"]["origin"] == "auto.queue.huey"
+        assert consumer_event["contexts"]["trace"]["status"] == "ok"
+        assert consumer_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+        assert "huey_task_id" in consumer_event["tags"]
+        assert consumer_event["tags"]["huey_task_retry"] is False
+
+
+@pytest.mark.skipif(HUEY_VERSION < (3, 0), reason="chord was added in 3.0")
+def test_huey_enqueue_chord(init_huey, capture_events):
+    huey = init_huey()
+
+    events = capture_events()
+
+    @huey.task()
+    def task1():
+        pass
+
+    @huey.task()
+    def task2(results):
+        pass
+
+    with start_transaction() as transaction:
+        huey.enqueue(chord([task1.s()], task2.s()))
+
+    for _ in range(2):
+        task = huey.dequeue()
+        huey.execute(task)
+
+    assert len(events) == 3
+
+    # Enqueue spans
+    producer_event = events[0]
+    assert producer_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+    assert producer_event["contexts"]["trace"]["origin"] == "manual"
+
+    spans = producer_event["spans"]
+    assert len(spans) == 2
+    assert spans[0]["op"] == "queue.submit.huey"
+    assert spans[0]["description"] == "Huey Chord"
+    assert spans[1]["op"] == "queue.submit.huey"
+    assert spans[1]["description"] == "task1"
+
+    task1_event = events[1]
+    # Confirm the first task enqueued the chord callback
+    task1_spans = task1_event["spans"]
+    assert len(task1_spans) == 1
+    assert task1_spans[0]["op"] == "queue.submit.huey"
+    assert task1_spans[0]["description"] == "task2"
+
+    consumer_events = events[1:]
+    for _, (consumer_event, expected_name) in enumerate(
+        zip(consumer_events, ["task1", "task2"])
+    ):
+        assert consumer_event["type"] == "transaction"
+        assert consumer_event["transaction"] == expected_name
+        assert consumer_event["transaction_info"] == {"source": "task"}
+        assert consumer_event["contexts"]["trace"]["op"] == "queue.task.huey"
+        assert consumer_event["contexts"]["trace"]["origin"] == "auto.queue.huey"
+        assert consumer_event["contexts"]["trace"]["status"] == "ok"
+        assert consumer_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+        assert "huey_task_id" in consumer_event["tags"]
+        assert consumer_event["tags"]["huey_task_retry"] is False
