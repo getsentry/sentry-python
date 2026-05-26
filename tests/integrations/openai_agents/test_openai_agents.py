@@ -6117,11 +6117,10 @@ async def test_conversation_id_on_tool_span(
         # Tool span should have the conversation_id passed to Runner.run()
         assert tool_span["attributes"]["gen_ai.conversation.id"] == "conv_tool_test_456"
 
-        # Workflow span (transaction) should have the same conversation_id
+        # Workflow span should have the same conversation_id
         workflow_span = spans[4]
         assert workflow_span["is_segment"] is True
 
-        # Workflow span (transaction) should have the same conversation_id
         assert (
             workflow_span["attributes"]["gen_ai.conversation.id"]
             == "conv_tool_test_456"
