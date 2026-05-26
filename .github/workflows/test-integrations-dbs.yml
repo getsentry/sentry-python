@@ -62,9 +62,7 @@ jobs:
       - name: "Setup ClickHouse Server"
         uses: getsentry/action-clickhouse-in-ci@5dc8a6a50d689bd6051db0241f34849e5a36490b # v1.7
       - name: Mark workspace safe for git (3.6/3.7 container)
-        # actions/checkout sets safe.directory under a temporary HOME that is
-        # discarded after the step, so the workspace is again "dubious ownership"
-        # for later steps. Re-add it under the container's real HOME so that
+        # needed to make git rev-parse work in the containers
         # subprocesses (e.g. sentry_sdk.utils.get_git_revision) can run git.
         if: ${{ matrix.python-version == '3.6' || matrix.python-version == '3.7' }}
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
