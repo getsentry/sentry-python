@@ -11,6 +11,7 @@ from sentry_sdk.ai.utils import (
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
     should_truncate_gen_ai_input,
@@ -389,14 +390,18 @@ def _set_usage_data(span: "sentry_sdk.tracing.Span", messages: "Any") -> None:
         output_tokens += int(token_usage.get("completion_tokens", 0))
         total_tokens += int(token_usage.get("total_tokens", 0))
 
+    set_on_span = (
+        span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
+    )
+
     if input_tokens > 0:
-        span.set_data(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
+        set_on_span(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
 
     if output_tokens > 0:
-        span.set_data(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
+        set_on_span(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
 
     if total_tokens > 0:
-        span.set_data(
+        set_on_span(
             SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
             total_tokens,
         )
@@ -436,13 +441,17 @@ def _set_response_attributes(
     if not (should_send_default_pii() and integration.include_prompts):
         return
 
+    set_on_span = (
+        span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
+    )
+
     llm_response_text = _extract_llm_response_text(new_messages)
     if llm_response_text:
-        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, llm_response_text)
+        set_on_span(span, SPANDATA.GEN_AI_RESPONSE_TEXT, llm_response_text)
     elif new_messages:
-        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, new_messages)
+        set_on_span(span, SPANDATA.GEN_AI_RESPONSE_TEXT, new_messages)
     else:
-        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, result)
+        set_on_span(span, SPANDATA.GEN_AI_RESPONSE_TEXT, result)
 
     tool_calls = _extract_tool_calls(new_messages)
     if tool_calls:
