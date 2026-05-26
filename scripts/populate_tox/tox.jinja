@@ -171,9 +171,9 @@ deps =
     # tox-uv does not seed pip into venvs, so all installs must go through deps.
 
     ; https://github.com/pallets/flask/issues/4455
-    {py3.7,py3.8,py3.9,py3.10,py3.11}-flask-v{1}: itsdangerous>=0.24,<2.0
-    {py3.7,py3.8,py3.9,py3.10,py3.11}-flask-v{1}: markupsafe<2.0.0
-    {py3.7,py3.8,py3.9,py3.10,py3.11}-flask-v{1}: jinja2<3.1.1
+    {py3.6,py3.7,py3.8}-flask-v1.1.4: itsdangerous>=0.24,<2.0
+    {py3.6,py3.7,py3.8}-flask-v1.1.4: markupsafe<2.0.0
+    {py3.6,py3.7,py3.8}-flask-v1.1.4: jinja2<3.1.1
 
 setenv =
     PYTHONDONTWRITEBYTECODE=1
