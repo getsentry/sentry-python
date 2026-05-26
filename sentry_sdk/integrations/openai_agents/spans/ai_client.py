@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 def ai_client_span(
     agent: "Agent", get_response_kwargs: "dict[str, Any]"
-) -> "sentry_sdk.tracing.Span":
+) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
     # TODO-anton: implement other types of operations. Now "chat" is hardcoded.
     # Get model name from agent.model or fall back to request model (for when agent.model is None/default)
     model_name = None

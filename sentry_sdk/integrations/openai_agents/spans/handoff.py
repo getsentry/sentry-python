@@ -26,7 +26,7 @@ def handoff_span(
             # Add conversation ID from agent
             conv_id = getattr(from_agent, "_sentry_conversation_id", None)
             if conv_id:
-                span.set_data(SPANDATA.GEN_AI_CONVERSATION_ID, conv_id)
+                span.set_attribute(SPANDATA.GEN_AI_CONVERSATION_ID, conv_id)
     else:
         with sentry_sdk.start_span(
             op=OP.GEN_AI_HANDOFF,

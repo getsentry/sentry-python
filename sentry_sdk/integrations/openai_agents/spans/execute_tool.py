@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 def execute_tool_span(
     tool: "agents.Tool", *args: "Any", **kwargs: "Any"
-) -> "sentry_sdk.tracing.Span":
+) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
     if span_streaming:
         span = sentry_sdk.traces.start_span(

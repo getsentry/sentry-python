@@ -7,10 +7,14 @@ from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from ..consts import SPAN_ORIGIN
 
 if TYPE_CHECKING:
+    from typing import Union
+
     import agents
 
 
-def agent_workflow_span(agent: "agents.Agent") -> "sentry_sdk.tracing.Span":
+def agent_workflow_span(
+    agent: "agents.Agent",
+) -> "Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]":
     # Create a transaction or a span if an transaction is already active
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
     if span_streaming:

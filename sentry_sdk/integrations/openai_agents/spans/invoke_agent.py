@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 def invoke_agent_span(
     context: "agents.RunContextWrapper", agent: "agents.Agent", kwargs: "dict[str, Any]"
-) -> "sentry_sdk.tracing.Span":
+) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
     if span_streaming:
         span = sentry_sdk.traces.start_span(
