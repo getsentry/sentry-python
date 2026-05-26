@@ -13,7 +13,7 @@ from ..spans import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Awaitable, Callable, Optional
+    from typing import Any, Awaitable, Callable, Optional, Union
 
     from agents.run_internal.run_steps import SingleStepResult
 
@@ -51,7 +51,7 @@ def _maybe_start_agent_span(
     should_run_agent_start_hooks: bool,
     span_kwargs: "dict[str, Any]",
     is_streaming: bool = False,
-) -> "Optional[Span]":
+) -> "Optional[Union[Span, StreamedSpan]]":
     """
     Start an agent invocation span if conditions are met.
     Handles ending any existing span for a different agent.
@@ -79,7 +79,12 @@ def _maybe_start_agent_span(
     context_wrapper._sentry_agent_span = span
     agent._sentry_agent_span = span
 
-    if is_streaming:
+    if not is_streaming:
+        return span
+
+    if isinstance(span, StreamedSpan):
+        span.set_attribute(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+    else:
         span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
     return span

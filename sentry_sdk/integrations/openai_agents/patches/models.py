@@ -17,7 +17,7 @@ from sentry_sdk.utils import logger
 from ..spans import ai_client_span, update_ai_client_span
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Optional
+    from typing import Any, Callable, Optional, Union
 
     from sentry_sdk.tracing import Span
 
@@ -42,7 +42,7 @@ def _set_response_model_on_agent_span(
 
 
 def _inject_trace_propagation_headers(
-    hosted_tool: "HostedMCPTool", span: "Span"
+    hosted_tool: "HostedMCPTool", span: "Union[Span, StreamedSpan]"
 ) -> None:
     headers = hosted_tool.tool_config.get("headers")
     if headers is None:

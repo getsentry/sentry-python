@@ -142,7 +142,12 @@ def _create_run_streamed_wrapper(
 
         # Set conversation ID on workflow span early so it's captured even on errors
         if conversation_id:
-            workflow_span.set_data(SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id)
+            if isinstance(workflow_span, StreamedSpan):
+                workflow_span.set_attribute(
+                    SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id
+                )
+            else:
+                workflow_span.set_data(SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id)
 
         # Store span on agent for cleanup
         agent._sentry_workflow_span = workflow_span
