@@ -7,7 +7,6 @@ from functools import wraps
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.ai.monitoring import set_ai_pipeline_name
 from sentry_sdk.ai.utils import (
     GEN_AI_ALLOWED_MESSAGE_ROLES,
     get_start_span_function,
@@ -246,22 +245,13 @@ class LangchainIntegration(Integration):
         _patch_embeddings_provider(OllamaEmbeddings)
 
 
-class WatchedSpan:
-    span: "Union[Span, StreamedSpan]" = None  # type: ignore[assignment]
-    children: "List[WatchedSpan]" = []
-    is_pipeline: bool = False
-
-    def __init__(self, span: "Union[Span, StreamedSpan]") -> None:
-        self.span = span
-
-
 class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     """Callback handler that creates Sentry spans."""
 
     def __init__(
         self, max_span_map_size: "Optional[int]", include_prompts: bool
     ) -> None:
-        self.span_map: "OrderedDict[UUID, WatchedSpan]" = OrderedDict()
+        self.span_map: "OrderedDict[UUID, Union[sentry_sdk.tracing.Span, StreamedSpan]]" = OrderedDict()
         self.max_span_map_size = max_span_map_size
         self.include_prompts = include_prompts
 
@@ -276,8 +266,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if not run_id or run_id not in self.span_map:
                 return
 
-            span_data = self.span_map[run_id]
-            span = span_data.span
+            span = self.span_map[run_id]
 
             sentry_sdk.capture_exception(
                 error, span._scope if isinstance(span, StreamedSpan) else span.scope
@@ -300,57 +289,51 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         op: str,
         name: str,
         origin: str,
-    ) -> "WatchedSpan":
-        watched_span: "Optional[WatchedSpan]" = None
+    ) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
+        span = None
         if parent_id:
-            parent_span: "Optional[WatchedSpan]" = self.span_map.get(parent_id)
+            parent_span: "Optional[Union[sentry_sdk.tracing.Span, StreamedSpan]]" = (
+                self.span_map.get(parent_id)
+            )
             if parent_span:
-                watched_span = (
-                    WatchedSpan(
-                        sentry_sdk.traces.start_span(
-                            parent_span=parent_span,
-                            name=name,
-                            attributes={
-                                "sentry.op": op,
-                                "sentry.origin": origin,
-                            },
-                        )
-                    )
-                    if isinstance(parent_span, StreamedSpan)
-                    else WatchedSpan(
-                        parent_span.span.start_child(op=op, name=name, origin=origin)
-                    )
-                )
-                parent_span.children.append(watched_span)
-
-        if watched_span is None:
-            span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-            watched_span = (
-                WatchedSpan(
+                span = (
                     sentry_sdk.traces.start_span(
+                        parent_span=parent_span,
                         name=name,
                         attributes={
                             "sentry.op": op,
                             "sentry.origin": origin,
                         },
                     )
+                    if isinstance(parent_span, StreamedSpan)
+                    else parent_span.start_child(op=op, name=name, origin=origin)
+                )
+
+        if span is None:
+            span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+            span = (
+                sentry_sdk.traces.start_span(
+                    name=name,
+                    attributes={
+                        "sentry.op": op,
+                        "sentry.origin": origin,
+                    },
                 )
                 if span_streaming
-                else WatchedSpan(sentry_sdk.start_span(op=op, name=name, origin=origin))
+                else sentry_sdk.start_span(op=op, name=name, origin=origin)
             )
 
-        watched_span.span.__enter__()
-        self.span_map[run_id] = watched_span
+        span.__enter__()
+        self.span_map[run_id] = span
         self.gc_span_map()
-        return watched_span
+        return span
 
     def _exit_span(
-        self: "SentryLangchainCallback", span_data: "WatchedSpan", run_id: "UUID"
+        self: "SentryLangchainCallback",
+        span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
+        run_id: "UUID",
     ) -> None:
-        if span_data.is_pipeline:
-            set_ai_pipeline_name(None)
-
-        span_data.span.__exit__(None, None, None)
+        span.__exit__(None, None, None)
         del self.span_map[run_id]
 
     def on_llm_start(
@@ -378,14 +361,13 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 or ""
             )
 
-            watched_span = self._create_span(
+            span = self._create_span(
                 run_id,
                 parent_run_id,
                 op=OP.GEN_AI_TEXT_COMPLETION,
                 name=f"text_completion {model}".strip(),
                 origin=LangchainIntegration.origin,
             )
-            span = watched_span.span
 
             set_on_span = (
                 span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
@@ -459,14 +441,13 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 or ""
             )
 
-            watched_span = self._create_span(
+            span = self._create_span(
                 run_id,
                 kwargs.get("parent_run_id"),
                 op=OP.GEN_AI_CHAT,
                 name=f"chat {model}".strip(),
                 origin=LangchainIntegration.origin,
             )
-            span = watched_span.span
 
             set_on_span = (
                 span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
@@ -542,8 +523,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if not run_id or run_id not in self.span_map:
                 return
 
-            span_data = self.span_map[run_id]
-            span = span_data.span
+            span = self.span_map[run_id]
 
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
@@ -553,7 +533,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 )
 
             _record_token_usage(span, response)
-            self._exit_span(span_data, run_id)
+            self._exit_span(span, run_id)
 
     def on_llm_end(
         self: "SentryLangchainCallback",
@@ -567,8 +547,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if not run_id or run_id not in self.span_map:
                 return
 
-            span_data = self.span_map[run_id]
-            span = span_data.span
+            span = self.span_map[run_id]
 
             try:
                 generation = response.generations[0][0]
@@ -622,7 +601,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 )
 
             _record_token_usage(span, response)
-            self._exit_span(span_data, run_id)
+            self._exit_span(span, run_id)
 
     def on_llm_error(
         self: "SentryLangchainCallback",
@@ -655,15 +634,14 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if not run_id or run_id not in self.span_map:
                 return
 
-            span_data = self.span_map[run_id]
-            span = span_data.span
+            span = self.span_map[run_id]
 
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
                     span, SPANDATA.GEN_AI_RESPONSE_TEXT, finish.return_values.items()
                 )
 
-            self._exit_span(span_data, run_id)
+            self._exit_span(span, run_id)
 
     def on_tool_start(
         self: "SentryLangchainCallback",
@@ -680,14 +658,13 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             tool_name = serialized.get("name") or kwargs.get("name") or ""
 
-            watched_span = self._create_span(
+            span = self._create_span(
                 run_id,
                 kwargs.get("parent_run_id"),
                 op=OP.GEN_AI_EXECUTE_TOOL,
                 name=f"execute_tool {tool_name}".strip(),
                 origin=LangchainIntegration.origin,
             )
-            span = watched_span.span
 
             set_on_span = (
                 span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
@@ -726,13 +703,12 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
             if not run_id or run_id not in self.span_map:
                 return
 
-            span_data = self.span_map[run_id]
-            span = span_data.span
+            span = self.span_map[run_id]
 
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(span, SPANDATA.GEN_AI_TOOL_OUTPUT, output)
 
-            self._exit_span(span_data, run_id)
+            self._exit_span(span, run_id)
 
     def on_tool_error(
         self,
