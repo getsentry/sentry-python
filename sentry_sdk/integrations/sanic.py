@@ -230,7 +230,7 @@ async def _context_exit(
                     span.set_attribute(SPANDATA.HTTP_STATUS_CODE, response_status)
                     span.status = "error" if response_status >= 400 else "ok"
 
-                span._end()
+                span.end()
             else:
                 span.set_http_status(response_status)
                 span.sampled &= (

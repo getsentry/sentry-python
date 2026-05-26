@@ -451,8 +451,8 @@ def test_transactions(
         segments = [
             i.payload
             for i in items
-            if i.type == "span"
-            and i.payload["attributes"].get("sentry.origin") == "auto.http.sanic"
+            if i.payload["attributes"].get("sentry.origin") == "auto.http.sanic"
+            and i.payload["is_segment"]
         ]
         assert len(segments) <= 1
         (segment, *_) = [*segments, None]
@@ -535,8 +535,7 @@ def test_span_origin(sentry_init, app, capture_events, capture_items, span_strea
         (segment,) = [
             i.payload
             for i in items
-            if i.type == "span"
-            and i.payload["attributes"].get("sentry.origin") == "auto.http.sanic"
+            if i.payload["attributes"].get("sentry.origin") == "auto.http.sanic"
         ]
         assert segment["attributes"]["sentry.origin"] == "auto.http.sanic"
     else:
