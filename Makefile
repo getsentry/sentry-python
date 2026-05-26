@@ -12,17 +12,17 @@ help:
 	@echo
 	@false
 
-.venv:
+$(VENV_PATH):
 	python -m venv $(VENV_PATH)
 	$(VENV_PATH)/bin/pip install tox tox-uv
 
-dist: .venv
+dist: $(VENV_PATH)
 	rm -rf dist dist-serverless build
 	$(VENV_PATH)/bin/pip install wheel setuptools
 	$(VENV_PATH)/bin/python setup.py sdist bdist_wheel
 .PHONY: dist
 
-apidocs: .venv
+apidocs: $(VENV_PATH)
 	@$(VENV_PATH)/bin/pip install --editable .
 	@$(VENV_PATH)/bin/pip install -U -r ./requirements-docs.txt
 	rm -rf docs/_build
