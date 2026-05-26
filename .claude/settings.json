@@ -30,11 +30,15 @@
       "Bash(mv:*)",
       "Bash(source .venv/bin/activate)",
       "Bash(source tox.venv/bin/activate:*)",
+      "Bash(source .tox/*/bin/activate:*)",
       "Bash(tox:*)",
       "Bash(tox.venv/bin/tox:*)",
       "Bash(.tox/*/bin/python:*)",
       "Bash(.tox/*/bin/pytest:*)",
-      "Bash(.tox/*/bin/ruff:*)"
+      "Bash(.tox/*/bin/ruff:*)",
+      "Bash(ruff format:*)",
+      "Bash(ruff check:*)",
+      "Bash(mypy:*)"
     ],
     "deny": []
   }
