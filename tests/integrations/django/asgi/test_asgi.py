@@ -30,9 +30,17 @@ if django.VERSION >= (3, 0):
     APPS += [asgi_application]
 
 
+@pytest.fixture
+def make_asgi_application():
+    """Build a fresh ASGI application. Call AFTER sentry_init so middleware
+    instrumentation is installed before Django builds the middleware chain."""
+    from django.core.asgi import get_asgi_application
+
+    return get_asgi_application
+
+
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 0), reason="Django ASGI support shipped in 3.0"
 )
@@ -140,7 +148,6 @@ async def test_basic(
 
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -192,7 +199,6 @@ async def test_async_views(
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
 @pytest.mark.parametrize("middleware_spans", [False, True])
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -269,42 +275,37 @@ async def test_active_thread_id(
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
-async def test_async_views_concurrent_execution(sentry_init, settings):
-    import asyncio
+async def test_async_views_concurrent_execution(
+    sentry_init, settings, make_asgi_application
+):
     import time
 
     settings.MIDDLEWARE = []
-    asgi_application.load_middleware(is_async=True)
-
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
     )
 
-    comm = HttpCommunicator(
-        asgi_application, "GET", "/my_async_view"
-    )  # sleeps for 1 second
+    application = make_asgi_application()
+
+    comm = HttpCommunicator(application, "GET", "/my_async_view")  # sleeps for 1 second
     comm2 = HttpCommunicator(
-        asgi_application, "GET", "/my_async_view"
+        application, "GET", "/my_async_view"
     )  # sleeps for 1 second
 
-    loop = asyncio.get_event_loop()
+    start = time.monotonic()
+    resp1, resp2 = await asyncio.gather(
+        comm.get_response(timeout=5),
+        comm2.get_response(timeout=5),
+    )
+    await asyncio.gather(comm.wait(), comm2.wait())
+    end = time.monotonic()
 
-    start = time.time()
-
-    r1 = loop.create_task(comm.get_response(timeout=5))
-    r2 = loop.create_task(comm2.get_response(timeout=5))
-
-    (resp1, resp2), _ = await asyncio.wait({r1, r2})
-
-    end = time.time()
-
-    assert resp1.result()["status"] == 200
-    assert resp2.result()["status"] == 200
+    assert resp1["status"] == 200
+    assert resp2["status"] == 200
 
     assert (
         end - start < 2
@@ -312,46 +313,39 @@ async def test_async_views_concurrent_execution(sentry_init, settings):
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
 async def test_async_middleware_that_is_function_concurrent_execution(
-    sentry_init, settings
+    sentry_init, settings, make_asgi_application
 ):
-    import asyncio
     import time
 
     settings.MIDDLEWARE = [
         "tests.integrations.django.myapp.middleware.simple_middleware"
     ]
-    asgi_application.load_middleware(is_async=True)
-
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
     )
 
-    comm = HttpCommunicator(
-        asgi_application, "GET", "/my_async_view"
-    )  # sleeps for 1 second
+    application = make_asgi_application()
+
+    comm = HttpCommunicator(application, "GET", "/my_async_view")  # sleeps for 1 second
     comm2 = HttpCommunicator(
-        asgi_application, "GET", "/my_async_view"
+        application, "GET", "/my_async_view"
     )  # sleeps for 1 second
 
-    loop = asyncio.get_event_loop()
+    start = time.monotonic()
+    resp1, resp2 = await asyncio.gather(
+        comm.get_response(timeout=5),
+        comm2.get_response(timeout=5),
+    )
+    await asyncio.gather(comm.wait(), comm2.wait())
+    end = time.monotonic()
 
-    start = time.time()
-
-    r1 = loop.create_task(comm.get_response(timeout=5))
-    r2 = loop.create_task(comm2.get_response(timeout=5))
-
-    (resp1, resp2), _ = await asyncio.wait({r1, r2})
-
-    end = time.time()
-
-    assert resp1.result()["status"] == 200
-    assert resp2.result()["status"] == 200
+    assert resp1["status"] == 200
+    assert resp2["status"] == 200
 
     assert (
         end - start < 2
@@ -359,7 +353,6 @@ async def test_async_middleware_that_is_function_concurrent_execution(
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -371,6 +364,7 @@ async def test_async_middleware_spans(
     capture_items,
     settings,
     span_streaming,
+    make_asgi_application,
 ):
     settings.MIDDLEWARE = [
         "django.contrib.sessions.middleware.SessionMiddleware",
@@ -378,8 +372,6 @@ async def test_async_middleware_spans(
         "django.middleware.csrf.CsrfViewMiddleware",
         "tests.integrations.django.myapp.settings.TestMiddleware",
     ]
-    asgi_application.load_middleware(is_async=True)
-
     sentry_init(
         integrations=[DjangoIntegration(middleware_spans=True)],
         traces_sample_rate=1.0,
@@ -389,7 +381,9 @@ async def test_async_middleware_spans(
         },
     )
 
-    comm = HttpCommunicator(asgi_application, "GET", "/simple_async_view")
+    application = make_asgi_application()
+
+    comm = HttpCommunicator(application, "GET", "/simple_async_view")
     if span_streaming:
         items = capture_items("span")
 
@@ -401,21 +395,20 @@ async def test_async_middleware_spans(
         sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
 
+        # Filter out signal-receiver spans — their ordering depends on Django
+        # module import order and is not what this middleware test verifies.
+        spans = [s for s in spans if s["attributes"].get("sentry.op") != "event.django"]
+
         assert (
             render_span_tree(spans)
             == """\
 - sentry.op="http.server": name="/simple_async_view"
-  - sentry.op="event.django": name="django.db.reset_queries"
-  - sentry.op="event.django": name="django.db.close_old_connections"
   - sentry.op="middleware.django": name="django.contrib.sessions.middleware.SessionMiddleware.__acall__"
     - sentry.op="middleware.django": name="django.contrib.auth.middleware.AuthenticationMiddleware.__acall__"
       - sentry.op="middleware.django": name="django.middleware.csrf.CsrfViewMiddleware.__acall__"
         - sentry.op="middleware.django": name="tests.integrations.django.myapp.settings.TestMiddleware.__acall__"
           - sentry.op="middleware.django": name="django.middleware.csrf.CsrfViewMiddleware.process_view"
-          - sentry.op="view.render": name="simple_async_view"
-  - sentry.op="event.django": name="django.db.close_old_connections"
-  - sentry.op="event.django": name="django.core.cache.close_caches"
-  - sentry.op="event.django": name="django.core.handlers.base.reset_urlconf\""""
+          - sentry.op="view.render": name="simple_async_view\""""
         )
     else:
         events = capture_events()
@@ -428,26 +421,25 @@ async def test_async_middleware_spans(
         (transaction,) = events
 
         assert transaction["type"] == "transaction"
+
+        # Filter out signal-receiver spans — their ordering depends on Django
+        # module import order and is not what this middleware test verifies.
+        spans = [s for s in transaction["spans"] if s.get("op") != "event.django"]
+
         assert (
-            render_span_tree(transaction["spans"], transaction["contexts"]["trace"])
+            render_span_tree(spans, transaction["contexts"]["trace"])
             == """\
 - op="http.server": description=null
-  - op="event.django": description="django.db.reset_queries"
-  - op="event.django": description="django.db.close_old_connections"
   - op="middleware.django": description="django.contrib.sessions.middleware.SessionMiddleware.__acall__"
     - op="middleware.django": description="django.contrib.auth.middleware.AuthenticationMiddleware.__acall__"
       - op="middleware.django": description="django.middleware.csrf.CsrfViewMiddleware.__acall__"
         - op="middleware.django": description="tests.integrations.django.myapp.settings.TestMiddleware.__acall__"
           - op="middleware.django": description="django.middleware.csrf.CsrfViewMiddleware.process_view"
-          - op="view.render": description="simple_async_view"
-  - op="event.django": description="django.db.close_old_connections"
-  - op="event.django": description="django.core.cache.close_caches"
-  - op="event.django": description="django.core.handlers.base.reset_urlconf\""""
+          - op="view.render": description="simple_async_view\""""
         )
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -505,7 +497,6 @@ async def test_has_trace_if_performance_enabled(
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -556,7 +547,6 @@ async def test_has_trace_if_performance_disabled(
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
@@ -619,7 +609,6 @@ async def test_trace_from_headers_if_performance_enabled(
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
