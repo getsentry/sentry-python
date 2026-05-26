@@ -198,6 +198,10 @@ setenv =
     common: PYTEST_ADDOPTS="--ignore=tests/test_shadowed_module.py"
     gevent: PYTEST_ADDOPTS="--ignore=tests/test_shadowed_module.py"
 
+    # Debug CI hangs for celery on py3.7: dump tracebacks and fail the test
+    # rather than letting the job time out at the workflow level.
+    py3.7-celery: PYTEST_ADDOPTS=--timeout=120 --timeout-method=thread
+
     # TESTPATH definitions for test suites not managed by toxgen
     common: _TESTPATH=tests
     gevent: _TESTPATH=tests
