@@ -62,6 +62,24 @@
           java-version: '21'
       {% endif %}
 
+      - name: Debug git availability (3.6/3.7 container)
+        if: {% raw %}${{ matrix.python-version == '3.6' || matrix.python-version == '3.7' }}{% endraw %}
+        run: |
+          echo "=== whoami / HOME ==="
+          id
+          echo "HOME=$HOME"
+          echo "=== which git / git --version ==="
+          which git || true
+          git --version || true
+          echo "=== ls -la repo dir ==="
+          ls -la .
+          echo "=== git config --list (global+system) ==="
+          git config --list --show-origin || true
+          echo "=== git rev-parse HEAD ==="
+          git rev-parse HEAD && echo "OK" || echo "FAILED with exit=$?"
+          echo "=== git status (short) ==="
+          git status --porcelain || true
+
       - name: Setup Test Env
         # Pin tox + coverage to uv-managed Python 3.13 even when the job sets
         # UV_PYTHON_PREFERENCE=only-system for 3.6/3.7 (which only applies to tox-uv at test time).

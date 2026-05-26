@@ -46,6 +46,23 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      - name: Debug git availability (3.6/3.7 container)
+        if: ${{ matrix.python-version == '3.6' || matrix.python-version == '3.7' }}
+        run: |
+          echo "=== whoami / HOME ==="
+          id
+          echo "HOME=$HOME"
+          echo "=== which git / git --version ==="
+          which git || true
+          git --version || true
+          echo "=== ls -la repo dir ==="
+          ls -la .
+          echo "=== git config --list (global+system) ==="
+          git config --list --show-origin || true
+          echo "=== git rev-parse HEAD ==="
+          git rev-parse HEAD && echo "OK" || echo "FAILED with exit=$?"
+          echo "=== git status (short) ==="
+          git status --porcelain || true
       - name: Setup Test Env
         # Pin tox + coverage to uv-managed Python 3.13 even when the job sets
         # UV_PYTHON_PREFERENCE=only-system for 3.6/3.7 (which only applies to tox-uv at test time).
