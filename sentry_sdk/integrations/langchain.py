@@ -287,7 +287,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 parent_id
             )
             if parent_span:
-                span = parent_span.span.start_child(**kwargs)
+                span = parent_span.start_child(**kwargs)
 
         if span is None:
             span = sentry_sdk.start_span(**kwargs)
