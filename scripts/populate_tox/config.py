@@ -313,6 +313,7 @@ TEST_SUITE_CONFIG = {
         "package": "pydantic-ai",
         "deps": {
             "*": ["pytest-asyncio"],
+            "==2.0.0b3": ["pydantic-ai-slim==2.0.0b3"],
         },
         "python": ">=3.10",
     },
