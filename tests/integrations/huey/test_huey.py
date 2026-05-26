@@ -226,7 +226,10 @@ def test_task_cancel_does_not_override_status(
         events = capture_events()
         execute_huey_task(huey, cancel_task)
 
-        (event,) = events
+        if HUEY_VERSION < (3, 0, 1):
+            (event, _) = events
+        else:
+            (event,) = events
         assert event["transaction"] == "cancel_task"
         assert event["contexts"]["trace"]["status"] == "aborted"
 
