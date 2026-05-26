@@ -49,6 +49,21 @@ from openai.types.responses.response_usage import (
 
 test_run_config = agents.RunConfig(tracing_disabled=True)
 
+
+@pytest.fixture
+def sync_event_loop():
+    # agents.Runner.run_sync() in openai-agents v0.0.19 calls
+    # asyncio.get_event_loop(), which on Python 3.12+ no longer auto-creates
+    # a loop when none is set on the thread.
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        yield loop
+    finally:
+        loop.close()
+        asyncio.set_event_loop(None)
+
+
 EXAMPLE_RESPONSE = Response(
     id="chat-id",
     output=[
@@ -952,6 +967,7 @@ def test_agent_invocation_span_sync_no_pii(
     nonstreaming_responses_model_response,
     get_model_response,
     stream_gen_ai_spans,
+    sync_event_loop,
 ):
     """
     Test that the integration creates spans for agent invocations.
@@ -1181,6 +1197,7 @@ def test_agent_invocation_span_sync(
     request,
     get_model_response,
     stream_gen_ai_spans,
+    sync_event_loop,
 ):
     """
     Test that the integration creates spans for agent invocations.
