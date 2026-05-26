@@ -49,18 +49,24 @@ jobs:
         ports:
           - 5432:5432
     env:
-      SENTRY_PYTHON_TEST_POSTGRES_HOST: ${{ matrix.python-version == '3.6' && 'postgres' || 'localhost' }}
+      # 3.6/3.7 run in the python:X.Y container; tell uv to use that system Python.
+      UV_PYTHON_PREFERENCE: ${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'only-system' || 'managed' }}
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: ${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'postgres' || 'localhost' }}
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
+    container: ${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && format('python:{0}', matrix.python-version) || null }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Setup Python (host for tox + tox-uv)
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
-        with:
-          python-version: "3.13"
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
       - name: Setup Test Env
+        # Pin tox + coverage to uv-managed Python 3.13 even when the job sets
+        # UV_PYTHON_PREFERENCE=only-system for 3.6/3.7 (which only applies to tox-uv at test time).
+        env:
+          UV_PYTHON_PREFERENCE: managed
         run: |
-          python -m pip install "coverage[toml]" tox tox-uv
+          uv tool install --python 3.13 --with tox-uv tox
+          uv tool install --python 3.13 "coverage[toml]"
       - name: Erase coverage
         run: |
           coverage erase
