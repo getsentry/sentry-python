@@ -69,8 +69,11 @@ def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., A
                             )
 
                             if (
-                                invoke_agent_span is not None
-                                and invoke_agent_span.timestamp is None
+                                invoke_agent_span is None
+                                or isinstance(invoke_agent_span, StreamedSpan)
+                                and invoke_agent_span.end_timestamp is not None
+                                or not isinstance(invoke_agent_span, StreamedSpan)
+                                and invoke_agent_span.timestamp is not None
                             ):
                                 update_invoke_agent_span(
                                     span=invoke_agent_span,
