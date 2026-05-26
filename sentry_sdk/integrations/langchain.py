@@ -247,11 +247,11 @@ class LangchainIntegration(Integration):
 
 
 class WatchedSpan:
-    span: "Span" = None  # type: ignore[assignment]
+    span: "Union[Span, StreamedSpan]" = None  # type: ignore[assignment]
     children: "List[WatchedSpan]" = []
     is_pipeline: bool = False
 
-    def __init__(self, span: "Span") -> None:
+    def __init__(self, span: "Union[Span, StreamedSpan]") -> None:
         self.span = span
 
 
