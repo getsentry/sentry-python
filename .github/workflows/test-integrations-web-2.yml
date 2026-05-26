@@ -33,20 +33,13 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.6","3.7","3.8","3.9","3.10","3.11","3.12","3.13","3.14","3.14t"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-22.04]
-    # Use Docker container only for Python 3.6
-    container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
-        if: ${{ matrix.python-version != '3.6' }}
+      - name: Setup Python (host for tox + tox-uv)
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
-          python-version: ${{ matrix.python-version }}
-          allow-prereleases: true
+          python-version: "3.13"
       - name: Setup Test Env
         run: |
           python -m pip install "coverage[toml]" tox tox-uv
@@ -93,14 +86,8 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-tornado"
-      - name: Generate coverage XML (Python 3.6)
-        if: ${{ !cancelled() && matrix.python-version == '3.6' }}
-        run: |
-          export COVERAGE_RCFILE=.coveragerc36
-          coverage combine .coverage-sentry-*
-          coverage xml --ignore-errors
       - name: Generate coverage XML
-        if: ${{ !cancelled() && matrix.python-version != '3.6' }}
+        if: ${{ !cancelled() }}
         run: |
           coverage combine .coverage-sentry-*
           coverage xml
