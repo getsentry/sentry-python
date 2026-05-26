@@ -253,8 +253,8 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     def gc_span_map(self) -> None:
         if self.max_span_map_size is not None:
             while len(self.span_map) > self.max_span_map_size:
-                run_id, watched_span = self.span_map.popitem(last=False)
-                self._exit_span(watched_span, run_id)
+                run_id, span = self.span_map.popitem(last=False)
+                self._exit_span(span, run_id)
 
     def _handle_error(self, run_id: "UUID", error: "Any") -> None:
         with capture_internal_exceptions():
