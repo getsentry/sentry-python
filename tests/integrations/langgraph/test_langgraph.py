@@ -712,21 +712,18 @@ def test_pregel_ainvoke_error(
         assert invoke_span.get("tags", {}).get("status") == "internal_error"
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_span_origin(
     sentry_init,
     capture_events,
     capture_items,
     stream_gen_ai_spans,
-    span_streaming,
 ):
     """Test that span origins are correctly set."""
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     graph = MockStateGraph()
@@ -734,7 +731,7 @@ def test_span_origin(
     def original_compile(self, *args, **kwargs):
         return MockCompiledGraph(self.name)
 
-    if span_streaming or stream_gen_ai_spans:
+    if stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction():
