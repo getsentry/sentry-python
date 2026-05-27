@@ -323,6 +323,22 @@ async def test_agent_invocation_span_no_pii(
         ),
         (
             "You are a coding assistant that talks like a pirate.",
+            ("Test input"),
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+            ],
+            [
+                {
+                    "content": [{"text": "Test input", "type": "text"}],
+                    "role": "user",
+                },
+            ],
+        ),
+        (
+            "You are a coding assistant that talks like a pirate.",
             [
                 {
                     "role": "system",
@@ -863,6 +879,22 @@ def test_agent_invocation_span_sync_no_pii(
             None,
             ("Test input"),
             None,
+            [
+                {
+                    "content": [{"text": "Test input", "type": "text"}],
+                    "role": "user",
+                },
+            ],
+        ),
+        (
+            "You are a coding assistant that talks like a pirate.",
+            ("Test input"),
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+            ],
             [
                 {
                     "content": [{"text": "Test input", "type": "text"}],
