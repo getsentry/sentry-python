@@ -42,6 +42,7 @@ from sentry_sdk.utils import (
     HAS_REAL_CONTEXTVARS,
     SENSITIVE_DATA_SUBSTITUTE,
     AnnotatedValue,
+    _register_control_flow_exception,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
@@ -110,6 +111,12 @@ class AioHttpIntegration(Integration):
                 "The aiohttp integration for Sentry requires Python 3.7+ "
                 " or aiocontextvars package." + CONTEXTVARS_ERROR_MESSAGE
             )
+
+        # In the aiohttp integration, all of their HTTP responses are Exceptions.
+        # Because they have to be raised and handled by the framework, we need to
+        # register the exceptions as control flow exceptions so that we don't
+        # accidentally overwrite a status of "ok" with "error".
+        _register_control_flow_exception(HTTPException)
 
         ignore_logger("aiohttp.server")
 
