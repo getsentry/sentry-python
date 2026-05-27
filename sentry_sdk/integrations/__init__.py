@@ -122,7 +122,7 @@ _MIN_VERSIONS = {
     "arq": (0, 23),
     "asyncpg": (0, 23),
     "beam": (2, 12),
-    "boto3": (1, 17),  # botocore
+    "boto3": (1, 16),  # botocore
     "bottle": (0, 12),
     "celery": (4, 4, 7),
     "chalice": (1, 16, 0),
