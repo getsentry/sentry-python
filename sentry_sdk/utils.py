@@ -27,11 +27,6 @@ except ImportError:
     # Python 3.10 and below
     BaseExceptionGroup = None  # type: ignore
 
-try:
-    from aiohttp.web_exceptions import HTTPException as AIOHttpHttpException
-except ImportError:
-    AIOHttpHttpException = None
-
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -92,6 +87,10 @@ _installed_modules = None
 _is_sentry_internal_task = contextvars.ContextVar(
     "is_sentry_internal_task", default=False
 )
+
+# These exceptions won't set the span status to error if they occur. Use
+# register_control_flow_exception to add to this list
+_control_flow_exceptions = []
 
 
 def is_internal_task() -> bool:
@@ -1983,15 +1982,16 @@ def get_current_thread_meta(
     return None, None
 
 
+def register_control_flow_exception(exc_type: type) -> None:
+    _control_flow_exceptions.append(exc_type)
+
+
 def should_be_treated_as_error(ty: "Any", value: "Any") -> bool:
     if ty == SystemExit and hasattr(value, "code") and value.code in (0, None):
         # https://docs.python.org/3/library/exceptions.html#SystemExit
         return False
 
-    # In the aiohttp integration, all of their HTTP responses are Exceptions.
-    # Because they have to be raised and handled by the framework, we need this check so
-    # that we don't accidentally overwrite a status of "ok" with "error" here.
-    if AIOHttpHttpException and isinstance(value, AIOHttpHttpException):
+    if ty in _control_flow_exceptions:
         return False
 
     return True
