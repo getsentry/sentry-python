@@ -48,16 +48,17 @@ jobs:
         if: ${{ matrix.python-version == '3.6' || matrix.python-version == '3.7' }}
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Setup Test Env
-        # Pin tox + coverage to uv-managed Python 3.13 even when the job sets
-        # UV_PYTHON_PREFERENCE=only-system for 3.6/3.7 (which only applies to tox-uv at test time).
+        # The UV_PYTHON_PREFERENCE=only-system override for 3.6/3.7 only applies to
+        # tox-uv at test time, not to the workspace venv itself.
         env:
           UV_PYTHON_PREFERENCE: managed
         run: |
-          uv tool install --python 3.13 --with tox-uv tox
-          uv tool install --python 3.13 "coverage[toml]"
+          uv sync
       - name: Erase coverage
+        env:
+          UV_PYTHON_PREFERENCE: managed
         run: |
-          coverage erase
+          uv run coverage erase
       - name: Test aiohttp
         run: |
           set -x # print commands that are executed
@@ -100,9 +101,11 @@ jobs:
           ./scripts/runtox.sh "py${{ matrix.python-version }}-tornado"
       - name: Generate coverage XML
         if: ${{ !cancelled() }}
+        env:
+          UV_PYTHON_PREFERENCE: managed
         run: |
-          coverage combine .coverage-sentry-*
-          coverage xml
+          uv run coverage combine .coverage-sentry-*
+          uv run coverage xml
       - name: Parse and Upload Coverage
         if: ${{ !cancelled() }}
         uses: getsentry/codecov-action@d90e69cdf071dfbb0430159125321dc09c424d4c # main

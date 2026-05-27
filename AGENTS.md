@@ -2,8 +2,8 @@
 
 ## Tox
 
-- Always run tox from the main `tox.venv`
-- If there is no `tox.venv`, create one with `python -m venv tox.venv`, activate it and run `pip install tox tox-uv`
+- Run tox via uv: `uv run -- tox -e <env>`
+- `tox` + `tox-uv` are declared as the project's default dev dependencies in `pyproject.toml`, so uv installs them automatically into `.venv`.
 
 ## Package Manager
 

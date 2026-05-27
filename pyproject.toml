@@ -1,4 +1,16 @@
 #
+# Project dev dependencies (PEP 735 `dev` group, installed by default).
+# Run tox with: `uv run -- tox -e <env>`
+#
+
+[dependency-groups]
+dev = [
+    "tox",
+    "tox-uv",
+    "coverage[toml]",
+]
+
+#
 # Tool: Coverage
 #
 

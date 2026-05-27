@@ -27,4 +27,10 @@ if [ -z "${ENV}" ]; then
     exit 0
 fi
 
-exec $TOXPATH -p auto -o -e "$ENV" -- "${@:2}"
+# Django ASGI tests deadlock under tox's parallel env scheduler when multiple
+# Django envs share the same Postgres service container. Run those serially.
+if [[ "$searchstring" == *-django* ]]; then
+    exec $TOXPATH -e "$ENV" -- "${@:2}"
+else
+    exec $TOXPATH -p auto -o -e "$ENV" -- "${@:2}"
+fi
