@@ -283,7 +283,7 @@ def test_task_lock(
         assert (
             event["contexts"]["trace"]["status"] == "aborted"
             if should_be_locked
-            else "ok"
+            else event["contexts"]["trace"]["status"] == "ok"
         )
     assert len(huey) == 0
 

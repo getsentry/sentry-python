@@ -16,6 +16,7 @@ from sentry_sdk.tracing import (
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
+    _register_control_flow_exception,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
@@ -55,6 +56,9 @@ class HueyIntegration(Integration):
     def setup_once() -> None:
         patch_enqueue()
         patch_execute()
+        _register_control_flow_exception(
+            [CancelExecution, RetryTask, TaskLockedException]
+        )
 
 
 def patch_enqueue() -> None:

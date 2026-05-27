@@ -90,7 +90,7 @@ _is_sentry_internal_task = contextvars.ContextVar(
 
 # These exceptions won't set the span status to error if they occur. Use
 # register_control_flow_exception to add to this list
-_control_flow_exception_classes: "list[type]" = []
+_control_flow_exception_classes: "set[type]" = set()
 
 
 def is_internal_task() -> bool:
@@ -1982,8 +1982,13 @@ def get_current_thread_meta(
     return None, None
 
 
-def _register_control_flow_exception(exc_type: type) -> None:
-    _control_flow_exception_classes.append(exc_type)
+def _register_control_flow_exception(
+    exc_type: "Union[type, list[type], tuple[type], set[type]]",
+) -> None:
+    if isinstance(exc_type, (list, tuple, set)):
+        _control_flow_exception_classes.update(exc_type)
+    else:
+        _control_flow_exception_classes.add(exc_type)
 
 
 def should_be_treated_as_error(ty: "Any", value: "Any") -> bool:
