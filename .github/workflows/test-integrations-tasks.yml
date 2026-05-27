@@ -46,7 +46,7 @@ jobs:
           - 6379:6379
     env:
       # 3.6/3.7 run in the python:X.Y container; tell uv to use that system Python.
-      UV_PYTHON_PREFERENCE: ${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'only-system' || 'managed' }}
+      TOX_UV_PYTHON_PREFERENCE: ${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'only-system' || 'managed' }}
       SENTRY_PYTHON_TEST_REDIS_HOST: ${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'redis' || 'localhost' }}
     container: ${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && format('python:{0}', matrix.python-version) || null }}
     steps:
@@ -64,15 +64,9 @@ jobs:
         if: ${{ matrix.python-version == '3.6' || matrix.python-version == '3.7' }}
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Setup Test Env
-        # The UV_PYTHON_PREFERENCE=only-system override for 3.6/3.7 only applies to
-        # tox-uv at test time, not to the workspace venv itself.
-        env:
-          UV_PYTHON_PREFERENCE: managed
         run: |
           uv sync
       - name: Erase coverage
-        env:
-          UV_PYTHON_PREFERENCE: managed
         run: |
           uv run coverage erase
       - name: Test arq
@@ -109,8 +103,6 @@ jobs:
           ./scripts/runtox.sh "py${{ matrix.python-version }}-spark"
       - name: Generate coverage XML
         if: ${{ !cancelled() }}
-        env:
-          UV_PYTHON_PREFERENCE: managed
         run: |
           uv run coverage combine .coverage-sentry-*
           uv run coverage xml
