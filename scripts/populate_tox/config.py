@@ -27,7 +27,7 @@ TEST_SUITE_CONFIG = {
     "ariadne": {
         "package": "ariadne",
         "deps": {
-            "*": ["fastapi", "flask", "httpx"],
+            "*": ["fastapi", "flask", "httpx<0.28.0"],
         },
         "python": ">=3.8",
         "num_versions": 2,
@@ -158,9 +158,6 @@ TEST_SUITE_CONFIG = {
     "gql": {
         "package": "gql[all]",
         "num_versions": 2,
-        "deps": {
-            "==4.3.0b2": ["graphql-core>=3.3.0a3"],
-        },
     },
     "google_genai": {
         "package": "google-genai",
@@ -279,7 +276,6 @@ TEST_SUITE_CONFIG = {
         "package": "fastmcp",
         "deps": {
             "*": ["pytest-asyncio"],
-            "==3.4.0b1": ["fastmcp-slim==3.4.0b1"],
         },
     },
     "openai-base": {
@@ -325,11 +321,7 @@ TEST_SUITE_CONFIG = {
         "package": "pydantic-ai",
         "deps": {
             "*": ["pytest-asyncio"],
-            "==2.0.0b3": [
-                "pydantic-ai-slim==2.0.0b3",
-                "pydantic-graph==2.0.0b3",
-                "pydantic-evals==2.0.0b3",
-            ],
+            "==2.0.0b3": ["pydantic<2.14"],
         },
         "python": ">=3.10",
     },

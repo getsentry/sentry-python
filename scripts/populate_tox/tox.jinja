@@ -179,7 +179,16 @@ setenv =
     PYTHONDONTWRITEBYTECODE=1
     OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
     COVERAGE_FILE=.coverage-sentry-{envname}
+
     UV_PRERELEASE=if-necessary-or-explicit
+    {% for group, integrations in groups.items() %}
+    {% for integration in integrations %}
+    {% for line in integration.prerelease_setenv %}
+    {{ line }}
+    {% endfor %}
+    {% endfor %}
+    {% endfor %}
+
     py3.6: COVERAGE_RCFILE=.coveragerc36
 
     django: DJANGO_SETTINGS_MODULE=tests.integrations.django.myapp.settings
