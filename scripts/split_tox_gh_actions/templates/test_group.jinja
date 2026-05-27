@@ -44,7 +44,7 @@
     {% endif %}
     env:
       # 3.6/3.7 run in the python:X.Y container; tell uv to use that system Python.
-      UV_PYTHON_PREFERENCE: {% raw %}${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'only-system' || 'managed' }}{% endraw %}
+      TOX_UV_PYTHON_PREFERENCE: {% raw %}${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'only-system' || 'managed' }}{% endraw %}
       {% if needs_postgres %}
       SENTRY_PYTHON_TEST_POSTGRES_HOST: {% raw %}${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'postgres' || 'localhost' }}{% endraw %}
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
@@ -79,15 +79,9 @@
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Setup Test Env
-        # The UV_PYTHON_PREFERENCE=only-system override for 3.6/3.7 only applies to
-        # tox-uv at test time, not to the workspace venv itself.
-        env:
-          UV_PYTHON_PREFERENCE: managed
         run: |
           uv sync
       - name: Erase coverage
-        env:
-          UV_PYTHON_PREFERENCE: managed
         run: |
           uv run coverage erase
 
@@ -100,8 +94,6 @@
 
       - name: Generate coverage XML
         if: {% raw %}${{ !cancelled() }}{% endraw %}
-        env:
-          UV_PYTHON_PREFERENCE: managed
         run: |
           uv run coverage combine .coverage-sentry-*
           uv run coverage xml

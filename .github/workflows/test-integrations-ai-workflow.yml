@@ -36,7 +36,7 @@ jobs:
         os: [ubuntu-22.04]
     env:
       # 3.6/3.7 run in the python:X.Y container; tell uv to use that system Python.
-      UV_PYTHON_PREFERENCE: ${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'only-system' || 'managed' }}
+      TOX_UV_PYTHON_PREFERENCE: ${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'only-system' || 'managed' }}
     container: ${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && format('python:{0}', matrix.python-version) || null }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -48,15 +48,9 @@ jobs:
         if: ${{ matrix.python-version == '3.6' || matrix.python-version == '3.7' }}
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Setup Test Env
-        # The UV_PYTHON_PREFERENCE=only-system override for 3.6/3.7 only applies to
-        # tox-uv at test time, not to the workspace venv itself.
-        env:
-          UV_PYTHON_PREFERENCE: managed
         run: |
           uv sync
       - name: Erase coverage
-        env:
-          UV_PYTHON_PREFERENCE: managed
         run: |
           uv run coverage erase
       - name: Test langchain-base
@@ -73,8 +67,6 @@ jobs:
           ./scripts/runtox.sh "py${{ matrix.python-version }}-langgraph"
       - name: Generate coverage XML
         if: ${{ !cancelled() }}
-        env:
-          UV_PYTHON_PREFERENCE: managed
         run: |
           uv run coverage combine .coverage-sentry-*
           uv run coverage xml
