@@ -4943,3 +4943,165 @@ async def test_no_conversation_id_when_not_provided(
         )
         assert "gen_ai.conversation.id" not in invoke_agent_span.get("data", {})
         assert "gen_ai.conversation.id" not in ai_client_span.get("data", {})
+
+
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.asyncio
+async def test_runner_run_with_starting_agent_kwarg(
+    sentry_init,
+    capture_events,
+    test_agent,
+    nonstreaming_responses_model_response,
+    get_model_response,
+    stream_gen_ai_spans,
+):
+    """Runner.run(starting_agent=agent, input=...) must not crash.
+
+    Regression test for https://github.com/getsentry/sentry-python/issues/6418
+    """
+    client = AsyncOpenAI(api_key="test-key")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent = test_agent.clone(model=model)
+
+    response = get_model_response(
+        nonstreaming_responses_model_response, serialize_pydantic=True
+    )
+
+    with patch.object(
+        agent.model._client._client,
+        "send",
+        return_value=response,
+    ):
+        sentry_init(
+            integrations=[OpenAIAgentsIntegration()],
+            traces_sample_rate=1.0,
+            stream_gen_ai_spans=stream_gen_ai_spans,
+        )
+
+        events = capture_events()
+
+        result = await agents.run.DEFAULT_AGENT_RUNNER.run(
+            starting_agent=agent,
+            input="Test input",
+            run_config=test_run_config,
+        )
+
+        assert result is not None
+        assert result.final_output == "Hello, how can I help you?"
+
+    (transaction,) = events
+    assert transaction["transaction"] == "test_agent workflow"
+
+
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.asyncio
+async def test_runner_run_streamed_with_starting_agent_kwarg(
+    sentry_init,
+    capture_events,
+    test_agent,
+    async_iterator,
+    server_side_event_chunks,
+    get_model_response,
+    stream_gen_ai_spans,
+):
+    """Runner.run_streamed(starting_agent=agent, input=...) must not crash.
+
+    Regression test for https://github.com/getsentry/sentry-python/issues/6418
+    """
+    client = AsyncOpenAI(api_key="test-key")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent = test_agent.clone(model=model)
+
+    request_headers = {}
+    if parse_version(OPENAI_AGENTS_VERSION) >= (0, 10, 3) and hasattr(
+        agent.model._client.responses, "with_streaming_response"
+    ):
+        request_headers["X-Stainless-Raw-Response"] = "stream"
+
+    response = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    ResponseCreatedEvent(
+                        response=Response(
+                            id="chat-id",
+                            output=[],
+                            parallel_tool_calls=False,
+                            tool_choice="none",
+                            tools=[],
+                            created_at=10000000,
+                            model="gpt-4",
+                            object="response",
+                        ),
+                        type="response.created",
+                        sequence_number=0,
+                    ),
+                    ResponseCompletedEvent(
+                        response=Response(
+                            id="chat-id",
+                            output=[
+                                ResponseOutputMessage(
+                                    id="message-id",
+                                    content=[
+                                        ResponseOutputText(
+                                            annotations=[],
+                                            text="Hello, how can I help you?",
+                                            type="output_text",
+                                        ),
+                                    ],
+                                    role="assistant",
+                                    status="completed",
+                                    type="message",
+                                ),
+                            ],
+                            parallel_tool_calls=False,
+                            tool_choice="none",
+                            tools=[],
+                            created_at=10000000,
+                            model="gpt-4",
+                            object="response",
+                            usage=ResponseUsage(
+                                input_tokens=10,
+                                input_tokens_details=InputTokensDetails(
+                                    cached_tokens=0,
+                                ),
+                                output_tokens=20,
+                                output_tokens_details=OutputTokensDetails(
+                                    reasoning_tokens=5,
+                                ),
+                                total_tokens=30,
+                            ),
+                        ),
+                        type="response.completed",
+                        sequence_number=1,
+                    ),
+                ]
+            )
+        ),
+        request_headers=request_headers,
+    )
+
+    with patch.object(
+        agent.model._client._client,
+        "send",
+        return_value=response,
+    ):
+        sentry_init(
+            integrations=[OpenAIAgentsIntegration()],
+            traces_sample_rate=1.0,
+            stream_gen_ai_spans=stream_gen_ai_spans,
+        )
+
+        events = capture_events()
+
+        result = agents.run.DEFAULT_AGENT_RUNNER.run_streamed(
+            starting_agent=agent,
+            input="Test input",
+            run_config=test_run_config,
+        )
+
+        async for _event in result.stream_events():
+            pass
+
+    (transaction,) = events
+    assert transaction["transaction"] == "test_agent workflow"
