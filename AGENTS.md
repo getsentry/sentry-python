@@ -2,29 +2,29 @@
 
 ## Tox
 
-- Run tox via uv: `uv run -- tox -e <env>`
+- Run tox via uv: `uv run tox -e <env>`
 - `tox` + `tox-uv` are declared as the project's default dev dependencies in `pyproject.toml`, so uv installs them automatically into `.venv`.
 
 ## Package Manager
 
 Use **tox** for testing (not pytest directly):
 - Test matrix configuration is in `tox.ini`
-- Integration tests: `tox -e py3.14-{integration}-v{version}`
-- Common tests: `tox -e py3.14-common`
-- Run specific test file: `TESTPATH=tests/integrations/logging/test_logging.py tox -e py3.14-common`
-- Run single test: `TESTPATH=tests/path/to/test_file.py tox -e py3.14-common -- -k "test_name"`
+- Integration tests: `uv run tox -e py3.14-{integration}-v{version}`
+- Common tests: `uv run tox -e py3.14-common`
+- Run specific test file: `TESTPATH=tests/integrations/logging/test_logging.py uv run tox -e py3.14-common`
+- Run single test: `TESTPATH=tests/path/to/test_file.py uv run tox -e py3.14-common -- -k "test_name"`
 
 ## Type Checking
 
 Use **tox** for type checking (not mypy directly):
-- Run `tox -e mypy` before committing (must pass with zero errors)
+- Run `uv run tox -e mypy` before committing (must pass with zero errors)
 - Strict mode enabled (`check_untyped_defs`, `disallow_untyped_defs`)
 
 ## Linting & Formatting
 
 Use **tox** for linting (not ruff directly):
-- `tox -e ruff`
-- Full lint suite: `tox -e linters`
+- `uv run tox -e ruff`
+- Full lint suite: `uv run tox -e linters`
 - Full lint suite must pass before committing
 
 ## Commit Attribution

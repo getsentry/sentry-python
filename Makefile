@@ -1,6 +1,6 @@
 SHELL = /bin/bash
 
-VENV_PATH = tox.venv
+VENV_PATH = .venv
 
 help:
 	@echo "Thanks for your interest in the Sentry Python SDK!"
@@ -12,17 +12,17 @@ help:
 	@echo
 	@false
 
-$(VENV_PATH):
+.venv:
 	python -m venv $(VENV_PATH)
-	$(VENV_PATH)/bin/pip install tox tox-uv
+	$(VENV_PATH)/bin/pip install tox
 
-dist: $(VENV_PATH)
+dist: .venv
 	rm -rf dist dist-serverless build
 	$(VENV_PATH)/bin/pip install wheel setuptools
 	$(VENV_PATH)/bin/python setup.py sdist bdist_wheel
 .PHONY: dist
 
-apidocs: $(VENV_PATH)
+apidocs: .venv
 	@$(VENV_PATH)/bin/pip install --editable .
 	@$(VENV_PATH)/bin/pip install -U -r ./requirements-docs.txt
 	rm -rf docs/_build

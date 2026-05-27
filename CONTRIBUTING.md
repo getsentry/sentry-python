@@ -76,20 +76,17 @@ Before you can contribute, you will need to [fork the `sentry-python` repository
 
 ### Create a Virtual Environment
 
-To keep your Python development environment and packages separate from the ones
-used by your operation system, create a [virtual environment](https://docs.python.org/3/tutorial/venv.html):
+We use [uv](https://docs.astral.sh/uv/) to manage the project's virtual environment and dev dependencies. Install uv following the [official instructions](https://docs.astral.sh/uv/getting-started/installation/), then run:
 
 ```bash
 cd sentry-python
 
-python -m venv .venv
+uv sync
 ```
 
-Then, activate your virtual environment with the following command. You will need to repeat this step every time you wish to work on your changes for `sentry-python`.
+This creates a `uv` managed `.venv` (using the Python version pinned in `.python-version`) and installs the project's dev dependencies (tox, tox-uv, etc.) into it. It is recommended not to deal with this `.venv` manually but only through `uv`.
 
-```bash
-source .venv/bin/activate
-```
+Invoke commands via `uv run <cmd>` (e.g. `uv run tox -e py3.14-common`).
 
 ### Install `sentry-python` in Editable Mode
 
@@ -103,16 +100,10 @@ pip install -e .
 
 ### Install Coding Style Pre-commit Hooks
 
-This will make sure that your commits will have the correct coding style.
+`pre-commit` is included in the project's dev dependencies (installed by `uv sync`). Register the git hooks with:
 
 ```bash
-cd sentry-python
-
-pip install -r requirements-devenv.txt
-
-pip install pre-commit
-
-pre-commit install
+uv run pre-commit install
 ```
 
 That's it. You should be ready to make changes, run tests, and make commits! If you experience any problems, please don't hesitate to ping us in our [Discord Community](https://discord.com/invite/Ww9hbqr).
@@ -121,34 +112,32 @@ That's it. You should be ready to make changes, run tests, and make commits! If 
 
 We test against a number of Python language and library versions, which are automatically generated and stored in the [tox.ini](tox.ini) file. The `envlist` defines the environments you can choose from when running tests, and correspond to package versions and environment variables. The `TESTPATH` environment variable, in turn, determines which tests are run.
 
-The tox CLI tool is required to run the tests locally. Follow [the installation instructions](https://tox.wiki/en/latest/installation.html) for tox. Dependencies are installed for you when you run the command below, but _you_ need to bring an appropriate Python interpreter.
-
-[Pyenv](https://github.com/pyenv/pyenv) is a cross-platform utility for managing Python versions. You can also use a conventional package manager, but not all versions may be distributed in the package manager of your choice. For macOS, versions 3.8 and up can be installed with Homebrew.
+`uv` manages both `tox` (installed as a dev dependency via `uv sync`) and the Python interpreters used by each tox environment — you don't need to install them yourself. Invoke tox via `uv run tox ...`.
 
 An environment consists of the Python major and minor version and the library name and version. The exception to the rule is that you can provide `common` instead of the library information. The environments tied to a specific library usually run the corresponding test suite, while `common` targets all tests but skips those that require uninstalled dependencies.
 
 To run Celery tests for version v5.5.3 of its Python library using a 3.12 interpreter, use
 
 ```bash
-tox -p auto -o -e py3.12-celery-v5.5.3
+uv run tox -p auto -o -e py3.12-celery-v5.5.3
 ```
 
 or to use the `common` environment, run
 
 ```bash
-tox -p auto -o -e py3.12-common
+uv run tox -p auto -o -e py3.12-common
 ```
 
 To select specific tests, you can forward arguments to `pytest` like so
 
 ```bash
-tox -p auto -o -e py3.12-celery-v5.5.3 -- -k test_transaction_events
+uv run tox -p auto -o -e py3.12-celery-v5.5.3 -- -k test_transaction_events
 ```
 
 In general, you use
 
 ```bash
-tox -p auto -o -e <tox_env> -- <pytest_args>
+uv run tox -p auto -o -e <tox_env> -- <pytest_args>
 ```
 
 ## Debugging
