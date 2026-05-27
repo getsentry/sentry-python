@@ -524,15 +524,34 @@ def test_langchain_tool_call_with_run_name(
     ],
 )
 @pytest.mark.parametrize(
-    "system_instructions_content",
+    "system_instructions_content,expected_system_instructions",
     [
-        "You are very powerful assistant, but don't know current events",
-        [
-            {"type": "text", "text": "You are a helpful assistant."},
-            {"type": "text", "text": "Be concise and clear."},
-        ],
+        (
+            "You are very powerful assistant, but don't know current events",
+            [
+                {
+                    "type": "text",
+                    "content": "You are very powerful assistant, but don't know current events",
+                },
+            ],
+        ),
+        (
+            [
+                {"type": "text", "text": "You are a helpful assistant."},
+                {"type": "text", "text": "Be concise and clear."},
+            ],
+            [
+                {
+                    "type": "text",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "text",
+                    "content": "Be concise and clear.",
+                },
+            ],
+        ),
     ],
-    ids=["string", "blocks"],
 )
 def test_langchain_create_agent(
     sentry_init,
@@ -541,7 +560,7 @@ def test_langchain_create_agent(
     send_default_pii,
     include_prompts,
     system_instructions_content,
-    request,
+    expected_system_instructions,
     get_model_response,
     nonstreaming_responses_model_response,
     stream_gen_ai_spans,
@@ -637,29 +656,9 @@ def test_langchain_create_agent(
                 },
             ]
 
-            param_id = request.node.callspec.id
-            if "string" in param_id:
-                assert [
-                    {
-                        "type": "text",
-                        "content": "You are very powerful assistant, but don't know current events",
-                    }
-                ] == json.loads(
-                    chat_spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-                )
-            else:
-                assert [
-                    {
-                        "type": "text",
-                        "content": "You are a helpful assistant.",
-                    },
-                    {
-                        "type": "text",
-                        "content": "Be concise and clear.",
-                    },
-                ] == json.loads(
-                    chat_spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-                )
+            assert expected_system_instructions == json.loads(
+                chat_spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+            )
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get(
                 "attributes", {}
@@ -708,29 +707,9 @@ def test_langchain_create_agent(
                 == "Hello, how can I help you?"
             )
 
-            param_id = request.node.callspec.id
-            if "string" in param_id:
-                assert [
-                    {
-                        "type": "text",
-                        "content": "You are very powerful assistant, but don't know current events",
-                    }
-                ] == json.loads(
-                    chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-                )
-            else:
-                assert [
-                    {
-                        "type": "text",
-                        "content": "You are a helpful assistant.",
-                    },
-                    {
-                        "type": "text",
-                        "content": "Be concise and clear.",
-                    },
-                ] == json.loads(
-                    chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-                )
+            assert expected_system_instructions == json.loads(
+                chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+            )
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get(
                 "data", {}
@@ -1306,23 +1285,54 @@ def test_langchain_openai_tools_agent_no_prompts(
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
-    "system_instructions_content",
+    "system_instructions_content,expected_system_instructions",
     [
-        "You are very powerful assistant, but don't know current events",
-        ["You are a helpful assistant.", "Be concise and clear."],
-        [
-            {"type": "text", "text": "You are a helpful assistant."},
-            {"type": "text", "text": "Be concise and clear."},
-        ],
+        (
+            "You are very powerful assistant, but don't know current events",
+            [
+                {
+                    "type": "text",
+                    "content": "You are very powerful assistant, but don't know current events",
+                }
+            ],
+        ),
+        (
+            ["You are a helpful assistant.", "Be concise and clear."],
+            [
+                {
+                    "type": "text",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "text",
+                    "content": "Be concise and clear.",
+                },
+            ],
+        ),
+        (
+            [
+                {"type": "text", "text": "You are a helpful assistant."},
+                {"type": "text", "text": "Be concise and clear."},
+            ],
+            [
+                {
+                    "type": "text",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "text",
+                    "content": "Be concise and clear.",
+                },
+            ],
+        ),
     ],
-    ids=["string", "list", "blocks"],
 )
 def test_langchain_openai_tools_agent(
     sentry_init,
     capture_events,
     capture_items,
     system_instructions_content,
-    request,
+    expected_system_instructions,
     get_model_response,
     server_side_event_chunks,
     streaming_chat_completions_model_responses,
@@ -1450,67 +1460,47 @@ def test_langchain_openai_tools_agent(
             }
         ]
 
-        param_id = request.node.callspec.id
-        if "string" in param_id:
-            assert [
-                {
-                    "type": "text",
-                    "content": "You are very powerful assistant, but don't know current events",
-                }
-            ] == json.loads(
-                chat_spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-            )
-        else:
-            assert [
-                {
-                    "type": "text",
-                    "content": "You are a helpful assistant.",
-                },
-                {
-                    "type": "text",
-                    "content": "Be concise and clear.",
-                },
-            ] == json.loads(
-                chat_spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-            )
+        assert expected_system_instructions == json.loads(
+            chat_spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        )
 
-            assert "5" in chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        assert "5" in chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
-            # Verify tool calls are recorded when PII is enabled
-            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get(
-                "attributes", {}
-            ), (
-                "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
-            )
-            tool_calls_data = chat_spans[0]["attributes"][
-                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS
+        # Verify tool calls are recorded when PII is enabled
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get(
+            "attributes", {}
+        ), (
+            "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
+        )
+        tool_calls_data = chat_spans[0]["attributes"][
+            SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS
+        ]
+
+        assert isinstance(tool_calls_data, (list, str))  # Could be serialized
+        if isinstance(tool_calls_data, str):
+            assert "get_word_length" in tool_calls_data
+        elif isinstance(tool_calls_data, list) and len(tool_calls_data) > 0:
+            # Check if tool calls contain expected function name
+            tool_call_str = str(tool_calls_data)
+            assert "get_word_length" in tool_call_str
+
+        # Verify finish_reasons is always an array of strings
+        assert chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
+            "function_call"
+        ]
+        assert chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
+            "stop"
+        ]
+
+        # Verify that available tools are always recorded regardless of PII settings
+        for chat_span in chat_spans:
+            tools_data = chat_span["attributes"][
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS
             ]
-
-            assert isinstance(tool_calls_data, (list, str))  # Could be serialized
-            if isinstance(tool_calls_data, str):
-                assert "get_word_length" in tool_calls_data
-            elif isinstance(tool_calls_data, list) and len(tool_calls_data) > 0:
-                # Check if tool calls contain expected function name
-                tool_call_str = str(tool_calls_data)
-                assert "get_word_length" in tool_call_str
-
-            # Verify finish_reasons is always an array of strings
-            assert chat_spans[0]["attributes"][
-                SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS
-            ] == ["function_call"]
-            assert chat_spans[1]["attributes"][
-                SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS
-            ] == ["stop"]
-
-            # Verify that available tools are always recorded regardless of PII settings
-            for chat_span in chat_spans:
-                tools_data = chat_span["attributes"][
-                    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS
-                ]
-                assert tools_data is not None, (
-                    "Available tools should always be recorded regardless of PII settings"
-                )
-                assert "get_word_length" in tools_data
+            assert tools_data is not None, (
+                "Available tools should always be recorded regardless of PII settings"
+            )
+            assert "get_word_length" in tools_data
     else:
         events = capture_events()
 
@@ -1559,59 +1549,41 @@ def test_langchain_openai_tools_agent(
         assert "word" in tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_INPUT]
         assert 5 == int(tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_OUTPUT])
 
-        param_id = request.node.callspec.id
-        if "string" in param_id:
-            assert [
-                {
-                    "type": "text",
-                    "content": "You are very powerful assistant, but don't know current events",
-                }
-            ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
-        else:
-            assert [
-                {
-                    "type": "text",
-                    "content": "You are a helpful assistant.",
-                },
-                {
-                    "type": "text",
-                    "content": "Be concise and clear.",
-                },
-            ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+        assert expected_system_instructions == json.loads(
+            chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        )
 
-            assert "5" in chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        assert "5" in chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
-            # Verify tool calls are recorded when PII is enabled
-            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get(
-                "data", {}
-            ), (
-                "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
+        # Verify tool calls are recorded when PII is enabled
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get("data", {}), (
+            "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
+        )
+        tool_calls_data = chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+
+        assert isinstance(tool_calls_data, (list, str))  # Could be serialized
+        if isinstance(tool_calls_data, str):
+            assert "get_word_length" in tool_calls_data
+        elif isinstance(tool_calls_data, list) and len(tool_calls_data) > 0:
+            # Check if tool calls contain expected function name
+            tool_call_str = str(tool_calls_data)
+            assert "get_word_length" in tool_call_str
+
+        # Verify finish_reasons is always an array of strings
+        assert chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
+            "function_call"
+        ]
+        assert chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
+            "stop"
+        ]
+
+        # Verify that available tools are always recorded regardless of PII settings
+        for chat_span in chat_spans:
+            tools_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
+            assert tools_data is not None, (
+                "Available tools should always be recorded regardless of PII settings"
             )
-            tool_calls_data = chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
-
-            assert isinstance(tool_calls_data, (list, str))  # Could be serialized
-            if isinstance(tool_calls_data, str):
-                assert "get_word_length" in tool_calls_data
-            elif isinstance(tool_calls_data, list) and len(tool_calls_data) > 0:
-                # Check if tool calls contain expected function name
-                tool_call_str = str(tool_calls_data)
-                assert "get_word_length" in tool_call_str
-
-            # Verify finish_reasons is always an array of strings
-            assert chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-                "function_call"
-            ]
-            assert chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-                "stop"
-            ]
-
-            # Verify that available tools are always recorded regardless of PII settings
-            for chat_span in chat_spans:
-                tools_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
-                assert tools_data is not None, (
-                    "Available tools should always be recorded regardless of PII settings"
-                )
-                assert "get_word_length" in tools_data
+            assert "get_word_length" in tools_data
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -2003,14 +1975,46 @@ def test_langchain_openai_tools_agent_stream_no_prompts(
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
-    "system_instructions_content",
+    "system_instructions_content,expected_system_instructions",
     [
-        "You are very powerful assistant, but don't know current events",
-        ["You are a helpful assistant.", "Be concise and clear."],
-        [
-            {"type": "text", "text": "You are a helpful assistant."},
-            {"type": "text", "text": "Be concise and clear."},
-        ],
+        (
+            "You are very powerful assistant, but don't know current events",
+            [
+                {
+                    "type": "text",
+                    "content": "You are very powerful assistant, but don't know current events",
+                }
+            ],
+        ),
+        (
+            ["You are a helpful assistant.", "Be concise and clear."],
+            [
+                {
+                    "type": "text",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "text",
+                    "content": "Be concise and clear.",
+                },
+            ],
+        ),
+        (
+            [
+                {"type": "text", "text": "You are a helpful assistant."},
+                {"type": "text", "text": "Be concise and clear."},
+            ],
+            [
+                {
+                    "type": "text",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "text",
+                    "content": "Be concise and clear.",
+                },
+            ],
+        ),
     ],
     ids=["string", "list", "blocks"],
 )
@@ -2019,7 +2023,7 @@ def test_langchain_openai_tools_agent_stream(
     capture_events,
     capture_items,
     system_instructions_content,
-    request,
+    expected_system_instructions,
     get_model_response,
     server_side_event_chunks,
     streaming_chat_completions_model_responses,
@@ -2153,67 +2157,47 @@ def test_langchain_openai_tools_agent_stream(
             }
         ]
 
-        param_id = request.node.callspec.id
-        if "string" in param_id:
-            assert [
-                {
-                    "type": "text",
-                    "content": "You are very powerful assistant, but don't know current events",
-                }
-            ] == json.loads(
-                chat_spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-            )
-        else:
-            assert [
-                {
-                    "type": "text",
-                    "content": "You are a helpful assistant.",
-                },
-                {
-                    "type": "text",
-                    "content": "Be concise and clear.",
-                },
-            ] == json.loads(
-                chat_spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
-            )
+        assert expected_system_instructions == json.loads(
+            chat_spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        )
 
-            assert "5" in chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        assert "5" in chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
-            # Verify tool calls are recorded when PII is enabled
-            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get(
-                "attributes", {}
-            ), (
-                "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
-            )
-            tool_calls_data = chat_spans[0]["attributes"][
-                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS
+        # Verify tool calls are recorded when PII is enabled
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get(
+            "attributes", {}
+        ), (
+            "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
+        )
+        tool_calls_data = chat_spans[0]["attributes"][
+            SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS
+        ]
+
+        assert isinstance(tool_calls_data, (list, str))  # Could be serialized
+        if isinstance(tool_calls_data, str):
+            assert "get_word_length" in tool_calls_data
+        elif isinstance(tool_calls_data, list) and len(tool_calls_data) > 0:
+            # Check if tool calls contain expected function name
+            tool_call_str = str(tool_calls_data)
+            assert "get_word_length" in tool_call_str
+
+        # Verify finish_reasons is always an array of strings
+        assert chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
+            "function_call"
+        ]
+        assert chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
+            "stop"
+        ]
+
+        # Verify that available tools are always recorded regardless of PII settings
+        for chat_span in chat_spans:
+            tools_data = chat_span["attributes"][
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS
             ]
-
-            assert isinstance(tool_calls_data, (list, str))  # Could be serialized
-            if isinstance(tool_calls_data, str):
-                assert "get_word_length" in tool_calls_data
-            elif isinstance(tool_calls_data, list) and len(tool_calls_data) > 0:
-                # Check if tool calls contain expected function name
-                tool_call_str = str(tool_calls_data)
-                assert "get_word_length" in tool_call_str
-
-            # Verify finish_reasons is always an array of strings
-            assert chat_spans[0]["attributes"][
-                SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS
-            ] == ["function_call"]
-            assert chat_spans[1]["attributes"][
-                SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS
-            ] == ["stop"]
-
-            # Verify that available tools are always recorded regardless of PII settings
-            for chat_span in chat_spans:
-                tools_data = chat_span["attributes"][
-                    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS
-                ]
-                assert tools_data is not None, (
-                    "Available tools should always be recorded regardless of PII settings"
-                )
-                assert "get_word_length" in tools_data
+            assert tools_data is not None, (
+                "Available tools should always be recorded regardless of PII settings"
+            )
+            assert "get_word_length" in tools_data
     else:
         events = capture_events()
 
@@ -2269,58 +2253,40 @@ def test_langchain_openai_tools_agent_stream(
         assert "word" in tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_INPUT]
         assert 5 == int(tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_OUTPUT])
 
-        param_id = request.node.callspec.id
-        if "string" in param_id:
-            assert [
-                {
-                    "type": "text",
-                    "content": "You are very powerful assistant, but don't know current events",
-                }
-            ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
-        else:
-            assert [
-                {
-                    "type": "text",
-                    "content": "You are a helpful assistant.",
-                },
-                {
-                    "type": "text",
-                    "content": "Be concise and clear.",
-                },
-            ] == json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+        assert expected_system_instructions == json.loads(
+            chat_spans[0]["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        )
 
-            assert "5" in chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        assert "5" in chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
 
-            # Verify tool calls are recorded when PII is enabled
-            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get(
-                "data", {}
-            ), (
-                "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
+        # Verify tool calls are recorded when PII is enabled
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_spans[0].get("data", {}), (
+            "Tool calls should be recorded when send_default_pii=True and include_prompts=True"
+        )
+        tool_calls_data = chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+        assert isinstance(tool_calls_data, (list, str))  # Could be serialized
+        if isinstance(tool_calls_data, str):
+            assert "get_word_length" in tool_calls_data
+        elif isinstance(tool_calls_data, list) and len(tool_calls_data) > 0:
+            # Check if tool calls contain expected function name
+            tool_call_str = str(tool_calls_data)
+            assert "get_word_length" in tool_call_str
+
+        # Verify finish_reasons is always an array of strings
+        assert chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
+            "function_call"
+        ]
+        assert chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
+            "stop"
+        ]
+
+        # Verify that available tools are always recorded regardless of PII settings
+        for chat_span in chat_spans:
+            tools_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
+            assert tools_data is not None, (
+                "Available tools should always be recorded regardless of PII settings"
             )
-            tool_calls_data = chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
-            assert isinstance(tool_calls_data, (list, str))  # Could be serialized
-            if isinstance(tool_calls_data, str):
-                assert "get_word_length" in tool_calls_data
-            elif isinstance(tool_calls_data, list) and len(tool_calls_data) > 0:
-                # Check if tool calls contain expected function name
-                tool_call_str = str(tool_calls_data)
-                assert "get_word_length" in tool_call_str
-
-            # Verify finish_reasons is always an array of strings
-            assert chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-                "function_call"
-            ]
-            assert chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == [
-                "stop"
-            ]
-
-            # Verify that available tools are always recorded regardless of PII settings
-            for chat_span in chat_spans:
-                tools_data = chat_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
-                assert tools_data is not None, (
-                    "Available tools should always be recorded regardless of PII settings"
-                )
-                assert "get_word_length" in tools_data
+            assert "get_word_length" in tools_data
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
