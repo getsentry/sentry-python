@@ -23,6 +23,12 @@ def celery_config():
         "task_always_eager": False,
         "task_create_missing_queues": True,
         "task_default_queue": f"queue_{os.getpid()}",
+        # DIAG (py3.7 container hang): fail fast on broker connect so the
+        # actual exception surfaces instead of looping forever in
+        # kombu.retry_over_time.
+        "broker_connection_retry": False,
+        "broker_connection_max_retries": 1,
+        "broker_connection_timeout": 2,
     }
 
 
