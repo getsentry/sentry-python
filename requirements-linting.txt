@@ -1,5 +1,4 @@
 mypy
-ruff
 types-certifi
 types-protobuf
 types-gevent
