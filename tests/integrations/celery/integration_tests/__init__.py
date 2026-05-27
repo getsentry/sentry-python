@@ -24,20 +24,11 @@ class ImmediateScheduler(Scheduler):
         return 1
 
 
-def kill_beat(beat_pid_file, delay_seconds=1, pidfile_timeout=30):
+def kill_beat(beat_pid_file, delay_seconds=1):
     """
-    Terminates Celery Beat after `delay_seconds` of beat-runtime.
-
-    Waits up to `pidfile_timeout` seconds for the pidfile to appear before
-    starting the runtime timer, so slow process startup doesn't race the
-    killer into a FileNotFoundError that would leak a running beat.
+    Terminates Celery Beat after the given `delay_seconds`.
     """
     logger.info("Starting Celery Beat killer...")
-    deadline = time.monotonic() + pidfile_timeout
-    while not os.path.exists(beat_pid_file):
-        if time.monotonic() > deadline:
-            raise RuntimeError("Celery Beat pidfile %s never appeared" % beat_pid_file)
-        time.sleep(0.05)
     time.sleep(delay_seconds)
     pid = int(open(beat_pid_file, "r").read())
     logger.info("Terminating Celery Beat...")

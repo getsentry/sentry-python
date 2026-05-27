@@ -73,7 +73,7 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["newrelic<10.17.0", "redis"],
             "py3.6": ["newrelic<8"],
-            "py3.7": ["importlib-metadata<5.0", "pytest-timeout"],
+            "py3.7": ["importlib-metadata<5.0"],
         },
     },
     "chalice": {
