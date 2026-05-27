@@ -104,11 +104,6 @@ class AioHttpIntegration(Integration):
         version = parse_version(AIOHTTP_VERSION)
         _check_minimum_version(AioHttpIntegration, version)
 
-        # In the aiohttp integration, all of their HTTP responses are Exceptions.
-        # Because they have to be raised and handled by the framework, we need this check so
-        # that we don't accidentally overwrite a status of "ok" with "error".
-        _register_control_flow_exception(HTTPException)
-
         if not HAS_REAL_CONTEXTVARS:
             # We better have contextvars or we're going to leak state between
             # requests.
@@ -116,6 +111,12 @@ class AioHttpIntegration(Integration):
                 "The aiohttp integration for Sentry requires Python 3.7+ "
                 " or aiocontextvars package." + CONTEXTVARS_ERROR_MESSAGE
             )
+
+        # In the aiohttp integration, all of their HTTP responses are Exceptions.
+        # Because they have to be raised and handled by the framework, we need to
+        # register the exceptions as control flow exceptions so that we don't
+        # accidentally overwrite a status of "ok" with "error".
+        _register_control_flow_exception(HTTPException)
 
         ignore_logger("aiohttp.server")
 
