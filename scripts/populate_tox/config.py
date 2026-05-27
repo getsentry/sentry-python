@@ -146,7 +146,13 @@ TEST_SUITE_CONFIG = {
         "package": "flask",
         "deps": {
             "*": ["flask-login", "werkzeug", "blinker"],
-            "<2.0": ["werkzeug<2.1.0", "markupsafe<2.1.0"],
+            # https://github.com/pallets/flask/issues/4455
+            "<2.0": [
+                "werkzeug<2.1.0",
+                "markupsafe<2.0.0",
+                "itsdangerous>=0.24,<2.0",
+                "jinja2<3.1.1",
+            ],
         },
     },
     "gql": {

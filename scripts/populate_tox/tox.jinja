@@ -168,15 +168,6 @@ deps =
 
     {% endfor %}
 
-    # === Compatibility overrides ===
-    # These replace the old `pip install` workaround commands that pip-backed tox used.
-    # tox-uv does not seed pip into venvs, so all installs must go through deps.
-
-    ; https://github.com/pallets/flask/issues/4455
-    {py3.6,py3.7,py3.8}-flask-v1.1.4: itsdangerous>=0.24,<2.0
-    {py3.6,py3.7,py3.8}-flask-v1.1.4: markupsafe<2.0.0
-    {py3.6,py3.7,py3.8}-flask-v1.1.4: jinja2<3.1.1
-
     ; Install the SDK in deps so uv resolves runtime deps together with
     ; everything above in a single pass.
     ; uv only supports PEP 660 editables; py3.6's max setuptools (~59) predates
