@@ -42,13 +42,13 @@ from sentry_sdk.utils import (
     HAS_REAL_CONTEXTVARS,
     SENSITIVE_DATA_SUBSTITUTE,
     AnnotatedValue,
+    _register_control_flow_exception,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
     logger,
     parse_url,
     parse_version,
-    register_control_flow_exception,
     reraise,
     transaction_from_function,
 )
@@ -107,7 +107,7 @@ class AioHttpIntegration(Integration):
         # In the aiohttp integration, all of their HTTP responses are Exceptions.
         # Because they have to be raised and handled by the framework, we need this check so
         # that we don't accidentally overwrite a status of "ok" with "error".
-        register_control_flow_exception(HTTPException)
+        _register_control_flow_exception(HTTPException)
 
         if not HAS_REAL_CONTEXTVARS:
             # We better have contextvars or we're going to leak state between

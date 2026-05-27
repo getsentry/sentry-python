@@ -1982,7 +1982,7 @@ def get_current_thread_meta(
     return None, None
 
 
-def register_control_flow_exception(exc_type: type) -> None:
+def _register_control_flow_exception(exc_type: type) -> None:
     _control_flow_exception_classes.append(exc_type)
 
 
