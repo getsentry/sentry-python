@@ -1423,6 +1423,15 @@ def test_langchain_openai_tools_agent(
         assert "word" in tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_INPUT]
         assert 5 == int(tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_OUTPUT])
 
+        assert json.loads(
+            chat_spans[0]["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        ) == [
+            {
+                "role": "user",
+                "content": "['Message demonstrating the absence of truncation.', 'How many letters in the word eudca']",
+            }
+        ]
+
         assert expected_system_instructions == json.loads(
             chat_spans[0]["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
         )
