@@ -527,3 +527,38 @@ def test_span_origin(
     else:
         (_, event) = events
         assert event["contexts"]["trace"]["origin"] == "auto.http.tornado"
+
+
+class ChildSpanHandler(RequestHandler):
+    def get(self):
+        with sentry_sdk.traces.start_span(name="child-span"):
+            pass
+        self.write("ok")
+
+
+@pytest.mark.parametrize("send_default_pii", [True, False])
+def test_user_ip_address_on_all_spans(
+    tornado_testcase, sentry_init, capture_items, send_default_pii
+):
+    sentry_init(
+        integrations=[TornadoIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    items = capture_items("span")
+
+    client = tornado_testcase(Application([(r"/hi", ChildSpanHandler)]))
+    client.fetch("/hi")
+
+    sentry_sdk.flush()
+
+    child_span, server_span = [item.payload for item in items]
+
+    if send_default_pii:
+        assert server_span["attributes"]["user.ip_address"] == "127.0.0.1"
+        assert child_span["attributes"]["user.ip_address"] == "127.0.0.1"
+    else:
+        assert "user.ip_address" not in server_span["attributes"]
+        assert "user.ip_address" not in child_span["attributes"]
