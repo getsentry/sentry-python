@@ -220,7 +220,6 @@ class RustTracingLayer:
                 else:
                     sentry_span.set_attribute(field, SENSITIVE_DATA_SUBSTITUTE)
 
-            sentry_span.__enter__()
             return sentry_span
 
         sentry_span = sentry_sdk.start_span(
