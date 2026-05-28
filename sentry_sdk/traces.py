@@ -572,7 +572,18 @@ class StreamedSpan:
         if not self._is_segment():
             return
 
-        self.set_attribute("process.command_args", sys.argv)
+        client = sentry_sdk.get_client()
+
+        self.set_attribute(SPANDATA.SENTRY_PLATFORM, "python")
+        self.set_attribute(SPANDATA.PROCESS_COMMAND_ARGS, sys.argv)
+        self.set_attribute(
+            SPANDATA.SENTRY_SDK_INTEGRATIONS, sorted(client.integrations.keys())
+        )
+
+        if client.options.get("dist") and SPANDATA.SENTRY_DIST not in self._attributes:
+            self.set_attribute(
+                SPANDATA.SENTRY_DIST, str(client.options["dist"]).strip()
+            )
 
     def _to_json(self) -> "SpanJSON":
         res: "SpanJSON" = {
