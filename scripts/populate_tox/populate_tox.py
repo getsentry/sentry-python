@@ -11,6 +11,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 from bisect import bisect_left
 from collections import defaultdict
@@ -20,6 +21,7 @@ from importlib.metadata import PackageMetadata, distributions
 from pathlib import Path
 from typing import Optional, Union
 
+from packaging.requirements import Requirement
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
@@ -77,6 +79,19 @@ IGNORE = {
 MIN_FREE_THREADING_SUPPORT = Version("3.14")
 
 
+class DryRunFailed(Exception):
+    def __init__(self, result: subprocess.CompletedProcess[str]) -> None:
+        self.result = result
+        message = f"Command failed with exit code {result.returncode}.\n"
+        stderr = result.stderr.strip()
+        if stderr:
+            message += f"\nStderr:\n{stderr}"
+        stdout = result.stdout.strip()
+        if stdout:
+            message += f"\nStdout:\n{stdout}"
+        super().__init__(message)
+
+
 class PackageVersion(Version):
     # Convenience wrapper around Version. It's convenient to be able to set
     # attributes on a Version in toxgen, but we can't because the class now
@@ -94,8 +109,11 @@ class ThreadedVersion:
         self.version = Version(version) if isinstance(version, str) else version
         self.no_gil = no_gil
 
+    def __hash__(self):
+        return hash((self.version, self.no_gil))
+
     def __str__(self):
-        version = f"py{self.version.major}.{self.version.minor}"
+        version = f"{self.version.major}.{self.version.minor}"
         if self.no_gil:
             version += "t"
 
@@ -146,8 +164,42 @@ def fetch_release(package: str, version: Version) -> Optional[dict]:
     return release
 
 
+def _get_dependency_probe_constraints(
+    integration: str,
+    release: Version,
+    python_version: ThreadedVersion,
+) -> tuple[str, ...]:
+    constraints = []
+    for rule, dependencies in TEST_SUITE_CONFIG[integration].get("deps", {}).items():
+        applies = False
+        if rule == "*":
+            applies = True
+        elif rule.startswith("py3"):
+            applies = f"py{python_version}" in rule.split(",")
+        else:
+            applies = release in SpecifierSet(rule, prereleases=True)
+        if not applies:
+            continue
+        for dependency in dependencies:
+            requirement = Requirement(dependency)
+
+            # Constraints are useful only when they actually constrain versions.
+            if (
+                requirement.specifier
+                and not requirement.extras
+                and requirement.url is None
+            ):
+                constraints.append(dependency)
+    return tuple(constraints)
+
+
 @functools.cache
-def fetch_package_dependencies(package: str, version: Version) -> dict:
+def fetch_package_dependencies(
+    package: str,
+    version: Version,
+    python_version: ThreadedVersion,
+    constraints: tuple[str, ...] = (),
+) -> dict:
     """Fetch package dependencies metadata from cache or, failing that, PyPI."""
     package_dependencies = _fetch_package_dependencies_from_cache(package, version)
     if package_dependencies is not None:
@@ -155,23 +207,42 @@ def fetch_package_dependencies(package: str, version: Version) -> dict:
 
     # Removing non-report output with -qqq may be brittle, but avoids file I/O.
     # Currently -qqq supresses all non-report output that would break json.loads().
-    pip_report = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "pip",
-            "install",
-            f"{package}=={str(version)}",
-            "--dry-run",
-            "--ignore-installed",
-            "--report",
-            "-",
-            "-qqq",
-        ],
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
+    cmd = [
+        "uv",
+        "run",
+        "--no-project",
+        "--python",
+        str(python_version),
+        "--with",
+        "pip",
+        "python",
+        "-m",
+        "pip",
+        "install",
+        f"{package}=={version}",
+        "--dry-run",
+        "--ignore-installed",
+        "--report",
+        "-",
+        "-qqq",
+    ]
 
+    if constraints:
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8") as f:
+            f.write("\n".join(constraints))
+            f.flush()
+            result = subprocess.run(
+                [*cmd, "--constraint", f.name],
+                capture_output=True,
+                text=True,
+            )
+    else:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+    if result.returncode != 0:
+        raise DryRunFailed(result)
+
+    pip_report = result.stdout.strip()
     dependencies_info = json.loads(pip_report)["install"]
     _save_to_package_dependencies_cache(package, version, dependencies_info)
 
@@ -209,16 +280,22 @@ def _save_to_cache(package: str, version: Version, release: Optional[dict]) -> N
 def _save_to_package_dependencies_cache(
     package: str, version: Version, release: Optional[dict]
 ) -> None:
+    normalized_dependencies = _normalize_package_dependencies(release)
+
     with open(DEPENDENCIES_CACHE_FILE, "a") as releases_cache:
-        line = {
-            "name": package,
-            "version": str(version),
-            "dependencies": _normalize_package_dependencies(release),
-        }
-        releases_cache.write(json.dumps(line) + "\n")
+        releases_cache.write(
+            json.dumps(
+                {
+                    "name": package,
+                    "version": str(version),
+                    "dependencies": normalized_dependencies,
+                }
+            )
+            + "\n"
+        )
 
     DEPENDENCIES_CACHE[_normalize_name(package)][str(version)] = {
-        "info": release,
+        "dependencies": normalized_dependencies,
         "_accessed": True,
     }
 
@@ -623,7 +700,9 @@ def _has_free_threading_dependencies(
     - no wheel targets the platform on which the script is run, but PyPI distributes a wheel
       satisfying one of the above conditions.
     """
-    dependencies_info = fetch_package_dependencies(package_name, release)
+    dependencies_info = fetch_package_dependencies(
+        package_name, release, ThreadedVersion(python_version, no_gil=True)
+    )
 
     for dependency_info in dependencies_info:
         wheel_filename = dependency_info["download_info"]["url"].split("/")[-1]
@@ -698,7 +777,7 @@ def _supports_free_threading(
 
 
 def _render_python_versions(python_versions: list[ThreadedVersion]) -> str:
-    return "{" + ",".join(str(version) for version in python_versions) + "}"
+    return "{" + ",".join(f"py{str(version)}" for version in python_versions) + "}"
 
 
 def _render_dependencies(integration: str, releases: list[Version]) -> list[str]:
@@ -724,9 +803,7 @@ def _render_dependencies(integration: str, releases: list[Version]) -> list[str]
     return rendered
 
 
-def _render_latest_dependencies(
-    integration: str, latest_release: Version
-) -> list[str]:
+def _render_latest_dependencies(integration: str, latest_release: Version) -> list[str]:
     """Render version-specific dependencies for the 'latest' alias.
 
     Dependencies with "*" or "py3.*" constraints already match the latest
@@ -827,6 +904,27 @@ def _compare_min_version_with_defined(
                 f"version, but the effective minimum version based on metadata "
                 f"is {releases[0]}."
             )
+
+
+def _get_transitive_dependencies(
+    integration: str,
+    package: str,
+    release: Version,
+    python_version: ThreadedVersion,
+) -> list[str]:
+    deps = []
+    for dependency in fetch_package_dependencies(
+        package,
+        release,
+        python_version,
+        _get_dependency_probe_constraints(integration, release, python_version),
+    ):
+        name = dependency["metadata"]["name"]
+        version = dependency["metadata"]["version"]
+        if _normalize_name(name) == _normalize_name(package):
+            continue
+        deps.append(f"{python_version}-{integration}-v{release}: {name}=={version}")
+    return deps
 
 
 def _add_python_versions_to_release(
@@ -945,9 +1043,13 @@ def _normalize_package_dependencies(package_dependencies: list[dict]) -> list[di
     """Filter out unneeded parts of the package dependencies JSON."""
     normalized = [
         {
-            "download_info": {"url": depedency["download_info"]["url"]},
+            "metadata": {
+                "name": dependency["metadata"]["name"],
+                "version": dependency["metadata"]["version"],
+            },
+            "download_info": {"url": dependency["download_info"]["url"]},
         }
-        for depedency in package_dependencies
+        for dependency in package_dependencies
     ]
 
     return normalized
@@ -1081,6 +1183,23 @@ def main() -> dict[str, list]:
                 _add_python_versions_to_release(integration, package, release)
                 if not release.python_versions:
                     print(f"  Release {release} has no Python versions, skipping.")
+                    continue
+
+                release.transitive_dependencies = []
+                for python_version in release.python_versions:
+                    if python_version < ThreadedVersion("3.8"):
+                        continue
+                    try:
+                        deps = _get_transitive_dependencies(
+                            integration, package, release, python_version
+                        )
+                    except DryRunFailed as error:
+                        print(
+                            f"\npip dry run failed for version {release} of {package} on Python {python_version}:\n{error}"
+                        )
+                        continue
+                    if deps:
+                        release.transitive_dependencies.append(deps)
 
             test_releases = [
                 release for release in test_releases if release.python_versions
