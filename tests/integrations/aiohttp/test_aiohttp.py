@@ -1226,8 +1226,7 @@ async def test_sensitive_header_scrubbing_span_streaming(
 
     sentry_sdk.flush()
 
-    items.pop()  # drop the test client's outer segment
-    (server_span,) = [item.payload for item in items]
+    server_span, _client_segment = [item.payload for item in items]
 
     # send_default_pii defaults to False, so _filter_headers substitutes
     # sensitive headers with SENSITIVE_DATA_SUBSTITUTE ("[Filtered]"). The
@@ -1267,8 +1266,7 @@ async def test_sensitive_header_passthrough_with_pii_span_streaming(
 
     sentry_sdk.flush()
 
-    items.pop()  # drop the test client's outer segment
-    (server_span,) = [item.payload for item in items]
+    server_span, _client_segment = [item.payload for item in items]
 
     # With send_default_pii=True, _filter_headers is a no-op and the original
     # value reaches the span attribute.
@@ -1396,10 +1394,7 @@ async def test_server_error_span_streaming(sentry_init, aiohttp_client, capture_
     assert error_event.type == "event"
     assert error_event.payload["exception"]["values"][0]["type"] == "ZeroDivisionError"
 
-    spans = items[1:]
-    assert spans[-1].type == "span"
-    segment = spans.pop().payload
-    (server_span,) = [item.payload for item in spans]
+    server_span, segment = [item.payload for item in items[1:]]
 
     assert segment["is_segment"] is True
     assert segment["attributes"]["sentry.op"] == "http.client"
@@ -1441,8 +1436,7 @@ async def test_http_exception_span_streaming(
     sentry_sdk.flush()
 
     assert len(items) == 2
-    segment = items.pop().payload
-    (server_span,) = [item.payload for item in items]
+    server_span, segment = [item.payload for item in items]
 
     assert segment["is_segment"] is True
     assert segment["attributes"]["sentry.op"] == "http.client"
@@ -1479,8 +1473,7 @@ async def test_http_exception_ok_status_not_overridden_span_streaming(
     sentry_sdk.flush()
 
     assert len(items) == 2
-    segment = items.pop().payload
-    (server_span,) = [item.payload for item in items]
+    server_span, segment = [item.payload for item in items]
 
     assert segment["is_segment"] is True
     assert segment["attributes"]["sentry.op"] == "http.client"
