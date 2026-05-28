@@ -4,16 +4,6 @@
 
 ### New Features ✨
 
-- (anthropic) Support span streaming by @alexander-alderman-webb in [#6311](https://github.com/getsentry/sentry-python/pull/6311)
-- (django) Support span streaming by @alexander-alderman-webb in [#6248](https://github.com/getsentry/sentry-python/pull/6248)
-- (dramatiq) Support span streaming by @sl0thentr0py in [#6273](https://github.com/getsentry/sentry-python/pull/6273)
-- (huey) Migrate Huey integration to spans-first tracing by @ericapisani in [#6399](https://github.com/getsentry/sentry-python/pull/6399)
-- (langchain) Support span streaming by @alexander-alderman-webb in [#6405](https://github.com/getsentry/sentry-python/pull/6405)
-- (langgraph) Support span streaming by @alexander-alderman-webb in [#6406](https://github.com/getsentry/sentry-python/pull/6406)
-- (socket) Support span streaming by @sl0thentr0py in [#6296](https://github.com/getsentry/sentry-python/pull/6296)
-- (starlite) Support span streaming by @sl0thentr0py in [#6294](https://github.com/getsentry/sentry-python/pull/6294)
-- (strawberry) Support span streaming by @ericapisani in [#6308](https://github.com/getsentry/sentry-python/pull/6308)
-- (tornado) Support span streaming by @sl0thentr0py in [#6206](https://github.com/getsentry/sentry-python/pull/6206)
 - Add `server.address` to transformed spans when `stream_gen_ai_spans=True` by @alexander-alderman-webb in [#6307](https://github.com/getsentry/sentry-python/pull/6307)
 - Allow integrations to define control flow exceptions by @sentrivana in [#6425](https://github.com/getsentry/sentry-python/pull/6425)
 - Disable string truncation for events by default by @alexander-alderman-webb in [#6290](https://github.com/getsentry/sentry-python/pull/6290)
@@ -27,12 +17,12 @@
 
 #### Openai Agents
 
-- Handle starting_agent keyword argument in runner patches by @ericapisani in [#6428](https://github.com/getsentry/sentry-python/pull/6428)
+- Handle `starting_agent` keyword argument in runner patches by @ericapisani in [#6428](https://github.com/getsentry/sentry-python/pull/6428)
 - Remove hosted MCP tool spans by @alexander-alderman-webb in [#6391](https://github.com/getsentry/sentry-python/pull/6391)
 - Use `name`, not `description` in `start_span` by @sentrivana in [#6323](https://github.com/getsentry/sentry-python/pull/6323)
 - Stop setting transaction status when child span fails by @alexander-alderman-webb in [#6303](https://github.com/getsentry/sentry-python/pull/6303)
 
-#### Pydantic Ai
+#### Pydantic AI
 
 - Stop setting tokens on Invoke Agent spans by @alexander-alderman-webb in [#6320](https://github.com/getsentry/sentry-python/pull/6320)
 - Stop setting transaction status when child span fails by @alexander-alderman-webb in [#6302](https://github.com/getsentry/sentry-python/pull/6302)
@@ -53,7 +43,16 @@
 - (huey) Fix group and chord handling in enqueue by @ericapisani in [#6392](https://github.com/getsentry/sentry-python/pull/6392)
 - (integrations) Auto-wrap root gen_ai spans for openai, cohere, langgraph, huggingface_hub by @constantinius in [#6285](https://github.com/getsentry/sentry-python/pull/6285)
 - (serializer) Don't call `__iter__` on arbitrary sequences by @sentrivana in [#6304](https://github.com/getsentry/sentry-python/pull/6304)
-- #6267 - memory leak in SentrySpanProcessor by @volodkindv in [#6271](https://github.com/getsentry/sentry-python/pull/6271)
+
+  Previously, we'd attempt to serialize any `Sequence` by walking through it by calling its `__iter__` function.
+  We've now changed the serializer to only serialize built-in sequences (like lists, tuples, and sets) to avoid
+  triggering side-effects from custom `__iter__` implementations.
+
+  This might mean some objects might be serialized differently. If you want to continue serializing a specific
+  custom sequence class, you can register it via `sentry_sdk.serializer.add_repr_sequence_type` (see
+  [here](https://github.com/getsentry/sentry-python/blob/54f768680cad8a40ab97be4dddd16c12c9cba493/sentry_sdk/serializer.py#L60-L61)).
+
+- Memory leak in SentrySpanProcessor by @volodkindv in [#6271](https://github.com/getsentry/sentry-python/pull/6271)
 
 ### Documentation 📚
 
