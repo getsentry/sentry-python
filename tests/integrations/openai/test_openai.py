@@ -4383,7 +4383,6 @@ def test_error_in_responses_api(
             )
 
         # make sure the span where the error occurred is captured
-        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert spans[0]["attributes"]["sentry.op"] == "gen_ai.responses"
 
@@ -4659,7 +4658,6 @@ async def test_ai_client_span_responses_async_api(
                 top_p=0.9,
             )
 
-        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
 
         assert len(spans) == 1
@@ -5108,7 +5106,6 @@ async def test_error_in_responses_async_api(
             )
 
         # make sure the span where the error occurred is captured
-        sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         assert spans[0]["attributes"]["sentry.op"] == "gen_ai.responses"
 
