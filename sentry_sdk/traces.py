@@ -580,17 +580,23 @@ class StreamedSpan:
             SPANDATA.SENTRY_SDK_INTEGRATIONS, sorted(client.integrations.keys())
         )
 
-        if client.options.get("release"):
+        if (
+            client.options.get("release")
+            and SPANDATA.SENTRY_RELEASE not in self._attributes
+        ):
             self.set_attribute(
                 SPANDATA.SENTRY_RELEASE, client.options["release"].strip()
             )
 
-        if client.options.get("environment"):
+        if (
+            client.options.get("environment")
+            and SPANDATA.SENTRY_ENVIRONMENT not in self._attributes
+        ):
             self.set_attribute(
                 SPANDATA.SENTRY_ENVIRONMENT, client.options["environment"].strip()
             )
 
-        if client.options.get("dist"):
+        if client.options.get("dist") and SPANDATA.SENTRY_DIST not in self._attributes:
             self.set_attribute(SPANDATA.SENTRY_DIST, client.options["dist"].strip())
 
     def _to_json(self) -> "SpanJSON":

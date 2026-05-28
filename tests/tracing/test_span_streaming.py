@@ -1622,6 +1622,7 @@ def test_default_attributes(sentry_init, capture_envelopes):
     sentry_init(
         server_name="test-server",
         release="1.0.0",
+        dist="1.0",
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream"},
     )
@@ -1653,6 +1654,9 @@ def test_default_attributes(sentry_init, capture_envelopes):
         "sentry.sdk.version": {"value": mock.ANY, "type": "string"},
         "server.address": {"value": "test-server", "type": "string"},
         "sentry.environment": {"value": "production", "type": "string"},
+        "sentry.platform": {"value": "python", "type": "string"},
         "sentry.release": {"value": "1.0.0", "type": "string"},
+        "sentry.dist": {"value": "1.0", "type": "string"},
         "sentry.origin": {"value": "manual", "type": "string"},
+        "sentry.sdk.integrations": {"value": mock.ANY, "type": "array"},
     }
