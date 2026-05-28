@@ -244,7 +244,7 @@ def _calculate_completions_token_usage(
 def _calculate_responses_token_usage(
     input: "Any",
     response: "Any",
-    span: "Span",
+    span: "Union[Span, StreamedSpan]",
     streaming_message_responses: "Optional[List[str]]",
     count_tokens: "Callable[..., Any]",
 ) -> None:
@@ -959,7 +959,7 @@ def _wrap_synchronous_completions_chunk_iterator(
 
 
 async def _wrap_asynchronous_completions_chunk_iterator(
-    span: "Span",
+    span: "Union[Span, StreamedSpan]",
     integration: "OpenAIIntegration",
     start_time: "Optional[float]",
     messages: "Optional[Iterable[ChatCompletionMessageParam]]",
