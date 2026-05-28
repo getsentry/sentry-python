@@ -22,8 +22,12 @@ Use **tox** for type checking (not mypy directly):
 
 ## Linting & Formatting
 
-Use **tox** for linting (not ruff directly):
-- `uv run tox -e ruff`
+Use **ruff** for linting and formatting:
+- `uv run ruff check --fix tests sentry_sdk`
+- `uv run ruff format tests sentry_sdk`
+
+
+Use **tox** for running the other linting steps:
 - Full lint suite: `uv run tox -e linters`
 - Full lint suite must pass before committing
 
