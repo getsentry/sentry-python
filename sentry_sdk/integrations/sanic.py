@@ -375,7 +375,9 @@ def _get_request_attributes(request: "Request") -> "Dict[str, Any]":
 
     if should_send_default_pii() and request.remote_addr:
         attributes[SPANDATA.CLIENT_ADDRESS] = request.remote_addr
-        attributes[SPANDATA.USER_IP_ADDRESS] = request.remote_addr
+        sentry_sdk.get_isolation_scope().set_attribute(
+            SPANDATA.USER_IP_ADDRESS, request.remote_addr
+        )
 
     return attributes
 

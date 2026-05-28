@@ -204,7 +204,9 @@ def _get_request_attributes(request: "Any") -> "Dict[str, Any]":
 
     if should_send_default_pii() and request.remote_ip:
         attributes[SPANDATA.CLIENT_ADDRESS] = request.remote_ip
-        attributes[SPANDATA.USER_IP_ADDRESS] = request.remote_ip
+        sentry_sdk.get_isolation_scope().set_attribute(
+            SPANDATA.USER_IP_ADDRESS, request.remote_ip
+        )
 
     with capture_internal_exceptions():
         raw_data = _get_tornado_request_data(request)
