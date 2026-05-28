@@ -1,6 +1,7 @@
 import math
 import sys
-from collections.abc import Mapping, Sequence, Set
+from array import array
+from collections.abc import Mapping
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -53,7 +54,7 @@ def add_global_repr_processor(processor: "ReprProcessor") -> None:
     global_repr_processors.append(processor)
 
 
-sequence_types: "List[type]" = [Sequence, Set]
+sequence_types: "List[type]" = [tuple, list, set, frozenset, array]
 
 
 def add_repr_sequence_type(ty: type) -> None:

@@ -13,7 +13,7 @@ from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from sentry_sdk.serializer import MAX_EVENT_BYTES
-from sentry_sdk.tracing_utils import record_sql_queries_supporting_streaming
+from sentry_sdk.tracing_utils import record_sql_queries
 from sentry_sdk.utils import json_dumps
 
 
@@ -934,9 +934,7 @@ def test_no_query_source_if_duration_too_short(
 
             class fake_record_sql_queries:  # noqa: N801
                 def __init__(self, *args, **kwargs):
-                    self._ctx_mgr = record_sql_queries_supporting_streaming(
-                        *args, **kwargs
-                    )
+                    self._ctx_mgr = record_sql_queries(*args, **kwargs)
 
                 def __enter__(self):
                     self.span = self._ctx_mgr.__enter__()
@@ -949,7 +947,7 @@ def test_no_query_source_if_duration_too_short(
                     self._ctx_mgr.__exit__(type, value, traceback)
 
             with mock.patch(
-                "sentry_sdk.integrations.sqlalchemy.record_sql_queries_supporting_streaming",
+                "sentry_sdk.integrations.sqlalchemy.record_sql_queries",
                 fake_record_sql_queries,
             ):
                 assert session.query(Person).first() == bob
@@ -994,9 +992,7 @@ def test_no_query_source_if_duration_too_short(
 
             class fake_record_sql_queries:  # noqa: N801
                 def __init__(self, *args, **kwargs):
-                    self._ctx_mgr = record_sql_queries_supporting_streaming(
-                        *args, **kwargs
-                    )
+                    self._ctx_mgr = record_sql_queries(*args, **kwargs)
 
                 def __enter__(self):
                     self.span = self._ctx_mgr.__enter__()
@@ -1008,7 +1004,7 @@ def test_no_query_source_if_duration_too_short(
                     self.span.timestamp = datetime(2024, 1, 1, microsecond=99999)
 
             with mock.patch(
-                "sentry_sdk.integrations.sqlalchemy.record_sql_queries_supporting_streaming",
+                "sentry_sdk.integrations.sqlalchemy.record_sql_queries",
                 fake_record_sql_queries,
             ):
                 assert session.query(Person).first() == bob
@@ -1069,9 +1065,7 @@ def test_query_source_if_duration_over_threshold(
 
             class fake_record_sql_queries:  # noqa: N801
                 def __init__(self, *args, **kwargs):
-                    self._ctx_mgr = record_sql_queries_supporting_streaming(
-                        *args, **kwargs
-                    )
+                    self._ctx_mgr = record_sql_queries(*args, **kwargs)
 
                 def __enter__(self):
                     self.span = self._ctx_mgr.__enter__()
@@ -1084,7 +1078,7 @@ def test_query_source_if_duration_over_threshold(
                     self._ctx_mgr.__exit__(type, value, traceback)
 
             with mock.patch(
-                "sentry_sdk.integrations.sqlalchemy.record_sql_queries_supporting_streaming",
+                "sentry_sdk.integrations.sqlalchemy.record_sql_queries",
                 fake_record_sql_queries,
             ):
                 assert session.query(Person).first() == bob
@@ -1146,9 +1140,7 @@ def test_query_source_if_duration_over_threshold(
 
             class fake_record_sql_queries:  # noqa: N801
                 def __init__(self, *args, **kwargs):
-                    self._ctx_mgr = record_sql_queries_supporting_streaming(
-                        *args, **kwargs
-                    )
+                    self._ctx_mgr = record_sql_queries(*args, **kwargs)
 
                 def __enter__(self):
                     self.span = self._ctx_mgr.__enter__()
@@ -1160,7 +1152,7 @@ def test_query_source_if_duration_over_threshold(
                     self.span.timestamp = datetime(2024, 1, 1, microsecond=101000)
 
             with mock.patch(
-                "sentry_sdk.integrations.sqlalchemy.record_sql_queries_supporting_streaming",
+                "sentry_sdk.integrations.sqlalchemy.record_sql_queries",
                 fake_record_sql_queries,
             ):
                 assert session.query(Person).first() == bob
