@@ -148,6 +148,13 @@ deps =
     {% else %}
     {{ integration.name }}-v{{ release }}: {{ integration.package }}=={{ release }}
     {% endif %}
+
+    {% for dependency_group in release.transitive_dependencies %}
+    {% for dep in dependency_group %}
+    {{ dep }}
+    {% endfor %}
+
+    {% endfor %}
     {% endfor %}
     {% if integration.latest_stable %}
     {% if integration.extra %}
