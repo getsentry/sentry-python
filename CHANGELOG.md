@@ -8,6 +8,19 @@
 - Allow integrations to define control flow exceptions by @sentrivana in [#6425](https://github.com/getsentry/sentry-python/pull/6425)
 - Disable string truncation for events by default by @alexander-alderman-webb in [#6290](https://github.com/getsentry/sentry-python/pull/6290)
 
+  Following a previous significant increase of the string truncation limit, we've now completely removed the limit by default.
+  In case you have large strings in your events, you should now be able to see them.
+  
+  In rare cases, if you have really long strings (or a lot of them), you might see envelopes being dropped because of their size.
+  If that happens, you can set the `max_value_length` `init` option to the previous value of `100_000`:
+
+  ```python
+  sentry_sdk.init(
+      ...,
+      max_value_length=100_000,
+  )
+  ```
+
 ### Bug Fixes 🐛
 
 #### Langchain
@@ -49,7 +62,7 @@
   triggering side-effects from custom `__iter__` implementations.
 
   This might mean some objects might be serialized differently. If you want to continue serializing a specific
-  custom sequence class, you can register it via `sentry_sdk.serializer.add_repr_sequence_type` (see
+  custom sequence class the old way, you can register it via `sentry_sdk.serializer.add_repr_sequence_type` (see
   [here](https://github.com/getsentry/sentry-python/blob/54f768680cad8a40ab97be4dddd16c12c9cba493/sentry_sdk/serializer.py#L60-L61)).
 
 - Memory leak in SentrySpanProcessor by @volodkindv in [#6271](https://github.com/getsentry/sentry-python/pull/6271)
