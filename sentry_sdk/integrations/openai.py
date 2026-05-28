@@ -34,6 +34,11 @@ from sentry_sdk.ai.utils import (
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.tracing_utils import (
+    has_span_streaming_enabled,
+    should_truncate_gen_ai_input,
+)
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -157,7 +162,7 @@ def _has_attr_and_is_int(
 def _calculate_completions_token_usage(
     messages: "Optional[Iterable[ChatCompletionMessageParam]]",
     response: "Any",
-    span: "Span",
+    span: "Union[Span, StreamedSpan]",
     streaming_message_responses: "Optional[List[str]]",
     streaming_message_total_token_usage: "Optional[CompletionUsage]",
     count_tokens: "Callable[..., Any]",
@@ -239,7 +244,7 @@ def _calculate_completions_token_usage(
 def _calculate_responses_token_usage(
     input: "Any",
     response: "Any",
-    span: "Span",
+    span: "Union[Span, StreamedSpan]",
     streaming_message_responses: "Optional[List[str]]",
     count_tokens: "Callable[..., Any]",
 ) -> None:
@@ -315,7 +320,7 @@ def _calculate_responses_token_usage(
 
 
 def _set_responses_api_input_data(
-    span: "Span",
+    span: "Union[Span, StreamedSpan]",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
 ) -> None:
@@ -328,21 +333,24 @@ def _set_responses_api_input_data(
             span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
         )
 
+    set_on_span = (
+        span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
+    )
     model = kwargs.get("model")
     if model is not None:
-        span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+        set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
     max_tokens = kwargs.get("max_output_tokens")
     if max_tokens is not None and _is_given(max_tokens):
-        span.set_data(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
+        set_on_span(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
 
     temperature = kwargs.get("temperature")
     if temperature is not None and _is_given(temperature):
-        span.set_data(SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature)
+        set_on_span(SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature)
 
     top_p = kwargs.get("top_p")
     if top_p is not None and _is_given(top_p):
-        span.set_data(SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
+        set_on_span(SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
 
     conversation = kwargs.get("conversation")
     if conversation is not None and _is_given(conversation):
@@ -352,7 +360,7 @@ def _set_responses_api_input_data(
         elif isinstance(conversation, dict):
             conversation_id = conversation.get("id")
         if conversation_id is not None:
-            span.set_data(SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id)
+            set_on_span(SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id)
 
     if not should_send_default_pii() or not integration.include_prompts:
         set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
@@ -363,7 +371,7 @@ def _set_responses_api_input_data(
         and explicit_instructions is not None
         and _is_given(explicit_instructions)
     ):
-        span.set_data(
+        set_on_span(
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
             json.dumps(
                 [
@@ -397,7 +405,7 @@ def _set_responses_api_input_data(
     instructions_text_parts += _transform_system_instructions(system_instructions)
 
     if len(instructions_text_parts) > 0:
-        span.set_data(
+        set_on_span(
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
             json.dumps(instructions_text_parts),
         )
@@ -407,9 +415,9 @@ def _set_responses_api_input_data(
         client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
         messages_data = (
-            normalized_messages
-            if client.options.get("stream_gen_ai_spans", False)
-            else truncate_and_annotate_messages(normalized_messages, span, scope)
+            truncate_and_annotate_messages(normalized_messages, span, scope)
+            if should_truncate_gen_ai_input(client.options)
+            else normalized_messages
         )
         if messages_data is not None:
             set_data_normalized(
@@ -427,9 +435,9 @@ def _set_responses_api_input_data(
         client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
         messages_data = (
-            normalized_messages
-            if client.options.get("stream_gen_ai_spans", False)
-            else truncate_and_annotate_messages(normalized_messages, span, scope)
+            truncate_and_annotate_messages(normalized_messages, span, scope)
+            if should_truncate_gen_ai_input(client.options)
+            else normalized_messages
         )
         if messages_data is not None:
             set_data_normalized(
@@ -440,7 +448,7 @@ def _set_responses_api_input_data(
 
 
 def _set_completions_api_input_data(
-    span: "Span",
+    span: "Union[Span, StreamedSpan]",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
 ) -> None:
@@ -454,29 +462,32 @@ def _set_completions_api_input_data(
             span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
         )
 
+    set_on_span = (
+        span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
+    )
     model = kwargs.get("model")
     if model is not None:
-        span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+        set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
     max_tokens = kwargs.get("max_tokens")
     if max_tokens is not None and _is_given(max_tokens):
-        span.set_data(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
+        set_on_span(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
 
     presence_penalty = kwargs.get("presence_penalty")
     if presence_penalty is not None and _is_given(presence_penalty):
-        span.set_data(SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY, presence_penalty)
+        set_on_span(SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY, presence_penalty)
 
     frequency_penalty = kwargs.get("frequency_penalty")
     if frequency_penalty is not None and _is_given(frequency_penalty):
-        span.set_data(SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY, frequency_penalty)
+        set_on_span(SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY, frequency_penalty)
 
     temperature = kwargs.get("temperature")
     if temperature is not None and _is_given(temperature):
-        span.set_data(SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature)
+        set_on_span(SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature)
 
     top_p = kwargs.get("top_p")
     if top_p is not None and _is_given(top_p):
-        span.set_data(SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
+        set_on_span(SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
 
     if (
         not should_send_default_pii()
@@ -491,9 +502,9 @@ def _set_completions_api_input_data(
         client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
         messages_data = (
-            normalized_messages
-            if client.options.get("stream_gen_ai_spans", False)
-            else truncate_and_annotate_messages(normalized_messages, span, scope)
+            truncate_and_annotate_messages(normalized_messages, span, scope)
+            if should_truncate_gen_ai_input(client.options)
+            else normalized_messages
         )
         if messages_data is not None:
             set_data_normalized(
@@ -512,7 +523,7 @@ def _set_completions_api_input_data(
 
     system_instructions = _get_system_instructions_completions(messages)
     if len(system_instructions) > 0:
-        span.set_data(
+        set_on_span(
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
             json.dumps(_transform_system_instructions(system_instructions)),
         )
@@ -527,9 +538,9 @@ def _set_completions_api_input_data(
         client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
         messages_data = (
-            normalized_messages
-            if client.options.get("stream_gen_ai_spans", False)
-            else truncate_and_annotate_messages(normalized_messages, span, scope)
+            truncate_and_annotate_messages(normalized_messages, span, scope)
+            if should_truncate_gen_ai_input(client.options)
+            else normalized_messages
         )
         if messages_data is not None:
             set_data_normalized(
@@ -540,7 +551,7 @@ def _set_completions_api_input_data(
 
 
 def _set_embeddings_input_data(
-    span: "Span",
+    span: "Union[Span, StreamedSpan]",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
 ) -> None:
@@ -548,9 +559,12 @@ def _set_embeddings_input_data(
         "input"
     )
 
+    set_on_span = (
+        span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
+    )
     model = kwargs.get("model")
     if model is not None:
-        span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+        set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
     if (
         not should_send_default_pii()
@@ -568,11 +582,9 @@ def _set_embeddings_input_data(
         client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
         messages_data = (
-            normalized_messages
-            if client.options.get("stream_gen_ai_spans", False)
-            else truncate_and_annotate_embedding_inputs(
-                normalized_messages, span, scope
-            )
+            truncate_and_annotate_embedding_inputs(normalized_messages, span, scope)
+            if should_truncate_gen_ai_input(client.options)
+            else normalized_messages
         )
         if messages_data is not None:
             set_data_normalized(
@@ -594,11 +606,9 @@ def _set_embeddings_input_data(
         client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
         messages_data = (
-            normalized_messages
-            if client.options.get("stream_gen_ai_spans", False)
-            else truncate_and_annotate_embedding_inputs(
-                normalized_messages, span, scope
-            )
+            truncate_and_annotate_embedding_inputs(normalized_messages, span, scope)
+            if should_truncate_gen_ai_input(client.options)
+            else normalized_messages
         )
         if messages_data is not None:
             set_data_normalized(
@@ -609,7 +619,7 @@ def _set_embeddings_input_data(
 
 
 def _set_common_output_data(
-    span: "Span",
+    span: "Union[Span, StreamedSpan]",
     response: "Any",
     input: "Any",
     integration: "OpenAIIntegration",
@@ -698,7 +708,8 @@ def _set_common_output_data(
 
 
 def _new_sync_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
-    integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+    client = sentry_sdk.get_client()
+    integration = client.get_integration(OpenAIIntegration)
     if integration is None:
         return f(*args, **kwargs)
 
@@ -714,18 +725,30 @@ def _new_sync_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
 
     model = kwargs.get("model")
 
-    span = get_start_span_function()(
-        op=consts.OP.GEN_AI_CHAT,
-        name=f"chat {model}",
-        origin=OpenAIIntegration.origin,
-    )
-    span.__enter__()
-
-    span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
-
     # Same bool handling as in https://github.com/openai/openai-python/blob/acd0c54d8a68efeedde0e5b4e6c310eef1ce7867/src/openai/resources/completions.py#L585
     is_streaming_response = kwargs.get("stream", False) or False
-    span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, is_streaming_response)
+
+    if has_span_streaming_enabled(client.options):
+        span = sentry_sdk.traces.start_span(
+            name=f"chat {model}",
+            attributes={
+                "sentry.op": consts.OP.GEN_AI_CHAT,
+                "sentry.origin": OpenAIIntegration.origin,
+                SPANDATA.GEN_AI_SYSTEM: "openai",
+                SPANDATA.GEN_AI_RESPONSE_STREAMING: is_streaming_response,
+            },
+        )
+
+    else:
+        span = get_start_span_function()(
+            op=consts.OP.GEN_AI_CHAT,
+            name=f"chat {model}",
+            origin=OpenAIIntegration.origin,
+        )
+        span.__enter__()
+
+        span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, is_streaming_response)
 
     _set_completions_api_input_data(span, kwargs, integration)
 
@@ -766,7 +789,8 @@ def _new_sync_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
 
 
 async def _new_async_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
-    integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+    client = sentry_sdk.get_client()
+    integration = client.get_integration(OpenAIIntegration)
     if integration is None:
         return await f(*args, **kwargs)
 
@@ -782,18 +806,29 @@ async def _new_async_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") ->
 
     model = kwargs.get("model")
 
-    span = get_start_span_function()(
-        op=consts.OP.GEN_AI_CHAT,
-        name=f"chat {model}",
-        origin=OpenAIIntegration.origin,
-    )
-    span.__enter__()
-
-    span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
-
     # Same bool handling as in https://github.com/openai/openai-python/blob/acd0c54d8a68efeedde0e5b4e6c310eef1ce7867/src/openai/resources/completions.py#L585
     is_streaming_response = kwargs.get("stream", False) or False
-    span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, is_streaming_response)
+
+    if has_span_streaming_enabled(client.options):
+        span = sentry_sdk.traces.start_span(
+            name=f"chat {model}",
+            attributes={
+                "sentry.op": consts.OP.GEN_AI_CHAT,
+                "sentry.origin": OpenAIIntegration.origin,
+                SPANDATA.GEN_AI_SYSTEM: "openai",
+                SPANDATA.GEN_AI_RESPONSE_STREAMING: is_streaming_response,
+            },
+        )
+    else:
+        span = get_start_span_function()(
+            op=consts.OP.GEN_AI_CHAT,
+            name=f"chat {model}",
+            origin=OpenAIIntegration.origin,
+        )
+        span.__enter__()
+
+        span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, is_streaming_response)
 
     _set_completions_api_input_data(span, kwargs, integration)
 
@@ -833,7 +868,7 @@ async def _new_async_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") ->
 
 
 def _set_completions_api_output_data(
-    span: "Span",
+    span: "Union[Span, StreamedSpan]",
     response: "Any",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
@@ -854,7 +889,7 @@ def _set_completions_api_output_data(
 
 
 def _wrap_synchronous_completions_chunk_iterator(
-    span: "Span",
+    span: "Union[Span, StreamedSpan]",
     integration: "OpenAIIntegration",
     start_time: "Optional[float]",
     messages: "Optional[Iterable[ChatCompletionMessageParam]]",
@@ -872,7 +907,10 @@ def _wrap_synchronous_completions_chunk_iterator(
     streaming_message_total_token_usage = None
 
     for x in old_iterator:
-        span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
+        if isinstance(span, StreamedSpan):
+            span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
+        else:
+            span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
 
         with capture_internal_exceptions():
             if hasattr(x, "choices") and x.choices is not None:
@@ -916,7 +954,7 @@ def _wrap_synchronous_completions_chunk_iterator(
 
 
 async def _wrap_asynchronous_completions_chunk_iterator(
-    span: "Span",
+    span: "Union[Span, StreamedSpan]",
     integration: "OpenAIIntegration",
     start_time: "Optional[float]",
     messages: "Optional[Iterable[ChatCompletionMessageParam]]",
@@ -934,7 +972,10 @@ async def _wrap_asynchronous_completions_chunk_iterator(
     streaming_message_total_token_usage = None
 
     async for x in old_iterator:
-        span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
+        if isinstance(span, StreamedSpan):
+            span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
+        else:
+            span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.model)
 
         with capture_internal_exceptions():
             if hasattr(x, "choices") and x.choices is not None:
@@ -978,7 +1019,7 @@ async def _wrap_asynchronous_completions_chunk_iterator(
 
 
 def _wrap_synchronous_responses_event_iterator(
-    span: "Span",
+    span: "Union[Span, StreamedSpan]",
     integration: "OpenAIIntegration",
     start_time: "Optional[float]",
     input: "Optional[Union[str, ResponseInputParam]]",
@@ -1005,7 +1046,10 @@ def _wrap_synchronous_responses_event_iterator(
                 data_buf[0].append(x.delta or "")
 
             if isinstance(x, ResponseCompletedEvent):
-                span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.response.model)
+                if isinstance(span, StreamedSpan):
+                    span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, x.response.model)
+                else:
+                    span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.response.model)
 
                 _calculate_responses_token_usage(
                     input=input,
@@ -1042,7 +1086,7 @@ def _wrap_synchronous_responses_event_iterator(
 
 
 async def _wrap_asynchronous_responses_event_iterator(
-    span: "Span",
+    span: "Union[Span, StreamedSpan]",
     integration: "OpenAIIntegration",
     start_time: "Optional[float]",
     input: "Optional[Union[str, ResponseInputParam]]",
@@ -1069,7 +1113,10 @@ async def _wrap_asynchronous_responses_event_iterator(
                 data_buf[0].append(x.delta or "")
 
             if isinstance(x, ResponseCompletedEvent):
-                span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.response.model)
+                if isinstance(span, StreamedSpan):
+                    span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, x.response.model)
+                else:
+                    span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, x.response.model)
 
                 _calculate_responses_token_usage(
                     input=input,
@@ -1104,7 +1151,7 @@ async def _wrap_asynchronous_responses_event_iterator(
 
 
 def _set_responses_api_output_data(
-    span: "Span",
+    span: "Union[Span, StreamedSpan]",
     response: "Any",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
@@ -1125,7 +1172,7 @@ def _set_responses_api_output_data(
 
 
 def _set_embeddings_output_data(
-    span: "Span",
+    span: "Union[Span, StreamedSpan]",
     response: "Any",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
@@ -1172,65 +1219,117 @@ def _wrap_async_chat_completion_create(f: "Callable[..., Any]") -> "Callable[...
 
 
 def _new_sync_embeddings_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
-    integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+    client = sentry_sdk.get_client()
+    integration = client.get_integration(OpenAIIntegration)
     if integration is None:
         return f(*args, **kwargs)
 
     model = kwargs.get("model")
 
-    with get_start_span_function()(
-        op=consts.OP.GEN_AI_EMBEDDINGS,
-        name=f"embeddings {model}",
-        origin=OpenAIIntegration.origin,
-    ) as span:
-        span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
-        _set_embeddings_input_data(span, kwargs, integration)
+    if has_span_streaming_enabled(client.options):
+        with sentry_sdk.traces.start_span(
+            name=f"embeddings {model}",
+            attributes={
+                "sentry.op": consts.OP.GEN_AI_EMBEDDINGS,
+                "sentry.origin": OpenAIIntegration.origin,
+                SPANDATA.GEN_AI_SYSTEM: "openai",
+            },
+        ) as span:
+            _set_embeddings_input_data(span, kwargs, integration)
 
-        try:
-            response = f(*args, **kwargs)
-        except Exception as exc:
-            exc_info = sys.exc_info()
-            with capture_internal_exceptions():
-                _capture_exception(exc)
-            reraise(*exc_info)
+            try:
+                response = f(*args, **kwargs)
+            except Exception as exc:
+                exc_info = sys.exc_info()
+                with capture_internal_exceptions():
+                    _capture_exception(exc)
+                reraise(*exc_info)
 
-        _set_embeddings_output_data(
-            span, response, kwargs, integration, finish_span=False
-        )
+            _set_embeddings_output_data(
+                span, response, kwargs, integration, finish_span=False
+            )
 
-        return response
+            return response
+    else:
+        with get_start_span_function()(
+            op=consts.OP.GEN_AI_EMBEDDINGS,
+            name=f"embeddings {model}",
+            origin=OpenAIIntegration.origin,
+        ) as span:
+            span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
+            _set_embeddings_input_data(span, kwargs, integration)
+
+            try:
+                response = f(*args, **kwargs)
+            except Exception as exc:
+                exc_info = sys.exc_info()
+                with capture_internal_exceptions():
+                    _capture_exception(exc)
+                reraise(*exc_info)
+
+            _set_embeddings_output_data(
+                span, response, kwargs, integration, finish_span=False
+            )
+
+            return response
 
 
 async def _new_async_embeddings_create(
     f: "Any", *args: "Any", **kwargs: "Any"
 ) -> "Any":
-    integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+    client = sentry_sdk.get_client()
+    integration = client.get_integration(OpenAIIntegration)
     if integration is None:
         return await f(*args, **kwargs)
 
     model = kwargs.get("model")
 
-    with get_start_span_function()(
-        op=consts.OP.GEN_AI_EMBEDDINGS,
-        name=f"embeddings {model}",
-        origin=OpenAIIntegration.origin,
-    ) as span:
-        span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
-        _set_embeddings_input_data(span, kwargs, integration)
+    if has_span_streaming_enabled(client.options):
+        with sentry_sdk.traces.start_span(
+            name=f"embeddings {model}",
+            attributes={
+                "sentry.op": consts.OP.GEN_AI_EMBEDDINGS,
+                "sentry.origin": OpenAIIntegration.origin,
+                SPANDATA.GEN_AI_SYSTEM: "openai",
+            },
+        ) as span:
+            _set_embeddings_input_data(span, kwargs, integration)
 
-        try:
-            response = await f(*args, **kwargs)
-        except Exception as exc:
-            exc_info = sys.exc_info()
-            with capture_internal_exceptions():
-                _capture_exception(exc)
-            reraise(*exc_info)
+            try:
+                response = await f(*args, **kwargs)
+            except Exception as exc:
+                exc_info = sys.exc_info()
+                with capture_internal_exceptions():
+                    _capture_exception(exc)
+                reraise(*exc_info)
 
-        _set_embeddings_output_data(
-            span, response, kwargs, integration, finish_span=False
-        )
+            _set_embeddings_output_data(
+                span, response, kwargs, integration, finish_span=False
+            )
 
-        return response
+            return response
+    else:
+        with get_start_span_function()(
+            op=consts.OP.GEN_AI_EMBEDDINGS,
+            name=f"embeddings {model}",
+            origin=OpenAIIntegration.origin,
+        ) as span:
+            span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
+            _set_embeddings_input_data(span, kwargs, integration)
+
+            try:
+                response = await f(*args, **kwargs)
+            except Exception as exc:
+                exc_info = sys.exc_info()
+                with capture_internal_exceptions():
+                    _capture_exception(exc)
+                reraise(*exc_info)
+
+            _set_embeddings_output_data(
+                span, response, kwargs, integration, finish_span=False
+            )
+
+            return response
 
 
 def _wrap_embeddings_create(f: "Any") -> "Any":
@@ -1258,24 +1357,36 @@ def _wrap_async_embeddings_create(f: "Any") -> "Any":
 
 
 def _new_sync_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
-    integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+    client = sentry_sdk.get_client()
+    integration = client.get_integration(OpenAIIntegration)
     if integration is None:
         return f(*args, **kwargs)
 
     model = kwargs.get("model")
 
-    span = get_start_span_function()(
-        op=consts.OP.GEN_AI_RESPONSES,
-        name=f"responses {model}",
-        origin=OpenAIIntegration.origin,
-    )
-    span.__enter__()
-
-    span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
-
     # Same bool handling as in https://github.com/openai/openai-python/blob/acd0c54d8a68efeedde0e5b4e6c310eef1ce7867/src/openai/resources/responses/responses.py#L940
     is_streaming_response = kwargs.get("stream", False) or False
-    span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, is_streaming_response)
+
+    if has_span_streaming_enabled(client.options):
+        span = sentry_sdk.traces.start_span(
+            name=f"responses {model}",
+            attributes={
+                "sentry.op": consts.OP.GEN_AI_RESPONSES,
+                "sentry.origin": OpenAIIntegration.origin,
+                SPANDATA.GEN_AI_SYSTEM: "openai",
+                SPANDATA.GEN_AI_RESPONSE_STREAMING: is_streaming_response,
+            },
+        )
+    else:
+        span = get_start_span_function()(
+            op=consts.OP.GEN_AI_RESPONSES,
+            name=f"responses {model}",
+            origin=OpenAIIntegration.origin,
+        )
+        span.__enter__()
+
+        span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, is_streaming_response)
 
     _set_responses_api_input_data(span, kwargs, integration)
 
@@ -1316,24 +1427,36 @@ def _new_sync_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any"
 
 
 async def _new_async_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
-    integration = sentry_sdk.get_client().get_integration(OpenAIIntegration)
+    client = sentry_sdk.get_client()
+    integration = client.get_integration(OpenAIIntegration)
     if integration is None:
         return await f(*args, **kwargs)
 
     model = kwargs.get("model")
 
-    span = get_start_span_function()(
-        op=consts.OP.GEN_AI_RESPONSES,
-        name=f"responses {model}",
-        origin=OpenAIIntegration.origin,
-    )
-    span.__enter__()
-
-    span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
-
     # Same bool handling as in https://github.com/openai/openai-python/blob/acd0c54d8a68efeedde0e5b4e6c310eef1ce7867/src/openai/resources/responses/responses.py#L940
     is_streaming_response = kwargs.get("stream", False) or False
-    span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, is_streaming_response)
+
+    if has_span_streaming_enabled(client.options):
+        span = sentry_sdk.traces.start_span(
+            name=f"responses {model}",
+            attributes={
+                "sentry.op": consts.OP.GEN_AI_RESPONSES,
+                "sentry.origin": OpenAIIntegration.origin,
+                SPANDATA.GEN_AI_SYSTEM: "openai",
+                SPANDATA.GEN_AI_RESPONSE_STREAMING: is_streaming_response,
+            },
+        )
+    else:
+        span = get_start_span_function()(
+            op=consts.OP.GEN_AI_RESPONSES,
+            name=f"responses {model}",
+            origin=OpenAIIntegration.origin,
+        )
+        span.__enter__()
+
+        span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
+        span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, is_streaming_response)
 
     _set_responses_api_input_data(span, kwargs, integration)
 

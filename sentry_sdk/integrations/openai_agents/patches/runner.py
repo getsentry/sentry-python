@@ -36,7 +36,10 @@ def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., A
         # don't touch each other's scopes
         with sentry_sdk.isolation_scope():
             # Clone agent because agent invocation spans are attached per run.
-            agent = args[0].clone()
+            if "starting_agent" in kwargs:
+                agent = kwargs["starting_agent"].clone()
+            else:
+                agent = args[0].clone()
 
             with agent_workflow_span(agent) as workflow_span:
                 # Set conversation ID on workflow span early so it's captured even on errors
@@ -47,7 +50,11 @@ def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., A
                         SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id
                     )
 
-                args = (agent, *args[1:])
+                if "starting_agent" in kwargs:
+                    kwargs["starting_agent"] = agent
+                else:
+                    args = (agent, *args[1:])
+
                 try:
                     run_result = await original_func(*args, **kwargs)
                 except AgentsException as exc:
@@ -122,7 +129,10 @@ def _create_run_streamed_wrapper(
     @wraps(original_func)
     def wrapper(*args: "Any", **kwargs: "Any") -> "Any":
         # Clone agent because agent invocation spans are attached per run.
-        agent = args[0].clone()
+        if "starting_agent" in kwargs:
+            agent = kwargs["starting_agent"].clone()
+        else:
+            agent = args[0].clone()
 
         # Capture conversation_id from kwargs if provided
         conversation_id = kwargs.get("conversation_id")
@@ -140,7 +150,10 @@ def _create_run_streamed_wrapper(
         # Store span on agent for cleanup
         agent._sentry_workflow_span = workflow_span
 
-        args = (agent, *args[1:])
+        if "starting_agent" in kwargs:
+            kwargs["starting_agent"] = agent
+        else:
+            args = (agent, *args[1:])
 
         try:
             # Call original function to get RunResultStreaming

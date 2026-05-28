@@ -14,7 +14,7 @@ from sentry_sdk.ai.utils import (
     set_data_normalized,
     truncate_and_annotate_messages,
 )
-from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import event_from_exception, safe_serialize
@@ -215,25 +215,3 @@ def _set_output_data(span: "sentry_sdk.tracing.Span", result: "Any") -> None:
         set_data_normalized(
             span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
         )
-
-
-def _create_mcp_execute_tool_spans(
-    span: "sentry_sdk.tracing.Span", result: "agents.Result"
-) -> None:
-    for output in result.output:
-        if output.__class__.__name__ == "McpCall":
-            with sentry_sdk.start_span(
-                op=OP.GEN_AI_EXECUTE_TOOL,
-                description=f"execute_tool {output.name}",
-                start_timestamp=span.start_timestamp,
-            ) as execute_tool_span:
-                execute_tool_span.set_data(SPANDATA.GEN_AI_TOOL_NAME, output.name)
-                if should_send_default_pii():
-                    execute_tool_span.set_data(
-                        SPANDATA.GEN_AI_TOOL_INPUT, output.arguments
-                    )
-                    execute_tool_span.set_data(
-                        SPANDATA.GEN_AI_TOOL_OUTPUT, output.output
-                    )
-                if output.error:
-                    execute_tool_span.set_status(SPANSTATUS.INTERNAL_ERROR)
