@@ -195,6 +195,7 @@ def test_nested_on_new_span_on_close(
             assert sentry_span_after_close == rust_first_rust_span
 
             rust_tracing.close_span(3)
+
             assert (
                 sentry_sdk.traces._get_current_streamed_span() == original_sentry_span
             )
@@ -259,6 +260,7 @@ def test_nested_on_new_span_on_close(
             assert sentry_span_after_close == rust_first_rust_span
 
             rust_tracing.close_span(3)
+
             assert sentry_sdk.get_current_span() == original_sentry_span
 
         (event,) = events
