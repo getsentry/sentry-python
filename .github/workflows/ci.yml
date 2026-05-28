@@ -15,11 +15,6 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  BUILD_CACHE_KEY: ${{ github.sha }}
-  CACHED_BUILD_PATHS: |
-    ${{ github.workspace }}/dist-serverless
-
 jobs:
   lint:
     name: Lint Sources
@@ -39,8 +34,8 @@ jobs:
       - name: Ruff format
         run: uv run ruff format --check tests sentry_sdk
 
-      - name: Linters
-        run: uv run tox -e linters
+      - name: Find raise from None
+        run: uv run python scripts/find_raise_from_none.py
 
       - name: Mypy
         run: uv run --group typing mypy sentry_sdk
@@ -52,20 +47,16 @@ jobs:
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
-          python-version: 3.12
-      - name: Setup build cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
-        id: build_cache
-        with:
-          path: ${{ env.CACHED_BUILD_PATHS }}
-          key: ${{ env.BUILD_CACHE_KEY }}
+          python-version: 3.14
       - name: Build Packages
         run: |
-          echo "Creating directory containing Python SDK Lambda Layer"
-          # This will also trigger "make dist" that creates the Python packages
-          make aws-lambda-layer
+          echo "Building SDK dist wheel and tar.gz"
+          uv build
+          echo "Building AWS Lambda Layer"
+          uv run --group aws --with-editable . python scripts/build_aws_lambda_layer.py
       - name: Upload Python Packages
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
@@ -81,12 +72,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
-          python-version: 3.12
+          python-version: 3.14
 
       - run: |
-          make apidocs
+          rm -rf docs/_build
+          uv run --group docs sphinx-build -vv -W -b html docs/ docs/_build
           cd docs/_build && zip -r gh-pages ./
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

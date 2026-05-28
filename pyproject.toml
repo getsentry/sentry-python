@@ -14,6 +14,32 @@ dev = [
     "ruff",
 ]
 
+toxgen = [
+    "jinja2",
+    "packaging<26.0",
+    "pip",
+    "requests",
+]
+
+docs = [
+    "gevent",
+    "shibuya",
+    "sphinx<8.2",
+    "sphinx-autodoc-typehints[type_comments]>=2.3.0",
+    "typing-extensions",
+]
+
+aws = [
+    "certifi",
+    "urllib3",
+    # In Lambda functions botocore is used, and botocore has
+    # restrictions on urllib3
+    # https://github.com/boto/botocore/blob/develop/setup.cfg
+    # So we pin this here to make our Lambda layer work with
+    # Lambda Function using Python 3.7+
+    "urllib3<1.27; python_version < '3.10'",
+]
+
 typing = [
     "mypy",
     # =================

@@ -232,15 +232,8 @@ basepython =
     py3.14: python3.14
     py3.14t: python3.14t
 
-    # Python version is pinned here for consistency across environments.
-    linters: python3.14
-
 commands =
     ; Running `pytest` as an executable suffers from an import error
     ; when loading tests in scenarios. In particular, django fails to
     ; load the settings from the test module.
     python -m pytest -W error::pytest.PytestUnraisableExceptionWarning {env:TESTPATH:{env:_TESTPATH}} -o junit_suite_name={envname} {posargs}
-
-[testenv:linters]
-commands =
-    python scripts/find_raise_from_none.py
