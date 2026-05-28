@@ -90,15 +90,8 @@
 
 #### Other
 
-- (flask) Add span streaming test coverage by @ericapisani in [#6264](https://github.com/getsentry/sentry-python/pull/6264)
 - (openai) Deduplicate by removing `node.callspec.id` matching by @alexander-alderman-webb in [#6427](https://github.com/getsentry/sentry-python/pull/6427)
-- (wsgi) Remove unused segment name setting by @sentrivana in [#6305](https://github.com/getsentry/sentry-python/pull/6305)
-- Ignore jsonl files in diffs with gitattributes by @sl0thentr0py in [#6419](https://github.com/getsentry/sentry-python/pull/6419)
-- 🤖 Update test matrix with new releases (05/25) by @github-actions in [#6398](https://github.com/getsentry/sentry-python/pull/6398)
 - Respect context manager lifecycles in `fake_record_sql_queries` by @alexander-alderman-webb in [#6295](https://github.com/getsentry/sentry-python/pull/6295)
-- 🤖 Update test matrix with new releases (05/18) by @github-actions in [#6279](https://github.com/getsentry/sentry-python/pull/6279)
-- Ignore import ordering commit in blame by @alexander-alderman-webb in [#6272](https://github.com/getsentry/sentry-python/pull/6272)
-- Enable Ruff import ordering by @alexander-alderman-webb in [#6270](https://github.com/getsentry/sentry-python/pull/6270)
 
 ## 2.60.0
 
