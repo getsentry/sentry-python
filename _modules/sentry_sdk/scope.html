@@ -2,11 +2,11 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.scope - sentry-python 2.60.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.scope - sentry-python 2.61.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=e1a1ceaf" />
-    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=44020203" />
+    <link rel="stylesheet" type="text/css" href="../../_static/shibuya.css?v=9454f7d5" />
     <link media="print" rel="stylesheet" type="text/css" href="../../_static/print.css?v=20ff2c19" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,7 +17,8 @@
   --sy-f-heading: "Inter", var(--sy-f-sys), var(--sy-f-cjk), sans-serif;
 }
 </style>
-    <meta property="og:type" content="website"/><meta property="og:title" content="sentry_sdk.scope"/>
+    
+  <meta property="og:type" content="website"/><meta property="og:title" content="sentry_sdk.scope"/>
     <meta name="twitter:card" content="summary"/>
   </head>
 <body><div class="sy-head">
@@ -501,8 +502,8 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="376">    <span class="k">def</span><span class="w"> </span><span class="nf">set_global_attributes</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 </span><span data-line="377">        <span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.client</span><span class="w"> </span><span class="kn">import</span> <span class="n">SDK_INFO</span>
 </span><span data-line="378">
-</span><span data-line="379">        <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="s2">&quot;sentry.sdk.name&quot;</span><span class="p">,</span> <span class="n">SDK_INFO</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">])</span>
-</span><span data-line="380">        <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="s2">&quot;sentry.sdk.version&quot;</span><span class="p">,</span> <span class="n">SDK_INFO</span><span class="p">[</span><span class="s2">&quot;version&quot;</span><span class="p">])</span>
+</span><span data-line="379">        <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="n">SPANDATA</span><span class="o">.</span><span class="n">SENTRY_SDK_NAME</span><span class="p">,</span> <span class="n">SDK_INFO</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">])</span>
+</span><span data-line="380">        <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="n">SPANDATA</span><span class="o">.</span><span class="n">SENTRY_SDK_VERSION</span><span class="p">,</span> <span class="n">SDK_INFO</span><span class="p">[</span><span class="s2">&quot;version&quot;</span><span class="p">])</span>
 </span><span data-line="381">
 </span><span data-line="382">        <span class="n">options</span> <span class="o">=</span> <span class="n">sentry_sdk</span><span class="o">.</span><span class="n">get_client</span><span class="p">()</span><span class="o">.</span><span class="n">options</span>
 </span><span data-line="383">
@@ -512,11 +513,11 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="387">
 </span><span data-line="388">        <span class="n">environment</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;environment&quot;</span><span class="p">)</span>
 </span><span data-line="389">        <span class="k">if</span> <span class="n">environment</span><span class="p">:</span>
-</span><span data-line="390">            <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="s2">&quot;sentry.environment&quot;</span><span class="p">,</span> <span class="n">environment</span><span class="p">)</span>
+</span><span data-line="390">            <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="n">SPANDATA</span><span class="o">.</span><span class="n">SENTRY_ENVIRONMENT</span><span class="p">,</span> <span class="n">environment</span><span class="p">)</span>
 </span><span data-line="391">
 </span><span data-line="392">        <span class="n">release</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;release&quot;</span><span class="p">)</span>
 </span><span data-line="393">        <span class="k">if</span> <span class="n">release</span><span class="p">:</span>
-</span><span data-line="394">            <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="s2">&quot;sentry.release&quot;</span><span class="p">,</span> <span class="n">release</span><span class="p">)</span>
+</span><span data-line="394">            <span class="bp">self</span><span class="o">.</span><span class="n">set_attribute</span><span class="p">(</span><span class="n">SPANDATA</span><span class="o">.</span><span class="n">SENTRY_RELEASE</span><span class="p">,</span> <span class="n">release</span><span class="p">)</span>
 </span><span data-line="395">
 <div class="viewcode-block" id="Scope.last_event_id">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.api.Scope.last_event_id">[docs]</a>
@@ -2475,8 +2476,8 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../_static/documentation_options.js?v=1bc0be70"></script>
+      <script src="../../_static/documentation_options.js?v=6a15f429"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
-      <script src="../../_static/shibuya.js?v=cac61aee"></script></body>
+      <script src="../../_static/shibuya.js?v=50760d75"></script></body>
 </html>
