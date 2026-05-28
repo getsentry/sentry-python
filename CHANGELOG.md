@@ -1,5 +1,93 @@
 # Changelog
 
+## 2.61.0
+
+### New Features ✨
+
+- (anthropic) Support span streaming by @alexander-alderman-webb in [#6311](https://github.com/getsentry/sentry-python/pull/6311)
+- (django) Support span streaming by @alexander-alderman-webb in [#6248](https://github.com/getsentry/sentry-python/pull/6248)
+- (dramatiq) Support span streaming by @sl0thentr0py in [#6273](https://github.com/getsentry/sentry-python/pull/6273)
+- (huey) Migrate Huey integration to spans-first tracing by @ericapisani in [#6399](https://github.com/getsentry/sentry-python/pull/6399)
+- (langchain) Support span streaming by @alexander-alderman-webb in [#6405](https://github.com/getsentry/sentry-python/pull/6405)
+- (langgraph) Support span streaming by @alexander-alderman-webb in [#6406](https://github.com/getsentry/sentry-python/pull/6406)
+- (socket) Support span streaming by @sl0thentr0py in [#6296](https://github.com/getsentry/sentry-python/pull/6296)
+- (starlite) Support span streaming by @sl0thentr0py in [#6294](https://github.com/getsentry/sentry-python/pull/6294)
+- (strawberry) Support span streaming by @ericapisani in [#6308](https://github.com/getsentry/sentry-python/pull/6308)
+- (tornado) Support span streaming by @sl0thentr0py in [#6206](https://github.com/getsentry/sentry-python/pull/6206)
+- Add `server.address` to transformed spans when `stream_gen_ai_spans=True` by @alexander-alderman-webb in [#6307](https://github.com/getsentry/sentry-python/pull/6307)
+- Allow integrations to define control flow exceptions by @sentrivana in [#6425](https://github.com/getsentry/sentry-python/pull/6425)
+- Disable string truncation for events by default by @alexander-alderman-webb in [#6290](https://github.com/getsentry/sentry-python/pull/6290)
+
+### Bug Fixes 🐛
+
+#### Langchain
+
+- Stop setting transaction status when child span fails by @alexander-alderman-webb in [#6301](https://github.com/getsentry/sentry-python/pull/6301)
+- Catch `TypeError` on `langchain.agents` import by @alexander-alderman-webb in [#6268](https://github.com/getsentry/sentry-python/pull/6268)
+
+#### Openai Agents
+
+- Handle starting_agent keyword argument in runner patches by @ericapisani in [#6428](https://github.com/getsentry/sentry-python/pull/6428)
+- Remove hosted MCP tool spans by @alexander-alderman-webb in [#6391](https://github.com/getsentry/sentry-python/pull/6391)
+- Use `name`, not `description` in `start_span` by @sentrivana in [#6323](https://github.com/getsentry/sentry-python/pull/6323)
+- Stop setting transaction status when child span fails by @alexander-alderman-webb in [#6303](https://github.com/getsentry/sentry-python/pull/6303)
+
+#### Pydantic Ai
+
+- Stop setting tokens on Invoke Agent spans by @alexander-alderman-webb in [#6320](https://github.com/getsentry/sentry-python/pull/6320)
+- Stop setting transaction status when child span fails by @alexander-alderman-webb in [#6302](https://github.com/getsentry/sentry-python/pull/6302)
+- Remove `Agent.run_stream_events()` patch by @alexander-alderman-webb in [#6281](https://github.com/getsentry/sentry-python/pull/6281)
+
+#### Strawberry
+
+- Wrap yields in try-except to ensure span cleanup by @ericapisani in [#6381](https://github.com/getsentry/sentry-python/pull/6381)
+- Fix `AttributeError` on `graphql_span` in `resolve` by @sentrivana in [#6289](https://github.com/getsentry/sentry-python/pull/6289)
+
+#### Other
+
+- (anthropic) Do not set `gen_ai.response.model` to `None` by @alexander-alderman-webb in [#6312](https://github.com/getsentry/sentry-python/pull/6312)
+- (asyncpg) Use Sentry span attribute name conventions by @ericapisani in [#6306](https://github.com/getsentry/sentry-python/pull/6306)
+- (boto3) Guard setting method by @sentrivana in [#6288](https://github.com/getsentry/sentry-python/pull/6288)
+- (cohere) Stop setting transaction status when child span fails by @alexander-alderman-webb in [#6300](https://github.com/getsentry/sentry-python/pull/6300)
+- (google-genai) Guard against `None` response ID and response model by @alexander-alderman-webb in [#6314](https://github.com/getsentry/sentry-python/pull/6314)
+- (huey) Fix group and chord handling in enqueue by @ericapisani in [#6392](https://github.com/getsentry/sentry-python/pull/6392)
+- (integrations) Auto-wrap root gen_ai spans for openai, cohere, langgraph, huggingface_hub by @constantinius in [#6285](https://github.com/getsentry/sentry-python/pull/6285)
+- (serializer) Don't call `__iter__` on arbitrary sequences by @sentrivana in [#6304](https://github.com/getsentry/sentry-python/pull/6304)
+- #6267 - memory leak in SentrySpanProcessor by @volodkindv in [#6271](https://github.com/getsentry/sentry-python/pull/6271)
+
+### Documentation 📚
+
+- (celery) Remove duplicated "is" in `beat.py` docstring by @quyentonndbs in [#6266](https://github.com/getsentry/sentry-python/pull/6266)
+
+### Internal Changes 🔧
+
+#### Langchain
+
+- Deduplicate by removing `node.callspec.id` matching by @alexander-alderman-webb in [#6426](https://github.com/getsentry/sentry-python/pull/6426)
+- Remove `WatchedSpan` class by @alexander-alderman-webb in [#6407](https://github.com/getsentry/sentry-python/pull/6407)
+
+#### Openai Agents
+
+- Deduplicate by removing `node.callspec.id` matching by @alexander-alderman-webb in [#6424](https://github.com/getsentry/sentry-python/pull/6424)
+- Fix asyncio loop missing for sync tests by @sl0thentr0py in [#6412](https://github.com/getsentry/sentry-python/pull/6412)
+
+#### Pydantic Ai
+
+- Support `Agent.run_stream_events()` returning a context manager by @alexander-alderman-webb in [#6322](https://github.com/getsentry/sentry-python/pull/6322)
+- Remove test without assertions by @alexander-alderman-webb in [#6321](https://github.com/getsentry/sentry-python/pull/6321)
+
+#### Other
+
+- (flask) Add span streaming test coverage by @ericapisani in [#6264](https://github.com/getsentry/sentry-python/pull/6264)
+- (openai) Deduplicate by removing `node.callspec.id` matching by @alexander-alderman-webb in [#6427](https://github.com/getsentry/sentry-python/pull/6427)
+- (wsgi) Remove unused segment name setting by @sentrivana in [#6305](https://github.com/getsentry/sentry-python/pull/6305)
+- Ignore jsonl files in diffs with gitattributes by @sl0thentr0py in [#6419](https://github.com/getsentry/sentry-python/pull/6419)
+- 🤖 Update test matrix with new releases (05/25) by @github-actions in [#6398](https://github.com/getsentry/sentry-python/pull/6398)
+- Respect context manager lifecycles in `fake_record_sql_queries` by @alexander-alderman-webb in [#6295](https://github.com/getsentry/sentry-python/pull/6295)
+- 🤖 Update test matrix with new releases (05/18) by @github-actions in [#6279](https://github.com/getsentry/sentry-python/pull/6279)
+- Ignore import ordering commit in blame by @alexander-alderman-webb in [#6272](https://github.com/getsentry/sentry-python/pull/6272)
+- Enable Ruff import ordering by @alexander-alderman-webb in [#6270](https://github.com/getsentry/sentry-python/pull/6270)
+
 ## 2.60.0
 
 Adds a new `stream_gen_ai_spans` option that controls how `gen_ai` spans are
