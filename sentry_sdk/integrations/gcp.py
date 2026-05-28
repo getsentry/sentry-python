@@ -10,8 +10,11 @@ from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.integrations.cloud_resource_context import CLOUD_PROVIDER
+from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.traces import SegmentSource
 from sentry_sdk.tracing import TransactionSource
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     AnnotatedValue,
     TimeoutThread,
@@ -82,16 +85,26 @@ def _wrap_func(func: "F") -> "F":
                     timeout_thread.start()
 
             headers = {}
+            header_attributes: "dict[str, Any]" = {}
             if hasattr(gcp_event, "headers"):
                 headers = gcp_event.headers
+                for header, header_value in _filter_headers(
+                    headers, use_annotated_value=False
+                ).items():
+                    header_attributes[f"http.request.header.{header.lower()}"] = (
+                        # header_value will always be a string because we set `use_annotated_value` to false above
+                        header_value
+                    )
 
-            transaction = continue_trace(
-                headers,
-                op=OP.FUNCTION_GCP,
-                name=environ.get("FUNCTION_NAME", ""),
-                source=TransactionSource.COMPONENT,
-                origin=GcpIntegration.origin,
-            )
+            additional_attributes = {}
+            if hasattr(gcp_event, "method"):
+                additional_attributes["http.request.method"] = gcp_event.method
+
+            if should_send_default_pii() and hasattr(gcp_event, "query_string"):
+                additional_attributes["url.query"] = gcp_event.query_string.decode(
+                    "utf-8"
+                )
+
             sampling_context = {
                 "gcp_env": {
                     "function_name": environ.get("FUNCTION_NAME"),
@@ -102,9 +115,36 @@ def _wrap_func(func: "F") -> "F":
                 },
                 "gcp_event": gcp_event,
             }
-            with sentry_sdk.start_transaction(
-                transaction, custom_sampling_context=sampling_context
-            ):
+
+            if has_span_streaming_enabled(client.options):
+                sentry_sdk.traces.continue_trace(headers)
+                Scope.set_custom_sampling_context(sampling_context)
+                span_ctx = sentry_sdk.traces.start_span(
+                    name=environ.get("FUNCTION_NAME", ""),
+                    parent_span=None,
+                    attributes={
+                        "sentry.op": OP.FUNCTION_GCP,
+                        "sentry.origin": GcpIntegration.origin,
+                        "sentry.span.source": SegmentSource.COMPONENT,
+                        "cloud.provider": CLOUD_PROVIDER.GCP,
+                        **header_attributes,
+                        **additional_attributes,
+                    },
+                )
+            else:
+                transaction = continue_trace(
+                    headers,
+                    op=OP.FUNCTION_GCP,
+                    name=environ.get("FUNCTION_NAME", ""),
+                    source=TransactionSource.COMPONENT,
+                    origin=GcpIntegration.origin,
+                )
+
+                span_ctx = sentry_sdk.start_transaction(
+                    transaction, custom_sampling_context=sampling_context
+                )
+
+            with span_ctx:
                 try:
                     return func(functionhandler, gcp_event, *args, **kwargs)
                 except Exception:
