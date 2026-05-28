@@ -585,7 +585,7 @@ class StreamedSpan:
             and SPANDATA.SENTRY_RELEASE not in self._attributes
         ):
             self.set_attribute(
-                SPANDATA.SENTRY_RELEASE, client.options["release"].strip()
+                SPANDATA.SENTRY_RELEASE, str(client.options["release"]).strip()
             )
 
         if (
@@ -593,11 +593,13 @@ class StreamedSpan:
             and SPANDATA.SENTRY_ENVIRONMENT not in self._attributes
         ):
             self.set_attribute(
-                SPANDATA.SENTRY_ENVIRONMENT, client.options["environment"].strip()
+                SPANDATA.SENTRY_ENVIRONMENT, str(client.options["environment"]).strip()
             )
 
         if client.options.get("dist") and SPANDATA.SENTRY_DIST not in self._attributes:
-            self.set_attribute(SPANDATA.SENTRY_DIST, client.options["dist"].strip())
+            self.set_attribute(
+                SPANDATA.SENTRY_DIST, str(client.options["dist"]).strip()
+            )
 
     def _to_json(self) -> "SpanJSON":
         res: "SpanJSON" = {
