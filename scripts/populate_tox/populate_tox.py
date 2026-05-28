@@ -906,7 +906,7 @@ def _compare_min_version_with_defined(
             )
 
 
-def _get_transitive_dependencies(
+def _render_transitive_dependencies(
     integration: str,
     package: str,
     release: Version,
@@ -923,7 +923,7 @@ def _get_transitive_dependencies(
         version = dependency["metadata"]["version"]
         if _normalize_name(name) == _normalize_name(package):
             continue
-        deps.append(f"{python_version}-{integration}-v{release}: {name}=={version}")
+        deps.append(f"py{python_version}-{integration}-v{release}: {name}=={version}")
     return deps
 
 
@@ -1190,7 +1190,7 @@ def main() -> dict[str, list]:
                     if python_version < ThreadedVersion("3.8"):
                         continue
                     try:
-                        deps = _get_transitive_dependencies(
+                        dependencies = _render_transitive_dependencies(
                             integration, package, release, python_version
                         )
                     except DryRunFailed as error:
@@ -1198,8 +1198,8 @@ def main() -> dict[str, list]:
                             f"\npip dry run failed for version {release} of {package} on Python {python_version}:\n{error}"
                         )
                         continue
-                    if deps:
-                        release.transitive_dependencies.append(deps)
+
+                    release.transitive_dependencies.append(dependencies)
 
             test_releases = [
                 release for release in test_releases if release.python_versions
