@@ -3643,6 +3643,7 @@ def test_ai_client_span_responses_api_no_pii(
             "sentry.sdk.version": mock.ANY,
             "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "openai tx",
+            "server.address": mock.ANY,
             "thread.id": mock.ANY,
             "thread.name": mock.ANY,
         }
@@ -3898,6 +3899,7 @@ def test_ai_client_span_responses_api(
             "sentry.sdk.version": mock.ANY,
             "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "openai tx",
+            "server.address": mock.ANY,
             "thread.id": mock.ANY,
             "thread.name": mock.ANY,
         }
@@ -4293,6 +4295,7 @@ async def test_ai_client_span_responses_async_api(
             "sentry.sdk.version": mock.ANY,
             "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "openai tx",
+            "server.address": mock.ANY,
             "thread.id": mock.ANY,
             "thread.name": mock.ANY,
         }
@@ -4576,6 +4579,7 @@ async def test_ai_client_span_streaming_responses_async_api(
             "sentry.sdk.version": mock.ANY,
             "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "openai tx",
+            "server.address": mock.ANY,
             "thread.id": mock.ANY,
             "thread.name": mock.ANY,
         }

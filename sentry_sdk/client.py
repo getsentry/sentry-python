@@ -225,6 +225,8 @@ def _serialized_v1_span_to_serialized_v2_span(
         attributes["sentry.release"] = event["release"]
     if "environment" in event:
         attributes["sentry.environment"] = event["environment"]
+    if "server_name" in event:
+        attributes["server.address"] = event["server_name"]
     if "transaction" in event:
         attributes["sentry.segment.name"] = event["transaction"]
 
