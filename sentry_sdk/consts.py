@@ -1110,6 +1110,18 @@ class SPANDATA:
     Example: "python"
     """
 
+    SENTRY_SDK_NAME = "sentry.sdk.name"
+    """
+    The name of the SDK.
+    Example: "python"
+    """
+
+    SENTRY_SDK_VERSION = "sentry.sdk.version"
+    """
+    The SDK version.
+    Example: "1.2.3"
+    """
+
     SENTRY_SDK_INTEGRATIONS = "sentry.sdk.integrations"
     """
     A list of names identifying enabled integrations.
