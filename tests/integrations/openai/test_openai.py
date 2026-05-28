@@ -3815,7 +3815,7 @@ def test_ai_client_span_responses_api_no_pii(
             )
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert len(spans) == 2
         assert spans[0]["attributes"] == {
@@ -4119,7 +4119,7 @@ def test_ai_client_span_responses_api(
             )
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert len(spans) == 2
 
@@ -4351,7 +4351,7 @@ def test_error_in_responses_api(
     )
 
     if span_streaming:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("event", "span")
 
         with sentry_sdk.traces.start_span(name="openai tx"), pytest.raises(OpenAIError):
             client.responses.create(
@@ -4607,7 +4607,7 @@ async def test_ai_client_span_responses_async_api(
             )
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert len(spans) == 2
 
@@ -5076,7 +5076,7 @@ async def test_error_in_responses_async_api(
     )
 
     if span_streaming:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("event", "span")
 
         with sentry_sdk.traces.start_span(name="openai tx"), pytest.raises(OpenAIError):
             await client.responses.create(

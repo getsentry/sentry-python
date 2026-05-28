@@ -162,7 +162,7 @@ def _has_attr_and_is_int(
 def _calculate_completions_token_usage(
     messages: "Optional[Iterable[ChatCompletionMessageParam]]",
     response: "Any",
-    span: "Span",
+    span: "Union[Span, StreamedSpan]",
     streaming_message_responses: "Optional[List[str]]",
     streaming_message_total_token_usage: "Optional[CompletionUsage]",
     count_tokens: "Callable[..., Any]",
@@ -894,7 +894,7 @@ def _set_completions_api_output_data(
 
 
 def _wrap_synchronous_completions_chunk_iterator(
-    span: "Span",
+    span: "Union[Span, StreamedSpan]",
     integration: "OpenAIIntegration",
     start_time: "Optional[float]",
     messages: "Optional[Iterable[ChatCompletionMessageParam]]",
@@ -1024,7 +1024,7 @@ async def _wrap_asynchronous_completions_chunk_iterator(
 
 
 def _wrap_synchronous_responses_event_iterator(
-    span: "Span",
+    span: "Union[Span, StreamedSpan]",
     integration: "OpenAIIntegration",
     start_time: "Optional[float]",
     input: "Optional[Union[str, ResponseInputParam]]",
@@ -1091,7 +1091,7 @@ def _wrap_synchronous_responses_event_iterator(
 
 
 async def _wrap_asynchronous_responses_event_iterator(
-    span: "Span",
+    span: "Union[Span, StreamedSpan]",
     integration: "OpenAIIntegration",
     start_time: "Optional[float]",
     input: "Optional[Union[str, ResponseInputParam]]",
@@ -1156,7 +1156,7 @@ async def _wrap_asynchronous_responses_event_iterator(
 
 
 def _set_responses_api_output_data(
-    span: "Span",
+    span: "Union[Span, StreamedSpan]",
     response: "Any",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
