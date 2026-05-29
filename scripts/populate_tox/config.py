@@ -35,7 +35,7 @@ TEST_SUITE_CONFIG = {
     "arq": {
         "package": "arq",
         "deps": {
-            "*": ["async-timeout", "pytest-asyncio", "fakeredis>=2.2.0,<2.8"],
+            "*": ["async-timeout", "pytest-asyncio"],
             "<=0.23": ["pydantic<2"],
         },
         "num_versions": 2,
