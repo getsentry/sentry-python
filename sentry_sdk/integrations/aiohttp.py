@@ -165,14 +165,12 @@ class AioHttpIntegration(Integration):
                             else {}
                         )
 
-                        client_address_attributes = (
-                            {
-                                "client.address": request.remote,
-                                "user.ip_address": request.remote,
-                            }
-                            if should_send_default_pii() and request.remote
-                            else {}
-                        )
+                        client_address_attributes = {}
+                        if should_send_default_pii() and request.remote:
+                            client_address_attributes["client.address"] = request.remote
+                            scope.set_attribute(
+                                SPANDATA.USER_IP_ADDRESS, request.remote
+                            )
 
                         span_ctx = sentry_sdk.traces.start_span(
                             # If this name makes it to the UI, AIOHTTP's URL

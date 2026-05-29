@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk._werkzeug import _get_headers, get_host
 from sentry_sdk.api import continue_trace
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     _filter_headers,
@@ -133,6 +133,13 @@ class SentryWsgiMiddleware:
                                 dict(_get_headers(environ))
                             )
                             Scope.set_custom_sampling_context({"wsgi_environ": environ})
+
+                            if should_send_default_pii():
+                                client_ip = get_client_ip(environ)
+                                if client_ip:
+                                    scope.set_attribute(
+                                        SPANDATA.USER_IP_ADDRESS, client_ip
+                                    )
 
                             span_ctx = sentry_sdk.traces.start_span(
                                 name=_DEFAULT_TRANSACTION_NAME,
@@ -412,6 +419,5 @@ def _get_request_attributes(
         client_ip = get_client_ip(environ)
         if client_ip:
             attributes["client.address"] = client_ip
-            attributes["user.ip_address"] = client_ip
 
     return attributes
