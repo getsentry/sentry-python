@@ -168,7 +168,7 @@ class AioHttpIntegration(Integration):
                         client_address_attributes = {}
                         if should_send_default_pii() and request.remote:
                             client_address_attributes["client.address"] = request.remote
-                            sentry_sdk.get_isolation_scope().set_attribute(
+                            scope.set_attribute(
                                 SPANDATA.USER_IP_ADDRESS, request.remote
                             )
 

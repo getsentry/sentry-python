@@ -182,9 +182,7 @@ async def _context_enter(request: "Request") -> None:
         scope.set_custom_sampling_context({"sanic_request": request})
 
         if should_send_default_pii() and request.remote_addr:
-            sentry_sdk.get_isolation_scope().set_attribute(
-                SPANDATA.USER_IP_ADDRESS, request.remote_addr
-            )
+            scope.set_attribute(SPANDATA.USER_IP_ADDRESS, request.remote_addr)
 
         span = sentry_sdk.traces.start_span(
             # Unless the request results in a 404 error, the name and source

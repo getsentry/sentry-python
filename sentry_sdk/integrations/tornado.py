@@ -131,9 +131,7 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
             scope.set_custom_sampling_context({"tornado_request": self.request})
 
             if should_send_default_pii() and self.request.remote_ip:
-                sentry_sdk.get_isolation_scope().set_attribute(
-                    SPANDATA.USER_IP_ADDRESS, self.request.remote_ip
-                )
+                scope.set_attribute(SPANDATA.USER_IP_ADDRESS, self.request.remote_ip)
 
             span_ctx = sentry_sdk.traces.start_span(
                 name=_DEFAULT_ROOT_SPAN_NAME,
