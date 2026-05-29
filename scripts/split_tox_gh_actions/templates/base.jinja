@@ -27,11 +27,6 @@ permissions:
   pull-requests: write
   statuses: write
 
-env:
-  BUILD_CACHE_KEY: {% raw %}${{ github.sha }}{% endraw %}
-  CACHED_BUILD_PATHS: |
-    {% raw %}${{ github.workspace }}/dist-serverless{% endraw %}
-
 jobs:
 {% include "test_group.jinja" %}
 {% include "check_required.jinja" %}

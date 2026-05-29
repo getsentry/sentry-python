@@ -828,6 +828,12 @@ def _render_dependencies(integration: str, releases: list[Version]) -> list[str]
     return rendered
 
 
+def _render_prerelease_setenv(integration: str, releases: list[Version]) -> list[str]:
+    return [
+        f"{integration}-v{r}: UV_PRERELEASE=allow" for r in releases if r.is_prerelease
+    ]
+
+
 def _render_latest_dependencies(integration: str, latest_release: Version) -> list[str]:
     """Render version-specific dependencies for the 'latest' alias.
 
@@ -886,6 +892,9 @@ def write_tox_file(packages: dict) -> None:
                     )
                     if latest_stable
                     else [],
+                    "prerelease_setenv": _render_prerelease_setenv(
+                        integration["name"], integration["releases"]
+                    ),
                 }
             )
             context["testpaths"].append(

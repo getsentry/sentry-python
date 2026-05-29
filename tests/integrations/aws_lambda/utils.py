@@ -51,20 +51,6 @@ def get_host_ip():
     return host
 
 
-def get_project_root():
-    """
-    Returns the absolute path to the project root directory.
-    """
-    # Start from the current file's directory
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-
-    # Navigate up to the project root (4 levels up from tests/integrations/aws_lambda/)
-    # This is equivalent to the multiple dirname() calls
-    project_root = os.path.abspath(os.path.join(current_dir, "../../../"))
-
-    return project_root
-
-
 class LocalLambdaStack(Stack):
     """
     Uses the AWS CDK to create a local SAM stack containing Lambda functions.
@@ -80,10 +66,8 @@ class LocalLambdaStack(Stack):
 
         print("[LocalLambdaStack] Create Sentry Lambda layer package")
         filename = "sentry-sdk-lambda-layer.zip"
-        build_packaged_zip(
-            make_dist=True,
-            out_zip_filename=filename,
-        )
+        subprocess.check_call(["uv", "build", "-o", DIST_PATH])
+        build_packaged_zip(out_zip_filename=filename)
 
         print(
             "[LocalLambdaStack] Add Sentry Lambda layer containing the Sentry SDK to the SAM stack"
@@ -164,22 +148,16 @@ class LocalLambdaStack(Stack):
                 shutil.copytree(sdk_source, sdk_path)
 
             # Install the requirements of Sentry SDK into the function directory
-            requirements_file = os.path.join(
-                get_project_root(), "requirements-aws-lambda-layer.txt"
-            )
-
-            # Install the package using pip
             subprocess.check_call(
                 [
-                    sys.executable,
-                    "-m",
+                    "uv",
                     "pip",
                     "install",
                     "--upgrade",
+                    "--group",
+                    "aws",
                     "--target",
                     os.path.join(LAMBDA_FUNCTION_WITH_EMBEDDED_SDK_DIR, lambda_dir),
-                    "-r",
-                    requirements_file,
                 ]
             )
 

@@ -1,4 +1,74 @@
 #
+# Project dev dependencies (PEP 735 groups).
+# `dev` is installed by default; `typing` is opt-in via `uv run --group typing`.
+# Run tox with: `uv run tox -e <env>`
+# Run mypy with: `uv run --group typing mypy sentry_sdk`
+#
+
+[dependency-groups]
+dev = [
+    "tox",
+    "tox-uv",
+    "coverage[toml]",
+    "pre-commit",
+    "ruff",
+]
+
+toxgen = [
+    "jinja2",
+    "packaging<26.0",
+    "pip",
+    "requests",
+]
+
+docs = [
+    "gevent",
+    "shibuya",
+    "sphinx<8.2",
+    "sphinx-autodoc-typehints[type_comments]>=2.3.0",
+    "typing-extensions",
+]
+
+aws = [
+    "certifi",
+    "urllib3",
+    # In Lambda functions botocore is used, and botocore has
+    # restrictions on urllib3
+    # https://github.com/boto/botocore/blob/develop/setup.cfg
+    # So we pin this here to make our Lambda layer work with
+    # Lambda Function using Python 3.7+
+    "urllib3<1.27; python_version < '3.10'",
+]
+
+typing = [
+    "mypy",
+    # =================
+    # TODO: remove redundant urllib3 and certifi after proper migration from setup.py
+    "urllib3>=1.26.11",
+    "certifi",
+    # =================
+    "types-protobuf",
+    "types-gevent",
+    "types-greenlet",
+    "types-redis",
+    "types-setuptools<71",
+    "types-webob",
+    "opentelemetry-distro[otlp]",
+    "pymongo",
+    "loguru",
+    "httpcore[asyncio,http2]",
+    "launchdarkly-server-sdk",
+    "openfeature-sdk",
+    "statsig",
+    "UnleashClient<6",
+    "typer",
+    "strawberry-graphql",
+    "httpx",
+    "botocore-stubs",
+    "werkzeug",
+]
+
+#
 # Tool: Coverage
 #
 
@@ -68,14 +138,6 @@ module = "pyramid.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = "psycopg2.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "pytest.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
 module = "aiohttp.*"
 ignore_missing_imports = true
 
@@ -92,19 +154,11 @@ module = "tornado.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = "fakeredis.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
 module = "rq.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "pyspark.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "asgiref.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

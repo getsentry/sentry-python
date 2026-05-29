@@ -99,12 +99,20 @@ def run_cloud_function():
                 f.write("[install]\nprefix=")
 
             subprocess.check_call(
-                [sys.executable, "setup.py", "sdist", "-d", os.path.join(tmpdir, "..")],
+                [
+                    "uv",
+                    "build",
+                    "--sdist",
+                    "-p",
+                    sys.executable,
+                    "-o",
+                    os.path.join(tmpdir, ".."),
+                ],
                 **subprocess_kwargs,
             )
 
             subprocess.check_call(
-                "pip install ../*.tar.gz -t .",
+                "uv pip install -p {} ../*.tar.gz --target .".format(sys.executable),
                 cwd=tmpdir,
                 shell=True,
                 **subprocess_kwargs,
