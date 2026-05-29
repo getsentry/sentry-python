@@ -12,9 +12,10 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.api import continue_trace
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations._asgi_common import (
     _get_headers,
+    _get_ip,
     _get_request_attributes,
     _get_request_data,
     _get_url,
@@ -23,7 +24,7 @@ from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     nullcontext,
 )
-from sentry_sdk.scope import Scope
+from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.sessions import track_session
 from sentry_sdk.traces import (
     SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE,
@@ -246,6 +247,11 @@ class SentryAsgiMiddleware:
                             "sentry.origin": self.span_origin,
                             "network.protocol.name": ty,
                         }
+
+                        if scope.get("client") and should_send_default_pii():
+                            sentry_scope.set_attribute(
+                                SPANDATA.USER_IP_ADDRESS, _get_ip(scope)
+                            )
 
                         if ty in ("http", "websocket"):
                             if (

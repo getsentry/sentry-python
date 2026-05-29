@@ -1,8 +1,6 @@
 import urllib
 from typing import TYPE_CHECKING
 
-import sentry_sdk
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.scope import should_send_default_pii
 
@@ -135,6 +133,5 @@ def _get_request_attributes(asgi_scope: "Any") -> "dict[str, Any]":
     if client and should_send_default_pii():
         ip = _get_ip(asgi_scope)
         attributes["client.address"] = ip
-        sentry_sdk.get_isolation_scope().set_attribute(SPANDATA.USER_IP_ADDRESS, ip)
 
     return attributes
