@@ -1651,7 +1651,7 @@ def test_multiple_providers(
             openai_client.completions._client._client,
             "send",
             return_value=openai_model_response,
-        ), start_transaction(name="test gpt-3.5-turbo"):
+        ), sentry_sdk.traces.start_span(name="test gpt-3.5-turbo"):
             litellm.completion(
                 model="gpt-3.5-turbo",
                 messages=messages,
@@ -1673,7 +1673,7 @@ def test_multiple_providers(
             anthropic_client,
             "post",
             return_value=anthropic_model_response,
-        ), start_transaction(name="test claude-3-opus-20240229"):
+        ), sentry_sdk.traces.start_span(name="test claude-3-opus-20240229"):
             litellm.completion(
                 model="claude-3-opus-20240229",
                 messages=messages,
@@ -1695,7 +1695,7 @@ def test_multiple_providers(
             gemini_client,
             "post",
             return_value=gemini_model_response,
-        ), start_transaction(name="test gemini/gemini-pro"):
+        ), sentry_sdk.traces.start_span(name="test gemini/gemini-pro"):
             litellm.completion(
                 model="gemini/gemini-pro",
                 messages=messages,
@@ -1708,6 +1708,8 @@ def test_multiple_providers(
         sentry_sdk.flush()
         spans = [item.payload for item in items]
         for span in spans:
+            if span["is_segment"] is True:
+                continue
             # The provider should be detected by litellm.get_llm_provider
             assert SPANDATA.GEN_AI_SYSTEM in span["attributes"]
     elif stream_gen_ai_spans:
