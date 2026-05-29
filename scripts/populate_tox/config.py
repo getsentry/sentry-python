@@ -27,7 +27,7 @@ TEST_SUITE_CONFIG = {
     "ariadne": {
         "package": "ariadne",
         "deps": {
-            "*": ["fastapi", "flask", "httpx"],
+            "*": ["fastapi", "flask", "httpx<0.28.0"],
         },
         "python": ">=3.8",
         "num_versions": 2,
@@ -53,6 +53,7 @@ TEST_SUITE_CONFIG = {
         "num_versions": 2,
         "deps": {
             "*": ["dill"],
+            ">=2.73": ["betterproto==2.0.0b6"],
         },
     },
     "boto3": {
@@ -71,6 +72,7 @@ TEST_SUITE_CONFIG = {
         "package": "celery",
         "deps": {
             "*": ["newrelic<10.17.0", "redis"],
+            "py3.6": ["newrelic<8"],
             "py3.7": ["importlib-metadata<5.0"],
         },
     },
@@ -143,8 +145,14 @@ TEST_SUITE_CONFIG = {
     "flask": {
         "package": "flask",
         "deps": {
-            "*": ["flask-login", "werkzeug"],
-            "<2.0": ["werkzeug<2.1.0", "markupsafe<2.1.0"],
+            "*": ["flask-login", "werkzeug", "blinker"],
+            # https://github.com/pallets/flask/issues/4455
+            "<2.0": [
+                "werkzeug<2.1.0",
+                "markupsafe<2.0.0",
+                "itsdangerous>=0.24,<2.0",
+                "jinja2<3.1.1",
+            ],
         },
     },
     "gql": {
@@ -313,6 +321,7 @@ TEST_SUITE_CONFIG = {
         "package": "pydantic-ai",
         "deps": {
             "*": ["pytest-asyncio"],
+            "==2.0.0b3": ["pydantic<2.14"],
         },
         "python": ">=3.10",
     },
