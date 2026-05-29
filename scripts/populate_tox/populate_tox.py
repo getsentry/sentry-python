@@ -171,15 +171,17 @@ def _get_dependency_probe_constraints(
 ) -> tuple[str, ...]:
     constraints = []
     for rule, dependencies in TEST_SUITE_CONFIG[integration].get("deps", {}).items():
-        applies = False
-        if rule == "*":
-            applies = True
-        elif rule.startswith("py3"):
-            applies = f"py{python_version}" in rule.split(",")
-        else:
-            applies = release in SpecifierSet(rule, prereleases=True)
-        if not applies:
+        # Skip if rule does not apply to current package or Python version
+        if (
+            rule == "*"
+            or (rule.startswith("py3") and f"py{python_version}" not in rule.split(","))
+            or (
+                not rule.startswith("py3")
+                and release not in SpecifierSet(rule, prereleases=True)
+            )
+        ):
             continue
+
         for dependency in dependencies:
             requirement = Requirement(dependency)
 
@@ -242,6 +244,7 @@ def fetch_package_dependencies(
         result = subprocess.run(cmd, capture_output=True, text=True)
 
     if result.returncode != 0:
+        # Some failures are expected because uv installs packages which pip rejects for having bad metadata.
         raise DryRunFailed(result)
 
     pip_report = result.stdout.strip()
@@ -1155,7 +1158,8 @@ def main() -> dict[str, list]:
             release = json.loads(line)
             name = _normalize_name(release["name"])
             version = release["version"]
-            DEPENDENCIES_CACHE[name][version] = {
+            python_version = release["python_version"]
+            DEPENDENCIES_CACHE[name].setdefault(version, {})[python_version] = {
                 "dependencies": release["dependencies"],
                 "_accessed": False,
             }
