@@ -272,9 +272,7 @@ def _fetch_package_dependencies_from_cache(
 ) -> Optional[dict]:
     package = _normalize_name(package)
     cache_entry = (
-        DEPENDENCIES_CACHE.get(package, {})
-        .get(str(version), {})
-        .get(str(python_version), None)
+        DEPENDENCIES_CACHE[package].get(str(version), {}).get(str(python_version), None)
     )
     if cache_entry is not None:
         cache_entry["_accessed"] = True
