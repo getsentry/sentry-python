@@ -196,10 +196,10 @@ def _get_dependency_probe_constraints(
 
 @functools.cache
 def fetch_package_dependencies(
+    integration: str,
     package: str,
     version: Version,
     python_version: ThreadedVersion,
-    constraints: tuple[str, ...] = (),
 ) -> dict:
     """Fetch package dependencies metadata from cache or, failing that, PyPI."""
     package_dependencies = _fetch_package_dependencies_from_cache(
@@ -230,17 +230,17 @@ def fetch_package_dependencies(
         "-qqq",
     ]
 
-    if constraints:
-        with tempfile.NamedTemporaryFile("w", encoding="utf-8") as f:
-            f.write("\n".join(constraints))
-            f.flush()
-            result = subprocess.run(
-                [*cmd, "--constraint", f.name],
-                capture_output=True,
-                text=True,
-            )
-    else:
-        result = subprocess.run(cmd, capture_output=True, text=True)
+    constraints = _get_dependency_probe_constraints(
+        integration, version, python_version
+    )
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8") as f:
+        f.write("\n".join(constraints))
+        f.flush()
+        result = subprocess.run(
+            [*cmd, "--constraint", f.name],
+            capture_output=True,
+            text=True,
+        )
 
     if result.returncode != 0:
         # Some failures are expected because uv installs packages which pip rejects for having bad metadata.
@@ -706,7 +706,7 @@ def _get_abi_tag_version(python_version: Version):
 
 @functools.cache
 def _has_free_threading_dependencies(
-    package_name: str, release: Version, python_version: Version
+    integration: str, package_name: str, release: Version, python_version: Version
 ) -> bool:
     """
     Checks if all dependencies of a version of a package support free-threading.
@@ -717,8 +717,12 @@ def _has_free_threading_dependencies(
     - no wheel targets the platform on which the script is run, but PyPI distributes a wheel
       satisfying one of the above conditions.
     """
+    threaded_version = ThreadedVersion(python_version, no_gil=True)
     dependencies_info = fetch_package_dependencies(
-        package_name, release, ThreadedVersion(python_version, no_gil=True)
+        integration,
+        package_name,
+        release,
+        threaded_version,
     )
 
     for dependency_info in dependencies_info:
@@ -761,7 +765,11 @@ def _has_free_threading_dependencies(
 
 
 def _supports_free_threading(
-    package_name: str, release: Version, python_version: Version, pypi_data: dict
+    integration: str,
+    package_name: str,
+    release: Version,
+    python_version: Version,
+    pypi_data: dict,
 ) -> bool:
     """
     Check if the package version supports free-threading on the given Python minor
@@ -785,7 +793,7 @@ def _supports_free_threading(
             ) or (
                 abi_tag == "none"
                 and _has_free_threading_dependencies(
-                    package_name, release, python_version
+                    integration, package_name, release, python_version
                 )
             ):
                 return True
@@ -931,10 +939,10 @@ def _render_transitive_dependencies(
 ) -> list[str]:
     deps = []
     for dependency in fetch_package_dependencies(
+        integration,
         package,
         release,
         python_version,
-        _get_dependency_probe_constraints(integration, release, python_version),
     ):
         name = dependency["metadata"]["name"]
         version = dependency["metadata"]["version"]
@@ -968,7 +976,9 @@ def _add_python_versions_to_release(
         version
         for version in supported_py_versions
         if version >= MIN_FREE_THREADING_SUPPORT
-        and _supports_free_threading(package, release, version, release_pypi_data)
+        and _supports_free_threading(
+            integration, package, release, version, release_pypi_data
+        )
     )
 
     release.python_versions = pick_python_versions_to_test(
