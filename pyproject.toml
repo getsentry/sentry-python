@@ -65,7 +65,7 @@ typing = [
     "strawberry-graphql",
     "httpx",
     "botocore-stubs",
-    "werkzeug<2.3.0",
+    "werkzeug",
 ]
 
 #
