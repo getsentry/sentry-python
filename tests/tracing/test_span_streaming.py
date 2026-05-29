@@ -754,6 +754,62 @@ def test_continue_trace_unsampled(sentry_init, capture_items):
     assert len(spans) == 0
 
 
+@pytest.mark.parametrize(
+    ("sample_rand", "expected_sampled", "expected_outcome"),
+    [
+        ("0.100000", True, None),
+        ("0.300000", False, "backpressure"),
+        ("0.700000", False, "sample_rate"),
+    ],
+)
+def test_backpressure_outcome(
+    sentry_init,
+    capture_items,
+    capture_record_lost_event_calls,
+    sample_rand,
+    expected_sampled,
+    expected_outcome,
+):
+    sentry_init(
+        traces_sample_rate=0.5,
+        enable_backpressure_handling=True,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    items = capture_items("span")
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    client = sentry_sdk.get_client()
+    client.monitor._downsample_factor = 1
+
+    trace_id = "0af7651916cd43dd8448eb211c80319c"
+    parent_span_id = "b7ad6b7169203331"
+
+    sentry_sdk.traces.continue_trace(
+        {
+            "sentry-trace": f"{trace_id}-{parent_span_id}",
+            "baggage": f"sentry-trace_id={trace_id},sentry-sample_rand={sample_rand}",
+        }
+    )
+
+    with sentry_sdk.traces.start_span(name="span") as span:
+        pass
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    assert span.sampled is expected_sampled
+
+    if expected_sampled:
+        assert len(spans) == 1
+        assert not record_lost_event_calls
+    else:
+        assert len(spans) == 0
+        assert record_lost_event_calls == [
+            (expected_outcome, "span", None, 1),
+        ]
+
+
 def test_unsampled_spans_produce_client_report(
     sentry_init, capture_items, capture_record_lost_event_calls
 ):
