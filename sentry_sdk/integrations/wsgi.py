@@ -134,6 +134,13 @@ class SentryWsgiMiddleware:
                             )
                             Scope.set_custom_sampling_context({"wsgi_environ": environ})
 
+                            if should_send_default_pii():
+                                client_ip = get_client_ip(environ)
+                                if client_ip:
+                                    scope.set_attribute(
+                                        SPANDATA.USER_IP_ADDRESS, client_ip
+                                    )
+
                             span_ctx = sentry_sdk.traces.start_span(
                                 name=_DEFAULT_TRANSACTION_NAME,
                                 attributes={
@@ -412,8 +419,5 @@ def _get_request_attributes(
         client_ip = get_client_ip(environ)
         if client_ip:
             attributes["client.address"] = client_ip
-            sentry_sdk.get_isolation_scope().set_attribute(
-                SPANDATA.USER_IP_ADDRESS, client_ip
-            )
 
     return attributes
