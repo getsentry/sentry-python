@@ -344,7 +344,7 @@ TEST_SUITE_CONFIG = {
     "pyramid": {
         "package": "pyramid",
         "deps": {
-            "*": ["werkzeug<2.1.0"],
+            "*": ["werkzeug<2.1.0", "setuptools<82"],
         },
     },
     "quart": {
