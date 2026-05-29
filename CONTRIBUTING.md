@@ -74,19 +74,45 @@ On macOS, we recommend using `brew` to install Python. For Windows, we recommend
 
 Before you can contribute, you will need to [fork the `sentry-python` repository](https://github.com/getsentry/sentry-python/fork). Then, clone the forked repository to your local development environment.
 
-### Create a Virtual Environment
+
+### Development Tooling
 
 We use [uv](https://docs.astral.sh/uv/) to manage the project's virtual environment and dev dependencies. Install uv following the [official instructions](https://docs.astral.sh/uv/getting-started/installation/), then run:
 
 ```bash
 cd sentry-python
-
 uv sync
 ```
 
-This creates a `uv` managed `.venv` (using the Python version pinned in `.python-version`) and installs the project's dev dependencies (tox, tox-uv, etc.) into it. It is recommended not to deal with this `.venv` manually but only through `uv`.
-
 Invoke commands via `uv run <cmd>` (e.g. `uv run tox -e py3.14-common`).
+
+#### Linting / Formatting
+
+We use `ruff` to lint and format our code. Use the following commands:
+
+```
+uv run ruff check --fix tests sentry_sdk
+uv run ruff format tests sentry_sdk
+```
+
+#### Typing
+
+We use `mypy` for typing our codebase. Use the following command to typecheck the source:
+
+```
+uv run --group typing mypy sentry_sdk 
+```
+
+##### Install Coding Style Pre-commit Hooks
+
+`pre-commit` is included in the project's dev dependencies (installed by `uv sync`). Register the git hooks with:
+
+```bash
+uv run pre-commit install
+```
+
+Now, pre-commit will automatically lint your changes with `ruff`.
+
 
 ### Install `sentry-python` in Editable Mode
 
@@ -96,15 +122,13 @@ Install `sentry-python` in [editable mode](https://pip.pypa.io/en/latest/topics/
 pip install -e .
 ```
 
-**Hint:** Sometimes you need a sample project to run your new changes to `sentry-python`. In this case install the sample project in the same virtualenv and you should be good to go.
-
-### Install Coding Style Pre-commit Hooks
-
-`pre-commit` is included in the project's dev dependencies (installed by `uv sync`). Register the git hooks with:
+or
 
 ```bash
-uv run pre-commit install
+uv add --editable .
 ```
+
+**Hint:** Sometimes you need a sample project to run your new changes to `sentry-python`. In this case install the sample project in the same virtualenv and you should be good to go.
 
 That's it. You should be ready to make changes, run tests, and make commits! If you experience any problems, please don't hesitate to ping us in our [Discord Community](https://discord.com/invite/Ww9hbqr).
 
@@ -116,28 +140,40 @@ We test against a number of Python language and library versions, which are auto
 
 An environment consists of the Python major and minor version and the library name and version. The exception to the rule is that you can provide `common` instead of the library information. The environments tied to a specific library usually run the corresponding test suite, while `common` targets all tests but skips those that require uninstalled dependencies.
 
+To list all tox environments:
+
+```bash
+uv run tox -l
+```
+
 To run Celery tests for version v5.5.3 of its Python library using a 3.12 interpreter, use
 
 ```bash
-uv run tox -p auto -o -e py3.12-celery-v5.5.3
+uv run tox -e py3.12-celery-v5.5.3
 ```
 
 or to use the `common` environment, run
 
 ```bash
-uv run tox -p auto -o -e py3.12-common
+uv run tox -e py3.12-common
+```
+
+To run a specific file:
+
+```bash
+TESTPATH=tests/integrations/logging/test_logging.py uv run tox -e py3.12-common
 ```
 
 To select specific tests, you can forward arguments to `pytest` like so
 
 ```bash
-uv run tox -p auto -o -e py3.12-celery-v5.5.3 -- -k test_transaction_events
+uv run tox -e py3.12-celery-v5.5.3 -- -k test_transaction_events
 ```
 
 In general, you use
 
 ```bash
-uv run tox -p auto -o -e <tox_env> -- <pytest_args>
+TESTPATH=<file_path> uv run tox -e <tox_env> -- <pytest_args>
 ```
 
 ## Debugging
