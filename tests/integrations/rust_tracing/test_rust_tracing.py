@@ -226,14 +226,14 @@ def test_nested_on_new_span_on_close(
         assert second_span["end_timestamp"] is not None
 
         # Ensure the extra data from Rust is hooked up in both spans
-        first_span_data = second_span["attributes"]
+        first_span_data = first_span["attributes"]
         assert first_span_data["use_memoized"]
-        assert first_span_data["index"] == 10
+        assert first_span_data["index"] == 9
         assert first_span_data["version"] == "None"
 
-        second_span_data = first_span["attributes"]
+        second_span_data = second_span["attributes"]
         assert second_span_data["use_memoized"]
-        assert second_span_data["index"] == 9
+        assert second_span_data["index"] == 10
         assert second_span_data["version"] == "None"
     else:
         events = capture_events()
