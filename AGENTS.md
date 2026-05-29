@@ -26,11 +26,6 @@ Use **ruff** for linting and formatting:
 - `uv run ruff check --fix tests sentry_sdk`
 - `uv run ruff format tests sentry_sdk`
 
-
-Use **tox** for running the other linting steps:
-- Full lint suite: `uv run tox -e linters`
-- Full lint suite must pass before committing
-
 ## Commit Attribution
 
 AI commits MUST include:
