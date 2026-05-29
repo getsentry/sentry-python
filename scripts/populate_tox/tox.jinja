@@ -77,14 +77,6 @@ deps =
     # with the -r flag
     -r requirements-testing.txt
 
-    linters: -r requirements-linting.txt
-    linters: werkzeug<2.3.0
-    linters: httpcore[asyncio]
-
-    mypy: -r requirements-linting.txt
-    mypy: werkzeug<2.3.0
-    mypy: httpcore[asyncio]
-
     # === Common ===
     py3.8-common: hypothesis
     common: pytest-asyncio
@@ -241,10 +233,7 @@ basepython =
     py3.14t: python3.14t
 
     # Python version is pinned here for consistency across environments.
-    # Tools like ruff and mypy have options that pin the target Python
-    # version (configured in pyproject.toml), ensuring consistent behavior.
     linters: python3.14
-    mypy: python3.14
 
 commands =
     ; Running `pytest` as an executable suffers from an import error
@@ -254,9 +243,4 @@ commands =
 
 [testenv:linters]
 commands =
-    mypy sentry_sdk
     python scripts/find_raise_from_none.py
-
-[testenv:mypy]
-commands =
-    mypy sentry_sdk
