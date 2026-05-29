@@ -758,7 +758,9 @@ def test_continue_trace_unsampled(sentry_init, capture_items):
     ("sample_rand", "expected_sampled", "expected_outcome"),
     [
         ("0.100000", True, None),
+        ("0.250000", False, "backpressure"),
         ("0.300000", False, "backpressure"),
+        ("0.500000", False, "sample_rate"),
         ("0.700000", False, "sample_rate"),
     ],
 )
@@ -797,6 +799,11 @@ def test_backpressure_outcome(
 
     sentry_sdk.get_client().flush()
     spans = [item.payload for item in items]
+
+    # Original traces_sample_rate is 0.5, downsampled sample rate is 0.25, so:
+    # - sample_rand < 0.25 -> sampled
+    # - 0.25 < sample_rand < 0.5 -> unsampled because of backpressure (would've been sampled if no backpressure)
+    # - 0.5 < sample_rand -> unsampled because of sampling rate
 
     assert span.sampled is expected_sampled
 
