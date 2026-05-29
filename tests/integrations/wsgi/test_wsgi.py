@@ -841,3 +841,35 @@ def test_file_response_wrapping(
 )
 def test_get_request_url_x_forwarded_proto(environ, use_x_forwarded_for, expected_url):
     assert get_request_url(environ, use_x_forwarded_for) == expected_url
+
+
+@pytest.mark.parametrize("send_default_pii", [True, False])
+def test_user_ip_address_on_all_spans(sentry_init, capture_items, send_default_pii):
+    def dogpark(environ, start_response):
+        with sentry_sdk.traces.start_span(name="child-span"):
+            pass
+        start_response("200 OK", [])
+        return ["Go get the ball! Good dog!"]
+
+    sentry_init(
+        send_default_pii=send_default_pii,
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+    app = SentryWsgiMiddleware(dogpark)
+    client = Client(app)
+
+    items = capture_items("span")
+
+    client.get("/dogs/are/great/", environ_base={"REMOTE_ADDR": "127.0.0.1"})
+
+    sentry_sdk.flush()
+
+    child_span, server_span = [item.payload for item in items]
+
+    if send_default_pii:
+        assert server_span["attributes"]["user.ip_address"] == "127.0.0.1"
+        assert child_span["attributes"]["user.ip_address"] == "127.0.0.1"
+    else:
+        assert "user.ip_address" not in server_span["attributes"]
+        assert "user.ip_address" not in child_span["attributes"]
