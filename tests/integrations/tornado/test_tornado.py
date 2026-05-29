@@ -62,6 +62,13 @@ class HelloHandler(RequestHandler):
         return b"hello"
 
 
+class ChildSpanHandler(RequestHandler):
+    def get(self):
+        with sentry_sdk.traces.start_span(name="child-span"):
+            pass
+        self.write("ok")
+
+
 def test_basic(tornado_testcase, sentry_init, capture_events):
     sentry_init(integrations=[TornadoIntegration()], send_default_pii=True)
     events = capture_events()
@@ -527,13 +534,6 @@ def test_span_origin(
     else:
         (_, event) = events
         assert event["contexts"]["trace"]["origin"] == "auto.http.tornado"
-
-
-class ChildSpanHandler(RequestHandler):
-    def get(self):
-        with sentry_sdk.traces.start_span(name="child-span"):
-            pass
-        self.write("ok")
 
 
 @pytest.mark.parametrize("send_default_pii", [True, False])
