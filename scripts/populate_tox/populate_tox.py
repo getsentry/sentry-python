@@ -172,9 +172,8 @@ def _get_dependency_probe_constraints(
     constraints = []
     for rule, dependencies in TEST_SUITE_CONFIG[integration].get("deps", {}).items():
         # Skip if rule does not apply to current package or Python version
-        if (
-            rule == "*"
-            or (rule.startswith("py3") and f"py{python_version}" not in rule.split(","))
+        if rule != "*" and (
+            (rule.startswith("py3") and f"py{python_version}" not in rule.split(","))
             or (
                 not rule.startswith("py3")
                 and release not in SpecifierSet(rule, prereleases=True)
