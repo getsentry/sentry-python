@@ -201,7 +201,9 @@ def fetch_package_dependencies(
     constraints: tuple[str, ...] = (),
 ) -> dict:
     """Fetch package dependencies metadata from cache or, failing that, PyPI."""
-    package_dependencies = _fetch_package_dependencies_from_cache(package, version)
+    package_dependencies = _fetch_package_dependencies_from_cache(
+        package, version, python_version
+    )
     if package_dependencies is not None:
         return package_dependencies
 
@@ -244,7 +246,9 @@ def fetch_package_dependencies(
 
     pip_report = result.stdout.strip()
     dependencies_info = json.loads(pip_report)["install"]
-    _save_to_package_dependencies_cache(package, version, dependencies_info)
+    _save_to_package_dependencies_cache(
+        package, version, python_version, dependencies_info
+    )
 
     return dependencies_info
 
@@ -259,12 +263,19 @@ def _fetch_from_cache(package: str, version: Version) -> Optional[dict]:
 
 
 def _fetch_package_dependencies_from_cache(
-    package: str, version: Version
+    package: str,
+    version: Version,
+    python_version: ThreadedVersion,
 ) -> Optional[dict]:
     package = _normalize_name(package)
-    if package in DEPENDENCIES_CACHE and str(version) in DEPENDENCIES_CACHE[package]:
-        DEPENDENCIES_CACHE[package][str(version)]["_accessed"] = True
-        return DEPENDENCIES_CACHE[package][str(version)]["dependencies"]
+    cache_entry = (
+        DEPENDENCIES_CACHE.get(package, {})
+        .get(str(version), {})
+        .get(str(python_version), None)
+    )
+    if cache_entry is not None:
+        cache_entry["_accessed"] = True
+        return cache_entry["dependencies"]
 
     return None
 
@@ -278,7 +289,10 @@ def _save_to_cache(package: str, version: Version, release: Optional[dict]) -> N
 
 
 def _save_to_package_dependencies_cache(
-    package: str, version: Version, release: Optional[dict]
+    package: str,
+    version: Version,
+    python_version: ThreadedVersion,
+    release: Optional[dict],
 ) -> None:
     normalized_dependencies = _normalize_package_dependencies(release)
 
@@ -288,13 +302,16 @@ def _save_to_package_dependencies_cache(
                 {
                     "name": package,
                     "version": str(version),
+                    "python_version": str(python_version),
                     "dependencies": normalized_dependencies,
                 }
             )
             + "\n"
         )
 
-    DEPENDENCIES_CACHE[_normalize_name(package)][str(version)] = {
+    DEPENDENCIES_CACHE[_normalize_name(package)].setdefault(str(version), {})[
+        str(python_version)
+    ] = {
         "dependencies": normalized_dependencies,
         "_accessed": True,
     }
@@ -1245,7 +1262,7 @@ def main() -> dict[str, list]:
             if (
                 DEPENDENCIES_CACHE[_normalize_name(release["name"])][
                     release["version"]
-                ]["_accessed"]
+                ][release["python_version"]]["_accessed"]
                 is True
             ):
                 releases_cache.write(json.dumps(release) + "\n")
