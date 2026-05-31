@@ -2142,10 +2142,17 @@ def format_attribute(val: "Any") -> "AttributeValue":
         ty = type(val[0])
         if ty in (str, int, float, bool) and all(type(v) is ty for v in val):
             return copy.deepcopy(val)
+        # Mixed-type or non-primitive list: preserve the array structure by
+        # coercing each element to a string. This matches sentry-javascript
+        # behaviour and avoids silently collapsing the whole array into a
+        # single string attribute value.
+        return [v if isinstance(v, str) else safe_repr(v) for v in val]
     elif isinstance(val, tuple):
         ty = type(val[0])
         if ty in (str, int, float, bool) and all(type(v) is ty for v in val):
             return list(val)
+        # Same treatment for tuples with mixed/non-primitive elements.
+        return [v if isinstance(v, str) else safe_repr(v) for v in val]
 
     return safe_repr(val)
 
