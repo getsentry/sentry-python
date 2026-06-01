@@ -1,3 +1,4 @@
+import os
 import threading
 from unittest import mock
 
@@ -59,8 +60,9 @@ def init_celery(sentry_init, request):
             # this backend requires capture_events_forksafe
             celery.conf.worker_max_tasks_per_child = 1
             celery.conf.worker_concurrency = 1
-            celery.conf.broker_url = "redis://127.0.0.1:6379"
-            celery.conf.result_backend = "redis://127.0.0.1:6379"
+            redis_url = f"redis://{os.environ.get('SENTRY_PYTHON_TEST_REDIS_HOST', '127.0.0.1')}:6379"
+            celery.conf.broker_url = redis_url
+            celery.conf.result_backend = redis_url
             celery.conf.task_always_eager = False
 
             # Once we drop celery 3 we can use the celery_worker fixture

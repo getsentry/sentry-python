@@ -38,7 +38,8 @@
       "Bash(.tox/*/bin/ruff:*)",
       "Bash(ruff format:*)",
       "Bash(ruff check:*)",
-      "Bash(mypy:*)"
+      "Bash(mypy:*)",
+      "Bash(uv run *)"
     ],
     "deny": []
   }

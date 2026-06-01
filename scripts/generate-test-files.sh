@@ -6,13 +6,7 @@ set -xe
 
 cd "$(dirname "$0")"
 
-rm -rf toxgen.venv
-python -m venv toxgen.venv
-. toxgen.venv/bin/activate
+export UV_PROJECT_ENVIRONMENT=toxgen.venv
 
-toxgen.venv/bin/pip install -e ..
-toxgen.venv/bin/pip install -r populate_tox/requirements.txt
-toxgen.venv/bin/pip install -r split_tox_gh_actions/requirements.txt
-
-toxgen.venv/bin/python populate_tox/populate_tox.py
-toxgen.venv/bin/python split_tox_gh_actions/split_tox_gh_actions.py
+uv run --python 3.14t --group toxgen --with-editable .. python populate_tox/populate_tox.py
+uv run --python 3.14t --group toxgen --with-editable .. python split_tox_gh_actions/split_tox_gh_actions.py

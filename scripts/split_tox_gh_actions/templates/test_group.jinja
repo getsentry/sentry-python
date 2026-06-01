@@ -6,20 +6,16 @@
       fail-fast: false
       matrix:
         python-version: [{{ py_versions|join(",") }}]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-22.04]
 
-    {% if needs_docker %}
+    {% if needs_docker or needs_postgres or needs_redis %}
     services:
+      {% if needs_docker %}
       docker:
         image: docker:dind  # Required for Docker network management
         options: --privileged  # Required for Docker-in-Docker operations
-    {% endif %}
-    {% if needs_postgres %}
-    services:
+      {% endif %}
+      {% if needs_postgres %}
       postgres:
         image: postgres
         env:
@@ -33,30 +29,41 @@
         # Maps tcp port 5432 on service container to the host
         ports:
           - 5432:5432
+      {% endif %}
+      {% if needs_redis %}
+      redis:
+        image: redis
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+      {% endif %}
+    {% endif %}
     env:
-      SENTRY_PYTHON_TEST_POSTGRES_HOST: {% raw %}${{ matrix.python-version == '3.6' && 'postgres' || 'localhost' }}{% endraw %}
+      # 3.6/3.7 run in the python:X.Y container; tell uv to use that system Python.
+      TOX_UV_PYTHON_PREFERENCE: {% raw %}${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'only-system' || 'managed' }}{% endraw %}
+      {% if needs_postgres %}
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: {% raw %}${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'postgres' || 'localhost' }}{% endraw %}
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
-
-    {% endif %}
-    # Use Docker container only for Python 3.6
-    {% raw %}container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}{% endraw %}
+      {% endif %}
+      {% if needs_redis %}
+      SENTRY_PYTHON_TEST_REDIS_HOST: {% raw %}${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'redis' || 'localhost' }}{% endraw %}
+      {% endif %}
+    container: {% raw %}${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && format('python:{0}', matrix.python-version) || null }}{% endraw %}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
-        {% raw %}if: ${{ matrix.python-version != '3.6' }}{% endraw %}
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
-          python-version: {% raw %}${{ matrix.python-version }}{% endraw %}
-          allow-prereleases: true
+          cache-suffix: {% raw %}${{ github.workflow }}-${{ matrix.python-version }}{% endraw %}
 
       {% if needs_clickhouse %}
       - name: "Setup ClickHouse Server"
         uses: getsentry/action-clickhouse-in-ci@5dc8a6a50d689bd6051db0241f34849e5a36490b # v1.7
-      {% endif %}
-
-      {% if needs_redis %}
-      - name: Start Redis
-        uses: supercharge/redis-github-action@87f27ff1ab2d9e62db54b11ee5e7f78ff18f8933 # v2
       {% endif %}
 
       {% if needs_java %}
@@ -67,12 +74,18 @@
           java-version: '21'
       {% endif %}
 
+      - name: Mark workspace safe for git (3.6/3.7 container)
+        # needed to make git rev-parse work in the containers
+        # subprocesses (e.g. sentry_sdk.utils.get_git_revision) can run git.
+        if: {% raw %}${{ matrix.python-version == '3.6' || matrix.python-version == '3.7' }}{% endraw %}
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
       - name: Setup Test Env
         run: |
-          pip install "coverage[toml]" tox
+          uv sync
       - name: Erase coverage
         run: |
-          coverage erase
+          uv run coverage erase
 
       {% for framework in frameworks %}
       - name: Test {{ framework }}
@@ -81,18 +94,11 @@
           ./scripts/runtox.sh "{% raw %}py${{ matrix.python-version }}{% endraw %}-{{ framework }}"
       {% endfor %}
 
-      - name: Generate coverage XML (Python 3.6)
-        if: {% raw %}${{ !cancelled() && matrix.python-version == '3.6' }}{% endraw %}
-        run: |
-          export COVERAGE_RCFILE=.coveragerc36
-          coverage combine .coverage-sentry-*
-          coverage xml --ignore-errors
-
       - name: Generate coverage XML
-        if: {% raw %}${{ !cancelled() && matrix.python-version != '3.6' }}{% endraw %}
+        if: {% raw %}${{ !cancelled() }}{% endraw %}
         run: |
-          coverage combine .coverage-sentry-*
-          coverage xml
+          uv run coverage combine .coverage-sentry-*
+          uv run coverage xml
 
       - name: Parse and Upload Coverage
         if: {% raw %}${{ !cancelled() }}{% endraw %}

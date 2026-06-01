@@ -13,6 +13,6 @@ responses
 pysocks
 socksio
 httpcore[http2]
-setuptools
+setuptools<81
 Brotli
 docker
