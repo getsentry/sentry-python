@@ -60,7 +60,7 @@ typing = [
     "launchdarkly-server-sdk",
     "openfeature-sdk",
     "statsig",
-    "UnleashClient<6",
+    "UnleashClient<7",
     "typer",
     "strawberry-graphql",
     "httpx",
