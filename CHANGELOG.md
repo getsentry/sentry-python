@@ -2,11 +2,6 @@
 
 ## 2.61.1
 
-### New Features ✨
-
-- (litellm) Support span streaming by @alexander-alderman-webb in [#6317](https://github.com/getsentry/sentry-python/pull/6317)
-- (rust-tracing) Support span streaming by @alexander-alderman-webb in [#6433](https://github.com/getsentry/sentry-python/pull/6433)
-
 ### Internal Changes 🔧
 
 #### Rq
