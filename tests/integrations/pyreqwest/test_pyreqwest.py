@@ -561,7 +561,7 @@ def test_request_source_disabled(
         sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         span = spans[0]
-        data = span.get("data", {})
+        data = span.get("attributes", {})
 
         assert SPANDATA.CODE_LINE_NUMBER not in data
         assert SPANDATA.CODE_NAMESPACE not in data
@@ -794,7 +794,7 @@ def test_no_request_source_if_duration_too_short(
                 with original_start_span(*args, **kwargs) as span:
                     span._start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
                     span._end_timestamp = datetime.datetime(
-                        2024, 1, 1, microsecond=100001
+                        2024, 1, 1, microsecond=99999
                     )
 
                     yield span
@@ -811,7 +811,7 @@ def test_no_request_source_if_duration_too_short(
         sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
         span = spans[0]
-        data = span.get("data", {})
+        data = span.get("attributes", {})
 
         assert SPANDATA.CODE_LINE_NUMBER not in data
         assert SPANDATA.CODE_NAMESPACE not in data
