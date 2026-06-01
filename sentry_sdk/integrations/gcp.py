@@ -120,7 +120,7 @@ def _wrap_func(func: "F") -> "F":
                 sentry_sdk.traces.continue_trace(headers)
                 Scope.set_custom_sampling_context(sampling_context)
                 span_ctx = sentry_sdk.traces.start_span(
-                    name=environ.get("FUNCTION_NAME", ""),
+                    name=environ.get("FUNCTION_NAME", "<unknown GCP function>"),
                     parent_span=None,
                     attributes={
                         "sentry.op": OP.FUNCTION_GCP,
