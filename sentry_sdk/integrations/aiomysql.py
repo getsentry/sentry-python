@@ -175,7 +175,8 @@ def _wrap_connect(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
             span_attributes: dict[str, Any] = {
                 "sentry.op": OP.DB,
                 "sentry.origin": AioMySQLIntegration.origin,
-                SPANDATA.DB_SYSTEM: "mysql",
+                SPANDATA.DB_SYSTEM_NAME: "mysql",
+                SPANDATA.DB_DRIVER_NAME: "aiomysql",
             }
             host = getattr(self, "host", None)
             if host is not None:
@@ -185,7 +186,7 @@ def _wrap_connect(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
                 span_attributes[SPANDATA.SERVER_PORT] = port
             database = getattr(self, "db", None)
             if database is not None:
-                span_attributes[SPANDATA.DB_NAME] = database
+                span_attributes[SPANDATA.DB_NAMESPACE] = database
             user = getattr(self, "user", None)
             if user is not None:
                 span_attributes[SPANDATA.DB_USER] = user
@@ -222,7 +223,7 @@ def _wrap_connect(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
 
 
 def _get_connect_data(conn: Any) -> dict[str, Any]:
-    data: dict[str, Any] = {SPANDATA.DB_SYSTEM: "mysql"}
+    data: dict[str, Any] = {SPANDATA.DB_SYSTEM: "mysql", SPANDATA.DB_DRIVER_NAME: "aiomysql"}
     host = getattr(conn, "host", None)
     if host is not None:
         data[SPANDATA.SERVER_ADDRESS] = host
@@ -240,9 +241,19 @@ def _get_connect_data(conn: Any) -> dict[str, Any]:
 
 def _set_db_data(span: Any, conn: Any) -> None:
     """Set database-related span data from connection object."""
-    set_value = span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
+    if isinstance(span, StreamedSpan):
+        set_value = span.set_attribute
+        db_system = SPANDATA.DB_SYSTEM_NAME
+        db_name = SPANDATA.DB_NAMESPACE
+    else:
+        # Remove this else block once we've completely migrated to streamed spans
+        # The use of deprecated attributes here is to ensure backwards compatibility
+        set_value = span.set_data
+        db_system = SPANDATA.DB_SYSTEM
+        db_name = SPANDATA.DB_NAME
 
-    set_value(SPANDATA.DB_SYSTEM, "mysql")
+    set_value(db_system, "mysql")
+    set_value(SPANDATA.DB_DRIVER_NAME, "aiomysql")
 
     host = getattr(conn, "host", None)
     if host is not None:
@@ -254,7 +265,7 @@ def _set_db_data(span: Any, conn: Any) -> None:
 
     database = getattr(conn, "db", None)
     if database is not None:
-        set_value(SPANDATA.DB_NAME, database)
+        set_value(db_name, database)
 
     user = getattr(conn, "user", None)
     if user is not None:
