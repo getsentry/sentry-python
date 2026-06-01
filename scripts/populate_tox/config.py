@@ -202,6 +202,13 @@ TEST_SUITE_CONFIG = {
             ">=0.28": ">=3.9",
         },
     },
+    "httpx2": {
+        "package": "httpx2",
+        "deps": {
+            "*": ["anyio>=3,<5", "httpx2-pytest==1.0.1"],
+        },
+        "python": ">=3.10",
+    },
     "huey": {
         "package": "huey",
         "num_versions": 2,
