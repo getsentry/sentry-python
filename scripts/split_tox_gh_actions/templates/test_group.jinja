@@ -59,7 +59,8 @@
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
-          cache-suffix: {% raw %}${{ github.workflow }}-${{ matrix.python-version }}{% endraw %}
+          cache-suffix: {{ lowercase_group }}-{% raw %}${{ matrix.python-version }}{% endraw %}
+          enable-cache: {% raw %}${{ matrix.python-version != '3.6' && matrix.python-version != '3.7' }}{% endraw %}
 
       {% if needs_clickhouse %}
       - name: "Setup ClickHouse Server"
@@ -83,9 +84,6 @@
       - name: Setup Test Env
         run: |
           uv sync
-      - name: Erase coverage
-        run: |
-          uv run coverage erase
 
       {% for framework in frameworks %}
       - name: Test {{ framework }}
@@ -94,18 +92,17 @@
           ./scripts/runtox.sh "{% raw %}py${{ matrix.python-version }}{% endraw %}-{{ framework }}"
       {% endfor %}
 
-      - name: Generate coverage XML
+      - name: Upload coverage data
         if: {% raw %}${{ !cancelled() }}{% endraw %}
-        run: |
-          uv run coverage combine .coverage-sentry-*
-          uv run coverage xml
-
-      - name: Parse and Upload Coverage
-        if: {% raw %}${{ !cancelled() }}{% endraw %}
-        uses: getsentry/codecov-action@d90e69cdf071dfbb0430159125321dc09c424d4c # main
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          token: {% raw %}${{ secrets.GITHUB_TOKEN }}{% endraw %}
-          files: coverage.xml
-          junit-xml-pattern: .junitxml
-          base-branch: master
-          verbose: true
+          name: coverage-{{ lowercase_group }}-{% raw %}${{ matrix.python-version }}{% endraw %}
+          # .coverage-* / .junitxml-* are dotfiles, excluded by default
+          include-hidden-files: true
+          path: |
+            .coverage-sentry-*
+            .junitxml-*
+          if-no-files-found: 'ignore'
+          retention-days: 1
+          overwrite: true

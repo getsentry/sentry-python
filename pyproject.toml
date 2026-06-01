@@ -76,10 +76,20 @@ typing = [
 [tool.coverage.run]
 branch = true
 core = "ctrace"
+# Store paths relative to the repo root so data files from different machines
+# (e.g. the 3.6/3.7 container vs. the normal runner) combine into one source.
+relative_files = true
 omit = [
     "/tmp/*",
     "*/tests/*",
     "*/.venv/*",
+]
+
+[tool.coverage.paths]
+# Map the differing absolute prefixes (container vs. runner) back to one source.
+source = [
+    "sentry_sdk/",
+    "*/sentry_sdk/",
 ]
 
 [tool.coverage.report]
@@ -92,7 +102,7 @@ exclude_also = [
 #
 
 [tool.pytest.ini_options]
-addopts = "-vvv -rfEs -s --durations=5 --cov=./sentry_sdk --cov-branch --cov-report= --tb=short --junitxml=.junitxml"
+addopts = "-vvv -rfEs -s --durations=5 --cov=./sentry_sdk --cov-branch --cov-report= --tb=short"
 asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "function"
 markers = [

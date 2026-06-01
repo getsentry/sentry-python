@@ -39,7 +39,8 @@
       "Bash(ruff format:*)",
       "Bash(ruff check:*)",
       "Bash(mypy:*)",
-      "Bash(uv run *)"
+      "Bash(uv run *)",
+      "Bash(./scripts/generate-test-files.sh)"
     ],
     "deny": []
   }
