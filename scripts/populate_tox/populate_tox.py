@@ -202,8 +202,12 @@ def fetch_package_dependencies(
     python_version: ThreadedVersion,
 ) -> dict:
     """Fetch package dependencies metadata from cache or, failing that, PyPI."""
+    constraints = _get_dependency_probe_constraints(
+        integration, version, python_version
+    )
+    constraints_hash = hashlib.md5("\n".join(constraints).encode("utf-8")).hexdigest()
     package_dependencies = _fetch_package_dependencies_from_cache(
-        package, version, python_version
+        package, version, python_version, constraints_hash
     )
     if package_dependencies is not None:
         return package_dependencies
@@ -230,9 +234,6 @@ def fetch_package_dependencies(
         "-qqq",
     ]
 
-    constraints = _get_dependency_probe_constraints(
-        integration, version, python_version
-    )
     with tempfile.NamedTemporaryFile("w", encoding="utf-8") as f:
         f.write("\n".join(constraints))
         f.flush()
@@ -249,7 +250,11 @@ def fetch_package_dependencies(
     pip_report = result.stdout.strip()
     dependencies_info = json.loads(pip_report)["install"]
     _save_to_package_dependencies_cache(
-        package, version, python_version, dependencies_info
+        package,
+        version,
+        python_version,
+        dependencies_info,
+        constraints_hash,
     )
 
     return dependencies_info
@@ -268,12 +273,13 @@ def _fetch_package_dependencies_from_cache(
     package: str,
     version: Version,
     python_version: ThreadedVersion,
+    constraints_hash: str,
 ) -> Optional[dict]:
     package = _normalize_name(package)
     cache_entry = (
         DEPENDENCIES_CACHE[package].get(str(version), {}).get(str(python_version), None)
     )
-    if cache_entry is not None:
+    if cache_entry is not None and cache_entry["constraints_hash"] == constraints_hash:
         cache_entry["_accessed"] = True
         return cache_entry["dependencies"]
 
@@ -293,6 +299,7 @@ def _save_to_package_dependencies_cache(
     version: Version,
     python_version: ThreadedVersion,
     release: Optional[dict],
+    constraints_hash: str,
 ) -> None:
     normalized_dependencies = _normalize_package_dependencies(release)
 
@@ -304,6 +311,7 @@ def _save_to_package_dependencies_cache(
                     "version": str(version),
                     "python_version": str(python_version),
                     "dependencies": normalized_dependencies,
+                    "constraints_hash": constraints_hash,
                 }
             )
             + "\n"
@@ -313,6 +321,7 @@ def _save_to_package_dependencies_cache(
         str(python_version)
     ] = {
         "dependencies": normalized_dependencies,
+        "constraints_hash": constraints_hash,
         "_accessed": True,
     }
 
@@ -1177,6 +1186,7 @@ def main() -> dict[str, list]:
             python_version = release["python_version"]
             DEPENDENCIES_CACHE[name].setdefault(version, {})[python_version] = {
                 "dependencies": release["dependencies"],
+                "constraints_hash": release["constraints_hash"],
                 "_accessed": False,
             }
 
