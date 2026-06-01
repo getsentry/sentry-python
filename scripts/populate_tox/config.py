@@ -205,7 +205,7 @@ TEST_SUITE_CONFIG = {
     "httpx2": {
         "package": "httpx2",
         "deps": {
-            "*": ["anyio>=3,<5"],
+            "*": ["anyio>=3,<5", "pytest-httpx"],
         },
     },
     "huey": {

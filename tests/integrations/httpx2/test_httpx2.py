@@ -8,22 +8,22 @@ import pytest
 import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import MATCH_ALL, OP, SPANDATA
-from sentry_sdk.integrations.httpx import HttpxIntegration
+from sentry_sdk.integrations.httpx2 import Httpx2Integration
 from tests.conftest import ApproxDict
 
 
 @pytest.mark.parametrize(
-    "httpx_client",
+    "httpx2_client",
     (httpx2.Client(), httpx2.AsyncClient()),
 )
-def test_crumb_capture_and_hint(sentry_init, capture_events, httpx2_client, httpx2_mock):
-    httpx2_mock.add_response()
+def test_crumb_capture_and_hint(sentry_init, capture_events, httpx2_client, httpx_mock):
+    httpx_mock.add_response()
 
     def before_breadcrumb(crumb, hint):
         crumb["data"]["extra"] = "foo"
         return crumb
 
-    sentry_init(integrations=[HttpxIntegration()], before_breadcrumb=before_breadcrumb)
+    sentry_init(integrations=[Httpx2Integration()], before_breadcrumb=before_breadcrumb)
 
     url = "http://example.com/"
 
@@ -73,11 +73,11 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx2_client, http
     ],
 )
 def test_crumb_capture_client_error(
-    sentry_init, capture_events, httpx2_client, httpx2_mock, status_code, level
+    sentry_init, capture_events, httpx2_client, httpx_mock, status_code, level
 ):
-    httpx2_mock.add_response(status_code=status_code)
+    httpx_mock.add_response(status_code=status_code)
 
-    sentry_init(integrations=[HttpxIntegration()])
+    sentry_init(integrations=[Httpx2Integration()])
 
     url = "http://example.com/"
 
@@ -120,12 +120,12 @@ def test_crumb_capture_client_error(
     "httpx2_client",
     (httpx2.Client(), httpx2.AsyncClient()),
 )
-def test_outgoing_trace_headers_legacy(sentry_init, httpx2_client, httpx2_mock):
-    httpx2_mock.add_response()
+def test_outgoing_trace_headers_legacy(sentry_init, httpx2_client, httpx_mock):
+    httpx_mock.add_response()
 
     sentry_init(
         traces_sample_rate=1.0,
-        integrations=[HttpxIntegration()],
+        integrations=[Httpx2Integration()],
     )
 
     url = "http://example.com/"
@@ -159,13 +159,13 @@ def test_outgoing_trace_headers_legacy(sentry_init, httpx2_client, httpx2_mock):
 def test_outgoing_trace_headers_append_to_baggage_legacy(
     sentry_init,
     httpx2_client,
-    httpx2_mock,
+    httpx_mock,
 ):
-    httpx2_mock.add_response()
+    httpx_mock.add_response()
 
     sentry_init(
         traces_sample_rate=1.0,
-        integrations=[HttpxIntegration()],
+        integrations=[Httpx2Integration()],
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
     )
 
@@ -315,18 +315,18 @@ def test_outgoing_trace_headers_append_to_baggage_legacy(
 def test_option_trace_propagation_targets(
     sentry_init,
     httpx2_client,
-    httpx2_mock,  # this comes from pytest-httpx2
+    httpx_mock,  # this comes from pytest-httpx2
     trace_propagation_targets,
     url,
     trace_propagated,
 ):
-    httpx2_mock.add_response()
+    httpx_mock.add_response()
 
     sentry_init(
         release="test",
         trace_propagation_targets=trace_propagation_targets,
         traces_sample_rate=1.0,
-        integrations=[HttpxIntegration()],
+        integrations=[Httpx2Integration()],
     )
 
     # Must be in a transaction to propagate headers
@@ -336,7 +336,7 @@ def test_option_trace_propagation_targets(
         else:
             httpx2_client.get(url)
 
-    request_headers = httpx2_mock.get_request().headers
+    request_headers = httpx_mock.get_request().headers
 
     if trace_propagated:
         assert "sentry-trace" in request_headers
@@ -344,27 +344,27 @@ def test_option_trace_propagation_targets(
         assert "sentry-trace" not in request_headers
 
 
-def test_do_not_propagate_outside_transaction(sentry_init, httpx2_mock):
-    httpx2_mock.add_response()
+def test_do_not_propagate_outside_transaction(sentry_init, httpx_mock):
+    httpx_mock.add_response()
 
     sentry_init(
         traces_sample_rate=1.0,
         trace_propagation_targets=[MATCH_ALL],
-        integrations=[HttpxIntegration()],
+        integrations=[Httpx2Integration()],
     )
 
     httpx2_client = httpx2.Client()
     httpx2_client.get("http://example.com/")
 
-    request_headers = httpx2_mock.get_request().headers
+    request_headers = httpx_mock.get_request().headers
     assert "sentry-trace" not in request_headers
 
 
 @pytest.mark.tests_internal_exceptions
-def test_omit_url_data_if_parsing_fails(sentry_init, capture_events, httpx2_mock):
-    httpx2_mock.add_response()
+def test_omit_url_data_if_parsing_fails(sentry_init, capture_events, httpx_mock):
+    httpx_mock.add_response()
 
-    sentry_init(integrations=[HttpxIntegration()])
+    sentry_init(integrations=[Httpx2Integration()])
 
     httpx2_client = httpx2.Client()
     url = "http://example.com"
@@ -399,11 +399,11 @@ def test_omit_url_data_if_parsing_fails(sentry_init, capture_events, httpx2_mock
     (httpx2.Client(), httpx2.AsyncClient()),
 )
 def test_request_source_disabled_legacy(
-    sentry_init, capture_events, httpx2_client, httpx2_mock
+    sentry_init, capture_events, httpx2_client, httpx_mock
 ):
-    httpx2_mock.add_response()
+    httpx_mock.add_response()
     sentry_options = {
-        "integrations": [HttpxIntegration()],
+        "integrations": [Httpx2Integration()],
         "traces_sample_rate": 1.0,
         "enable_http_request_source": False,
         "http_request_source_threshold_ms": 0,
@@ -444,11 +444,11 @@ def test_request_source_enabled_legacy(
     capture_events,
     enable_http_request_source,
     httpx2_client,
-    httpx2_mock,
+    httpx_mock,
 ):
-    httpx2_mock.add_response()
+    httpx_mock.add_response()
     sentry_options = {
-        "integrations": [HttpxIntegration()],
+        "integrations": [Httpx2Integration()],
         "traces_sample_rate": 1.0,
         "http_request_source_threshold_ms": 0,
     }
@@ -484,11 +484,11 @@ def test_request_source_enabled_legacy(
     "httpx2_client",
     (httpx2.Client(), httpx2.AsyncClient()),
 )
-def test_request_source_legacy(sentry_init, capture_events, httpx2_client, httpx2_mock):
-    httpx2_mock.add_response()
+def test_request_source_legacy(sentry_init, capture_events, httpx2_client, httpx_mock):
+    httpx_mock.add_response()
 
     sentry_init(
-        integrations=[HttpxIntegration()],
+        integrations=[Httpx2Integration()],
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
@@ -534,14 +534,14 @@ def test_request_source_legacy(sentry_init, capture_events, httpx2_client, httpx
     (httpx2.Client(), httpx2.AsyncClient()),
 )
 def test_request_source_with_module_in_search_path_legacy(
-    sentry_init, capture_events, httpx2_client, httpx2_mock
+    sentry_init, capture_events, httpx2_client, httpx_mock
 ):
     """
     Test that request source is relative to the path of the module it ran in
     """
-    httpx2_mock.add_response()
+    httpx_mock.add_response()
     sentry_init(
-        integrations=[HttpxIntegration()],
+        integrations=[Httpx2Integration()],
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
@@ -594,12 +594,12 @@ def test_request_source_with_module_in_search_path_legacy(
     (httpx2.Client(), httpx2.AsyncClient()),
 )
 def test_no_request_source_if_duration_too_short_legacy(
-    sentry_init, capture_events, httpx2_client, httpx2_mock
+    sentry_init, capture_events, httpx2_client, httpx_mock
 ):
-    httpx2_mock.add_response()
+    httpx_mock.add_response()
 
     sentry_init(
-        integrations=[HttpxIntegration()],
+        integrations=[Httpx2Integration()],
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         # Threshold so high no real request will ever exceed it
@@ -634,12 +634,12 @@ def test_no_request_source_if_duration_too_short_legacy(
     (httpx2.Client(), httpx2.AsyncClient()),
 )
 def test_request_source_if_duration_over_threshold_legacy(
-    sentry_init, capture_events, httpx2_client, httpx2_mock
+    sentry_init, capture_events, httpx2_client, httpx_mock
 ):
-    httpx2_mock.add_response()
+    httpx_mock.add_response()
 
     sentry_init(
-        integrations=[HttpxIntegration()],
+        integrations=[Httpx2Integration()],
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         # Threshold is low so any request will exceed it
@@ -688,11 +688,11 @@ def test_request_source_if_duration_over_threshold_legacy(
     "httpx2_client",
     (httpx2.Client(), httpx2.AsyncClient()),
 )
-def test_span_origin_legacy(sentry_init, capture_events, httpx2_client, httpx2_mock):
-    httpx2_mock.add_response()
+def test_span_origin_legacy(sentry_init, capture_events, httpx2_client, httpx_mock):
+    httpx_mock.add_response()
 
     sentry_init(
-        integrations=[HttpxIntegration()],
+        integrations=[Httpx2Integration()],
         traces_sample_rate=1.0,
     )
 
@@ -725,13 +725,13 @@ def _get_http_client_span(items):
     (httpx2.Client(), httpx2.AsyncClient()),
 )
 def test_outgoing_trace_headers_span_streaming(
-    sentry_init, capture_items, httpx2_client, httpx2_mock
+    sentry_init, capture_items, httpx2_client, httpx_mock
 ):
-    httpx2_mock.add_response()
+    httpx_mock.add_response()
 
     sentry_init(
         traces_sample_rate=1.0,
-        integrations=[HttpxIntegration()],
+        integrations=[Httpx2Integration()],
         _experiments={"trace_lifecycle": "stream"},
     )
 
@@ -765,13 +765,13 @@ def test_outgoing_trace_headers_append_to_baggage_span_streaming(
     sentry_init,
     capture_items,
     httpx2_client,
-    httpx2_mock,
+    httpx_mock,
 ):
-    httpx2_mock.add_response()
+    httpx_mock.add_response()
 
     sentry_init(
         traces_sample_rate=1.0,
-        integrations=[HttpxIntegration()],
+        integrations=[Httpx2Integration()],
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
         _experiments={"trace_lifecycle": "stream"},
     )
@@ -804,12 +804,12 @@ def test_outgoing_trace_headers_append_to_baggage_span_streaming(
     (httpx2.Client(), httpx2.AsyncClient()),
 )
 def test_request_source_disabled_span_streaming(
-    sentry_init, capture_items, httpx2_client, httpx2_mock
+    sentry_init, capture_items, httpx2_client, httpx_mock
 ):
-    httpx2_mock.add_response()
+    httpx_mock.add_response()
 
     sentry_init(
-        integrations=[HttpxIntegration()],
+        integrations=[Httpx2Integration()],
         traces_sample_rate=1.0,
         enable_http_request_source=False,
         http_request_source_threshold_ms=0,
@@ -845,12 +845,12 @@ def test_request_source_enabled_span_streaming(
     capture_items,
     enable_http_request_source,
     httpx2_client,
-    httpx2_mock,
+    httpx_mock,
 ):
-    httpx2_mock.add_response()
+    httpx_mock.add_response()
 
     sentry_options = {
-        "integrations": [HttpxIntegration()],
+        "integrations": [Httpx2Integration()],
         "traces_sample_rate": 1.0,
         "http_request_source_threshold_ms": 0,
         "_experiments": {"trace_lifecycle": "stream"},
@@ -884,12 +884,12 @@ def test_request_source_enabled_span_streaming(
     (httpx2.Client(), httpx2.AsyncClient()),
 )
 def test_request_source_span_streaming(
-    sentry_init, capture_items, httpx2_client, httpx2_mock
+    sentry_init, capture_items, httpx2_client, httpx_mock
 ):
-    httpx2_mock.add_response()
+    httpx_mock.add_response()
 
     sentry_init(
-        integrations=[HttpxIntegration()],
+        integrations=[Httpx2Integration()],
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
@@ -938,15 +938,15 @@ def test_request_source_span_streaming(
     (httpx2.Client(), httpx2.AsyncClient()),
 )
 def test_request_source_with_module_in_search_path_span_streaming(
-    sentry_init, capture_items, httpx2_client, httpx2_mock
+    sentry_init, capture_items, httpx2_client, httpx_mock
 ):
     """
     Test that request source is relative to the path of the module it ran in
     """
-    httpx2_mock.add_response()
+    httpx_mock.add_response()
 
     sentry_init(
-        integrations=[HttpxIntegration()],
+        integrations=[Httpx2Integration()],
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
@@ -1001,12 +1001,12 @@ def test_request_source_with_module_in_search_path_span_streaming(
     (httpx2.Client(), httpx2.AsyncClient()),
 )
 def test_no_request_source_if_duration_too_short_span_streaming(
-    sentry_init, capture_items, httpx2_client, httpx2_mock
+    sentry_init, capture_items, httpx2_client, httpx_mock
 ):
-    httpx2_mock.add_response()
+    httpx_mock.add_response()
 
     sentry_init(
-        integrations=[HttpxIntegration()],
+        integrations=[Httpx2Integration()],
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         # Threshold so high no real request will ever exceed it
@@ -1038,12 +1038,12 @@ def test_no_request_source_if_duration_too_short_span_streaming(
     (httpx2.Client(), httpx2.AsyncClient()),
 )
 def test_request_source_if_duration_over_threshold_span_streaming(
-    sentry_init, capture_items, httpx2_client, httpx2_mock
+    sentry_init, capture_items, httpx2_client, httpx_mock
 ):
-    httpx2_mock.add_response()
+    httpx_mock.add_response()
 
     sentry_init(
-        integrations=[HttpxIntegration()],
+        integrations=[Httpx2Integration()],
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         # Threshold of 0 means any non-zero duration qualifies
@@ -1093,12 +1093,12 @@ def test_request_source_if_duration_over_threshold_span_streaming(
     (httpx2.Client(), httpx2.AsyncClient()),
 )
 def test_span_origin_span_streaming(
-    sentry_init, capture_items, httpx2_client, httpx2_mock
+    sentry_init, capture_items, httpx2_client, httpx_mock
 ):
-    httpx2_mock.add_response()
+    httpx_mock.add_response()
 
     sentry_init(
-        integrations=[HttpxIntegration()],
+        integrations=[Httpx2Integration()],
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream"},
     )
@@ -1124,12 +1124,12 @@ def test_span_origin_span_streaming(
     (httpx2.Client(), httpx2.AsyncClient()),
 )
 def test_http_url_attributes_span_streaming(
-    sentry_init, capture_items, httpx2_client, httpx2_mock
+    sentry_init, capture_items, httpx2_client, httpx_mock
 ):
-    httpx2_mock.add_response()
+    httpx_mock.add_response()
 
     sentry_init(
-        integrations=[HttpxIntegration()],
+        integrations=[Httpx2Integration()],
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream"},
     )
@@ -1159,12 +1159,12 @@ def test_http_url_attributes_span_streaming(
     (httpx2.Client(), httpx2.AsyncClient()),
 )
 def test_http_url_attributes_no_query_or_fragment_span_streaming(
-    sentry_init, capture_items, httpx2_client, httpx2_mock
+    sentry_init, capture_items, httpx2_client, httpx_mock
 ):
-    httpx2_mock.add_response()
+    httpx_mock.add_response()
 
     sentry_init(
-        integrations=[HttpxIntegration()],
+        integrations=[Httpx2Integration()],
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream"},
     )
