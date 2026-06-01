@@ -172,31 +172,19 @@ def _wrap_connect(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
             return await f(self)
 
         if has_span_streaming_enabled(client.options):
+            breadcrumb_data = _get_connect_data(self, use_streaming_keys=True)
+
             span_attributes: dict[str, Any] = {
                 "sentry.op": OP.DB,
                 "sentry.origin": AioMySQLIntegration.origin,
-                SPANDATA.DB_SYSTEM_NAME: "mysql",
-                SPANDATA.DB_DRIVER_NAME: "aiomysql",
-            }
-            host = getattr(self, "host", None)
-            if host is not None:
-                span_attributes[SPANDATA.SERVER_ADDRESS] = host
-            port = getattr(self, "port", None)
-            if port is not None:
-                span_attributes[SPANDATA.SERVER_PORT] = port
-            database = getattr(self, "db", None)
-            if database is not None:
-                span_attributes[SPANDATA.DB_NAMESPACE] = database
-            user = getattr(self, "user", None)
-            if user is not None:
-                span_attributes[SPANDATA.DB_USER] = user
+            } | breadcrumb_data
 
             with sentry_sdk.traces.start_span(
                 name="connect", attributes=span_attributes
             ) as span:
                 with capture_internal_exceptions():
                     sentry_sdk.add_breadcrumb(
-                        message="connect", category="query", data=span_attributes
+                        message="connect", category="query", data=breadcrumb_data
                     )
                 res = await f(self)
         else:
@@ -222,20 +210,35 @@ def _wrap_connect(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
     return _inner
 
 
-def _get_connect_data(conn: Any) -> dict[str, Any]:
-    data: dict[str, Any] = {SPANDATA.DB_SYSTEM: "mysql", SPANDATA.DB_DRIVER_NAME: "aiomysql"}
+def _get_connect_data(conn: Any, *, use_streaming_keys: bool = False) -> dict[str, Any]:
+    if use_streaming_keys:
+        db_system = SPANDATA.DB_SYSTEM_NAME
+        db_name = SPANDATA.DB_NAMESPACE
+    else:
+        db_system = SPANDATA.DB_SYSTEM
+        db_name = SPANDATA.DB_NAME
+
+    data: dict[str, Any] = {
+        db_system: "mysql",
+        SPANDATA.DB_DRIVER_NAME: "aiomysql",
+    }
+
     host = getattr(conn, "host", None)
     if host is not None:
         data[SPANDATA.SERVER_ADDRESS] = host
+
     port = getattr(conn, "port", None)
     if port is not None:
         data[SPANDATA.SERVER_PORT] = port
+
     database = getattr(conn, "db", None)
     if database is not None:
-        data[SPANDATA.DB_NAME] = database
+        data[db_name] = database
+
     user = getattr(conn, "user", None)
     if user is not None:
         data[SPANDATA.DB_USER] = user
+
     return data
 
 
