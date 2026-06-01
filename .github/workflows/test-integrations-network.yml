@@ -59,6 +59,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-httpx"
+      - name: Test httpx2
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-httpx2"
       - name: Test pyreqwest
         run: |
           set -x # print commands that are executed
