@@ -1577,6 +1577,7 @@ def _make_sampling_decision(
         return False, 0.0, None, "sample_rate"
 
     # Adjust sample rate if we're under backpressure
+    sample_rate_before_backpressure = sample_rate
     if client.monitor:
         sample_rate /= 2**client.monitor.downsample_factor
 
@@ -1584,16 +1585,31 @@ def _make_sampling_decision(
             logger.debug(f"[Tracing] Discarding {name} because backpressure")
             return False, 0.0, None, "backpressure"
 
+    # Make the actual decision
     sampled = sample_rand < sample_rate
 
     if sampled:
         logger.debug(f"[Tracing] Starting {name}")
         outcome = None
+
     else:
-        logger.debug(
-            f"[Tracing] Discarding {name} because it's not included in the random sample (sampling rate = {sample_rate})"
-        )
-        outcome = "sample_rate"
+        # Determine why exactly the span will not be sampled. If we've lowered
+        # the effective sample_rate because of backpressure, check whether the
+        # span would've been sampled if backpressure wasn't active. If that's the
+        # case, backpressure is the actual reason, otherwise just pure sampling
+        # rate.
+        if (
+            sample_rate_before_backpressure != sample_rate
+            and sample_rand < sample_rate_before_backpressure
+        ):
+            logger.debug(f"[Tracing] Discarding {name} because backpressure")
+            outcome = "backpressure"
+
+        else:
+            logger.debug(
+                f"[Tracing] Discarding {name} because it's not included in the random sample (sampling rate = {sample_rate})"
+            )
+            outcome = "sample_rate"
 
     return sampled, sample_rate, sample_rand, outcome
 
