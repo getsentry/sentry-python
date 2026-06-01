@@ -33,9 +33,7 @@ def test_crumb_capture_and_hint(
         events = capture_events()
 
         if asyncio.iscoroutinefunction(httpx2_client.get):
-            response = asyncio.get_event_loop().run_until_complete(
-                httpx2_client.get(url)
-            )
+            response = asyncio.run(httpx2_client.get(url))
         else:
             response = httpx2_client.get(url)
 
@@ -87,9 +85,7 @@ def test_crumb_capture_client_error(
         events = capture_events()
 
         if asyncio.iscoroutinefunction(httpx2_client.get):
-            response = asyncio.get_event_loop().run_until_complete(
-                httpx2_client.get(url)
-            )
+            response = asyncio.run(httpx2_client.get(url))
         else:
             response = httpx2_client.get(url)
 
@@ -138,9 +134,7 @@ def test_outgoing_trace_headers_legacy(sentry_init, httpx2_client, httpx2_mock):
         trace_id="01234567890123456789012345678901",
     ) as transaction:
         if asyncio.iscoroutinefunction(httpx2_client.get):
-            response = asyncio.get_event_loop().run_until_complete(
-                httpx2_client.get(url)
-            )
+            response = asyncio.run(httpx2_client.get(url))
         else:
             response = httpx2_client.get(url)
 
@@ -181,7 +175,7 @@ def test_outgoing_trace_headers_append_to_baggage_legacy(
             trace_id="01234567890123456789012345678901",
         ) as transaction:
             if asyncio.iscoroutinefunction(httpx2_client.get):
-                response = asyncio.get_event_loop().run_until_complete(
+                response = asyncio.run(
                     httpx2_client.get(url, headers={"baGGage": "custom=data"})
                 )
             else:
@@ -334,7 +328,7 @@ def test_option_trace_propagation_targets(
     # Must be in a transaction to propagate headers
     with sentry_sdk.start_transaction():
         if asyncio.iscoroutinefunction(httpx2_client.get):
-            asyncio.get_event_loop().run_until_complete(httpx2_client.get(url))
+            asyncio.run(httpx2_client.get(url))
         else:
             httpx2_client.get(url)
 
@@ -419,7 +413,7 @@ def test_request_source_disabled_legacy(
 
     with start_transaction(name="test_transaction"):
         if asyncio.iscoroutinefunction(httpx2_client.get):
-            asyncio.get_event_loop().run_until_complete(httpx2_client.get(url))
+            asyncio.run(httpx2_client.get(url))
         else:
             httpx2_client.get(url)
 
@@ -465,7 +459,7 @@ def test_request_source_enabled_legacy(
 
     with start_transaction(name="test_transaction"):
         if asyncio.iscoroutinefunction(httpx2_client.get):
-            asyncio.get_event_loop().run_until_complete(httpx2_client.get(url))
+            asyncio.run(httpx2_client.get(url))
         else:
             httpx2_client.get(url)
 
@@ -502,7 +496,7 @@ def test_request_source_legacy(sentry_init, capture_events, httpx2_client, httpx
 
     with start_transaction(name="test_transaction"):
         if asyncio.iscoroutinefunction(httpx2_client.get):
-            asyncio.get_event_loop().run_until_complete(httpx2_client.get(url))
+            asyncio.run(httpx2_client.get(url))
         else:
             httpx2_client.get(url)
 
@@ -557,9 +551,7 @@ def test_request_source_with_module_in_search_path_legacy(
         if asyncio.iscoroutinefunction(httpx2_client.get):
             from httpx2_helpers.helpers import async_get_request_with_client
 
-            asyncio.get_event_loop().run_until_complete(
-                async_get_request_with_client(httpx2_client, url)
-            )
+            asyncio.run(async_get_request_with_client(httpx2_client, url))
         else:
             from httpx2_helpers.helpers import get_request_with_client
 
@@ -614,7 +606,7 @@ def test_no_request_source_if_duration_too_short_legacy(
 
     with start_transaction(name="test_transaction"):
         if asyncio.iscoroutinefunction(httpx2_client.get):
-            asyncio.get_event_loop().run_until_complete(httpx2_client.get(url))
+            asyncio.run(httpx2_client.get(url))
         else:
             httpx2_client.get(url)
 
@@ -654,7 +646,7 @@ def test_request_source_if_duration_over_threshold_legacy(
 
     with start_transaction(name="test_transaction"):
         if asyncio.iscoroutinefunction(httpx2_client.get):
-            asyncio.get_event_loop().run_until_complete(httpx2_client.get(url))
+            asyncio.run(httpx2_client.get(url))
         else:
             httpx2_client.get(url)
 
@@ -704,7 +696,7 @@ def test_span_origin_legacy(sentry_init, capture_events, httpx2_client, httpx2_m
 
     with start_transaction(name="test_transaction"):
         if asyncio.iscoroutinefunction(httpx2_client.get):
-            asyncio.get_event_loop().run_until_complete(httpx2_client.get(url))
+            asyncio.run(httpx2_client.get(url))
         else:
             httpx2_client.get(url)
 
@@ -742,7 +734,7 @@ def test_outgoing_trace_headers_span_streaming(
     items = capture_items("span")
 
     if asyncio.iscoroutinefunction(httpx2_client.get):
-        response = asyncio.get_event_loop().run_until_complete(httpx2_client.get(url))
+        response = asyncio.run(httpx2_client.get(url))
     else:
         response = httpx2_client.get(url)
 
@@ -784,7 +776,7 @@ def test_outgoing_trace_headers_append_to_baggage_span_streaming(
 
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=500000):
         if asyncio.iscoroutinefunction(httpx2_client.get):
-            response = asyncio.get_event_loop().run_until_complete(
+            response = asyncio.run(
                 httpx2_client.get(url, headers={"baGGage": "custom=data"})
             )
         else:
@@ -823,7 +815,7 @@ def test_request_source_disabled_span_streaming(
     url = "http://example.com/"
 
     if asyncio.iscoroutinefunction(httpx2_client.get):
-        asyncio.get_event_loop().run_until_complete(httpx2_client.get(url))
+        asyncio.run(httpx2_client.get(url))
     else:
         httpx2_client.get(url)
 
@@ -867,7 +859,7 @@ def test_request_source_enabled_span_streaming(
     url = "http://example.com/"
 
     if asyncio.iscoroutinefunction(httpx2_client.get):
-        asyncio.get_event_loop().run_until_complete(httpx2_client.get(url))
+        asyncio.run(httpx2_client.get(url))
     else:
         httpx2_client.get(url)
 
@@ -903,7 +895,7 @@ def test_request_source_span_streaming(
     url = "http://example.com/"
 
     if asyncio.iscoroutinefunction(httpx2_client.get):
-        asyncio.get_event_loop().run_until_complete(httpx2_client.get(url))
+        asyncio.run(httpx2_client.get(url))
     else:
         httpx2_client.get(url)
 
@@ -962,9 +954,7 @@ def test_request_source_with_module_in_search_path_span_streaming(
     if asyncio.iscoroutinefunction(httpx2_client.get):
         from httpx2_helpers.helpers import async_get_request_with_client
 
-        asyncio.get_event_loop().run_until_complete(
-            async_get_request_with_client(httpx2_client, url)
-        )
+        asyncio.run(async_get_request_with_client(httpx2_client, url))
     else:
         from httpx2_helpers.helpers import get_request_with_client
 
@@ -1021,7 +1011,7 @@ def test_no_request_source_if_duration_too_short_span_streaming(
     url = "http://example.com/"
 
     if asyncio.iscoroutinefunction(httpx2_client.get):
-        asyncio.get_event_loop().run_until_complete(httpx2_client.get(url))
+        asyncio.run(httpx2_client.get(url))
     else:
         httpx2_client.get(url)
 
@@ -1058,7 +1048,7 @@ def test_request_source_if_duration_over_threshold_span_streaming(
     url = "http://example.com/"
 
     if asyncio.iscoroutinefunction(httpx2_client.get):
-        asyncio.get_event_loop().run_until_complete(httpx2_client.get(url))
+        asyncio.run(httpx2_client.get(url))
     else:
         httpx2_client.get(url)
 
@@ -1110,7 +1100,7 @@ def test_span_origin_span_streaming(
     url = "http://example.com/"
 
     if asyncio.iscoroutinefunction(httpx2_client.get):
-        asyncio.get_event_loop().run_until_complete(httpx2_client.get(url))
+        asyncio.run(httpx2_client.get(url))
     else:
         httpx2_client.get(url)
 
@@ -1141,7 +1131,7 @@ def test_http_url_attributes_span_streaming(
     url = "http://example.com/?foo=bar#frag"
 
     if asyncio.iscoroutinefunction(httpx2_client.get):
-        asyncio.get_event_loop().run_until_complete(httpx2_client.get(url))
+        asyncio.run(httpx2_client.get(url))
     else:
         httpx2_client.get(url)
 
@@ -1176,7 +1166,7 @@ def test_http_url_attributes_no_query_or_fragment_span_streaming(
     url = "http://example.com/"
 
     if asyncio.iscoroutinefunction(httpx2_client.get):
-        asyncio.get_event_loop().run_until_complete(httpx2_client.get(url))
+        asyncio.run(httpx2_client.get(url))
     else:
         httpx2_client.get(url)
 
