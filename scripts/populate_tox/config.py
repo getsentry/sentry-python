@@ -366,6 +366,9 @@ TEST_SUITE_CONFIG = {
     },
     "ray": {
         "package": "ray",
+        "deps": {
+            "*": ["setuptools<82"],
+        },
         "python": {
             ">0.0,<2.52.0": ">=3.9",
             ">=2.52.0": ">=3.10",
