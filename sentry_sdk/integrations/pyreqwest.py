@@ -96,9 +96,9 @@ def _sentry_pyreqwest_span(request: "Request") -> "Generator[Any, None, None]":
             },
         ) as span:
             if parsed_url is not None:
-                span.set_attribute("url", parsed_url.url)
-                span.set_attribute(SPANDATA.HTTP_QUERY, parsed_url.query)
-                span.set_attribute(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+                span.set_attribute(SPANDATA.URL_FULL, parsed_url.url)
+                span.set_attribute(SPANDATA.URL_QUERY, parsed_url.query)
+                span.set_attribute(SPANDATA.URL_FRAGMENT, parsed_url.fragment)
 
             if should_propagate_trace(sentry_sdk.get_client(), str(request.url)):
                 for (
@@ -167,7 +167,7 @@ async def sentry_async_middleware(
         if isinstance(span, StreamedSpan):
             span.status = "error" if response.status >= 400 else "ok"
             span.set_attribute(
-                SPANDATA.HTTP_RESPONSE_STATUS_CODE,
+                SPANDATA.HTTP_STATUS_CODE,
                 response.status,
             )
         else:
@@ -187,7 +187,7 @@ def sentry_sync_middleware(
         if isinstance(span, StreamedSpan):
             span.status = "error" if response.status >= 400 else "ok"
             span.set_attribute(
-                SPANDATA.HTTP_RESPONSE_STATUS_CODE,
+                SPANDATA.HTTP_STATUS_CODE,
                 response.status,
             )
         else:

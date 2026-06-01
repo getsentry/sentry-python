@@ -88,11 +88,11 @@ def test_sync_client_spans(
         span = spans[0]
         assert span["attributes"]["sentry.op"] == "http.client"
         assert span["name"] == f"GET http://localhost:{server_port}/hello"
-        assert span["attributes"]["url"] == f"http://localhost:{server_port}/hello"
+        assert span["attributes"]["url.full"] == f"http://localhost:{server_port}/hello"
         assert span["attributes"][SPANDATA.HTTP_METHOD] == "GET"
         assert span["attributes"][SPANDATA.HTTP_STATUS_CODE] == 200
-        assert span["attributes"][SPANDATA.HTTP_QUERY] == "q=test"
-        assert span["attributes"][SPANDATA.HTTP_FRAGMENT] == "frag"
+        assert span["attributes"][SPANDATA.URL_QUERY] == "q=test"
+        assert span["attributes"][SPANDATA.URL_FRAGMENT] == "frag"
         assert span["attributes"]["sentry.origin"] == "auto.http.pyreqwest"
     else:
         events = capture_events()
@@ -145,7 +145,7 @@ async def test_async_client_spans(
         span = spans[0]
         assert span["attributes"]["sentry.op"] == "http.client"
         assert span["name"] == f"GET {url}"
-        assert span["attributes"]["url"] == url
+        assert span["attributes"]["url.full"] == url
         assert span["attributes"][SPANDATA.HTTP_METHOD] == "GET"
         assert span["attributes"][SPANDATA.HTTP_STATUS_CODE] == 200
         assert span["attributes"]["sentry.origin"] == "auto.http.pyreqwest"
@@ -196,7 +196,7 @@ def test_sync_simple_request_spans(
         span = spans[0]
         assert span["attributes"]["sentry.op"] == "http.client"
         assert span["name"] == f"GET {url}"
-        assert span["attributes"]["url"] == url
+        assert span["attributes"]["url.full"] == url
         assert span["attributes"][SPANDATA.HTTP_METHOD] == "GET"
         assert span["attributes"][SPANDATA.HTTP_STATUS_CODE] == 200
         assert span["attributes"]["sentry.origin"] == "auto.http.pyreqwest"
@@ -247,7 +247,7 @@ async def test_async_simple_request_spans(
         span = spans[0]
         assert span["attributes"]["sentry.op"] == "http.client"
         assert span["name"] == f"GET {url}"
-        assert span["attributes"]["url"] == url
+        assert span["attributes"]["url.full"] == url
         assert span["attributes"][SPANDATA.HTTP_METHOD] == "GET"
         assert span["attributes"][SPANDATA.HTTP_STATUS_CODE] == 200
         assert span["attributes"]["sentry.origin"] == "auto.http.pyreqwest"
@@ -510,8 +510,8 @@ def test_omit_url_data_if_parsing_fails(
         assert span["attributes"][SPANDATA.HTTP_METHOD] == "GET"
         assert span["attributes"][SPANDATA.HTTP_STATUS_CODE] == 200
         assert "url" not in span["attributes"]
-        assert SPANDATA.HTTP_QUERY not in span["attributes"]
-        assert SPANDATA.HTTP_FRAGMENT not in span["attributes"]
+        assert SPANDATA.URL_QUERY not in span["attributes"]
+        assert SPANDATA.URL_FRAGMENT not in span["attributes"]
     else:
         events = capture_events()
 
@@ -530,8 +530,8 @@ def test_omit_url_data_if_parsing_fails(
         assert span["data"][SPANDATA.HTTP_METHOD] == "GET"
         assert span["data"][SPANDATA.HTTP_STATUS_CODE] == 200
         assert "url" not in span["data"]
-        assert SPANDATA.HTTP_QUERY not in span["data"]
-        assert SPANDATA.HTTP_FRAGMENT not in span["data"]
+        assert SPANDATA.URL_QUERY not in span["data"]
+        assert SPANDATA.URL_FRAGMENT not in span["data"]
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
