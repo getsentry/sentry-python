@@ -202,6 +202,12 @@ TEST_SUITE_CONFIG = {
             ">=0.28": ">=3.9",
         },
     },
+    "httpx2": {
+        "package": "httpx2",
+        "deps": {
+            "*": ["anyio>=3,<5"],
+        },
+    },
     "huey": {
         "package": "huey",
         "num_versions": 2,
