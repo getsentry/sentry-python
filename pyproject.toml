@@ -44,7 +44,7 @@ typing = [
     "mypy",
     # =================
     # TODO: remove redundant urllib3 and certifi after proper migration from setup.py
-    "urllib3>=1.26.11",
+    "urllib3>=1.26.20",
     "certifi",
     # =================
     "types-protobuf",
