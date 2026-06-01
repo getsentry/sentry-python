@@ -85,8 +85,8 @@ def _sentry_pyreqwest_span(request: "Request") -> "Generator[Any, None, None]":
     with capture_internal_exceptions():
         parsed_url = parse_url(str(request.url), sanitize=False)
 
-    client = sentry_sdk.get_client()
-    if has_span_streaming_enabled(client.options):
+    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+    if span_streaming:
         with sentry_sdk.traces.start_span(
             name=f"{request.method} {parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE}",
             attributes={
