@@ -509,7 +509,7 @@ def test_omit_url_data_if_parsing_fails(
         assert span["name"] == "GET [Filtered]"
         assert span["attributes"][SPANDATA.HTTP_METHOD] == "GET"
         assert span["attributes"][SPANDATA.HTTP_STATUS_CODE] == 200
-        assert "url" not in span["attributes"]
+        assert "url.full" not in span["attributes"]
         assert SPANDATA.URL_QUERY not in span["attributes"]
         assert SPANDATA.URL_FRAGMENT not in span["attributes"]
     else:
