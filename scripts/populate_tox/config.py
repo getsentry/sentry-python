@@ -393,7 +393,11 @@ TEST_SUITE_CONFIG = {
             # https://github.com/jamesls/fakeredis/issues/245
             # https://github.com/cunla/fakeredis-py/issues/341
             "*": ["fakeredis"],
-            ">=2.8,<2.9": ["fakeredis<2.36.0"],
+            # RQ commit https://github.com/rq/rq/commit/64cb1a27b9d1f2fd52bbbb5c1e4518c024f74685
+            # introduced unguarded access to "addr" from the CLIENT LIST command.
+            # The default "addr" value was removed in https://github.com/cunla/fakeredis-py/commit/0441288fb22c8c191fc716b561e0001cf512abe5.
+            # from fakeredis.
+            ">=1.1.14": ["fakeredis<2.36.0"],
             "<0.9": ["fakeredis<1.0", "redis<3.2.2"],
             ">=0.9,<0.14": ["fakeredis>=1.0,<1.7.4"],
             "py3.6,py3.7": ["fakeredis!=2.26.0"],
