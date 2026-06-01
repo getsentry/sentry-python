@@ -138,6 +138,7 @@ _MIN_VERSIONS = {
     "google_genai": (1, 29, 0),  # google-genai
     "grpc": (1, 32, 0),  # grpcio
     "httpx": (0, 16, 0),
+    "httpx2": (2, 0, 0),
     "huggingface_hub": (0, 24, 7),
     "langchain": (0, 1, 0),
     "langgraph": (0, 6, 6),
