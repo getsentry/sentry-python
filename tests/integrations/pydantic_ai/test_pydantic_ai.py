@@ -57,7 +57,7 @@ def get_test_agent_with_settings():
 
 @pytest.fixture
 def sync_event_loop():
-    # Pydantic AI creates an event loop and doesn't close it in synchronous methods.
+    # Pydantic AI creates an event loop if there is none and doesn't close it in synchronous methods.
     # Run with "-X tracemalloc=25 -W default::ResourceWarning" to reproduce.
     # https://github.com/pydantic/pydantic-ai/commit/a58dd47f9cd6494665e47bf7cf71fccbfce2c0dd
     loop = asyncio.new_event_loop()
