@@ -37,6 +37,8 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["async-timeout", "pytest-asyncio", "fakeredis"],
             "<=0.23": ["pydantic<2"],
+            # https://github.com/cunla/fakeredis-py/issues/490
+            "py3.6,py3.7,py3.8": ["fakeredis<2.36.0"],
         },
         "num_versions": 2,
     },
