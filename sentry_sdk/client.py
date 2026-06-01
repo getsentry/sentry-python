@@ -507,6 +507,14 @@ class _Client(BaseClient):
         for function in functions_to_trace:
             class_name = None
             function_qualname = function["qualified_name"]
+
+            if "." not in function_qualname:
+                logger.warning(
+                    "Can not enable tracing for '%s'. Please provide the fully qualified name including the module (e.g. 'mymodule.my_function').",
+                    function_qualname,
+                )
+                continue
+
             module_name, function_name = function_qualname.rsplit(".", 1)
 
             try:

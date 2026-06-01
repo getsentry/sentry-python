@@ -1090,6 +1090,14 @@ def test_classmethod_instance_tracing(sentry_init, capture_events):
     assert span["description"] == "tests.test_basics.TracingTestClass.class_"
 
 
+def test_functions_to_trace_no_dot_does_not_crash(sentry_init):
+    # A qualified_name with no dot should not raise ValueError during sentry_sdk.init()
+    sentry_init(
+        traces_sample_rate=1.0,
+        functions_to_trace=[{"qualified_name": "my_function"}],
+    )
+
+
 def test_last_event_id(sentry_init):
     sentry_init(traces_sample_rate=1.0)
 
