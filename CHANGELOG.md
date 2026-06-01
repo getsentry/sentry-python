@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.61.1
+
+### New Features ✨
+
+- (litellm) Support span streaming by @alexander-alderman-webb in [#6317](https://github.com/getsentry/sentry-python/pull/6317)
+- (rust-tracing) Support span streaming by @alexander-alderman-webb in [#6433](https://github.com/getsentry/sentry-python/pull/6433)
+
+### Internal Changes 🔧
+
+#### Rq
+
+- Pin `fakeredis<2.36.0` in tests by @alexander-alderman-webb in [#6454](https://github.com/getsentry/sentry-python/pull/6454)
+- Unpin `redis` and `fakeredis` for tests by @alexander-alderman-webb in [#6443](https://github.com/getsentry/sentry-python/pull/6443)
+
+#### Other
+
+- (aiohttp) Unfurl spans explicitly instead of using pop() by @sentrivana in [#6435](https://github.com/getsentry/sentry-python/pull/6435)
+- (tox) Migrate from pip to uv via tox-uv by @sentry-junior in [#6390](https://github.com/getsentry/sentry-python/pull/6390)
+- Pin redis<8 for rq by @sl0thentr0py in [#6438](https://github.com/getsentry/sentry-python/pull/6438)
+
 ## 2.61.0
 
 ### New Features ✨
