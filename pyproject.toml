@@ -16,7 +16,7 @@ dev = [
 
 toxgen = [
     "jinja2",
-    "packaging<26.0",
+    "packaging<27.0",
     "pip",
     "requests",
 ]
