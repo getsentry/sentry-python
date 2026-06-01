@@ -20,10 +20,6 @@ permissions:
   actions: read
   pull-requests: write
   statuses: write
-env:
-  BUILD_CACHE_KEY: ${{ github.sha }}
-  CACHED_BUILD_PATHS: |
-    ${{ github.workspace }}/dist-serverless
 jobs:
   test-gevent:
     name: Gevent
@@ -33,44 +29,40 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.6","3.8","3.10","3.11","3.12"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-22.04]
-    # Use Docker container only for Python 3.6
-    container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
+    env:
+      # 3.6/3.7 run in the python:X.Y container; tell uv to use that system Python.
+      TOX_UV_PYTHON_PREFERENCE: ${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'only-system' || 'managed' }}
+    container: ${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && format('python:{0}', matrix.python-version) || null }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
-        if: ${{ matrix.python-version != '3.6' }}
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
-          python-version: ${{ matrix.python-version }}
-          allow-prereleases: true
+          cache-suffix: ${{ github.workflow }}-${{ matrix.python-version }}
+      - name: Mark workspace safe for git (3.6/3.7 container)
+        # needed to make git rev-parse work in the containers
+        # subprocesses (e.g. sentry_sdk.utils.get_git_revision) can run git.
+        if: ${{ matrix.python-version == '3.6' || matrix.python-version == '3.7' }}
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Setup Test Env
         run: |
-          pip install "coverage[toml]" tox
+          uv sync
       - name: Erase coverage
         run: |
-          coverage erase
+          uv run coverage erase
       - name: Test gevent
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-gevent"
-      - name: Generate coverage XML (Python 3.6)
-        if: ${{ !cancelled() && matrix.python-version == '3.6' }}
-        run: |
-          export COVERAGE_RCFILE=.coveragerc36
-          coverage combine .coverage-sentry-*
-          coverage xml --ignore-errors
       - name: Generate coverage XML
-        if: ${{ !cancelled() && matrix.python-version != '3.6' }}
+        if: ${{ !cancelled() }}
         run: |
-          coverage combine .coverage-sentry-*
-          coverage xml
+          uv run coverage combine .coverage-sentry-*
+          uv run coverage xml
       - name: Parse and Upload Coverage
         if: ${{ !cancelled() }}
-        uses: getsentry/codecov-action@fda17cfc37e16a0cc23f61685813390bfee7daf3 # main
+        uses: getsentry/codecov-action@d90e69cdf071dfbb0430159125321dc09c424d4c # main
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           files: coverage.xml

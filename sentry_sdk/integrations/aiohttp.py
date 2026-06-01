@@ -42,6 +42,7 @@ from sentry_sdk.utils import (
     HAS_REAL_CONTEXTVARS,
     SENSITIVE_DATA_SUBSTITUTE,
     AnnotatedValue,
+    _register_control_flow_exception,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
@@ -111,6 +112,12 @@ class AioHttpIntegration(Integration):
                 " or aiocontextvars package." + CONTEXTVARS_ERROR_MESSAGE
             )
 
+        # In the aiohttp integration, all of their HTTP responses are Exceptions.
+        # Because they have to be raised and handled by the framework, we need to
+        # register the exceptions as control flow exceptions so that we don't
+        # accidentally overwrite a status of "ok" with "error".
+        _register_control_flow_exception(HTTPException)
+
         ignore_logger("aiohttp.server")
 
         old_handle = Application._handle
@@ -158,14 +165,12 @@ class AioHttpIntegration(Integration):
                             else {}
                         )
 
-                        client_address_attributes = (
-                            {
-                                "client.address": request.remote,
-                                "user.ip_address": request.remote,
-                            }
-                            if should_send_default_pii() and request.remote
-                            else {}
-                        )
+                        client_address_attributes = {}
+                        if should_send_default_pii() and request.remote:
+                            client_address_attributes["client.address"] = request.remote
+                            scope.set_attribute(
+                                SPANDATA.USER_IP_ADDRESS, request.remote
+                            )
 
                         span_ctx = sentry_sdk.traces.start_span(
                             # If this name makes it to the UI, AIOHTTP's URL

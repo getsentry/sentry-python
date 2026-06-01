@@ -917,6 +917,12 @@ class SPANDATA:
     Example: 12345
     """
 
+    PROCESS_COMMAND_ARGS = "process.command_args"
+    """
+    All the command arguments (including the command/executable itself) as received by the process.
+    Example: ["cmd/otecol","--config=config.yaml"]
+    """
+
     PROFILER_ID = "profiler_id"
     """
     Label identifying the profiler id that the span occurred in. This should be a string.
@@ -1078,6 +1084,48 @@ class SPANDATA:
     """
     The session identifier for the MCP connection.
     Example: "a1b2c3d4e5f6"
+    """
+
+    SENTRY_DIST = "sentry.dist"
+    """
+    The Sentry dist.
+    Example: "1.0"
+    """
+
+    SENTRY_ENVIRONMENT = "sentry.environment"
+    """
+    The Sentry environment.
+    Example: "prod"
+    """
+
+    SENTRY_RELEASE = "sentry.release"
+    """
+    The Sentry release.
+    Example: "1.2.3"
+    """
+
+    SENTRY_PLATFORM = "sentry.platform"
+    """
+    The sdk platform that generated the event.
+    Example: "python"
+    """
+
+    SENTRY_SDK_NAME = "sentry.sdk.name"
+    """
+    The name of the SDK.
+    Example: "python"
+    """
+
+    SENTRY_SDK_VERSION = "sentry.sdk.version"
+    """
+    The SDK version.
+    Example: "1.2.3"
+    """
+
+    SENTRY_SDK_INTEGRATIONS = "sentry.sdk.integrations"
+    """
+    A list of names identifying enabled integrations.
+    Example: ["AtexitIntegration", "StdlibIntegration"]
     """
 
 
@@ -1697,4 +1745,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.60.0"
+VERSION = "2.61.1"

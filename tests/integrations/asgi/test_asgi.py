@@ -1002,3 +1002,59 @@ async def test_custom_transaction_name(
         assert transaction_event["type"] == "transaction"
         assert transaction_event["transaction"] == "foobar"
         assert transaction_event["transaction_info"] == {"source": "custom"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("send_default_pii", [True, False])
+async def test_user_ip_address_on_all_spans(
+    sentry_init,
+    capture_items,
+    send_default_pii,
+):
+    async def app(scope, receive, send):
+        if scope["type"] == "lifespan":
+            while True:
+                message = await receive()
+                if message["type"] == "lifespan.startup":
+                    await send({"type": "lifespan.startup.complete"})
+                elif message["type"] == "lifespan.shutdown":
+                    await send({"type": "lifespan.shutdown.complete"})
+                    return
+
+        with sentry_sdk.traces.start_span(name="child-span"):
+            pass
+
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 200,
+                "headers": [[b"content-type", b"text/plain"]],
+            }
+        )
+        await send({"type": "http.response.body", "body": b"Hello, world!"})
+
+    sentry_init(
+        send_default_pii=send_default_pii,
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+    sentry_app = SentryAsgiMiddleware(app)
+
+    async def wrapped_app(scope, receive, send):
+        scope["client"] = ("127.0.0.1", 0)
+        await sentry_app(scope, receive, send)
+
+    async with TestClient(wrapped_app) as client:
+        items = capture_items("span")
+        await client.get("/some_url")
+
+    sentry_sdk.flush()
+
+    child_span, server_span = [item.payload for item in items]
+
+    if send_default_pii:
+        assert server_span["attributes"]["user.ip_address"] == "127.0.0.1"
+        assert child_span["attributes"]["user.ip_address"] == "127.0.0.1"
+    else:
+        assert "user.ip_address" not in server_span["attributes"]
+        assert "user.ip_address" not in child_span["attributes"]

@@ -34,7 +34,7 @@ TEST_SUITE_CONFIG = {
     "ariadne": {
         "package": "ariadne",
         "deps": {
-            "*": ["fastapi", "flask", "httpx"],
+            "*": ["fastapi", "flask", "httpx<0.28.0"],
         },
         "python": ">=3.8",
         "num_versions": 2,
@@ -42,8 +42,10 @@ TEST_SUITE_CONFIG = {
     "arq": {
         "package": "arq",
         "deps": {
-            "*": ["async-timeout", "pytest-asyncio", "fakeredis>=2.2.0,<2.8"],
+            "*": ["async-timeout", "pytest-asyncio", "fakeredis"],
             "<=0.23": ["pydantic<2"],
+            # https://github.com/cunla/fakeredis-py/issues/490
+            "py3.6,py3.7,py3.8": ["fakeredis<2.36.0"],
         },
         "num_versions": 2,
     },
@@ -60,6 +62,7 @@ TEST_SUITE_CONFIG = {
         "num_versions": 2,
         "deps": {
             "*": ["dill"],
+            ">=2.73": ["betterproto==2.0.0b6"],
         },
     },
     "boto3": {
@@ -78,6 +81,7 @@ TEST_SUITE_CONFIG = {
         "package": "celery",
         "deps": {
             "*": ["newrelic<10.17.0", "redis"],
+            "py3.6": ["newrelic<8"],
             "py3.7": ["importlib-metadata<5.0"],
         },
     },
@@ -150,8 +154,14 @@ TEST_SUITE_CONFIG = {
     "flask": {
         "package": "flask",
         "deps": {
-            "*": ["flask-login", "werkzeug"],
-            "<2.0": ["werkzeug<2.1.0", "markupsafe<2.1.0"],
+            "*": ["flask-login", "werkzeug", "blinker"],
+            # https://github.com/pallets/flask/issues/4455
+            "<2.0": [
+                "werkzeug<2.1.0",
+                "markupsafe<2.0.0",
+                "itsdangerous>=0.24,<2.0",
+                "jinja2<3.1.1",
+            ],
         },
     },
     "gql": {
@@ -320,6 +330,7 @@ TEST_SUITE_CONFIG = {
         "package": "pydantic-ai",
         "deps": {
             "*": ["pytest-asyncio"],
+            "==2.0.0b3": ["pydantic<2.14"],
         },
         "python": ">=3.10",
     },
@@ -390,7 +401,12 @@ TEST_SUITE_CONFIG = {
         "deps": {
             # https://github.com/jamesls/fakeredis/issues/245
             # https://github.com/cunla/fakeredis-py/issues/341
-            "*": ["fakeredis<2.28.0"],
+            "*": ["fakeredis"],
+            # RQ commit https://github.com/rq/rq/commit/64cb1a27b9d1f2fd52bbbb5c1e4518c024f74685
+            # introduced unguarded access to "addr" from the CLIENT LIST command.
+            # The default "addr" value was removed in https://github.com/cunla/fakeredis-py/commit/0441288fb22c8c191fc716b561e0001cf512abe5.
+            # from fakeredis.
+            ">=1.1.14": ["fakeredis<2.36.0"],
             "<0.9": ["fakeredis<1.0", "redis<3.2.2"],
             ">=0.9,<0.14": ["fakeredis>=1.0,<1.7.4"],
             "py3.6,py3.7": ["fakeredis!=2.26.0"],

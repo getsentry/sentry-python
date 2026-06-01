@@ -6,11 +6,14 @@ from urllib.parse import urlsplit
 
 import sentry_sdk
 from sentry_sdk import continue_trace
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
 from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import SegmentSource, StreamedSpan
 from sentry_sdk.tracing import TransactionSource
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     CONTEXTVARS_ERROR_MESSAGE,
     HAS_REAL_CONTEXTVARS,
@@ -165,23 +168,46 @@ async def _context_enter(request: "Request") -> None:
     if not request.ctx._sentry_do_integration:
         return
 
+    client = sentry_sdk.get_client()
+    is_span_streaming_enabled = has_span_streaming_enabled(client.options)
+
     weak_request = weakref.ref(request)
     request.ctx._sentry_scope = sentry_sdk.isolation_scope()
     scope = request.ctx._sentry_scope.__enter__()
     scope.clear_breadcrumbs()
     scope.add_event_processor(_make_request_processor(weak_request))
 
-    transaction = continue_trace(
-        dict(request.headers),
-        op=OP.HTTP_SERVER,
-        # Unless the request results in a 404 error, the name and source will get overwritten in _set_transaction
-        name=request.path,
-        source=TransactionSource.URL,
-        origin=SanicIntegration.origin,
-    )
-    request.ctx._sentry_transaction = sentry_sdk.start_transaction(
-        transaction
-    ).__enter__()
+    if is_span_streaming_enabled:
+        sentry_sdk.traces.continue_trace(dict(request.headers))
+        scope.set_custom_sampling_context({"sanic_request": request})
+
+        if should_send_default_pii() and request.remote_addr:
+            scope.set_attribute(SPANDATA.USER_IP_ADDRESS, request.remote_addr)
+
+        span = sentry_sdk.traces.start_span(
+            # Unless the request results in a 404 error, the name and source
+            # will get overwritten in _set_transaction
+            name=request.path,
+            attributes={
+                "sentry.op": OP.HTTP_SERVER,
+                "sentry.origin": SanicIntegration.origin,
+                "sentry.span.source": SegmentSource.URL.value,
+            },
+            parent_span=None,
+        )
+        request.ctx._sentry_root_span = span
+    else:
+        transaction = continue_trace(
+            dict(request.headers),
+            op=OP.HTTP_SERVER,
+            # Unless the request results in a 404 error, the name and source will get overwritten in _set_transaction
+            name=request.path,
+            source=TransactionSource.URL,
+            origin=SanicIntegration.origin,
+        )
+        request.ctx._sentry_root_span = sentry_sdk.start_transaction(
+            transaction
+        ).__enter__()
 
 
 async def _context_exit(
@@ -198,12 +224,24 @@ async def _context_exit(
         # This capture_internal_exceptions block has been intentionally nested here, so that in case an exception
         # happens while trying to end the transaction, we still attempt to exit the hub.
         with capture_internal_exceptions():
-            request.ctx._sentry_transaction.set_http_status(response_status)
-            request.ctx._sentry_transaction.sampled &= (
-                isinstance(integration, SanicIntegration)
-                and response_status not in integration._unsampled_statuses
-            )
-            request.ctx._sentry_transaction.__exit__(None, None, None)
+            span = request.ctx._sentry_root_span
+            if isinstance(span, StreamedSpan):
+                with capture_internal_exceptions():
+                    for attr, value in _get_request_attributes(request).items():
+                        span.set_attribute(attr, value)
+                if response_status is not None:
+                    span.set_attribute(SPANDATA.HTTP_STATUS_CODE, response_status)
+                    span.status = "error" if response_status >= 400 else "ok"
+
+                span.end()
+            else:
+                span.set_http_status(response_status)
+                span.sampled &= (
+                    isinstance(integration, SanicIntegration)
+                    and response_status not in integration._unsampled_statuses
+                )
+
+                span.__exit__(None, None, None)
 
         request.ctx._sentry_scope.__exit__(None, None, None)
 
@@ -313,6 +351,35 @@ def _capture_exception(exception: "Union[ExcInfo, BaseException]") -> None:
             return
 
         sentry_sdk.capture_event(event, hint=hint)
+
+
+def _get_request_attributes(request: "Request") -> "Dict[str, Any]":
+    """
+    Return span attributes related to the HTTP request from a Sanic request.
+    """
+    attributes = {}  # type: Dict[str, Any]
+
+    if request.method:
+        attributes[SPANDATA.HTTP_REQUEST_METHOD] = request.method.upper()
+
+    headers = _filter_headers(dict(request.headers), use_annotated_value=False)
+    for header, value in headers.items():
+        attributes[f"{SPANDATA.HTTP_REQUEST_HEADER}.{header.lower()}"] = value
+
+    urlparts = urlsplit(request.url)
+
+    if urlparts.query:
+        attributes[SPANDATA.HTTP_QUERY] = urlparts.query
+
+    attributes[SPANDATA.URL_FULL] = request.url
+
+    if urlparts.scheme:
+        attributes[SPANDATA.NETWORK_PROTOCOL_NAME] = urlparts.scheme
+
+    if should_send_default_pii() and request.remote_addr:
+        attributes[SPANDATA.CLIENT_ADDRESS] = request.remote_addr
+
+    return attributes
 
 
 def _make_request_processor(weak_request: "Callable[[], Request]") -> "EventProcessor":
