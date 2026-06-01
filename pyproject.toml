@@ -25,7 +25,7 @@ docs = [
     "gevent",
     "shibuya",
     "sphinx<8.2",
-    "sphinx-autodoc-typehints[type_comments]>=2.3.0",
+    "sphinx-autodoc-typehints[type_comments]>=3.10.4",
     "typing-extensions",
 ]
 
