@@ -28,8 +28,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
-          cache-suffix: network-${{ matrix.python-version }}
-          enable-cache: ${{ matrix.python-version != '3.6' && matrix.python-version != '3.7' }}
+          enable-cache: false
       - name: Mark workspace safe for git (3.6/3.7 container)
         # needed to make git rev-parse work in the containers
         # subprocesses (e.g. sentry_sdk.utils.get_git_revision) can run git.

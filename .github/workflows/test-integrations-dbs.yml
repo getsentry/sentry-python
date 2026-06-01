@@ -45,8 +45,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
-          cache-suffix: dbs-${{ matrix.python-version }}
-          enable-cache: ${{ matrix.python-version != '3.6' && matrix.python-version != '3.7' }}
+          enable-cache: false
       - name: "Setup ClickHouse Server"
         uses: getsentry/action-clickhouse-in-ci@5dc8a6a50d689bd6051db0241f34849e5a36490b # v1.7
       - name: Mark workspace safe for git (3.6/3.7 container)
