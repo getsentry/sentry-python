@@ -102,7 +102,7 @@ def _wrap_func(func: "F") -> "F":
 
             if should_send_default_pii() and hasattr(gcp_event, "query_string"):
                 additional_attributes["url.query"] = gcp_event.query_string.decode(
-                    "utf-8"
+                    "utf-8", errors="replace"
                 )
 
             sampling_context = {
@@ -221,7 +221,9 @@ def _make_request_event_processor(
             request["method"] = gcp_event.method
 
         if hasattr(gcp_event, "query_string"):
-            request["query_string"] = gcp_event.query_string.decode("utf-8")
+            request["query_string"] = gcp_event.query_string.decode(
+                "utf-8", errors="replace"
+            )
 
         if hasattr(gcp_event, "headers"):
             request["headers"] = _filter_headers(gcp_event.headers)
