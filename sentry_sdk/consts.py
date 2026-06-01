@@ -844,6 +844,12 @@ class SPANDATA:
     Example: "[{\"role\": \"user\", \"message\": \"hello\"}]"
     """
 
+    HTTP_RESPONSE_STATUS_CODE = "http.response.status_code"
+    """
+    The status code of the HTTP response.
+    Example: 404
+    """
+
     HTTP_QUERY = "http.query"
     """
     The Query string present in the URL.
