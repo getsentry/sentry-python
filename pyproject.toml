@@ -24,7 +24,7 @@ toxgen = [
 docs = [
     "gevent",
     "shibuya",
-    "sphinx<8.2",
+    "sphinx<9.2",
     "sphinx-autodoc-typehints[type_comments]>=2.3.0",
     "typing-extensions",
 ]
