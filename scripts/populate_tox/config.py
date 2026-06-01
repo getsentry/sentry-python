@@ -354,6 +354,8 @@ TEST_SUITE_CONFIG = {
         "package": "pyramid",
         "deps": {
             "*": ["werkzeug<2.1.0"],
+            # Pinned by library in https://github.com/Pylons/pyramid/commit/e239cb693b06e8d01c02dacd2a7b93e5d0a4d5ae
+            "<2.1": ["setuptools<82"],
         },
     },
     "quart": {
@@ -373,6 +375,10 @@ TEST_SUITE_CONFIG = {
     },
     "ray": {
         "package": "ray",
+        "deps": {
+            # Required for pkg_resources import prior to https://github.com/ray-project/ray/commit/7e9043c38d76412c310fcf6e3fff79cb55d481da
+            "<2.10": ["setuptools<82"],
+        },
         "python": {
             ">0.0,<2.52.0": ">=3.9",
             ">=2.52.0": ">=3.10",
