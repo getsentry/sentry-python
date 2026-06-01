@@ -92,7 +92,7 @@ def _sentry_pyreqwest_span(request: "Request") -> "Generator[Any, None, None]":
             attributes={
                 "sentry.op": OP.HTTP_CLIENT,
                 "sentry.origin": PyreqwestIntegration.origin,
-                SPANDATA.HTTP_METHOD: request.method,
+                SPANDATA.HTTP_REQUEST_METHOD: request.method,
             },
         ) as span:
             if parsed_url is not None:
