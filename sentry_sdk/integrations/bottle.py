@@ -10,7 +10,9 @@ from sentry_sdk.integrations import (
 )
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+from sentry_sdk.traces import SegmentSource
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -100,7 +102,38 @@ class BottleIntegration(Integration):
             scope.add_event_processor(
                 _make_request_event_processor(self, bottle_request, integration)
             )
-            res = old_handle(self, environ)
+
+            if has_span_streaming_enabled(sentry_sdk.get_client().options):
+                # Using SegmentSource.COMPONENT as the default since this is the also value for "handler_name"
+                # within SOURCE_FOR_STYLE.
+                # See https://github.com/getsentry/sentry-python/blob/c3aab3932f5a7e89ad3aff551a206db710acf0e6/sentry_sdk/tracing.py#L151-L161
+                with sentry_sdk.traces.start_span(
+                    name="bottle",
+                    attributes={"sentry.span.source": SegmentSource.COMPONENT},
+                ) as span:
+                    res = old_handle(self, environ)
+
+                    try:
+                        if integration.transaction_style == "url":
+                            span.name = bottle_request.route.rule or "bottle"
+                            span.set_attribute("sentry.span.source", SegmentSource.URL)
+                        elif integration.transaction_style == "endpoint":
+                            name = (
+                                bottle_request.route.name
+                                or transaction_from_function(
+                                    bottle_request.route.callback
+                                )
+                                or "bottle"
+                            )
+                            span.name = name
+                            span.set_attribute(
+                                "sentry.span.source", SegmentSource.COMPONENT
+                            )
+                    except RuntimeError:
+                        pass
+
+            else:
+                res = old_handle(self, environ)
 
             return res
 
@@ -119,17 +152,33 @@ class BottleIntegration(Integration):
                 return prepared_callback
 
             def wrapped_callback(*args: object, **kwargs: object) -> "Any":
-                try:
-                    res = prepared_callback(*args, **kwargs)
-                except Exception as exception:
-                    _capture_exception(exception, handled=False)
-                    raise exception
+                if has_span_streaming_enabled(sentry_sdk.get_client().options):
+                    with sentry_sdk.traces.start_span(name="bottle"):
+                        try:
+                            res = prepared_callback(*args, **kwargs)
+                        except Exception as exception:
+                            _capture_exception(exception, handled=False)
+                            raise exception
 
-                if (
-                    isinstance(res, HTTPResponse)
-                    and res.status_code in integration.failed_request_status_codes
-                ):
-                    _capture_exception(res, handled=True)
+                        if (
+                            isinstance(res, HTTPResponse)
+                            and res.status_code
+                            in integration.failed_request_status_codes
+                        ):
+                            _capture_exception(res, handled=True)
+
+                else:
+                    try:
+                        res = prepared_callback(*args, **kwargs)
+                    except Exception as exception:
+                        _capture_exception(exception, handled=False)
+                        raise exception
+
+                    if (
+                        isinstance(res, HTTPResponse)
+                        and res.status_code in integration.failed_request_status_codes
+                    ):
+                        _capture_exception(res, handled=True)
 
                 return res
 
