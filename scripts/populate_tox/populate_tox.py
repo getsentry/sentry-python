@@ -886,6 +886,27 @@ def write_tox_file(packages: dict) -> None:
                     latest_stable = rel
                     break
 
+            transitive_dependencies = []
+            if latest_stable:
+                transitive_dependencies.append(
+                    _render_latest_dependencies(integration["name"], latest_stable)
+                )
+                for python_version in latest_stable.python_versions:
+                    if python_version < ThreadedVersion("3.8"):
+                        continue
+
+                    try:
+                        dependencies = _render_transitive_dependencies(
+                            integration["name"],
+                            integration["package"],
+                            latest_stable,
+                            python_version,
+                            display_version="latest",
+                        )
+                    except DryRunFailed:
+                        continue
+                    transitive_dependencies.append(dependencies)
+
             context["groups"][group].append(
                 {
                     "name": integration["name"],
@@ -901,6 +922,7 @@ def write_tox_file(packages: dict) -> None:
                     )
                     if latest_stable
                     else [],
+                    "latest_transitive_dependencies": transitive_dependencies,
                     "prerelease_setenv": _render_prerelease_setenv(
                         integration["name"], integration["releases"]
                     ),
@@ -954,7 +976,11 @@ def _render_transitive_dependencies(
     package: str,
     release: Version,
     python_version: ThreadedVersion,
+    display_version: Optional[str] = None,
 ) -> list[str]:
+    if display_version is None:
+        display_version = f"v{release}"
+
     deps = []
     for dependency in fetch_package_dependencies(
         integration,
@@ -966,7 +992,9 @@ def _render_transitive_dependencies(
         version = dependency["metadata"]["version"]
         if _normalize_name(name) == _normalize_name(package):
             continue
-        deps.append(f"py{python_version}-{integration}-v{release}: {name}=={version}")
+        deps.append(
+            f"py{python_version}-{integration}-{display_version}: {name}=={version}"
+        )
     return deps
 
 

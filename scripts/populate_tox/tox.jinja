@@ -155,6 +155,13 @@ deps =
     {% else %}
     {{ integration.name }}-latest: {{ integration.package }}=={{ integration.latest_stable }}
     {% endif %}
+
+    {% for dependency_group in integration.latest_transitive_dependencies if dependency_group %}
+    {% for dep in dependency_group %}
+    {{ dep }}
+    {% endfor %}
+
+    {% endfor %}
     {% endif %}
     {% for dep in integration.dependencies %}
     {{ dep }}
