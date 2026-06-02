@@ -3,23 +3,12 @@
 # The template responsible for it is in
 # scripts/split_tox_gh_actions/templates/base.jinja
 name: Test Agents
+# Reusable workflow. It is invoked by the top-level `test.yml` orchestrator.
 on:
-  push:
-    branches:
-      - master
-      - release/**
-      - major/**
-  pull_request:
-# Cancel in progress workflows on pull_requests.
-# https://docs.github.com/en/actions/using-jobs/using-concurrency#example-using-a-fallback-value
-concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
-  cancel-in-progress: true
+  workflow_call:
 permissions:
   contents: read
   actions: read
-  pull-requests: write
-  statuses: write
 jobs:
   test-agents:
     name: Agents
@@ -39,7 +28,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
-          cache-suffix: ${{ github.workflow }}-${{ matrix.python-version }}
+          enable-cache: false
       - name: Mark workspace safe for git (3.6/3.7 container)
         # needed to make git rev-parse work in the containers
         # subprocesses (e.g. sentry_sdk.utils.get_git_revision) can run git.
@@ -48,9 +37,6 @@ jobs:
       - name: Setup Test Env
         run: |
           uv sync
-      - name: Erase coverage
-        run: |
-          uv run coverage erase
       - name: Test openai_agents
         run: |
           set -x # print commands that are executed
@@ -59,28 +45,17 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-pydantic_ai"
-      - name: Generate coverage XML
+      - name: Upload coverage data
         if: ${{ !cancelled() }}
-        run: |
-          uv run coverage combine .coverage-sentry-*
-          uv run coverage xml
-      - name: Parse and Upload Coverage
-        if: ${{ !cancelled() }}
-        uses: getsentry/codecov-action@d90e69cdf071dfbb0430159125321dc09c424d4c # main
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          files: coverage.xml
-          junit-xml-pattern: .junitxml
-          base-branch: master
-          verbose: true
-  check_required_tests:
-    name: All Agents tests passed
-    needs: test-agents
-    # Always run this, even if a dependent job failed
-    if: always()
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Check for failures
-        if: needs.test-agents.result != 'success'
-        run: |
-          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
+          name: coverage-agents-${{ matrix.python-version }}
+          # .coverage-* / .junitxml-* are dotfiles, excluded by default
+          include-hidden-files: true
+          path: |
+            .coverage-sentry-*
+            .junitxml-*
+          if-no-files-found: 'ignore'
+          retention-days: 1
+          overwrite: true

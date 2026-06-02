@@ -35,8 +35,10 @@ TEST_SUITE_CONFIG = {
     "arq": {
         "package": "arq",
         "deps": {
-            "*": ["async-timeout", "pytest-asyncio", "fakeredis>=2.2.0,<2.8"],
+            "*": ["async-timeout", "pytest-asyncio", "fakeredis"],
             "<=0.23": ["pydantic<2"],
+            # https://github.com/cunla/fakeredis-py/issues/490
+            "py3.6,py3.7,py3.8": ["fakeredis<2.36.0"],
         },
         "num_versions": 2,
     },
@@ -200,6 +202,13 @@ TEST_SUITE_CONFIG = {
             ">=0.28": ">=3.9",
         },
     },
+    "httpx2": {
+        "package": "httpx2",
+        "deps": {
+            "*": ["anyio>=3,<5", "httpx2-pytest==1.0.1"],
+        },
+        "python": ">=3.10",
+    },
     "huey": {
         "package": "huey",
         "num_versions": 2,
@@ -345,6 +354,8 @@ TEST_SUITE_CONFIG = {
         "package": "pyramid",
         "deps": {
             "*": ["werkzeug<2.1.0"],
+            # Pinned by library in https://github.com/Pylons/pyramid/commit/e239cb693b06e8d01c02dacd2a7b93e5d0a4d5ae
+            "<2.1": ["setuptools<82"],
         },
     },
     "quart": {
@@ -364,6 +375,10 @@ TEST_SUITE_CONFIG = {
     },
     "ray": {
         "package": "ray",
+        "deps": {
+            # Required for pkg_resources import prior to https://github.com/ray-project/ray/commit/7e9043c38d76412c310fcf6e3fff79cb55d481da
+            "<2.10": ["setuptools<82"],
+        },
         "python": {
             ">0.0,<2.52.0": ">=3.9",
             ">=2.52.0": ">=3.10",
