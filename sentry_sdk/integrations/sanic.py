@@ -1,4 +1,5 @@
 import sys
+import warnings
 import weakref
 from inspect import isawaitable
 from typing import TYPE_CHECKING
@@ -69,6 +70,13 @@ class SanicIntegration(Integration):
         HTTP statuses, including 404.
         """
         self._unsampled_statuses = unsampled_statuses or set()
+
+        client = sentry_sdk.get_client()
+        if self._unsampled_statuses and has_span_streaming_enabled(client.options):
+            warnings.warn(
+                "The unsampled_statuses SanicIntegration option has no effect when span streaming is active.",
+                stacklevel=2,
+            )
 
     @staticmethod
     def setup_once() -> None:
