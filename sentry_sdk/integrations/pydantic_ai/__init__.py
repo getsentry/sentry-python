@@ -159,12 +159,7 @@ class PydanticAIIntegration(Integration):
         _patch_agent_run()
         _patch_tool_execution()
 
-        try:
-            from pydantic_ai.capabilities import Hooks
-        except ImportError:
-            Hooks = None
-            PydanticAIIntegration.are_request_hooks_available = False
-
+        PydanticAIIntegration.using_request_hooks = False
         try:
             PYDANTIC_AI_VERSION = version("pydantic-ai-slim")
         except PackageNotFoundError:
@@ -182,8 +177,12 @@ class PydanticAIIntegration(Integration):
             _patch_graph_nodes()
             return
 
-        if Hooks is None:
+        try:
+            from pydantic_ai.capabilities import Hooks
+        except ImportError:
+            Hooks = None
             return
 
+        PydanticAIIntegration.using_request_hooks = True
         hooks = Hooks()
         register_hooks(hooks)
