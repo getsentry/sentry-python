@@ -129,7 +129,7 @@ class PydanticAIIntegration(Integration):
 
     identifier = "pydantic_ai"
     origin = f"auto.ai.{identifier}"
-    are_request_hooks_available = True
+    using_request_hooks = False
 
     def __init__(
         self, include_prompts: bool = True, handled_tool_call_exceptions: bool = True
