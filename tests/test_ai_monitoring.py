@@ -923,6 +923,23 @@ class TestRedactBlobMessageParts:
         # Should return same list since no blobs
         assert result is messages
 
+    def test_redact_blob_message_parts_image_url_string_shorthand(self):
+        """image_url as a plain string (OpenAI shorthand) must not raise AttributeError"""
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "What is in this image?"},
+                    {
+                        "type": "image_url",
+                        "image_url": "data:image/jpeg;base64,/9j/abc123==",
+                    },
+                ],
+            }
+        ]
+        result = redact_blob_message_parts(messages)
+        assert result[0]["content"][1]["image_url"] == "[Blob substitute]"
+
 
 class TestParseDataUri:
     def test_parses_base64_image_data_uri(self):

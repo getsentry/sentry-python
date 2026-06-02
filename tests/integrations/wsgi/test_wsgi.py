@@ -604,9 +604,9 @@ def test_auto_session_tracking_with_aggregates(
     ]
     assert len(session_envelopes) == 1
     session_aggregates = session_envelopes[0].items[0].payload.json["aggregates"]
-    assert session_aggregates[0]["exited"] == 2
-    assert session_aggregates[0]["crashed"] == 1
-    assert len(session_aggregates) == 1
+    # Sum across buckets: sessions split by minute-truncated start time.
+    assert sum(agg.get("exited", 0) for agg in session_aggregates) == 2
+    assert sum(agg.get("crashed", 0) for agg in session_aggregates) == 1
 
 
 @mock.patch("sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0)

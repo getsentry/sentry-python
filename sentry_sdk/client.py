@@ -363,6 +363,12 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
             stacklevel=2,
         )
 
+    if rv["trace_ignore_status_codes"] and has_span_streaming_enabled(rv):
+        warnings.warn(
+            "The `trace_ignore_status_codes` parameter is ignored in span streaming mode.",
+            stacklevel=2,
+        )
+
     return rv
 
 
@@ -507,6 +513,14 @@ class _Client(BaseClient):
         for function in functions_to_trace:
             class_name = None
             function_qualname = function["qualified_name"]
+
+            if "." not in function_qualname:
+                logger.warning(
+                    "Can not enable tracing for '%s'. Please provide the fully qualified name including the module (e.g. 'mymodule.my_function').",
+                    function_qualname,
+                )
+                continue
+
             module_name, function_name = function_qualname.rsplit(".", 1)
 
             try:

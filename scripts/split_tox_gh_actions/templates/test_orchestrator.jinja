@@ -1,0 +1,96 @@
+# Do not edit this YAML file. This file is generated automatically by executing
+# python scripts/split_tox_gh_actions/split_tox_gh_actions.py
+# The template responsible for it is in
+# scripts/split_tox_gh_actions/templates/test_orchestrator.jinja
+#
+# Top-level test orchestrator. It runs every test group (each a reusable
+# workflow) in a single run, then combines their coverage and reports it once.
+name: Test
+
+on:
+  push:
+    branches:
+      - master
+      - release/**
+      - major/**
+
+  pull_request:
+
+# Cancel in progress workflows on pull_requests.
+concurrency:
+  group: {% raw %}${{ github.workflow }}-${{ github.head_ref || github.run_id }}{% endraw %}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  pull-requests: write
+  statuses: write
+
+# To temporarily skip a group for unblocking a release,
+# add `if: false` to its job below, e.g.:
+#
+#   dbs:
+#     name: DBs
+#     if: false  # TEMP: skipping, see PR #xxxx
+#     uses: ./.github/workflows/test-integrations-dbs.yml
+#     secrets: inherit
+jobs:
+{% for g in orchestrated_groups %}
+  {{ g.id }}:
+    name: {{ g.name }}
+    uses: ./.github/workflows/test-integrations-{{ g.slug }}.yml
+    secrets: inherit
+{% endfor %}
+
+  report:
+    name: Combine and report coverage
+    needs:
+{% for g in orchestrated_groups %}
+      - {{ g.id }}
+{% endfor %}
+    # Report whatever coverage exists, even if some test jobs failed.
+    if: {% raw %}${{ !cancelled() }}{% endraw %}
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      - name: Download coverage data
+        # Artifacts from the reusable test workflows live in this same run.
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          pattern: coverage-*
+          merge-multiple: true
+      - name: Combine coverage and generate XML
+        run: |
+          uv sync
+          # relative_files + [tool.coverage.paths] let the 3.6/3.7 container and
+          # the runner data files merge into one source tree.
+          uv run coverage combine .coverage-sentry-*
+          uv run coverage xml
+      - name: Report coverage and test results
+        uses: getsentry/codecov-action@d90e69cdf071dfbb0430159125321dc09c424d4c # main
+        with:
+          token: {% raw %}${{ secrets.GITHUB_TOKEN }}{% endraw %}
+          files: coverage.xml
+          junit-xml-pattern: .junitxml-*
+          base-branch: master
+          post-pr-comment: true
+          verbose: true
+
+  check-required:
+    name: All tests passed
+    needs:
+{% for g in orchestrated_groups %}
+      - {{ g.id }}
+{% endfor %}
+    # Always run so it can gate merges even when a dependency failed.
+    if: always()
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check for failures
+        if: {% raw %}${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}{% endraw %}
+        run: |
+          echo "One of the test jobs failed. You may need to re-run it." && exit 1
