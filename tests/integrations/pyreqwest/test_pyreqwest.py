@@ -83,7 +83,7 @@ def test_sync_client_spans(
             assert response.status == 200
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert len(spans) == 2
         span = spans[0]
         assert span["attributes"]["sentry.op"] == "http.client"
@@ -140,7 +140,7 @@ async def test_async_client_spans(
                 assert response.status == 200
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert len(spans) == 2
         span = spans[0]
         assert span["attributes"]["sentry.op"] == "http.client"
@@ -191,7 +191,7 @@ def test_sync_simple_request_spans(
             assert response.status == 200
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert len(spans) == 2
         span = spans[0]
         assert span["attributes"]["sentry.op"] == "http.client"
@@ -242,7 +242,7 @@ async def test_async_simple_request_spans(
             assert response.status == 200
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert len(spans) == 2
         span = spans[0]
         assert span["attributes"]["sentry.op"] == "http.client"
@@ -292,7 +292,7 @@ def test_span_origin(
             client.get(url).build().send()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert spans[0]["attributes"]["sentry.origin"] == "auto.http.pyreqwest"
     else:
         events = capture_events()
@@ -334,7 +334,7 @@ def test_outgoing_trace_headers(
         headers = PyreqwestMockHandler.captured_requests[0]["headers"]
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         http_span = next(
             span
             for span in spans
@@ -397,7 +397,7 @@ def test_outgoing_trace_headers_append_to_baggage(
         headers = PyreqwestMockHandler.captured_requests[0]["headers"]
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         http_span = next(
             span
             for span in spans
@@ -503,7 +503,7 @@ def test_omit_url_data_if_parsing_fails(
                 client.get(url).build().send()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         span = spans[0]
 
         assert span["name"] == "GET [Filtered]"
@@ -559,7 +559,7 @@ def test_request_source_disabled(
             client.get(url).build().send()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         span = spans[0]
         data = span.get("attributes", {})
 
@@ -613,7 +613,7 @@ def test_request_source_enabled(
             client.get(url).build().send()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         span = spans[0]
         data = span.get("attributes", {})
 
@@ -662,7 +662,7 @@ def test_request_source(
             client.get(url).build().send()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         span = spans[0]
         data = span.get("attributes", {})
 
@@ -719,14 +719,11 @@ def test_request_source_with_module_in_search_path(
         http_request_source_threshold_ms=0,
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-    if span_streaming:
-        items = capture_items("span")
-    else:
-        events = capture_events()
 
     url = f"http://localhost:{server_port}/hello"
-
     if span_streaming:
+        items = capture_items("span")
+
         with sentry_sdk.traces.start_span(name="custom parent"):
             from pyreqwest_helpers.helpers import get_request_with_client
 
@@ -734,7 +731,7 @@ def test_request_source_with_module_in_search_path(
             get_request_with_client(client, url)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         span = spans[0]
         data = span.get("attributes", {})
 
@@ -745,6 +742,8 @@ def test_request_source_with_module_in_search_path(
 
         is_relative_path = data.get(SPANDATA.CODE_FILE_PATH)[0] != os.sep
     else:
+        events = capture_events()
+
         with start_transaction(name="test_transaction"):
             from pyreqwest_helpers.helpers import get_request_with_client
 
@@ -809,7 +808,7 @@ def test_no_request_source_if_duration_too_short(
                 client.get(url).build().send()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         span = spans[0]
         data = span.get("attributes", {})
 
@@ -889,7 +888,7 @@ def test_request_source_if_duration_over_threshold(
                 client.get(url).build().send()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         span = spans[0]
         data = span.get("attributes", {})
 
