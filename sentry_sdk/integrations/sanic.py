@@ -179,6 +179,16 @@ async def _context_enter(request: "Request") -> None:
     scope.add_event_processor(_make_request_processor(weak_request))
 
     if is_span_streaming_enabled:
+        integration = client.get_integration(SanicIntegration)
+        if (
+            isinstance(integration, SanicIntegration)
+            and integration._unsampled_statuses
+        ):
+            warnings.warn(
+                "The `unsampled_statuses` option of SanicIntegration has no effect when span streaming is enabled.",
+                stacklevel=2,
+            )
+
         sentry_sdk.traces.continue_trace(dict(request.headers))
         scope.set_custom_sampling_context({"sanic_request": request})
 
@@ -235,12 +245,6 @@ async def _context_exit(
                     span.status = "error" if response_status >= 400 else "ok"
 
                 span.end()
-
-                if integration and integration._unsampled_statuses:
-                    warnings.warn(
-                        "The unsampled_statuses SanicIntegration option has no effect when span streaming is active.",
-                        stacklevel=2,
-                    )
 
             else:
                 span.set_http_status(response_status)
