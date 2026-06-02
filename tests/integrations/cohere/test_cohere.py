@@ -53,6 +53,7 @@ def test_nonstreaming_chat(
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "ai.chat_completions.create.cohere"
+    assert span["data"][SPANDATA.AI_STREAMING] is False
     assert span["data"][SPANDATA.AI_MODEL_ID] == "some-model"
 
     if send_default_pii and include_prompts:
@@ -130,6 +131,7 @@ def test_streaming_chat(sentry_init, capture_events, send_default_pii, include_p
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "ai.chat_completions.create.cohere"
+    assert span["data"][SPANDATA.AI_STREAMING] is True
     assert span["data"][SPANDATA.AI_MODEL_ID] == "some-model"
 
     if send_default_pii and include_prompts:
