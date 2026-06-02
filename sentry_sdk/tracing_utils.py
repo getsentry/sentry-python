@@ -2,6 +2,7 @@ import contextlib
 import functools
 import inspect
 import os
+import random
 import re
 import sys
 import uuid
@@ -1524,6 +1525,8 @@ def _make_sampling_decision(
     3. the sample rand
     4. the reason for not sampling the span, if unsampled
     """
+    LOG_SAMPLE_RATE = 0.002
+
     client = sentry_sdk.get_client()
 
     if not has_tracing_enabled(client.options):
@@ -1564,6 +1567,15 @@ def _make_sampling_decision(
     # traces_sampler is user-provided, it could return anything.
     if not is_valid_sample_rate(sample_rate, source="Tracing"):
         logger.warning(f"[Tracing] Discarding {name} because of invalid sample rate.")
+        if random.random() < LOG_SAMPLE_RATE:
+            logger.warning(
+                f"[Tracing debug] dropped "
+                f"span: {name} "
+                f"sample_rate: {sample_rate} "
+                f"origin: {attributes.get('sentry.origin')} "
+                f"op: {attributes.get('sentry.op')} "
+                f"reason: invalid sample rate"
+            )
         return False, None, None, "sample_rate"
 
     sample_rate = float(sample_rate)
@@ -1574,6 +1586,17 @@ def _make_sampling_decision(
             reason = "traces_sample_rate is set to 0"
 
         logger.debug(f"[Tracing] Discarding {name} because {reason}")
+
+        if random.random() < LOG_SAMPLE_RATE:
+            logger.warning(
+                f"[Tracing debug] dropped "
+                f"span: {name} "
+                f"sample_rate: {sample_rate} "
+                f"origin: {attributes.get('sentry.origin')} "
+                f"op: {attributes.get('sentry.op')} "
+                f"reason: traces_sampler or traces_sample_rate is falsy"
+            )
+
         return False, 0.0, None, "sample_rate"
 
     # Adjust sample rate if we're under backpressure
@@ -1606,6 +1629,16 @@ def _make_sampling_decision(
             outcome = "backpressure"
 
         else:
+            if random.random() < LOG_SAMPLE_RATE:
+                logger.warning(
+                    f"[Tracing debug] dropped "
+                    f"span: {name} "
+                    f"sample_rate: {sample_rate} "
+                    f"origin: {attributes.get('sentry.origin')} "
+                    f"op: {attributes.get('sentry.op')} "
+                    f"reason: below sampling rate"
+                )
+
             logger.debug(
                 f"[Tracing] Discarding {name} because it's not included in the random sample (sampling rate = {sample_rate})"
             )
