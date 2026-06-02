@@ -236,7 +236,7 @@ async def _context_exit(
 
                 span.end()
 
-                if integration._unsampled_statuses:
+                if integration and integration._unsampled_statuses:
                     warnings.warn(
                         "The unsampled_statuses SanicIntegration option has no effect when span streaming is active.",
                         stacklevel=2,
