@@ -39,8 +39,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
-          cache-suffix: tasks-${{ matrix.python-version }}
-          enable-cache: ${{ matrix.python-version != '3.6' && matrix.python-version != '3.7' }}
+          enable-cache: false
       - name: Install Java
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5
         with:

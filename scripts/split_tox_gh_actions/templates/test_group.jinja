@@ -59,8 +59,7 @@
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
-          cache-suffix: {{ lowercase_group }}-{% raw %}${{ matrix.python-version }}{% endraw %}
-          enable-cache: {% raw %}${{ matrix.python-version != '3.6' && matrix.python-version != '3.7' }}{% endraw %}
+          enable-cache: false
 
       {% if needs_clickhouse %}
       - name: "Setup ClickHouse Server"

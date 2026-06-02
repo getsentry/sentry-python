@@ -15,6 +15,7 @@ import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.sanic import SanicIntegration
 from sentry_sdk.tracing import TransactionSource
+from tests.conftest import get_free_port
 
 try:
     from sanic_testing import TestManager
@@ -85,7 +86,7 @@ def get_client(app):
         yield app.test_client
 
     if ReusableClient is not None:
-        return ReusableClient(app)
+        return ReusableClient(app, port=get_free_port())
     else:
         return simple_client(app)
 
