@@ -165,7 +165,6 @@ class PydanticAIIntegration(Integration):
             Hooks = None
             PydanticAIIntegration.are_request_hooks_available = False
 
-        # ModelRequestContext.model added in https://github.com/pydantic/pydantic-ai/commit/f1260dfe09907f17688eee1646daf898fc428d4c
         try:
             PYDANTIC_AI_VERSION = version("pydantic-ai-slim")
         except PackageNotFoundError:
@@ -175,6 +174,7 @@ class PydanticAIIntegration(Integration):
         if PYDANTIC_AI_VERSION is None:
             return
 
+        # ModelRequestContext.model added in https://github.com/pydantic/pydantic-ai/commit/f1260dfe09907f17688eee1646daf898fc428d4c
         if PYDANTIC_AI_VERSION < (
             1,
             73,
