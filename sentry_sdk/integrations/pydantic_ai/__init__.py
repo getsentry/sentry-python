@@ -168,12 +168,14 @@ class PydanticAIIntegration(Integration):
         try:
             PYDANTIC_AI_VERSION = version("pydantic-ai-slim")
         except PackageNotFoundError:
-            _patch_graph_nodes()
+            return
+
+        PYDANTIC_AI_VERSION = parse_version(PYDANTIC_AI_VERSION)
+        if PYDANTIC_AI_VERSION is None:
             return
 
         # ModelRequestContext.model added in https://github.com/pydantic/pydantic-ai/commit/f1260dfe09907f17688eee1646daf898fc428d4c
-        PYDANTIC_AI_VERSION = parse_version(PYDANTIC_AI_VERSION)
-        if PYDANTIC_AI_VERSION is None or PYDANTIC_AI_VERSION < (
+        if PYDANTIC_AI_VERSION < (
             1,
             73,
         ):
