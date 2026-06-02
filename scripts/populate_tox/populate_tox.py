@@ -237,6 +237,9 @@ def fetch_package_dependencies(
     with tempfile.NamedTemporaryFile("w", encoding="utf-8") as f:
         f.write("\n".join(constraints))
         f.flush()
+        print(
+            f"  Resolving dependencies: {package}=={version} on Python {python_version}"
+        )
         result = subprocess.run(
             [*cmd, "--constraint", f.name],
             capture_output=True,

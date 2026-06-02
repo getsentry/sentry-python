@@ -26,7 +26,11 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
-          python-version: 3.14t
+          cache-python: true
+
+      - name: Pre-install Python interpreters
+        run: |
+          uv python install 3.8 3.9 3.10 3.11 3.12 3.13 3.14 3.14t
 
       - name: Configure git
         run: |
@@ -34,6 +38,8 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
       - name: Run generate-test-files.sh
+        env:
+          PYTHONUNBUFFERED: "1"
         run: |
           set -e
           sh scripts/generate-test-files.sh
