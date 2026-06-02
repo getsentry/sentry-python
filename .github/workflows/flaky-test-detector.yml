@@ -1,0 +1,145 @@
+name: Flaky Test Detector
+
+# Weekly job that asks Claude to inspect recent master CI runs for flaky
+# tests and open a single draft PR with proposed fixes.
+#
+# This file is hand-maintained (it is NOT one of the auto-generated
+# test-integrations-*.yml / test.yml files produced by
+# scripts/split_tox_gh_actions/split_tox_gh_actions.py).
+
+on:
+  schedule:
+    # Every Wednesday at 08:00 UTC.
+    - cron: "0 8 * * 3"
+  # Allow manual runs for testing / on-demand sweeps.
+  workflow_dispatch:
+
+# Only one detector run at a time; cancelling a stale run is fine.
+concurrency:
+  group: flaky-test-detector
+  cancel-in-progress: false
+
+permissions:
+  contents: write # create branch + push commits for the fix PR
+  pull-requests: write # open the draft PR
+  actions: read # read recent workflow runs and failed logs
+  issues: read
+
+jobs:
+  detect-flaky-tests:
+    name: Detect flaky tests and open draft fix PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          # Full history so Claude can branch off master and inspect blame.
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: 3.14
+
+      - name: Detect flaky tests
+        uses: anthropics/claude-code-action@787c5a0ce96a9a6cfb050ea0c8f4c05f2447c251 # v1.0.133
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # PAT (FLAKY_BOT_TOKEN) with contents:write + pull_requests:write.
+          # Unlike the default GITHUB_TOKEN, PRs/commits made with a PAT DO
+          # trigger other workflows, so CI runs automatically on the draft PR.
+          github_token: ${{ secrets.FLAKY_BOT_TOKEN }}
+          claude_args: |
+            --max-turns 60
+            --model opus
+            --allowedTools "Bash,Edit,Write,Read,Glob,Grep,TodoWrite"
+          prompt: |
+            You are running as a scheduled GitHub Action in the
+            ${{ github.repository }} repository. The repo is already checked
+            out at the default branch (master) and `gh`, `git`, `uv`, and
+            `tox` are available. Your job: find flaky tests on master CI and
+            open ONE combined draft PR proposing fixes.
+
+            ## Step 1 — Gather recent master CI failures
+
+            master is gated by required CI, so test failures on master are
+            almost always flakes (or genuinely broken main, which is also
+            worth a fix). Investigate the last ~30 runs of the main test
+            workflow on master:
+
+            ```
+            gh run list --workflow=test.yml --branch=master --limit 30 \
+              --json databaseId,conclusion,createdAt,event,headSha
+            ```
+
+            For runs that failed, pull the failing logs to extract the
+            specific failing test node IDs and tracebacks:
+
+            ```
+            gh run view <run-id> --log-failed
+            ```
+
+            Also check the `CI` workflow (ci.yml) the same way if useful.
+
+            ## Step 2 — Decide what is actually flaky
+
+            A test is flaky when it fails intermittently rather than
+            deterministically. Strong signals:
+              - The same test failed on some master runs but passed on others
+                (including the same commit re-run).
+              - Failures involving timing/sleep, ordering, randomness,
+                network, ports, threads/async, datetime, or shared global
+                state.
+              - Errors that don't correspond to any code change in that
+                commit.
+            Ignore failures that are clearly real regressions tied to a
+            specific PR's logic, and ignore infra-only failures (runner died,
+            artifact upload, dependency resolution) that aren't fixable in
+            test code.
+
+            Pick at most the 5 most impactful / clearest flaky tests.
+
+            ## Step 3 — Investigate and fix
+
+            For each selected flaky test, read the test and the code it
+            exercises (tests live under `tests/`, see CLAUDE.md for project
+            conventions). Make a minimal, targeted fix that removes the source
+            of non-determinism — e.g. replace fixed sleeps with proper waits,
+            seed randomness, make ordering explicit, isolate global state,
+            widen tolerances, or add appropriate mocking/fixtures. Follow the
+            surrounding code style. Do NOT mass-rewrite tests or add skips/
+            xfails unless a test is fundamentally unfixable (and explain why).
+
+            If helpful and time permits, try to reproduce locally to confirm,
+            e.g. run the specific test repeatedly via tox (see CLAUDE.md for
+            the TESTPATH + `uv run tox -e py3.14-common` pattern). Keep this
+            time-bounded; do not exhaust your turns running the full matrix.
+
+            ## Step 4 — Open ONE draft PR
+
+            If you made fixes, create a single branch off master named
+            `flaky-test-fixes/<YYYY-MM-DD>` (use today's date), commit all
+            changes with a clear conventional-commit message, push it, and
+            open a DRAFT pull request:
+
+            ```
+            gh pr create --draft \
+              --base master \
+              --title "test: Fix flaky tests detected on master CI" \
+              --body "<body>"
+            ```
+
+            The PR body must include, per test: the failing test node ID,
+            evidence of flakiness (link the failing run(s) and quote the
+            error), the root cause, and the fix. End with a note that this PR
+            was generated automatically by the weekly Flaky Test Detector and
+            needs human review (and that CI may need to be manually triggered
+            on it). Add the commit trailer:
+            `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`
+
+            ## Step 5 — Nothing found
+
+            If you find no flaky tests after a genuine investigation, do NOT
+            open a PR or an issue. Just print a short summary of what you
+            checked and exit cleanly.
