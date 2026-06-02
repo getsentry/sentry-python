@@ -71,13 +71,6 @@ class SanicIntegration(Integration):
         """
         self._unsampled_statuses = unsampled_statuses or set()
 
-        client = sentry_sdk.get_client()
-        if self._unsampled_statuses and has_span_streaming_enabled(client.options):
-            warnings.warn(
-                "The unsampled_statuses SanicIntegration option has no effect when span streaming is active.",
-                stacklevel=2,
-            )
-
     @staticmethod
     def setup_once() -> None:
         SanicIntegration.version = parse_version(SANIC_VERSION)
@@ -242,6 +235,13 @@ async def _context_exit(
                     span.status = "error" if response_status >= 400 else "ok"
 
                 span.end()
+
+                if integration._unsampled_statuses:
+                    warnings.warn(
+                        "The unsampled_statuses SanicIntegration option has no effect when span streaming is active.",
+                        stacklevel=2,
+                    )
+
             else:
                 span.set_http_status(response_status)
                 span.sampled &= (
