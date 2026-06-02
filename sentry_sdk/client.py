@@ -363,6 +363,12 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
             stacklevel=2,
         )
 
+    if rv["trace_ignore_status_codes"] and has_span_streaming_enabled(rv):
+        warnings.warn(
+            "The `trace_ignore_status_codes` parameter is ignored in span streaming mode.",
+            stacklevel=2,
+        )
+
     return rv
 
 
