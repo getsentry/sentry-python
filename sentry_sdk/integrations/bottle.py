@@ -10,8 +10,8 @@ from sentry_sdk.integrations import (
 )
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.traces import SegmentSource
-from sentry_sdk.tracing import SOURCE_FOR_STYLE
+from sentry_sdk.traces import SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE
+from sentry_sdk.tracing import SOURCE_FOR_STYLE as TRANSACTION_SOURCE_FOR_STYLE
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -104,33 +104,24 @@ class BottleIntegration(Integration):
             )
 
             if has_span_streaming_enabled(sentry_sdk.get_client().options):
-                # Using SegmentSource.COMPONENT as the default since this is the also value for "handler_name"
-                # within SOURCE_FOR_STYLE.
-                # See https://github.com/getsentry/sentry-python/blob/c3aab3932f5a7e89ad3aff551a206db710acf0e6/sentry_sdk/tracing.py#L151-L161
-                with sentry_sdk.traces.start_span(
-                    name="bottle",
-                    attributes={"sentry.span.source": SegmentSource.COMPONENT},
-                ) as span:
-                    res = old_handle(self, environ)
+                res = old_handle(self, environ)
 
-                    try:
-                        if integration.transaction_style == "url":
-                            span.name = bottle_request.route.rule or "bottle"
-                            span.set_attribute("sentry.span.source", SegmentSource.URL)
-                        elif integration.transaction_style == "endpoint":
-                            name = (
-                                bottle_request.route.name
-                                or transaction_from_function(
-                                    bottle_request.route.callback
-                                )
-                                or "bottle"
-                            )
-                            span.name = name
-                            span.set_attribute(
-                                "sentry.span.source", SegmentSource.COMPONENT
-                            )
-                    except RuntimeError:
-                        pass
+                try:
+                    if integration.transaction_style == "url":
+                        name = bottle_request.route.rule or "bottle"
+                    else:
+                        name = (
+                            bottle_request.route.name
+                            or transaction_from_function(bottle_request.route.callback)
+                            or "bottle"
+                        )
+
+                    sentry_sdk.get_current_scope().set_transaction_name(
+                        name,
+                        source=SEGMENT_SOURCE_FOR_STYLE[integration.transaction_style],
+                    )
+                except RuntimeError:
+                    pass
 
             else:
                 res = old_handle(self, environ)
@@ -234,7 +225,9 @@ def _set_transaction_name_and_source(
             pass
 
     event["transaction"] = name
-    event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
+    event["transaction_info"] = {
+        "source": TRANSACTION_SOURCE_FOR_STYLE[transaction_style]
+    }
 
 
 def _make_request_event_processor(

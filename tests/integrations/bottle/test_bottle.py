@@ -593,11 +593,10 @@ def test_span_streaming_basic(sentry_init, capture_items):
     sentry_sdk.flush()
 
     spans = [item.payload for item in items]
-    assert len(spans) == 3
+    assert len(spans) == 2
 
     callback_span = spans[0]
-    handle_span = spans[1]
-    segment = spans[2]
+    segment = spans[1]
 
     # Segment span (root, created by WSGI middleware)
     assert segment["is_segment"] is True
@@ -607,15 +606,11 @@ def test_span_streaming_basic(sentry_init, capture_items):
     assert segment["attributes"]["sentry.origin"] == "auto.http.bottle"
     assert segment["attributes"]["http.request.method"] == "GET"
     assert segment["attributes"]["http.response.status_code"] == 200
+    assert segment["name"].endswith("hi")
 
-    # Handle span (created by _patched_handle, child of segment)
-    assert handle_span["is_segment"] is False
-    assert handle_span["parent_span_id"] == segment["span_id"]
-    assert handle_span["name"].endswith("hi")
-
-    # Callback span (created by wrapped_callback, child of handle span)
+    # Callback span (created by wrapped_callback, child of segment)
     assert callback_span["is_segment"] is False
-    assert callback_span["parent_span_id"] == handle_span["span_id"]
+    assert callback_span["parent_span_id"] == segment["span_id"]
     assert callback_span["name"] == "bottle"
 
 
@@ -623,8 +618,8 @@ def test_span_streaming_basic(sentry_init, capture_items):
     "url,transaction_style,expected_name,expected_source",
     [
         ("/message", "endpoint", "hi", "component"),
-        ("/message", "url", "/message", "url"),
-        ("/message/123456", "url", "/message/<message_id>", "url"),
+        ("/message", "url", "/message", "route"),
+        ("/message/123456", "url", "/message/<message_id>", "route"),
         ("/message-named-route", "endpoint", "hi", "component"),
     ],
 )
@@ -663,18 +658,16 @@ def test_span_streaming_transaction_style(
     sentry_sdk.flush()
 
     spans = [item.payload for item in items]
-    assert len(spans) == 3
+    assert len(spans) == 2
 
     callback_span = spans[0]
-    handle_span = spans[1]
-    segment = spans[2]
+    segment = spans[1]
 
     assert segment["is_segment"] is True
-    assert handle_span["parent_span_id"] == segment["span_id"]
-    assert callback_span["parent_span_id"] == handle_span["span_id"]
+    assert callback_span["parent_span_id"] == segment["span_id"]
 
-    assert handle_span["name"].endswith(expected_name)
-    assert handle_span["attributes"]["sentry.span.source"] == expected_source
+    assert segment["name"].endswith(expected_name)
+    assert segment["attributes"]["sentry.span.source"] == expected_source
 
 
 def test_span_streaming_with_error(sentry_init, capture_items):
@@ -702,23 +695,20 @@ def test_span_streaming_with_error(sentry_init, capture_items):
     events = [item.payload for item in items if item.type == "event"]
     spans = [item.payload for item in items if item.type == "span"]
     assert len(events) == 1
-    assert len(spans) == 3
+    assert len(spans) == 2
 
     error_event = events[0]
     callback_span = spans[0]
-    handle_span = spans[1]
-    segment = spans[2]
+    segment = spans[1]
 
     # All share the same trace
     assert callback_span["trace_id"] == error_event["contexts"]["trace"]["trace_id"]
-    assert handle_span["trace_id"] == error_event["contexts"]["trace"]["trace_id"]
     assert segment["trace_id"] == error_event["contexts"]["trace"]["trace_id"]
 
     # Span hierarchy
     assert segment["is_segment"] is True
     assert "parent_span_id" not in segment
-    assert handle_span["parent_span_id"] == segment["span_id"]
-    assert callback_span["parent_span_id"] == handle_span["span_id"]
+    assert callback_span["parent_span_id"] == segment["span_id"]
 
     # Error event span_id points to the callback span (where the exception was raised)
     assert error_event["contexts"]["trace"]["span_id"] == callback_span["span_id"]
@@ -765,15 +755,13 @@ def test_span_streaming_http_error_status(
     sentry_sdk.flush()
 
     spans = [item.payload for item in items]
-    assert len(spans) == 3
+    assert len(spans) == 2
 
     callback_span = spans[0]
-    handle_span = spans[1]
-    segment = spans[2]
+    segment = spans[1]
 
     assert segment["is_segment"] is True
-    assert handle_span["parent_span_id"] == segment["span_id"]
-    assert callback_span["parent_span_id"] == handle_span["span_id"]
+    assert callback_span["parent_span_id"] == segment["span_id"]
 
     assert segment["status"] == expected_span_status
     assert segment["attributes"]["http.response.status_code"] == status_code
@@ -821,15 +809,13 @@ def test_span_streaming_failed_request_status_codes(
 
     events = [item.payload for item in items if item.type == "event"]
     spans = [item.payload for item in items if item.type == "span"]
-    assert len(spans) == 3
+    assert len(spans) == 2
 
     callback_span = spans[0]
-    handle_span = spans[1]
-    segment = spans[2]
+    segment = spans[1]
 
     assert segment["is_segment"] is True
-    assert handle_span["parent_span_id"] == segment["span_id"]
-    assert callback_span["parent_span_id"] == handle_span["span_id"]
+    assert callback_span["parent_span_id"] == segment["span_id"]
 
     if should_capture:
         assert len(events) == 1
