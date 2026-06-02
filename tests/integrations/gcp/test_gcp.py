@@ -605,6 +605,10 @@ def test_span_streaming_no_error(run_cloud_function):
     assert segment_span["attributes"]["sentry.origin"] == "auto.function.gcp"
     assert segment_span["attributes"]["sentry.span.source"] == "component"
     assert segment_span["attributes"]["cloud.provider"] == "gcp"
+    assert segment_span["attributes"]["faas.name"] == "Google Cloud function"
+    assert segment_span["attributes"]["gcp.project.id"] == "serverless_project"
+    assert segment_span["attributes"]["faas.identity"] == "func_ID"
+    assert segment_span["attributes"]["faas.entry_point"] == "cloud_function"
 
 
 def test_span_streaming_error(run_cloud_function):
@@ -641,6 +645,10 @@ def test_span_streaming_error(run_cloud_function):
     assert segment_span["attributes"]["sentry.origin"] == "auto.function.gcp"
     assert segment_span["attributes"]["sentry.span.source"] == "component"
     assert segment_span["attributes"]["cloud.provider"] == "gcp"
+    assert segment_span["attributes"]["faas.name"] == "Google Cloud function"
+    assert segment_span["attributes"]["gcp.project.id"] == "serverless_project"
+    assert segment_span["attributes"]["faas.identity"] == "func_ID"
+    assert segment_span["attributes"]["faas.entry_point"] == "cloud_function"
     assert segment_span["status"] == SpanStatus.ERROR
 
 
@@ -686,6 +694,10 @@ def test_span_streaming_existing_trace_context(run_cloud_function):
     assert segment_span["attributes"]["sentry.origin"] == "auto.function.gcp"
     assert segment_span["attributes"]["sentry.span.source"] == "component"
     assert segment_span["attributes"]["cloud.provider"] == "gcp"
+    assert segment_span["attributes"]["faas.name"] == "Google Cloud function"
+    assert segment_span["attributes"]["gcp.project.id"] == "serverless_project"
+    assert segment_span["attributes"]["faas.identity"] == "func_ID"
+    assert segment_span["attributes"]["faas.entry_point"] == "cloud_function"
 
 
 def test_span_streaming_request_attributes(run_cloud_function):
@@ -723,6 +735,10 @@ def test_span_streaming_request_attributes(run_cloud_function):
     assert attrs["url.query"] == "foo=bar"
     assert attrs["http.request.header.content-type"] == "application/json"
     assert attrs["http.request.header.accept"] == "text/html"
+    assert attrs["faas.name"] == "Google Cloud function"
+    assert attrs["gcp.project.id"] == "serverless_project"
+    assert attrs["faas.identity"] == "func_ID"
+    assert attrs["faas.entry_point"] == "cloud_function"
 
 
 def test_span_streaming_no_query_string_without_pii(run_cloud_function):
@@ -758,3 +774,7 @@ def test_span_streaming_no_query_string_without_pii(run_cloud_function):
 
     assert "url.query" not in attrs
     assert attrs["http.request.method"] == "GET"
+    assert attrs["faas.name"] == "Google Cloud function"
+    assert attrs["gcp.project.id"] == "serverless_project"
+    assert attrs["faas.identity"] == "func_ID"
+    assert attrs["faas.entry_point"] == "cloud_function"

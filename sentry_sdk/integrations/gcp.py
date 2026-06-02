@@ -116,17 +116,31 @@ def _wrap_func(func: "F") -> "F":
                 "gcp_event": gcp_event,
             }
 
+            function_name = environ.get("FUNCTION_NAME", "<unknown GCP function>")
+
+            if environ.get("GCP_PROJECT"):
+                additional_attributes["gcp.project.id"] = environ.get("GCP_PROJECT")
+
+            if environ.get("FUNCTION_IDENTITY"):
+                additional_attributes["faas.identity"] = environ.get(
+                    "FUNCTION_IDENTITY"
+                )
+
+            if environ.get("ENTRY_POINT"):
+                additional_attributes["faas.entry_point"] = environ.get("ENTRY_POINT")
+
             if has_span_streaming_enabled(client.options):
                 sentry_sdk.traces.continue_trace(headers)
                 Scope.set_custom_sampling_context(sampling_context)
                 span_ctx = sentry_sdk.traces.start_span(
-                    name=environ.get("FUNCTION_NAME", "<unknown GCP function>"),
+                    name=function_name,
                     parent_span=None,
                     attributes={
                         "sentry.op": OP.FUNCTION_GCP,
                         "sentry.origin": GcpIntegration.origin,
                         "sentry.span.source": SegmentSource.COMPONENT,
                         "cloud.provider": CLOUD_PROVIDER.GCP,
+                        "faas.name": function_name,
                         **header_attributes,
                         **additional_attributes,
                     },
