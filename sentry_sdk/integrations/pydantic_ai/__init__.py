@@ -180,7 +180,6 @@ class PydanticAIIntegration(Integration):
         try:
             from pydantic_ai.capabilities import Hooks
         except ImportError:
-            Hooks = None
             return
 
         PydanticAIIntegration.using_request_hooks = True
