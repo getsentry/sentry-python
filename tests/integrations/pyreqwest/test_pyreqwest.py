@@ -530,8 +530,8 @@ def test_omit_url_data_if_parsing_fails(
         assert span["data"][SPANDATA.HTTP_METHOD] == "GET"
         assert span["data"][SPANDATA.HTTP_STATUS_CODE] == 200
         assert "url" not in span["data"]
-        assert SPANDATA.URL_QUERY not in span["data"]
-        assert SPANDATA.URL_FRAGMENT not in span["data"]
+        assert SPANDATA.HTTP_QUERY not in span["data"]
+        assert SPANDATA.HTTP_FRAGMENT not in span["data"]
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
