@@ -227,6 +227,8 @@ def fetch_package_dependencies(
         "pip",
         "install",
         f"{package}=={version}",
+        "--only-binary",
+        "grpcio-tools",  # Prevent source builds that hang CI. grpcio-tools is a build-time dependency pinned by apache-beam.
         "--dry-run",
         "--ignore-installed",
         "--report",
