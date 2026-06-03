@@ -22,7 +22,7 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan, _get_current_streamed_span
+from sentry_sdk.traces import StreamedSpan, get_current_span
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TransactionSource,
@@ -254,7 +254,7 @@ def _serialize_request_body_data(data: "Any") -> str:
 def _set_request_body_data_on_streaming_segment(
     info: "Optional[Dict[str, Any]]",
 ) -> None:
-    current_span = _get_current_streamed_span()
+    current_span = get_current_span()
     if info and "data" in info and type(current_span) is StreamedSpan:
         with capture_internal_exceptions():
             current_span._segment.set_attribute(
