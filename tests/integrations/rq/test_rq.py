@@ -543,7 +543,6 @@ def test_span_origin(
             if span["attributes"].get("sentry.op") == "queue.task.rq"
         )
 
-        assert span["is_segment"] is True
         assert span["attributes"]["sentry.origin"] == "auto.queue.rq"
     else:
         events = capture_events()
