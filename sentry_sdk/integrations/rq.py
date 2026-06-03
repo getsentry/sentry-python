@@ -90,10 +90,14 @@ class RqIntegration(Integration):
                             "sentry.origin": RqIntegration.origin,
                             "sentry.span.source": TransactionSource.TASK,
                             SPANDATA.MESSAGING_MESSAGE_ID: job.id,
-                            SPANDATA.CODE_FUNCTION_NAME: job.func_name,
                         },
                         parent_span=None,
-                    ):
+                    ) as span:
+                        if span_name != "unknown RQ task":
+                            span.set_attribute(
+                                SPANDATA.CODE_FUNCTION_NAME, job.func_name
+                            )
+
                         rv = old_perform_job(self, job, *args, **kwargs)
                 else:
                     transaction = continue_trace(
