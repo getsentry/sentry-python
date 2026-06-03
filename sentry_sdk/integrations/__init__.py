@@ -118,6 +118,7 @@ del _generate_default_integrations_iterator
 
 _MIN_VERSIONS = {
     "aiohttp": (3, 4),
+    "aiomysql": (0, 1, 1),
     "anthropic": (0, 16),
     "ariadne": (0, 20),
     "arq": (0, 23),
