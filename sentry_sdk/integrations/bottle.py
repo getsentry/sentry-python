@@ -106,22 +106,9 @@ class BottleIntegration(Integration):
             if has_span_streaming_enabled(sentry_sdk.get_client().options):
                 res = old_handle(self, environ)
 
-                try:
-                    if integration.transaction_style == "url":
-                        name = bottle_request.route.rule or "bottle"
-                    else:
-                        name = (
-                            bottle_request.route.name
-                            or transaction_from_function(bottle_request.route.callback)
-                            or "bottle"
-                        )
-
-                    sentry_sdk.get_current_scope().set_transaction_name(
-                        name,
-                        source=SEGMENT_SOURCE_FOR_STYLE[integration.transaction_style],
-                    )
-                except RuntimeError:
-                    pass
+                _set_segment_name_and_source(
+                    transaction_style=integration.transaction_style
+                )
 
             else:
                 res = old_handle(self, environ)
@@ -143,33 +130,17 @@ class BottleIntegration(Integration):
                 return prepared_callback
 
             def wrapped_callback(*args: object, **kwargs: object) -> "Any":
-                if has_span_streaming_enabled(sentry_sdk.get_client().options):
-                    with sentry_sdk.traces.start_span(name="bottle"):
-                        try:
-                            res = prepared_callback(*args, **kwargs)
-                        except Exception as exception:
-                            _capture_exception(exception, handled=False)
-                            raise exception
+                try:
+                    res = prepared_callback(*args, **kwargs)
+                except Exception as exception:
+                    _capture_exception(exception, handled=False)
+                    raise exception
 
-                        if (
-                            isinstance(res, HTTPResponse)
-                            and res.status_code
-                            in integration.failed_request_status_codes
-                        ):
-                            _capture_exception(res, handled=True)
-
-                else:
-                    try:
-                        res = prepared_callback(*args, **kwargs)
-                    except Exception as exception:
-                        _capture_exception(exception, handled=False)
-                        raise exception
-
-                    if (
-                        isinstance(res, HTTPResponse)
-                        and res.status_code in integration.failed_request_status_codes
-                    ):
-                        _capture_exception(res, handled=True)
+                if (
+                    isinstance(res, HTTPResponse)
+                    and res.status_code in integration.failed_request_status_codes
+                ):
+                    _capture_exception(res, handled=True)
 
                 return res
 
@@ -201,6 +172,25 @@ class BottleRequestExtractor(RequestExtractor):
 
     def size_of_file(self, file: "FileUpload") -> int:
         return file.content_length
+
+
+def _set_segment_name_and_source(transaction_style: str) -> None:
+    try:
+        if transaction_style == "url":
+            name = bottle_request.route.rule or "bottle request"
+        else:
+            name = (
+                bottle_request.route.name
+                or transaction_from_function(bottle_request.route.callback)
+                or "bottle request"
+            )
+
+        sentry_sdk.get_current_scope().set_transaction_name(
+            name,
+            source=SEGMENT_SOURCE_FOR_STYLE[transaction_style],
+        )
+    except RuntimeError:
+        pass
 
 
 def _set_transaction_name_and_source(
