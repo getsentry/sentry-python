@@ -6,6 +6,7 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.traces import SegmentSource
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -88,7 +89,7 @@ class RqIntegration(Integration):
                         attributes={
                             "sentry.op": OP.QUEUE_TASK_RQ,
                             "sentry.origin": RqIntegration.origin,
-                            "sentry.span.source": TransactionSource.TASK,
+                            "sentry.span.source": SegmentSource.TASK,
                             SPANDATA.MESSAGING_MESSAGE_ID: job.id,
                         },
                         parent_span=None,
