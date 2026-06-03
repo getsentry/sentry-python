@@ -71,7 +71,7 @@ def test_basic(
         queue.enqueue(crashing_job, foo=42)
         worker.work(burst=True)
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
 
         (exception,) = event["exception"]["values"]
         assert exception["type"] == "ZeroDivisionError"
@@ -129,9 +129,7 @@ def test_transport_shutdown(
         captured_items = items.read_event()
         items.read_flush()
 
-        event = next(
-            item["payload"] for item in captured_items if item["type"] == "event"
-        )
+        event = next(item["payload"] for item in captured_items)
         (exception,) = event["exception"]["values"]
         assert exception["type"] == "ZeroDivisionError"
     else:
@@ -264,7 +262,7 @@ def test_error_has_trace_context_if_tracing_disabled(
         queue.enqueue(crashing_job, foo=None)
         worker.work(burst=True)
 
-        (error_event,) = (item.payload for item in items if item.type == "event")
+        (error_event,) = (item.payload for item in items)
     else:
         events = capture_events()
 
@@ -304,7 +302,7 @@ def test_tracing_enabled(
             queue.enqueue(crashing_job, foo=None)
             worker.work(burst=True)
 
-        (error_event,) = (item.payload for item in items if item.type == "event")
+        (error_event,) = (item.payload for item in items)
 
         assert error_event["contexts"]["trace"]["trace_id"] == span.trace_id
 
@@ -361,7 +359,7 @@ def test_tracing_disabled(
         queue.enqueue(crashing_job, foo=None)
         worker.work(burst=True)
 
-        (error_event,) = (item.payload for item in items if item.type == "event")
+        (error_event,) = (item.payload for item in items)
 
         assert error_event["contexts"]["trace"]["trace_id"]
     else:
@@ -410,10 +408,15 @@ def test_transaction_no_error(
         worker.work(burst=True)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
+        (span,) = (
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == "queue.task.rq"
+        )
 
-        assert spans[43]["attributes"]["sentry.op"] == "queue.task.rq"
-        assert spans[43]["name"] == "tests.integrations.rq.test_rq.do_trick"
+        assert span["attributes"]["sentry.op"] == "queue.task.rq"
+        assert span["name"] == "tests.integrations.rq.test_rq.do_trick"
     else:
         events = capture_events()
 
@@ -500,7 +503,7 @@ def test_job_with_retries(
 
         queue.enqueue(crashing_job, foo=42, retry=rq.Retry(max=1))
         worker.work(burst=True)
-        events = [item.payload for item in items if item.type == "event"]
+        events = [item.payload for item in items]
     else:
         events = capture_events()
 
@@ -534,9 +537,14 @@ def test_span_origin(
 
         sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
+        (span,) = (
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == "queue.task.rq"
+        )
 
-        assert spans[43]["is_segment"] is True
-        assert spans[43]["attributes"]["sentry.origin"] == "auto.queue.rq"
+        assert span["is_segment"] is True
+        assert span["attributes"]["sentry.origin"] == "auto.queue.rq"
     else:
         events = capture_events()
 
