@@ -228,7 +228,7 @@ def fetch_package_dependencies(
         "install",
         f"{package}=={version}",
         "--only-binary",
-        "apache-beam",  # Prevent source install due to missing PEP 658 metadata on sdists.
+        "apache-beam",  # Prevent source builds that hang CI.
         "--dry-run",
         "--ignore-installed",
         "--report",
