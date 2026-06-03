@@ -533,26 +533,24 @@ def _get_span_attr(attrs, key):
     return val
 
 
-def _get_segment_spans(span_items):
-    """Filter span items to only segment (root) spans."""
-    return [s for s in span_items if s.get("is_segment") is True]
-
-
 def test_span_streaming_no_error(lambda_client, test_environment):
     lambda_client.invoke(
         FunctionName="BasicOkSpanStreaming",
         Payload=json.dumps({}),
     )
     envelopes = test_environment["server"].envelopes
-    segment_spans = _get_segment_spans(test_environment["server"].span_items)
+    span_items = test_environment["server"].span_items
 
     assert len(envelopes) == 0
-    assert len(segment_spans) == 1
+    assert len(span_items) == 1
 
-    segment_span = segment_spans[0]
+    segment_span = span_items[0]
+
     assert segment_span["is_segment"] is True
     assert segment_span["name"] == "BasicOkSpanStreaming"
+
     attrs = segment_span["attributes"]
+
     assert _get_span_attr(attrs, "sentry.op") == "function.aws"
     assert _get_span_attr(attrs, "sentry.origin") == "auto.function.aws_lambda"
     assert _get_span_attr(attrs, "sentry.span.source") == "component"
@@ -582,7 +580,7 @@ def test_span_streaming_error(lambda_client, test_environment):
         Payload=json.dumps({}),
     )
     envelopes = test_environment["server"].envelopes
-    segment_spans = _get_segment_spans(test_environment["server"].span_items)
+    span_items = test_environment["server"].span_items
 
     assert len(envelopes) == 1
     error_event = envelopes[0]
@@ -593,12 +591,16 @@ def test_span_streaming_error(lambda_client, test_environment):
     assert exception["mechanism"]["type"] == "aws_lambda"
     assert not exception["mechanism"]["handled"]
 
-    assert len(segment_spans) == 1
-    segment_span = segment_spans[0]
+    assert len(span_items) == 1
+
+    segment_span = span_items[0]
+
     assert segment_span["is_segment"] is True
     assert segment_span["name"] == "RaiseErrorSpanStreaming"
     assert segment_span["status"] == "error"
+
     attrs = segment_span["attributes"]
+
     assert _get_span_attr(attrs, "sentry.op") == "function.aws"
     assert _get_span_attr(attrs, "sentry.origin") == "auto.function.aws_lambda"
     assert _get_span_attr(attrs, "sentry.span.source") == "component"
@@ -639,14 +641,14 @@ def test_span_streaming_trace_continuation(lambda_client, test_environment):
         Payload=json.dumps(payload),
     )
     envelopes = test_environment["server"].envelopes
-    segment_spans = _get_segment_spans(test_environment["server"].span_items)
+    span_items = test_environment["server"].span_items
 
     assert len(envelopes) == 1
     error_event = envelopes[0]
     assert error_event["contexts"]["trace"]["trace_id"] == trace_id
 
-    assert len(segment_spans) == 1
-    segment_span = segment_spans[0]
+    assert len(span_items) == 1
+    segment_span = span_items[0]
     assert segment_span["is_segment"] is True
     assert segment_span["trace_id"] == trace_id
     assert segment_span["name"] == "RaiseErrorSpanStreaming"
@@ -677,10 +679,10 @@ def test_span_streaming_request_attributes(lambda_client, test_environment):
         FunctionName="BasicOkSpanStreamingPii",
         Payload=json.dumps(payload),
     )
-    segment_spans = _get_segment_spans(test_environment["server"].span_items)
+    span_items = test_environment["server"].span_items
 
-    assert len(segment_spans) == 1
-    segment_span = segment_spans[0]
+    assert len(span_items) == 1
+    segment_span = span_items[0]
     attrs = segment_span["attributes"]
 
     assert _get_span_attr(attrs, "http.request.method") == "POST"
