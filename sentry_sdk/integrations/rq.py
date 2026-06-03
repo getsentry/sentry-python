@@ -95,9 +95,7 @@ class RqIntegration(Integration):
                         parent_span=None,
                     ) as span:
                         if func_name is not None:
-                            span.set_attribute(
-                                SPANDATA.CODE_FUNCTION_NAME, job.func_name
-                            )
+                            span.set_attribute(SPANDATA.CODE_FUNCTION_NAME, func_name)
 
                         rv = old_perform_job(self, job, *args, **kwargs)
                 else:
