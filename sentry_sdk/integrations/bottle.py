@@ -102,16 +102,12 @@ class BottleIntegration(Integration):
             scope.add_event_processor(
                 _make_request_event_processor(self, bottle_request, integration)
             )
+            res = old_handle(self, environ)
 
             if has_span_streaming_enabled(sentry_sdk.get_client().options):
-                res = old_handle(self, environ)
-
                 _set_segment_name_and_source(
                     transaction_style=integration.transaction_style
                 )
-
-            else:
-                res = old_handle(self, environ)
 
             return res
 
