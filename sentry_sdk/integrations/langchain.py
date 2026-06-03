@@ -117,6 +117,16 @@ try:
 except ImportError:
     OllamaEmbeddings = None
 
+# LangGraph raises GraphBubbleUp / GraphInterrupt for normal control flow
+# (human-in-the-loop interrupts, etc.) — these should never be captured as errors.
+_graph_bubble_up: "type | tuple[()]" = ()
+try:
+    from langgraph.errors import GraphBubbleUp  # type: ignore[import-untyped]
+
+    _graph_bubble_up = GraphBubbleUp
+except ImportError:
+    pass
+
 
 def _get_ai_system(all_params: "Dict[str, Any]") -> "Optional[str]":
     ai_type = all_params.get("_type")
@@ -264,6 +274,12 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     def _handle_error(self, run_id: "UUID", error: "Any") -> None:
         with capture_internal_exceptions():
             if not run_id or run_id not in self.span_map:
+                return
+
+            # LangGraph raises GraphBubbleUp/GraphInterrupt for normal
+            # control flow (e.g. human-in-the-loop interrupts). These are
+            # not errors and should not be captured as Sentry issues.
+            if isinstance(error, _graph_bubble_up):
                 return
 
             span = self.span_map[run_id]
