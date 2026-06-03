@@ -200,12 +200,13 @@ def continue_trace(incoming: "dict[str, Any]") -> None:
     # used to be set there in non-span-first mode. But in span first mode, we
     # start spans on the current scope, regardless of type, like JS does, so we
     # need to set the propagation context there.
-    sentry_sdk.get_isolation_scope().generate_propagation_context(
+    isolation_scope = sentry_sdk.get_isolation_scope()
+    current_scope = sentry_sdk.get_current_scope()
+
+    isolation_scope.generate_propagation_context(
         incoming,
     )
-    sentry_sdk.get_current_scope().generate_propagation_context(
-        incoming,
-    )
+    current_scope._propagation_context = isolation_scope._propagation_context
 
 
 def new_trace() -> None:
