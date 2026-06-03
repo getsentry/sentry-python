@@ -363,7 +363,6 @@ def test_tracing_disabled(
 
         assert error_event["contexts"]["trace"]["trace_id"]
     else:
-        sentry_init(integrations=[RqIntegration()])
         events = capture_events()
 
         scope = sentry_sdk.get_isolation_scope()
