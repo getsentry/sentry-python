@@ -12,8 +12,14 @@ from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.integrations.cloud_resource_context import (
+    CLOUD_PLATFORM,
+    CLOUD_PROVIDER,
+)
+from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.traces import SegmentSource
 from sentry_sdk.tracing import TransactionSource
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     AnnotatedValue,
     TimeoutThread,
@@ -144,20 +150,74 @@ def _wrap_handler(handler: "F") -> "F":
             if not isinstance(headers, dict):
                 headers = {}
 
-            transaction = continue_trace(
-                headers,
-                op=OP.FUNCTION_AWS,
-                name=aws_context.function_name,
-                source=TransactionSource.COMPONENT,
-                origin=AwsLambdaIntegration.origin,
-            )
-            with sentry_sdk.start_transaction(
-                transaction,
-                custom_sampling_context={
-                    "aws_event": aws_event,
-                    "aws_context": aws_context,
-                },
-            ):
+            header_attributes: "dict[str, Any]" = {}
+            for header, header_value in _filter_headers(
+                headers, use_annotated_value=False
+            ).items():
+                header_attributes[f"http.request.header.{header.lower()}"] = (
+                    header_value
+                )
+
+            additional_attributes: "dict[str, Any]" = {}
+            if "httpMethod" in request_data:
+                additional_attributes["http.request.method"] = request_data[
+                    "httpMethod"
+                ]
+
+            if should_send_default_pii() and "queryStringParameters" in request_data:
+                qs = request_data["queryStringParameters"]
+                if qs:
+                    additional_attributes["url.query"] = "&".join(
+                        f"{k}={v}" for k, v in qs.items()
+                    )
+
+            aws_region = aws_context.invoked_function_arn.split(":")[3]
+
+            sampling_context = {
+                "aws_event": aws_event,
+                "aws_context": aws_context,
+            }
+
+            function_name = aws_context.function_name
+
+            if has_span_streaming_enabled(client.options):
+                sentry_sdk.traces.continue_trace(headers)
+                Scope.set_custom_sampling_context(sampling_context)
+                span_ctx = sentry_sdk.traces.start_span(
+                    name=function_name,
+                    parent_span=None,
+                    attributes={
+                        "sentry.op": OP.FUNCTION_AWS,
+                        "sentry.origin": AwsLambdaIntegration.origin,
+                        "sentry.span.source": SegmentSource.COMPONENT,
+                        "cloud.region": aws_region,
+                        "cloud.resource_id": aws_context.invoked_function_arn,
+                        "cloud.platform": CLOUD_PLATFORM.AWS_LAMBDA,
+                        "cloud.provider": CLOUD_PROVIDER.AWS,
+                        "faas.name": function_name,
+                        "faas.invocation_id": aws_context.aws_request_id,
+                        "faas.version": aws_context.function_version,
+                        "aws.lambda.invoked_arn": aws_context.invoked_function_arn,
+                        "aws.log.group.names": [aws_context.log_group_name],
+                        "aws.log.stream.names": [aws_context.log_stream_name],
+                        **header_attributes,
+                        **additional_attributes,
+                    },
+                )
+            else:
+                transaction = continue_trace(
+                    headers,
+                    op=OP.FUNCTION_AWS,
+                    name=function_name,
+                    source=TransactionSource.COMPONENT,
+                    origin=AwsLambdaIntegration.origin,
+                )
+
+                span_ctx = sentry_sdk.start_transaction(
+                    transaction, custom_sampling_context=sampling_context
+                )
+
+            with span_ctx:
                 try:
                     return handler(aws_event, aws_context, *args, **kwargs)
                 except Exception:
