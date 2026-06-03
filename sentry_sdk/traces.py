@@ -827,7 +827,7 @@ def trace(
         return decorator
 
 
-def _get_current_streamed_span(
+def get_current_span(
     scope: "Optional[sentry_sdk.Scope]" = None,
 ) -> "Optional[StreamedSpan]":
     """

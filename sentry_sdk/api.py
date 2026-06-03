@@ -8,7 +8,8 @@ from sentry_sdk._init_implementation import init
 from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.crons import monitor
 from sentry_sdk.scope import Scope, _ScopeManager, isolation_scope, new_scope
-from sentry_sdk.traces import StreamedSpan, _get_current_streamed_span
+from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import get_current_span as _get_current_streamed_span
 from sentry_sdk.tracing import NoOpSpan, Transaction, trace
 
 if TYPE_CHECKING:
