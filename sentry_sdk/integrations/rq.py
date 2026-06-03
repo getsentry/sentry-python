@@ -79,12 +79,12 @@ class RqIntegration(Integration):
 
                     Scope.set_custom_sampling_context({"rq_job": job})
 
-                    span_name = "unknown RQ task"
+                    func_name = None
                     with capture_internal_exceptions():
-                        span_name = job.func_name
+                        func_name = job.func_name
 
                     with sentry_sdk.traces.start_span(
-                        name=span_name,
+                        name="unknown RQ task" if func_name is None else func_name,
                         attributes={
                             "sentry.op": OP.QUEUE_TASK_RQ,
                             "sentry.origin": RqIntegration.origin,
@@ -93,7 +93,7 @@ class RqIntegration(Integration):
                         },
                         parent_span=None,
                     ) as span:
-                        if span_name != "unknown RQ task":
+                        if func_name is not None:
                             span.set_attribute(
                                 SPANDATA.CODE_FUNCTION_NAME, job.func_name
                             )
