@@ -185,6 +185,7 @@ setenv =
     PYTHONDONTWRITEBYTECODE=1
     OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
     COVERAGE_FILE=.coverage-sentry-{envname}
+    UV_CACHE_DIR={env:HOME}/.cache/uv/{envname}
 
     UV_PRERELEASE=if-necessary-or-explicit
     {% for group, integrations in groups.items() %}
