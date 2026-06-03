@@ -156,11 +156,9 @@ class RqIntegration(Integration):
 
             scope = sentry_sdk.get_current_scope()
             span_streaming = has_span_streaming_enabled(client.options)
-            if span_streaming and scope.streamed_span is not None:
-                job.meta["_sentry_trace_headers"] = dict(
-                    scope.iter_trace_propagation_headers()
-                )
-            elif not span_streaming and scope.span is not None:
+            if (span_streaming and scope.streamed_span is not None) or (
+                not span_streaming and scope.span is not None
+            ):
                 job.meta["_sentry_trace_headers"] = dict(
                     scope.iter_trace_propagation_headers()
                 )
