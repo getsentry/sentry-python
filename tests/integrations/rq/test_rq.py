@@ -187,19 +187,21 @@ def test_transaction_with_error(
 
         sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
-
-        assert spans[44]["trace_id"] == error_event["contexts"]["trace"]["trace_id"]
-        assert spans[44]["span_id"] == error_event["contexts"]["trace"]["span_id"]
-        assert (
-            spans[44]["attributes"]["sentry.op"]
-            == error_event["contexts"]["trace"]["op"]
+        (span,) = (
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == "queue.task.rq"
         )
+
+        assert span["trace_id"] == error_event["contexts"]["trace"]["trace_id"]
+        assert span["span_id"] == error_event["contexts"]["trace"]["span_id"]
+        assert span["attributes"]["sentry.op"] == error_event["contexts"]["trace"]["op"]
         assert (
-            spans[44]["attributes"]["sentry.origin"]
+            span["attributes"]["sentry.origin"]
             == error_event["contexts"]["trace"]["origin"]
         )
         assert (
-            spans[44]["attributes"][SPANDATA.CODE_FUNCTION_NAME]
+            span["attributes"][SPANDATA.CODE_FUNCTION_NAME]
             == "tests.integrations.rq.test_rq.chew_up_shoes"
         )
     else:
@@ -308,15 +310,17 @@ def test_tracing_enabled(
 
         sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
-
-        assert spans[33]["trace_id"] == error_event["contexts"]["trace"]["trace_id"]
-        assert spans[33]["span_id"] == error_event["contexts"]["trace"]["span_id"]
-        assert (
-            spans[33]["attributes"]["sentry.op"]
-            == error_event["contexts"]["trace"]["op"]
+        (span,) = (
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == "queue.task.rq"
         )
+
+        assert span["trace_id"] == error_event["contexts"]["trace"]["trace_id"]
+        assert span["span_id"] == error_event["contexts"]["trace"]["span_id"]
+        assert span["attributes"]["sentry.op"] == error_event["contexts"]["trace"]["op"]
         assert (
-            spans[33]["attributes"]["sentry.origin"]
+            span["attributes"]["sentry.origin"]
             == error_event["contexts"]["trace"]["origin"]
         )
     else:
