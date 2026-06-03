@@ -6,6 +6,7 @@ from fakeredis import FakeStrictRedis
 
 import sentry_sdk
 from sentry_sdk import start_transaction
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.rq import RqIntegration
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE, parse_version
 
@@ -197,6 +198,10 @@ def test_transaction_with_error(
             spans[44]["attributes"]["sentry.origin"]
             == error_event["contexts"]["trace"]["origin"]
         )
+        assert (
+            spans[44]["attributes"][SPANDATA.CODE_FUNCTION_NAME]
+            == "tests.integrations.rq.test_rq.chew_up_shoes"
+        )
     else:
         events = capture_events()
 
@@ -360,7 +365,6 @@ def test_tracing_disabled(
         events = capture_events()
 
         scope = sentry_sdk.get_isolation_scope()
-
         queue.enqueue(crashing_job, foo=None)
         worker.work(burst=True)
 
