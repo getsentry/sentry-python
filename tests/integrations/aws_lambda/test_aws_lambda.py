@@ -688,7 +688,10 @@ def test_span_streaming_request_attributes(lambda_client, test_environment):
     attrs = segment_span["attributes"]
 
     assert _get_span_attr(attrs, "http.request.method") == "POST"
-    assert _get_span_attr(attrs, "url.query") == "foo=bar&a-complicated-value=a%3Db%26c%3Dd"
+    assert (
+        _get_span_attr(attrs, "url.query")
+        == "foo=bar&a-complicated-value=a%3Db%26c%3Dd"
+    )
     assert (
         _get_span_attr(attrs, "http.request.header.content-type") == "application/json"
     )
