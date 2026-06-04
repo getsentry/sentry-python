@@ -203,12 +203,14 @@ async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
                     "url.query",
                     request_websocket.query_string.decode("utf-8", errors="replace"),
                 )
-                segment.set_attribute(
-                    "client.address", request_websocket.access_route[0]
-                )
-                segment.set_attribute(
-                    "user.ip_address", request_websocket.access_route[0]
-                )
+
+                if len(request_websocket.access_route) >= 1:
+                    segment.set_attribute(
+                        "client.address", request_websocket.access_route[0]
+                    )
+                    segment.set_attribute(
+                        "user.ip_address", request_websocket.access_route[0]
+                    )
 
     evt_processor = _make_request_event_processor(app, request_websocket, integration)
     scope.add_event_processor(evt_processor)
@@ -235,7 +237,8 @@ def _make_request_event_processor(
             request_info["headers"] = _filter_headers(dict(request.headers))
 
             if should_send_default_pii():
-                request_info["env"] = {"REMOTE_ADDR": request.access_route[0]}
+                if len(request.access_route) >= 1:
+                    request_info["env"] = {"REMOTE_ADDR": request.access_route[0]}
                 _add_user_to_event(event)
 
         return event
