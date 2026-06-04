@@ -121,6 +121,7 @@ def _get_request_attributes(asgi_scope: "Any") -> "dict[str, Any]":
         for header, value in headers.items():
             attributes[f"http.request.header.{header.lower()}"] = value
 
+    if should_send_default_pii():
         query = _get_query(asgi_scope)
         if query:
             attributes["http.query"] = query
@@ -129,9 +130,9 @@ def _get_request_attributes(asgi_scope: "Any") -> "dict[str, Any]":
             asgi_scope, "http" if ty == "http" else "ws", headers.get("host")
         )
 
-    client = asgi_scope.get("client")
-    if client and should_send_default_pii():
-        ip = _get_ip(asgi_scope)
-        attributes["client.address"] = ip
+        client = asgi_scope.get("client")
+        if client:
+            ip = _get_ip(asgi_scope)
+            attributes["client.address"] = ip
 
     return attributes
