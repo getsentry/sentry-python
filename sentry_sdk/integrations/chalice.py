@@ -103,7 +103,7 @@ def _get_view_function_response(
             if has_span_streaming_enabled(client.options):
                 aws_context = app.lambda_context
                 request_dict = app.current_request.to_dict()
-                headers = request_dict.get("headers", {}) or {}
+                headers = request_dict.get("headers", {})
 
                 header_attrs: "Dict[str, Any]" = {}
                 for header, value in _filter_headers(
