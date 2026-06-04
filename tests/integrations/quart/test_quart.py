@@ -747,6 +747,7 @@ async def test_span_streaming_with_error(sentry_init, capture_items):
 
     events = [item.payload for item in items if item.type == "event"]
     spans = [item.payload for item in items if item.type == "span"]
+
     assert len(events) == 1
     assert len(spans) == 1
 
@@ -755,9 +756,11 @@ async def test_span_streaming_with_error(sentry_init, capture_items):
 
     assert segment["trace_id"] == error_event["contexts"]["trace"]["trace_id"]
     assert segment["is_segment"] is True
-    assert "parent_span_id" not in segment
-    assert error_event["contexts"]["trace"]["span_id"] == segment["span_id"]
     assert segment["status"] == "error"
+
+    assert "parent_span_id" not in segment
+
+    assert error_event["contexts"]["trace"]["span_id"] == segment["span_id"]
     assert error_event["exception"]["values"][0]["mechanism"]["type"] == "quart"
     assert error_event["exception"]["values"][0]["mechanism"]["handled"] is False
 
