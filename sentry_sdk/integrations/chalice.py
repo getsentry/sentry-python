@@ -11,7 +11,7 @@ from sentry_sdk.integrations.cloud_resource_context import (
     CLOUD_PLATFORM,
     CLOUD_PROVIDER,
 )
-from sentry_sdk.traces import SegmentSource
+from sentry_sdk.traces import SegmentSource, SpanStatus
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -51,23 +51,27 @@ class EventSourceHandler(ChaliceEventSourceHandler):  # type: ignore
                 )
 
             if has_span_streaming_enabled(client.options):
-                with sentry_sdk.traces.start_span(
+                span = sentry_sdk.traces.start_span(
                     name=context.function_name,
                     parent_span=None,
                     attributes=_get_lambda_span_attributes(context),
-                ):
-                    try:
-                        return ChaliceEventSourceHandler.__call__(self, event, context)
-                    except Exception:
-                        exc_info = sys.exc_info()
-                        sentry_event, hint = event_from_exception(
-                            exc_info,
-                            client_options=client.options,
-                            mechanism={"type": "chalice", "handled": False},
-                        )
-                        sentry_sdk.capture_event(sentry_event, hint=hint)
-                        client.flush()
-                        reraise(*exc_info)
+                )
+                try:
+                    return ChaliceEventSourceHandler.__call__(self, event, context)
+                except Exception:
+                    exc_info = sys.exc_info()
+                    span.status = SpanStatus.ERROR.value
+                    sentry_event, hint = event_from_exception(
+                        exc_info,
+                        client_options=client.options,
+                        mechanism={"type": "chalice", "handled": False},
+                    )
+                    sentry_sdk.capture_event(sentry_event, hint=hint)
+                    reraise(*exc_info)
+                finally:
+                    span.end()
+                    client.flush()
+
             else:
                 try:
                     return ChaliceEventSourceHandler.__call__(self, event, context)
@@ -115,7 +119,7 @@ def _get_view_function_response(
                 if "method" in request_dict:
                     additional_attrs["http.request.method"] = request_dict["method"]
 
-                with sentry_sdk.traces.start_span(
+                span = sentry_sdk.traces.start_span(
                     name=aws_context.function_name,
                     parent_span=None,
                     attributes={
@@ -123,21 +127,24 @@ def _get_view_function_response(
                         **header_attrs,
                         **additional_attrs,
                     },
-                ):
-                    try:
-                        return view_function(**function_args)
-                    except Exception as exc:
-                        if isinstance(exc, ChaliceViewError):
-                            raise
-                        exc_info = sys.exc_info()
-                        sentry_event, hint = event_from_exception(
-                            exc_info,
-                            client_options=client.options,
-                            mechanism={"type": "chalice", "handled": False},
-                        )
-                        sentry_sdk.capture_event(sentry_event, hint=hint)
-                        client.flush()
+                )
+                try:
+                    return view_function(**function_args)
+                except Exception as exc:
+                    if isinstance(exc, ChaliceViewError):
                         raise
+                    exc_info = sys.exc_info()
+                    span.status = SpanStatus.ERROR.value
+                    sentry_event, hint = event_from_exception(
+                        exc_info,
+                        client_options=client.options,
+                        mechanism={"type": "chalice", "handled": False},
+                    )
+                    sentry_sdk.capture_event(sentry_event, hint=hint)
+                    raise
+                finally:
+                    span.end()
+                    client.flush()
             else:
                 scope.set_transaction_name(
                     app.lambda_context.function_name,

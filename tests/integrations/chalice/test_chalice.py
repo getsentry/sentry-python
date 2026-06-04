@@ -236,6 +236,7 @@ def test_span_streaming_basic(
     assert attrs["aws.log.stream.names"] == ["2024/01/01/[$LATEST]abcdef1234567890"]
     assert attrs["http.request.method"] == "GET"
     assert attrs["http.request.header.x-custom-header"] == "test-value"
+    assert span["status"] == "ok"
 
 
 def test_span_streaming_error(
@@ -263,6 +264,29 @@ def test_span_streaming_error(
     attrs = segment_spans[0]["attributes"]
     assert attrs["sentry.op"] == "function.aws"
     assert attrs["sentry.origin"] == "auto.function.chalice"
+    assert segment_spans[0]["status"] == "error"
+
+
+def test_span_streaming_error_flush_ordering(
+    sentry_init,
+    capture_items,
+):
+    """The handler's own client.flush() must send the segment span.
+
+    If flush runs before the span ends, the segment won't be in the
+    transport without an extra sentry_sdk.flush() call after the request.
+    On Lambda, the worker can freeze right after the response, so there's
+    no second chance.
+    """
+    app = _make_span_streaming_app(sentry_init)
+    client = RequestHandler(app)
+    items = capture_items("span")
+
+    response = client.get("/boom")
+    assert response.status_code == 500
+
+    segment_spans = [s.payload for s in items if s.payload.get("is_segment")]
+    assert len(segment_spans) == 1
 
 
 def test_span_streaming_scheduled_event(
@@ -328,3 +352,4 @@ def test_span_streaming_scheduled_event(
     assert attrs["faas.version"] == "$LATEST"
     assert attrs["aws.log.group.names"] == ["/aws/lambda/lambda_name"]
     assert attrs["aws.log.stream.names"] == ["2024/01/01/[$LATEST]abcdef1234567890"]
+    assert segment_spans[0]["status"] == "error"
