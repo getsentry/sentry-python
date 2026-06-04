@@ -9,7 +9,10 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import SOURCE_FOR_STYLE
+from sentry_sdk.traces import SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE
+from sentry_sdk.traces import StreamedSpan, get_current_span
+from sentry_sdk.tracing import SOURCE_FOR_STYLE as TRANSACTION_SOURCE_FOR_STYLE
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -144,9 +147,16 @@ def _set_transaction_name_and_source(
             "url": request.url_rule.rule,
             "endpoint": request.url_rule.endpoint,
         }
+
+        source = (
+            SEGMENT_SOURCE_FOR_STYLE[transaction_style]
+            if has_span_streaming_enabled(sentry_sdk.get_client().options)
+            else TRANSACTION_SOURCE_FOR_STYLE[transaction_style]
+        )
+
         scope.set_transaction_name(
-            name_for_style[transaction_style],
-            source=SOURCE_FOR_STYLE[transaction_style],
+            name=name_for_style[transaction_style],
+            source=source,
         )
     except Exception:
         pass
@@ -169,6 +179,37 @@ async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
     )
 
     scope = sentry_sdk.get_isolation_scope()
+
+    if has_span_streaming_enabled(sentry_sdk.get_client().options):
+        current_span = get_current_span()
+        if type(current_span) is StreamedSpan:
+            segment = current_span._segment
+
+            segment.set_attribute("http.request.method", request_websocket.method)
+            header_attributes: "dict[str, Any]" = {}
+
+            for header, header_value in _filter_headers(
+                dict(request_websocket.headers), use_annotated_value=False
+            ).items():
+                header_attributes[f"http.request.header.{header.lower()}"] = (
+                    header_value
+                )
+
+            segment.set_attributes(header_attributes)
+
+            if should_send_default_pii():
+                segment.set_attribute("url.full", request_websocket.url)
+                segment.set_attribute(
+                    "url.query",
+                    request_websocket.query_string.decode("utf-8", errors="replace"),
+                )
+                segment.set_attribute(
+                    "client.address", request_websocket.access_route[0]
+                )
+                segment.set_attribute(
+                    "user.ip_address", request_websocket.access_route[0]
+                )
+
     evt_processor = _make_request_event_processor(app, request_websocket, integration)
     scope.add_event_processor(evt_processor)
 

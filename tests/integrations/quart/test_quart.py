@@ -14,6 +14,7 @@ from sentry_sdk import (
     set_tag,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 
 
 def quart_app_factory():
@@ -647,3 +648,243 @@ async def test_span_origin(sentry_init, capture_events):
     (_, event) = events
 
     assert event["contexts"]["trace"]["origin"] == "auto.http.quart"
+
+
+@pytest.mark.asyncio
+async def test_span_streaming_basic(sentry_init, capture_items):
+    sentry_init(
+        integrations=[quart_sentry.QuartIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+    items = capture_items("span")
+
+    app = quart_app_factory()
+    client = app.test_client()
+    response = await client.get("/message")
+    assert response.status_code == 200
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
+
+    segment = spans[0]
+    assert segment["is_segment"] is True
+    assert "parent_span_id" not in segment
+    assert segment["status"] == "ok"
+    assert segment["attributes"]["sentry.op"] == "http.server"
+    assert segment["attributes"]["sentry.origin"] == "auto.http.quart"
+    assert segment["attributes"]["http.request.method"] == "GET"
+    assert segment["name"] == "hi"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "url,transaction_style,expected_name,expected_source",
+    [
+        ("/message", "endpoint", "hi", "component"),
+        ("/message", "url", "/message", "route"),
+        ("/message/123456", "endpoint", "hi_with_id", "component"),
+        ("/message/123456", "url", "/message/<message_id>", "route"),
+    ],
+)
+async def test_span_streaming_transaction_style(
+    sentry_init,
+    capture_items,
+    url,
+    transaction_style,
+    expected_name,
+    expected_source,
+):
+    sentry_init(
+        integrations=[
+            quart_sentry.QuartIntegration(transaction_style=transaction_style)
+        ],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+    items = capture_items("span")
+
+    app = quart_app_factory()
+    client = app.test_client()
+    response = await client.get(url)
+    assert response.status_code == 200
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
+
+    segment = spans[0]
+    assert segment["is_segment"] is True
+    assert segment["name"] == expected_name
+    assert segment["attributes"]["sentry.span.source"] == expected_source
+
+
+@pytest.mark.asyncio
+async def test_span_streaming_with_error(sentry_init, capture_items):
+    sentry_init(
+        integrations=[quart_sentry.QuartIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+    items = capture_items("event", "span")
+
+    app = quart_app_factory()
+
+    @app.route("/error")
+    async def error():
+        1 / 0
+
+    client = app.test_client()
+    try:
+        await client.get("/error")
+    except ZeroDivisionError:
+        pass
+
+    sentry_sdk.flush()
+
+    events = [item.payload for item in items if item.type == "event"]
+    spans = [item.payload for item in items if item.type == "span"]
+    assert len(events) == 1
+    assert len(spans) == 1
+
+    error_event = events[0]
+    segment = spans[0]
+
+    assert segment["trace_id"] == error_event["contexts"]["trace"]["trace_id"]
+    assert segment["is_segment"] is True
+    assert "parent_span_id" not in segment
+    assert error_event["contexts"]["trace"]["span_id"] == segment["span_id"]
+    assert segment["status"] == "error"
+    assert error_event["exception"]["values"][0]["mechanism"]["type"] == "quart"
+    assert error_event["exception"]["values"][0]["mechanism"]["handled"] is False
+
+
+@pytest.mark.asyncio
+async def test_span_streaming_request_attributes_no_pii(sentry_init, capture_items):
+    sentry_init(
+        integrations=[quart_sentry.QuartIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=False,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+    items = capture_items("span")
+
+    app = quart_app_factory()
+    client = app.test_client()
+    response = await client.get("/message?foo=bar")
+    assert response.status_code == 200
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
+
+    segment = spans[0]
+    assert segment["attributes"]["http.request.method"] == "GET"
+    assert "http.request.header.host" in segment["attributes"]
+
+    assert "url.full" not in segment["attributes"]
+    assert "url.query" not in segment["attributes"]
+    assert "client.address" not in segment["attributes"]
+    assert "user.ip_address" not in segment["attributes"]
+
+
+@pytest.mark.asyncio
+async def test_span_streaming_request_attributes_with_pii(sentry_init, capture_items):
+    sentry_init(
+        integrations=[quart_sentry.QuartIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+    items = capture_items("span")
+
+    app = quart_app_factory()
+    client = app.test_client()
+    response = await client.get("/message?foo=bar&baz=qux")
+    assert response.status_code == 200
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
+
+    segment = spans[0]
+    assert segment["attributes"]["http.request.method"] == "GET"
+    assert "http.request.header.host" in segment["attributes"]
+
+    assert (
+        segment["attributes"]["url.full"] == "http://localhost/message?foo=bar&baz=qux"
+    )
+    assert segment["attributes"]["url.query"] == "foo=bar&baz=qux"
+    assert "client.address" in segment["attributes"]
+    assert "user.ip_address" in segment["attributes"]
+
+
+@pytest.mark.asyncio
+async def test_span_streaming_sensitive_header_scrubbing(sentry_init, capture_items):
+    sentry_init(
+        integrations=[quart_sentry.QuartIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=False,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+    items = capture_items("span")
+
+    app = quart_app_factory()
+    client = app.test_client()
+    response = await client.get(
+        "/message",
+        headers={
+            "Authorization": "Bearer secret-token",
+            "X-Custom-Header": "passthrough",
+        },
+    )
+    assert response.status_code == 200
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
+
+    segment = spans[0]
+    assert (
+        segment["attributes"]["http.request.header.authorization"]
+        == SENSITIVE_DATA_SUBSTITUTE
+    )
+    assert segment["attributes"]["http.request.header.x-custom-header"] == "passthrough"
+
+
+@pytest.mark.asyncio
+async def test_span_streaming_sensitive_header_passthrough_with_pii(
+    sentry_init, capture_items
+):
+    sentry_init(
+        integrations=[quart_sentry.QuartIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+    items = capture_items("span")
+
+    app = quart_app_factory()
+    client = app.test_client()
+    response = await client.get(
+        "/message",
+        headers={"Authorization": "Bearer secret-token"},
+    )
+    assert response.status_code == 200
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
+
+    segment = spans[0]
+    assert (
+        segment["attributes"]["http.request.header.authorization"]
+        == "Bearer secret-token"
+    )
