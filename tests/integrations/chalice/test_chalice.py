@@ -5,9 +5,21 @@ from chalice import BadRequestError, Chalice
 from chalice.local import LambdaContext, LocalGateway
 from pytest_chalice.handlers import RequestHandler
 
+import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.chalice import CHALICE_VERSION, ChaliceIntegration
 from sentry_sdk.utils import parse_version
+
+
+def _populate_lambda_context(context):
+    fn = context.function_name
+    context.invoked_function_arn = (
+        f"arn:aws:lambda:us-east-1:123456789012:function:{fn}"
+    )
+    context.log_group_name = f"/aws/lambda/{fn}"
+    context.log_stream_name = "2024/01/01/[$LATEST]abcdef1234567890"
+    context.aws_request_id = "test-request-id-1234"
+    return context
 
 
 def _generate_lambda_context(self):
@@ -19,11 +31,12 @@ def _generate_lambda_context(self):
         timeout = 10 * 1000
     else:
         timeout = self._config.lambda_timeout * 1000
-    return LambdaContext(
+    context = LambdaContext(
         function_name=self._config.function_name,
         memory_size=self._config.lambda_memory_size,
         max_runtime_ms=timeout,
     )
+    return _populate_lambda_context(context)
 
 
 @pytest.fixture
@@ -89,8 +102,8 @@ def test_scheduled_event(app, lambda_context_args):
     def every_hour(event):
         raise Exception("schedule event!")
 
-    context = LambdaContext(
-        *lambda_context_args, max_runtime_ms=10000, time_source=time
+    context = _populate_lambda_context(
+        LambdaContext(*lambda_context_args, max_runtime_ms=10000, time_source=time)
     )
 
     lambda_event = {
@@ -160,3 +173,158 @@ def test_transaction(
     (event,) = events
     assert event["transaction"] == expected_transaction
     assert event["transaction_info"] == {"source": expected_source}
+
+
+def _make_span_streaming_app(sentry_init):
+    sentry_init(
+        integrations=[ChaliceIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+    app = Chalice(app_name="sentry_chalice")
+
+    @app.route("/message")
+    def hi():
+        capture_message("hi")
+        return {"status": "ok"}
+
+    @app.route("/boom")
+    def boom():
+        raise Exception("boom goes the dynamite!")
+
+    LocalGateway._generate_lambda_context = _generate_lambda_context
+
+    return app
+
+
+def test_span_streaming_basic(
+    sentry_init,
+    capture_items,
+):
+    app = _make_span_streaming_app(sentry_init)
+    client = RequestHandler(app)
+    items = capture_items("span")
+
+    response = client.get("/message", headers={"X-Custom-Header": "test-value"})
+    assert response.status_code == 200
+
+    sentry_sdk.flush()
+
+    segment_spans = [s.payload for s in items if s.payload.get("is_segment")]
+    assert len(segment_spans) == 1
+    span = segment_spans[0]
+
+    attrs = span["attributes"]
+    assert attrs["sentry.op"] == "function.aws"
+    assert attrs["sentry.origin"] == "auto.function.chalice"
+    assert attrs["sentry.span.source"] == "component"
+    assert attrs["cloud.platform"] == "aws_lambda"
+    assert attrs["cloud.provider"] == "aws"
+    assert attrs["cloud.region"] == "us-east-1"
+    assert (
+        attrs["cloud.resource_id"]
+        == "arn:aws:lambda:us-east-1:123456789012:function:api_handler"
+    )
+    assert (
+        attrs["aws.lambda.invoked_arn"]
+        == "arn:aws:lambda:us-east-1:123456789012:function:api_handler"
+    )
+    assert attrs["faas.name"] == "api_handler"
+    assert attrs["faas.invocation_id"] == "test-request-id-1234"
+    assert attrs["faas.version"] == "$LATEST"
+    assert attrs["aws.log.group.names"] == ["/aws/lambda/api_handler"]
+    assert attrs["aws.log.stream.names"] == ["2024/01/01/[$LATEST]abcdef1234567890"]
+    assert attrs["http.request.method"] == "GET"
+    assert attrs["http.request.header.x-custom-header"] == "test-value"
+
+
+def test_span_streaming_error(
+    sentry_init,
+    capture_items,
+):
+    app = _make_span_streaming_app(sentry_init)
+    client = RequestHandler(app)
+    items = capture_items("event", "span")
+
+    response = client.get("/boom")
+    assert response.status_code == 500
+
+    sentry_sdk.flush()
+
+    error_items = [i for i in items if i.type == "event"]
+    span_items = [i for i in items if i.type == "span"]
+
+    assert len(error_items) == 1
+    assert len(span_items) >= 1
+
+    segment_spans = [s.payload for s in span_items if s.payload.get("is_segment")]
+    assert len(segment_spans) == 1
+
+    attrs = segment_spans[0]["attributes"]
+    assert attrs["sentry.op"] == "function.aws"
+    assert attrs["sentry.origin"] == "auto.function.chalice"
+
+
+def test_span_streaming_scheduled_event(
+    sentry_init,
+    lambda_context_args,
+    capture_items,
+):
+    sentry_init(
+        integrations=[ChaliceIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+    app = Chalice(app_name="sentry_chalice")
+
+    @app.schedule("rate(1 minutes)")
+    def every_hour(event):
+        raise Exception("schedule event!")
+
+    items = capture_items("event", "span")
+
+    context = _populate_lambda_context(
+        LambdaContext(*lambda_context_args, max_runtime_ms=10000, time_source=time)
+    )
+
+    lambda_event = {
+        "version": "0",
+        "account": "120987654312",
+        "region": "us-west-1",
+        "detail": {},
+        "detail-type": "Scheduled Event",
+        "source": "aws.events",
+        "time": "1970-01-01T00:00:00Z",
+        "id": "event-id",
+        "resources": ["arn:aws:events:us-west-1:120987654312:rule/my-schedule"],
+    }
+    with pytest.raises(Exception) as exc_info:
+        every_hour(lambda_event, context=context)
+    assert str(exc_info.value) == "schedule event!"
+
+    sentry_sdk.flush()
+
+    span_items = [i for i in items if i.type == "span"]
+    segment_spans = [s.payload for s in span_items if s.payload.get("is_segment")]
+    assert len(segment_spans) == 1
+
+    attrs = segment_spans[0]["attributes"]
+    assert attrs["sentry.op"] == "function.aws"
+    assert attrs["sentry.origin"] == "auto.function.chalice"
+    assert attrs["sentry.span.source"] == "component"
+    assert attrs["cloud.platform"] == "aws_lambda"
+    assert attrs["cloud.provider"] == "aws"
+    assert attrs["cloud.region"] == "us-east-1"
+    assert (
+        attrs["cloud.resource_id"]
+        == "arn:aws:lambda:us-east-1:123456789012:function:lambda_name"
+    )
+    assert (
+        attrs["aws.lambda.invoked_arn"]
+        == "arn:aws:lambda:us-east-1:123456789012:function:lambda_name"
+    )
+    assert attrs["faas.name"] == "lambda_name"
+    assert attrs["faas.invocation_id"] == "test-request-id-1234"
+    assert attrs["faas.version"] == "$LATEST"
+    assert attrs["aws.log.group.names"] == ["/aws/lambda/lambda_name"]
+    assert attrs["aws.log.stream.names"] == ["2024/01/01/[$LATEST]abcdef1234567890"]
