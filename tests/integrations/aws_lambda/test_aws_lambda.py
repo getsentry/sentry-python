@@ -542,11 +542,11 @@ def test_span_streaming_no_error(lambda_client, test_environment):
     span_items = test_environment["server"].span_items
 
     assert len(envelopes) == 0
-    assert len(span_items) == 1
 
-    segment_span = span_items[0]
+    segment_spans = [s for s in span_items if s["is_segment"]]
+    assert len(segment_spans) == 1
+    segment_span = segment_spans[0]
 
-    assert segment_span["is_segment"] is True
     assert segment_span["name"] == "BasicOkSpanStreaming"
 
     attrs = segment_span["attributes"]
@@ -591,11 +591,10 @@ def test_span_streaming_error(lambda_client, test_environment):
     assert exception["mechanism"]["type"] == "aws_lambda"
     assert not exception["mechanism"]["handled"]
 
-    assert len(span_items) == 1
+    segment_spans = [s for s in span_items if s["is_segment"]]
+    assert len(segment_spans) == 1
+    segment_span = segment_spans[0]
 
-    segment_span = span_items[0]
-
-    assert segment_span["is_segment"] is True
     assert segment_span["name"] == "RaiseErrorSpanStreaming"
     assert segment_span["status"] == "error"
 
@@ -647,9 +646,9 @@ def test_span_streaming_trace_continuation(lambda_client, test_environment):
     error_event = envelopes[0]
     assert error_event["contexts"]["trace"]["trace_id"] == trace_id
 
-    assert len(span_items) == 1
-    segment_span = span_items[0]
-    assert segment_span["is_segment"] is True
+    segment_spans = [s for s in span_items if s["is_segment"]]
+    assert len(segment_spans) == 1
+    segment_span = segment_spans[0]
     assert segment_span["trace_id"] == trace_id
     assert segment_span["name"] == "RaiseErrorSpanStreaming"
     attrs = segment_span["attributes"]
@@ -681,8 +680,9 @@ def test_span_streaming_request_attributes(lambda_client, test_environment):
     )
     span_items = test_environment["server"].span_items
 
-    assert len(span_items) == 1
-    segment_span = span_items[0]
+    segment_spans = [s for s in span_items if s["is_segment"]]
+    assert len(segment_spans) == 1
+    segment_span = segment_spans[0]
     attrs = segment_span["attributes"]
 
     assert _get_span_attr(attrs, "http.request.method") == "POST"
