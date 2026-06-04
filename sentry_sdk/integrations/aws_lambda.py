@@ -6,6 +6,7 @@ from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from os import environ
 from typing import TYPE_CHECKING
+from urllib.parse import urlencode
 
 import sentry_sdk
 from sentry_sdk.api import continue_trace
@@ -166,9 +167,7 @@ def _wrap_handler(handler: "F") -> "F":
             if should_send_default_pii() and "queryStringParameters" in request_data:
                 qs = request_data["queryStringParameters"]
                 if qs:
-                    additional_attributes["url.query"] = "&".join(
-                        f"{k}={v}" for k, v in qs.items()
-                    )
+                    additional_attributes["url.query"] = urlencode(qs)
 
             sampling_context = {
                 "aws_event": aws_event,
