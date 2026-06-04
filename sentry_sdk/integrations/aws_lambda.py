@@ -107,6 +107,7 @@ def _wrap_handler(handler: "F") -> "F":
             request_data = {}
 
         configured_time = aws_context.get_remaining_time_in_millis()
+        aws_region = aws_context.invoked_function_arn.split(":")[3]
 
         with sentry_sdk.isolation_scope() as scope:
             timeout_thread = None
@@ -117,9 +118,7 @@ def _wrap_handler(handler: "F") -> "F":
                         request_data, aws_context, configured_time
                     )
                 )
-                scope.set_tag(
-                    "aws_region", aws_context.invoked_function_arn.split(":")[3]
-                )
+                scope.set_tag("aws_region", aws_region)
                 if batch_size > 1:
                     scope.set_tag("batch_request", True)
                     scope.set_tag("batch_size", batch_size)
@@ -171,8 +170,6 @@ def _wrap_handler(handler: "F") -> "F":
                         f"{k}={v}" for k, v in qs.items()
                     )
 
-            aws_region = aws_context.invoked_function_arn.split(":")[3]
-
             sampling_context = {
                 "aws_event": aws_event,
                 "aws_context": aws_context,
@@ -200,6 +197,7 @@ def _wrap_handler(handler: "F") -> "F":
                         "aws.lambda.invoked_arn": aws_context.invoked_function_arn,
                         "aws.log.group.names": [aws_context.log_group_name],
                         "aws.log.stream.names": [aws_context.log_stream_name],
+                        "messaging.batch.message_count": batch_size,
                         **header_attributes,
                         **additional_attributes,
                     },

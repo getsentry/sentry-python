@@ -572,6 +572,7 @@ def test_span_streaming_no_error(lambda_client, test_environment):
         "aws/lambda/BasicOkSpanStreaming"
     ]
     assert _get_span_attr(attrs, "aws.log.stream.names") == ["$LATEST"]
+    assert _get_span_attr(attrs, "messaging.batch.message_count") == 1
 
 
 def test_span_streaming_error(lambda_client, test_environment):
@@ -621,6 +622,7 @@ def test_span_streaming_error(lambda_client, test_environment):
         "aws/lambda/RaiseErrorSpanStreaming"
     ]
     assert _get_span_attr(attrs, "aws.log.stream.names") == ["$LATEST"]
+    assert _get_span_attr(attrs, "messaging.batch.message_count") == 1
 
 
 def test_span_streaming_trace_continuation(lambda_client, test_environment):
