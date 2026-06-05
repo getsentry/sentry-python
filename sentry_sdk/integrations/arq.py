@@ -1,11 +1,13 @@
 import sys
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANSTATUS
+from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import SegmentSource, SpanStatus
 from sentry_sdk.tracing import Transaction, TransactionSource
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
@@ -69,9 +71,19 @@ def patch_enqueue_job() -> None:
     async def _sentry_enqueue_job(
         self: "ArqRedis", function: str, *args: "Any", **kwargs: "Any"
     ) -> "Optional[Job]":
-        integration = sentry_sdk.get_client().get_integration(ArqIntegration)
-        if integration is None:
+        client = sentry_sdk.get_client()
+        if client.get_integration(ArqIntegration) is None:
             return await old_enqueue_job(self, function, *args, **kwargs)
+
+        if has_span_streaming_enabled(client.options):
+            with sentry_sdk.traces.start_span(
+                name=function,
+                attributes={
+                    "sentry.op": OP.QUEUE_SUBMIT_ARQ,
+                    "sentry.origin": ArqIntegration.origin,
+                },
+            ):
+                return await old_enqueue_job(self, function, *args, **kwargs)
 
         with sentry_sdk.start_span(
             op=OP.QUEUE_SUBMIT_ARQ, name=function, origin=ArqIntegration.origin
@@ -86,13 +98,26 @@ def patch_run_job() -> None:
     old_run_job = Worker.run_job
 
     async def _sentry_run_job(self: "Worker", job_id: str, score: int) -> None:
-        integration = sentry_sdk.get_client().get_integration(ArqIntegration)
-        if integration is None:
+        client = sentry_sdk.get_client()
+        if client.get_integration(ArqIntegration) is None:
             return await old_run_job(self, job_id, score)
 
         with sentry_sdk.isolation_scope() as scope:
             scope._name = "arq"
             scope.clear_breadcrumbs()
+
+            if has_span_streaming_enabled(client.options):
+                with sentry_sdk.traces.start_span(
+                    name="unknown arq task",
+                    attributes={
+                        "sentry.op": OP.QUEUE_TASK_ARQ,
+                        "sentry.origin": ArqIntegration.origin,
+                        "sentry.span.source": SegmentSource.TASK,
+                        SPANDATA.MESSAGING_MESSAGE_ID: job_id,
+                    },
+                    parent_span=None,
+                ):
+                    return await old_run_job(self, job_id, score)
 
             transaction = Transaction(
                 name="unknown arq task",
@@ -111,7 +136,13 @@ def patch_run_job() -> None:
 def _capture_exception(exc_info: "ExcInfo") -> None:
     scope = sentry_sdk.get_current_scope()
 
-    if scope.transaction is not None:
+    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+    if span_streaming and scope.streamed_span is not None:
+        if exc_info[0] in ARQ_CONTROL_FLOW_EXCEPTIONS:
+            return
+
+        scope.streamed_span.status = SpanStatus.ERROR
+    elif not span_streaming and scope.transaction is not None:
         if exc_info[0] in ARQ_CONTROL_FLOW_EXCEPTIONS:
             scope.transaction.set_status(SPANSTATUS.ABORTED)
             return
@@ -163,6 +194,10 @@ def _wrap_coroutine(name: str, coroutine: "WorkerCoroutine") -> "WorkerCoroutine
         integration = sentry_sdk.get_client().get_integration(ArqIntegration)
         if integration is None:
             return await coroutine(ctx, *args, **kwargs)
+
+        span = sentry_sdk.traces.get_current_span()
+        if span is not None:
+            span.name = name
 
         sentry_sdk.get_isolation_scope().add_event_processor(
             _make_event_processor({**ctx, "job_name": name}, *args, **kwargs)
