@@ -273,9 +273,9 @@ def test_clickhouse_client_spans(
             {
                 "name": "DROP TABLE IF EXISTS test",
                 "attributes": {
-                    "db.system": "clickhouse",
+                    "db.system.name": "clickhouse",
                     "db.driver.name": "clickhouse-driver",
-                    "db.name": "",
+                    "db.namespace": "",
                     "db.user": "default",
                     "sentry.op": "db",
                     "sentry.origin": "auto.db.clickhouse_driver",
@@ -288,9 +288,9 @@ def test_clickhouse_client_spans(
             {
                 "name": "CREATE TABLE test (x Int32) ENGINE = Memory",
                 "attributes": {
-                    "db.system": "clickhouse",
+                    "db.system.name": "clickhouse",
                     "db.driver.name": "clickhouse-driver",
-                    "db.name": "",
+                    "db.namespace": "",
                     "db.user": "default",
                     "sentry.op": "db",
                     "sentry.origin": "auto.db.clickhouse_driver",
@@ -303,9 +303,9 @@ def test_clickhouse_client_spans(
             {
                 "name": "INSERT INTO test (x) VALUES",
                 "attributes": {
-                    "db.system": "clickhouse",
+                    "db.system.name": "clickhouse",
                     "db.driver.name": "clickhouse-driver",
-                    "db.name": "",
+                    "db.namespace": "",
                     "db.user": "default",
                     "sentry.op": "db",
                     "sentry.origin": "auto.db.clickhouse_driver",
@@ -318,9 +318,9 @@ def test_clickhouse_client_spans(
             {
                 "name": "INSERT INTO test (x) VALUES",
                 "attributes": {
-                    "db.system": "clickhouse",
+                    "db.system.name": "clickhouse",
                     "db.driver.name": "clickhouse-driver",
-                    "db.name": "",
+                    "db.namespace": "",
                     "db.user": "default",
                     "sentry.op": "db",
                     "sentry.origin": "auto.db.clickhouse_driver",
@@ -333,9 +333,9 @@ def test_clickhouse_client_spans(
             {
                 "name": "SELECT sum(x) FROM test WHERE x > 150",
                 "attributes": {
-                    "db.system": "clickhouse",
+                    "db.system.name": "clickhouse",
                     "db.driver.name": "clickhouse-driver",
-                    "db.name": "",
+                    "db.namespace": "",
                     "db.user": "default",
                     "sentry.op": "db",
                     "sentry.origin": "auto.db.clickhouse_driver",
@@ -560,8 +560,8 @@ def test_clickhouse_client_spans_with_pii(
             {
                 "name": "DROP TABLE IF EXISTS test",
                 "attributes": {
-                    "db.system": "clickhouse",
-                    "db.name": "",
+                    "db.system.name": "clickhouse",
+                    "db.namespace": "",
                     "db.user": "default",
                     "server.address": "localhost",
                     "server.port": 9000,
@@ -574,8 +574,8 @@ def test_clickhouse_client_spans_with_pii(
             {
                 "name": "CREATE TABLE test (x Int32) ENGINE = Memory",
                 "attributes": {
-                    "db.system": "clickhouse",
-                    "db.name": "",
+                    "db.system.name": "clickhouse",
+                    "db.namespace": "",
                     "db.user": "default",
                     "server.address": "localhost",
                     "server.port": 9000,
@@ -588,8 +588,8 @@ def test_clickhouse_client_spans_with_pii(
             {
                 "name": "INSERT INTO test (x) VALUES",
                 "attributes": {
-                    "db.system": "clickhouse",
-                    "db.name": "",
+                    "db.system.name": "clickhouse",
+                    "db.namespace": "",
                     "db.user": "default",
                     "server.address": "localhost",
                     "server.port": 9000,
@@ -602,8 +602,8 @@ def test_clickhouse_client_spans_with_pii(
             {
                 "name": "INSERT INTO test (x) VALUES",
                 "attributes": {
-                    "db.system": "clickhouse",
-                    "db.name": "",
+                    "db.system.name": "clickhouse",
+                    "db.namespace": "",
                     "db.user": "default",
                     "server.address": "localhost",
                     "server.port": 9000,
@@ -614,8 +614,8 @@ def test_clickhouse_client_spans_with_pii(
             {
                 "name": "SELECT sum(x) FROM test WHERE x > 150",
                 "attributes": {
-                    "db.system": "clickhouse",
-                    "db.name": "",
+                    "db.system.name": "clickhouse",
+                    "db.namespace": "",
                     "db.user": "default",
                     "server.address": "localhost",
                     "server.port": 9000,
@@ -1008,9 +1008,9 @@ def test_clickhouse_dbapi_spans(
             {
                 "name": "DROP TABLE IF EXISTS test",
                 "attributes": {
-                    "db.system": "clickhouse",
+                    "db.system.name": "clickhouse",
                     "db.driver.name": "clickhouse-driver",
-                    "db.name": "",
+                    "db.namespace": "",
                     "db.user": "default",
                     "sentry.op": "db",
                     "sentry.origin": "auto.db.clickhouse_driver",
@@ -1023,9 +1023,9 @@ def test_clickhouse_dbapi_spans(
             {
                 "name": "CREATE TABLE test (x Int32) ENGINE = Memory",
                 "attributes": {
-                    "db.system": "clickhouse",
+                    "db.system.name": "clickhouse",
                     "db.driver.name": "clickhouse-driver",
-                    "db.name": "",
+                    "db.namespace": "",
                     "db.user": "default",
                     "sentry.op": "db",
                     "sentry.origin": "auto.db.clickhouse_driver",
@@ -1038,9 +1038,9 @@ def test_clickhouse_dbapi_spans(
             {
                 "name": "INSERT INTO test (x) VALUES",
                 "attributes": {
-                    "db.system": "clickhouse",
+                    "db.system.name": "clickhouse",
                     "db.driver.name": "clickhouse-driver",
-                    "db.name": "",
+                    "db.namespace": "",
                     "db.user": "default",
                     "sentry.op": "db",
                     "sentry.origin": "auto.db.clickhouse_driver",
@@ -1053,9 +1053,9 @@ def test_clickhouse_dbapi_spans(
             {
                 "name": "INSERT INTO test (x) VALUES",
                 "attributes": {
-                    "db.system": "clickhouse",
+                    "db.system.name": "clickhouse",
                     "db.driver.name": "clickhouse-driver",
-                    "db.name": "",
+                    "db.namespace": "",
                     "db.user": "default",
                     "sentry.op": "db",
                     "sentry.origin": "auto.db.clickhouse_driver",
@@ -1068,9 +1068,9 @@ def test_clickhouse_dbapi_spans(
             {
                 "name": "SELECT sum(x) FROM test WHERE x > 150",
                 "attributes": {
-                    "db.system": "clickhouse",
+                    "db.system.name": "clickhouse",
                     "db.driver.name": "clickhouse-driver",
-                    "db.name": "",
+                    "db.namespace": "",
                     "db.user": "default",
                     "sentry.op": "db",
                     "sentry.origin": "auto.db.clickhouse_driver",
@@ -1263,8 +1263,8 @@ def test_clickhouse_dbapi_spans_with_pii(
             {
                 "name": "DROP TABLE IF EXISTS test",
                 "attributes": {
-                    "db.system": "clickhouse",
-                    "db.name": "",
+                    "db.system.name": "clickhouse",
+                    "db.namespace": "",
                     "db.user": "default",
                     "sentry.op": "db",
                     "sentry.origin": "auto.db.clickhouse_driver",
@@ -1277,8 +1277,8 @@ def test_clickhouse_dbapi_spans_with_pii(
             {
                 "name": "CREATE TABLE test (x Int32) ENGINE = Memory",
                 "attributes": {
-                    "db.system": "clickhouse",
-                    "db.name": "",
+                    "db.system.name": "clickhouse",
+                    "db.namespace": "",
                     "db.user": "default",
                     "sentry.op": "db",
                     "sentry.origin": "auto.db.clickhouse_driver",
@@ -1291,8 +1291,8 @@ def test_clickhouse_dbapi_spans_with_pii(
             {
                 "name": "INSERT INTO test (x) VALUES",
                 "attributes": {
-                    "db.system": "clickhouse",
-                    "db.name": "",
+                    "db.system.name": "clickhouse",
+                    "db.namespace": "",
                     "db.user": "default",
                     "sentry.op": "db",
                     "sentry.origin": "auto.db.clickhouse_driver",
@@ -1305,8 +1305,8 @@ def test_clickhouse_dbapi_spans_with_pii(
             {
                 "name": "INSERT INTO test (x) VALUES",
                 "attributes": {
-                    "db.system": "clickhouse",
-                    "db.name": "",
+                    "db.system.name": "clickhouse",
+                    "db.namespace": "",
                     "db.user": "default",
                     "sentry.op": "db",
                     "sentry.origin": "auto.db.clickhouse_driver",
@@ -1319,8 +1319,8 @@ def test_clickhouse_dbapi_spans_with_pii(
             {
                 "name": "SELECT sum(x) FROM test WHERE x > 150",
                 "attributes": {
-                    "db.system": "clickhouse",
-                    "db.name": "",
+                    "db.system.name": "clickhouse",
+                    "db.namespace": "",
                     "db.user": "default",
                     "sentry.op": "db",
                     "sentry.origin": "auto.db.clickhouse_driver",

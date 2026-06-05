@@ -193,15 +193,16 @@ def _wrap_send_data() -> None:
 def _set_db_data(span: "Union[Span, StreamedSpan]", connection: "Connection") -> None:
     if isinstance(span, StreamedSpan):
         span.set_attribute(SPANDATA.DB_SYSTEM_NAME, "clickhouse")
-        span.set_attribute(SPANDATA.DB_DRIVER_NAME, "clickhouse-driver")
-        span.set_attribute(SPANDATA.SERVER_ADDRESS, connection.host)
-        span.set_attribute(SPANDATA.SERVER_PORT, connection.port)
         span.set_attribute(SPANDATA.DB_NAMESPACE, connection.database)
-        span.set_attribute(SPANDATA.DB_USER, connection.user)
+
+        set_on_span = span.set_attribute
     else:
         span.set_data(SPANDATA.DB_SYSTEM, "clickhouse")
-        span.set_data(SPANDATA.DB_DRIVER_NAME, "clickhouse-driver")
-        span.set_data(SPANDATA.SERVER_ADDRESS, connection.host)
-        span.set_data(SPANDATA.SERVER_PORT, connection.port)
         span.set_data(SPANDATA.DB_NAME, connection.database)
-        span.set_data(SPANDATA.DB_USER, connection.user)
+
+        set_on_span = span.set_data
+
+    set_on_span(SPANDATA.DB_DRIVER_NAME, "clickhouse-driver")
+    set_on_span(SPANDATA.SERVER_ADDRESS, connection.host)
+    set_on_span(SPANDATA.SERVER_PORT, connection.port)
+    set_on_span(SPANDATA.DB_USER, connection.user)
