@@ -191,13 +191,18 @@ def _wrap_coroutine(name: str, coroutine: "WorkerCoroutine") -> "WorkerCoroutine
     async def _sentry_coroutine(
         ctx: "Dict[Any, Any]", *args: "Any", **kwargs: "Any"
     ) -> "Any":
-        integration = sentry_sdk.get_client().get_integration(ArqIntegration)
+        client = sentry_sdk.get_client()
+        integration = client.get_integration(ArqIntegration)
         if integration is None:
             return await coroutine(ctx, *args, **kwargs)
 
-        span = sentry_sdk.traces.get_current_span()
-        if span is not None:
-            span.name = name
+        if has_span_streaming_enabled(client.options):
+            span = sentry_sdk.traces.get_current_span()
+            if span is not None:
+                span.name = name
+
+            scope = sentry_sdk.get_current_scope()
+            scope.set_transaction_name(name)
 
         sentry_sdk.get_isolation_scope().add_event_processor(
             _make_event_processor({**ctx, "job_name": name}, *args, **kwargs)
