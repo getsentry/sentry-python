@@ -237,12 +237,12 @@ async def test_job_retry(
     job = await pool.enqueue_job("retry_job")
 
     if span_streaming:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("span")
 
         await worker.run_job(job.job_id, timestamp_ms())
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert spans[4]["attributes"]["sentry.op"] == "queue.task.arq"
         assert spans[4]["status"] == "ok"
@@ -251,7 +251,7 @@ async def test_job_retry(
         await worker.run_job(job.job_id, timestamp_ms())
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert spans[7]["attributes"]["sentry.op"] == "queue.task.arq"
         assert spans[7]["status"] == "ok"
@@ -311,10 +311,11 @@ async def test_job_transaction(
         span_streaming, **{functions_key: [division], cron_jobs_key: [cron_job]}
     )
 
-    if span_streaming:
-        items = capture_items("event", "transaction", "span")
+    job = await pool.enqueue_job("division", 1, b=int(not job_fails))
 
-        job = await pool.enqueue_job("division", 1, b=int(not job_fails))
+    if span_streaming:
+        items = capture_items("event", "span")
+
         await worker.run_job(job.job_id, timestamp_ms())
 
         loop = asyncio.get_event_loop()
@@ -364,7 +365,6 @@ async def test_job_transaction(
     else:
         events = capture_events()
 
-        job = await pool.enqueue_job("division", 1, b=int(not job_fails))
         await worker.run_job(job.job_id, timestamp_ms())
 
         loop = asyncio.get_event_loop()
@@ -452,13 +452,13 @@ async def test_enqueue_job(
     pool, _ = init_fixture_method(span_streaming, **{source: [dummy_job]})
 
     if span_streaming:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("span")
 
         with sentry_sdk.traces.start_span(name="custom parent") as span:
             await pool.enqueue_job("dummy_job")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert spans[2]["is_segment"] is True
         assert spans[2]["trace_id"] == span.trace_id
@@ -530,13 +530,13 @@ async def test_span_origin_producer(
     pool, _ = init_fixture_method(span_streaming, **{source: [dummy_job]})
 
     if span_streaming:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("span")
 
         with sentry_sdk.traces.start_span(name="custom parent"):
             await pool.enqueue_job("dummy_job")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert spans[2]["attributes"]["sentry.origin"] == "manual"
         assert spans[1]["attributes"]["sentry.origin"] == "auto.queue.arq"
     else:
@@ -574,12 +574,12 @@ async def test_span_origin_consumer(
     if span_streaming:
         job = await pool.enqueue_job("retry_job")
 
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("span")
 
         await worker.run_job(job.job_id, timestamp_ms())
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert spans[4]["attributes"]["sentry.op"] == "queue.task.arq"
         assert spans[4]["attributes"]["sentry.origin"] == "auto.queue.arq"
@@ -627,15 +627,15 @@ async def test_job_concurrency(
 
     pool, worker = init_arq(span_streaming, [sleepy, division])
 
-    if span_streaming:
-        items = capture_items("event", "transaction", "span")
+    await pool.enqueue_job(
+        "division", _job_id="123", _defer_by=timedelta(milliseconds=10)
+    )
+    await pool.enqueue_job(
+        "sleepy", _job_id="456", _defer_by=timedelta(milliseconds=70)
+    )
 
-        await pool.enqueue_job(
-            "division", _job_id="123", _defer_by=timedelta(milliseconds=10)
-        )
-        await pool.enqueue_job(
-            "sleepy", _job_id="456", _defer_by=timedelta(milliseconds=70)
-        )
+    if span_streaming:
+        items = capture_items("event")
 
         loop = asyncio.get_event_loop()
         task = loop.create_task(worker.async_run())
@@ -645,18 +645,11 @@ async def test_job_concurrency(
 
         await worker.close()
 
-        events = [item.payload for item in items if item.type == "event"]
+        events = [item.payload for item in items]
         exception_event = events[0]
         assert exception_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
     else:
         events = capture_events()
-
-        await pool.enqueue_job(
-            "division", _job_id="123", _defer_by=timedelta(milliseconds=10)
-        )
-        await pool.enqueue_job(
-            "sleepy", _job_id="456", _defer_by=timedelta(milliseconds=70)
-        )
 
         loop = asyncio.get_event_loop()
         task = loop.create_task(worker.async_run())
