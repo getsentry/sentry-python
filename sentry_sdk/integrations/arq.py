@@ -5,11 +5,12 @@ from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import SegmentSource, SpanStatus
+from sentry_sdk.traces import SegmentSource
 from sentry_sdk.tracing import Transaction, TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
+    _register_control_flow_exception,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
@@ -60,6 +61,8 @@ class ArqIntegration(Integration):
         patch_enqueue_job()
         patch_run_job()
         patch_create_worker()
+
+        _register_control_flow_exception(ARQ_CONTROL_FLOW_EXCEPTIONS)
 
         ignore_logger("arq.worker")
 
@@ -136,13 +139,7 @@ def patch_run_job() -> None:
 def _capture_exception(exc_info: "ExcInfo") -> None:
     scope = sentry_sdk.get_current_scope()
 
-    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-    if span_streaming and scope.streamed_span is not None:
-        if exc_info[0] in ARQ_CONTROL_FLOW_EXCEPTIONS:
-            return
-
-        scope.streamed_span.status = SpanStatus.ERROR
-    elif not span_streaming and scope.transaction is not None:
+    if scope.transaction is not None:
         if exc_info[0] in ARQ_CONTROL_FLOW_EXCEPTIONS:
             scope.transaction.set_status(SPANSTATUS.ABORTED)
             return
