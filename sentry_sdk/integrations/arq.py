@@ -146,6 +146,9 @@ def _capture_exception(exc_info: "ExcInfo") -> None:
 
         scope.transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
 
+    if exc_info[0] in ARQ_CONTROL_FLOW_EXCEPTIONS:
+        return
+
     event, hint = event_from_exception(
         exc_info,
         client_options=sentry_sdk.get_client().options,
