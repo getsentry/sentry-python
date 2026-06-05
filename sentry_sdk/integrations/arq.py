@@ -197,11 +197,11 @@ def _wrap_coroutine(name: str, coroutine: "WorkerCoroutine") -> "WorkerCoroutine
             return await coroutine(ctx, *args, **kwargs)
 
         if has_span_streaming_enabled(client.options):
-            span = sentry_sdk.traces.get_current_span()
+            scope = sentry_sdk.get_current_scope()
+            span = scope.streamed_span
             if span is not None:
                 span.name = name
 
-            scope = sentry_sdk.get_current_scope()
             scope.set_transaction_name(name)
 
         sentry_sdk.get_isolation_scope().add_event_processor(
