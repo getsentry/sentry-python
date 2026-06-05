@@ -37,7 +37,6 @@ jobs:
         image: mysql
         env:
           MYSQL_ROOT_PASSWORD: sentry
-          MYSQL_DATABASE: test_db
         options: >-
           --health-cmd "mysqladmin ping -h localhost"
           --health-interval 10s
@@ -51,10 +50,8 @@ jobs:
       SENTRY_PYTHON_TEST_POSTGRES_HOST: ${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'postgres' || 'localhost' }}
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
-      SENTRY_PYTHON_TEST_MYSQL_HOST: ${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'mysql' || 'localhost' }}
       SENTRY_PYTHON_TEST_MYSQL_USER: root
       SENTRY_PYTHON_TEST_MYSQL_PASSWORD: sentry
-      SENTRY_PYTHON_TEST_MYSQL_DB: test_db
     container: ${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && format('python:{0}', matrix.python-version) || null }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
