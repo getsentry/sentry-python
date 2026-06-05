@@ -62,7 +62,7 @@ class ArqIntegration(Integration):
         patch_run_job()
         patch_create_worker()
 
-        _register_control_flow_exception(ARQ_CONTROL_FLOW_EXCEPTIONS)
+        _register_control_flow_exception(ARQ_CONTROL_FLOW_EXCEPTIONS)  # type: ignore
 
         ignore_logger("arq.worker")
 
