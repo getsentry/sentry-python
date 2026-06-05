@@ -84,7 +84,7 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
 
         if has_span_streaming_enabled(client.options):
             span = sentry_sdk.traces.start_span(
-                name=query,
+                name=query,  # type: ignore
                 attributes={
                     "sentry.op": OP.DB,
                     "sentry.origin": ClickhouseDriverIntegration.origin,
@@ -192,11 +192,11 @@ def _wrap_send_data() -> None:
 
 def _set_db_data(span: "Union[Span, StreamedSpan]", connection: "Connection") -> None:
     if isinstance(span, StreamedSpan):
-        span.set_attribute(SPANDATA.DB_SYSTEM, "clickhouse")
+        span.set_attribute(SPANDATA.DB_SYSTEM_NAME, "clickhouse")
         span.set_attribute(SPANDATA.DB_DRIVER_NAME, "clickhouse-driver")
         span.set_attribute(SPANDATA.SERVER_ADDRESS, connection.host)
         span.set_attribute(SPANDATA.SERVER_PORT, connection.port)
-        span.set_attribute(SPANDATA.DB_NAME, connection.database)
+        span.set_attribute(SPANDATA.DB_NAMESPACE, connection.database)
         span.set_attribute(SPANDATA.DB_USER, connection.user)
     else:
         span.set_data(SPANDATA.DB_SYSTEM, "clickhouse")

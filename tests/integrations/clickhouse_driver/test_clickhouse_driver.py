@@ -267,7 +267,7 @@ def test_clickhouse_client_spans(
             assert res[0][0] == 370
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         expected_spans = [
             {
@@ -554,7 +554,7 @@ def test_clickhouse_client_spans_with_pii(
             assert res[0][0] == 370
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         expected_spans = [
             {
@@ -1002,7 +1002,7 @@ def test_clickhouse_dbapi_spans(
             res = cursor.fetchall()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         expected_spans = [
             {
@@ -1257,7 +1257,7 @@ def test_clickhouse_dbapi_spans_with_pii(
         assert res[0][0] == 370
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         expected_spans = [
             {
@@ -1491,7 +1491,7 @@ def test_span_origin(
             cursor.execute("SELECT 1")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert spans[1]["attributes"]["sentry.origin"] == "manual"
         assert spans[0]["attributes"]["sentry.origin"] == "auto.db.clickhouse_driver"
