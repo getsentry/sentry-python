@@ -648,6 +648,7 @@ async def test_job_concurrency(
         events = [item.payload for item in items]
         exception_event = events[0]
         assert exception_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
+        assert exception_event["transaction"] == "division"
     else:
         events = capture_events()
 
