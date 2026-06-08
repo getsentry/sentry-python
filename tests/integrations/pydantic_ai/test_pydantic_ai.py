@@ -55,6 +55,20 @@ def get_test_agent_with_settings():
     return inner
 
 
+@pytest.fixture
+def sync_event_loop():
+    # Pydantic AI creates an event loop if there is none and doesn't close it in synchronous methods.
+    # Run with "-X tracemalloc=25 -W default::ResourceWarning" to reproduce.
+    # https://github.com/pydantic/pydantic-ai/commit/a58dd47f9cd6494665e47bf7cf71fccbfce2c0dd
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        yield loop
+    finally:
+        loop.close()
+        asyncio.set_event_loop(None)
+
+
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
@@ -284,6 +298,7 @@ def test_agent_run_sync(
     get_test_agent,
     stream_gen_ai_spans,
     span_streaming,
+    sync_event_loop,
 ):
     """
     Test that the integration creates spans for sync agent runs.
@@ -381,6 +396,7 @@ def test_agent_run_sync_model_error(
     capture_items,
     stream_gen_ai_spans,
     span_streaming,
+    sync_event_loop,
 ):
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -1985,7 +2001,7 @@ async def test_context_cleanup_after_run(sentry_init, get_test_agent):
     assert "pydantic_ai_agent" not in scope._contexts
 
 
-def test_context_cleanup_after_run_sync(sentry_init, get_test_agent):
+def test_context_cleanup_after_run_sync(sentry_init, get_test_agent, sync_event_loop):
     """
     Test that the pydantic_ai_agent context is properly cleaned up after sync agent execution.
     """

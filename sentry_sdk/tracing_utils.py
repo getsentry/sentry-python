@@ -719,7 +719,7 @@ class Baggage:
 
                 with capture_internal_exceptions():
                     item = item.strip()
-                    key, val = item.split("=")
+                    key, val = item.split("=", 1)
                     if Baggage.SENTRY_PREFIX_REGEX.match(key):
                         baggage_key = unquote(key.split("-")[1])
                         sentry_items[baggage_key] = unquote(val)
@@ -1101,7 +1101,7 @@ def create_streaming_span_decorator(
         @functools.wraps(f)
         async def async_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
             client = sentry_sdk.get_client()
-            if not has_span_streaming_enabled(client.options):
+            if client.is_active() and not has_span_streaming_enabled(client.options):
                 warnings.warn(
                     "Using span streaming API in non-span-streaming mode. Use "
                     "@sentry_sdk.trace instead.",
@@ -1124,7 +1124,7 @@ def create_streaming_span_decorator(
         @functools.wraps(f)
         def sync_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
             client = sentry_sdk.get_client()
-            if not has_span_streaming_enabled(client.options):
+            if client.is_active() and not has_span_streaming_enabled(client.options):
                 warnings.warn(
                     "Using span streaming API in non-span-streaming mode. Use "
                     "@sentry_sdk.trace instead.",

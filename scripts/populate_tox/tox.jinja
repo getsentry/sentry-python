@@ -98,6 +98,7 @@ deps =
     {py3.6,py3.7}-gevent: pytest<7.0.0
     {py3.8,py3.9,py3.10,py3.11,py3.12}-gevent: pytest
     gevent: pytest-asyncio
+    gevent: setuptools<82
     {py3.10,py3.11}-gevent: zope.event<5.0.0
     {py3.10,py3.11}-gevent: zope.interface<8.0
 
@@ -140,6 +141,13 @@ deps =
     {% else %}
     {{ integration.name }}-v{{ release }}: {{ integration.package }}=={{ release }}
     {% endif %}
+
+    {% for dependency_group in release.transitive_dependencies if dependency_group %}
+    {% for dep in dependency_group %}
+    {{ dep }}
+    {% endfor %}
+
+    {% endfor %}
     {% endfor %}
     {% if integration.latest_stable %}
     {% if integration.extra %}
@@ -147,6 +155,13 @@ deps =
     {% else %}
     {{ integration.name }}-latest: {{ integration.package }}=={{ integration.latest_stable }}
     {% endif %}
+
+    {% for dependency_group in integration.latest_transitive_dependencies if dependency_group %}
+    {% for dep in dependency_group %}
+    {{ dep }}
+    {% endfor %}
+
+    {% endfor %}
     {% endif %}
     {% for dep in integration.dependencies %}
     {{ dep }}
@@ -170,6 +185,7 @@ setenv =
     PYTHONDONTWRITEBYTECODE=1
     OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
     COVERAGE_FILE=.coverage-sentry-{envname}
+    UV_CACHE_DIR={env:HOME}/.cache/uv/{envname}
 
     UV_PRERELEASE=if-necessary-or-explicit
     {% for group, integrations in groups.items() %}
@@ -218,6 +234,8 @@ passenv =
     SENTRY_PYTHON_TEST_POSTGRES_PASSWORD
     SENTRY_PYTHON_TEST_POSTGRES_NAME
     SENTRY_PYTHON_TEST_REDIS_HOST
+    SENTRY_PYTHON_TEST_MYSQL_USER
+    SENTRY_PYTHON_TEST_MYSQL_PASSWORD
     TESTPATH
 
 basepython =
@@ -236,4 +254,4 @@ commands =
     ; Running `pytest` as an executable suffers from an import error
     ; when loading tests in scenarios. In particular, django fails to
     ; load the settings from the test module.
-    python -m pytest -W error::pytest.PytestUnraisableExceptionWarning {env:TESTPATH:{env:_TESTPATH}} -o junit_suite_name={envname} {posargs}
+    python -m pytest -W error::pytest.PytestUnraisableExceptionWarning {env:TESTPATH:{env:_TESTPATH}} -o junit_suite_name={envname} --junitxml=.junitxml-{envname} {posargs}
