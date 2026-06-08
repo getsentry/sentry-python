@@ -196,9 +196,7 @@ def test_tracing_in_ray_tasks(task_options, task, span_streaming):
         try:
             ray.init(
                 runtime_env={
-                    "worker_process_setup_hook": setup_sentry_with_logging_transport_and_span_streaming
-                    if span_streaming
-                    else setup_sentry,
+                    "worker_process_setup_hook": setup_sentry_with_logging_transport_and_span_streaming,
                     "working_dir": "./",
                 },
                 _temp_dir=ray_temp_dir,
@@ -252,9 +250,7 @@ def test_tracing_in_ray_tasks(task_options, task, span_streaming):
     else:
         ray.init(
             runtime_env={
-                "worker_process_setup_hook": setup_sentry_with_logging_transport_and_span_streaming
-                if span_streaming
-                else setup_sentry,
+                "worker_process_setup_hook": setup_sentry,
                 "working_dir": "./",
             }
         )
@@ -389,7 +385,7 @@ def test_tracing_in_ray_actors(remote_kwargs, span_streaming):
                     ):
                         self.n += 1
 
-                return sentry_sdk.get_client().transport.envelopes
+                    return sentry_sdk.get_client().transport.envelopes
     else:
 
         @ray.remote
@@ -409,7 +405,7 @@ def test_tracing_in_ray_actors(remote_kwargs, span_streaming):
                     ):
                         self.n += 1
 
-                return sentry_sdk.get_client().transport.envelopes
+                    return sentry_sdk.get_client().transport.envelopes
 
     if span_streaming:
         ray_temp_dir = os.path.join("/tmp", f"ray_test_{uuid.uuid4().hex[:8]}")
@@ -418,9 +414,7 @@ def test_tracing_in_ray_actors(remote_kwargs, span_streaming):
         try:
             ray.init(
                 runtime_env={
-                    "worker_process_setup_hook": setup_sentry_with_span_streaming
-                    if span_streaming
-                    else setup_sentry,
+                    "worker_process_setup_hook": setup_sentry_with_logging_transport_and_span_streaming,
                     "working_dir": "./",
                 },
                 _temp_dir=ray_temp_dir,
@@ -429,7 +423,8 @@ def test_tracing_in_ray_actors(remote_kwargs, span_streaming):
             with sentry_sdk.traces.start_span(
                 name="ray test parent", attributes={"sentry.op": "task"}
             ):
-                future = example_task.remote(span_streaming)
+                counter = Counter.remote()
+                future = counter.increment.remote()
                 ray.get(future)
 
             job_id = future.job_id().hex()
@@ -456,9 +451,7 @@ def test_tracing_in_ray_actors(remote_kwargs, span_streaming):
     else:
         ray.init(
             runtime_env={
-                "worker_process_setup_hook": setup_sentry_with_span_streaming
-                if span_streaming
-                else setup_sentry,
+                "worker_process_setup_hook": setup_sentry,
                 "working_dir": "./",
             }
         )
