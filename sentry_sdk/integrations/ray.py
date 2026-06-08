@@ -96,8 +96,11 @@ def _patch_ray_remote() -> None:
                 if span_streaming:
                     sentry_sdk.traces.continue_trace(_sentry_tracing or {})
 
+                    function_name = qualname_from_function(user_f)
                     with sentry_sdk.traces.start_span(
-                        name=qualname_from_function(user_f),
+                        name="unknown Ray task"
+                        if function_name is None
+                        else function_name,
                         attributes={
                             "sentry.op": OP.QUEUE_TASK_RAY,
                             "sentry.origin": RayIntegration.origin,
@@ -152,8 +155,11 @@ def _patch_ray_remote() -> None:
                     sentry_sdk.get_client().options
                 )
                 if span_streaming:
+                    function_name = qualname_from_function(user_f)
                     with sentry_sdk.traces.start_span(
-                        name=qualname_from_function(user_f),
+                        name="unknown Ray task"
+                        if function_name is None
+                        else function_name,
                         attributes={
                             "sentry.op": OP.QUEUE_SUBMIT_RAY,
                             "sentry.origin": RayIntegration.origin,
