@@ -2,7 +2,7 @@
 <html lang="en" data-accent-color="violet" data-content_root="./">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Top Level API - sentry-python 2.61.1 documentation</title><link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="Integrations" href="integrations.html" /><link rel="prev" title="sentry-python - Sentry SDK for Python" href="index.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Top Level API - sentry-python 2.62.0 documentation</title><link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="Integrations" href="integrations.html" /><link rel="prev" title="sentry-python - Sentry SDK for Python" href="index.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="_static/pygments.css?v=e1a1ceaf" />
@@ -445,6 +445,7 @@ HTTP requests with certain status codes.</p>
 <p>Requests are not traced if the status code is contained in the provided set.</p>
 <p>If <cite>trace_ignore_status_codes</cite> is not provided, requests with any status code
 may be traced.</p>
+<p>This option has no effect in span streaming mode (<cite>trace_lifecycle=”stream”</cite>).</p>
 </p></li>
 <li><p><strong>strict_trace_continuation</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span>) – <p>If set to <cite>True</cite>, the SDK will only continue a trace if the <cite>org_id</cite> of the incoming trace found in the
 <cite>baggage</cite> header matches the <cite>org_id</cite> of the current Sentry client and only if BOTH are present.</p>
@@ -1028,7 +1029,7 @@ After the wrapped code is executed, the original scope is restored.</p>
     </div>
   </div>
 </footer>
-      <script src="_static/documentation_options.js?v=ce6d7030"></script>
+      <script src="_static/documentation_options.js?v=f86a2ac2"></script>
       <script src="_static/doctools.js?v=9bcbadda"></script>
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="_static/shibuya.js?v=50760d75"></script></body>
