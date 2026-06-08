@@ -109,7 +109,7 @@ def _create_run_wrapper(
             model = kwargs.get("model")
             model_settings = kwargs.get("model_settings")
 
-            if PydanticAIIntegration.are_request_hooks_available:
+            if PydanticAIIntegration.using_request_hooks:
                 metadata = kwargs.get("metadata")
                 if metadata is None:
                     kwargs["metadata"] = {"_sentry_span": None}
@@ -158,7 +158,7 @@ def _create_streaming_wrapper(
         model = kwargs.get("model")
         model_settings = kwargs.get("model_settings")
 
-        if PydanticAIIntegration.are_request_hooks_available:
+        if PydanticAIIntegration.using_request_hooks:
             metadata = kwargs.get("metadata")
             if metadata is None:
                 kwargs["metadata"] = {"_sentry_span": None}

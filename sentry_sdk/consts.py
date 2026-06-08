@@ -1705,6 +1705,8 @@ class ClientConstructor:
             If `trace_ignore_status_codes` is not provided, requests with any status code
             may be traced.
 
+            This option has no effect in span streaming mode (`trace_lifecycle="stream"`).
+
         :param strict_trace_continuation: If set to `True`, the SDK will only continue a trace if the `org_id` of the incoming trace found in the
            `baggage` header matches the `org_id` of the current Sentry client and only if BOTH are present.
 
@@ -1745,4 +1747,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.61.0"
+VERSION = "2.61.1"

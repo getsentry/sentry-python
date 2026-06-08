@@ -8,13 +8,13 @@ from celery import VERSION, Celery
 from celery.bin import worker
 
 import sentry_sdk
+import sentry_sdk.traces
 from sentry_sdk import get_current_span, start_transaction
 from sentry_sdk.integrations.celery import (
     CeleryIntegration,
     _wrap_task_run,
 )
 from sentry_sdk.integrations.celery.beat import _get_headers
-from sentry_sdk.traces import _get_current_streamed_span
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 from tests.conftest import ApproxDict
 
@@ -667,7 +667,7 @@ def test_sentry_propagate_traces_override(span_streaming, init_celery):
     @celery.task(name="dummy_task", bind=True)
     def dummy_task(self, message):
         trace_id = (
-            _get_current_streamed_span().trace_id
+            sentry_sdk.traces.get_current_span().trace_id
             if span_streaming
             else get_current_span().trace_id
         )

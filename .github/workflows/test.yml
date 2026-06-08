@@ -1,0 +1,167 @@
+# Do not edit this YAML file. This file is generated automatically by executing
+# python scripts/split_tox_gh_actions/split_tox_gh_actions.py
+# The template responsible for it is in
+# scripts/split_tox_gh_actions/templates/test_orchestrator.jinja
+#
+# Top-level test orchestrator. It runs every test group (each a reusable
+# workflow) in a single run, then combines their coverage and reports it once.
+name: Test
+on:
+  push:
+    branches:
+      - master
+      - release/**
+      - major/**
+  pull_request:
+# Cancel in progress workflows on pull_requests.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  pull-requests: write
+  statuses: write
+# To temporarily skip a group for unblocking a release,
+# add `if: false` to its job below, e.g.:
+#
+#   dbs:
+#     name: DBs
+#     if: false  # TEMP: skipping, see PR #xxxx
+#     uses: ./.github/workflows/test-integrations-dbs.yml
+#     secrets: inherit
+jobs:
+  common:
+    name: Common
+    uses: ./.github/workflows/test-integrations-common.yml
+    secrets: inherit
+  mcp:
+    name: MCP
+    uses: ./.github/workflows/test-integrations-mcp.yml
+    secrets: inherit
+  agents:
+    name: Agents
+    uses: ./.github/workflows/test-integrations-agents.yml
+    secrets: inherit
+  ai_workflow:
+    name: AI Workflow
+    uses: ./.github/workflows/test-integrations-ai-workflow.yml
+    secrets: inherit
+  ai:
+    name: AI
+    uses: ./.github/workflows/test-integrations-ai.yml
+    secrets: inherit
+  cloud:
+    name: Cloud
+    uses: ./.github/workflows/test-integrations-cloud.yml
+    secrets: inherit
+  dbs:
+    name: DBs
+    uses: ./.github/workflows/test-integrations-dbs.yml
+    secrets: inherit
+  flags:
+    name: Flags
+    uses: ./.github/workflows/test-integrations-flags.yml
+    secrets: inherit
+  gevent:
+    name: Gevent
+    uses: ./.github/workflows/test-integrations-gevent.yml
+    secrets: inherit
+  graphql:
+    name: GraphQL
+    uses: ./.github/workflows/test-integrations-graphql.yml
+    secrets: inherit
+  network:
+    name: Network
+    uses: ./.github/workflows/test-integrations-network.yml
+    secrets: inherit
+  tasks:
+    name: Tasks
+    uses: ./.github/workflows/test-integrations-tasks.yml
+    secrets: inherit
+  web_1:
+    name: Web 1
+    uses: ./.github/workflows/test-integrations-web-1.yml
+    secrets: inherit
+  web_2:
+    name: Web 2
+    uses: ./.github/workflows/test-integrations-web-2.yml
+    secrets: inherit
+  misc:
+    name: Misc
+    uses: ./.github/workflows/test-integrations-misc.yml
+    secrets: inherit
+  report:
+    name: Combine and report coverage
+    needs:
+      - common
+      - mcp
+      - agents
+      - ai_workflow
+      - ai
+      - cloud
+      - dbs
+      - flags
+      - gevent
+      - graphql
+      - network
+      - tasks
+      - web_1
+      - web_2
+      - misc
+    # Report whatever coverage exists, even if some test jobs failed.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+      - name: Download coverage data
+        # Artifacts from the reusable test workflows live in this same run.
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: coverage-*
+          merge-multiple: true
+      - name: Combine coverage and generate XML
+        run: |
+          uv sync
+          # relative_files + [tool.coverage.paths] let the 3.6/3.7 container and
+          # the runner data files merge into one source tree.
+          uv run coverage combine .coverage-sentry-*
+          uv run coverage xml
+      - name: Report coverage and test results
+        uses: getsentry/codecov-action@d90e69cdf071dfbb0430159125321dc09c424d4c # main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          files: coverage.xml
+          junit-xml-pattern: .junitxml-*
+          base-branch: master
+          post-pr-comment: true
+          verbose: true
+  check-required:
+    name: All tests passed
+    needs:
+      - common
+      - mcp
+      - agents
+      - ai_workflow
+      - ai
+      - cloud
+      - dbs
+      - flags
+      - gevent
+      - graphql
+      - network
+      - tasks
+      - web_1
+      - web_2
+      - misc
+    # Always run so it can gate merges even when a dependency failed.
+    if: always()
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check for failures
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          echo "One of the test jobs failed. You may need to re-run it." && exit 1
