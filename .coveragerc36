@@ -3,10 +3,19 @@
 
 [run]
 branch = true
+# Match pyproject.toml so the 3.6 container's data file combines with the rest.
+relative_files = true
+disable_warnings = couldnt-parse
 omit =
     /tmp/*
     */tests/*
     */.venv/*
+
+
+[paths]
+source =
+    sentry_sdk/
+    */sentry_sdk/
 
 
 [report]
