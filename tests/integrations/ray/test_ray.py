@@ -76,7 +76,7 @@ def read_error_from_log(job_id, ray_temp_dir):
         if "worker" in f and job_id in f and f.endswith(".out")
     ][0]
 
-    next_line_is_event = False
+    next_line_is_event_payload = False
     with open(os.path.join(log_dir, log_file), "r") as file:
         for line in file:
             try:
@@ -84,13 +84,49 @@ def read_error_from_log(job_id, ray_temp_dir):
             except ValueError:
                 continue
 
-            if next_line_is_event:
+            if next_line_is_event_payload:
                 return payload
 
             if isinstance(payload, dict) and payload.get("type") == "event":
-                next_line_is_event = True
+                next_line_is_event_payload = True
 
     return None
+
+
+def read_spans_from_log(job_id, ray_temp_dir):
+    # Find the actual session directory that Ray created
+    session_dirs = [d for d in os.listdir(ray_temp_dir) if d.startswith("session_")]
+    if not session_dirs:
+        raise FileNotFoundError(f"No session directory found in {ray_temp_dir}")
+
+    session_dir = os.path.join(ray_temp_dir, session_dirs[0])
+    log_dir = os.path.join(session_dir, "logs")
+
+    if not os.path.exists(log_dir):
+        raise FileNotFoundError(f"No logs directory found at {log_dir}")
+
+    log_file = [
+        f
+        for f in os.listdir(log_dir)
+        if "worker" in f and job_id in f and f.endswith(".out")
+    ][0]
+
+    spans = []
+    next_line_is_span_payload = False
+    with open(os.path.join(log_dir, log_file), "r") as file:
+        for line in file:
+            try:
+                payload = json.loads(line)
+            except ValueError:
+                continue
+            if next_line_is_span_payload:
+                spans.extend(payload["items"])
+                next_line_is_span_payload = False
+                continue
+            if isinstance(payload, dict) and payload.get("type") == "span":
+                next_line_is_span_payload = True
+
+    return spans
 
 
 def example_task(span_streaming: bool):
@@ -102,12 +138,11 @@ def example_task(span_streaming: bool):
             },
         ):
             ...
-        sentry_sdk.flush()
     else:
         with sentry_sdk.start_span(op="task", name="example task step"):
             ...
 
-    return sentry_sdk.get_client().transport.envelopes
+        return sentry_sdk.get_client().transport.envelopes
 
 
 # RayIntegration must leave variadic keyword arguments at the end
@@ -117,12 +152,11 @@ def example_task_with_kwargs(span_streaming: bool, **kwargs):
             name="example task step", attributes={"sentry.op": "task"}
         ):
             ...
-        sentry_sdk.flush()
     else:
         with sentry_sdk.start_span(op="task", name="example task step"):
             ...
 
-    return sentry_sdk.get_client().transport.envelopes
+        return sentry_sdk.get_client().transport.envelopes
 
 
 @pytest.mark.parametrize(
@@ -142,15 +176,6 @@ def test_tracing_in_ray_tasks(task_options, task, span_streaming):
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    ray.init(
-        runtime_env={
-            "worker_process_setup_hook": setup_sentry_with_span_streaming
-            if span_streaming
-            else setup_sentry,
-            "working_dir": "./",
-        }
-    )
-
     # Setup ray task, calling decorator directly instead of @,
     # to accommodate for test parametrization
     if task_options:
@@ -165,10 +190,31 @@ def test_tracing_in_ray_tasks(task_options, task, span_streaming):
     )
 
     if span_streaming:
-        with sentry_sdk.traces.start_span(
-            name="ray test parent", attributes={"sentry.op": "task"}
-        ):
-            worker_envelopes = ray.get(example_task.remote(span_streaming))
+        ray_temp_dir = os.path.join("/tmp", f"ray_test_{uuid.uuid4().hex[:8]}")
+        os.makedirs(ray_temp_dir, exist_ok=True)
+
+        try:
+            ray.init(
+                runtime_env={
+                    "worker_process_setup_hook": setup_sentry_with_logging_transport_and_span_streaming
+                    if span_streaming
+                    else setup_sentry,
+                    "working_dir": "./",
+                },
+                _temp_dir=ray_temp_dir,
+            )
+
+            with sentry_sdk.traces.start_span(
+                name="ray test parent", attributes={"sentry.op": "task"}
+            ):
+                future = example_task.remote(span_streaming)
+                ray.get(future)
+
+            job_id = future.job_id().hex()
+            worker_spans = read_spans_from_log(job_id, ray_temp_dir)
+        finally:
+            if os.path.exists(ray_temp_dir):
+                shutil.rmtree(ray_temp_dir, ignore_errors=True)
 
         sentry_sdk.flush()
         client_envelope = sentry_sdk.get_client().transport.envelopes[0]
@@ -179,12 +225,6 @@ def test_tracing_in_ray_tasks(task_options, task, span_streaming):
         ]
         assert client_spans[1]["name"] == "ray test parent"
 
-        worker_envelope = worker_envelopes[0]
-        worker_spans = [
-            span
-            for item in worker_envelope.items
-            for span in item.payload.json["items"]
-        ]
         assert (
             worker_spans[1]["name"]
             == f"tests.integrations.ray.test_ray.{task.__name__}"
@@ -210,6 +250,15 @@ def test_tracing_in_ray_tasks(task_options, task, span_streaming):
 
         assert client_spans[1]["trace_id"] == worker_spans[1]["trace_id"]
     else:
+        ray.init(
+            runtime_env={
+                "worker_process_setup_hook": setup_sentry_with_logging_transport_and_span_streaming
+                if span_streaming
+                else setup_sentry,
+                "working_dir": "./",
+            }
+        )
+
         with sentry_sdk.start_transaction(op="task", name="ray test transaction"):
             worker_envelopes = ray.get(example_task.remote(span_streaming))
 
@@ -320,15 +369,6 @@ def test_tracing_in_ray_actors(remote_kwargs, span_streaming):
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    ray.init(
-        runtime_env={
-            "worker_process_setup_hook": setup_sentry_with_span_streaming
-            if span_streaming
-            else setup_sentry,
-            "working_dir": "./",
-        }
-    )
-
     # Setup ray actor
     if remote_kwargs:
 
@@ -372,11 +412,31 @@ def test_tracing_in_ray_actors(remote_kwargs, span_streaming):
                 return sentry_sdk.get_client().transport.envelopes
 
     if span_streaming:
-        with sentry_sdk.traces.start_span(
-            name="ray test parent", attributes={"sentry.op": "task"}
-        ):
-            counter = Counter.remote()
-            worker_envelopes = ray.get(counter.increment.remote())
+        ray_temp_dir = os.path.join("/tmp", f"ray_test_{uuid.uuid4().hex[:8]}")
+        os.makedirs(ray_temp_dir, exist_ok=True)
+
+        try:
+            ray.init(
+                runtime_env={
+                    "worker_process_setup_hook": setup_sentry_with_span_streaming
+                    if span_streaming
+                    else setup_sentry,
+                    "working_dir": "./",
+                },
+                _temp_dir=ray_temp_dir,
+            )
+
+            with sentry_sdk.traces.start_span(
+                name="ray test parent", attributes={"sentry.op": "task"}
+            ):
+                future = example_task.remote(span_streaming)
+                ray.get(future)
+
+            job_id = future.job_id().hex()
+            worker_spans = read_spans_from_log(job_id, ray_temp_dir)
+        finally:
+            if os.path.exists(ray_temp_dir):
+                shutil.rmtree(ray_temp_dir, ignore_errors=True)
 
         sentry_sdk.flush()
         client_envelope = sentry_sdk.get_client().transport.envelopes[0]
@@ -390,17 +450,19 @@ def test_tracing_in_ray_actors(remote_kwargs, span_streaming):
         # Only the manual "example actor execution" span is recorded.
         assert len(client_spans) == 1
 
-        worker_envelope = worker_envelopes[0]
-        worker_spans = [
-            span
-            for item in worker_envelope.items
-            for span in item.payload.json["items"]
-        ]
-
         # Transaction are not yet created when executing ray actors (actors are not supported yet)
         # Only the manual "example actor execution" span is recorded.
         assert len(worker_spans) == 1
     else:
+        ray.init(
+            runtime_env={
+                "worker_process_setup_hook": setup_sentry_with_span_streaming
+                if span_streaming
+                else setup_sentry,
+                "working_dir": "./",
+            }
+        )
+
         with sentry_sdk.start_transaction(op="task", name="ray test transaction"):
             counter = Counter.remote()
             worker_envelopes = ray.get(counter.increment.remote())
