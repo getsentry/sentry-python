@@ -102,6 +102,7 @@ def example_task(span_streaming: bool):
             },
         ):
             ...
+        sentry_sdk.flush()
     else:
         with sentry_sdk.start_span(op="task", name="example task step"):
             ...
@@ -116,6 +117,7 @@ def example_task_with_kwargs(span_streaming: bool, **kwargs):
             name="example task step", attributes={"sentry.op": "task"}
         ):
             ...
+        sentry_sdk.flush()
     else:
         with sentry_sdk.start_span(op="task", name="example task step"):
             ...
