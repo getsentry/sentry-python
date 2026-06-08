@@ -54,10 +54,6 @@ def setup_sentry(span_streaming=False, transport=None):
     )
 
 
-def setup_sentry_with_span_streaming():
-    setup_sentry(span_streaming=True)
-
-
 def read_error_from_log(job_id, ray_temp_dir):
     # Find the actual session directory that Ray created
     session_dirs = [d for d in os.listdir(ray_temp_dir) if d.startswith("session_")]
