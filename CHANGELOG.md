@@ -4,17 +4,37 @@
 
 ### New Features ✨
 
-- (bottle) Add span streaming support to Bottle integration by @ericapisani in [#6486](https://github.com/getsentry/sentry-python/pull/6486)
-- (cohere) Add span streaming support by @ericapisani in [#6479](https://github.com/getsentry/sentry-python/pull/6479)
-- (gcp) Add span streaming support to GCP Cloud Functions integration by @ericapisani in [#6440](https://github.com/getsentry/sentry-python/pull/6440)
-- (graphene) Add span streaming support by @ericapisani in [#6476](https://github.com/getsentry/sentry-python/pull/6476)
-- (integrations) Add integration for `aiomysql` by @tonal in [#4703](https://github.com/getsentry/sentry-python/pull/4703)
-- (pyreqwest) Support span streaming by @alexander-alderman-webb in [#6455](https://github.com/getsentry/sentry-python/pull/6455)
-- Support httpx2 by @sentrivana in [#6463](https://github.com/getsentry/sentry-python/pull/6463)
+- Add integration for `aiomysql` by @tonal in [#4703](https://github.com/getsentry/sentry-python/pull/4703)
+  
+  We're adding support for the `aiomysql` package. To enable the integration, add it to your `integrations` list:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.aiomysql import AioMySQLIntegration
+
+  sentry_sdk.init(
+      traces_sample_rate=1.0,
+      integrations=[AioMySQLIntegration()],
+  )
+  ```
+
+- Support HTTPX2 by @sentrivana in [#6463](https://github.com/getsentry/sentry-python/pull/6463)
+
+  We're adding out-of-the-box support for HTTPX2. As long as use the package, the Sentry integration
+  will be enabled automatically and you should see your requests instrumented in Sentry.
+
+  ```python
+  import httpx2
+  import sentry_sdk
+
+  sentry_sdk.init(...)
+  
+  with sentry_sdk.start_transaction(name="testing_sentry"):
+      httpx2.get("https://sentry.io/")
+  ```
 
 ### Bug Fixes 🐛
 
-- (api) Only emit API mismatch warnings when client is active by @sentrivana in [#6520](https://github.com/getsentry/sentry-python/pull/6520)
 - (arq) Never capture control flow exceptions by @alexander-alderman-webb in [#6507](https://github.com/getsentry/sentry-python/pull/6507)
 - (client) Guard against dotless qualified_name in \_setup_instrumentation by @devteamaegis in [#6452](https://github.com/getsentry/sentry-python/pull/6452)
 - (pydantic-ai) Only use hooks when `ModelRequestContext.model` exists by @alexander-alderman-webb in [#6480](https://github.com/getsentry/sentry-python/pull/6480)
