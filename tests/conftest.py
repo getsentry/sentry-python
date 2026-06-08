@@ -466,8 +466,8 @@ def capture_items_forksafe(monkeypatch, capture_items, request):
 
         def flush(timeout=None, callback=None):
             real_flush(timeout=timeout, callback=callback)
-            items_w.write(json.dumps(telemetry).encode("utf-8"))
-            items_w.write(b"\n")
+            items_w.write(json.dumps(telemetry).encode("utf-8") + b"\n")
+            items_w.write(b"flush\n")
 
         monkeypatch.setattr(test_client.transport, "capture_envelope", append)
         monkeypatch.setattr(test_client, "flush", flush)
