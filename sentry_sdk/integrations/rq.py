@@ -1,3 +1,4 @@
+import functools
 import weakref
 
 import sentry_sdk
@@ -62,6 +63,7 @@ class RqIntegration(Integration):
 
         old_perform_job = worker_cls.perform_job
 
+        @functools.wraps(old_perform_job)
         def sentry_patched_perform_job(
             self: "Any", job: "Job", *args: "Queue", **kwargs: "Any"
         ) -> bool:
@@ -146,6 +148,7 @@ class RqIntegration(Integration):
 
         old_enqueue_job = Queue.enqueue_job
 
+        @functools.wraps(old_enqueue_job)
         def sentry_patched_enqueue_job(
             self: "Queue", job: "Any", **kwargs: "Any"
         ) -> "Any":
