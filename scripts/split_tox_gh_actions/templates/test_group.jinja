@@ -46,7 +46,6 @@
         image: mysql
         env:
           MYSQL_ROOT_PASSWORD: sentry
-          MYSQL_DATABASE: test_db
         options: >-
           --health-cmd "mysqladmin ping -h localhost"
           --health-interval 10s
@@ -68,10 +67,8 @@
       SENTRY_PYTHON_TEST_REDIS_HOST: {% raw %}${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'redis' || 'localhost' }}{% endraw %}
       {% endif %}
       {% if needs_mysql %}
-      SENTRY_PYTHON_TEST_MYSQL_HOST: {% raw %}${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'mysql' || 'localhost' }}{% endraw %}
       SENTRY_PYTHON_TEST_MYSQL_USER: root
       SENTRY_PYTHON_TEST_MYSQL_PASSWORD: sentry
-      SENTRY_PYTHON_TEST_MYSQL_DB: test_db
       {% endif %}
     container: {% raw %}${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && format('python:{0}', matrix.python-version) || null }}{% endraw %}
     steps:

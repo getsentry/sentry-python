@@ -33,12 +33,25 @@ jobs:
         # Maps tcp port 5432 on service container to the host
         ports:
           - 5432:5432
+      mysql:
+        image: mysql
+        env:
+          MYSQL_ROOT_PASSWORD: sentry
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 3306:3306
     env:
       # 3.6/3.7 run in the python:X.Y container; tell uv to use that system Python.
       TOX_UV_PYTHON_PREFERENCE: ${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'only-system' || 'managed' }}
       SENTRY_PYTHON_TEST_POSTGRES_HOST: ${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'postgres' || 'localhost' }}
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
+      SENTRY_PYTHON_TEST_MYSQL_USER: root
+      SENTRY_PYTHON_TEST_MYSQL_PASSWORD: sentry
     container: ${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && format('python:{0}', matrix.python-version) || null }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -56,6 +69,10 @@ jobs:
       - name: Setup Test Env
         run: |
           uv sync
+      - name: Test aiomysql
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-aiomysql"
       - name: Test asyncpg
         run: |
           set -x # print commands that are executed
