@@ -168,7 +168,8 @@ def start_span(
     """
     from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
-    if not has_span_streaming_enabled(sentry_sdk.get_client().options):
+    client = sentry_sdk.get_client()
+    if client.is_active() and not has_span_streaming_enabled(client.options):
         warnings.warn(
             "Using span streaming API in non-span-streaming mode. Use "
             "sentry_sdk.start_transaction() and sentry_sdk.start_span() "
@@ -827,7 +828,7 @@ def trace(
         return decorator
 
 
-def _get_current_streamed_span(
+def get_current_span(
     scope: "Optional[sentry_sdk.Scope]" = None,
 ) -> "Optional[StreamedSpan]":
     """

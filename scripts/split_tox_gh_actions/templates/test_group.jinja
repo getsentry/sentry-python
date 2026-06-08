@@ -8,7 +8,7 @@
         python-version: [{{ py_versions|join(",") }}]
         os: [ubuntu-22.04]
 
-    {% if needs_docker or needs_postgres or needs_redis %}
+    {% if needs_docker or needs_postgres or needs_redis or needs_mysql %}
     services:
       {% if needs_docker %}
       docker:
@@ -41,6 +41,19 @@
         ports:
           - 6379:6379
       {% endif %}
+      {% if needs_mysql %}
+      mysql:
+        image: mysql
+        env:
+          MYSQL_ROOT_PASSWORD: sentry
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 3306:3306
+      {% endif %}
     {% endif %}
     env:
       # 3.6/3.7 run in the python:X.Y container; tell uv to use that system Python.
@@ -53,13 +66,17 @@
       {% if needs_redis %}
       SENTRY_PYTHON_TEST_REDIS_HOST: {% raw %}${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'redis' || 'localhost' }}{% endraw %}
       {% endif %}
+      {% if needs_mysql %}
+      SENTRY_PYTHON_TEST_MYSQL_USER: root
+      SENTRY_PYTHON_TEST_MYSQL_PASSWORD: sentry
+      {% endif %}
     container: {% raw %}${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && format('python:{0}', matrix.python-version) || null }}{% endraw %}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - name: Install uv
-        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          cache-suffix: {% raw %}${{ github.workflow }}-${{ matrix.python-version }}{% endraw %}
+          enable-cache: false
 
       {% if needs_clickhouse %}
       - name: "Setup ClickHouse Server"
@@ -83,9 +100,6 @@
       - name: Setup Test Env
         run: |
           uv sync
-      - name: Erase coverage
-        run: |
-          uv run coverage erase
 
       {% for framework in frameworks %}
       - name: Test {{ framework }}
@@ -94,18 +108,17 @@
           ./scripts/runtox.sh "{% raw %}py${{ matrix.python-version }}{% endraw %}-{{ framework }}"
       {% endfor %}
 
-      - name: Generate coverage XML
+      - name: Upload coverage data
         if: {% raw %}${{ !cancelled() }}{% endraw %}
-        run: |
-          uv run coverage combine .coverage-sentry-*
-          uv run coverage xml
-
-      - name: Parse and Upload Coverage
-        if: {% raw %}${{ !cancelled() }}{% endraw %}
-        uses: getsentry/codecov-action@d90e69cdf071dfbb0430159125321dc09c424d4c # main
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          token: {% raw %}${{ secrets.GITHUB_TOKEN }}{% endraw %}
-          files: coverage.xml
-          junit-xml-pattern: .junitxml
-          base-branch: master
-          verbose: true
+          name: coverage-{{ lowercase_group }}-{% raw %}${{ matrix.python-version }}{% endraw %}
+          # .coverage-* / .junitxml-* are dotfiles, excluded by default
+          include-hidden-files: true
+          path: |
+            .coverage-sentry-*
+            .junitxml-*
+          if-no-files-found: 'ignore'
+          retention-days: 1
+          overwrite: true
