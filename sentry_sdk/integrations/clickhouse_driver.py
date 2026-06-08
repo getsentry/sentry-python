@@ -1,3 +1,4 @@
+import functools
 from typing import TYPE_CHECKING, TypeVar
 
 import sentry_sdk
@@ -72,6 +73,7 @@ T = TypeVar("T")
 
 
 def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
+    @functools.wraps(f)
     def _inner(*args: "P.args", **kwargs: "P.kwargs") -> "T":
         client = sentry_sdk.get_client()
         if client.get_integration(ClickhouseDriverIntegration) is None:
