@@ -51,7 +51,7 @@ typing = [
     "types-gevent",
     "types-greenlet",
     "types-redis",
-    "types-setuptools<71",
+    "types-setuptools<83",
     "types-webob",
     "opentelemetry-distro[otlp]",
     "pymongo",
