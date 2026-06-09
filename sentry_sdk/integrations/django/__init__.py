@@ -482,29 +482,23 @@ def _after_get_response(request: "WSGIRequest") -> None:
         if user is None or not is_authenticated(user):
             return
 
-        user_id = None
+        user_info = {}
         try:
-            user_id = str(user.pk)
+            user_info["id"] = str(user.pk)
         except Exception:
             pass
-        if user_id is not None:
-            scope.set_attribute(SPANDATA.USER_ID, user_id)
 
-        user_email = None
         try:
-            user_email = user.email
+            user_info["email"] = user.email
         except Exception:
             pass
-        if user_email is not None:
-            scope.set_attribute(SPANDATA.USER_EMAIL, user_email)
 
-        username = None
         try:
-            username = user.get_username()
+            user_info["username"] = user.get_username()
         except Exception:
             pass
-        if username is not None:
-            scope.set_attribute(SPANDATA.USER_NAME, username)
+
+        scope.set_user(user_info)
 
 
 def _patch_get_response() -> None:
