@@ -254,18 +254,6 @@ def _serialize_request_body_data(data: "Any") -> str:
     return json.dumps(data, default=_default)
 
 
-def _set_request_body_data_on_streaming_segment(
-    info: "Optional[Dict[str, Any]]",
-) -> None:
-    current_span = get_current_span()
-    if info and "data" in info and type(current_span) is StreamedSpan:
-        with capture_internal_exceptions():
-            current_span._segment.set_attribute(
-                "http.request.body.data",
-                _serialize_request_body_data(info["data"]),
-            )
-
-
 @ensure_integration_enabled(StarletteIntegration)
 def _capture_exception(exception: BaseException, handled: "Any" = False) -> None:
     event, hint = event_from_exception(
