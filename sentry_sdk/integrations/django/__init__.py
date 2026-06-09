@@ -459,11 +459,13 @@ def _attempt_resolve_again(
 
 def _after_get_response(request: "WSGIRequest") -> None:
     integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
-    if integration is None or integration.transaction_style != "url":
+    if integration is None:
         return
 
     scope = sentry_sdk.get_current_scope()
-    _attempt_resolve_again(request, scope, integration.transaction_style)
+
+    if integration.transaction_style == "url":
+        _attempt_resolve_again(request, scope, integration.transaction_style)
 
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
     if span_streaming:
