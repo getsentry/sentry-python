@@ -14,8 +14,7 @@
 
 [tox]
 requires =
-    # This version introduced using pip 24.1 which does not work with older Celery and HTTPX versions.
-    virtualenv<20.26.3
+    tox-uv
 envlist =
     # === Common ===
     {py3.6,py3.7,py3.8,py3.9,py3.10,py3.11,py3.12,py3.13,py3.14,py3.14t}-common
@@ -70,20 +69,13 @@ envlist =
     {% endfor %}
 
 [testenv]
+; SDK is installed via deps below to resolve all deps at once (tox-uv limitation)
+package = skip
 deps =
     # if you change requirements-testing.txt and your change is not being reflected
     # in what's installed by tox (when running tox locally), try running tox
     # with the -r flag
     -r requirements-testing.txt
-
-    linters: -r requirements-linting.txt
-    linters: werkzeug<2.3.0
-    linters: httpcore[asyncio]
-
-    mypy: -r requirements-linting.txt
-    mypy: werkzeug<2.3.0
-    mypy: httpcore[asyncio]
-    ruff: -r requirements-linting.txt
 
     # === Common ===
     py3.8-common: hypothesis
@@ -106,6 +98,7 @@ deps =
     {py3.6,py3.7}-gevent: pytest<7.0.0
     {py3.8,py3.9,py3.10,py3.11,py3.12}-gevent: pytest
     gevent: pytest-asyncio
+    gevent: setuptools<82
     {py3.10,py3.11}-gevent: zope.event<5.0.0
     {py3.10,py3.11}-gevent: zope.interface<8.0
 
@@ -134,7 +127,7 @@ deps =
     otlp: opentelemetry-distro[otlp]
 
     # OpenTelemetry Experimental (POTel)
-    potel: -e .[opentelemetry-experimental]
+    potel: opentelemetry-distro
 
     # === Integrations - Auto-generated ===
     # These come from the populate_tox.py script.
@@ -148,6 +141,13 @@ deps =
     {% else %}
     {{ integration.name }}-v{{ release }}: {{ integration.package }}=={{ release }}
     {% endif %}
+
+    {% for dependency_group in release.transitive_dependencies if dependency_group %}
+    {% for dep in dependency_group %}
+    {{ dep }}
+    {% endfor %}
+
+    {% endfor %}
     {% endfor %}
     {% if integration.latest_stable %}
     {% if integration.extra %}
@@ -155,6 +155,13 @@ deps =
     {% else %}
     {{ integration.name }}-latest: {{ integration.package }}=={{ integration.latest_stable }}
     {% endif %}
+
+    {% for dependency_group in integration.latest_transitive_dependencies if dependency_group %}
+    {% for dep in dependency_group %}
+    {{ dep }}
+    {% endfor %}
+
+    {% endfor %}
     {% endif %}
     {% for dep in integration.dependencies %}
     {{ dep }}
@@ -167,17 +174,36 @@ deps =
 
     {% endfor %}
 
+    ; Install the SDK in deps so uv resolves runtime deps together with
+    ; everything above in a single pass.
+    ; uv only supports PEP 660 editables; py3.6's max setuptools (~59) predates
+    ; PEP 660, so fall back to a non-editable install there.
+    !py3.6: -e .
+    py3.6: .
+
 setenv =
     PYTHONDONTWRITEBYTECODE=1
     OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
     COVERAGE_FILE=.coverage-sentry-{envname}
+    UV_CACHE_DIR={env:HOME}/.cache/uv/{envname}
+
+    UV_PRERELEASE=if-necessary-or-explicit
+    {% for group, integrations in groups.items() %}
+    {% for integration in integrations %}
+    {% for line in integration.prerelease_setenv %}
+    {{ line }}
+    {% endfor %}
+    {% endfor %}
+    {% endfor %}
+
     py3.6: COVERAGE_RCFILE=.coveragerc36
-    # Lowest version to support free-threading
-    # https://discuss.python.org/t/announcement-pip-24-1-release/56281
-    py3.14t: VIRTUALENV_PIP=24.1
 
     django: DJANGO_SETTINGS_MODULE=tests.integrations.django.myapp.settings
     spark-v{3.0.3,3.5.6}: JAVA_HOME=/usr/lib/jvm/temurin-11-jdk-amd64
+
+    # Ray 2.43+ auto-detects `uv run` drivers and spawns workers via uv,
+    # which targets the workspace `.venv` instead of the tox env and hangs.
+    ray: RAY_ENABLE_UV_RUN_RUNTIME_ENV=0
 
     # Avoid polluting test suite with imports
     common: PYTEST_ADDOPTS="--ignore=tests/test_shadowed_module.py"
@@ -207,15 +233,10 @@ passenv =
     SENTRY_PYTHON_TEST_POSTGRES_USER
     SENTRY_PYTHON_TEST_POSTGRES_PASSWORD
     SENTRY_PYTHON_TEST_POSTGRES_NAME
+    SENTRY_PYTHON_TEST_REDIS_HOST
+    SENTRY_PYTHON_TEST_MYSQL_USER
+    SENTRY_PYTHON_TEST_MYSQL_PASSWORD
     TESTPATH
-
-usedevelop = True
-
-extras =
-    bottle: bottle
-    falcon: falcon
-    flask: flask
-    pymongo: pymongo
 
 basepython =
     py3.6: python3.6
@@ -229,36 +250,8 @@ basepython =
     py3.14: python3.14
     py3.14t: python3.14t
 
-    # Python version is pinned here for consistency across environments.
-    # Tools like ruff and mypy have options that pin the target Python
-    # version (configured in pyproject.toml), ensuring consistent behavior.
-    linters: python3.14
-    mypy: python3.14
-    ruff: python3.14
-
 commands =
-    {py3.7,py3.8}-boto3: pip install urllib3<2.0.0
-
-    ; https://github.com/pallets/flask/issues/4455
-    {py3.7,py3.8,py3.9,py3.10,py3.11}-flask-v{1}: pip install "itsdangerous>=0.24,<2.0" "markupsafe<2.0.0" "jinja2<3.1.1"
-
     ; Running `pytest` as an executable suffers from an import error
     ; when loading tests in scenarios. In particular, django fails to
     ; load the settings from the test module.
-    python -m pytest -W error::pytest.PytestUnraisableExceptionWarning {env:TESTPATH:{env:_TESTPATH}} -o junit_suite_name={envname} {posargs}
-
-[testenv:linters]
-commands =
-    ruff check tests sentry_sdk
-    ruff format --check tests sentry_sdk
-    mypy sentry_sdk
-    python scripts/find_raise_from_none.py
-
-[testenv:mypy]
-commands =
-    mypy sentry_sdk
-
-[testenv:ruff]
-commands =
-    ruff check tests sentry_sdk
-    ruff format --check tests sentry_sdk
+    python -m pytest -W error::pytest.PytestUnraisableExceptionWarning {env:TESTPATH:{env:_TESTPATH}} -o junit_suite_name={envname} --junitxml=.junitxml-{envname} {posargs}

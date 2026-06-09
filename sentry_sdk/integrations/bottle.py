@@ -10,7 +10,9 @@ from sentry_sdk.integrations import (
 )
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.tracing import SOURCE_FOR_STYLE
+from sentry_sdk.traces import SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE
+from sentry_sdk.tracing import SOURCE_FOR_STYLE as TRANSACTION_SOURCE_FOR_STYLE
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -102,6 +104,11 @@ class BottleIntegration(Integration):
             )
             res = old_handle(self, environ)
 
+            if has_span_streaming_enabled(sentry_sdk.get_client().options):
+                _set_segment_name_and_source(
+                    transaction_style=integration.transaction_style
+                )
+
             return res
 
         Bottle._handle = _patched_handle
@@ -163,6 +170,25 @@ class BottleRequestExtractor(RequestExtractor):
         return file.content_length
 
 
+def _set_segment_name_and_source(transaction_style: str) -> None:
+    try:
+        if transaction_style == "url":
+            name = bottle_request.route.rule or "bottle request"
+        else:
+            name = (
+                bottle_request.route.name
+                or transaction_from_function(bottle_request.route.callback)
+                or "bottle request"
+            )
+
+        sentry_sdk.get_current_scope().set_transaction_name(
+            name,
+            source=SEGMENT_SOURCE_FOR_STYLE[transaction_style],
+        )
+    except RuntimeError:
+        pass
+
+
 def _set_transaction_name_and_source(
     event: "Event", transaction_style: str, request: "Any"
 ) -> None:
@@ -185,7 +211,9 @@ def _set_transaction_name_and_source(
             pass
 
     event["transaction"] = name
-    event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
+    event["transaction_info"] = {
+        "source": TRANSACTION_SOURCE_FOR_STYLE[transaction_style]
+    }
 
 
 def _make_request_event_processor(

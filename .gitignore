@@ -3,7 +3,6 @@
 *.egg
 *.db
 *.pid
-.python-version
 .coverage
 .coverage-sentry*
 coverage.xml
