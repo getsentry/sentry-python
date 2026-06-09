@@ -468,7 +468,7 @@ def _after_get_response(request: "WSGIRequest") -> None:
         _attempt_resolve_again(request, scope, integration.transaction_style)
 
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-    if span_streaming:
+    if span_streaming and should_send_default_pii():
         user = getattr(request, "user", None)
 
         # Evaluating a SimpleLazyObject in an async view can raise django.core.exceptions.SynchronousOnlyOperation.
@@ -487,23 +487,30 @@ def _after_get_response(request: "WSGIRequest") -> None:
             return
 
         segment_span = scope.streamed_span._segment
+
+        user_id = None
         try:
             user_id = str(user.pk)
         except Exception:
             pass
-        segment_span.set_attribute(SPANDATA.USER_ID, user_id)
+        if user_id is not None:
+            segment_span.set_attribute(SPANDATA.USER_ID, user_id)
 
+        user_email = None
         try:
             user_email = user.email
         except Exception:
             pass
-        segment_span.set_attribute(SPANDATA.USER_EMAIL, user_email)
+        if user_email is not None:
+            segment_span.set_attribute(SPANDATA.USER_EMAIL, user_email)
 
+        username = None
         try:
             username = user.get_username()
         except Exception:
             pass
-        segment_span.set_attribute(SPANDATA.USER_NAME, username)
+        if username is not None:
+            segment_span.set_attribute(SPANDATA.USER_NAME, username)
 
 
 def _patch_get_response() -> None:
