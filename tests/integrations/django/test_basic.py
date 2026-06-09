@@ -532,7 +532,7 @@ def test_user_captured(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-def test_materialized_user_captured_on_segment_span(
+def test_materialized_user_captured(
     sentry_init,
     client,
     capture_events,

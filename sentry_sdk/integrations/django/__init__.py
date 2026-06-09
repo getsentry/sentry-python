@@ -479,14 +479,8 @@ def _after_get_response(request: "WSGIRequest") -> None:
         elif is_lazy:
             return
 
-        if (
-            user is None
-            or not is_authenticated(user)
-            or type(scope.streamed_span) is not StreamedSpan
-        ):
+        if user is None or not is_authenticated(user):
             return
-
-        segment_span = scope.streamed_span._segment
 
         user_id = None
         try:
@@ -494,7 +488,7 @@ def _after_get_response(request: "WSGIRequest") -> None:
         except Exception:
             pass
         if user_id is not None:
-            segment_span.set_attribute(SPANDATA.USER_ID, user_id)
+            scope.set_attribute(SPANDATA.USER_ID, user_id)
 
         user_email = None
         try:
@@ -502,7 +496,7 @@ def _after_get_response(request: "WSGIRequest") -> None:
         except Exception:
             pass
         if user_email is not None:
-            segment_span.set_attribute(SPANDATA.USER_EMAIL, user_email)
+            scope.set_attribute(SPANDATA.USER_EMAIL, user_email)
 
         username = None
         try:
@@ -510,7 +504,7 @@ def _after_get_response(request: "WSGIRequest") -> None:
         except Exception:
             pass
         if username is not None:
-            segment_span.set_attribute(SPANDATA.USER_NAME, username)
+            scope.set_attribute(SPANDATA.USER_NAME, username)
 
 
 def _patch_get_response() -> None:
