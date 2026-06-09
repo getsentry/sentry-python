@@ -99,7 +99,8 @@ def _sentry_request_created(
 
         span.set_tag("aws.service_id", service_id.hyphenize())
         span.set_tag("aws.operation_name", operation_name)
-        span.set_data(SPANDATA.HTTP_METHOD, request.method)
+        if request.method is not None:
+            span.set_data(SPANDATA.HTTP_METHOD, request.method)
 
     # We do it in order for subsequent http calls/retries be
     # attached to this span.

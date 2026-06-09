@@ -15,7 +15,7 @@ from ..consts import SPAN_ORIGIN
 from ..utils import _set_agent_data, _set_usage_data
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Any
 
     import agents
 
@@ -85,37 +85,19 @@ def invoke_agent_span(
 
 
 def update_invoke_agent_span(
-    context: "agents.RunContextWrapper", agent: "agents.Agent", output: "Any"
-) -> None:
-    span = getattr(context, "_sentry_agent_span", None)
-
-    if span:
-        # Add aggregated usage data from context_wrapper
-        if hasattr(context, "usage"):
-            _set_usage_data(span, context.usage)
-
-        if should_send_default_pii():
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_RESPONSE_TEXT, output, unpack=False
-            )
-
-        # Add conversation ID from agent
-        conv_id = getattr(agent, "_sentry_conversation_id", None)
-        if conv_id:
-            span.set_data(SPANDATA.GEN_AI_CONVERSATION_ID, conv_id)
-
-        span.__exit__(None, None, None)
-        delattr(context, "_sentry_agent_span")
-
-
-def end_invoke_agent_span(
-    context_wrapper: "agents.RunContextWrapper",
+    span: "sentry_sdk.tracing.Span",
+    context: "agents.RunContextWrapper",
     agent: "agents.Agent",
-    output: "Optional[Any]" = None,
+    output: "Any" = None,
 ) -> None:
-    """End the agent invocation span"""
-    # Clear the stored agent
-    if hasattr(context_wrapper, "_sentry_current_agent"):
-        delattr(context_wrapper, "_sentry_current_agent")
+    # Add aggregated usage data from context_wrapper
+    if hasattr(context, "usage"):
+        _set_usage_data(span, context.usage)
 
-    update_invoke_agent_span(context_wrapper, agent, output)
+    if should_send_default_pii():
+        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output, unpack=False)
+
+    # Add conversation ID from agent
+    conv_id = getattr(agent, "_sentry_conversation_id", None)
+    if conv_id:
+        span.set_data(SPANDATA.GEN_AI_CONVERSATION_ID, conv_id)

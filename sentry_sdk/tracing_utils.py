@@ -20,7 +20,7 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS, SPANTEMPLATE
+from sentry_sdk.consts import OP, SPANDATA, SPANTEMPLATE
 from sentry_sdk.utils import (
     _is_external_source,
     _is_in_project_root,
@@ -116,56 +116,17 @@ def has_span_streaming_enabled(options: "Optional[dict[str, Any]]") -> bool:
     return (options.get("_experiments") or {}).get("trace_lifecycle") == "stream"
 
 
+def should_truncate_gen_ai_input(options: "Optional[dict[str, Any]]") -> bool:
+    if options is None:
+        return True
+
+    return not options.get(
+        "stream_gen_ai_spans", False
+    ) and not has_span_streaming_enabled(options)
+
+
 @contextlib.contextmanager
 def record_sql_queries(
-    cursor: "Any",
-    query: "Any",
-    params_list: "Any",
-    paramstyle: "Optional[str]",
-    executemany: bool,
-    record_cursor_repr: bool = False,
-    span_origin: str = "manual",
-) -> "Generator[sentry_sdk.tracing.Span, None, None]":
-    # TODO: Bring back capturing of params by default
-    if sentry_sdk.get_client().options["_experiments"].get("record_sql_params", False):
-        if not params_list or params_list == [None]:
-            params_list = None
-
-        if paramstyle == "pyformat":
-            paramstyle = "format"
-    else:
-        params_list = None
-        paramstyle = None
-
-    query = _format_sql(cursor, query)
-
-    data = {}
-    if params_list is not None:
-        data["db.params"] = params_list
-    if paramstyle is not None:
-        data["db.paramstyle"] = paramstyle
-    if executemany:
-        data["db.executemany"] = True
-    if record_cursor_repr and cursor is not None:
-        data["db.cursor"] = cursor
-
-    with capture_internal_exceptions():
-        sentry_sdk.add_breadcrumb(message=query, category="query", data=data)
-
-    with sentry_sdk.start_span(
-        op=OP.DB,
-        name=query,
-        origin=span_origin,
-    ) as span:
-        for k, v in data.items():
-            span.set_data(k, v)
-        yield span
-
-
-# Mirrors record_sql_queries() temporarily so the Django and asyncpg integrations don't crash with span streaming enabled.
-# Once both are ported, remove record_sql_queries() and rename record_sql_queries_supporting_streaming() to record_sql_queries().
-@contextlib.contextmanager
-def record_sql_queries_supporting_streaming(
     cursor: "Any",
     query: "Any",
     params_list: "Any",
@@ -758,7 +719,7 @@ class Baggage:
 
                 with capture_internal_exceptions():
                     item = item.strip()
-                    key, val = item.split("=")
+                    key, val = item.split("=", 1)
                     if Baggage.SENTRY_PREFIX_REGEX.match(key):
                         baggage_key = unquote(key.split("-")[1])
                         sentry_items[baggage_key] = unquote(val)
@@ -1140,7 +1101,7 @@ def create_streaming_span_decorator(
         @functools.wraps(f)
         async def async_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
             client = sentry_sdk.get_client()
-            if not has_span_streaming_enabled(client.options):
+            if client.is_active() and not has_span_streaming_enabled(client.options):
                 warnings.warn(
                     "Using span streaming API in non-span-streaming mode. Use "
                     "@sentry_sdk.trace instead.",
@@ -1163,7 +1124,7 @@ def create_streaming_span_decorator(
         @functools.wraps(f)
         def sync_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
             client = sentry_sdk.get_client()
-            if not has_span_streaming_enabled(client.options):
+            if client.is_active() and not has_span_streaming_enabled(client.options):
                 warnings.warn(
                     "Using span streaming API in non-span-streaming mode. Use "
                     "@sentry_sdk.trace instead.",
@@ -1199,33 +1160,6 @@ def get_current_span(
     scope = scope or sentry_sdk.get_current_scope()
     current_span = scope.span
     return current_span
-
-
-def set_span_errored(span: "Optional[Union[Span, StreamedSpan]]" = None) -> None:
-    """
-    Set the status of the current or given span to INTERNAL_ERROR.
-    Also sets the status of the transaction (root span) to INTERNAL_ERROR.
-    """
-    from sentry_sdk.traces import SpanStatus, StreamedSpan, _get_current_streamed_span
-
-    client = sentry_sdk.get_client()
-
-    if not span:
-        span = (
-            _get_current_streamed_span()
-            if has_span_streaming_enabled(client.options)
-            else sentry_sdk.get_current_span()
-        )
-
-    if span is not None:
-        if isinstance(span, Span):
-            span.set_status(SPANSTATUS.INTERNAL_ERROR)
-            if span.containing_transaction is not None:
-                span.containing_transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
-        elif isinstance(span, StreamedSpan):
-            span.status = SpanStatus.ERROR
-            if span._segment is not None:
-                span._segment.status = SpanStatus.ERROR
 
 
 def _generate_sample_rand(
@@ -1643,6 +1577,7 @@ def _make_sampling_decision(
         return False, 0.0, None, "sample_rate"
 
     # Adjust sample rate if we're under backpressure
+    sample_rate_before_backpressure = sample_rate
     if client.monitor:
         sample_rate /= 2**client.monitor.downsample_factor
 
@@ -1650,16 +1585,31 @@ def _make_sampling_decision(
             logger.debug(f"[Tracing] Discarding {name} because backpressure")
             return False, 0.0, None, "backpressure"
 
+    # Make the actual decision
     sampled = sample_rand < sample_rate
 
     if sampled:
         logger.debug(f"[Tracing] Starting {name}")
         outcome = None
+
     else:
-        logger.debug(
-            f"[Tracing] Discarding {name} because it's not included in the random sample (sampling rate = {sample_rate})"
-        )
-        outcome = "sample_rate"
+        # Determine why exactly the span will not be sampled. If we've lowered
+        # the effective sample_rate because of backpressure, check whether the
+        # span would've been sampled if backpressure wasn't active. If that's the
+        # case, backpressure is the actual reason, otherwise just pure sampling
+        # rate.
+        if (
+            sample_rate_before_backpressure != sample_rate
+            and sample_rand < sample_rate_before_backpressure
+        ):
+            logger.debug(f"[Tracing] Discarding {name} because backpressure")
+            outcome = "backpressure"
+
+        else:
+            logger.debug(
+                f"[Tracing] Discarding {name} because it's not included in the random sample (sampling rate = {sample_rate})"
+            )
+            outcome = "sample_rate"
 
     return sampled, sample_rate, sample_rand, outcome
 
@@ -1690,12 +1640,12 @@ def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
             name_matches = True
             attributes_match = True
 
-            attributes = attributes or {}
-
             if "name" in rule:
                 name_matches = _matches(rule["name"], name)
 
             if "attributes" in rule:
+                attributes = attributes or {}
+
                 for attribute, value in rule["attributes"].items():
                     if attribute not in attributes or not _matches(
                         value, attributes[attribute]

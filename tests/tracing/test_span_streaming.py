@@ -270,6 +270,143 @@ def test_custom_sampling_context_update_to_context_value_persists(sentry_init):
         ...
 
 
+def test_before_send_span_basic(sentry_init, capture_items):
+    def before_send_span(span, hint):
+        assert isinstance(span, dict)
+
+        span["name"] = "Better span name"
+        del span["attributes"]["drop"]
+        span["attributes"]["sanitize"] = "[Removed]"
+        span["attributes"]["add"] = "new"
+
+        return span
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={
+            "before_send_span": before_send_span,
+            "trace_lifecycle": "stream",
+        },
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(
+        name="span",
+        attributes={
+            "drop": True,
+            "sanitize": "myamazingpassword",
+        },
+    ):
+        ...
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    assert len(spans) == 1
+    (span,) = spans
+
+    assert span["name"] == "Better span name"
+    assert "drop" not in span["attributes"]
+    assert span["attributes"]["sanitize"] == "[Removed]"
+    assert span["attributes"]["add"] == "new"
+
+
+@pytest.mark.parametrize(
+    "return_value",
+    [None, {}, {"not_a_span": True}],
+)
+def test_before_send_span_invalid_return_value(
+    sentry_init, capture_items, return_value
+):
+    def before_send_span(span, hint):
+        # Spans can't be dropped in before_send_span, so unsupported return
+        # values will be ignored
+        return return_value
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={
+            "before_send_span": before_send_span,
+            "trace_lifecycle": "stream",
+        },
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="span"):
+        ...
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    assert len(spans) == 1
+    (span,) = spans
+
+    assert span["name"] == "span"
+
+
+def test_before_send_span_unsupported_edit(sentry_init, capture_items):
+    def before_send_span(span, hint):
+        # Anything beyond attribute and name changes will be ignored
+        span["trace_id"] = "my-trace-id"
+
+        return span
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={
+            "before_send_span": before_send_span,
+            "trace_lifecycle": "stream",
+        },
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="span"):
+        ...
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    assert len(spans) == 1
+    (span,) = spans
+
+    assert span["name"] == "span"
+    assert span["trace_id"] != "my-trace-id"
+
+
+def test_before_send_span_doesnt_receive_ignored_spans(sentry_init, capture_items):
+    before_send_span_called = False
+
+    def before_send_span(span, hint):
+        nonlocal before_send_span_called
+        before_send_span_called = True
+        return span
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={
+            "before_send_span": before_send_span,
+            "trace_lifecycle": "stream",
+            "ignore_spans": [
+                "ignored",
+            ],
+        },
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="ignored"):
+        ...
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    assert not spans
+    assert not before_send_span_called
+
+
 def test_span_attributes(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
@@ -615,6 +752,69 @@ def test_continue_trace_unsampled(sentry_init, capture_items):
     spans = [item.payload for item in items]
 
     assert len(spans) == 0
+
+
+@pytest.mark.parametrize(
+    ("sample_rand", "expected_sampled", "expected_outcome"),
+    [
+        ("0.100000", True, None),
+        ("0.250000", False, "backpressure"),
+        ("0.300000", False, "backpressure"),
+        ("0.500000", False, "sample_rate"),
+        ("0.700000", False, "sample_rate"),
+    ],
+)
+def test_backpressure_outcome(
+    sentry_init,
+    capture_items,
+    capture_record_lost_event_calls,
+    sample_rand,
+    expected_sampled,
+    expected_outcome,
+):
+    sentry_init(
+        traces_sample_rate=0.5,
+        enable_backpressure_handling=True,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    items = capture_items("span")
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    client = sentry_sdk.get_client()
+    client.monitor._downsample_factor = 1
+
+    trace_id = "0af7651916cd43dd8448eb211c80319c"
+    parent_span_id = "b7ad6b7169203331"
+
+    sentry_sdk.traces.continue_trace(
+        {
+            "sentry-trace": f"{trace_id}-{parent_span_id}",
+            "baggage": f"sentry-trace_id={trace_id},sentry-sample_rand={sample_rand}",
+        }
+    )
+
+    with sentry_sdk.traces.start_span(name="span") as span:
+        pass
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    # Original traces_sample_rate is 0.5, downsampled sample rate is 0.25, so:
+    # - sample_rand < 0.25 -> sampled
+    # - 0.25 < sample_rand < 0.5 -> unsampled because of backpressure (would've been sampled if no backpressure)
+    # - 0.5 < sample_rand -> unsampled because of sampling rate
+
+    assert span.sampled is expected_sampled
+
+    if expected_sampled:
+        assert len(spans) == 1
+        assert not record_lost_event_calls
+    else:
+        assert len(spans) == 0
+        assert record_lost_event_calls == [
+            (expected_outcome, "span", None, 1),
+        ]
 
 
 def test_unsampled_spans_produce_client_report(
@@ -1485,6 +1685,7 @@ def test_default_attributes(sentry_init, capture_envelopes):
     sentry_init(
         server_name="test-server",
         release="1.0.0",
+        dist="1.0",
         traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream"},
     )
@@ -1516,6 +1717,9 @@ def test_default_attributes(sentry_init, capture_envelopes):
         "sentry.sdk.version": {"value": mock.ANY, "type": "string"},
         "server.address": {"value": "test-server", "type": "string"},
         "sentry.environment": {"value": "production", "type": "string"},
+        "sentry.platform": {"value": "python", "type": "string"},
         "sentry.release": {"value": "1.0.0", "type": "string"},
+        "sentry.dist": {"value": "1.0", "type": "string"},
         "sentry.origin": {"value": "manual", "type": "string"},
+        "sentry.sdk.integrations": {"value": mock.ANY, "type": "array"},
     }

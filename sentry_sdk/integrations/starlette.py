@@ -23,7 +23,7 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan, _get_current_streamed_span
+from sentry_sdk.traces import StreamedSpan, get_current_span
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TransactionSource,
@@ -552,7 +552,7 @@ async def _wrap_async_handler(
     try:
         return await handler(*args, **kwargs)
     finally:
-        current_span = _get_current_streamed_span()
+        current_span = get_current_span()
 
         if type(current_span) is StreamedSpan:
             request_body = _get_cached_request_body_attribute(

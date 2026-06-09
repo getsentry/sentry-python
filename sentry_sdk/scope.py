@@ -376,8 +376,8 @@ class Scope:
     def set_global_attributes(self) -> None:
         from sentry_sdk.client import SDK_INFO
 
-        self.set_attribute("sentry.sdk.name", SDK_INFO["name"])
-        self.set_attribute("sentry.sdk.version", SDK_INFO["version"])
+        self.set_attribute(SPANDATA.SENTRY_SDK_NAME, SDK_INFO["name"])
+        self.set_attribute(SPANDATA.SENTRY_SDK_VERSION, SDK_INFO["version"])
 
         options = sentry_sdk.get_client().options
 
@@ -387,11 +387,11 @@ class Scope:
 
         environment = options.get("environment")
         if environment:
-            self.set_attribute("sentry.environment", environment)
+            self.set_attribute(SPANDATA.SENTRY_ENVIRONMENT, environment)
 
         release = options.get("release")
         if release:
-            self.set_attribute("sentry.release", release)
+            self.set_attribute(SPANDATA.SENTRY_RELEASE, release)
 
     @classmethod
     def last_event_id(cls) -> "Optional[str]":

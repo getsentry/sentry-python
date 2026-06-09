@@ -23,7 +23,7 @@ import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.asyncpg import AsyncPGIntegration
-from sentry_sdk.tracing_utils import record_sql_queries_supporting_streaming
+from sentry_sdk.tracing_utils import record_sql_queries
 from tests.conftest import ApproxDict
 
 PG_HOST = os.getenv("SENTRY_PYTHON_TEST_POSTGRES_HOST", "localhost")
@@ -49,6 +49,23 @@ CRUMBS_CONNECT = {
         {
             "db.name": PG_NAME,
             "db.system": "postgresql",
+            "db.user": PG_USER,
+            "db.driver.name": "asyncpg",
+            "server.address": PG_HOST,
+            "server.port": PG_PORT,
+        }
+    ),
+    "message": "connect",
+    "type": "default",
+}
+CRUMBS_CONNECT_STREAMING = {
+    "category": "query",
+    "data": ApproxDict(
+        {
+            "sentry.op": "db",
+            "sentry.origin": "auto.db.asyncpg",
+            "db.system.name": "postgresql",
+            "db.namespace": PG_NAME,
             "db.user": PG_USER,
             "db.driver.name": "asyncpg",
             "server.address": PG_HOST,
@@ -124,7 +141,10 @@ async def test_connect(
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
 
-    assert event["breadcrumbs"]["values"] == [CRUMBS_CONNECT]
+    expected_crumbs_connect = (
+        CRUMBS_CONNECT_STREAMING if span_streaming else CRUMBS_CONNECT
+    )
+    assert event["breadcrumbs"]["values"] == [expected_crumbs_connect]
 
 
 @pytest.mark.asyncio
@@ -176,8 +196,11 @@ async def test_execute(
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
 
+    expected_crumbs_connect = (
+        CRUMBS_CONNECT_STREAMING if span_streaming else CRUMBS_CONNECT
+    )
     assert event["breadcrumbs"]["values"] == [
-        CRUMBS_CONNECT,
+        expected_crumbs_connect,
         {
             "category": "query",
             "data": {},
@@ -245,8 +268,11 @@ async def test_execute_many(
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
 
+    expected_crumbs_connect = (
+        CRUMBS_CONNECT_STREAMING if span_streaming else CRUMBS_CONNECT
+    )
     assert event["breadcrumbs"]["values"] == [
-        CRUMBS_CONNECT,
+        expected_crumbs_connect,
         {
             "category": "query",
             "data": {"db.executemany": True},
@@ -839,7 +865,7 @@ async def test_no_query_source_if_duration_too_short(
 
         @contextmanager
         def fake_record_sql_queries_streaming(*args, **kwargs):
-            with record_sql_queries_supporting_streaming(*args, **kwargs) as span:
+            with record_sql_queries(*args, **kwargs) as span:
                 pass
             span._start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
             if span_streaming:
@@ -852,7 +878,7 @@ async def test_no_query_source_if_duration_too_short(
             conn: Connection = await connect(PG_CONNECTION_URI)
 
             with mock.patch(
-                "sentry_sdk.integrations.asyncpg.record_sql_queries_supporting_streaming",
+                "sentry_sdk.integrations.asyncpg.record_sql_queries",
                 fake_record_sql_queries_streaming,
             ):
                 await conn.execute(
@@ -882,14 +908,14 @@ async def test_no_query_source_if_duration_too_short(
 
             @contextmanager
             def fake_record_sql_queries(*args, **kwargs):
-                with record_sql_queries_supporting_streaming(*args, **kwargs) as span:
+                with record_sql_queries(*args, **kwargs) as span:
                     pass
                 span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
                 span.timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
                 yield span
 
             with mock.patch(
-                "sentry_sdk.integrations.asyncpg.record_sql_queries_supporting_streaming",
+                "sentry_sdk.integrations.asyncpg.record_sql_queries",
                 fake_record_sql_queries,
             ):
                 await conn.execute(
@@ -926,14 +952,14 @@ async def test_query_source_if_duration_over_threshold(sentry_init, capture_even
 
         @contextmanager
         def fake_record_sql_queries(*args, **kwargs):
-            with record_sql_queries_supporting_streaming(*args, **kwargs) as span:
+            with record_sql_queries(*args, **kwargs) as span:
                 pass
             span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
             span.timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
             yield span
 
         with mock.patch(
-            "sentry_sdk.integrations.asyncpg.record_sql_queries_supporting_streaming",
+            "sentry_sdk.integrations.asyncpg.record_sql_queries",
             fake_record_sql_queries,
         ):
             await conn.execute(
@@ -1398,11 +1424,11 @@ async def test_cursor__bind_exec_creates_spans(
 
         assert bind_exec_span["attributes"]["sentry.origin"] == "auto.db.asyncpg"
         assert bind_exec_span["attributes"]["sentry.op"] == "db"
-        assert bind_exec_span["attributes"]["db.system"] == "postgresql"
+        assert bind_exec_span["attributes"]["db.system.name"] == "postgresql"
         assert bind_exec_span["attributes"]["db.driver.name"] == "asyncpg"
         assert bind_exec_span["attributes"]["server.address"] == PG_HOST
         assert bind_exec_span["attributes"]["server.port"] == PG_PORT
-        assert bind_exec_span["attributes"]["db.name"] == PG_NAME
+        assert bind_exec_span["attributes"]["db.namespace"] == PG_NAME
         assert bind_exec_span["attributes"]["db.user"] == PG_USER
     else:
         events = capture_events()

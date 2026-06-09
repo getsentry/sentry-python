@@ -195,6 +195,7 @@ def test_span_templates_ai_dicts(
             "sentry.sdk.version": mock.ANY,
             "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "test-transaction",
+            "server.address": mock.ANY,
             "thread.id": mock.ANY,
             "thread.name": mock.ANY,
         }
@@ -217,6 +218,7 @@ def test_span_templates_ai_dicts(
             "sentry.sdk.version": mock.ANY,
             "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "test-transaction",
+            "server.address": mock.ANY,
             "thread.id": mock.ANY,
             "thread.name": mock.ANY,
         }
@@ -245,6 +247,7 @@ def test_span_templates_ai_dicts(
             "sentry.sdk.version": mock.ANY,
             "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "test-transaction",
+            "server.address": mock.ANY,
             "thread.id": mock.ANY,
             "thread.name": mock.ANY,
         }
@@ -389,6 +392,7 @@ def test_span_templates_ai_objects(
             "sentry.sdk.version": mock.ANY,
             "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "test-transaction",
+            "server.address": mock.ANY,
             "thread.id": mock.ANY,
             "thread.name": mock.ANY,
         }
@@ -412,6 +416,7 @@ def test_span_templates_ai_objects(
             "sentry.sdk.version": mock.ANY,
             "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "test-transaction",
+            "server.address": mock.ANY,
             "thread.id": mock.ANY,
             "thread.name": mock.ANY,
         }
@@ -439,6 +444,7 @@ def test_span_templates_ai_objects(
             "sentry.sdk.version": mock.ANY,
             "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "test-transaction",
+            "server.address": mock.ANY,
             "thread.id": mock.ANY,
             "thread.name": mock.ANY,
         }

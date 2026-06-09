@@ -236,7 +236,7 @@ def test_weight_based_flushing_by_attribute_size(
     with sentry_sdk.traces.start_span(name="small span") as bare_span:
         pass
 
-    bare_span_size = SpanBatcher._estimate_size(bare_span)
+    bare_span_size = SpanBatcher._estimate_size(bare_span._to_json())
     big_attr = "x" * bare_span_size
 
     monkeypatch.setattr(SpanBatcher, "MAX_BYTES_BEFORE_FLUSH", bare_span_size * 3)
