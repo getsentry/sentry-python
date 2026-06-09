@@ -609,7 +609,12 @@ def _is_image_type_with_blob_content(item: "Dict[str, Any]") -> bool:
     if item.get("type") != "image_url":
         return False
 
-    image_url = item.get("image_url", {}).get("url", "")
+    image_url_val = item.get("image_url")
+    image_url = (
+        image_url_val.get("url", "")
+        if isinstance(image_url_val, dict)
+        else (image_url_val or "")
+    )
     data_url_match = DATA_URL_BASE64_REGEX.match(image_url)
 
     return bool(data_url_match)
@@ -694,7 +699,10 @@ def redact_blob_message_parts(
                     if item.get("type") == "blob":
                         item["content"] = BLOB_DATA_SUBSTITUTE
                     elif _is_image_type_with_blob_content(item):
-                        item["image_url"]["url"] = BLOB_DATA_SUBSTITUTE
+                        if isinstance(item["image_url"], dict):
+                            item["image_url"]["url"] = BLOB_DATA_SUBSTITUTE
+                        else:
+                            item["image_url"] = BLOB_DATA_SUBSTITUTE
 
     return messages_copy
 

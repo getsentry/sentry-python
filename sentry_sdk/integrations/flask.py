@@ -95,10 +95,9 @@ class FlaskIntegration(Integration):
         def sentry_patched_wsgi_app(
             self: "Any", environ: "Dict[str, str]", start_response: "Callable[..., Any]"
         ) -> "_ScopedResponse":
-            if sentry_sdk.get_client().get_integration(FlaskIntegration) is None:
-                return old_app(self, environ, start_response)
-
             integration = sentry_sdk.get_client().get_integration(FlaskIntegration)
+            if integration is None:
+                return old_app(self, environ, start_response)
 
             middleware = SentryWsgiMiddleware(
                 lambda *a, **kw: old_app(self, *a, **kw),

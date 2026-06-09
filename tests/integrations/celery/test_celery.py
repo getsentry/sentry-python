@@ -1,3 +1,4 @@
+import os
 import threading
 from unittest import mock
 
@@ -7,13 +8,13 @@ from celery import VERSION, Celery
 from celery.bin import worker
 
 import sentry_sdk
+import sentry_sdk.traces
 from sentry_sdk import get_current_span, start_transaction
 from sentry_sdk.integrations.celery import (
     CeleryIntegration,
     _wrap_task_run,
 )
 from sentry_sdk.integrations.celery.beat import _get_headers
-from sentry_sdk.traces import _get_current_streamed_span
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 from tests.conftest import ApproxDict
 
@@ -59,8 +60,9 @@ def init_celery(sentry_init, request):
             # this backend requires capture_events_forksafe
             celery.conf.worker_max_tasks_per_child = 1
             celery.conf.worker_concurrency = 1
-            celery.conf.broker_url = "redis://127.0.0.1:6379"
-            celery.conf.result_backend = "redis://127.0.0.1:6379"
+            redis_url = f"redis://{os.environ.get('SENTRY_PYTHON_TEST_REDIS_HOST', '127.0.0.1')}:6379"
+            celery.conf.broker_url = redis_url
+            celery.conf.result_backend = redis_url
             celery.conf.task_always_eager = False
 
             # Once we drop celery 3 we can use the celery_worker fixture
@@ -665,7 +667,7 @@ def test_sentry_propagate_traces_override(span_streaming, init_celery):
     @celery.task(name="dummy_task", bind=True)
     def dummy_task(self, message):
         trace_id = (
-            _get_current_streamed_span().trace_id
+            sentry_sdk.traces.get_current_span().trace_id
             if span_streaming
             else get_current_span().trace_id
         )

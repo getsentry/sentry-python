@@ -64,157 +64,312 @@ class FakeRustTracing:
         self.layer.on_record(str(span_id), """{"version": "memoized"}""", state)
 
 
-def test_on_new_span_on_close(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_on_new_span_on_close(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
         "test_on_new_span_on_close",
         initializer=rust_tracing.set_layer_impl,
         include_tracing_fields=True,
     )
-    sentry_init(integrations=[integration], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[integration],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
+    if span_streaming:
+        items = capture_items("event", "transaction", "span")
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            rust_tracing.new_span(RustTracingLevel.Info, 3)
 
-    events = capture_events()
-    with start_transaction():
-        rust_tracing.new_span(RustTracingLevel.Info, 3)
+            sentry_first_rust_span = sentry_sdk.traces.get_current_span()
+            rust_first_rust_span = rust_tracing.spans[3]
 
-        sentry_first_rust_span = sentry_sdk.get_current_span()
-        rust_first_rust_span = rust_tracing.spans[3]
+            assert sentry_first_rust_span == rust_first_rust_span
 
-        assert sentry_first_rust_span == rust_first_rust_span
+            rust_tracing.close_span(3)
+            assert sentry_sdk.traces.get_current_span() != sentry_first_rust_span
 
-        rust_tracing.close_span(3)
-        assert sentry_sdk.get_current_span() != sentry_first_rust_span
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert len(spans) == 2
 
-    (event,) = events
-    assert len(event["spans"]) == 1
+        # Ensure the span metadata is wired up
+        span = spans[0]
+        assert span["attributes"]["sentry.op"] == "function"
+        assert (
+            span["attributes"]["sentry.origin"]
+            == "auto.function.rust_tracing.test_on_new_span_on_close"
+        )
+        assert span["name"] == "_bindings::fibonacci"
 
-    # Ensure the span metadata is wired up
-    span = event["spans"][0]
-    assert span["op"] == "function"
-    assert span["origin"] == "auto.function.rust_tracing.test_on_new_span_on_close"
-    assert span["description"] == "_bindings::fibonacci"
+        # Ensure the span was opened/closed appropriately
+        assert span["start_timestamp"] is not None
+        assert span["end_timestamp"] is not None
 
-    # Ensure the span was opened/closed appropriately
-    assert span["start_timestamp"] is not None
-    assert span["timestamp"] is not None
+        # Ensure the extra data from Rust is hooked up
+        data = span["attributes"]
+        assert data["use_memoized"]
+        assert data["index"] == 10
+        assert data["version"] == "None"
+    else:
+        events = capture_events()
+        with start_transaction():
+            rust_tracing.new_span(RustTracingLevel.Info, 3)
 
-    # Ensure the extra data from Rust is hooked up
-    data = span["data"]
-    assert data["use_memoized"]
-    assert data["index"] == 10
-    assert data["version"] is None
+            sentry_first_rust_span = sentry_sdk.get_current_span()
+            rust_first_rust_span = rust_tracing.spans[3]
+
+            assert sentry_first_rust_span == rust_first_rust_span
+
+            rust_tracing.close_span(3)
+            assert sentry_sdk.get_current_span() != sentry_first_rust_span
+
+        (event,) = events
+        assert len(event["spans"]) == 1
+
+        # Ensure the span metadata is wired up
+        span = event["spans"][0]
+        assert span["op"] == "function"
+        assert span["origin"] == "auto.function.rust_tracing.test_on_new_span_on_close"
+        assert span["description"] == "_bindings::fibonacci"
+
+        # Ensure the span was opened/closed appropriately
+        assert span["start_timestamp"] is not None
+        assert span["timestamp"] is not None
+
+        # Ensure the extra data from Rust is hooked up
+        data = span["data"]
+        assert data["use_memoized"]
+        assert data["index"] == 10
+        assert data["version"] is None
 
 
-def test_nested_on_new_span_on_close(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_nested_on_new_span_on_close(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
         "test_nested_on_new_span_on_close",
         initializer=rust_tracing.set_layer_impl,
         include_tracing_fields=True,
     )
-    sentry_init(integrations=[integration], traces_sample_rate=1.0)
-
-    events = capture_events()
-    with start_transaction():
-        original_sentry_span = sentry_sdk.get_current_span()
-
-        rust_tracing.new_span(RustTracingLevel.Info, 3, index_arg=10)
-        sentry_first_rust_span = sentry_sdk.get_current_span()
-        rust_first_rust_span = rust_tracing.spans[3]
-
-        # Use a different `index_arg` value for the inner span to help
-        # distinguish the two at the end of the test
-        rust_tracing.new_span(RustTracingLevel.Info, 5, index_arg=9)
-        sentry_second_rust_span = sentry_sdk.get_current_span()
-        rust_second_rust_span = rust_tracing.spans[5]
-
-        assert rust_second_rust_span == sentry_second_rust_span
-
-        rust_tracing.close_span(5)
-
-        # Ensure the current sentry span was moved back to the parent
-        sentry_span_after_close = sentry_sdk.get_current_span()
-        assert sentry_span_after_close == sentry_first_rust_span
-        assert sentry_span_after_close == rust_first_rust_span
-
-        rust_tracing.close_span(3)
-
-        assert sentry_sdk.get_current_span() == original_sentry_span
-
-    (event,) = events
-    assert len(event["spans"]) == 2
-
-    # Ensure the span metadata is wired up for all spans
-    first_span, second_span = event["spans"]
-    assert first_span["op"] == "function"
-    assert (
-        first_span["origin"]
-        == "auto.function.rust_tracing.test_nested_on_new_span_on_close"
+    sentry_init(
+        integrations=[integration],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-    assert first_span["description"] == "_bindings::fibonacci"
-    assert second_span["op"] == "function"
-    assert (
-        second_span["origin"]
-        == "auto.function.rust_tracing.test_nested_on_new_span_on_close"
-    )
-    assert second_span["description"] == "_bindings::fibonacci"
+    if span_streaming:
+        items = capture_items("event", "transaction", "span")
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            original_sentry_span = sentry_sdk.traces.get_current_span()
 
-    # Ensure the spans were opened/closed appropriately
-    assert first_span["start_timestamp"] is not None
-    assert first_span["timestamp"] is not None
-    assert second_span["start_timestamp"] is not None
-    assert second_span["timestamp"] is not None
+            rust_tracing.new_span(RustTracingLevel.Info, 3, index_arg=10)
+            sentry_first_rust_span = sentry_sdk.traces.get_current_span()
+            rust_first_rust_span = rust_tracing.spans[3]
 
-    # Ensure the extra data from Rust is hooked up in both spans
-    first_span_data = first_span["data"]
-    assert first_span_data["use_memoized"]
-    assert first_span_data["index"] == 10
-    assert first_span_data["version"] is None
+            # Use a different `index_arg` value for the inner span to help
+            # distinguish the two at the end of the test
+            rust_tracing.new_span(RustTracingLevel.Info, 5, index_arg=9)
+            sentry_second_rust_span = sentry_sdk.traces.get_current_span()
+            rust_second_rust_span = rust_tracing.spans[5]
 
-    second_span_data = second_span["data"]
-    assert second_span_data["use_memoized"]
-    assert second_span_data["index"] == 9
-    assert second_span_data["version"] is None
+            assert rust_second_rust_span == sentry_second_rust_span
+
+            rust_tracing.close_span(5)
+
+            # Ensure the current sentry span was moved back to the parent
+            sentry_span_after_close = sentry_sdk.traces.get_current_span()
+            assert sentry_span_after_close == sentry_first_rust_span
+            assert sentry_span_after_close == rust_first_rust_span
+
+            rust_tracing.close_span(3)
+
+            assert sentry_sdk.traces.get_current_span() == original_sentry_span
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert len(spans) == 3
+
+        # Ensure the span metadata is wired up for all spans
+        first_span, second_span, _ = spans
+        assert first_span["attributes"]["sentry.op"] == "function"
+        assert (
+            first_span["attributes"]["sentry.origin"]
+            == "auto.function.rust_tracing.test_nested_on_new_span_on_close"
+        )
+        assert first_span["name"] == "_bindings::fibonacci"
+        assert second_span["attributes"]["sentry.op"] == "function"
+        assert (
+            second_span["attributes"]["sentry.origin"]
+            == "auto.function.rust_tracing.test_nested_on_new_span_on_close"
+        )
+        assert second_span["name"] == "_bindings::fibonacci"
+
+        # Ensure the spans were opened/closed appropriately
+        assert first_span["start_timestamp"] is not None
+        assert first_span["end_timestamp"] is not None
+        assert second_span["start_timestamp"] is not None
+        assert second_span["end_timestamp"] is not None
+
+        # Ensure the extra data from Rust is hooked up in both spans
+        first_span_data = first_span["attributes"]
+        assert first_span_data["use_memoized"]
+        assert first_span_data["index"] == 9
+        assert first_span_data["version"] == "None"
+
+        second_span_data = second_span["attributes"]
+        assert second_span_data["use_memoized"]
+        assert second_span_data["index"] == 10
+        assert second_span_data["version"] == "None"
+    else:
+        events = capture_events()
+        with start_transaction():
+            original_sentry_span = sentry_sdk.get_current_span()
+
+            rust_tracing.new_span(RustTracingLevel.Info, 3, index_arg=10)
+            sentry_first_rust_span = sentry_sdk.get_current_span()
+            rust_first_rust_span = rust_tracing.spans[3]
+
+            # Use a different `index_arg` value for the inner span to help
+            # distinguish the two at the end of the test
+            rust_tracing.new_span(RustTracingLevel.Info, 5, index_arg=9)
+            sentry_second_rust_span = sentry_sdk.get_current_span()
+            rust_second_rust_span = rust_tracing.spans[5]
+
+            assert rust_second_rust_span == sentry_second_rust_span
+
+            rust_tracing.close_span(5)
+
+            # Ensure the current sentry span was moved back to the parent
+            sentry_span_after_close = sentry_sdk.get_current_span()
+            assert sentry_span_after_close == sentry_first_rust_span
+            assert sentry_span_after_close == rust_first_rust_span
+
+            rust_tracing.close_span(3)
+
+            assert sentry_sdk.get_current_span() == original_sentry_span
+
+        (event,) = events
+        assert len(event["spans"]) == 2
+
+        # Ensure the span metadata is wired up for all spans
+        first_span, second_span = event["spans"]
+        assert first_span["op"] == "function"
+        assert (
+            first_span["origin"]
+            == "auto.function.rust_tracing.test_nested_on_new_span_on_close"
+        )
+        assert first_span["description"] == "_bindings::fibonacci"
+        assert second_span["op"] == "function"
+        assert (
+            second_span["origin"]
+            == "auto.function.rust_tracing.test_nested_on_new_span_on_close"
+        )
+        assert second_span["description"] == "_bindings::fibonacci"
+
+        # Ensure the spans were opened/closed appropriately
+        assert first_span["start_timestamp"] is not None
+        assert first_span["timestamp"] is not None
+        assert second_span["start_timestamp"] is not None
+        assert second_span["timestamp"] is not None
+
+        # Ensure the extra data from Rust is hooked up in both spans
+        first_span_data = first_span["data"]
+        assert first_span_data["use_memoized"]
+        assert first_span_data["index"] == 10
+        assert first_span_data["version"] is None
+
+        second_span_data = second_span["data"]
+        assert second_span_data["use_memoized"]
+        assert second_span_data["index"] == 9
+        assert second_span_data["version"] is None
 
 
-def test_on_new_span_without_transaction(sentry_init):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_on_new_span_without_transaction(sentry_init, span_streaming):
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
         "test_on_new_span_without_transaction", rust_tracing.set_layer_impl
     )
-    sentry_init(integrations=[integration], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[integration],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
 
-    assert sentry_sdk.get_current_span() is None
+    if span_streaming:
+        assert sentry_sdk.traces.get_current_span() is None
 
-    # Should still create a span hierarchy, it just will not be under a txn
-    rust_tracing.new_span(RustTracingLevel.Info, 3)
-    current_span = sentry_sdk.get_current_span()
-    assert current_span is not None
-    assert current_span.containing_transaction is None
+        rust_tracing.new_span(RustTracingLevel.Info, 3)
+        current_span = sentry_sdk.traces.get_current_span()
+        assert current_span is not None
+        assert current_span._segment is current_span
+    else:
+        assert sentry_sdk.get_current_span() is None
+
+        # Should still create a span hierarchy, it just will not be under a txn
+        rust_tracing.new_span(RustTracingLevel.Info, 3)
+        current_span = sentry_sdk.get_current_span()
+        assert current_span is not None
+        assert current_span.containing_transaction is None
 
 
-def test_on_event_exception(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_on_event_exception(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
         "test_on_event_exception",
         rust_tracing.set_layer_impl,
         event_type_mapping=_test_event_type_mapping,
     )
-    sentry_init(integrations=[integration], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[integration],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
+    if span_streaming:
+        items = capture_items("event", "transaction", "span")
+        sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-    events = capture_events()
-    sentry_sdk.get_isolation_scope().clear_breadcrumbs()
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            rust_tracing.new_span(RustTracingLevel.Info, 3)
 
-    with start_transaction():
-        rust_tracing.new_span(RustTracingLevel.Info, 3)
+            # Mapped to Exception
+            rust_tracing.event(RustTracingLevel.Error, 3)
 
-        # Mapped to Exception
-        rust_tracing.event(RustTracingLevel.Error, 3)
+            rust_tracing.close_span(3)
 
-        rust_tracing.close_span(3)
+        (exc,) = (item.payload for item in items if item.type == "event")
+    else:
+        events = capture_events()
+        sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-    assert len(events) == 2
-    exc, _tx = events
+        with start_transaction():
+            rust_tracing.new_span(RustTracingLevel.Info, 3)
+
+            # Mapped to Exception
+            rust_tracing.event(RustTracingLevel.Error, 3)
+
+            rust_tracing.close_span(3)
+
+        assert len(events) == 2
+        exc, _tx = events
+
     assert exc["level"] == "error"
     assert exc["logger"] == "_bindings"
     assert exc["message"] == "Getting the 10th fibonacci number"
@@ -229,29 +384,53 @@ def test_on_event_exception(sentry_init, capture_events):
     assert field_context["message"] == "Getting the 10th fibonacci number"
 
 
-def test_on_event_breadcrumb(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_on_event_breadcrumb(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
         "test_on_event_breadcrumb",
         rust_tracing.set_layer_impl,
         event_type_mapping=_test_event_type_mapping,
     )
-    sentry_init(integrations=[integration], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[integration],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
+    if span_streaming:
+        items = capture_items("event", "transaction", "span")
+        sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-    events = capture_events()
-    sentry_sdk.get_isolation_scope().clear_breadcrumbs()
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            rust_tracing.new_span(RustTracingLevel.Info, 3)
 
-    with start_transaction():
-        rust_tracing.new_span(RustTracingLevel.Info, 3)
+            # Mapped to Breadcrumb
+            rust_tracing.event(RustTracingLevel.Info, 3)
 
-        # Mapped to Breadcrumb
-        rust_tracing.event(RustTracingLevel.Info, 3)
+            rust_tracing.close_span(3)
+            capture_message("test message")
 
-        rust_tracing.close_span(3)
-        capture_message("test message")
+        (message,) = (item.payload for item in items if item.type == "event")
+    else:
+        events = capture_events()
+        sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-    assert len(events) == 2
-    message, _tx = events
+        with start_transaction():
+            rust_tracing.new_span(RustTracingLevel.Info, 3)
+
+            # Mapped to Breadcrumb
+            rust_tracing.event(RustTracingLevel.Info, 3)
+
+            rust_tracing.close_span(3)
+            capture_message("test message")
+
+        assert len(events) == 2
+        message, _tx = events
 
     breadcrumbs = message["breadcrumbs"]["values"]
     assert len(breadcrumbs) == 1
@@ -260,28 +439,51 @@ def test_on_event_breadcrumb(sentry_init, capture_events):
     assert breadcrumbs[0]["type"] == "default"
 
 
-def test_on_event_event(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_on_event_event(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
         "test_on_event_event",
         rust_tracing.set_layer_impl,
         event_type_mapping=_test_event_type_mapping,
     )
-    sentry_init(integrations=[integration], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[integration],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
+    if span_streaming:
+        items = capture_items("event", "transaction", "span")
+        sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-    events = capture_events()
-    sentry_sdk.get_isolation_scope().clear_breadcrumbs()
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            rust_tracing.new_span(RustTracingLevel.Info, 3)
 
-    with start_transaction():
-        rust_tracing.new_span(RustTracingLevel.Info, 3)
+            # Mapped to Event
+            rust_tracing.event(RustTracingLevel.Debug, 3)
 
-        # Mapped to Event
-        rust_tracing.event(RustTracingLevel.Debug, 3)
+            rust_tracing.close_span(3)
 
-        rust_tracing.close_span(3)
+        (event,) = (item.payload for item in items if item.type == "event")
+    else:
+        events = capture_events()
+        sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-    assert len(events) == 2
-    event, _tx = events
+        with start_transaction():
+            rust_tracing.new_span(RustTracingLevel.Info, 3)
+
+            # Mapped to Event
+            rust_tracing.event(RustTracingLevel.Debug, 3)
+
+            rust_tracing.close_span(3)
+
+        assert len(events) == 2
+        event, _tx = events
 
     assert event["logger"] == "_bindings"
     assert event["level"] == "debug"
@@ -297,33 +499,64 @@ def test_on_event_event(sentry_init, capture_events):
     assert field_context["message"] == "Getting the 10th fibonacci number"
 
 
-def test_on_event_ignored(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_on_event_ignored(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
         "test_on_event_ignored",
         rust_tracing.set_layer_impl,
         event_type_mapping=_test_event_type_mapping,
     )
-    sentry_init(integrations=[integration], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[integration],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
+    if span_streaming:
+        items = capture_items("event", "transaction", "span")
+        sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-    events = capture_events()
-    sentry_sdk.get_isolation_scope().clear_breadcrumbs()
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            rust_tracing.new_span(RustTracingLevel.Info, 3)
 
-    with start_transaction():
-        rust_tracing.new_span(RustTracingLevel.Info, 3)
+            # Ignored
+            rust_tracing.event(RustTracingLevel.Trace, 3)
 
-        # Ignored
-        rust_tracing.event(RustTracingLevel.Trace, 3)
+            rust_tracing.close_span(3)
 
-        rust_tracing.close_span(3)
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[1]["is_segment"] is True
+    else:
+        events = capture_events()
+        sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-    assert len(events) == 1
-    (tx,) = events
-    assert tx["type"] == "transaction"
-    assert "message" not in tx
+        with start_transaction():
+            rust_tracing.new_span(RustTracingLevel.Info, 3)
+
+            # Ignored
+            rust_tracing.event(RustTracingLevel.Trace, 3)
+
+            rust_tracing.close_span(3)
+
+        assert len(events) == 1
+        (tx,) = events
+        assert tx["type"] == "transaction"
+        assert "message" not in tx
 
 
-def test_span_filter(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_span_filter(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
     def span_filter(metadata: Dict[str, object]) -> bool:
         return RustTracingLevel(metadata.get("level")) in (
             RustTracingLevel.Error,
@@ -339,55 +572,102 @@ def test_span_filter(sentry_init, capture_events):
         span_filter=span_filter,
         include_tracing_fields=True,
     )
-    sentry_init(integrations=[integration], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[integration],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
+    if span_streaming:
+        items = capture_items("event", "transaction", "span")
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            original_sentry_span = sentry_sdk.traces.get_current_span()
 
-    events = capture_events()
-    with start_transaction():
-        original_sentry_span = sentry_sdk.get_current_span()
+            # Span is not ignored
+            rust_tracing.new_span(RustTracingLevel.Info, 3, index_arg=10)
+            info_span = sentry_sdk.traces.get_current_span()
 
-        # Span is not ignored
-        rust_tracing.new_span(RustTracingLevel.Info, 3, index_arg=10)
-        info_span = sentry_sdk.get_current_span()
+            # Span is ignored, current span should remain the same
+            rust_tracing.new_span(RustTracingLevel.Trace, 5, index_arg=9)
+            assert sentry_sdk.traces.get_current_span() == info_span
 
-        # Span is ignored, current span should remain the same
-        rust_tracing.new_span(RustTracingLevel.Trace, 5, index_arg=9)
-        assert sentry_sdk.get_current_span() == info_span
+            # Closing the filtered span should leave the current span alone
+            rust_tracing.close_span(5)
+            assert sentry_sdk.traces.get_current_span() == info_span
 
-        # Closing the filtered span should leave the current span alone
-        rust_tracing.close_span(5)
-        assert sentry_sdk.get_current_span() == info_span
+            rust_tracing.close_span(3)
+            assert sentry_sdk.traces.get_current_span() == original_sentry_span
 
-        rust_tracing.close_span(3)
-        assert sentry_sdk.get_current_span() == original_sentry_span
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert len(spans) == 2
+        # The ignored span has index == 9
+        assert spans[0]["attributes"]["index"] == 10
+    else:
+        events = capture_events()
+        with start_transaction():
+            original_sentry_span = sentry_sdk.get_current_span()
 
-    (event,) = events
-    assert len(event["spans"]) == 1
-    # The ignored span has index == 9
-    assert event["spans"][0]["data"]["index"] == 10
+            # Span is not ignored
+            rust_tracing.new_span(RustTracingLevel.Info, 3, index_arg=10)
+            info_span = sentry_sdk.get_current_span()
+
+            # Span is ignored, current span should remain the same
+            rust_tracing.new_span(RustTracingLevel.Trace, 5, index_arg=9)
+            assert sentry_sdk.get_current_span() == info_span
+
+            # Closing the filtered span should leave the current span alone
+            rust_tracing.close_span(5)
+            assert sentry_sdk.get_current_span() == info_span
+
+            rust_tracing.close_span(3)
+            assert sentry_sdk.get_current_span() == original_sentry_span
+
+        (event,) = events
+        assert len(event["spans"]) == 1
+        # The ignored span has index == 9
+        assert event["spans"][0]["data"]["index"] == 10
 
 
-def test_record(sentry_init):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_record(sentry_init, span_streaming):
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
         "test_record",
         initializer=rust_tracing.set_layer_impl,
         include_tracing_fields=True,
     )
-    sentry_init(integrations=[integration], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[integration],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
 
-    with start_transaction():
-        rust_tracing.new_span(RustTracingLevel.Info, 3)
+    if span_streaming:
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            rust_tracing.new_span(RustTracingLevel.Info, 3)
 
-        span_before_record = sentry_sdk.get_current_span().to_json()
-        assert span_before_record["data"]["version"] is None
+            span_before_record = sentry_sdk.traces.get_current_span()._to_json()
+            assert span_before_record["attributes"]["version"] == "None"
 
-        rust_tracing.record(3)
+            rust_tracing.record(3)
 
-        span_after_record = sentry_sdk.get_current_span().to_json()
-        assert span_after_record["data"]["version"] == "memoized"
+            span_after_record = sentry_sdk.traces.get_current_span()._to_json()
+            assert span_after_record["attributes"]["version"] == "memoized"
+    else:
+        with start_transaction():
+            rust_tracing.new_span(RustTracingLevel.Info, 3)
+
+            span_before_record = sentry_sdk.get_current_span().to_json()
+            assert span_before_record["data"]["version"] is None
+
+            rust_tracing.record(3)
+
+            span_after_record = sentry_sdk.get_current_span().to_json()
+            assert span_after_record["data"]["version"] == "memoized"
 
 
-def test_record_in_ignored_span(sentry_init):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_record_in_ignored_span(sentry_init, span_streaming):
     def span_filter(metadata: Dict[str, object]) -> bool:
         # Just ignore Trace
         return RustTracingLevel(metadata.get("level")) != RustTracingLevel.Trace
@@ -399,20 +679,38 @@ def test_record_in_ignored_span(sentry_init):
         span_filter=span_filter,
         include_tracing_fields=True,
     )
-    sentry_init(integrations=[integration], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[integration],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
 
-    with start_transaction():
-        rust_tracing.new_span(RustTracingLevel.Info, 3)
+    if span_streaming:
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            rust_tracing.new_span(RustTracingLevel.Info, 3)
 
-        span_before_record = sentry_sdk.get_current_span().to_json()
-        assert span_before_record["data"]["version"] is None
+            span_before_record = sentry_sdk.traces.get_current_span()._to_json()
+            assert span_before_record["attributes"]["version"] == "None"
 
-        rust_tracing.new_span(RustTracingLevel.Trace, 5)
-        rust_tracing.record(5)
+            rust_tracing.new_span(RustTracingLevel.Trace, 5)
+            rust_tracing.record(5)
 
-        # `on_record()` should not do anything to the current Sentry span if the associated Rust span was ignored
-        span_after_record = sentry_sdk.get_current_span().to_json()
-        assert span_after_record["data"]["version"] is None
+            # `on_record()` should not do anything to the current Sentry span if the associated Rust span was ignored
+            span_after_record = sentry_sdk.traces.get_current_span()._to_json()
+            assert span_after_record["attributes"]["version"] == "None"
+    else:
+        with start_transaction():
+            rust_tracing.new_span(RustTracingLevel.Info, 3)
+
+            span_before_record = sentry_sdk.get_current_span().to_json()
+            assert span_before_record["data"]["version"] is None
+
+            rust_tracing.new_span(RustTracingLevel.Trace, 5)
+            rust_tracing.record(5)
+
+            # `on_record()` should not do anything to the current Sentry span if the associated Rust span was ignored
+            span_after_record = sentry_sdk.get_current_span().to_json()
+            assert span_after_record["data"]["version"] is None
 
 
 @pytest.mark.parametrize(
@@ -426,8 +724,13 @@ def test_record_in_ignored_span(sentry_init):
         (False, None, False),
     ],
 )
+@pytest.mark.parametrize("span_streaming", [True, False])
 def test_include_tracing_fields(
-    sentry_init, send_default_pii, include_tracing_fields, tracing_fields_expected
+    sentry_init,
+    send_default_pii,
+    include_tracing_fields,
+    tracing_fields_expected,
+    span_streaming,
 ):
     rust_tracing = FakeRustTracing()
     integration = RustTracingIntegration(
@@ -440,34 +743,72 @@ def test_include_tracing_fields(
         integrations=[integration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-    with start_transaction():
-        rust_tracing.new_span(RustTracingLevel.Info, 3)
 
-        span_before_record = sentry_sdk.get_current_span().to_json()
-        if tracing_fields_expected:
-            assert span_before_record["data"]["version"] is None
-        else:
-            assert span_before_record["data"]["version"] == "[Filtered]"
+    if span_streaming:
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            rust_tracing.new_span(RustTracingLevel.Info, 3)
 
-        rust_tracing.record(3)
+            span_before_record = sentry_sdk.traces.get_current_span()._to_json()
+            if tracing_fields_expected:
+                assert span_before_record["attributes"]["version"] == "None"
+            else:
+                assert span_before_record["attributes"]["version"] == "[Filtered]"
 
-        span_after_record = sentry_sdk.get_current_span().to_json()
+            rust_tracing.record(3)
 
-        if tracing_fields_expected:
-            assert span_after_record["data"] == {
-                "thread.id": mock.ANY,
-                "thread.name": mock.ANY,
-                "use_memoized": True,
-                "version": "memoized",
-                "index": 10,
-            }
+            span_after_record = sentry_sdk.traces.get_current_span()._to_json()
 
-        else:
-            assert span_after_record["data"] == {
-                "thread.id": mock.ANY,
-                "thread.name": mock.ANY,
-                "use_memoized": "[Filtered]",
-                "version": "[Filtered]",
-                "index": "[Filtered]",
-            }
+            if tracing_fields_expected:
+                assert span_after_record["attributes"] == {
+                    "thread.id": mock.ANY,
+                    "thread.name": mock.ANY,
+                    "sentry.op": "function",
+                    "sentry.origin": "auto.function.rust_tracing.test_record",
+                    "use_memoized": True,
+                    "version": "memoized",
+                    "index": 10,
+                }
+
+            else:
+                assert span_after_record["attributes"] == {
+                    "thread.id": mock.ANY,
+                    "thread.name": mock.ANY,
+                    "sentry.op": "function",
+                    "sentry.origin": "auto.function.rust_tracing.test_record",
+                    "use_memoized": "[Filtered]",
+                    "version": "[Filtered]",
+                    "index": "[Filtered]",
+                }
+    else:
+        with start_transaction():
+            rust_tracing.new_span(RustTracingLevel.Info, 3)
+
+            span_before_record = sentry_sdk.get_current_span().to_json()
+            if tracing_fields_expected:
+                assert span_before_record["data"]["version"] is None
+            else:
+                assert span_before_record["data"]["version"] == "[Filtered]"
+
+            rust_tracing.record(3)
+
+            span_after_record = sentry_sdk.get_current_span().to_json()
+
+            if tracing_fields_expected:
+                assert span_after_record["data"] == {
+                    "thread.id": mock.ANY,
+                    "thread.name": mock.ANY,
+                    "use_memoized": True,
+                    "version": "memoized",
+                    "index": 10,
+                }
+
+            else:
+                assert span_after_record["data"] == {
+                    "thread.id": mock.ANY,
+                    "thread.name": mock.ANY,
+                    "use_memoized": "[Filtered]",
+                    "version": "[Filtered]",
+                    "index": "[Filtered]",
+                }

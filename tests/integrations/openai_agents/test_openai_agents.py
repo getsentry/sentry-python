@@ -16,7 +16,6 @@ from agents import (
 )
 from agents.exceptions import MaxTurnsExceeded, ModelBehaviorError
 from agents.items import (
-    McpCall,
     ResponseFunctionToolCall,
     ResponseOutputMessage,
     ResponseOutputText,
@@ -49,6 +48,21 @@ from openai.types.responses.response_usage import (
 )
 
 test_run_config = agents.RunConfig(tracing_disabled=True)
+
+
+@pytest.fixture
+def sync_event_loop():
+    # agents.Runner.run_sync() in openai-agents v0.0.19 calls
+    # asyncio.get_event_loop(), which on Python 3.12+ no longer auto-creates
+    # a loop when none is set on the thread.
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        yield loop
+    finally:
+        loop.close()
+        asyncio.set_event_loop(None)
+
 
 EXAMPLE_RESPONSE = Response(
     id="chat-id",
@@ -294,17 +308,37 @@ async def test_agent_invocation_span_no_pii(
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "instructions",
-    (
-        None,
-        "You are a coding assistant that talks like a pirate.",
-    ),
-)
-@pytest.mark.parametrize(
-    "input",
+    "instructions,input,expected_system_instructions,expected_request_messages",
     [
-        pytest.param("Test input", id="string"),
-        pytest.param(
+        (
+            None,
+            ("Test input"),
+            None,
+            [
+                {
+                    "content": [{"text": "Test input", "type": "text"}],
+                    "role": "user",
+                },
+            ],
+        ),
+        (
+            "You are a coding assistant that talks like a pirate.",
+            ("Test input"),
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+            ],
+            [
+                {
+                    "content": [{"text": "Test input", "type": "text"}],
+                    "role": "user",
+                },
+            ],
+        ),
+        (
+            "You are a coding assistant that talks like a pirate.",
             [
                 {
                     "role": "system",
@@ -319,9 +353,28 @@ async def test_agent_invocation_span_no_pii(
                     "content": "Test input",
                 },
             ],
-            id="blocks_no_type",
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+            ],
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        }
+                    ],
+                },
+                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
+            ],
         ),
-        pytest.param(
+        (
+            "You are a coding assistant that talks like a pirate.",
             [
                 {
                     "type": "message",
@@ -339,9 +392,28 @@ async def test_agent_invocation_span_no_pii(
                     "content": "Test input",
                 },
             ],
-            id="blocks",
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+            ],
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        }
+                    ],
+                },
+                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
+            ],
         ),
-        pytest.param(
+        (
+            "You are a coding assistant that talks like a pirate.",
             [
                 {
                     "role": "system",
@@ -359,9 +431,29 @@ async def test_agent_invocation_span_no_pii(
                     "content": "Test input",
                 },
             ],
-            id="parts_no_type",
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ],
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        }
+                    ],
+                },
+                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
+            ],
         ),
-        pytest.param(
+        (
+            "You are a coding assistant that talks like a pirate.",
             [
                 {
                     "type": "message",
@@ -382,7 +474,26 @@ async def test_agent_invocation_span_no_pii(
                     "content": "Test input",
                 },
             ],
-            id="parts",
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ],
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        }
+                    ],
+                },
+                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
+            ],
         ),
     ],
 )
@@ -394,7 +505,8 @@ async def test_agent_invocation_span(
     nonstreaming_responses_model_response,
     instructions,
     input,
-    request,
+    expected_system_instructions,
+    expected_request_messages,
     get_model_response,
     stream_gen_ai_spans,
 ):
@@ -443,236 +555,17 @@ async def test_agent_invocation_span(
 
         assert invoke_agent_span["name"] == "invoke_agent test_agent"
 
-        # Only first case checks "gen_ai.request.messages" until further input handling work.
-        param_id = request.node.callspec.id
-        if "string" in param_id and instructions is None:  # type: ignore
+        if expected_system_instructions is None:
             assert "gen_ai.system_instructions" not in ai_client_span["attributes"]
-
-            assert invoke_agent_span["attributes"][
-                "gen_ai.request.messages"
-            ] == safe_serialize(
-                [
-                    {
-                        "content": [{"text": "Test input", "type": "text"}],
-                        "role": "user",
-                    },
-                ]
-            )
-        elif "string" in param_id:
-            assert ai_client_span["attributes"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {
-                        "type": "text",
-                        "content": "You are a coding assistant that talks like a pirate.",
-                    },
-                ]
-            )
-        elif "blocks_no_type" in param_id and instructions is None:  # type: ignore
-            assert ai_client_span["attributes"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {"type": "text", "content": "You are a helpful assistant."},
-                ]
-            )
-
-            assert json.loads(
-                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            ) == [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Message demonstrating the absence of truncation.",
-                        }
-                    ],
-                },
-                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
-            ]
-        elif "blocks_no_type" in param_id:
-            assert ai_client_span["attributes"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {
-                        "type": "text",
-                        "content": "You are a coding assistant that talks like a pirate.",
-                    },
-                    {"type": "text", "content": "You are a helpful assistant."},
-                ]
-            )
-
-            assert json.loads(
-                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            ) == [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Message demonstrating the absence of truncation.",
-                        }
-                    ],
-                },
-                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
-            ]
-        elif "blocks" in param_id and instructions is None:  # type: ignore
-            assert ai_client_span["attributes"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {"type": "text", "content": "You are a helpful assistant."},
-                ]
-            )
-
-            assert json.loads(
-                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            ) == [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Message demonstrating the absence of truncation.",
-                        }
-                    ],
-                },
-                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
-            ]
-        elif "blocks" in param_id:
-            assert ai_client_span["attributes"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {
-                        "type": "text",
-                        "content": "You are a coding assistant that talks like a pirate.",
-                    },
-                    {"type": "text", "content": "You are a helpful assistant."},
-                ]
-            )
-
-            assert json.loads(
-                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            ) == [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Message demonstrating the absence of truncation.",
-                        }
-                    ],
-                },
-                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
-            ]
-        elif "parts_no_type" in param_id and instructions is None:
-            assert ai_client_span["attributes"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {"type": "text", "content": "You are a helpful assistant."},
-                    {"type": "text", "content": "Be concise and clear."},
-                ]
-            )
-
-            assert json.loads(
-                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            ) == [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Message demonstrating the absence of truncation.",
-                        }
-                    ],
-                },
-                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
-            ]
-        elif "parts_no_type" in param_id:
-            assert ai_client_span["attributes"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {
-                        "type": "text",
-                        "content": "You are a coding assistant that talks like a pirate.",
-                    },
-                    {"type": "text", "content": "You are a helpful assistant."},
-                    {"type": "text", "content": "Be concise and clear."},
-                ]
-            )
-
-            assert json.loads(
-                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            ) == [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Message demonstrating the absence of truncation.",
-                        }
-                    ],
-                },
-                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
-            ]
-        elif instructions is None:  # type: ignore
-            assert ai_client_span["attributes"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {"type": "text", "content": "You are a helpful assistant."},
-                    {"type": "text", "content": "Be concise and clear."},
-                ]
-            )
-
-            assert json.loads(
-                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            ) == [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Message demonstrating the absence of truncation.",
-                        }
-                    ],
-                },
-                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
-            ]
         else:
             assert ai_client_span["attributes"][
                 "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {
-                        "type": "text",
-                        "content": "You are a coding assistant that talks like a pirate.",
-                    },
-                    {"type": "text", "content": "You are a helpful assistant."},
-                    {"type": "text", "content": "Be concise and clear."},
-                ]
-            )
+            ] == safe_serialize(expected_system_instructions)
 
-            assert json.loads(
-                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            ) == [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Message demonstrating the absence of truncation.",
-                        }
-                    ],
-                },
-                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
-            ]
+        assert (
+            json.loads(ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+            == expected_request_messages
+        )
 
         assert (
             invoke_agent_span["attributes"]["gen_ai.response.text"]
@@ -730,117 +623,17 @@ async def test_agent_invocation_span(
 
         assert invoke_agent_span["description"] == "invoke_agent test_agent"
 
-        # Only first case checks "gen_ai.request.messages" until further input handling work.
-        param_id = request.node.callspec.id
-        if "string" in param_id and instructions is None:  # type: ignore
+        if expected_system_instructions is None:
             assert "gen_ai.system_instructions" not in ai_client_span["data"]
-
-            assert invoke_agent_span["data"][
-                "gen_ai.request.messages"
-            ] == safe_serialize(
-                [
-                    {
-                        "content": [{"text": "Test input", "type": "text"}],
-                        "role": "user",
-                    },
-                ]
-            )
-
-        elif "string" in param_id:
-            assert ai_client_span["data"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {
-                        "type": "text",
-                        "content": "You are a coding assistant that talks like a pirate.",
-                    },
-                ]
-            )
-        elif "blocks_no_type" in param_id and instructions is None:  # type: ignore
-            assert ai_client_span["data"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {"type": "text", "content": "You are a helpful assistant."},
-                ]
-            )
-        elif "blocks_no_type" in param_id:
-            assert ai_client_span["data"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {
-                        "type": "text",
-                        "content": "You are a coding assistant that talks like a pirate.",
-                    },
-                    {"type": "text", "content": "You are a helpful assistant."},
-                ]
-            )
-        elif "blocks" in param_id and instructions is None:  # type: ignore
-            assert ai_client_span["data"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {"type": "text", "content": "You are a helpful assistant."},
-                ]
-            )
-        elif "blocks" in param_id:
-            assert ai_client_span["data"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {
-                        "type": "text",
-                        "content": "You are a coding assistant that talks like a pirate.",
-                    },
-                    {"type": "text", "content": "You are a helpful assistant."},
-                ]
-            )
-        elif "parts_no_type" in param_id and instructions is None:
-            assert ai_client_span["data"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {"type": "text", "content": "You are a helpful assistant."},
-                    {"type": "text", "content": "Be concise and clear."},
-                ]
-            )
-        elif "parts_no_type" in param_id:
-            assert ai_client_span["data"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {
-                        "type": "text",
-                        "content": "You are a coding assistant that talks like a pirate.",
-                    },
-                    {"type": "text", "content": "You are a helpful assistant."},
-                    {"type": "text", "content": "Be concise and clear."},
-                ]
-            )
-        elif instructions is None:  # type: ignore
-            assert ai_client_span["data"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {"type": "text", "content": "You are a helpful assistant."},
-                    {"type": "text", "content": "Be concise and clear."},
-                ]
-            )
         else:
             assert ai_client_span["data"][
                 "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {
-                        "type": "text",
-                        "content": "You are a coding assistant that talks like a pirate.",
-                    },
-                    {"type": "text", "content": "You are a helpful assistant."},
-                    {"type": "text", "content": "Be concise and clear."},
-                ]
-            )
+            ] == safe_serialize(expected_system_instructions)
+
+        assert (
+            json.loads(ai_client_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+            == expected_request_messages[-1:]
+        )
 
         assert (
             invoke_agent_span["data"]["gen_ai.response.text"]
@@ -953,6 +746,7 @@ def test_agent_invocation_span_sync_no_pii(
     nonstreaming_responses_model_response,
     get_model_response,
     stream_gen_ai_spans,
+    sync_event_loop,
 ):
     """
     Test that the integration creates spans for agent invocations.
@@ -1079,17 +873,37 @@ def test_agent_invocation_span_sync_no_pii(
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
-    "instructions",
-    (
-        None,
-        "You are a coding assistant that talks like a pirate.",
-    ),
-)
-@pytest.mark.parametrize(
-    "input",
+    "instructions,input,expected_system_instructions,expected_request_messages",
     [
-        pytest.param("Test input", id="string"),
-        pytest.param(
+        (
+            None,
+            ("Test input"),
+            None,
+            [
+                {
+                    "content": [{"text": "Test input", "type": "text"}],
+                    "role": "user",
+                },
+            ],
+        ),
+        (
+            "You are a coding assistant that talks like a pirate.",
+            ("Test input"),
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+            ],
+            [
+                {
+                    "content": [{"text": "Test input", "type": "text"}],
+                    "role": "user",
+                },
+            ],
+        ),
+        (
+            "You are a coding assistant that talks like a pirate.",
             [
                 {
                     "role": "system",
@@ -1104,9 +918,28 @@ def test_agent_invocation_span_sync_no_pii(
                     "content": "Test input",
                 },
             ],
-            id="blocks_no_type",
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+            ],
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        }
+                    ],
+                },
+                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
+            ],
         ),
-        pytest.param(
+        (
+            "You are a coding assistant that talks like a pirate.",
             [
                 {
                     "type": "message",
@@ -1124,9 +957,28 @@ def test_agent_invocation_span_sync_no_pii(
                     "content": "Test input",
                 },
             ],
-            id="blocks",
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+            ],
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        }
+                    ],
+                },
+                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
+            ],
         ),
-        pytest.param(
+        (
+            "You are a coding assistant that talks like a pirate.",
             [
                 {
                     "role": "system",
@@ -1144,9 +996,29 @@ def test_agent_invocation_span_sync_no_pii(
                     "content": "Test input",
                 },
             ],
-            id="parts_no_type",
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ],
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        }
+                    ],
+                },
+                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
+            ],
         ),
-        pytest.param(
+        (
+            "You are a coding assistant that talks like a pirate.",
             [
                 {
                     "type": "message",
@@ -1167,7 +1039,26 @@ def test_agent_invocation_span_sync_no_pii(
                     "content": "Test input",
                 },
             ],
-            id="parts",
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ],
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        }
+                    ],
+                },
+                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
+            ],
         ),
     ],
 )
@@ -1179,9 +1070,11 @@ def test_agent_invocation_span_sync(
     nonstreaming_responses_model_response,
     instructions,
     input,
-    request,
+    expected_system_instructions,
+    expected_request_messages,
     get_model_response,
     stream_gen_ai_spans,
+    sync_event_loop,
 ):
     """
     Test that the integration creates spans for agent invocations.
@@ -1245,224 +1138,17 @@ def test_agent_invocation_span_sync(
         assert ai_client_span["attributes"]["gen_ai.request.temperature"] == 0.7
         assert ai_client_span["attributes"]["gen_ai.request.top_p"] == 1.0
 
-        param_id = request.node.callspec.id
-        if "string" in param_id and instructions is None:  # type: ignore
+        if expected_system_instructions is None:
             assert "gen_ai.system_instructions" not in ai_client_span["attributes"]
-        elif "string" in param_id:
-            assert ai_client_span["attributes"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {
-                        "type": "text",
-                        "content": "You are a coding assistant that talks like a pirate.",
-                    },
-                ]
-            )
-        elif "blocks_no_type" in param_id and instructions is None:  # type: ignore
-            assert ai_client_span["attributes"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {"type": "text", "content": "You are a helpful assistant."},
-                ]
-            )
-
-            assert json.loads(
-                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            ) == [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Message demonstrating the absence of truncation.",
-                        }
-                    ],
-                },
-                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
-            ]
-        elif "blocks_no_type" in param_id:
-            assert ai_client_span["attributes"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {
-                        "type": "text",
-                        "content": "You are a coding assistant that talks like a pirate.",
-                    },
-                    {"type": "text", "content": "You are a helpful assistant."},
-                ]
-            )
-
-            assert json.loads(
-                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            ) == [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Message demonstrating the absence of truncation.",
-                        }
-                    ],
-                },
-                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
-            ]
-        elif "blocks" in param_id and instructions is None:  # type: ignore
-            assert ai_client_span["attributes"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {"type": "text", "content": "You are a helpful assistant."},
-                ]
-            )
-
-            assert json.loads(
-                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            ) == [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Message demonstrating the absence of truncation.",
-                        }
-                    ],
-                },
-                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
-            ]
-        elif "blocks" in param_id:
-            assert ai_client_span["attributes"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {
-                        "type": "text",
-                        "content": "You are a coding assistant that talks like a pirate.",
-                    },
-                    {"type": "text", "content": "You are a helpful assistant."},
-                ]
-            )
-
-            assert json.loads(
-                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            ) == [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Message demonstrating the absence of truncation.",
-                        }
-                    ],
-                },
-                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
-            ]
-        elif "parts_no_type" in param_id and instructions is None:
-            assert ai_client_span["attributes"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {"type": "text", "content": "You are a helpful assistant."},
-                    {"type": "text", "content": "Be concise and clear."},
-                ]
-            )
-
-            assert json.loads(
-                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            ) == [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Message demonstrating the absence of truncation.",
-                        }
-                    ],
-                },
-                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
-            ]
-        elif "parts_no_type" in param_id:
-            assert ai_client_span["attributes"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {
-                        "type": "text",
-                        "content": "You are a coding assistant that talks like a pirate.",
-                    },
-                    {"type": "text", "content": "You are a helpful assistant."},
-                    {"type": "text", "content": "Be concise and clear."},
-                ]
-            )
-
-            assert json.loads(
-                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            ) == [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Message demonstrating the absence of truncation.",
-                        }
-                    ],
-                },
-                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
-            ]
-        elif instructions is None:  # type: ignore
-            assert ai_client_span["attributes"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {"type": "text", "content": "You are a helpful assistant."},
-                    {"type": "text", "content": "Be concise and clear."},
-                ]
-            )
-
-            assert json.loads(
-                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            ) == [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Message demonstrating the absence of truncation.",
-                        }
-                    ],
-                },
-                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
-            ]
         else:
             assert ai_client_span["attributes"][
                 "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {
-                        "type": "text",
-                        "content": "You are a coding assistant that talks like a pirate.",
-                    },
-                    {"type": "text", "content": "You are a helpful assistant."},
-                    {"type": "text", "content": "Be concise and clear."},
-                ]
-            )
+            ] == safe_serialize(expected_system_instructions)
 
-            assert json.loads(
-                ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            ) == [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Message demonstrating the absence of truncation.",
-                        }
-                    ],
-                },
-                {"role": "user", "content": [{"type": "text", "text": "Test input"}]},
-            ]
+        assert (
+            json.loads(ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+            == expected_request_messages
+        )
     else:
         with patch.object(
             agent.model._client._client,
@@ -1512,104 +1198,12 @@ def test_agent_invocation_span_sync(
         assert ai_client_span["data"]["gen_ai.request.temperature"] == 0.7
         assert ai_client_span["data"]["gen_ai.request.top_p"] == 1.0
 
-        param_id = request.node.callspec.id
-        if "string" in param_id and instructions is None:  # type: ignore
+        if expected_system_instructions is None:
             assert "gen_ai.system_instructions" not in ai_client_span["data"]
-        elif "string" in param_id:
-            assert ai_client_span["data"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {
-                        "type": "text",
-                        "content": "You are a coding assistant that talks like a pirate.",
-                    },
-                ]
-            )
-        elif "blocks_no_type" in param_id and instructions is None:  # type: ignore
-            assert ai_client_span["data"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {"type": "text", "content": "You are a helpful assistant."},
-                ]
-            )
-        elif "blocks_no_type" in param_id:
-            assert ai_client_span["data"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {
-                        "type": "text",
-                        "content": "You are a coding assistant that talks like a pirate.",
-                    },
-                    {"type": "text", "content": "You are a helpful assistant."},
-                ]
-            )
-        elif "blocks" in param_id and instructions is None:  # type: ignore
-            assert ai_client_span["data"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {"type": "text", "content": "You are a helpful assistant."},
-                ]
-            )
-        elif "blocks" in param_id:
-            assert ai_client_span["data"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {
-                        "type": "text",
-                        "content": "You are a coding assistant that talks like a pirate.",
-                    },
-                    {"type": "text", "content": "You are a helpful assistant."},
-                ]
-            )
-        elif "parts_no_type" in param_id and instructions is None:
-            assert ai_client_span["data"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {"type": "text", "content": "You are a helpful assistant."},
-                    {"type": "text", "content": "Be concise and clear."},
-                ]
-            )
-        elif "parts_no_type" in param_id:
-            assert ai_client_span["data"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {
-                        "type": "text",
-                        "content": "You are a coding assistant that talks like a pirate.",
-                    },
-                    {"type": "text", "content": "You are a helpful assistant."},
-                    {"type": "text", "content": "Be concise and clear."},
-                ]
-            )
-        elif instructions is None:  # type: ignore
-            assert ai_client_span["data"][
-                "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {"type": "text", "content": "You are a helpful assistant."},
-                    {"type": "text", "content": "Be concise and clear."},
-                ]
-            )
         else:
             assert ai_client_span["data"][
                 "gen_ai.system_instructions"
-            ] == safe_serialize(
-                [
-                    {
-                        "type": "text",
-                        "content": "You are a coding assistant that talks like a pirate.",
-                    },
-                    {"type": "text", "content": "You are a helpful assistant."},
-                    {"type": "text", "content": "Be concise and clear."},
-                ]
-            )
+            ] == safe_serialize(expected_system_instructions)
 
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
@@ -3121,528 +2715,6 @@ async def test_span_status_error(
         assert transaction["spans"][0]["tags"]["status"] == "internal_error"
 
     assert transaction["contexts"]["trace"]["status"] == "internal_error"
-
-
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
-@pytest.mark.asyncio
-async def test_mcp_tool_execution_spans(
-    sentry_init,
-    capture_events,
-    capture_items,
-    test_agent,
-    get_model_response,
-    stream_gen_ai_spans,
-):
-    """
-    Test that MCP (Model Context Protocol) tool calls create execute_tool spans.
-    """
-    client = AsyncOpenAI(api_key="test-key")
-    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
-    agent = test_agent.clone(model=model)
-
-    mcp_response = get_model_response(
-        Response(
-            id="resp_mcp_123",
-            output=[
-                McpCall(
-                    id="mcp_call_123",
-                    name="test_mcp_tool",
-                    arguments='{"query": "search term"}',
-                    output="MCP tool executed successfully",
-                    error=None,
-                    type="mcp_call",
-                    server_label="test_server",
-                )
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="gpt-4.1-2025-04-14",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=10,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=0,
-                ),
-                output_tokens=5,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=0,
-                ),
-                total_tokens=15,
-            ),
-        ),
-        serialize_pydantic=True,
-    )
-
-    final_response = get_model_response(
-        Response(
-            id="resp_final_123",
-            output=[
-                ResponseOutputMessage(
-                    id="msg_final",
-                    type="message",
-                    status="completed",
-                    content=[
-                        ResponseOutputText(
-                            text="Task completed using MCP tool",
-                            type="output_text",
-                            annotations=[],
-                        )
-                    ],
-                    role="assistant",
-                )
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="gpt-4.1-2025-04-14",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=15,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=0,
-                ),
-                output_tokens=10,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=0,
-                ),
-                total_tokens=25,
-            ),
-        ),
-        serialize_pydantic=True,
-    )
-
-    if stream_gen_ai_spans:
-        with patch.object(
-            agent.model._client._client,
-            "send",
-            side_effect=[mcp_response, final_response],
-        ) as _:
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-                send_default_pii=True,
-                stream_gen_ai_spans=stream_gen_ai_spans,
-            )
-
-            items = capture_items("span", "transaction")
-
-            await agents.Runner.run(
-                agent,
-                "Please use MCP tool",
-                run_config=test_run_config,
-            )
-
-        spans = [item.payload for item in items if item.type == "span"]
-
-        # Find the MCP execute_tool span
-        mcp_tool_span = None
-        for span in spans:
-            if span.get("name") == "execute_tool test_mcp_tool":
-                mcp_tool_span = span
-                break
-
-        # Verify the MCP tool span was created
-        assert mcp_tool_span is not None, "MCP execute_tool span was not created"
-        assert mcp_tool_span["name"] == "execute_tool test_mcp_tool"
-        assert mcp_tool_span["attributes"]["gen_ai.tool.name"] == "test_mcp_tool"
-        assert (
-            mcp_tool_span["attributes"]["gen_ai.tool.input"]
-            == '{"query": "search term"}'
-        )
-        assert (
-            mcp_tool_span["attributes"]["gen_ai.tool.output"]
-            == "MCP tool executed successfully"
-        )
-
-        # Verify no error status since error was None
-        assert mcp_tool_span.get("status") != "error"
-        assert mcp_tool_span.get("tags", {}).get("status") != "error"
-    else:
-        with patch.object(
-            agent.model._client._client,
-            "send",
-            side_effect=[mcp_response, final_response],
-        ) as _:
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-                send_default_pii=True,
-                stream_gen_ai_spans=stream_gen_ai_spans,
-            )
-            events = capture_events()
-
-            await agents.Runner.run(
-                agent,
-                "Please use MCP tool",
-                run_config=test_run_config,
-            )
-
-        (transaction,) = events
-        spans = transaction["spans"]
-
-        # Find the MCP execute_tool span
-        mcp_tool_span = None
-        for span in spans:
-            if span.get("description") == "execute_tool test_mcp_tool":
-                mcp_tool_span = span
-                break
-
-        # Verify the MCP tool span was created
-        assert mcp_tool_span is not None, "MCP execute_tool span was not created"
-        assert mcp_tool_span["description"] == "execute_tool test_mcp_tool"
-        assert mcp_tool_span["data"]["gen_ai.tool.name"] == "test_mcp_tool"
-        assert mcp_tool_span["data"]["gen_ai.tool.input"] == '{"query": "search term"}'
-        assert (
-            mcp_tool_span["data"]["gen_ai.tool.output"]
-            == "MCP tool executed successfully"
-        )
-
-        # Verify no error status since error was None
-        assert mcp_tool_span.get("status") != "internal_error"
-        assert mcp_tool_span.get("tags", {}).get("status") != "internal_error"
-
-
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
-@pytest.mark.asyncio
-async def test_mcp_tool_execution_with_error(
-    sentry_init,
-    capture_events,
-    capture_items,
-    test_agent,
-    get_model_response,
-    stream_gen_ai_spans,
-):
-    """
-    Test that MCP tool calls with errors are tracked with error status.
-    """
-    client = AsyncOpenAI(api_key="test-key")
-    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
-    agent = test_agent.clone(model=model)
-
-    mcp_response = get_model_response(
-        Response(
-            id="resp_mcp_123",
-            output=[
-                McpCall(
-                    id="mcp_call_error_123",
-                    name="failing_mcp_tool",
-                    arguments='{"query": "test"}',
-                    output=None,
-                    error="MCP tool execution failed",
-                    type="mcp_call",
-                    server_label="test_server",
-                )
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="gpt-4.1-2025-04-14",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=10,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=0,
-                ),
-                output_tokens=5,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=0,
-                ),
-                total_tokens=15,
-            ),
-        ),
-        serialize_pydantic=True,
-    )
-
-    final_response = get_model_response(
-        Response(
-            id="resp_final_123",
-            output=[
-                ResponseOutputMessage(
-                    id="msg_final",
-                    type="message",
-                    status="completed",
-                    content=[
-                        ResponseOutputText(
-                            text="Task completed using MCP tool",
-                            type="output_text",
-                            annotations=[],
-                        )
-                    ],
-                    role="assistant",
-                )
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="gpt-4.1-2025-04-14",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=15,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=0,
-                ),
-                output_tokens=10,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=0,
-                ),
-                total_tokens=25,
-            ),
-        ),
-        serialize_pydantic=True,
-    )
-
-    if stream_gen_ai_spans:
-        with patch.object(
-            agent.model._client._client,
-            "send",
-            side_effect=[mcp_response, final_response],
-        ) as _:
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-                send_default_pii=True,
-                stream_gen_ai_spans=stream_gen_ai_spans,
-            )
-
-            items = capture_items("span", "transaction")
-
-            await agents.Runner.run(
-                agent,
-                "Please use failing MCP tool",
-                run_config=test_run_config,
-            )
-
-        spans = [item.payload for item in items if item.type == "span"]
-
-        # Find the MCP execute_tool span with error
-        mcp_tool_span = None
-        for span in spans:
-            if span.get("name") == "execute_tool failing_mcp_tool":
-                mcp_tool_span = span
-                break
-
-        # Verify the MCP tool span was created with error status
-        assert mcp_tool_span is not None, "MCP execute_tool span was not created"
-        assert mcp_tool_span["name"] == "execute_tool failing_mcp_tool"
-        assert mcp_tool_span["attributes"]["gen_ai.tool.name"] == "failing_mcp_tool"
-        assert mcp_tool_span["attributes"]["gen_ai.tool.input"] == '{"query": "test"}'
-
-        # Verify error status was set
-        assert mcp_tool_span["status"] == "error"
-    else:
-        with patch.object(
-            agent.model._client._client,
-            "send",
-            side_effect=[mcp_response, final_response],
-        ) as _:
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-                send_default_pii=True,
-                stream_gen_ai_spans=stream_gen_ai_spans,
-            )
-            events = capture_events()
-
-            await agents.Runner.run(
-                agent,
-                "Please use failing MCP tool",
-                run_config=test_run_config,
-            )
-
-        (transaction,) = events
-        spans = transaction["spans"]
-
-        # Find the MCP execute_tool span with error
-        mcp_tool_span = None
-        for span in spans:
-            if span.get("description") == "execute_tool failing_mcp_tool":
-                mcp_tool_span = span
-                break
-
-        # Verify the MCP tool span was created with error status
-        assert mcp_tool_span is not None, "MCP execute_tool span was not created"
-        assert mcp_tool_span["description"] == "execute_tool failing_mcp_tool"
-        assert mcp_tool_span["data"]["gen_ai.tool.name"] == "failing_mcp_tool"
-        assert mcp_tool_span["data"]["gen_ai.tool.input"] == '{"query": "test"}'
-        assert mcp_tool_span["data"]["gen_ai.tool.output"] is None
-
-        # Verify error status was set
-        assert mcp_tool_span["status"] == "internal_error"
-        assert mcp_tool_span["tags"]["status"] == "internal_error"
-
-
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
-@pytest.mark.asyncio
-async def test_mcp_tool_execution_without_pii(
-    sentry_init,
-    capture_events,
-    capture_items,
-    test_agent,
-    get_model_response,
-    stream_gen_ai_spans,
-):
-    """
-    Test that MCP tool input/output are not included when send_default_pii is False.
-    """
-    client = AsyncOpenAI(api_key="test-key")
-    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
-    agent = test_agent.clone(model=model)
-
-    mcp_response = get_model_response(
-        Response(
-            id="resp_mcp_123",
-            output=[
-                McpCall(
-                    id="mcp_call_pii_123",
-                    name="test_mcp_tool",
-                    arguments='{"query": "sensitive data"}',
-                    output="Result with sensitive info",
-                    error=None,
-                    type="mcp_call",
-                    server_label="test_server",
-                )
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="gpt-4.1-2025-04-14",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=10,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=0,
-                ),
-                output_tokens=5,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=0,
-                ),
-                total_tokens=15,
-            ),
-        ),
-        serialize_pydantic=True,
-    )
-
-    final_response = get_model_response(
-        Response(
-            id="resp_final_123",
-            output=[
-                ResponseOutputMessage(
-                    id="msg_final",
-                    type="message",
-                    status="completed",
-                    content=[
-                        ResponseOutputText(
-                            text="Task completed",
-                            type="output_text",
-                            annotations=[],
-                        )
-                    ],
-                    role="assistant",
-                )
-            ],
-            parallel_tool_calls=False,
-            tool_choice="none",
-            tools=[],
-            created_at=10000000,
-            model="gpt-4.1-2025-04-14",
-            object="response",
-            usage=ResponseUsage(
-                input_tokens=15,
-                input_tokens_details=InputTokensDetails(
-                    cached_tokens=0,
-                ),
-                output_tokens=10,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=5,
-                ),
-                total_tokens=25,
-            ),
-        ),
-        serialize_pydantic=True,
-    )
-
-    if stream_gen_ai_spans:
-        with patch.object(
-            agent.model._client._client,
-            "send",
-            side_effect=[mcp_response, final_response],
-        ) as _:
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-                send_default_pii=False,  # PII disabled
-                stream_gen_ai_spans=stream_gen_ai_spans,
-            )
-
-            items = capture_items("span", "transaction")
-
-            await agents.Runner.run(
-                agent,
-                "Please use MCP tool",
-                run_config=test_run_config,
-            )
-
-        spans = [item.payload for item in items if item.type == "span"]
-
-        # Find the MCP execute_tool span
-        mcp_tool_span = None
-        for span in spans:
-            if span.get("name") == "execute_tool test_mcp_tool":
-                mcp_tool_span = span
-                break
-
-        # Verify the MCP tool span was created but without input/output
-        assert mcp_tool_span is not None, "MCP execute_tool span was not created"
-        assert mcp_tool_span["name"] == "execute_tool test_mcp_tool"
-        assert mcp_tool_span["attributes"]["gen_ai.tool.name"] == "test_mcp_tool"
-
-        # Verify input and output are not included when send_default_pii is False
-        assert "gen_ai.tool.input" not in mcp_tool_span["attributes"]
-        assert "gen_ai.tool.output" not in mcp_tool_span["attributes"]
-    else:
-        with patch.object(
-            agent.model._client._client,
-            "send",
-            side_effect=[mcp_response, final_response],
-        ) as _:
-            sentry_init(
-                integrations=[OpenAIAgentsIntegration()],
-                traces_sample_rate=1.0,
-                send_default_pii=False,  # PII disabled
-                stream_gen_ai_spans=stream_gen_ai_spans,
-            )
-            events = capture_events()
-
-            await agents.Runner.run(
-                agent,
-                "Please use MCP tool",
-                run_config=test_run_config,
-            )
-
-        (transaction,) = events
-        spans = transaction["spans"]
-
-        # Find the MCP execute_tool span
-        mcp_tool_span = None
-        for span in spans:
-            if span.get("description") == "execute_tool test_mcp_tool":
-                mcp_tool_span = span
-                break
-
-        # Verify the MCP tool span was created but without input/output
-        assert mcp_tool_span is not None, "MCP execute_tool span was not created"
-        assert mcp_tool_span["description"] == "execute_tool test_mcp_tool"
-        assert mcp_tool_span["data"]["gen_ai.tool.name"] == "test_mcp_tool"
-
-        # Verify input and output are not included when send_default_pii is False
-        assert "gen_ai.tool.input" not in mcp_tool_span["data"]
-        assert "gen_ai.tool.output" not in mcp_tool_span["data"]
 
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
@@ -5449,3 +4521,165 @@ async def test_no_conversation_id_when_not_provided(
         )
         assert "gen_ai.conversation.id" not in invoke_agent_span.get("data", {})
         assert "gen_ai.conversation.id" not in ai_client_span.get("data", {})
+
+
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.asyncio
+async def test_runner_run_with_starting_agent_kwarg(
+    sentry_init,
+    capture_events,
+    test_agent,
+    nonstreaming_responses_model_response,
+    get_model_response,
+    stream_gen_ai_spans,
+):
+    """Runner.run(starting_agent=agent, input=...) must not crash.
+
+    Regression test for https://github.com/getsentry/sentry-python/issues/6418
+    """
+    client = AsyncOpenAI(api_key="test-key")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent = test_agent.clone(model=model)
+
+    response = get_model_response(
+        nonstreaming_responses_model_response, serialize_pydantic=True
+    )
+
+    with patch.object(
+        agent.model._client._client,
+        "send",
+        return_value=response,
+    ):
+        sentry_init(
+            integrations=[OpenAIAgentsIntegration()],
+            traces_sample_rate=1.0,
+            stream_gen_ai_spans=stream_gen_ai_spans,
+        )
+
+        events = capture_events()
+
+        result = await agents.run.DEFAULT_AGENT_RUNNER.run(
+            starting_agent=agent,
+            input="Test input",
+            run_config=test_run_config,
+        )
+
+        assert result is not None
+        assert result.final_output == "Hello, how can I help you?"
+
+    (transaction,) = events
+    assert transaction["transaction"] == "test_agent workflow"
+
+
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.asyncio
+async def test_runner_run_streamed_with_starting_agent_kwarg(
+    sentry_init,
+    capture_events,
+    test_agent,
+    async_iterator,
+    server_side_event_chunks,
+    get_model_response,
+    stream_gen_ai_spans,
+):
+    """Runner.run_streamed(starting_agent=agent, input=...) must not crash.
+
+    Regression test for https://github.com/getsentry/sentry-python/issues/6418
+    """
+    client = AsyncOpenAI(api_key="test-key")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent = test_agent.clone(model=model)
+
+    request_headers = {}
+    if parse_version(OPENAI_AGENTS_VERSION) >= (0, 10, 3) and hasattr(
+        agent.model._client.responses, "with_streaming_response"
+    ):
+        request_headers["X-Stainless-Raw-Response"] = "stream"
+
+    response = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    ResponseCreatedEvent(
+                        response=Response(
+                            id="chat-id",
+                            output=[],
+                            parallel_tool_calls=False,
+                            tool_choice="none",
+                            tools=[],
+                            created_at=10000000,
+                            model="gpt-4",
+                            object="response",
+                        ),
+                        type="response.created",
+                        sequence_number=0,
+                    ),
+                    ResponseCompletedEvent(
+                        response=Response(
+                            id="chat-id",
+                            output=[
+                                ResponseOutputMessage(
+                                    id="message-id",
+                                    content=[
+                                        ResponseOutputText(
+                                            annotations=[],
+                                            text="Hello, how can I help you?",
+                                            type="output_text",
+                                        ),
+                                    ],
+                                    role="assistant",
+                                    status="completed",
+                                    type="message",
+                                ),
+                            ],
+                            parallel_tool_calls=False,
+                            tool_choice="none",
+                            tools=[],
+                            created_at=10000000,
+                            model="gpt-4",
+                            object="response",
+                            usage=ResponseUsage(
+                                input_tokens=10,
+                                input_tokens_details=InputTokensDetails(
+                                    cached_tokens=0,
+                                ),
+                                output_tokens=20,
+                                output_tokens_details=OutputTokensDetails(
+                                    reasoning_tokens=5,
+                                ),
+                                total_tokens=30,
+                            ),
+                        ),
+                        type="response.completed",
+                        sequence_number=1,
+                    ),
+                ]
+            )
+        ),
+        request_headers=request_headers,
+    )
+
+    with patch.object(
+        agent.model._client._client,
+        "send",
+        return_value=response,
+    ):
+        sentry_init(
+            integrations=[OpenAIAgentsIntegration()],
+            traces_sample_rate=1.0,
+            stream_gen_ai_spans=stream_gen_ai_spans,
+        )
+
+        events = capture_events()
+
+        result = agents.run.DEFAULT_AGENT_RUNNER.run_streamed(
+            starting_agent=agent,
+            input="Test input",
+            run_config=test_run_config,
+        )
+
+        async for _event in result.stream_events():
+            pass
+
+    (transaction,) = events
+    assert transaction["transaction"] == "test_agent workflow"
