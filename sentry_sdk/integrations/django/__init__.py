@@ -40,6 +40,7 @@ try:
     from django.conf import settings
     from django.conf import settings as django_settings
     from django.core import signals
+    from django.utils.functional import SimpleLazyObject
 
     try:
         from django.urls import resolve
@@ -463,6 +464,40 @@ def _after_get_response(request: "WSGIRequest") -> None:
 
     scope = sentry_sdk.get_current_scope()
     _attempt_resolve_again(request, scope, integration.transaction_style)
+
+    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+    if span_streaming:
+        user = getattr(request, "user", None)
+
+        # Evaluating a SimpleLazyObject in an async view can raise django.core.exceptions.SynchronousOnlyOperation.
+        # Exit early if the user has not been materialized yet.
+        is_lazy = isinstance(user, SimpleLazyObject)
+        if is_lazy and hasattr(request, "_cached_user"):
+            user = request._cached_user
+        elif is_lazy:
+            return
+
+        if user is None or not is_authenticated(user):
+            return
+
+        segment_span = scope.streamed_span._segment
+        try:
+            user_id = str(user.pk)
+        except Exception:
+            pass
+        segment_span.set_attribute(SPANDATA.USER_ID, user_id)
+
+        try:
+            user_email = user.email
+        except Exception:
+            pass
+        segment_span.set_attribute(SPANDATA.USER_EMAIL, user_email)
+
+        try:
+            username = user.get_username()
+        except Exception:
+            pass
+        segment_span.set_attribute(SPANDATA.USER_NAME, username)
 
 
 def _patch_get_response() -> None:
