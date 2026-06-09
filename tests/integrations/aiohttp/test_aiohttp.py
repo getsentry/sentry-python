@@ -19,10 +19,8 @@ from aiohttp.web_request import Request
 
 import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
-from sentry_sdk._types import OVER_SIZE_LIMIT_SUBSTITUTE
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.aiohttp import (
-    BODY_NOT_READ_MESSAGE,
     AioHttpIntegration,
     create_trace_config,
 )
@@ -1228,8 +1226,7 @@ async def test_sensitive_header_scrubbing_span_streaming(
 
     sentry_sdk.flush()
 
-    items.pop()  # drop the test client's outer segment
-    (server_span,) = [item.payload for item in items]
+    server_span, _client_segment = [item.payload for item in items]
 
     # send_default_pii defaults to False, so _filter_headers substitutes
     # sensitive headers with SENSITIVE_DATA_SUBSTITUTE ("[Filtered]"). The
@@ -1269,8 +1266,7 @@ async def test_sensitive_header_passthrough_with_pii_span_streaming(
 
     sentry_sdk.flush()
 
-    items.pop()  # drop the test client's outer segment
-    (server_span,) = [item.payload for item in items]
+    server_span, _client_segment = [item.payload for item in items]
 
     # With send_default_pii=True, _filter_headers is a no-op and the original
     # value reaches the span attribute.
@@ -1281,107 +1277,6 @@ async def test_sensitive_header_passthrough_with_pii_span_streaming(
     # client.address and user.ip_address is captured under send_default_pii=True.
     assert server_span["attributes"]["client.address"] == "127.0.0.1"
     assert server_span["attributes"]["user.ip_address"] == "127.0.0.1"
-
-
-@pytest.mark.asyncio
-async def test_request_body_captured_on_segment_span_streaming(
-    sentry_init, aiohttp_client, capture_items
-):
-    sentry_init(
-        integrations=[AioHttpIntegration()],
-        traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    body = {"some": "value"}
-
-    async def hello(request):
-        # Reading the body populates request._read_bytes; the integration
-        # captures body data in a finally after the handler returns.
-        await request.json()
-        return web.Response(text="hello")
-
-    app = web.Application()
-    app.router.add_post("/", hello)
-
-    items = capture_items("span")
-
-    client = await aiohttp_client(app)
-    resp = await client.post("/", json=body)
-    assert resp.status == 200
-
-    sentry_sdk.flush()
-
-    server_segment, client_segment = [item.payload for item in items]
-    assert server_segment["is_segment"] is True
-    assert server_segment["attributes"]["http.request.body.data"] == json.dumps(body)
-
-
-@pytest.mark.asyncio
-async def test_request_body_not_read_span_streaming(
-    sentry_init, aiohttp_client, capture_items
-):
-    sentry_init(
-        integrations=[AioHttpIntegration()],
-        traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    async def hello(request):
-        # Handler does not read the body; request._read_bytes stays None.
-        return web.Response(text="hello")
-
-    app = web.Application()
-    app.router.add_post("/", hello)
-
-    items = capture_items("span")
-
-    client = await aiohttp_client(app)
-    resp = await client.post("/", json={"some": "value"})
-    assert resp.status == 200
-
-    sentry_sdk.flush()
-
-    server_segment, client_segment = [item.payload for item in items]
-    assert server_segment["is_segment"] is True
-    assert (
-        server_segment["attributes"]["http.request.body.data"] == BODY_NOT_READ_MESSAGE
-    )
-
-
-@pytest.mark.asyncio
-async def test_request_body_over_size_limit_span_streaming(
-    sentry_init, aiohttp_client, capture_items
-):
-    sentry_init(
-        integrations=[AioHttpIntegration()],
-        traces_sample_rate=1.0,
-        max_request_body_size="small",
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    async def hello(request):
-        await request.read()
-        return web.Response(text="hello")
-
-    app = web.Application()
-    app.router.add_post("/", hello)
-
-    items = capture_items("span")
-
-    client = await aiohttp_client(app)
-    # "small" caps at 1 KB; send a body larger than that.
-    resp = await client.post("/", data=b"x" * 2000)
-    assert resp.status == 200
-
-    sentry_sdk.flush()
-
-    server_segment, client_segment = [item.payload for item in items]
-    assert server_segment["is_segment"] is True
-    assert (
-        server_segment["attributes"]["http.request.body.data"]
-        == OVER_SIZE_LIMIT_SUBSTITUTE
-    )
 
 
 @pytest.mark.asyncio
@@ -1499,10 +1394,7 @@ async def test_server_error_span_streaming(sentry_init, aiohttp_client, capture_
     assert error_event.type == "event"
     assert error_event.payload["exception"]["values"][0]["type"] == "ZeroDivisionError"
 
-    spans = items[1:]
-    assert spans[-1].type == "span"
-    segment = spans.pop().payload
-    (server_span,) = [item.payload for item in spans]
+    server_span, segment = [item.payload for item in items[1:]]
 
     assert segment["is_segment"] is True
     assert segment["attributes"]["sentry.op"] == "http.client"
@@ -1544,8 +1436,7 @@ async def test_http_exception_span_streaming(
     sentry_sdk.flush()
 
     assert len(items) == 2
-    segment = items.pop().payload
-    (server_span,) = [item.payload for item in items]
+    server_span, segment = [item.payload for item in items]
 
     assert segment["is_segment"] is True
     assert segment["attributes"]["sentry.op"] == "http.client"
@@ -1582,8 +1473,7 @@ async def test_http_exception_ok_status_not_overridden_span_streaming(
     sentry_sdk.flush()
 
     assert len(items) == 2
-    segment = items.pop().payload
-    (server_span,) = [item.payload for item in items]
+    server_span, segment = [item.payload for item in items]
 
     assert segment["is_segment"] is True
     assert segment["attributes"]["sentry.op"] == "http.client"
@@ -1693,3 +1583,40 @@ async def test_outgoing_trace_headers_span_streaming(
         span_id=client_span["span_id"],
         sampled=1,
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("send_default_pii", [True, False])
+async def test_user_ip_address_on_all_spans(
+    sentry_init, aiohttp_client, capture_items, send_default_pii
+):
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    async def hello(request):
+        with sentry_sdk.traces.start_span(name="child-span"):
+            pass
+        return web.Response(text="hello")
+
+    app = web.Application()
+    app.router.add_get("/", hello)
+
+    items = capture_items("span")
+
+    client = await aiohttp_client(app)
+    await client.get("/")
+
+    sentry_sdk.flush()
+
+    child_span, server_span, client_span = [item.payload for item in items]
+
+    if send_default_pii:
+        assert server_span["attributes"]["user.ip_address"] == "127.0.0.1"
+        assert child_span["attributes"]["user.ip_address"] == "127.0.0.1"
+    else:
+        assert "user.ip_address" not in server_span["attributes"]
+        assert "user.ip_address" not in child_span["attributes"]

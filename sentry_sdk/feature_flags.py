@@ -65,7 +65,7 @@ def add_feature_flag(flag: str, result: bool) -> None:
     flags.set(flag, result)
 
     if has_span_streaming_enabled(client.options):
-        span = sentry_sdk.traces._get_current_streamed_span()
+        span = sentry_sdk.traces.get_current_span()
         if span and isinstance(span, sentry_sdk.traces.StreamedSpan):
             span.set_attribute(f"flag.evaluation.{flag}", result)
 

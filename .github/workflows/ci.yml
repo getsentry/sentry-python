@@ -15,11 +15,6 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  BUILD_CACHE_KEY: ${{ github.sha }}
-  CACHED_BUILD_PATHS: |
-    ${{ github.workspace }}/dist-serverless
-
 jobs:
   lint:
     name: Lint Sources
@@ -27,14 +22,23 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           python-version: 3.14
 
-      - run: |
-          pip install tox
-          tox -e linters
+      - name: Ruff check
+        run: uv run ruff check tests sentry_sdk
+
+      - name: Ruff format
+        run: uv run ruff format --check tests sentry_sdk
+
+      - name: Find raise from None
+        run: uv run python scripts/find_raise_from_none.py
+
+      - name: Mypy
+        run: uv run --group typing mypy sentry_sdk
 
   build_lambda_layer:
     name: Build Package
@@ -42,21 +46,17 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          python-version: 3.12
-      - name: Setup build cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
-        id: build_cache
-        with:
-          path: ${{ env.CACHED_BUILD_PATHS }}
-          key: ${{ env.BUILD_CACHE_KEY }}
+          python-version: 3.14
       - name: Build Packages
         run: |
-          echo "Creating directory containing Python SDK Lambda Layer"
-          # This will also trigger "make dist" that creates the Python packages
-          make aws-lambda-layer
+          echo "Building SDK dist wheel and tar.gz"
+          uv build
+          echo "Building AWS Lambda Layer"
+          uv run --group aws --with-editable . python scripts/build_aws_lambda_layer.py
       - name: Upload Python Packages
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
@@ -71,13 +71,15 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          python-version: 3.12
+          python-version: 3.14
 
       - run: |
-          make apidocs
+          rm -rf docs/_build
+          uv run --group docs sphinx-build -vv -W -b html docs/ docs/_build
           cd docs/_build && zip -r gh-pages ./
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

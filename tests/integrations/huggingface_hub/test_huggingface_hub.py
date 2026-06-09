@@ -529,6 +529,7 @@ def test_text_generation(
             "sentry.sdk.version": mock.ANY,
             "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "test",
+            "server.address": mock.ANY,
             "thread.id": mock.ANY,
             "thread.name": mock.ANY,
         }
@@ -665,6 +666,7 @@ def test_text_generation_streaming(
             "sentry.sdk.version": mock.ANY,
             "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "test",
+            "server.address": mock.ANY,
             "thread.id": mock.ANY,
             "thread.name": mock.ANY,
         }
@@ -805,6 +807,7 @@ def test_chat_completion(
             "sentry.sdk.version": mock.ANY,
             "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "test",
+            "server.address": mock.ANY,
             "thread.id": mock.ANY,
             "thread.name": mock.ANY,
         }
@@ -953,6 +956,7 @@ def test_chat_completion_streaming(
             "sentry.sdk.version": mock.ANY,
             "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "test",
+            "server.address": mock.ANY,
             "thread.id": mock.ANY,
             "thread.name": mock.ANY,
         }
@@ -1099,6 +1103,7 @@ def test_chat_completion_api_error(
             "sentry.sdk.version": mock.ANY,
             "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "test",
+            "server.address": mock.ANY,
             "thread.id": mock.ANY,
             "thread.name": mock.ANY,
         }
@@ -1297,6 +1302,7 @@ def test_chat_completion_with_tools(
             "sentry.sdk.version": mock.ANY,
             "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "test",
+            "server.address": mock.ANY,
             "thread.id": mock.ANY,
             "thread.name": mock.ANY,
         }
@@ -1456,6 +1462,7 @@ def test_chat_completion_streaming_with_tools(
             "sentry.sdk.version": mock.ANY,
             "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "test",
+            "server.address": mock.ANY,
             "thread.id": mock.ANY,
             "thread.name": mock.ANY,
         }
