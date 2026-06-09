@@ -477,7 +477,11 @@ def _after_get_response(request: "WSGIRequest") -> None:
         elif is_lazy:
             return
 
-        if user is None or not is_authenticated(user) or scope.streamed_span is None:
+        if (
+            user is None
+            or not is_authenticated(user)
+            or type(scope.streamed_span) is not StreamedSpan
+        ):
             return
 
         segment_span = scope.streamed_span._segment
