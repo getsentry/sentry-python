@@ -825,6 +825,12 @@ class SPANDATA:
     Example: GET
     """
 
+    HTTP_REQUEST_BODY_DATA = "http.request.body.data"
+    """
+    HTTP request body data. Can be given as string or structural data of any format.
+    Example: "[{\"role\": \"user\", \"message\": \"hello\"}]"
+    """
+
     HTTP_REQUEST_HEADER = "http.request.header"
     """
     Prefix for HTTP request header attributes. The header name (lowercased) is
@@ -836,12 +842,6 @@ class SPANDATA:
     """
     The HTTP method used.
     Example: GET
-    """
-
-    HTTP_REQUEST_BODY_DATA = "http.request.body.data"
-    """
-    The HTTP request body data as string.
-    Example: "[{\"role\": \"user\", \"message\": \"hello\"}]"
     """
 
     HTTP_QUERY = "http.query"
@@ -978,10 +978,28 @@ class SPANDATA:
     Example: "MainThread"
     """
 
+    USER_EMAIL = "user.email"
+    """
+    User email address.
+    Example: "test@example.com"
+    """
+
+    USER_ID = "user.id"
+    """
+    Unique identifier of the user.
+    Example: "S-1-5-21-202424912787-2692429404-2351956786-1000"
+    """
+
     USER_IP_ADDRESS = "user.ip_address"
     """
     The IP address of the user that triggered the request.
     Example: "10.1.2.80"
+    """
+
+    USER_NAME = "user.name"
+    """
+    Short name or login/username of the user.
+    Example: "j.smith"
     """
 
     URL_FULL = "url.full"
@@ -1747,4 +1765,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.61.1"
+VERSION = "2.62.0"

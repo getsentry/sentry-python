@@ -40,6 +40,7 @@ try:
     from django.conf import settings
     from django.conf import settings as django_settings
     from django.core import signals
+    from django.utils.functional import SimpleLazyObject
 
     try:
         from django.urls import resolve
@@ -457,12 +458,47 @@ def _attempt_resolve_again(
 
 
 def _after_get_response(request: "WSGIRequest") -> None:
-    integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
-    if integration is None or integration.transaction_style != "url":
+    client = sentry_sdk.get_client()
+    integration = client.get_integration(DjangoIntegration)
+    if integration is None:
         return
 
-    scope = sentry_sdk.get_current_scope()
-    _attempt_resolve_again(request, scope, integration.transaction_style)
+    if integration.transaction_style == "url":
+        scope = sentry_sdk.get_current_scope()
+        _attempt_resolve_again(request, scope, integration.transaction_style)
+
+    span_streaming = has_span_streaming_enabled(client.options)
+    if span_streaming and should_send_default_pii():
+        user = getattr(request, "user", None)
+
+        # Evaluating a SimpleLazyObject in an async view can raise django.core.exceptions.SynchronousOnlyOperation.
+        # Exit early if the user has not been materialized yet.
+        is_lazy = isinstance(user, SimpleLazyObject)
+        if is_lazy and hasattr(request, "_cached_user"):
+            user = request._cached_user
+        elif is_lazy:
+            return
+
+        if user is None or not is_authenticated(user):
+            return
+
+        user_info = {}
+        try:
+            user_info["id"] = str(user.pk)
+        except Exception:
+            pass
+
+        try:
+            user_info["email"] = user.email
+        except Exception:
+            pass
+
+        try:
+            user_info["username"] = user.get_username()
+        except Exception:
+            pass
+
+        sentry_sdk.set_user(user_info)
 
 
 def _patch_get_response() -> None:

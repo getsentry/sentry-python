@@ -25,10 +25,10 @@ from starlette.testclient import TestClient
 
 import sentry_sdk
 from sentry_sdk import capture_message, get_baggage, get_traceparent
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.starlette import (
     StarletteIntegration,
-    StarletteRequestExtractor,
 )
 from sentry_sdk.utils import parse_version
 from tests.integrations.conftest import parametrize_test_configurable_status_codes
@@ -43,16 +43,6 @@ BODY_FORM = """--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="usern
     "{{image_data}}", str(base64.b64encode(open(PICTURE, "rb").read()))
 )
 
-FORM_RECEIVE_MESSAGES = [
-    {"type": "http.request", "body": BODY_FORM.encode("utf-8")},
-    {"type": "http.disconnect"},
-]
-
-JSON_RECEIVE_MESSAGES = [
-    {"type": "http.request", "body": json.dumps(BODY_JSON).encode("utf-8")},
-    {"type": "http.disconnect"},
-]
-
 PARSED_FORM = starlette.datastructures.FormData(
     [
         ("username", "Jane"),
@@ -66,27 +56,6 @@ PARSED_FORM = starlette.datastructures.FormData(
         ),
     ]
 )
-
-# Dummy ASGI scope for creating mock Starlette requests
-SCOPE = {
-    "client": ("172.29.0.10", 34784),
-    "headers": [
-        [b"host", b"example.com"],
-        [b"user-agent", b"Mozilla/5.0 Gecko/20100101 Firefox/60.0"],
-        [b"content-type", b"application/json"],
-        [b"accept-language", b"en-US,en;q=0.5"],
-        [b"accept-encoding", b"gzip, deflate, br"],
-        [b"upgrade-insecure-requests", b"1"],
-        [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
-    ],
-    "http_version": "0.0",
-    "method": "GET",
-    "path": "/path",
-    "query_string": b"qs=hello",
-    "scheme": "http",
-    "server": ("172.28.0.10", 8000),
-    "type": "http",
-}
 
 
 async def _mock_receive(msg):
@@ -150,6 +119,21 @@ def starlette_app_factory(middleware=None, debug=True):
         else:
             return templates.TemplateResponse("trace_meta.html", template_context)
 
+    async def _body_json(request):
+        await request.json()
+        capture_message("hi")
+        return starlette.responses.JSONResponse({"status": "ok"})
+
+    async def _body_form(request):
+        await request.form()
+        capture_message("hi")
+        return starlette.responses.JSONResponse({"status": "ok"})
+
+    async def _body_raw(request):
+        await request.body()
+        capture_message("hi")
+        return starlette.responses.JSONResponse({"status": "ok"})
+
     all_methods = [
         "CONNECT",
         "DELETE",
@@ -173,6 +157,9 @@ def starlette_app_factory(middleware=None, debug=True):
             starlette.routing.Route("/sync/thread_ids", _thread_ids_sync),
             starlette.routing.Route("/async/thread_ids", _thread_ids_async),
             starlette.routing.Route("/render_template", _render_template),
+            starlette.routing.Route("/body/json", _body_json, methods=["POST"]),
+            starlette.routing.Route("/body/form", _body_form, methods=["POST"]),
+            starlette.routing.Route("/body/raw", _body_raw, methods=["POST"]),
         ],
         middleware=middleware,
     )
@@ -287,196 +274,260 @@ class SamplePartialReceiveSendMiddleware:
 
 
 @pytest.mark.asyncio
-async def test_starletterequestextractor_content_length(sentry_init):
-    scope = SCOPE.copy()
-    scope["headers"] = [
-        [b"content-length", str(len(json.dumps(BODY_JSON))).encode()],
-    ]
-    starlette_request = starlette.requests.Request(scope)
-    extractor = StarletteRequestExtractor(starlette_request)
-
-    assert await extractor.content_length() == len(json.dumps(BODY_JSON))
-
-
-@pytest.mark.asyncio
-async def test_starletterequestextractor_cookies(sentry_init):
-    starlette_request = starlette.requests.Request(SCOPE)
-    extractor = StarletteRequestExtractor(starlette_request)
-
-    assert extractor.cookies() == {
-        "tasty_cookie": "strawberry",
-        "yummy_cookie": "choco",
-    }
-
-
-@pytest.mark.asyncio
-async def test_starletterequestextractor_json(sentry_init):
-    starlette_request = starlette.requests.Request(SCOPE)
-
-    # Mocking async `_receive()` that works in Python 3.7+
-    side_effect = [_mock_receive(msg) for msg in JSON_RECEIVE_MESSAGES]
-    starlette_request._receive = mock.Mock(side_effect=side_effect)
-
-    extractor = StarletteRequestExtractor(starlette_request)
-
-    assert extractor.is_json()
-    assert await extractor.json() == BODY_JSON
-
-
-@pytest.mark.asyncio
-async def test_starletterequestextractor_form(sentry_init):
-    scope = SCOPE.copy()
-    scope["headers"] = [
-        [b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"],
-    ]
-    # TODO add test for content-type: "application/x-www-form-urlencoded"
-
-    starlette_request = starlette.requests.Request(scope)
-
-    # Mocking async `_receive()` that works in Python 3.7+
-    side_effect = [_mock_receive(msg) for msg in FORM_RECEIVE_MESSAGES]
-    starlette_request._receive = mock.Mock(side_effect=side_effect)
-
-    extractor = StarletteRequestExtractor(starlette_request)
-
-    form_data = await extractor.form()
-    assert form_data.keys() == PARSED_FORM.keys()
-    assert form_data["username"] == PARSED_FORM["username"]
-    assert form_data["password"] == PARSED_FORM["password"]
-    assert form_data["photo"].filename == PARSED_FORM["photo"].filename
-
-    # Make sure we still can read the body
-    # after alreading it with extractor.form() above.
-    body = await extractor.request.body()
-    assert body
-
-
-@pytest.mark.asyncio
-async def test_starletterequestextractor_body_consumed_twice(
-    sentry_init, capture_events
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_request_info_json_body(
+    sentry_init, capture_events, capture_items, span_streaming
 ):
-    """
-    Starlette does cache when you read the request data via `request.json()`
-    or `request.body()`, but it does NOT when using `request.form()`.
-    So we have an edge case when the Sentry Starlette reads the body using `.form()`
-    and the user wants to read the body using `.body()`.
-    Because the underlying stream can not be consumed twice and is not cached.
-
-    We have fixed this in `StarletteRequestExtractor.form()` by consuming the body
-    first with `.body()` (to put it into the `_body` cache and then consume it with `.form()`.
-
-    If this behavior is changed in Starlette and the `request.form()` in Starlette
-    is also caching the body, this test will fail.
-
-    See also https://github.com/encode/starlette/discussions/1933
-    """
-    scope = SCOPE.copy()
-    scope["headers"] = [
-        [b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"],
-    ]
-
-    starlette_request = starlette.requests.Request(scope)
-
-    # Mocking async `_receive()` that works in Python 3.7+
-    side_effect = [_mock_receive(msg) for msg in FORM_RECEIVE_MESSAGES]
-    starlette_request._receive = mock.Mock(side_effect=side_effect)
-
-    extractor = StarletteRequestExtractor(starlette_request)
-
-    await extractor.request.form()
-
-    with pytest.raises(RuntimeError):
-        await extractor.request.body()
-
-
-@pytest.mark.asyncio
-async def test_starletterequestextractor_extract_request_info_too_big(sentry_init):
     sentry_init(
+        traces_sample_rate=1.0,
         send_default_pii=True,
         integrations=[StarletteIntegration()],
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
     )
-    scope = SCOPE.copy()
-    scope["headers"] = [
-        [b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"],
-        [b"content-length", str(len(BODY_FORM)).encode()],
-        [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
-    ]
-    starlette_request = starlette.requests.Request(scope)
 
-    # Mocking async `_receive()` that works in Python 3.7+
-    side_effect = [_mock_receive(msg) for msg in FORM_RECEIVE_MESSAGES]
-    starlette_request._receive = mock.Mock(side_effect=side_effect)
+    starlette_app = starlette_app_factory()
+    client = TestClient(starlette_app)
 
-    extractor = StarletteRequestExtractor(starlette_request)
+    if span_streaming:
+        items = capture_items("event", "span")
 
-    request_info = await extractor.extract_request_info()
+        client.post(
+            "/body/json",
+            json=BODY_JSON,
+            headers={
+                "cookie": "yummy_cookie=choco; tasty_cookie=strawberry",
+            },
+        )
 
-    assert request_info
-    assert request_info["cookies"] == {
-        "tasty_cookie": "strawberry",
-        "yummy_cookie": "choco",
-    }
-    # Because request is too big only the AnnotatedValue is extracted.
-    assert request_info["data"].metadata == {"rem": [["!config", "x"]]}
+        (event,) = (item.payload for item in items if item.type == "event")
+        assert event["request"]["cookies"] == {
+            "tasty_cookie": "strawberry",
+            "yummy_cookie": "choco",
+        }
+        assert event["request"]["data"] == BODY_JSON
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        server_span = next(
+            span for span in spans if span["attributes"]["sentry.op"] == "http.server"
+        )
+
+        assert json.loads(
+            server_span["attributes"][SPANDATA.HTTP_REQUEST_BODY_DATA]
+        ) == {"some": "json", "for": "testing", "nested": {"numbers": 123}}
+    else:
+        events = capture_events()
+
+        client.post(
+            "/body/json",
+            json=BODY_JSON,
+            headers={
+                "cookie": "yummy_cookie=choco; tasty_cookie=strawberry",
+            },
+        )
+
+        (event, transaction_event) = events
+
+        assert event["request"]["cookies"] == {
+            "tasty_cookie": "strawberry",
+            "yummy_cookie": "choco",
+        }
+        assert event["request"]["data"] == BODY_JSON
+
+        assert transaction_event["request"]["cookies"] == {
+            "tasty_cookie": "strawberry",
+            "yummy_cookie": "choco",
+        }
+        assert transaction_event["request"]["data"] == BODY_JSON
 
 
 @pytest.mark.asyncio
-async def test_starletterequestextractor_extract_request_info(sentry_init):
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_formdata_request_body(
+    sentry_init, capture_events, capture_items, span_streaming
+):
     sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        max_request_body_size="always",
+        integrations=[StarletteIntegration()],
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
+
+    starlette_app = starlette_app_factory()
+    client = TestClient(starlette_app)
+
+    if span_streaming:
+        items = capture_items("event", "span")
+
+        client.post(
+            "/body/form",
+            data=BODY_FORM.encode("utf-8"),
+            headers={
+                "content-type": "multipart/form-data; boundary=fd721ef49ea403a6",
+            },
+        )
+
+        (event,) = (item.payload for item in items if item.type == "event")
+        assert event["request"]["data"].keys() == PARSED_FORM.keys()
+        assert event["request"]["data"]["username"] == PARSED_FORM["username"]
+        assert event["request"]["data"]["password"] == "[Filtered]"
+        assert event["request"]["data"]["photo"] == ""
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        server_span = next(
+            span for span in spans if span["attributes"]["sentry.op"] == "http.server"
+        )
+
+        # Going forward, the sanitization of data will need to happen within the `before_send_span` hooks
+        # See https://sentry.slack.com/archives/C09RR0KD2N7/p1776951331206129?thread_ts=1776951227.440659&cid=C09RR0KD2N7
+        parsed_form_attribute = json.loads(
+            server_span["attributes"][SPANDATA.HTTP_REQUEST_BODY_DATA]
+        )
+        assert parsed_form_attribute.keys() == PARSED_FORM.keys()
+        assert parsed_form_attribute["username"] == PARSED_FORM["username"]
+        assert parsed_form_attribute["password"] == "hello123"
+        assert parsed_form_attribute["photo"] == "[Unparsable]"
+    else:
+        events = capture_events()
+
+        client.post(
+            "/body/form",
+            data=BODY_FORM.encode("utf-8"),
+            headers={
+                "content-type": "multipart/form-data; boundary=fd721ef49ea403a6",
+            },
+        )
+
+        (event, transaction_event) = events
+        assert event["request"]["data"].keys() == PARSED_FORM.keys()
+        assert event["request"]["data"]["username"] == PARSED_FORM["username"]
+        assert event["request"]["data"]["password"] == "[Filtered]"
+        assert event["request"]["data"]["photo"] == ""
+        assert event["_meta"]["request"]["data"]["photo"] == {
+            "": {"rem": [["!raw", "x"]]}
+        }
+
+        assert transaction_event["request"]["data"].keys() == PARSED_FORM.keys()
+        assert (
+            transaction_event["request"]["data"]["username"] == PARSED_FORM["username"]
+        )
+        assert transaction_event["request"]["data"]["password"] == "[Filtered]"
+        assert transaction_event["request"]["data"]["photo"] == ""
+        assert transaction_event["_meta"]["request"]["data"]["photo"] == {
+            "": {"rem": [["!raw", "x"]]}
+        }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_request_body_too_big(
+    sentry_init, capture_events, capture_items, span_streaming
+):
+    sentry_init(
+        traces_sample_rate=1.0,
         send_default_pii=True,
         integrations=[StarletteIntegration()],
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
     )
-    scope = SCOPE.copy()
-    scope["headers"] = [
-        [b"content-type", b"application/json"],
-        [b"content-length", str(len(json.dumps(BODY_JSON))).encode()],
-        [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
-    ]
 
-    starlette_request = starlette.requests.Request(scope)
+    starlette_app = starlette_app_factory()
+    client = TestClient(starlette_app)
 
-    # Mocking async `_receive()` that works in Python 3.7+
-    side_effect = [_mock_receive(msg) for msg in JSON_RECEIVE_MESSAGES]
-    starlette_request._receive = mock.Mock(side_effect=side_effect)
+    if span_streaming:
+        items = capture_items("event", "span")
 
-    extractor = StarletteRequestExtractor(starlette_request)
+        client.post(
+            "/body/form",
+            data=BODY_FORM.encode("utf-8"),
+            headers={
+                "content-type": "multipart/form-data; boundary=fd721ef49ea403a6",
+                "cookie": "yummy_cookie=choco; tasty_cookie=strawberry",
+            },
+        )
 
-    request_info = await extractor.extract_request_info()
+        (event,) = (item.payload for item in items if item.type == "event")
+        assert event["request"]["cookies"] == {
+            "tasty_cookie": "strawberry",
+            "yummy_cookie": "choco",
+        }
+        # Because request is too big only the AnnotatedValue is extracted.
+        assert event["_meta"]["request"]["data"] == {"": {"rem": [["!config", "x"]]}}
 
-    assert request_info
-    assert request_info["cookies"] == {
-        "tasty_cookie": "strawberry",
-        "yummy_cookie": "choco",
-    }
-    assert request_info["data"] == BODY_JSON
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        server_span = next(
+            span for span in spans if span["attributes"]["sentry.op"] == "http.server"
+        )
+
+        # Because request is too big only the AnnotatedValue is extracted.
+        assert (
+            server_span["attributes"][SPANDATA.HTTP_REQUEST_BODY_DATA]
+            == "[Exceeds maximum size]"
+        )
+    else:
+        events = capture_events()
+
+        client.post(
+            "/body/form",
+            data=BODY_FORM.encode("utf-8"),
+            headers={
+                "content-type": "multipart/form-data; boundary=fd721ef49ea403a6",
+                "cookie": "yummy_cookie=choco; tasty_cookie=strawberry",
+            },
+        )
+
+        (event, transaction_event) = events
+        assert event["request"]["cookies"] == {
+            "tasty_cookie": "strawberry",
+            "yummy_cookie": "choco",
+        }
+        # Because request is too big only the AnnotatedValue is extracted.
+        assert event["_meta"]["request"]["data"] == {"": {"rem": [["!config", "x"]]}}
+
+        assert transaction_event["request"]["cookies"] == {
+            "tasty_cookie": "strawberry",
+            "yummy_cookie": "choco",
+        }
+        # Because request is too big only the AnnotatedValue is extracted.
+        assert transaction_event["_meta"]["request"]["data"] == {
+            "": {"rem": [["!config", "x"]]}
+        }
 
 
 @pytest.mark.asyncio
-async def test_starletterequestextractor_extract_request_info_no_pii(sentry_init):
+async def test_request_info_no_pii(sentry_init, capture_events):
     sentry_init(
+        traces_sample_rate=1.0,
         send_default_pii=False,
         integrations=[StarletteIntegration()],
     )
-    scope = SCOPE.copy()
-    scope["headers"] = [
-        [b"content-type", b"application/json"],
-        [b"content-length", str(len(json.dumps(BODY_JSON))).encode()],
-        [b"cookie", b"yummy_cookie=choco; tasty_cookie=strawberry"],
-    ]
 
-    starlette_request = starlette.requests.Request(scope)
+    starlette_app = starlette_app_factory()
+    events = capture_events()
 
-    # Mocking async `_receive()` that works in Python 3.7+
-    side_effect = [_mock_receive(msg) for msg in JSON_RECEIVE_MESSAGES]
-    starlette_request._receive = mock.Mock(side_effect=side_effect)
+    client = TestClient(starlette_app)
+    client.post(
+        "/body/json",
+        json=BODY_JSON,
+        headers={
+            "cookie": "yummy_cookie=choco; tasty_cookie=strawberry",
+        },
+    )
 
-    extractor = StarletteRequestExtractor(starlette_request)
+    (event, transaction_event) = events
+    assert "cookies" not in event["request"]
+    assert event["request"]["data"] == BODY_JSON
 
-    request_info = await extractor.extract_request_info()
-
-    assert request_info
-    assert "cookies" not in request_info
-    assert request_info["data"] == BODY_JSON
+    assert "cookies" not in transaction_event["request"]
+    assert transaction_event["request"]["data"] == BODY_JSON
 
 
 @pytest.mark.parametrize(
@@ -1055,134 +1106,6 @@ def test_active_thread_id_span_streaming(sentry_init, capture_items, endpoint):
     assert str(data["active"]) == segments[0]["attributes"]["thread.id"]
 
 
-def _post_body_app(handler_awaitable):
-    async def _handler(request):
-        await handler_awaitable(request)
-        return starlette.responses.JSONResponse({"ok": True})
-
-    return starlette.applications.Starlette(
-        routes=[starlette.routing.Route("/body", _handler, methods=["POST"])],
-    )
-
-
-@pytest.mark.parametrize("middleware_spans", [False, True])
-def test_request_body_data_does_not_scrub_pii_span_streaming(
-    sentry_init, capture_items, middleware_spans
-):
-    sentry_init(
-        auto_enabling_integrations=False,
-        integrations=[StarletteIntegration(middleware_spans=middleware_spans)],
-        traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    async def _read_json(request):
-        await request.json()
-
-    items = capture_items("span")
-
-    client = TestClient(_post_body_app(_read_json))
-    response = client.post(
-        "/body",
-        json={
-            "password": "ohno",
-            "authorization": "Bearer token",
-            "message": "hello",
-        },
-    )
-    assert response.status_code == 200
-
-    sentry_sdk.flush()
-
-    segments = [item.payload for item in items if item.payload.get("is_segment")]
-    assert len(segments) == 1
-    attr = segments[0]["attributes"]["http.request.body.data"]
-
-    # Going forward, the sanitization of data will need to happen within the `before_send_span` hooks
-    # See https://sentry.slack.com/archives/C09RR0KD2N7/p1776951331206129?thread_ts=1776951227.440659&cid=C09RR0KD2N7
-    assert "ohno" in attr
-    assert "Bearer token" in attr
-    assert "hello" in attr
-
-
-@pytest.mark.skipif(
-    STARLETTE_VERSION < (0, 21),
-    reason="Requires Starlette >= 0.21, because earlier versions use a requests-based TestClient which does not support the 'content' kwarg",
-)
-@pytest.mark.parametrize("middleware_spans", [False, True])
-def test_request_body_data_annotated_value_top_level_span_streaming(
-    sentry_init, capture_items, middleware_spans
-):
-    sentry_init(
-        auto_enabling_integrations=False,
-        integrations=[StarletteIntegration(middleware_spans=middleware_spans)],
-        traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    async def _read_body(request):
-        await request.body()
-
-    items = capture_items("span")
-
-    client = TestClient(_post_body_app(_read_body))
-    response = client.post(
-        "/body",
-        content=b"not json and not form",
-        headers={"content-type": "application/octet-stream"},
-    )
-    assert response.status_code == 200
-
-    sentry_sdk.flush()
-
-    segments = [item.payload for item in items if item.payload.get("is_segment")]
-    assert len(segments) == 1
-    attr = segments[0]["attributes"]["http.request.body.data"]
-
-    assert isinstance(attr, str)
-    assert (
-        attr == '""'
-    )  # AnnotatedValue.removed_because_raw_data is called because the content was not able to be parsed, and replaces the value with an empty string
-
-
-@pytest.mark.parametrize("middleware_spans", [False, True])
-def test_request_body_data_annotated_value_nested_span_streaming(
-    sentry_init, capture_items, middleware_spans
-):
-    pytest.importorskip("multipart")
-
-    sentry_init(
-        auto_enabling_integrations=False,
-        integrations=[StarletteIntegration(middleware_spans=middleware_spans)],
-        traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    async def _read_form(request):
-        await request.form()
-
-    items = capture_items("span")
-
-    client = TestClient(_post_body_app(_read_form))
-    response = client.post(
-        "/body",
-        data={"name": "erica"},
-        files={"avatar": ("photo.jpg", b"fake-bytes", "image/jpeg")},
-    )
-    assert response.status_code == 200
-
-    sentry_sdk.flush()
-
-    segments = [item.payload for item in items if item.payload.get("is_segment")]
-    assert len(segments) == 1
-    attr = segments[0]["attributes"]["http.request.body.data"]
-
-    assert isinstance(attr, str)
-    parsed = json.loads(attr)
-    assert parsed["name"] == "erica"
-    assert "fake-bytes" not in attr
-
-
 def test_original_request_not_scrubbed(sentry_init, capture_events):
     sentry_init(integrations=[StarletteIntegration()])
 
@@ -1624,25 +1547,23 @@ def test_configurable_status_codes(
 
 
 @pytest.mark.asyncio
-async def test_starletterequestextractor_malformed_json_error_handling(sentry_init):
-    scope = SCOPE.copy()
-    scope["headers"] = [
-        [b"content-type", b"application/json"],
-    ]
-    starlette_request = starlette.requests.Request(scope)
+async def test_malformed_json_request_body(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        integrations=[StarletteIntegration()],
+    )
 
-    malformed_json = "{invalid json"
-    malformed_messages = [
-        {"type": "http.request", "body": malformed_json.encode("utf-8")},
-        {"type": "http.disconnect"},
-    ]
+    starlette_app = starlette_app_factory()
+    events = capture_events()
 
-    side_effect = [_mock_receive(msg) for msg in malformed_messages]
-    starlette_request._receive = mock.Mock(side_effect=side_effect)
+    client = TestClient(starlette_app)
+    client.post(
+        "/body/raw",
+        data="{invalid json".encode("utf-8"),
+        headers={"content-type": "application/json"},
+    )
 
-    extractor = StarletteRequestExtractor(starlette_request)
-
-    assert extractor.is_json()
-
-    result = await extractor.json()
-    assert result is None
+    (event, transaction_event) = events
+    assert event["request"]["data"] == ""
+    assert transaction_event["request"]["data"] == ""

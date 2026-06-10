@@ -48,6 +48,7 @@ class CLOUD_PLATFORM:  # noqa: N801
     """
 
     AWS_EC2 = "aws_ec2"
+    AWS_LAMBDA = "aws_lambda"
     GCP_COMPUTE_ENGINE = "gcp_compute_engine"
 
 

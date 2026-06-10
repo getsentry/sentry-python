@@ -66,7 +66,7 @@ def test_query_source_disabled(
         assert status == "200 OK"
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         for span in spans:
             if span["attributes"].get("sentry.op") == "db" and "auth_user" in span.get(
@@ -143,7 +143,7 @@ def test_query_source_enabled(
         assert status == "200 OK"
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         for span in spans:
             if span["attributes"].get("sentry.op") == "db" and "auth_user" in span.get(
@@ -214,7 +214,7 @@ def test_query_source(
         assert status == "200 OK"
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         for span in spans:
             if span["attributes"].get("sentry.op") == "db" and "auth_user" in span.get(
@@ -322,7 +322,7 @@ def test_query_source_with_module_in_search_path(
         assert status == "200 OK"
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         for span in spans:
             if span["attributes"].get("sentry.op") == "db" and "auth_user" in span.get(
@@ -416,7 +416,7 @@ def test_query_source_with_in_app_exclude(
         assert status == "200 OK"
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         for span in spans:
             if span["attributes"].get("sentry.op") == "db" and "auth_user" in span.get(
@@ -538,7 +538,7 @@ def test_query_source_with_in_app_include(
         assert status == "200 OK"
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         for span in spans:
             if span["attributes"].get("sentry.op") == "db" and "auth_user" in span.get(
@@ -662,7 +662,7 @@ def test_no_query_source_if_duration_too_short(
         assert status == "200 OK"
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         for span in spans:
             if span["attributes"].get("sentry.op") == "db" and "auth_user" in span.get(
@@ -768,7 +768,7 @@ def test_query_source_if_duration_over_threshold(
         assert status == "200 OK"
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         for span in spans:
             if span["attributes"].get("sentry.op") == "db" and "auth_user" in span.get(
@@ -870,7 +870,7 @@ def test_db_span_origin_execute(
         client.get(reverse("postgres_select_orm"))
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert spans[1]["attributes"]["sentry.origin"] == "auto.http.django"
 
@@ -937,7 +937,7 @@ def test_db_span_origin_executemany(
             transaction.commit()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert spans[1]["attributes"]["sentry.origin"] == "manual"
         assert spans[0]["attributes"]["sentry.origin"] == "auto.db.django"

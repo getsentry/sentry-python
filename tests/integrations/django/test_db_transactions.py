@@ -135,7 +135,7 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
             transaction.set_autocommit(True)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         postgres_rollback = spans[4]
         assert postgres_rollback["is_segment"] is True
@@ -376,7 +376,7 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
                 cursor.executemany(query, query_list)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         postgres_rollback = spans[4]
         assert postgres_rollback["is_segment"] is True
@@ -528,7 +528,7 @@ def test_db_no_autocommit_execute(
         client.get(reverse("postgres_insert_orm_no_autocommit"))
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         # Ensure operation is persisted
         assert User.objects.using("postgres").exists()
@@ -671,7 +671,7 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
             transaction.set_autocommit(True)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         # Ensure operation is persisted
         assert User.objects.exists()
@@ -810,7 +810,7 @@ def test_db_no_autocommit_rollback_execute(
         client.get(reverse("postgres_insert_orm_no_autocommit_rollback"))
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         # Ensure operation is rolled back
         assert not User.objects.using("postgres").exists()
@@ -954,7 +954,7 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
             transaction.set_autocommit(True)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         # Ensure operation is rolled back
         assert not User.objects.exists()
@@ -1092,7 +1092,7 @@ def test_db_atomic_execute(
         client.get(reverse("postgres_insert_orm_atomic"))
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         # Ensure operation is persisted
         assert User.objects.using("postgres").exists()
@@ -1233,7 +1233,7 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
                 cursor.executemany(query, query_list)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         # Ensure operation is persisted
         assert User.objects.exists()
@@ -1366,7 +1366,7 @@ def test_db_atomic_rollback_execute(
         client.get(reverse("postgres_insert_orm_atomic_rollback"))
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         # Ensure operation is rolled back
         assert not User.objects.using("postgres").exists()
@@ -1510,7 +1510,7 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
                 transaction.set_rollback(True)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         # Ensure operation is rolled back
         assert not User.objects.exists()
@@ -1647,7 +1647,7 @@ def test_db_atomic_execute_exception(
         client.get(reverse("postgres_insert_orm_atomic_exception"))
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         # Ensure operation is rolled back
         assert not User.objects.using("postgres").exists()
@@ -1793,7 +1793,7 @@ VALUES ('password', false, %s, %s, %s, %s, false, true, %s);"""
                 pass
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         # Ensure operation is rolled back
         assert not User.objects.exists()
