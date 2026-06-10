@@ -280,10 +280,10 @@ async def _capture_exception(
 
 def _get_current_user_id_from_quart() -> str | None:
     if quart_auth is None:
-        return
+        return None
 
     if quart_auth.current_user is None:
-        return
+        return None
 
     try:
         return quart_auth.current_user._auth_id
