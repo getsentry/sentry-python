@@ -96,7 +96,7 @@ def test_on_new_span_on_close(
             assert sentry_sdk.traces.get_current_span() != sentry_first_rust_span
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert len(spans) == 2
 
         # Ensure the span metadata is wired up
@@ -197,7 +197,7 @@ def test_nested_on_new_span_on_close(
             assert sentry_sdk.traces.get_current_span() == original_sentry_span
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert len(spans) == 3
 
         # Ensure the span metadata is wired up for all spans
@@ -530,7 +530,7 @@ def test_on_event_ignored(
             rust_tracing.close_span(3)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert spans[1]["is_segment"] is True
     else:
         events = capture_events()
@@ -598,7 +598,7 @@ def test_span_filter(
             assert sentry_sdk.traces.get_current_span() == original_sentry_span
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert len(spans) == 2
         # The ignored span has index == 9
         assert spans[0]["attributes"]["index"] == 10

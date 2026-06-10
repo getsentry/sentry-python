@@ -421,7 +421,7 @@ def test_langchain_chat_with_run_name(
             )
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         chat_spans = list(
             x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.chat"
         )
@@ -482,7 +482,7 @@ def test_langchain_tool_call_with_run_name(
             )
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         tool_spans = list(
             x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.execute_tool"
         )
@@ -2863,7 +2863,7 @@ def test_langchain_message_role_mapping(
             list(agent_executor.stream({"input": test_input}))
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         # Find spans with gen_ai operation that should have message data
         gen_ai_spans = [
             span
@@ -3145,7 +3145,7 @@ def test_langchain_embeddings_sync(
             mock_embed_documents.assert_called_once()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         # Find embeddings span
         embeddings_spans = [
             span
@@ -3294,7 +3294,7 @@ def test_langchain_embeddings_embed_query(
             mock_embed_query.assert_called_once()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         # Find embeddings span
         embeddings_spans = [
             span
@@ -3441,7 +3441,7 @@ async def test_langchain_embeddings_async(
             mock_aembed.assert_called_once()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         # Find embeddings span
         embeddings_spans = [
             span
@@ -3592,7 +3592,7 @@ async def test_langchain_embeddings_aembed_query(
             mock_aembed.assert_called_once()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         # Find embeddings span
         embeddings_spans = [
             span
@@ -3706,7 +3706,7 @@ def test_langchain_embeddings_no_model_name(
                 embeddings.embed_documents(["Test"])
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         # Find embeddings span
         embeddings_spans = [
             span
@@ -3806,7 +3806,7 @@ def test_langchain_embeddings_integration_disabled(
 
         # Check that no embeddings spans were created
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         embeddings_spans = [
             span
             for span in spans
@@ -3893,7 +3893,7 @@ def test_langchain_embeddings_multiple_providers(
                 azure_embeddings.embed_documents(["Azure test"])
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         # Find embeddings spans
         embeddings_spans = [
             span
@@ -4049,7 +4049,7 @@ def test_langchain_embeddings_multiple_calls(
                 embeddings.embed_documents(["Third batch"])
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         # Find embeddings spans - should have 3 (2 embed_documents + 1 embed_query)
         embeddings_spans = [
             span
@@ -4335,7 +4335,7 @@ def test_langchain_embeddings_with_list_and_string_inputs(
                 embeddings.embed_query("Single string query")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         # Find embeddings spans
         embeddings_spans = [
             span
@@ -4460,7 +4460,7 @@ def test_langchain_response_model_extraction(
             callback.on_llm_end(response=response, run_id=run_id)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         llm_spans = [
             span
             for span in spans
@@ -4814,7 +4814,7 @@ def test_langchain_ai_system_detection(
             callback.on_llm_end(response=response, run_id=run_id)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         llm_spans = [
             span
             for span in spans

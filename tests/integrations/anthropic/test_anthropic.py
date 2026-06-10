@@ -5074,7 +5074,7 @@ def test_system_prompt_with_complex_structure(
         assert response == EXAMPLE_MESSAGE
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert len(spans) == 1
         (span,) = spans
 
@@ -5426,7 +5426,7 @@ def test_message_with_url_image(
             client.messages.create(max_tokens=1024, messages=messages, model="model")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         (span,) = spans
 
         stored_messages = json.loads(
@@ -5498,7 +5498,7 @@ def test_message_with_file_image(
             client.messages.create(max_tokens=1024, messages=messages, model="model")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         (span,) = spans
 
         stored_messages = json.loads(
@@ -5614,7 +5614,7 @@ def test_message_with_url_pdf(
             client.messages.create(max_tokens=1024, messages=messages, model="model")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         (span,) = spans
 
         stored_messages = json.loads(
@@ -5686,7 +5686,7 @@ def test_message_with_file_document(
             client.messages.create(max_tokens=1024, messages=messages, model="model")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         (span,) = spans
 
         stored_messages = json.loads(
@@ -5916,7 +5916,7 @@ def test_binary_content_not_stored_when_pii_disabled(
             client.messages.create(max_tokens=1024, messages=messages, model="model")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         (span,) = spans
 
         # Messages should not be stored
@@ -5980,7 +5980,7 @@ def test_binary_content_not_stored_when_prompts_disabled(
             client.messages.create(max_tokens=1024, messages=messages, model="model")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         (span,) = spans
 
         # Messages should not be stored
@@ -6213,7 +6213,7 @@ def test_input_tokens_include_cache_read_nonstreaming(
             )
 
         sentry_sdk.flush()
-        (span,) = [item.payload for item in items if item.type == "span"]
+        (span,) = [item.payload for item in items]
 
         # input_tokens should be total: 19 (non-cached) + 2846 (cache_read) = 2865
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
