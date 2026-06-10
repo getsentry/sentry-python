@@ -365,7 +365,7 @@ def test_subprocess_span_origin(
             popen.poll()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert spans[3]["attributes"]["sentry.origin"] == "manual"
 

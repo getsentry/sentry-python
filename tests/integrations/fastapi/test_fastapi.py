@@ -1,5 +1,7 @@
+import base64
 import json
 import logging
+import os
 import threading
 import warnings
 from unittest import mock
@@ -7,12 +9,13 @@ from unittest import mock
 import fastapi
 import pytest
 import starlette
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Body, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.testclient import TestClient
 
 import sentry_sdk
 from sentry_sdk import capture_message
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.feature_flags import add_feature_flag
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.fastapi import FastApiIntegration
@@ -21,6 +24,28 @@ from sentry_sdk.utils import parse_version
 
 FASTAPI_VERSION = parse_version(fastapi.__version__)
 STARLETTE_VERSION = parse_version(starlette.__version__)
+
+PICTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "photo.jpg")
+
+BODY_JSON = {"some": "json", "for": "testing", "nested": {"numbers": 123}}
+
+BODY_FORM = """--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="username"\r\n\r\nJane\r\n--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="password"\r\n\r\nhello123\r\n--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="photo"; filename="photo.jpg"\r\nContent-Type: image/jpg\r\nContent-Transfer-Encoding: base64\r\n\r\n{{image_data}}\r\n--fd721ef49ea403a6--\r\n""".replace(
+    "{{image_data}}", str(base64.b64encode(open(PICTURE, "rb").read()))
+)
+
+PARSED_FORM = starlette.datastructures.FormData(
+    [
+        ("username", "Jane"),
+        ("password", "hello123"),
+        (
+            "photo",
+            starlette.datastructures.UploadFile(
+                filename="photo.jpg",
+                file=open(PICTURE, "rb"),
+            ),
+        ),
+    ]
+)
 
 from tests.integrations.conftest import parametrize_test_configurable_status_codes
 from tests.integrations.starlette import test_starlette
@@ -70,7 +95,250 @@ def fastapi_app_factory():
             "active": str(threading.current_thread().ident),
         }
 
+    @app.post("/body/json")
+    async def body_json(payload: dict = Body(...)):
+        capture_message("hi")
+        return {"status": "ok"}
+
+    @app.post("/body/form")
+    async def body_form(
+        username: str = Form(...),
+        password: str = Form(...),
+        photo: UploadFile = File(...),
+    ):
+        capture_message("hi")
+        return {"status": "ok"}
+
     return app
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_request_info_json_body(
+    sentry_init, capture_events, capture_items, span_streaming
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        integrations=[StarletteIntegration()],
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
+
+    app = fastapi_app_factory()
+    client = TestClient(app)
+
+    if span_streaming:
+        items = capture_items("event", "span")
+
+        client.post(
+            "/body/json",
+            json=BODY_JSON,
+            headers={
+                "cookie": "yummy_cookie=choco; tasty_cookie=strawberry",
+            },
+        )
+
+        (event,) = (item.payload for item in items if item.type == "event")
+        assert event["request"]["cookies"] == {
+            "tasty_cookie": "strawberry",
+            "yummy_cookie": "choco",
+        }
+        assert event["request"]["data"] == BODY_JSON
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        server_span = next(
+            span for span in spans if span["attributes"]["sentry.op"] == "http.server"
+        )
+
+        assert json.loads(
+            server_span["attributes"][SPANDATA.HTTP_REQUEST_BODY_DATA]
+        ) == {"some": "json", "for": "testing", "nested": {"numbers": 123}}
+    else:
+        events = capture_events()
+
+        client.post(
+            "/body/json",
+            json=BODY_JSON,
+            headers={
+                "cookie": "yummy_cookie=choco; tasty_cookie=strawberry",
+            },
+        )
+
+        (event, transaction_event) = events
+
+        assert event["request"]["cookies"] == {
+            "tasty_cookie": "strawberry",
+            "yummy_cookie": "choco",
+        }
+        assert event["request"]["data"] == BODY_JSON
+
+        assert transaction_event["request"]["cookies"] == {
+            "tasty_cookie": "strawberry",
+            "yummy_cookie": "choco",
+        }
+        assert transaction_event["request"]["data"] == BODY_JSON
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_formdata_request_body(
+    sentry_init, capture_events, capture_items, span_streaming
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        max_request_body_size="always",
+        integrations=[StarletteIntegration()],
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
+
+    app = fastapi_app_factory()
+    client = TestClient(app)
+
+    if span_streaming:
+        items = capture_items("event", "span")
+
+        client.post(
+            "/body/form",
+            data=BODY_FORM.encode("utf-8"),
+            headers={
+                "content-type": "multipart/form-data; boundary=fd721ef49ea403a6",
+            },
+        )
+
+        (event,) = (item.payload for item in items if item.type == "event")
+        assert event["request"]["data"].keys() == PARSED_FORM.keys()
+        assert event["request"]["data"]["username"] == PARSED_FORM["username"]
+        assert event["request"]["data"]["password"] == "[Filtered]"
+        assert event["request"]["data"]["photo"] == ""
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        server_span = next(
+            span for span in spans if span["attributes"]["sentry.op"] == "http.server"
+        )
+
+        # Going forward, the sanitization of data will need to happen within the `before_send_span` hooks
+        # See https://sentry.slack.com/archives/C09RR0KD2N7/p1776951331206129?thread_ts=1776951227.440659&cid=C09RR0KD2N7
+        parsed_form_attribute = json.loads(
+            server_span["attributes"][SPANDATA.HTTP_REQUEST_BODY_DATA]
+        )
+        assert parsed_form_attribute.keys() == PARSED_FORM.keys()
+        assert parsed_form_attribute["username"] == PARSED_FORM["username"]
+        assert parsed_form_attribute["password"] == "hello123"
+        assert parsed_form_attribute["photo"] == "[Unparsable]"
+    else:
+        events = capture_events()
+
+        client.post(
+            "/body/form",
+            data=BODY_FORM.encode("utf-8"),
+            headers={
+                "content-type": "multipart/form-data; boundary=fd721ef49ea403a6",
+            },
+        )
+
+        (event, transaction_event) = events
+        assert event["request"]["data"].keys() == PARSED_FORM.keys()
+        assert event["request"]["data"]["username"] == PARSED_FORM["username"]
+        assert event["request"]["data"]["password"] == "[Filtered]"
+        assert event["request"]["data"]["photo"] == ""
+        assert event["_meta"]["request"]["data"]["photo"] == {
+            "": {"rem": [["!raw", "x"]]}
+        }
+
+        assert transaction_event["request"]["data"].keys() == PARSED_FORM.keys()
+        assert (
+            transaction_event["request"]["data"]["username"] == PARSED_FORM["username"]
+        )
+        assert transaction_event["request"]["data"]["password"] == "[Filtered]"
+        assert transaction_event["request"]["data"]["photo"] == ""
+        assert transaction_event["_meta"]["request"]["data"]["photo"] == {
+            "": {"rem": [["!raw", "x"]]}
+        }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_request_body_too_big(
+    sentry_init, capture_events, capture_items, span_streaming
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        integrations=[StarletteIntegration()],
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
+
+    app = fastapi_app_factory()
+    client = TestClient(app)
+
+    if span_streaming:
+        items = capture_items("event", "span")
+
+        client.post(
+            "/body/form",
+            data=BODY_FORM.encode("utf-8"),
+            headers={
+                "content-type": "multipart/form-data; boundary=fd721ef49ea403a6",
+                "cookie": "yummy_cookie=choco; tasty_cookie=strawberry",
+            },
+        )
+
+        (event,) = (item.payload for item in items if item.type == "event")
+        assert event["request"]["cookies"] == {
+            "tasty_cookie": "strawberry",
+            "yummy_cookie": "choco",
+        }
+        # Because request is too big only the AnnotatedValue is extracted.
+        assert event["_meta"]["request"]["data"] == {"": {"rem": [["!config", "x"]]}}
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        server_span = next(
+            span for span in spans if span["attributes"]["sentry.op"] == "http.server"
+        )
+
+        # Because request is too big only the AnnotatedValue is extracted.
+        assert (
+            server_span["attributes"][SPANDATA.HTTP_REQUEST_BODY_DATA]
+            == "[Exceeds maximum size]"
+        )
+    else:
+        events = capture_events()
+
+        client.post(
+            "/body/form",
+            data=BODY_FORM.encode("utf-8"),
+            headers={
+                "content-type": "multipart/form-data; boundary=fd721ef49ea403a6",
+                "cookie": "yummy_cookie=choco; tasty_cookie=strawberry",
+            },
+        )
+
+        (event, transaction_event) = events
+        assert event["request"]["cookies"] == {
+            "tasty_cookie": "strawberry",
+            "yummy_cookie": "choco",
+        }
+        # Because request is too big only the AnnotatedValue is extracted.
+        assert event["_meta"]["request"]["data"] == {"": {"rem": [["!config", "x"]]}}
+
+        assert transaction_event["request"]["cookies"] == {
+            "tasty_cookie": "strawberry",
+            "yummy_cookie": "choco",
+        }
+        # Because request is too big only the AnnotatedValue is extracted.
+        assert transaction_event["_meta"]["request"]["data"] == {
+            "": {"rem": [["!config", "x"]]}
+        }
 
 
 @pytest.mark.asyncio
@@ -244,142 +512,6 @@ def test_active_thread_id_span_streaming(sentry_init, capture_items, endpoint):
     segments = [item.payload for item in items if item.payload.get("is_segment")]
     assert len(segments) == 1
     assert str(data["active"]) == segments[0]["attributes"]["thread.id"]
-
-
-def _post_body_fastapi_app(handler_awaitable):
-    app = FastAPI()
-
-    @app.post("/body")
-    async def _route(request: Request):
-        await handler_awaitable(request)
-        return {"ok": True}
-
-    return app
-
-
-@pytest.mark.parametrize("middleware_spans", [False, True])
-def test_request_body_data_does_not_scrub_pii_span_streaming(
-    sentry_init, capture_items, middleware_spans
-):
-    sentry_init(
-        auto_enabling_integrations=False,
-        integrations=[
-            StarletteIntegration(middleware_spans=middleware_spans),
-            FastApiIntegration(middleware_spans=middleware_spans),
-        ],
-        traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    async def _read_json(request):
-        await request.json()
-
-    items = capture_items("span")
-
-    client = TestClient(_post_body_fastapi_app(_read_json))
-    response = client.post(
-        "/body",
-        json={
-            "password": "ohno",
-            "authorization": "Bearer token",
-            "message": "hello",
-        },
-    )
-    assert response.status_code == 200
-
-    sentry_sdk.flush()
-
-    segments = [item.payload for item in items if item.payload.get("is_segment")]
-    assert len(segments) == 1
-    attr = segments[0]["attributes"]["http.request.body.data"]
-
-    # Going forward, the sanitization of data will need to happen within the `before_send_span` hooks
-    # See https://sentry.slack.com/archives/C09RR0KD2N7/p1776951331206129?thread_ts=1776951227.440659&cid=C09RR0KD2N7
-    assert "ohno" in attr
-    assert "Bearer token" in attr
-    assert "hello" in attr
-
-
-@pytest.mark.skipif(
-    STARLETTE_VERSION < (0, 21),
-    reason="Requires Starlette >= 0.21, because earlier versions use a requests-based TestClient which does not support the 'content' kwarg",
-)
-@pytest.mark.parametrize("middleware_spans", [False, True])
-def test_request_body_data_annotated_value_top_level_span_streaming(
-    sentry_init, capture_items, middleware_spans
-):
-    sentry_init(
-        auto_enabling_integrations=False,
-        integrations=[
-            StarletteIntegration(middleware_spans=middleware_spans),
-            FastApiIntegration(middleware_spans=middleware_spans),
-        ],
-        traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    async def _read_body(request):
-        await request.body()
-
-    items = capture_items("span")
-
-    client = TestClient(_post_body_fastapi_app(_read_body))
-    response = client.post(
-        "/body",
-        content=b"not json and not form",
-        headers={"content-type": "application/octet-stream"},
-    )
-    assert response.status_code == 200
-
-    sentry_sdk.flush()
-
-    segments = [item.payload for item in items if item.payload.get("is_segment")]
-    assert len(segments) == 1
-    attr = segments[0]["attributes"]["http.request.body.data"]
-
-    assert isinstance(attr, str)
-    assert attr == '""'
-
-
-@pytest.mark.parametrize("middleware_spans", [False, True])
-def test_request_body_data_annotated_value_nested_span_streaming(
-    sentry_init, capture_items, middleware_spans
-):
-    pytest.importorskip("multipart")
-
-    sentry_init(
-        auto_enabling_integrations=False,
-        integrations=[
-            StarletteIntegration(middleware_spans=middleware_spans),
-            FastApiIntegration(middleware_spans=middleware_spans),
-        ],
-        traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    async def _read_form(request):
-        await request.form()
-
-    items = capture_items("span")
-
-    client = TestClient(_post_body_fastapi_app(_read_form))
-    response = client.post(
-        "/body",
-        data={"name": "erica"},
-        files={"avatar": ("photo.jpg", b"fake-bytes", "image/jpeg")},
-    )
-    assert response.status_code == 200
-
-    sentry_sdk.flush()
-
-    segments = [item.payload for item in items if item.payload.get("is_segment")]
-    assert len(segments) == 1
-    attr = segments[0]["attributes"]["http.request.body.data"]
-
-    assert isinstance(attr, str)
-    parsed = json.loads(attr)
-    assert parsed["name"] == "erica"
-    assert "fake-bytes" not in attr
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])

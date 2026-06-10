@@ -170,7 +170,7 @@ def test_state_graph_compile(
         return MockCompiledGraph(self.name)
 
     if stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with patch("sentry_sdk.integrations.langgraph.StateGraph"), start_transaction():
             wrapped_compile = _wrap_state_graph_compile(original_compile)
@@ -181,7 +181,7 @@ def test_state_graph_compile(
         assert compiled_graph is not None
         assert compiled_graph.name == "test_graph"
 
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         agent_spans = [
             span
             for span in spans
@@ -299,7 +299,7 @@ def test_pregel_invoke(
         return {"messages": new_messages}
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction():
             wrapped_invoke = _wrap_pregel_invoke(original_invoke)
@@ -308,7 +308,7 @@ def test_pregel_invoke(
         assert result is not None
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -485,13 +485,13 @@ def test_pregel_ainvoke(
             return result
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         result = asyncio.run(run_test())
         assert result is not None
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -610,7 +610,7 @@ def test_pregel_invoke_error(
         raise Exception("Graph execution failed")
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction(), pytest.raises(
             Exception, match="Graph execution failed"
@@ -619,7 +619,7 @@ def test_pregel_invoke_error(
             wrapped_invoke(pregel, test_state)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -681,12 +681,12 @@ def test_pregel_ainvoke_error(
             await wrapped_ainvoke(pregel, test_state)
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         asyncio.run(run_error_test())
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -792,14 +792,14 @@ def test_pregel_invoke_with_different_graph_names(
         return {"result": "test"}
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction():
             wrapped_invoke = _wrap_pregel_invoke(original_invoke)
             wrapped_invoke(pregel, {"messages": []})
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -904,7 +904,7 @@ def test_pregel_invoke_span_includes_usage_data(
         return {"messages": new_messages}
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction():
             wrapped_invoke = _wrap_pregel_invoke(original_invoke)
@@ -913,7 +913,7 @@ def test_pregel_invoke_span_includes_usage_data(
         assert result is not None
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -1028,13 +1028,13 @@ def test_pregel_ainvoke_span_includes_usage_data(
             return result
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         result = asyncio.run(run_test())
         assert result is not None
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -1151,7 +1151,7 @@ def test_pregel_invoke_multiple_llm_calls_aggregate_usage(
         return {"messages": new_messages}
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction():
             wrapped_invoke = _wrap_pregel_invoke(original_invoke)
@@ -1160,7 +1160,7 @@ def test_pregel_invoke_multiple_llm_calls_aggregate_usage(
         assert result is not None
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -1274,13 +1274,13 @@ def test_pregel_ainvoke_multiple_llm_calls_aggregate_usage(
             return result
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         result = asyncio.run(run_test())
         assert result is not None
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -1374,7 +1374,7 @@ def test_pregel_invoke_span_includes_response_model(
         return {"messages": new_messages}
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction():
             wrapped_invoke = _wrap_pregel_invoke(original_invoke)
@@ -1383,7 +1383,7 @@ def test_pregel_invoke_span_includes_response_model(
         assert result is not None
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -1491,13 +1491,13 @@ def test_pregel_ainvoke_span_includes_response_model(
             return result
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         result = asyncio.run(run_test())
         assert result is not None
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -1609,7 +1609,7 @@ def test_pregel_invoke_span_uses_last_response_model(
         return {"messages": new_messages}
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction():
             wrapped_invoke = _wrap_pregel_invoke(original_invoke)
@@ -1618,7 +1618,7 @@ def test_pregel_invoke_span_uses_last_response_model(
         assert result is not None
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -1737,13 +1737,13 @@ def test_pregel_ainvoke_span_uses_last_response_model(
             return result
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         result = asyncio.run(run_test())
         assert result is not None
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -1881,7 +1881,7 @@ def test_extraction_functions_complex_scenario(
         return {"messages": new_messages}
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction():
             wrapped_invoke = _wrap_pregel_invoke(original_invoke)
@@ -1890,7 +1890,7 @@ def test_extraction_functions_complex_scenario(
         assert result is not None
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -1980,7 +1980,7 @@ def test_langgraph_message_role_mapping(
     pregel = MockPregelInstance(compiled_graph)
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction(name="langgraph tx"):
             # Use the wrapped invoke function directly

@@ -119,7 +119,7 @@ def test_cache_spans_disabled_middleware(
         client.get(reverse("not_cached_view"))
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert len(spans) == 2
     else:
         events = capture_events()
@@ -162,7 +162,7 @@ def test_cache_spans_disabled_decorator(
         client.get(reverse("cached_view"))
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert len(spans) == 2
     else:
         events = capture_events()
@@ -205,7 +205,7 @@ def test_cache_spans_disabled_templatetag(
         client.get(reverse("view_with_cached_template_fragment"))
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert len(spans) == 2
     else:
         events = capture_events()
@@ -250,7 +250,7 @@ def test_cache_spans_middleware(
         client.get(reverse("not_cached_view"))
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         # first_event - cache.get
         assert spans[0]["attributes"]["sentry.op"] == "cache.get"
         assert spans[0]["name"].startswith("views.decorators.cache.cache_header.")
@@ -370,7 +370,7 @@ def test_cache_spans_decorator(
         client.get(reverse("cached_view"))
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         # first_event - cache.get
         assert spans[0]["attributes"]["sentry.op"] == "cache.get"
         assert spans[0]["name"].startswith("views.decorators.cache.cache_header.")
@@ -470,7 +470,7 @@ def test_cache_spans_templatetag(
         client.get(reverse("view_with_cached_template_fragment"))
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert len(spans) == 5
         # first_event - cache.get
         assert spans[0]["attributes"]["sentry.op"] == "cache.get"
@@ -607,7 +607,7 @@ def test_cache_spans_location_with_port(
         client.get(reverse("cached_view"))
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         for span in spans:
             if span["is_segment"] is True:
@@ -660,7 +660,7 @@ def test_cache_spans_location_without_port(
         client.get(reverse("cached_view"))
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         for span in spans:
             if span["is_segment"] is True:
@@ -709,7 +709,7 @@ def test_cache_spans_location_with_cluster(
         client.get(reverse("cached_view"))
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         for span in spans:
             # because it is a cluster we do not know what host is actually accessed, so we omit the data
@@ -757,7 +757,7 @@ def test_cache_spans_item_size(
         client.get(reverse("cached_view"))
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert len(spans) == 7
         assert spans[0]["attributes"]["sentry.op"] == "cache.get"
         assert not spans[0]["attributes"]["cache.hit"]
@@ -851,7 +851,7 @@ def test_cache_spans_get_custom_default(
             cache.get(f"S{id + 2}", default="null")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert len(spans) == 9
 
         assert spans[0]["attributes"]["sentry.op"] == "cache.put"
@@ -956,7 +956,7 @@ def test_cache_spans_get_many(
             cache.get_many([f"S{id}", f"S{id + 1}"])
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert len(spans) == 8
 
         assert spans[2]["attributes"]["sentry.op"] == "cache.get"
@@ -1058,7 +1058,7 @@ def test_cache_spans_set_many(
             cache.get(f"S{id}")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert len(spans) == 5
 
         assert spans[2]["attributes"]["sentry.op"] == "cache.put"
@@ -1125,7 +1125,7 @@ def test_span_origin_cache(
         client.get(reverse("cached_view"))
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert spans[1]["attributes"]["sentry.origin"] == "auto.http.django"
 
