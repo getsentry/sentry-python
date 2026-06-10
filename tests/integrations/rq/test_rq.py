@@ -291,7 +291,7 @@ def test_tracing_enabled(
     worker = rq.SimpleWorker([queue], connection=queue.connection)
 
     if span_streaming:
-        items = capture_items("span")
+        items = capture_items("event", "span")
 
         with sentry_sdk.traces.start_span(
             name="custom parent",
@@ -302,7 +302,7 @@ def test_tracing_enabled(
             queue.enqueue(crashing_job, foo=None)
             worker.work(burst=True)
 
-        (error_event,) = (item.payload for item in items)
+        (error_event,) = (item.payload for item in items if item.type == "event")
 
         assert error_event["contexts"]["trace"]["trace_id"] == span.trace_id
 
