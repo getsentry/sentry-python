@@ -238,9 +238,27 @@ def patch_http_route_handle() -> None:
 
         request_data = await body
 
-        def event_processor(event: "Event", _: "Hint") -> "Event":
-            route_handler = scope.get("route_handler")
+        route_handler = scope.get("route_handler")
 
+        func = None
+        if route_handler.name is not None:
+            name = route_handler.name
+        elif isinstance(route_handler.fn, Ref):
+            func = route_handler.fn.value
+        else:
+            func = route_handler.fn
+        if func is not None:
+            name = transaction_from_function(func)
+
+        source = SOURCE_FOR_STYLE["endpoint"]
+
+        if not name:
+            name = _DEFAULT_TRANSACTION_NAME
+            source = TransactionSource.ROUTE
+
+        sentry_sdk.get_current_scope().set_transaction_name(name, source)
+
+        def event_processor(event: "Event", _: "Hint") -> "Event":
             request_info = event.get("request", {})
             request_info["content_length"] = len(scope.get("_body", b""))
             if should_send_default_pii():
@@ -248,29 +266,7 @@ def patch_http_route_handle() -> None:
             if request_data is not None:
                 request_info["data"] = request_data
 
-            func = None
-            if route_handler.name is not None:
-                tx_name = route_handler.name
-            elif isinstance(route_handler.fn, Ref):
-                func = route_handler.fn.value
-            else:
-                func = route_handler.fn
-            if func is not None:
-                tx_name = transaction_from_function(func)
-
-            tx_info = {"source": SOURCE_FOR_STYLE["endpoint"]}
-
-            if not tx_name:
-                tx_name = _DEFAULT_TRANSACTION_NAME
-                tx_info = {"source": TransactionSource.ROUTE}
-
-            event.update(
-                {
-                    "request": deepcopy(request_info),
-                    "transaction": tx_name,
-                    "transaction_info": tx_info,
-                }
-            )
+            event["request"] = deepcopy(request_info)
             return event
 
         sentry_scope._name = StarliteIntegration.identifier
