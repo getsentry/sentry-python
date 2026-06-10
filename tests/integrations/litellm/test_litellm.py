@@ -1538,7 +1538,7 @@ def test_span_origin(
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
     if span_streaming:
-        items = capture_items("span", "transaction")
+        items = capture_items("span")
 
         with mock.patch.object(
             client.completions._client._client,
@@ -1645,7 +1645,7 @@ def test_multiple_providers(
     )
 
     if span_streaming:
-        items = capture_items("span", "transaction")
+        items = capture_items("span")
 
         with mock.patch.object(
             openai_client.completions._client._client,
