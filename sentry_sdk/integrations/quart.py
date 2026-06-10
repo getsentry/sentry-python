@@ -2,7 +2,7 @@ import asyncio
 import inspect
 import sys
 from functools import wraps
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration
@@ -278,7 +278,7 @@ async def _capture_exception(
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _get_current_user_id_from_quart() -> str | None:
+def _get_current_user_id_from_quart() -> "str | None":
     if quart_auth is None:
         return None
 
