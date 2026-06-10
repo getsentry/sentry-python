@@ -218,6 +218,7 @@ class SentryServerForTesting:
 
     def __init__(self, host="0.0.0.0", port=9999, log_level="warning"):
         self.envelopes = []
+        self.span_items = []
         self.host = host
         self.port = port
         self.log_level = log_level
@@ -246,13 +247,22 @@ class SentryServerForTesting:
                     current_line += 1
                     continue
 
-                # skip envelope item header
+                # parse envelope item header
+                item_header = json.loads(lines[current_line])
                 current_line += 1
 
-                # add envelope item to store
-                envelope_item = lines[current_line]
-                if envelope_item.strip():
-                    self.envelopes.append(json.loads(envelope_item))
+                # parse envelope item payload
+                if current_line < len(lines) and lines[current_line].strip():
+                    parsed_item = json.loads(lines[current_line])
+                    if item_header.get("type") == "span":
+                        if "items" in parsed_item:
+                            self.span_items.extend(parsed_item["items"])
+                        else:
+                            self.span_items.append(parsed_item)
+                    else:
+                        self.envelopes.append(parsed_item)
+
+                current_line += 1
 
             return {"status": "ok"}
 
@@ -269,3 +279,4 @@ class SentryServerForTesting:
     def clear_envelopes(self):
         print("[SentryServerForTesting] Clearing envelopes")
         self.envelopes = []
+        self.span_items = []
