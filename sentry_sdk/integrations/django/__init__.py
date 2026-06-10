@@ -463,9 +463,8 @@ def _after_get_response(request: "WSGIRequest") -> None:
     if integration is None:
         return
 
-    scope = sentry_sdk.get_current_scope()
-
     if integration.transaction_style == "url":
+        scope = sentry_sdk.get_current_scope()
         _attempt_resolve_again(request, scope, integration.transaction_style)
 
     span_streaming = has_span_streaming_enabled(client.options)
@@ -499,7 +498,7 @@ def _after_get_response(request: "WSGIRequest") -> None:
         except Exception:
             pass
 
-        scope.set_user(user_info)
+        sentry_sdk.set_user(user_info)
 
 
 def _patch_get_response() -> None:
