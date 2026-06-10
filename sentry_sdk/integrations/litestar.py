@@ -304,7 +304,7 @@ def patch_http_route_handle() -> None:
 
         if not name:
             name = _DEFAULT_TRANSACTION_NAME
-            source = TransactionSource.ROUTE.value
+            source = TransactionSource.ROUTE
 
         sentry_sdk.set_transaction_name(name, source)
         sentry_scope.set_transaction_name(name, source)
