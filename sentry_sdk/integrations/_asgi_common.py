@@ -126,9 +126,11 @@ def _get_request_attributes(asgi_scope: "Any") -> "dict[str, Any]":
             if query:
                 attributes["http.query"] = query
 
-            attributes["url.full"] = _get_url(
+            url_without_query_string = _get_url(
                 asgi_scope, "http" if ty == "http" else "ws", headers.get("host")
             )
+            query_string = _get_query(asgi_scope)
+            attributes["url.full"] = f"{url_without_query_string}?{query_string}"
 
     client = asgi_scope.get("client")
     if client and should_send_default_pii():

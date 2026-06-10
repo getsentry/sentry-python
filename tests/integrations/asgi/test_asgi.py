@@ -217,7 +217,10 @@ async def test_capture_transaction(
         )
 
         if should_send_pii:
-            assert span["attributes"]["url.full"] == "http://localhost/some_url"
+            assert (
+                span["attributes"]["url.full"]
+                == "http://localhost/some_url?somevalue=123"
+            )
             assert span["attributes"]["http.query"] == "somevalue=123"
 
     else:
