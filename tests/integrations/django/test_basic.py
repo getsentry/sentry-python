@@ -840,7 +840,7 @@ def test_response_trace(
         assert status == "200 OK"
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert (
             '- sentry.op="view.response.render": name="serialize response"'
@@ -1055,7 +1055,7 @@ def test_django_connect_trace(
         assert status == "200 OK"
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         for span in spans:
             if span["attributes"].get("sentry.op") == "db":
@@ -1171,7 +1171,7 @@ def test_db_connection_span_data(
         assert status == "200 OK"
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         for span in spans:
             if span["attributes"].get("sentry.op") == "db":
@@ -1481,7 +1481,7 @@ def test_template_tracing_meta(
         content, _, _ = unpack_werkzeug_response(client.get(reverse("template_test3")))
         rendered_meta = content.decode("utf-8")
 
-        events = [item.payload for item in items if item.type == "event"]
+        events = [item.payload for item in items]
     else:
         events = capture_events()
 
@@ -1710,7 +1710,7 @@ def test_render_spans(
             items = capture_items("span")
             client.get(url)
             sentry_sdk.flush()
-            spans = [item.payload for item in items if item.type == "span"]
+            spans = [item.payload for item in items]
             assert expected_line in render_span_tree(spans)
     else:
         views_tests = [
@@ -2033,7 +2033,7 @@ def test_signals_spans_filtering(
         client.get(reverse("send_myapp_custom_signal"))
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert (
             render_span_tree(spans)
             == """\
@@ -2275,7 +2275,7 @@ def test_span_origin(
         client.get(reverse("view_with_signal"))
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert spans[-1]["attributes"]["sentry.origin"] == "auto.http.django"
 
@@ -2324,7 +2324,7 @@ def test_transaction_http_method_default(
         client.head("/nomessage")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert spans[2]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "GET"
     else:
@@ -2368,7 +2368,7 @@ def test_transaction_http_method_custom(
         client.head("/nomessage")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert spans[4]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "OPTIONS"
         assert spans[7]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "HEAD"

@@ -543,7 +543,7 @@ def test_tool_execution(
         assert result == "The weather in San Francisco is sunny"
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert len(spans) == 1
         sentry_sdk.flush()
         tool_span = next(item.payload for item in items if item.type == "span")
@@ -743,7 +743,7 @@ def test_streaming_generate_content(
         )
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert len(spans) == 1
         sentry_sdk.flush()
         chat_span = next(item.payload for item in items if item.type == "span")
@@ -1207,7 +1207,7 @@ def test_empty_response(
 
         # Should still create spans even with empty candidates
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert len(spans) == 1
     else:
         events = capture_events()
@@ -1746,7 +1746,7 @@ def test_embed_content_string_input(
             )
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         (embed_span,) = spans
 
         # Check that single string is handled correctly
@@ -1886,7 +1886,7 @@ def test_embed_content_without_statistics(
             )
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         (embed_span,) = spans
 
         # No usage tokens since there are no statistics in older versions
@@ -2153,7 +2153,7 @@ async def test_async_embed_content_string_input(
             )
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         (embed_span,) = spans
 
         # Check that single string is handled correctly
@@ -2299,7 +2299,7 @@ async def test_async_embed_content_without_statistics(
             )
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         (embed_span,) = spans
 
         # No usage tokens since there are no statistics in older versions

@@ -72,7 +72,7 @@ def test_task_span_is_created(
             simple_task.enqueue()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         queue_submit_spans = [
             span
@@ -151,7 +151,7 @@ def test_task_enqueue_with_kwargs(
         assert result.return_value == "Hi, World!"
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         queue_submit_spans = [
             span
@@ -210,7 +210,7 @@ def test_task_error_reporting(
             _ = result.return_value
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         queue_submit_spans = [
             span
@@ -276,7 +276,7 @@ def test_multiple_task_enqueues_create_multiple_spans(
             task_one.enqueue()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         queue_submit_spans = [
             span

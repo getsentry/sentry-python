@@ -235,7 +235,7 @@ async def test_active_thread_id(
         data = json.loads(response["body"])
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         for span in spans:
             if span["is_segment"] is False:
@@ -393,7 +393,7 @@ async def test_async_middleware_spans(
         assert response["status"] == 200
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         # Filter out signal-receiver spans — their ordering depends on Django
         # module import order and is not what this middleware test verifies.
@@ -911,7 +911,7 @@ async def test_async_view(
         await comm.wait()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert spans[5]["name"] == "/simple_async_view"
     else:
         events = capture_events()
@@ -961,7 +961,7 @@ async def test_transaction_http_method_default(
         await comm.wait()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert spans[5]["attributes"]["http.request.method"] == "GET"
     else:
         events = capture_events()
@@ -1025,7 +1025,7 @@ async def test_transaction_http_method_custom(
         await comm.wait()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert spans[10]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "OPTIONS"
         assert spans[16]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "HEAD"

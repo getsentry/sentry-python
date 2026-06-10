@@ -519,7 +519,7 @@ def test_streaming_chat_completion(
             streaming_handler.executor.shutdown(wait=True)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         chat_spans = list(
             x
             for x in spans
@@ -638,7 +638,7 @@ async def test_async_streaming_chat_completion(
             await asyncio.sleep(0.5)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         chat_spans = list(
             x
             for x in spans
@@ -741,7 +741,7 @@ def test_embeddings_create(
             # Response is processed by litellm, so just check it exists
             assert response is not None
             sentry_sdk.flush()
-            spans = [item.payload for item in items if item.type == "span"]
+            spans = [item.payload for item in items]
             spans = list(
                 x
                 for x in spans
@@ -863,7 +863,7 @@ async def test_async_embeddings_create(
             # Response is processed by litellm, so just check it exists
             assert response is not None
             sentry_sdk.flush()
-            spans = [item.payload for item in items if item.type == "span"]
+            spans = [item.payload for item in items]
             spans = list(
                 x
                 for x in spans
@@ -980,7 +980,7 @@ def test_embeddings_create_with_list_input(
             assert response is not None
 
             sentry_sdk.flush()
-            spans = [item.payload for item in items if item.type == "span"]
+            spans = [item.payload for item in items]
             spans = list(
                 x
                 for x in spans
@@ -1094,7 +1094,7 @@ async def test_async_embeddings_create_with_list_input(
             # Response is processed by litellm, so just check it exists
             assert response is not None
             sentry_sdk.flush()
-            spans = [item.payload for item in items if item.type == "span"]
+            spans = [item.payload for item in items]
             spans = list(
                 x
                 for x in spans
@@ -1207,7 +1207,7 @@ def test_embeddings_no_pii(
             # Response is processed by litellm, so just check it exists
             assert response is not None
             sentry_sdk.flush()
-            spans = [item.payload for item in items if item.type == "span"]
+            spans = [item.payload for item in items]
             spans = list(
                 x
                 for x in spans
@@ -1308,7 +1308,7 @@ async def test_async_embeddings_no_pii(
             # Response is processed by litellm, so just check it exists
             assert response is not None
             sentry_sdk.flush()
-            spans = [item.payload for item in items if item.type == "span"]
+            spans = [item.payload for item in items]
             spans = list(
                 x
                 for x in spans
@@ -1400,11 +1400,7 @@ def test_exception_handling(
             )
 
         # Find the error event
-        error_events = [
-            item.payload
-            for item in items
-            if item.type == "event" and item.payload.get("level") == "error"
-        ]
+        error_events = [item.payload for item in items]
     else:
         events = capture_events()
 
@@ -1470,11 +1466,7 @@ async def test_async_exception_handling(
             )
 
         # Find the error event
-        error_events = [
-            item.payload
-            for item in items
-            if item.type == "event" and item.payload.get("level") == "error"
-        ]
+        error_events = [item.payload for item in items]
     else:
         events = capture_events()
 
@@ -2098,7 +2090,7 @@ def test_additional_parameters(
             litellm_utils.executor.shutdown(wait=True)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         chat_spans = list(
             x
             for x in spans
@@ -2213,7 +2205,7 @@ async def test_async_additional_parameters(
             await asyncio.sleep(0.5)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         chat_spans = list(
             x
             for x in spans
@@ -2322,7 +2314,7 @@ def test_no_integration(
             litellm_utils.executor.shutdown(wait=True)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         chat_spans = list(
             x
             for x in spans
@@ -2413,7 +2405,7 @@ async def test_async_no_integration(
             await asyncio.sleep(0.5)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         chat_spans = list(
             x
             for x in spans
@@ -2672,7 +2664,7 @@ def test_binary_content_encoding_image_url(
             litellm_utils.executor.shutdown(wait=True)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         chat_spans = list(
             x
             for x in spans
@@ -2798,7 +2790,7 @@ async def test_async_binary_content_encoding_image_url(
             await asyncio.sleep(0.5)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         chat_spans = list(
             x
             for x in spans
@@ -2925,7 +2917,7 @@ def test_binary_content_encoding_mixed_content(
             litellm_utils.executor.shutdown(wait=True)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         chat_spans = list(
             x
             for x in spans
@@ -3040,7 +3032,7 @@ async def test_async_binary_content_encoding_mixed_content(
             await asyncio.sleep(0.5)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         chat_spans = list(
             x
             for x in spans
@@ -3152,7 +3144,7 @@ def test_binary_content_encoding_uri_type(
             litellm_utils.executor.shutdown(wait=True)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         chat_spans = list(
             x
             for x in spans
@@ -3272,7 +3264,7 @@ async def test_async_binary_content_encoding_uri_type(
             await asyncio.sleep(0.5)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         chat_spans = list(
             x
             for x in spans

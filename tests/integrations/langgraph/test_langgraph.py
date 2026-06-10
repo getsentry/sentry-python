@@ -181,7 +181,7 @@ def test_state_graph_compile(
         assert compiled_graph is not None
         assert compiled_graph.name == "test_graph"
 
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         agent_spans = [
             span
             for span in spans
@@ -308,7 +308,7 @@ def test_pregel_invoke(
         assert result is not None
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -491,7 +491,7 @@ def test_pregel_ainvoke(
         assert result is not None
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -619,7 +619,7 @@ def test_pregel_invoke_error(
             wrapped_invoke(pregel, test_state)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -686,7 +686,7 @@ def test_pregel_ainvoke_error(
         asyncio.run(run_error_test())
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -799,7 +799,7 @@ def test_pregel_invoke_with_different_graph_names(
             wrapped_invoke(pregel, {"messages": []})
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -913,7 +913,7 @@ def test_pregel_invoke_span_includes_usage_data(
         assert result is not None
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -1034,7 +1034,7 @@ def test_pregel_ainvoke_span_includes_usage_data(
         assert result is not None
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -1160,7 +1160,7 @@ def test_pregel_invoke_multiple_llm_calls_aggregate_usage(
         assert result is not None
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -1280,7 +1280,7 @@ def test_pregel_ainvoke_multiple_llm_calls_aggregate_usage(
         assert result is not None
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -1383,7 +1383,7 @@ def test_pregel_invoke_span_includes_response_model(
         assert result is not None
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -1497,7 +1497,7 @@ def test_pregel_ainvoke_span_includes_response_model(
         assert result is not None
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -1618,7 +1618,7 @@ def test_pregel_invoke_span_uses_last_response_model(
         assert result is not None
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -1743,7 +1743,7 @@ def test_pregel_ainvoke_span_uses_last_response_model(
         assert result is not None
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans
@@ -1890,7 +1890,7 @@ def test_extraction_functions_complex_scenario(
         assert result is not None
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         invoke_spans = [
             span
             for span in spans

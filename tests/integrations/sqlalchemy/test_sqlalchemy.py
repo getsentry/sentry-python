@@ -148,7 +148,7 @@ def test_transactions(
                 session.query(Person).first()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         sqlalchemy_spans = [
             span
             for span in spans
@@ -279,7 +279,7 @@ def test_transactions_no_engine_url(
                 session.query(Person).first()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         sqlalchemy_spans = [
             span
             for span in spans
@@ -339,7 +339,7 @@ def test_long_sql_query_preserved(
                 )
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         name = spans[0]["name"]
         assert name.startswith("SELECT 0 UNION SELECT 1")
         assert name.endswith("SELECT 98 UNION SELECT 99")
@@ -479,7 +479,7 @@ def test_query_source_disabled(
             assert session.query(Person).first() == bob
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         for span in spans:
             if span["attributes"].get("sentry.op") == "db" and span["name"].startswith(
                 "SELECT person"
@@ -581,7 +581,7 @@ def test_query_source_enabled(
             assert session.query(Person).first() == bob
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         for span in spans:
             if span["attributes"].get("sentry.op") == "db" and span["name"].startswith(
                 "SELECT person"
@@ -675,7 +675,7 @@ def test_query_source(
             assert session.query(Person).first() == bob
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         for span in spans:
             if span["attributes"].get("sentry.op") == "db" and span["name"].startswith(
                 "SELECT person"
@@ -808,7 +808,7 @@ def test_query_source_with_module_in_search_path(
             assert query_first_model_from_session(Person, session) == bob
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         for span in spans:
             if span["attributes"].get("sentry.op") == "db" and span["name"].startswith(
                 "SELECT person"
@@ -953,7 +953,7 @@ def test_no_query_source_if_duration_too_short(
                 assert session.query(Person).first() == bob
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         for span in spans:
             if span["attributes"].get("sentry.op") == "db" and span["name"].startswith(
                 "SELECT person"
@@ -1084,7 +1084,7 @@ def test_query_source_if_duration_over_threshold(
                 assert session.query(Person).first() == bob
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         for span in spans:
             if span["attributes"].get("sentry.op") == "db" and span["name"].startswith(
                 "SELECT person"
@@ -1215,7 +1215,7 @@ def test_span_origin(
                 con.execute(text("SELECT 0"))
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert spans[0]["attributes"]["sentry.origin"] == "auto.db.sqlalchemy"
         assert spans[1]["attributes"]["sentry.origin"] == "manual"

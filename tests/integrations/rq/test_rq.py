@@ -535,7 +535,7 @@ def test_span_origin(
         worker.work(burst=True)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         (span,) = (
             span
             for span in spans

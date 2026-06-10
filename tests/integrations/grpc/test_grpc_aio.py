@@ -99,7 +99,7 @@ async def test_noop_for_unimplemented_method(
             await server.stop(None)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert len(spans) == 1  # Only client span present.
     else:
         events = capture_events()
@@ -137,7 +137,7 @@ async def test_grpc_server_starts_transaction(
         await stub.TestServe(gRPCTestMessage(text="test"))
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         span = spans[0]
 
         assert spans[1]["attributes"]["sentry.span.source"] == "custom"
@@ -197,7 +197,7 @@ async def test_grpc_server_continues_transaction(
             await stub.TestServe(gRPCTestMessage(text="test"), metadata=metadata)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         span = spans[0]
 
         assert spans[1]["attributes"]["sentry.span.source"] == "custom"

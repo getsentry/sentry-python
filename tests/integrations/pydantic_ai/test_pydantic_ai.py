@@ -754,7 +754,7 @@ async def test_agent_with_tools(
         assert result is not None
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         # Find child span types (invoke_agent is the transaction, not a child span)
         chat_spans = [
@@ -1131,7 +1131,7 @@ async def test_agent_with_tools_streaming(
                 pass
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         # Find span types
         chat_spans = [
@@ -1212,7 +1212,7 @@ async def test_model_settings(
         await test_agent_with_settings.run("Test input")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         # Find chat span
         chat_spans = [
@@ -1288,7 +1288,7 @@ async def test_system_prompt_attribute(
         await agent.run("Hello")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         # The transaction IS the invoke_agent span, check for messages in chat spans instead
         chat_spans = [
@@ -1432,7 +1432,7 @@ async def test_without_pii(
         await test_agent.run("Sensitive input")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         # Find child spans (invoke_agent is the transaction, not a child span)
         chat_spans = [
@@ -1496,7 +1496,7 @@ async def test_without_pii_tools(
         await test_agent.run("Use sensitive tool with private data")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         # Find tool spans
         tool_spans = [
@@ -1575,7 +1575,7 @@ async def test_multiple_agents_concurrent(
         assert len(results) == 3
 
         # Verify each transaction is separate
-        events = [item.payload for item in items if item.type == "transaction"]
+        events = [item.payload for item in items]
         assert len(events) == 3
         for i, transaction in enumerate(events):
             assert transaction["transaction"] == "invoke_agent test_agent"
@@ -1644,7 +1644,7 @@ async def test_message_history(
         await agent.run("What is my name?", message_history=history)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
@@ -1708,7 +1708,7 @@ async def test_gen_ai_system(
         await test_agent.run("Test input")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         # Find chat span
         chat_spans = [
@@ -1768,7 +1768,7 @@ async def test_include_prompts_false(
         await test_agent.run("Sensitive prompt")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         # Find child spans (invoke_agent is the transaction, not a child span)
         chat_spans = [
@@ -1826,7 +1826,7 @@ async def test_include_prompts_true(
         await test_agent.run("Test prompt")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         # Find child spans (invoke_agent is the transaction, not a child span)
         chat_spans = [
@@ -1889,7 +1889,7 @@ async def test_include_prompts_false_with_tools(
         await test_agent.run("Use the test tool with value 5")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         # Find tool spans
         tool_spans = [
@@ -1949,7 +1949,7 @@ async def test_include_prompts_requires_pii(
         await test_agent.run("Test prompt")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         # Find child spans (invoke_agent is the transaction, not a child span)
         chat_spans = [
@@ -2180,7 +2180,7 @@ async def test_invoke_agent_with_list_user_prompt(
         # Use a list as user prompt
         await agent.run(["First part", "Second part"])
 
-        (transaction,) = [item.payload for item in items if item.type == "transaction"]
+        (transaction,) = [item.payload for item in items]
 
         # Check that the invoke_agent transaction has messages data
         # The invoke_agent is the transaction itself
@@ -2258,7 +2258,7 @@ async def test_invoke_agent_with_instructions(
         await agent.run("Test input")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         # The transaction IS the invoke_agent span, check for messages in chat spans instead
         chat_spans = [
@@ -2424,7 +2424,7 @@ async def test_usage_data_partial(
         await agent.run("Test input")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
@@ -2541,7 +2541,7 @@ async def test_available_tools_without_description(
         await test_agent.run("Use the tool with 5")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
@@ -2602,7 +2602,7 @@ async def test_output_with_tool_calls(
         await test_agent.run("Use calc_tool with 5")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
@@ -2681,7 +2681,7 @@ async def test_message_formatting_with_different_parts(
         await agent.run("What did I say?", message_history=history)
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
@@ -3017,7 +3017,7 @@ async def test_message_parts_with_tool_return(
         await agent.run("Use test_tool with 5")
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
@@ -4176,7 +4176,7 @@ async def test_binary_content_in_agent_run(
         await agent.run(["Analyze this image:", binary_content])
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
@@ -4365,7 +4365,7 @@ def test_image_url_base64_content_in_span(
             span.finish()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
@@ -4470,7 +4470,7 @@ async def test_invoke_agent_image_url(
         found_image = False
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
@@ -4545,7 +4545,7 @@ async def test_tool_description_in_execute_tool_span(
         assert result is not None
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         tool_spans = [
             s
