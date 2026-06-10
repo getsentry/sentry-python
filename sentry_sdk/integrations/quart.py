@@ -2,7 +2,7 @@ import asyncio
 import inspect
 import sys
 from functools import wraps
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration
