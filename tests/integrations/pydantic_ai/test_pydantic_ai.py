@@ -262,7 +262,7 @@ async def test_agent_run_async_model_error(
 
         assert spans[0]["status"] == "error"
     elif stream_gen_ai_spans:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("event", "span")
 
         with pytest.raises(RuntimeError, match="model exploded"):
             await agent.run("Test input")
@@ -428,7 +428,7 @@ def test_agent_run_sync_model_error(
 
         assert spans[0]["status"] == "error"
     elif stream_gen_ai_spans:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("event", "span")
 
         with pytest.raises(RuntimeError, match="model exploded"):
             agent.run_sync("Test input")
@@ -747,7 +747,7 @@ async def test_agent_with_tools(
         return a + b
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         result = await test_agent.run("What is 5 + 3?")
 
@@ -863,7 +863,7 @@ async def test_agent_with_tool_model_retry(
         return a + b
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("event", "span")
 
         result = await test_agent.run("What is 5 + 3?")
 
@@ -1000,7 +1000,7 @@ async def test_agent_with_tool_validation_error(
         return a + b
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("event", "span")
 
         result = None
         with pytest.raises(UnexpectedModelBehavior):
@@ -1124,7 +1124,7 @@ async def test_agent_with_tools_streaming(
         return a * b
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         async with test_agent.run_stream("What is 7 times 8?") as result:
             async for _ in result.stream_output():
@@ -1207,7 +1207,7 @@ async def test_model_settings(
     test_agent_with_settings = get_test_agent_with_settings()
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         await test_agent_with_settings.run("Test input")
 
@@ -1283,7 +1283,7 @@ async def test_system_prompt_attribute(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         await agent.run("Hello")
 
@@ -1375,7 +1375,7 @@ async def test_error_handling(
         assert spans[1]["is_segment"] is True
         assert spans[1]["status"] != "error"  # Could be None or some other status
     elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("transaction")
 
         # Simple run that should succeed
         await agent.run("Hello")
@@ -1426,7 +1426,7 @@ async def test_without_pii(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         test_agent = get_test_agent()
         await test_agent.run("Sensitive input")
@@ -1491,7 +1491,7 @@ async def test_without_pii_tools(
         return f"Processed: {data}"
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         await test_agent.run("Use sensitive tool with private data")
 
@@ -1567,7 +1567,7 @@ async def test_multiple_agents_concurrent(
                 continue
             assert span["name"] == "invoke_agent test_agent"
     elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("transaction")
 
         # Run 3 agents concurrently
         results = await asyncio.gather(*[run_agent(f"Input {i}") for i in range(3)])
@@ -1636,7 +1636,7 @@ async def test_message_history(
     ]
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         # First message
         await agent.run("Hello, I'm Alice")
@@ -1703,7 +1703,7 @@ async def test_gen_ai_system(
     test_agent = get_test_agent()
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         await test_agent.run("Test input")
 
@@ -1763,7 +1763,7 @@ async def test_include_prompts_false(
     test_agent = get_test_agent()
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         await test_agent.run("Sensitive prompt")
 
@@ -1821,7 +1821,7 @@ async def test_include_prompts_true(
     test_agent = get_test_agent()
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         await test_agent.run("Test prompt")
 
@@ -1884,7 +1884,7 @@ async def test_include_prompts_false_with_tools(
         return value * 2
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         await test_agent.run("Use the test tool with value 5")
 
@@ -1944,7 +1944,7 @@ async def test_include_prompts_requires_pii(
     test_agent = get_test_agent()
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         await test_agent.run("Test prompt")
 
@@ -2175,7 +2175,7 @@ async def test_invoke_agent_with_list_user_prompt(
             assert "First part" in messages_str
             assert "Second part" in messages_str
     elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("transaction")
 
         # Use a list as user prompt
         await agent.run(["First part", "Second part"])
@@ -2253,7 +2253,7 @@ async def test_invoke_agent_with_instructions(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         await agent.run("Test input")
 
@@ -2419,7 +2419,7 @@ async def test_usage_data_partial(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         await agent.run("Test input")
 
@@ -2484,7 +2484,7 @@ async def test_agent_data_from_scope(
 
         assert spans[1]["name"] == "invoke_agent test_scope_agent"
     elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("transaction")
 
         # The integration automatically sets agent in scope during execution
         await agent.run("Test input")
@@ -2536,7 +2536,7 @@ async def test_available_tools_without_description(
         return x * 2
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         await test_agent.run("Use the tool with 5")
 
@@ -2597,7 +2597,7 @@ async def test_output_with_tool_calls(
         return value + 10
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         await test_agent.run("Use calc_tool with 5")
 
@@ -2676,7 +2676,7 @@ async def test_message_formatting_with_different_parts(
     ]
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         await agent.run("What did I say?", message_history=history)
 
@@ -2804,7 +2804,7 @@ async def test_agent_without_name(
 
         assert "invoke_agent" in spans[1]["name"]
     elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("transaction")
 
         await agent.run("Test input")
 
@@ -3011,7 +3011,7 @@ async def test_message_parts_with_tool_return(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         # Run with history containing tool return
         await agent.run("Use test_tool with 5")
@@ -3984,7 +3984,7 @@ async def test_binary_content_encoding_image(
         messages_data = _get_messages_from_span(span_data)
         assert _find_binary_content(messages_data, "image", "image/png")
     elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("transaction")
 
         with sentry_sdk.start_transaction(op="test", name="test"):
             span = sentry_sdk.start_span(op="test_span")
@@ -4082,7 +4082,7 @@ async def test_binary_content_encoding_mixed_content(
         assert found_text, "Text content should be found"
         assert _find_binary_content(messages_data, "image", "image/jpeg")
     elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("transaction")
 
         with sentry_sdk.start_transaction(op="test", name="test"):
             span = sentry_sdk.start_span(op="test_span")
@@ -4171,7 +4171,7 @@ async def test_binary_content_in_agent_run(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         await agent.run(["Analyze this image:", binary_content])
 
@@ -4250,7 +4250,7 @@ async def test_set_usage_data_with_cache_tokens(
             spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
         )
     elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("transaction")
 
         with sentry_sdk.start_transaction(op="test", name="test"):
             span = sentry_sdk.start_span(op="test_span")
@@ -4352,7 +4352,7 @@ def test_image_url_base64_content_in_span(
 
     found_image = False
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with sentry_sdk.start_transaction(op="test", name="test"):
             image_url = ImageUrl(url=url, **image_url_kwargs)
@@ -4463,7 +4463,7 @@ async def test_invoke_agent_image_url(
     image_url = ImageUrl(url=url, **image_url_kwargs)
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         await agent.run([image_url, "Describe this image"])
 
@@ -4539,7 +4539,7 @@ async def test_tool_description_in_execute_tool_span(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         result = await agent.run("What is 5 times 3?")
         assert result is not None

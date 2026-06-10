@@ -2274,7 +2274,7 @@ def test_span_status_error(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("event", "span")
 
         with start_transaction(name="test"):
             client = OpenAI(api_key="z")
