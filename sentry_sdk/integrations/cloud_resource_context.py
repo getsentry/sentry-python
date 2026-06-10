@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 import urllib3
 
+import sentry_sdk
 from sentry_sdk.api import set_context
 from sentry_sdk.integrations import Integration
 from sentry_sdk.utils import logger
@@ -262,6 +263,8 @@ class CloudResourceContextIntegration(Integration):
         context = CloudResourceContextIntegration._get_cloud_resource_context()
         if context != {}:
             set_context(CONTEXT_TYPE, context)
+            for k, v in context.items():
+                sentry_sdk.get_isolation_scope().set_attribute(k, v)
 
 
 # Map with the currently supported cloud providers
