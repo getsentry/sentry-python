@@ -94,7 +94,7 @@ async def test_agent_run_async(
     test_agent = get_test_agent()
 
     if span_streaming:
-        items = capture_items("span", "transaction")
+        items = capture_items("span")
 
         result = await test_agent.run(
             ["Message demonstrating the absence of truncation.", "Test input"]
@@ -314,7 +314,7 @@ def test_agent_run_sync(
     test_agent = get_test_agent()
 
     if span_streaming:
-        items = capture_items("span", "transaction")
+        items = capture_items("span")
 
         result = test_agent.run_sync(
             ["Message demonstrating the absence of truncation.", "Test input"]
@@ -480,7 +480,7 @@ async def test_agent_run_stream(
     test_agent = get_test_agent()
 
     if span_streaming:
-        items = capture_items("span", "transaction")
+        items = capture_items("span")
 
         async with test_agent.run_stream(
             ["Message demonstrating the absence of truncation.", "Test input"]
@@ -633,7 +633,7 @@ async def test_agent_run_stream_events(
     test_agent = get_test_agent()
 
     if span_streaming:
-        items = capture_items("span", "transaction")
+        items = capture_items("span")
 
         if PYDANTIC_AI_VERSION > (2,):
             async with test_agent.run_stream_events(
@@ -1364,7 +1364,7 @@ async def test_error_handling(
     )
 
     if span_streaming:
-        items = capture_items("transaction")
+        items = capture_items("span")
 
         # Simple run that should succeed
         await agent.run("Hello")
@@ -1553,7 +1553,7 @@ async def test_multiple_agents_concurrent(
         return await test_agent.run(input_text)
 
     if span_streaming:
-        items = capture_items("transaction")
+        items = capture_items("span")
 
         # Run 3 agents concurrently
         results = await asyncio.gather(*[run_agent(f"Input {i}") for i in range(3)])
@@ -2162,7 +2162,7 @@ async def test_invoke_agent_with_list_user_prompt(
     )
 
     if span_streaming:
-        items = capture_items("transaction")
+        items = capture_items("span")
 
         # Use a list as user prompt
         await agent.run(["First part", "Second part"])
@@ -2474,7 +2474,7 @@ async def test_agent_data_from_scope(
     )
 
     if span_streaming:
-        items = capture_items("transaction")
+        items = capture_items("span")
 
         # The integration automatically sets agent in scope during execution
         await agent.run("Test input")
@@ -2795,7 +2795,7 @@ async def test_agent_without_name(
     )
 
     if span_streaming:
-        items = capture_items("transaction")
+        items = capture_items("span")
 
         await agent.run("Test input")
 
@@ -3958,7 +3958,7 @@ async def test_binary_content_encoding_image(
     )
 
     if span_streaming:
-        items = capture_items("transaction")
+        items = capture_items("span")
 
         with sentry_sdk.traces.start_span(
             name="test", attributes={"sentry.op": "test"}
@@ -4045,7 +4045,7 @@ async def test_binary_content_encoding_mixed_content(
     )
 
     if span_streaming:
-        items = capture_items("transaction")
+        items = capture_items("span")
 
         with sentry_sdk.traces.start_span(
             name="test", attributes={"sentry.op": "test"}
@@ -4225,7 +4225,7 @@ async def test_set_usage_data_with_cache_tokens(
     )
 
     if span_streaming:
-        items = capture_items("transaction")
+        items = capture_items("span")
 
         with sentry_sdk.traces.start_span(
             name="test", attributes={"sentry.op": "test"}
