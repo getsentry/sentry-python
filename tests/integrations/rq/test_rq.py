@@ -307,7 +307,7 @@ def test_tracing_enabled(
         assert error_event["contexts"]["trace"]["trace_id"] == span.trace_id
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items]
+        spans = [item.payload for item in items if item.type == "span"]
         (span,) = (
             span
             for span in spans
