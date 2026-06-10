@@ -532,6 +532,39 @@ def test_user_captured(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
+def test_materialized_user_captured(
+    sentry_init,
+    client,
+    capture_events,
+    capture_items,
+):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=True,
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    content, status, headers = unpack_werkzeug_response(client.get(reverse("mylogin")))
+    assert content == b"ok"
+
+    items = capture_items("span")
+
+    content, status, headers = unpack_werkzeug_response(
+        client.get(reverse("template_test"))
+    )
+
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = (span for span in spans if span["name"] == "/template-test")
+
+    assert span["attributes"][SPANDATA.USER_ID] == "1"
+    assert span["attributes"][SPANDATA.USER_EMAIL] == "lennon@thebeatles.com"
+    assert span["attributes"][SPANDATA.USER_NAME] == "john"
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator()
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_queryset_repr(
     sentry_init,
