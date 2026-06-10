@@ -633,6 +633,38 @@ async def test_active_thread_id(
             assert str(data["active"]) == trace_context["data"]["thread.id"]
 
 
+@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
+@pytest.mark.asyncio
+async def test_active_thread_id_span_streaming(
+    sentry_init, capture_items, teardown_profiling, endpoint
+):
+    with mock.patch(
+        "sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0
+    ):
+        sentry_init(
+            traces_sample_rate=1.0,
+            profiles_sample_rate=1.0,
+            _experiments={"trace_lifecycle": "stream"},
+        )
+        app = quart_app_factory()
+
+        items = capture_items("span")
+
+        async with app.test_client() as client:
+            response = await client.get(endpoint)
+            assert response.status_code == 200
+
+        data = json.loads(await response.get_data(as_text=True))
+
+        sentry_sdk.flush()
+
+        spans = [item.payload for item in items]
+        assert len(spans) == 1
+
+        segment = spans[0]
+        assert str(data["active"]) == segment["attributes"]["thread.id"]
+
+
 @pytest.mark.asyncio
 async def test_span_origin(sentry_init, capture_events):
     sentry_init(
@@ -859,6 +891,49 @@ async def test_span_streaming_sensitive_header_scrubbing(sentry_init, capture_it
         == SENSITIVE_DATA_SUBSTITUTE
     )
     assert segment["attributes"]["http.request.header.x-custom-header"] == "passthrough"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("send_default_pii", [True, False])
+@pytest.mark.parametrize("user_id", [None, "42"])
+async def test_span_streaming_quart_auth_user_id(
+    send_default_pii,
+    sentry_init,
+    user_id,
+    capture_items,
+):
+    from quart_auth import AuthUser, login_user
+
+    sentry_init(
+        integrations=[quart_sentry.QuartIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+    items = capture_items("span")
+
+    app = quart_app_factory()
+
+    @app.route("/login")
+    async def login():
+        if user_id is not None:
+            login_user(AuthUser(user_id))
+        return "ok"
+
+    client = app.test_client()
+    assert (await client.get("/login")).status_code == 200
+    assert (await client.get("/message")).status_code == 200
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 2
+
+    segment = spans[1]
+    if send_default_pii and user_id is not None:
+        assert segment["attributes"]["user.id"] == user_id
+    else:
+        assert "user.id" not in segment.get("attributes", {})
 
 
 @pytest.mark.asyncio

@@ -120,9 +120,15 @@ def patch_scaffold_route() -> None:
                 @wraps(old_func)
                 @ensure_integration_enabled(QuartIntegration, old_func)
                 def _sentry_func(*args: "Any", **kwargs: "Any") -> "Any":
-                    current_scope = sentry_sdk.get_current_scope()
-                    if current_scope.transaction is not None:
-                        current_scope.transaction.update_active_thread()
+                    client = sentry_sdk.get_client()
+                    if has_span_streaming_enabled(client.options):
+                        span = get_current_span()
+                        if span is not None and hasattr(span, "_segment"):
+                            span._segment._update_active_thread()
+                    else:
+                        current_scope = sentry_sdk.get_current_scope()
+                        if current_scope.transaction is not None:
+                            current_scope.transaction.update_active_thread()
 
                     sentry_scope = sentry_sdk.get_isolation_scope()
                     if sentry_scope.profile is not None:
@@ -204,6 +210,12 @@ async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
                     request_websocket.query_string.decode("utf-8", errors="replace"),
                 )
 
+                current_user_id = _get_current_user_id_from_quart()
+                if current_user_id:
+                    sentry_sdk.get_current_scope().set_attribute(
+                        "user.id", current_user_id
+                    )
+
                 if len(request_websocket.access_route) >= 1:
                     segment.set_attribute(
                         "client.address", request_websocket.access_route[0]
@@ -239,7 +251,11 @@ def _make_request_event_processor(
             if should_send_default_pii():
                 if len(request.access_route) >= 1:
                     request_info["env"] = {"REMOTE_ADDR": request.access_route[0]}
-                _add_user_to_event(event)
+
+                current_user_id = _get_current_user_id_from_quart()
+                if current_user_id:
+                    user_info = event.setdefault("user", {})
+                    user_info["id"] = current_user_id
 
         return event
 
@@ -262,15 +278,14 @@ async def _capture_exception(
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _add_user_to_event(event: "Event") -> None:
+def _get_current_user_id_from_quart() -> str | None:
     if quart_auth is None:
         return
 
-    user = quart_auth.current_user
-    if user is None:
+    if quart_auth.current_user is None:
         return
 
-    with capture_internal_exceptions():
-        user_info = event.setdefault("user", {})
-
-        user_info["id"] = quart_auth.current_user._auth_id
+    try:
+        return quart_auth.current_user._auth_id
+    except Exception:
+        return None
