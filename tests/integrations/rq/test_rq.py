@@ -291,7 +291,7 @@ def test_tracing_enabled(
     worker = rq.SimpleWorker([queue], connection=queue.connection)
 
     if span_streaming:
-        items = capture_items("event", "span")
+        items = capture_items("span")
 
         with sentry_sdk.traces.start_span(
             name="custom parent",

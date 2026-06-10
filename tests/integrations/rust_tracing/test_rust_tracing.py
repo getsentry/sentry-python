@@ -83,7 +83,7 @@ def test_on_new_span_on_close(
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
     if span_streaming:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("span")
         with sentry_sdk.traces.start_span(name="custom parent"):
             rust_tracing.new_span(RustTracingLevel.Info, 3)
 
@@ -169,7 +169,7 @@ def test_nested_on_new_span_on_close(
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
     if span_streaming:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("span")
         with sentry_sdk.traces.start_span(name="custom parent"):
             original_sentry_span = sentry_sdk.traces.get_current_span()
 
@@ -343,7 +343,7 @@ def test_on_event_exception(
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
     if span_streaming:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("event")
         sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
         with sentry_sdk.traces.start_span(name="custom parent"):
@@ -403,7 +403,7 @@ def test_on_event_breadcrumb(
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
     if span_streaming:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("event")
         sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
         with sentry_sdk.traces.start_span(name="custom parent"):
@@ -458,7 +458,7 @@ def test_on_event_event(
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
     if span_streaming:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("event")
         sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
         with sentry_sdk.traces.start_span(name="custom parent"):
@@ -518,7 +518,7 @@ def test_on_event_ignored(
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
     if span_streaming:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("span")
         sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
         with sentry_sdk.traces.start_span(name="custom parent"):
@@ -578,7 +578,7 @@ def test_span_filter(
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
     if span_streaming:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("span")
         with sentry_sdk.traces.start_span(name="custom parent"):
             original_sentry_span = sentry_sdk.traces.get_current_span()
 

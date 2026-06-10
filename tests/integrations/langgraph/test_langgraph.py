@@ -170,7 +170,7 @@ def test_state_graph_compile(
         return MockCompiledGraph(self.name)
 
     if stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with patch("sentry_sdk.integrations.langgraph.StateGraph"), start_transaction():
             wrapped_compile = _wrap_state_graph_compile(original_compile)
@@ -299,7 +299,7 @@ def test_pregel_invoke(
         return {"messages": new_messages}
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction():
             wrapped_invoke = _wrap_pregel_invoke(original_invoke)
@@ -485,7 +485,7 @@ def test_pregel_ainvoke(
             return result
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         result = asyncio.run(run_test())
         assert result is not None
@@ -610,7 +610,7 @@ def test_pregel_invoke_error(
         raise Exception("Graph execution failed")
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction(), pytest.raises(
             Exception, match="Graph execution failed"
@@ -681,7 +681,7 @@ def test_pregel_ainvoke_error(
             await wrapped_ainvoke(pregel, test_state)
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         asyncio.run(run_error_test())
 
@@ -792,7 +792,7 @@ def test_pregel_invoke_with_different_graph_names(
         return {"result": "test"}
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction():
             wrapped_invoke = _wrap_pregel_invoke(original_invoke)
@@ -904,7 +904,7 @@ def test_pregel_invoke_span_includes_usage_data(
         return {"messages": new_messages}
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction():
             wrapped_invoke = _wrap_pregel_invoke(original_invoke)
@@ -1028,7 +1028,7 @@ def test_pregel_ainvoke_span_includes_usage_data(
             return result
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         result = asyncio.run(run_test())
         assert result is not None
@@ -1151,7 +1151,7 @@ def test_pregel_invoke_multiple_llm_calls_aggregate_usage(
         return {"messages": new_messages}
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction():
             wrapped_invoke = _wrap_pregel_invoke(original_invoke)
@@ -1274,7 +1274,7 @@ def test_pregel_ainvoke_multiple_llm_calls_aggregate_usage(
             return result
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         result = asyncio.run(run_test())
         assert result is not None
@@ -1374,7 +1374,7 @@ def test_pregel_invoke_span_includes_response_model(
         return {"messages": new_messages}
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction():
             wrapped_invoke = _wrap_pregel_invoke(original_invoke)
@@ -1491,7 +1491,7 @@ def test_pregel_ainvoke_span_includes_response_model(
             return result
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         result = asyncio.run(run_test())
         assert result is not None
@@ -1609,7 +1609,7 @@ def test_pregel_invoke_span_uses_last_response_model(
         return {"messages": new_messages}
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction():
             wrapped_invoke = _wrap_pregel_invoke(original_invoke)
@@ -1737,7 +1737,7 @@ def test_pregel_ainvoke_span_uses_last_response_model(
             return result
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         result = asyncio.run(run_test())
         assert result is not None
@@ -1881,7 +1881,7 @@ def test_extraction_functions_complex_scenario(
         return {"messages": new_messages}
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction():
             wrapped_invoke = _wrap_pregel_invoke(original_invoke)
@@ -1980,7 +1980,7 @@ def test_langgraph_message_role_mapping(
     pregel = MockPregelInstance(compiled_graph)
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction(name="langgraph tx"):
             # Use the wrapped invoke function directly

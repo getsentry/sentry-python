@@ -4149,7 +4149,7 @@ def test_langchain_embeddings_span_hierarchy(
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
     if span_streaming:
-        items = capture_items("span")
+        items = capture_items("span", "transaction")
 
         # Mock the actual API call
         with mock.patch.object(

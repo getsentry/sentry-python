@@ -594,7 +594,7 @@ def test_error_handling(
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("event", "transaction")
+        items = capture_items("event")
 
         # Mock an error at the HTTP level
         with mock.patch.object(
@@ -1800,7 +1800,7 @@ def test_embed_content_error_handling(
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "event")
+        items = capture_items("event")
 
         # Mock an error at the HTTP level
         with mock.patch.object(
@@ -2210,7 +2210,7 @@ async def test_async_embed_content_error_handling(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "event")
+        items = capture_items("event")
 
         # Mock an error at the HTTP level
         with mock.patch.object(

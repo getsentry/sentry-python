@@ -1629,7 +1629,7 @@ def test_does_not_capture_403(
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
     if span_streaming:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("span")
 
         _, status, _ = unpack_werkzeug_response(client.get(reverse(endpoint)))
         assert status.lower() == "403 forbidden"

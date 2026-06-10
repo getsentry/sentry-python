@@ -3300,7 +3300,7 @@ def test_exception_message_create(
     )
 
     if span_streaming:
-        items = capture_items("event", "transaction")
+        items = capture_items("event")
 
         with pytest.raises(AnthropicError):
             client.messages.create(
@@ -3495,7 +3495,7 @@ async def test_exception_message_create_async(
     )
 
     if span_streaming:
-        items = capture_items("event", "transaction")
+        items = capture_items("event")
 
         with pytest.raises(AnthropicError):
             await client.messages.create(
@@ -3768,7 +3768,7 @@ def test_anthropic_message_role_mapping(
     test_messages = [test_message]
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction(name="anthropic tx"):
             client.messages.create(
@@ -5064,7 +5064,7 @@ def test_system_prompt_with_complex_structure(
     ]
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction(name="anthropic"):
             response = client.messages.create(
@@ -5420,7 +5420,7 @@ def test_message_with_url_image(
     ]
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction(name="anthropic"):
             client.messages.create(max_tokens=1024, messages=messages, model="model")
@@ -5492,7 +5492,7 @@ def test_message_with_file_image(
     ]
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction(name="anthropic"):
             client.messages.create(max_tokens=1024, messages=messages, model="model")
@@ -5608,7 +5608,7 @@ def test_message_with_url_pdf(
     ]
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction(name="anthropic"):
             client.messages.create(max_tokens=1024, messages=messages, model="model")
@@ -5680,7 +5680,7 @@ def test_message_with_file_document(
     ]
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction(name="anthropic"):
             client.messages.create(max_tokens=1024, messages=messages, model="model")
@@ -5910,7 +5910,7 @@ def test_binary_content_not_stored_when_pii_disabled(
     ]
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction(name="anthropic"):
             client.messages.create(max_tokens=1024, messages=messages, model="model")
@@ -5974,7 +5974,7 @@ def test_binary_content_not_stored_when_prompts_disabled(
     ]
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction(name="anthropic"):
             client.messages.create(max_tokens=1024, messages=messages, model="model")
@@ -6035,7 +6035,7 @@ def test_cache_tokens_nonstreaming(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction(name="anthropic"):
             client.messages.create(
@@ -6117,7 +6117,7 @@ def test_input_tokens_include_cache_write_nonstreaming(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction(name="anthropic"):
             client.messages.create(
@@ -6203,7 +6203,7 @@ def test_input_tokens_include_cache_read_nonstreaming(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction(name="anthropic"):
             client.messages.create(
@@ -6295,7 +6295,7 @@ def test_input_tokens_include_cache_read_streaming(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with mock.patch.object(
             client._client,
@@ -6398,7 +6398,7 @@ def test_stream_messages_input_tokens_include_cache_read_streaming(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with mock.patch.object(
             client._client,
@@ -6485,7 +6485,7 @@ def test_input_tokens_unchanged_without_caching(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction(name="anthropic"):
             client.messages.create(
@@ -6565,7 +6565,7 @@ def test_cache_tokens_streaming(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with mock.patch.object(
             client._client,
@@ -6663,7 +6663,7 @@ def test_stream_messages_cache_tokens(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with mock.patch.object(
             client._client,

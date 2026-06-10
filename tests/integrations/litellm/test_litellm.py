@@ -618,7 +618,7 @@ async def test_async_streaming_chat_completion(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with mock.patch.object(
             client.completions._client._client,
@@ -722,7 +722,7 @@ def test_embeddings_create(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with mock.patch.object(
             client.embeddings._client._client,
@@ -843,7 +843,7 @@ async def test_async_embeddings_create(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with mock.patch.object(
             client.embeddings._client._client,
@@ -960,7 +960,7 @@ def test_embeddings_create_with_list_input(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with mock.patch.object(
             client.embeddings._client._client,
@@ -1074,7 +1074,7 @@ async def test_async_embeddings_create_with_list_input(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with mock.patch.object(
             client.embeddings._client._client,
@@ -1188,7 +1188,7 @@ def test_embeddings_no_pii(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with mock.patch.object(
             client.embeddings._client._client,
@@ -1288,7 +1288,7 @@ async def test_async_embeddings_no_pii(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with mock.patch.object(
             client.embeddings._client._client,
@@ -1538,7 +1538,7 @@ def test_span_origin(
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
     if span_streaming:
-        items = capture_items("span")
+        items = capture_items("span", "transaction")
 
         with mock.patch.object(
             client.completions._client._client,
@@ -1645,7 +1645,7 @@ def test_multiple_providers(
     )
 
     if span_streaming:
-        items = capture_items("span")
+        items = capture_items("span", "transaction")
 
         with mock.patch.object(
             openai_client.completions._client._client,
@@ -1713,7 +1713,7 @@ def test_multiple_providers(
             # The provider should be detected by litellm.get_llm_provider
             assert SPANDATA.GEN_AI_SYSTEM in span["attributes"]
     elif stream_gen_ai_spans:
-        items = capture_items("transaction")
+        items = capture_items("span", "transaction")
 
         with mock.patch.object(
             openai_client.completions._client._client,
@@ -2077,7 +2077,7 @@ def test_additional_parameters(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with mock.patch.object(
             client.completions._client._client,
@@ -2191,7 +2191,7 @@ async def test_async_additional_parameters(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with mock.patch.object(
             client.completions._client._client,
@@ -2306,7 +2306,7 @@ def test_no_integration(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with mock.patch.object(
             client.completions._client._client,
@@ -2396,7 +2396,7 @@ async def test_async_no_integration(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with mock.patch.object(
             client.completions._client._client,
@@ -2479,7 +2479,7 @@ def test_response_without_usage(
     )()
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with start_transaction(name="litellm test"):
             kwargs = {
@@ -2655,7 +2655,7 @@ def test_binary_content_encoding_image_url(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with mock.patch.object(
             client.completions._client._client,
@@ -2780,7 +2780,7 @@ async def test_async_binary_content_encoding_image_url(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with mock.patch.object(
             client.completions._client._client,
@@ -2908,7 +2908,7 @@ def test_binary_content_encoding_mixed_content(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with mock.patch.object(
             client.completions._client._client,
@@ -3022,7 +3022,7 @@ async def test_async_binary_content_encoding_mixed_content(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with mock.patch.object(
             client.completions._client._client,
@@ -3136,7 +3136,7 @@ def test_binary_content_encoding_uri_type(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
         with mock.patch.object(
             client.completions._client._client,
             "send",
@@ -3254,7 +3254,7 @@ async def test_async_binary_content_encoding_uri_type(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+        items = capture_items("span")
 
         with mock.patch.object(
             client.completions._client._client,
