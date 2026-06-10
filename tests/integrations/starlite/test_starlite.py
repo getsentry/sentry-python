@@ -157,8 +157,7 @@ def test_transaction_name_and_source(
             pass
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-
+        spans = [item.payload for item in items]
         spans = [span for span in spans if span["name"] == expected_tx_name]
         assert len(spans) == 1
         assert spans[0]["attributes"]["sentry.span.source"] == "component"
