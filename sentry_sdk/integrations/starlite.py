@@ -257,6 +257,7 @@ def patch_http_route_handle() -> None:
             source = TransactionSource.ROUTE
 
         sentry_sdk.set_transaction_name(name, source)
+        sentry_scope.set_transaction_name(name, source)
 
         def event_processor(event: "Event", _: "Hint") -> "Event":
             request_info = event.get("request", {})
