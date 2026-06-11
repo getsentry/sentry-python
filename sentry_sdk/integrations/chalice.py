@@ -54,17 +54,16 @@ class EventSourceHandler(ChaliceEventSourceHandler):  # type: ignore
                 scope.add_event_processor(
                     _make_request_event_processor(event, context, configured_time)
                 )
-
             try:
                 return ChaliceEventSourceHandler.__call__(self, event, context)
             except Exception:
                 exc_info = sys.exc_info()
-                sentry_event, hint = event_from_exception(
+                event, hint = event_from_exception(
                     exc_info,
                     client_options=client.options,
                     mechanism={"type": "chalice", "handled": False},
                 )
-                sentry_sdk.capture_event(sentry_event, hint=hint)
+                sentry_sdk.capture_event(event, hint=hint)
                 client.flush()
                 reraise(*exc_info)
 
@@ -132,7 +131,7 @@ def _get_view_function_response(
                         mechanism={"type": "chalice", "handled": False},
                     )
                     sentry_sdk.capture_event(sentry_event, hint=hint)
-                    if not segment:
+                    if segment is None:
                         client.flush()
                     raise
             else:
