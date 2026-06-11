@@ -254,7 +254,7 @@ async def test_agent_invocation_span_no_pii(
         assert ai_client_span["attributes"]["gen_ai.request.model"] == "gpt-4"
         assert ai_client_span["attributes"]["gen_ai.request.temperature"] == 0.7
         assert ai_client_span["attributes"]["gen_ai.request.top_p"] == 1.0
-    elif span_streaming or stream_gen_ai_spans:
+    elif stream_gen_ai_spans:
         with patch.object(
             agent.model._client._client,
             "send",
@@ -661,7 +661,7 @@ async def test_agent_invocation_span(
         assert ai_client_span["attributes"]["gen_ai.request.temperature"] == 0.7
         assert ai_client_span["attributes"]["gen_ai.request.top_p"] == 1.0
 
-    elif span_streaming or stream_gen_ai_spans:
+    elif stream_gen_ai_spans:
         with patch.object(
             agent.model._client._client,
             "send",
@@ -970,7 +970,7 @@ def test_agent_invocation_span_sync_no_pii(
         assert (
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in invoke_agent_span["attributes"]
         )
-    elif span_streaming or stream_gen_ai_spans:
+    elif stream_gen_ai_spans:
         with patch.object(
             agent.model._client._client,
             "send",
@@ -1364,7 +1364,7 @@ def test_agent_invocation_span_sync(
             json.loads(ai_client_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
             == expected_request_messages
         )
-    elif span_streaming or stream_gen_ai_spans:
+    elif stream_gen_ai_spans:
         with patch.object(
             agent.model._client._client,
             "send",
@@ -2143,7 +2143,7 @@ async def test_tool_execution_span(
         assert ai_client_span2["attributes"]["gen_ai.usage.output_tokens"] == 10
         assert ai_client_span2["attributes"]["gen_ai.usage.total_tokens"] == 25
 
-    elif span_streaming or stream_gen_ai_spans:
+    elif stream_gen_ai_spans:
         with patch.object(
             agent_with_tool.model._client._client,
             "send",
@@ -2905,7 +2905,7 @@ async def test_model_behavior_error(
 
         # Error due to unrecognized tool in model response.
         assert agent_span["status"] == "error"
-    elif span_streaming or stream_gen_ai_spans:
+    elif stream_gen_ai_spans:
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}), patch(
             "agents.models.openai_responses.OpenAIResponsesModel.get_response"
         ) as mock_get_response:
@@ -3078,7 +3078,7 @@ async def test_error_handling(
         assert ai_client_span["name"] == "chat gpt-4"
         assert ai_client_span["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
         assert ai_client_span["status"] == "error"
-    elif span_streaming or stream_gen_ai_spans:
+    elif stream_gen_ai_spans:
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}), patch(
             "agents.models.openai_responses.OpenAIResponsesModel.get_response"
         ) as mock_get_response:
@@ -3339,7 +3339,7 @@ async def test_span_status_error(
 
         assert spans[2]["is_segment"] is True
         assert spans[2]["status"] == "error"
-    elif span_streaming or stream_gen_ai_spans:
+    elif stream_gen_ai_spans:
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}), patch(
             "agents.models.openai_responses.OpenAIResponsesModel.get_response"
         ) as mock_get_response:
@@ -3455,7 +3455,7 @@ async def test_multiple_agents_asyncio(
         assert spans[2]["name"] == "test_agent workflow"
         assert spans[5]["name"] == "test_agent workflow"
         assert spans[8]["name"] == "test_agent workflow"
-    elif span_streaming or stream_gen_ai_spans:
+    elif stream_gen_ai_spans:
         with patch.object(
             agent.model._client._client,
             "send",
@@ -4268,7 +4268,7 @@ async def test_multiple_llm_calls_aggregate_usage(
         assert (
             invoke_agent_span["attributes"]["gen_ai.usage.output_tokens.reasoning"] == 3
         )
-    elif span_streaming or stream_gen_ai_spans:
+    elif stream_gen_ai_spans:
         with patch.object(
             agent_with_tool.model._client._client,
             "send",
@@ -4636,7 +4636,7 @@ async def test_invoke_agent_span_uses_last_response_model(
             second_ai_client_span["attributes"]["gen_ai.response.model"]
             == "gpt-4.1-2025-04-14"
         )
-    elif span_streaming or stream_gen_ai_spans:
+    elif stream_gen_ai_spans:
         with patch.object(
             agent_with_tool.model._client._client,
             "send",
@@ -5038,7 +5038,7 @@ async def test_conversation_id_on_all_spans(
 
         # Verify ai_client span has conversation_id
         assert ai_client_span["attributes"]["gen_ai.conversation.id"] == "conv_test_123"
-    elif span_streaming or stream_gen_ai_spans:
+    elif stream_gen_ai_spans:
         with patch.object(
             agent.model._client._client,
             "send",
@@ -5277,7 +5277,7 @@ async def test_conversation_id_on_tool_span(
             workflow_span["attributes"]["gen_ai.conversation.id"]
             == "conv_tool_test_456"
         )
-    elif span_streaming or stream_gen_ai_spans:
+    elif stream_gen_ai_spans:
         with patch.object(
             agent_with_tool.model._client._client,
             "send",
@@ -5432,7 +5432,7 @@ async def test_no_conversation_id_when_not_provided(
         assert "gen_ai.conversation.id" not in workflow_span.get("attributes", {})
         assert "gen_ai.conversation.id" not in invoke_agent_span.get("attributes", {})
         assert "gen_ai.conversation.id" not in ai_client_span.get("attributes", {})
-    elif span_streaming or stream_gen_ai_spans:
+    elif stream_gen_ai_spans:
         with patch.object(
             agent.model._client._client,
             "send",
