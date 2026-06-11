@@ -225,7 +225,11 @@ async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
                     user_properties["id"] = current_user_id
 
                 if user_properties:
-                    sentry_sdk.get_current_scope().set_user(user_properties)
+                    current_scope = sentry_sdk.get_current_scope()
+                    existing_user_properties = current_scope._user or {}
+                    current_scope.set_user(
+                        {**existing_user_properties, **user_properties}
+                    )
 
     evt_processor = _make_request_event_processor(app, request_websocket, integration)
     scope.add_event_processor(evt_processor)
