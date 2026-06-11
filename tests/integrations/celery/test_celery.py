@@ -1,14 +1,15 @@
+import os
 import threading
-import kombu
 from unittest import mock
 
+import kombu
 import pytest
-from celery import Celery, VERSION
+from celery import VERSION, Celery
 from celery.bin import worker
 
 import sentry_sdk
-from sentry_sdk import start_transaction, get_current_span
-from sentry_sdk.traces import _get_current_streamed_span
+import sentry_sdk.traces
+from sentry_sdk import get_current_span, start_transaction
 from sentry_sdk.integrations.celery import (
     CeleryIntegration,
     _wrap_task_run,
@@ -59,8 +60,9 @@ def init_celery(sentry_init, request):
             # this backend requires capture_events_forksafe
             celery.conf.worker_max_tasks_per_child = 1
             celery.conf.worker_concurrency = 1
-            celery.conf.broker_url = "redis://127.0.0.1:6379"
-            celery.conf.result_backend = "redis://127.0.0.1:6379"
+            redis_url = f"redis://{os.environ.get('SENTRY_PYTHON_TEST_REDIS_HOST', '127.0.0.1')}:6379"
+            celery.conf.broker_url = redis_url
+            celery.conf.result_backend = redis_url
             celery.conf.task_always_eager = False
 
             # Once we drop celery 3 we can use the celery_worker fixture
@@ -507,18 +509,18 @@ def test_newrelic_interference(init_celery, newrelic_order, celery_invocation):
     def instrument_newrelic():
         try:
             # older newrelic versions
+            import celery.app.trace as celery_trace_module
             from newrelic.hooks.application_celery import (
                 instrument_celery_execute_trace,
             )
-            import celery.app.trace as celery_trace_module
 
             assert hasattr(celery_trace_module, "build_tracer")
             instrument_celery_execute_trace(celery_trace_module)
 
         except ImportError:
             # newer newrelic versions
-            from newrelic.hooks.application_celery import instrument_celery_app_base
             import celery.app as celery_app_module
+            from newrelic.hooks.application_celery import instrument_celery_app_base
 
             assert hasattr(celery_app_module, "Celery")
             assert hasattr(celery_app_module.Celery, "send_task")
@@ -665,7 +667,7 @@ def test_sentry_propagate_traces_override(span_streaming, init_celery):
     @celery.task(name="dummy_task", bind=True)
     def dummy_task(self, message):
         trace_id = (
-            _get_current_streamed_span().trace_id
+            sentry_sdk.traces.get_current_span().trace_id
             if span_streaming
             else get_current_span().trace_id
         )

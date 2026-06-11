@@ -1,9 +1,9 @@
-import sentry_sdk
-from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk.scope import add_global_event_processor
-from sentry_sdk.utils import walk_exception_chain, iter_stacks
-
 from typing import TYPE_CHECKING
+
+import sentry_sdk
+from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.scope import add_global_event_processor
+from sentry_sdk.utils import iter_stacks, walk_exception_chain
 
 if TYPE_CHECKING:
     from typing import Optional

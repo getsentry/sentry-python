@@ -1,12 +1,14 @@
+from typing import TYPE_CHECKING
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
 from sentry_sdk.tracing_utils import (
     add_http_request_source,
-    should_propagate_trace,
     add_sentry_baggage_to_headers,
     has_span_streaming_enabled,
+    should_propagate_trace,
 )
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
@@ -16,10 +18,9 @@ from sentry_sdk.utils import (
     parse_url,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from typing import Any
+
     from sentry_sdk._types import Attributes
 
 

@@ -4,16 +4,18 @@ An ASGI middleware.
 Based on Tom Christie's `sentry-asgi <https://github.com/encode/sentry-asgi>`.
 """
 
-import sys
 import inspect
+import sys
 from copy import deepcopy
 from functools import partial
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.api import continue_trace
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations._asgi_common import (
     _get_headers,
+    _get_ip,
     _get_request_attributes,
     _get_request_data,
     _get_url,
@@ -22,11 +24,14 @@ from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     nullcontext,
 )
+from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.sessions import track_session
 from sentry_sdk.traces import (
-    StreamedSpan,
-    SegmentSource,
     SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE,
+)
+from sentry_sdk.traces import (
+    SegmentSource,
+    StreamedSpan,
 )
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
@@ -35,27 +40,20 @@ from sentry_sdk.tracing import (
 )
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
-    ContextVar,
-    event_from_exception,
-    HAS_REAL_CONTEXTVARS,
     CONTEXTVARS_ERROR_MESSAGE,
-    logger,
-    transaction_from_function,
+    HAS_REAL_CONTEXTVARS,
+    ContextVar,
     _get_installed_modules,
-    reraise,
     capture_internal_exceptions,
+    event_from_exception,
+    logger,
     qualname_from_function,
+    reraise,
+    transaction_from_function,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import ContextManager
-    from typing import Dict
-    from typing import Optional
-    from typing import Tuple
-    from typing import Union
+    from typing import Any, ContextManager, Dict, Optional, Tuple, Union
 
     from sentry_sdk._types import Attributes, Event, Hint
     from sentry_sdk.tracing import Span
@@ -250,6 +248,11 @@ class SentryAsgiMiddleware:
                             "network.protocol.name": ty,
                         }
 
+                        if scope.get("client") and should_send_default_pii():
+                            sentry_scope.set_attribute(
+                                SPANDATA.USER_IP_ADDRESS, _get_ip(scope)
+                            )
+
                         if ty in ("http", "websocket"):
                             if (
                                 ty == "websocket"
@@ -257,9 +260,7 @@ class SentryAsgiMiddleware:
                             ):
                                 sentry_sdk.traces.continue_trace(_get_headers(scope))
 
-                                sentry_scope.set_custom_sampling_context(
-                                    {"asgi_scope": scope}
-                                )
+                                Scope.set_custom_sampling_context({"asgi_scope": scope})
 
                                 attributes["sentry.op"] = f"{ty}.server"
                                 segment = sentry_sdk.traces.start_span(
@@ -270,9 +271,7 @@ class SentryAsgiMiddleware:
                         else:
                             sentry_sdk.traces.new_trace()
 
-                            sentry_scope.set_custom_sampling_context(
-                                {"asgi_scope": scope}
-                            )
+                            Scope.set_custom_sampling_context({"asgi_scope": scope})
 
                             attributes["sentry.op"] = OP.HTTP_SERVER
                             segment = sentry_sdk.traces.start_span(

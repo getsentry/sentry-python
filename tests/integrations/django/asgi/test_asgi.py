@@ -1,15 +1,18 @@
-import base64
-import sys
-import json
-import inspect
 import asyncio
+import base64
+import inspect
+import json
 import os
+import sys
 from unittest import mock
 
 import django
 import pytest
 from channels.testing import HttpCommunicator
+
+import sentry_sdk
 from sentry_sdk import capture_message
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.django.asgi import _asgi_middleware_mixin_factory
 from tests.integrations.django.myapp.asgi import channels_application
@@ -27,84 +30,160 @@ if django.VERSION >= (3, 0):
     APPS += [asgi_application]
 
 
+@pytest.fixture
+def make_asgi_application():
+    """Build a fresh ASGI application. Call AFTER sentry_init so middleware
+    instrumentation is installed before Django builds the middleware chain."""
+    from django.core.asgi import get_asgi_application
+
+    return get_asgi_application
+
+
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 0), reason="Django ASGI support shipped in 3.0"
 )
-async def test_basic(sentry_init, capture_events, application):
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_basic(
+    sentry_init,
+    capture_events,
+    capture_items,
+    application,
+    span_streaming,
+):
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-
-    events = capture_events()
 
     import channels  # type: ignore[import-not-found]
 
-    if (
-        sys.version_info < (3, 9)
-        and channels.__version__ < "4.0.0"
-        and django.VERSION >= (3, 0)
-        and django.VERSION < (4, 0)
-    ):
-        # We emit a UserWarning for channels 2.x and 3.x on Python 3.8 and older
-        # because the async support was not really good back then and there is a known issue.
-        # See the TreadingIntegration for details.
-        with pytest.warns(UserWarning):
+    if span_streaming:
+        items = capture_items("event")
+
+        if (
+            sys.version_info < (3, 9)
+            and channels.__version__ < "4.0.0"
+            and django.VERSION >= (3, 0)
+            and django.VERSION < (4, 0)
+        ):
+            # We emit a UserWarning for channels 2.x and 3.x on Python 3.8 and older
+            # because the async support was not really good back then and there is a known issue.
+            # See the TreadingIntegration for details.
+            with pytest.warns(UserWarning):
+                comm = HttpCommunicator(application, "GET", "/view-exc?test=query")
+                response = await comm.get_response()
+                await comm.wait()
+        else:
             comm = HttpCommunicator(application, "GET", "/view-exc?test=query")
             response = await comm.get_response()
             await comm.wait()
+
+        assert response["status"] == 500
+
+        (event,) = (item.payload for item in items if item.type == "event")
+
+        (exception,) = event["exception"]["values"]
+        assert exception["type"] == "ZeroDivisionError"
+
+        # Test that the ASGI middleware got set up correctly. Right now this needs
+        # to be installed manually (see myapp/asgi.py)
+        assert event["transaction"] == "/view-exc"
+        assert event["request"] == {
+            "cookies": {},
+            "headers": {},
+            "method": "GET",
+            "query_string": "test=query",
+            "url": "/view-exc",
+        }
+
+        capture_message("hi")
+        event = items[-1].payload
     else:
-        comm = HttpCommunicator(application, "GET", "/view-exc?test=query")
-        response = await comm.get_response()
-        await comm.wait()
+        events = capture_events()
 
-    assert response["status"] == 500
+        if (
+            sys.version_info < (3, 9)
+            and channels.__version__ < "4.0.0"
+            and django.VERSION >= (3, 0)
+            and django.VERSION < (4, 0)
+        ):
+            # We emit a UserWarning for channels 2.x and 3.x on Python 3.8 and older
+            # because the async support was not really good back then and there is a known issue.
+            # See the TreadingIntegration for details.
+            with pytest.warns(UserWarning):
+                comm = HttpCommunicator(application, "GET", "/view-exc?test=query")
+                response = await comm.get_response()
+                await comm.wait()
+        else:
+            comm = HttpCommunicator(application, "GET", "/view-exc?test=query")
+            response = await comm.get_response()
+            await comm.wait()
 
-    (event,) = events
+        assert response["status"] == 500
 
-    (exception,) = event["exception"]["values"]
-    assert exception["type"] == "ZeroDivisionError"
+        (event,) = events
 
-    # Test that the ASGI middleware got set up correctly. Right now this needs
-    # to be installed manually (see myapp/asgi.py)
-    assert event["transaction"] == "/view-exc"
-    assert event["request"] == {
-        "cookies": {},
-        "headers": {},
-        "method": "GET",
-        "query_string": "test=query",
-        "url": "/view-exc",
-    }
+        (exception,) = event["exception"]["values"]
+        assert exception["type"] == "ZeroDivisionError"
 
-    capture_message("hi")
-    event = events[-1]
+        # Test that the ASGI middleware got set up correctly. Right now this needs
+        # to be installed manually (see myapp/asgi.py)
+        assert event["transaction"] == "/view-exc"
+        assert event["request"] == {
+            "cookies": {},
+            "headers": {},
+            "method": "GET",
+            "query_string": "test=query",
+            "url": "/view-exc",
+        }
+
+        capture_message("hi")
+        event = events[-1]
+
     assert "request" not in event
 
 
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
-async def test_async_views(sentry_init, capture_events, application):
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_async_views(
+    sentry_init,
+    capture_events,
+    capture_items,
+    application,
+    span_streaming,
+):
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    events = capture_events()
-
     comm = HttpCommunicator(application, "GET", "/async_message")
-    response = await comm.get_response()
-    await comm.wait()
+    if span_streaming:
+        items = capture_items("event")
 
-    assert response["status"] == 200
+        response = await comm.get_response()
+        await comm.wait()
 
-    (event,) = events
+        assert response["status"] == 200
+
+        (event,) = (item.payload for item in items if item.type == "event")
+    else:
+        events = capture_events()
+
+        response = await comm.get_response()
+        await comm.wait()
+
+        assert response["status"] == 200
+
+        (event,) = events
 
     assert event["transaction"] == "/async_message"
     assert event["request"] == {
@@ -120,93 +199,113 @@ async def test_async_views(sentry_init, capture_events, application):
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
 @pytest.mark.parametrize("middleware_spans", [False, True])
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
+@pytest.mark.parametrize("span_streaming", [True, False])
 async def test_active_thread_id(
     sentry_init,
     capture_envelopes,
+    capture_items,
     teardown_profiling,
     endpoint,
     application,
     middleware_spans,
+    span_streaming,
 ):
-    with mock.patch(
-        "sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0
-    ):
-        sentry_init(
-            integrations=[DjangoIntegration(middleware_spans=middleware_spans)],
-            traces_sample_rate=1.0,
-            profiles_sample_rate=1.0,
-        )
+    sentry_init(
+        integrations=[DjangoIntegration(middleware_spans=middleware_spans)],
+        traces_sample_rate=1.0,
+        profiles_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
 
-        envelopes = capture_envelopes()
+    comm = HttpCommunicator(application, "GET", endpoint)
 
-        comm = HttpCommunicator(application, "GET", endpoint)
-        response = await comm.get_response()
-        await comm.wait()
+    if span_streaming:
+        with mock.patch(
+            "sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0
+        ):
+            items = capture_items("span")
+            response = await comm.get_response()
+            await comm.wait()
 
-        assert response["status"] == 200, response["body"]
+            assert response["status"] == 200, response["body"]
 
-    assert len(envelopes) == 1
+        data = json.loads(response["body"])
 
-    profiles = [item for item in envelopes[0].items if item.type == "profile"]
-    assert len(profiles) == 1
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
 
-    data = json.loads(response["body"])
+        for span in spans:
+            if span["is_segment"] is False:
+                continue
+            assert str(data["active"]) == span["attributes"]["thread.id"]
+    else:
+        with mock.patch(
+            "sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0
+        ):
+            envelopes = capture_envelopes()
+            response = await comm.get_response()
+            await comm.wait()
 
-    for item in profiles:
-        transactions = item.payload.json["transactions"]
+            assert response["status"] == 200, response["body"]
+
+        assert len(envelopes) == 1
+
+        profiles = [item for item in envelopes[0].items if item.type == "profile"]
+        assert len(profiles) == 1
+
+        data = json.loads(response["body"])
+
+        for item in profiles:
+            transactions = item.payload.json["transactions"]
+            assert len(transactions) == 1
+            assert str(data["active"]) == transactions[0]["active_thread_id"]
+
+        transactions = [
+            item for item in envelopes[0].items if item.type == "transaction"
+        ]
         assert len(transactions) == 1
-        assert str(data["active"]) == transactions[0]["active_thread_id"]
 
-    transactions = [item for item in envelopes[0].items if item.type == "transaction"]
-    assert len(transactions) == 1
-
-    for item in transactions:
-        transaction = item.payload.json
-        trace_context = transaction["contexts"]["trace"]
-        assert str(data["active"]) == trace_context["data"]["thread.id"]
+        for item in transactions:
+            transaction = item.payload.json
+            trace_context = transaction["contexts"]["trace"]
+            assert str(data["active"]) == trace_context["data"]["thread.id"]
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
-async def test_async_views_concurrent_execution(sentry_init, settings):
-    import asyncio
+async def test_async_views_concurrent_execution(
+    sentry_init, settings, make_asgi_application
+):
     import time
 
     settings.MIDDLEWARE = []
-    asgi_application.load_middleware(is_async=True)
-
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
     )
 
-    comm = HttpCommunicator(
-        asgi_application, "GET", "/my_async_view"
-    )  # sleeps for 1 second
+    application = make_asgi_application()
+
+    comm = HttpCommunicator(application, "GET", "/my_async_view")  # sleeps for 1 second
     comm2 = HttpCommunicator(
-        asgi_application, "GET", "/my_async_view"
+        application, "GET", "/my_async_view"
     )  # sleeps for 1 second
 
-    loop = asyncio.get_event_loop()
+    start = time.monotonic()
+    resp1, resp2 = await asyncio.gather(
+        comm.get_response(timeout=5),
+        comm2.get_response(timeout=5),
+    )
+    await asyncio.gather(comm.wait(), comm2.wait())
+    end = time.monotonic()
 
-    start = time.time()
-
-    r1 = loop.create_task(comm.get_response(timeout=5))
-    r2 = loop.create_task(comm2.get_response(timeout=5))
-
-    (resp1, resp2), _ = await asyncio.wait({r1, r2})
-
-    end = time.time()
-
-    assert resp1.result()["status"] == 200
-    assert resp2.result()["status"] == 200
+    assert resp1["status"] == 200
+    assert resp2["status"] == 200
 
     assert (
         end - start < 2
@@ -214,46 +313,39 @@ async def test_async_views_concurrent_execution(sentry_init, settings):
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
 async def test_async_middleware_that_is_function_concurrent_execution(
-    sentry_init, settings
+    sentry_init, settings, make_asgi_application
 ):
-    import asyncio
     import time
 
     settings.MIDDLEWARE = [
         "tests.integrations.django.myapp.middleware.simple_middleware"
     ]
-    asgi_application.load_middleware(is_async=True)
-
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
     )
 
-    comm = HttpCommunicator(
-        asgi_application, "GET", "/my_async_view"
-    )  # sleeps for 1 second
+    application = make_asgi_application()
+
+    comm = HttpCommunicator(application, "GET", "/my_async_view")  # sleeps for 1 second
     comm2 = HttpCommunicator(
-        asgi_application, "GET", "/my_async_view"
+        application, "GET", "/my_async_view"
     )  # sleeps for 1 second
 
-    loop = asyncio.get_event_loop()
+    start = time.monotonic()
+    resp1, resp2 = await asyncio.gather(
+        comm.get_response(timeout=5),
+        comm2.get_response(timeout=5),
+    )
+    await asyncio.gather(comm.wait(), comm2.wait())
+    end = time.monotonic()
 
-    start = time.time()
-
-    r1 = loop.create_task(comm.get_response(timeout=5))
-    r2 = loop.create_task(comm2.get_response(timeout=5))
-
-    (resp1, resp2), _ = await asyncio.wait({r1, r2})
-
-    end = time.time()
-
-    assert resp1.result()["status"] == 200
-    assert resp2.result()["status"] == 200
+    assert resp1["status"] == 200
+    assert resp2["status"] == 200
 
     assert (
         end - start < 2
@@ -261,12 +353,18 @@ async def test_async_middleware_that_is_function_concurrent_execution(
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
+@pytest.mark.parametrize("span_streaming", [True, False])
 async def test_async_middleware_spans(
-    sentry_init, render_span_tree, capture_events, settings
+    sentry_init,
+    render_span_tree,
+    capture_events,
+    capture_items,
+    settings,
+    span_streaming,
+    make_asgi_application,
 ):
     settings.MIDDLEWARE = [
         "django.contrib.sessions.middleware.SessionMiddleware",
@@ -274,90 +372,168 @@ async def test_async_middleware_spans(
         "django.middleware.csrf.CsrfViewMiddleware",
         "tests.integrations.django.myapp.settings.TestMiddleware",
     ]
-    asgi_application.load_middleware(is_async=True)
-
     sentry_init(
         integrations=[DjangoIntegration(middleware_spans=True)],
         traces_sample_rate=1.0,
-        _experiments={"record_sql_params": True},
+        _experiments={
+            "record_sql_params": True,
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
     )
 
-    events = capture_events()
+    application = make_asgi_application()
 
-    comm = HttpCommunicator(asgi_application, "GET", "/simple_async_view")
-    response = await comm.get_response()
-    await comm.wait()
+    comm = HttpCommunicator(application, "GET", "/simple_async_view")
+    if span_streaming:
+        items = capture_items("span")
 
-    assert response["status"] == 200
+        response = await comm.get_response()
+        await comm.wait()
 
-    (transaction,) = events
+        assert response["status"] == 200
 
-    assert transaction["type"] == "transaction"
-    assert (
-        render_span_tree(transaction["spans"], transaction["contexts"]["trace"])
-        == """\
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+
+        # Filter out signal-receiver spans — their ordering depends on Django
+        # module import order and is not what this middleware test verifies.
+        spans = [s for s in spans if s["attributes"].get("sentry.op") != "event.django"]
+
+        assert (
+            render_span_tree(spans)
+            == """\
+- sentry.op="http.server": name="/simple_async_view"
+  - sentry.op="middleware.django": name="django.contrib.sessions.middleware.SessionMiddleware.__acall__"
+    - sentry.op="middleware.django": name="django.contrib.auth.middleware.AuthenticationMiddleware.__acall__"
+      - sentry.op="middleware.django": name="django.middleware.csrf.CsrfViewMiddleware.__acall__"
+        - sentry.op="middleware.django": name="tests.integrations.django.myapp.settings.TestMiddleware.__acall__"
+          - sentry.op="middleware.django": name="django.middleware.csrf.CsrfViewMiddleware.process_view"
+          - sentry.op="view.render": name="simple_async_view\""""
+        )
+    else:
+        events = capture_events()
+
+        response = await comm.get_response()
+        await comm.wait()
+
+        assert response["status"] == 200
+
+        (transaction,) = events
+
+        assert transaction["type"] == "transaction"
+
+        # Filter out signal-receiver spans — their ordering depends on Django
+        # module import order and is not what this middleware test verifies.
+        spans = [s for s in transaction["spans"] if s.get("op") != "event.django"]
+
+        assert (
+            render_span_tree(spans, transaction["contexts"]["trace"])
+            == """\
 - op="http.server": description=null
-  - op="event.django": description="django.db.reset_queries"
-  - op="event.django": description="django.db.close_old_connections"
   - op="middleware.django": description="django.contrib.sessions.middleware.SessionMiddleware.__acall__"
     - op="middleware.django": description="django.contrib.auth.middleware.AuthenticationMiddleware.__acall__"
       - op="middleware.django": description="django.middleware.csrf.CsrfViewMiddleware.__acall__"
         - op="middleware.django": description="tests.integrations.django.myapp.settings.TestMiddleware.__acall__"
           - op="middleware.django": description="django.middleware.csrf.CsrfViewMiddleware.process_view"
-          - op="view.render": description="simple_async_view"
-  - op="event.django": description="django.db.close_old_connections"
-  - op="event.django": description="django.core.cache.close_caches"
-  - op="event.django": description="django.core.handlers.base.reset_urlconf\""""
-    )
+          - op="view.render": description="simple_async_view\""""
+        )
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
-async def test_has_trace_if_performance_enabled(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_has_trace_if_performance_enabled(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-
-    events = capture_events()
 
     comm = HttpCommunicator(asgi_application, "GET", "/view-exc-with-msg")
-    response = await comm.get_response()
-    await comm.wait()
+    if span_streaming:
+        items = capture_items("event", "span")
 
-    assert response["status"] == 500
+        response = await comm.get_response()
+        await comm.wait()
 
-    (msg_event, error_event, transaction_event) = events
+        assert response["status"] == 500
 
-    assert (
-        msg_event["contexts"]["trace"]["trace_id"]
-        == error_event["contexts"]["trace"]["trace_id"]
-        == transaction_event["contexts"]["trace"]["trace_id"]
-    )
+        (
+            msg_event,
+            error_event,
+        ) = (item.payload for item in items if item.type == "event")
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[6]["is_segment"] is True
+
+        assert (
+            msg_event["contexts"]["trace"]["trace_id"]
+            == error_event["contexts"]["trace"]["trace_id"]
+            == spans[6]["trace_id"]
+        )
+    else:
+        events = capture_events()
+
+        response = await comm.get_response()
+        await comm.wait()
+
+        assert response["status"] == 500
+
+        (msg_event, error_event, transaction_event) = events
+
+        assert (
+            msg_event["contexts"]["trace"]["trace_id"]
+            == error_event["contexts"]["trace"]["trace_id"]
+            == transaction_event["contexts"]["trace"]["trace_id"]
+        )
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
-async def test_has_trace_if_performance_disabled(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_has_trace_if_performance_disabled(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
     sentry_init(
         integrations=[DjangoIntegration()],
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    events = capture_events()
-
     comm = HttpCommunicator(asgi_application, "GET", "/view-exc-with-msg")
-    response = await comm.get_response()
-    await comm.wait()
+    if span_streaming:
+        items = capture_items("event")
 
-    assert response["status"] == 500
+        response = await comm.get_response()
+        await comm.wait()
 
-    (msg_event, error_event) = events
+        assert response["status"] == 500
+
+        (
+            msg_event,
+            error_event,
+        ) = (item.payload for item in items if item.type == "event")
+    else:
+        events = capture_events()
+
+        response = await comm.get_response()
+        await comm.wait()
+
+        assert response["status"] == 500
+
+        (msg_event, error_event) = events
 
     assert msg_event["contexts"]["trace"]
     assert "trace_id" in msg_event["contexts"]["trace"]
@@ -371,17 +547,21 @@ async def test_has_trace_if_performance_disabled(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
-async def test_trace_from_headers_if_performance_enabled(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_trace_from_headers_if_performance_enabled(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-
-    events = capture_events()
 
     trace_id = "582b43a4192642f0b136d5159a501701"
     sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
@@ -392,29 +572,57 @@ async def test_trace_from_headers_if_performance_enabled(sentry_init, capture_ev
         "/view-exc-with-msg",
         headers=[(b"sentry-trace", sentry_trace_header.encode())],
     )
-    response = await comm.get_response()
-    await comm.wait()
 
-    assert response["status"] == 500
+    if span_streaming:
+        items = capture_items("event", "span")
 
-    (msg_event, error_event, transaction_event) = events
+        response = await comm.get_response()
+        await comm.wait()
 
-    assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
-    assert error_event["contexts"]["trace"]["trace_id"] == trace_id
-    assert transaction_event["contexts"]["trace"]["trace_id"] == trace_id
+        assert response["status"] == 500
+
+        (
+            msg_event,
+            error_event,
+        ) = (item.payload for item in items if item.type == "event")
+
+        assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
+        assert error_event["contexts"]["trace"]["trace_id"] == trace_id
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[6]["is_segment"] is True
+        assert spans[6]["trace_id"] == trace_id
+    else:
+        events = capture_events()
+
+        response = await comm.get_response()
+        await comm.wait()
+
+        assert response["status"] == 500
+
+        (msg_event, error_event, transaction_event) = events
+
+        assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
+        assert error_event["contexts"]["trace"]["trace_id"] == trace_id
+        assert transaction_event["contexts"]["trace"]["trace_id"] == trace_id
 
 
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
-async def test_trace_from_headers_if_performance_disabled(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_trace_from_headers_if_performance_disabled(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
     sentry_init(
         integrations=[DjangoIntegration()],
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-
-    events = capture_events()
 
     trace_id = "582b43a4192642f0b136d5159a501701"
     sentry_trace_header = "{}-{}-{}".format(trace_id, "6e8f22c393e68f19", 1)
@@ -425,12 +633,27 @@ async def test_trace_from_headers_if_performance_disabled(sentry_init, capture_e
         "/view-exc-with-msg",
         headers=[(b"sentry-trace", sentry_trace_header.encode())],
     )
-    response = await comm.get_response()
-    await comm.wait()
 
-    assert response["status"] == 500
+    if span_streaming:
+        items = capture_items("event")
 
-    (msg_event, error_event) = events
+        response = await comm.get_response()
+        await comm.wait()
+
+        assert response["status"] == 500
+
+        (msg_event, error_event) = (
+            item.payload for item in items if item.type == "event"
+        )
+    else:
+        events = capture_events()
+
+        response = await comm.get_response()
+        await comm.wait()
+
+        assert response["status"] == 500
+
+        (msg_event, error_event) = events
 
     assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
     assert error_event["contexts"]["trace"]["trace_id"] == trace_id
@@ -536,13 +759,14 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
     ],
 )
 @pytest.mark.asyncio
-@pytest.mark.forked
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
+@pytest.mark.parametrize("span_streaming", [True, False])
 async def test_asgi_request_body(
     sentry_init,
     capture_envelopes,
+    capture_items,
     application,
     send_default_pii,
     method,
@@ -550,13 +774,13 @@ async def test_asgi_request_body(
     url_name,
     body,
     expected_data,
+    span_streaming,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=send_default_pii,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-
-    envelopes = capture_envelopes()
 
     comm = HttpCommunicator(
         application,
@@ -565,14 +789,29 @@ async def test_asgi_request_body(
         path=reverse(url_name),
         body=body,
     )
-    response = await comm.get_response()
-    await comm.wait()
 
-    assert response["status"] == 200
-    assert response["body"] == body
+    if span_streaming:
+        items = capture_items("event")
 
-    (envelope,) = envelopes
-    event = envelope.get_event()
+        response = await comm.get_response()
+        await comm.wait()
+
+        assert response["status"] == 200
+        assert response["body"] == body
+
+        sentry_sdk.flush()
+        (event,) = (item.payload for item in items if item.type == "event")
+    else:
+        envelopes = capture_envelopes()
+
+        response = await comm.get_response()
+        await comm.wait()
+
+        assert response["status"] == 200
+        assert response["body"] == body
+
+        (envelope,) = envelopes
+        event = envelope.get_event()
 
     if expected_data is not None:
         assert event["request"]["data"] == expected_data
@@ -650,21 +889,39 @@ def test_asgi_mixin_iscoroutinefunction_when_not_async_after_3_12():
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
 )
-async def test_async_view(sentry_init, capture_events, application):
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_async_view(
+    sentry_init,
+    capture_events,
+    capture_items,
+    application,
+    span_streaming,
+):
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
-    events = capture_events()
-
     comm = HttpCommunicator(application, "GET", "/simple_async_view")
-    await comm.get_response()
-    await comm.wait()
+    if span_streaming:
+        items = capture_items("span")
 
-    (event,) = events
-    assert event["type"] == "transaction"
-    assert event["transaction"] == "/simple_async_view"
+        await comm.get_response()
+        await comm.wait()
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        assert spans[5]["name"] == "/simple_async_view"
+    else:
+        events = capture_events()
+
+        await comm.get_response()
+        await comm.wait()
+
+        (event,) = events
+        assert event["type"] == "transaction"
+        assert event["transaction"] == "/simple_async_view"
 
 
 @pytest.mark.parametrize("application", APPS)
@@ -672,8 +929,13 @@ async def test_async_view(sentry_init, capture_events, application):
 @pytest.mark.skipif(
     django.VERSION < (3, 0), reason="Django ASGI support shipped in 3.0"
 )
+@pytest.mark.parametrize("span_streaming", [True, False])
 async def test_transaction_http_method_default(
-    sentry_init, capture_events, application
+    sentry_init,
+    capture_events,
+    capture_items,
+    application,
+    span_streaming,
 ):
     """
     By default OPTIONS and HEAD requests do not create a transaction.
@@ -681,25 +943,45 @@ async def test_transaction_http_method_default(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-    events = capture_events()
+    if span_streaming:
+        items = capture_items("span")
 
-    comm = HttpCommunicator(application, "GET", "/simple_async_view")
-    await comm.get_response()
-    await comm.wait()
+        comm = HttpCommunicator(application, "GET", "/simple_async_view")
+        await comm.get_response()
+        await comm.wait()
 
-    comm = HttpCommunicator(application, "OPTIONS", "/simple_async_view")
-    await comm.get_response()
-    await comm.wait()
+        comm = HttpCommunicator(application, "OPTIONS", "/simple_async_view")
+        await comm.get_response()
+        await comm.wait()
 
-    comm = HttpCommunicator(application, "HEAD", "/simple_async_view")
-    await comm.get_response()
-    await comm.wait()
+        comm = HttpCommunicator(application, "HEAD", "/simple_async_view")
+        await comm.get_response()
+        await comm.wait()
 
-    (event,) = events
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        assert spans[5]["attributes"]["http.request.method"] == "GET"
+    else:
+        events = capture_events()
 
-    assert len(events) == 1
-    assert event["request"]["method"] == "GET"
+        comm = HttpCommunicator(application, "GET", "/simple_async_view")
+        await comm.get_response()
+        await comm.wait()
+
+        comm = HttpCommunicator(application, "OPTIONS", "/simple_async_view")
+        await comm.get_response()
+        await comm.wait()
+
+        comm = HttpCommunicator(application, "HEAD", "/simple_async_view")
+        await comm.get_response()
+        await comm.wait()
+
+        (event,) = events
+
+        assert len(events) == 1
+        assert event["request"]["method"] == "GET"
 
 
 @pytest.mark.parametrize("application", APPS)
@@ -707,7 +989,14 @@ async def test_transaction_http_method_default(
 @pytest.mark.skipif(
     django.VERSION < (3, 0), reason="Django ASGI support shipped in 3.0"
 )
-async def test_transaction_http_method_custom(sentry_init, capture_events, application):
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_transaction_http_method_custom(
+    sentry_init,
+    capture_events,
+    capture_items,
+    application,
+    span_streaming,
+):
     sentry_init(
         integrations=[
             DjangoIntegration(
@@ -718,23 +1007,45 @@ async def test_transaction_http_method_custom(sentry_init, capture_events, appli
             )
         ],
         traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-    events = capture_events()
+    if span_streaming:
+        items = capture_items("span")
 
-    comm = HttpCommunicator(application, "GET", "/simple_async_view")
-    await comm.get_response()
-    await comm.wait()
+        comm = HttpCommunicator(application, "GET", "/simple_async_view")
+        await comm.get_response()
+        await comm.wait()
 
-    comm = HttpCommunicator(application, "OPTIONS", "/simple_async_view")
-    await comm.get_response()
-    await comm.wait()
+        comm = HttpCommunicator(application, "OPTIONS", "/simple_async_view")
+        await comm.get_response()
+        await comm.wait()
 
-    comm = HttpCommunicator(application, "HEAD", "/simple_async_view")
-    await comm.get_response()
-    await comm.wait()
+        comm = HttpCommunicator(application, "HEAD", "/simple_async_view")
+        await comm.get_response()
+        await comm.wait()
 
-    assert len(events) == 2
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
 
-    (event1, event2) = events
-    assert event1["request"]["method"] == "OPTIONS"
-    assert event2["request"]["method"] == "HEAD"
+        assert spans[10]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "OPTIONS"
+        assert spans[16]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "HEAD"
+    else:
+        events = capture_events()
+
+        comm = HttpCommunicator(application, "GET", "/simple_async_view")
+        await comm.get_response()
+        await comm.wait()
+
+        comm = HttpCommunicator(application, "OPTIONS", "/simple_async_view")
+        await comm.get_response()
+        await comm.wait()
+
+        comm = HttpCommunicator(application, "HEAD", "/simple_async_view")
+        await comm.get_response()
+        await comm.wait()
+
+        assert len(events) == 2
+
+        (event1, event2) = events
+        assert event1["request"]["method"] == "OPTIONS"
+        assert event2["request"]["method"] == "HEAD"

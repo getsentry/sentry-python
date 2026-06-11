@@ -3,27 +3,12 @@
 # The template responsible for it is in
 # scripts/split_tox_gh_actions/templates/base.jinja
 name: Test Network
+# Reusable workflow. It is invoked by the top-level `test.yml` orchestrator.
 on:
-  push:
-    branches:
-      - master
-      - release/**
-      - major/**
-  pull_request:
-# Cancel in progress workflows on pull_requests.
-# https://docs.github.com/en/actions/using-jobs/using-concurrency#example-using-a-fallback-value
-concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
-  cancel-in-progress: true
+  workflow_call:
 permissions:
   contents: read
   actions: read
-  pull-requests: write
-  statuses: write
-env:
-  BUILD_CACHE_KEY: ${{ github.sha }}
-  CACHED_BUILD_PATHS: |
-    ${{ github.workspace }}/dist-serverless
 jobs:
   test-network:
     name: Network
@@ -33,26 +18,25 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.6","3.7","3.8","3.9","3.10","3.11","3.12","3.13","3.14","3.14t"]
-        # python3.6 reached EOL and is no longer being supported on
-        # new versions of hosted runners on Github Actions
-        # ubuntu-20.04 is the last version that supported python3.6
-        # see https://github.com/actions/setup-python/issues/544#issuecomment-1332535877
         os: [ubuntu-22.04]
-    # Use Docker container only for Python 3.6
-    container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
+    env:
+      # 3.6/3.7 run in the python:X.Y container; tell uv to use that system Python.
+      TOX_UV_PYTHON_PREFERENCE: ${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'only-system' || 'managed' }}
+    container: ${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && format('python:{0}', matrix.python-version) || null }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
-        if: ${{ matrix.python-version != '3.6' }}
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          python-version: ${{ matrix.python-version }}
-          allow-prereleases: true
+          enable-cache: false
+      - name: Mark workspace safe for git (3.6/3.7 container)
+        # needed to make git rev-parse work in the containers
+        # subprocesses (e.g. sentry_sdk.utils.get_git_revision) can run git.
+        if: ${{ matrix.python-version == '3.6' || matrix.python-version == '3.7' }}
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Setup Test Env
         run: |
-          pip install "coverage[toml]" tox
-      - name: Erase coverage
-        run: |
-          coverage erase
+          uv sync
       - name: Test grpc
         run: |
           set -x # print commands that are executed
@@ -61,6 +45,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-httpx"
+      - name: Test httpx2
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-httpx2"
       - name: Test pyreqwest
         run: |
           set -x # print commands that are executed
@@ -69,34 +57,17 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-requests"
-      - name: Generate coverage XML (Python 3.6)
-        if: ${{ !cancelled() && matrix.python-version == '3.6' }}
-        run: |
-          export COVERAGE_RCFILE=.coveragerc36
-          coverage combine .coverage-sentry-*
-          coverage xml --ignore-errors
-      - name: Generate coverage XML
-        if: ${{ !cancelled() && matrix.python-version != '3.6' }}
-        run: |
-          coverage combine .coverage-sentry-*
-          coverage xml
-      - name: Parse and Upload Coverage
+      - name: Upload coverage data
         if: ${{ !cancelled() }}
-        uses: getsentry/codecov-action@fda17cfc37e16a0cc23f61685813390bfee7daf3 # main
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          files: coverage.xml
-          junit-xml-pattern: .junitxml
-          base-branch: master
-          verbose: true
-  check_required_tests:
-    name: All Network tests passed
-    needs: test-network
-    # Always run this, even if a dependent job failed
-    if: always()
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Check for failures
-        if: needs.test-network.result != 'success'
-        run: |
-          echo "One of the dependent jobs has failed. You may need to re-run it." && exit 1
+          name: coverage-network-${{ matrix.python-version }}
+          # .coverage-* / .junitxml-* are dotfiles, excluded by default
+          include-hidden-files: true
+          path: |
+            .coverage-sentry-*
+            .junitxml-*
+          if-no-files-found: 'ignore'
+          retention-days: 1
+          overwrite: true

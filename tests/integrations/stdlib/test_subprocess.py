@@ -1,5 +1,4 @@
 import os
-import sentry_sdk
 import platform
 import subprocess
 import sys
@@ -7,6 +6,7 @@ from collections.abc import Mapping
 
 import pytest
 
+import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.stdlib import StdlibIntegration
@@ -67,7 +67,7 @@ def test_subprocess_basic(
     )
 
     if span_streaming:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("event", "span")
 
         with sentry_sdk.traces.start_span(name="custom parent") as span:
             args = [
@@ -350,7 +350,7 @@ def test_subprocess_span_origin(
     )
 
     if span_streaming:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("span")
 
         with sentry_sdk.traces.start_span(name="custom parent"):
             args = [
@@ -365,7 +365,7 @@ def test_subprocess_span_origin(
             popen.poll()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert spans[3]["attributes"]["sentry.origin"] == "manual"
 

@@ -1,14 +1,16 @@
-from abc import ABC, abstractmethod
 import asyncio
-import io
-import os
 import gzip
+import io
+import json
+import logging
+import os
 import socket
 import ssl
 import time
 import warnings
-from datetime import datetime, timedelta, timezone
+from abc import ABC, abstractmethod
 from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 from urllib.request import getproxies
 
 try:
@@ -35,36 +37,37 @@ try:
 except ImportError:
     ASYNC_TRANSPORT_AVAILABLE = False
 
-import urllib3
+from typing import TYPE_CHECKING, Dict, List, cast
+
 import certifi
+import urllib3
 
 import sentry_sdk
 from sentry_sdk.consts import EndpointType
+from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk.utils import (
     Dsn,
-    logger,
     capture_internal_exceptions,
+    logger,
     mark_sentry_task_internal,
 )
-from sentry_sdk.worker import BackgroundWorker, Worker, AsyncWorker
-from sentry_sdk.envelope import Envelope, Item, PayloadRef
-
-from typing import TYPE_CHECKING, cast, List, Dict
+from sentry_sdk.worker import AsyncWorker, BackgroundWorker, Worker
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import DefaultDict
-    from typing import Iterable
-    from typing import Mapping
-    from typing import Optional
-    from typing import Self
-    from typing import Tuple
-    from typing import Type
-    from typing import Union
+    from typing import (
+        Any,
+        Callable,
+        DefaultDict,
+        Iterable,
+        Mapping,
+        Optional,
+        Self,
+        Tuple,
+        Type,
+        Union,
+    )
 
-    from urllib3.poolmanager import PoolManager
-    from urllib3.poolmanager import ProxyManager
+    from urllib3.poolmanager import PoolManager, ProxyManager
 
     from sentry_sdk._types import Event, EventDataCategory
 
@@ -1081,6 +1084,83 @@ else:
             return httpcore.ConnectionPool(**opts)
 
 
+class _EnvelopePrinterTransport(Transport):
+    """Wraps another transport, printing envelope contents to the SDK debug logger before sending."""
+
+    def __init__(self, transport: "Transport") -> None:
+        Transport.__init__(self, options=transport.options)
+        self._inner = transport
+        self.parsed_dsn = transport.parsed_dsn
+
+        self.envelope_logger = logging.getLogger("sentry_sdk.envelopes")
+        self.envelope_logger.setLevel(logging.INFO)
+        self.envelope_logger.propagate = False
+        if not self.envelope_logger.handlers:
+            handler = logging.StreamHandler()
+            handler.setLevel(logging.INFO)
+            handler.setFormatter(logging.Formatter("%(message)s"))
+            self.envelope_logger.addHandler(handler)
+
+    @property  # type: ignore[misc]
+    def __class__(self) -> type:
+        return self._inner.__class__
+
+    def capture_envelope(self, envelope: "Envelope") -> None:
+        try:
+            self.envelope_logger.info("--- Sentry Envelope ---")
+            self.envelope_logger.info(
+                "Headers: %s", json.dumps(envelope.headers, indent=2, default=str)
+            )
+            for item in envelope.items:
+                self.envelope_logger.info("  Item type: %s", item.type)
+                self.envelope_logger.info(
+                    "  Item headers: %s",
+                    json.dumps(item.headers, indent=2, default=str),
+                )
+                try:
+                    payload = json.loads(item.get_bytes())
+                    self.envelope_logger.info(
+                        "  Payload:\n%s",
+                        json.dumps(payload, indent=2, default=str),
+                    )
+                except (ValueError, TypeError):
+                    self.envelope_logger.info(
+                        "  Payload: <binary %d bytes>",
+                        len(item.get_bytes()),
+                    )
+            self.envelope_logger.info("--- End Envelope ---")
+        except Exception:
+            pass
+
+        self._inner.capture_envelope(envelope)
+
+    def flush(
+        self,
+        timeout: float,
+        callback: "Optional[Any]" = None,
+    ) -> "Any":
+        return self._inner.flush(timeout, callback)
+
+    def kill(self) -> "Any":
+        return self._inner.kill()
+
+    def record_lost_event(
+        self,
+        reason: str,
+        data_category: "Optional[EventDataCategory]" = None,
+        item: "Optional[Item]" = None,
+        *,
+        quantity: int = 1,
+    ) -> None:
+        self._inner.record_lost_event(reason, data_category, item, quantity=quantity)
+
+    def is_healthy(self) -> bool:
+        return self._inner.is_healthy()
+
+    def __getattr__(self, name: str) -> "Any":
+        return getattr(self._inner, name)
+
+
 class _FunctionTransport(Transport):
     """
     DEPRECATED: Users wishing to provide a custom transport should subclass
@@ -1147,8 +1227,10 @@ def make_transport(options: "Dict[str, Any]") -> "Optional[Transport]":
             "You tried to use AsyncHttpTransport but don't have httpcore[asyncio] installed. Falling back to sync transport."
         )
 
+    transport: "Optional[Transport]" = None
+
     if isinstance(ref_transport, Transport):
-        return ref_transport
+        transport = ref_transport
     elif isinstance(ref_transport, type) and issubclass(ref_transport, Transport):
         transport_cls = ref_transport
     elif callable(ref_transport):
@@ -1158,11 +1240,16 @@ def make_transport(options: "Dict[str, Any]") -> "Optional[Transport]":
             DeprecationWarning,
             stacklevel=2,
         )
-        return _FunctionTransport(ref_transport)
+        transport = _FunctionTransport(ref_transport)
 
     # if a transport class is given only instantiate it if the dsn is not
     # empty or None
-    if options["dsn"]:
-        return transport_cls(options)
+    if transport is None and options["dsn"]:
+        transport = transport_cls(options)
 
-    return None
+    if transport is not None and os.environ.get(
+        "SENTRY_PRINT_ENVELOPES", ""
+    ).lower() in ("1", "true", "yes"):
+        transport = _EnvelopePrinterTransport(transport)
+
+    return transport

@@ -1,11 +1,12 @@
-import pytest
 from dataclasses import asdict, dataclass
-from typing import Optional, List
+from typing import List, Optional
+
+import pytest
 
 from sentry_sdk.tracing_utils import (
+    Baggage,
     _should_be_included,
     _should_continue_trace,
-    Baggage,
 )
 from tests.conftest import TestTransportWithOptions
 
@@ -278,3 +279,10 @@ def test_should_continue_trace(
 
     baggage = Baggage.from_incoming_header(baggage_header) if baggage_header else None
     assert _should_continue_trace(baggage) == should_continue_trace
+
+
+def test_baggage_from_incoming_header_value_with_equals_sign():
+    # Baggage values that legitimately contain '=' (e.g. base64) must not be dropped
+    header = "sentry-release=v1.0==1,sentry-trace_id=abc123"
+    baggage = Baggage.from_incoming_header(header)
+    assert baggage.sentry_items == {"release": "v1.0==1", "trace_id": "abc123"}

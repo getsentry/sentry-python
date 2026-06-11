@@ -1,15 +1,12 @@
 import urllib
-
-from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.integrations._wsgi_common import _filter_headers
-
 from typing import TYPE_CHECKING
 
+from sentry_sdk.integrations._wsgi_common import _filter_headers
+from sentry_sdk.scope import should_send_default_pii
+
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Dict
-    from typing import Optional
-    from typing import Union
+    from typing import Any, Dict, Optional, Union
+
     from typing_extensions import Literal
 
     from sentry_sdk.utils import AnnotatedValue
@@ -136,6 +133,5 @@ def _get_request_attributes(asgi_scope: "Any") -> "dict[str, Any]":
     if client and should_send_default_pii():
         ip = _get_ip(asgi_scope)
         attributes["client.address"] = ip
-        attributes["user.ip_address"] = ip
 
     return attributes

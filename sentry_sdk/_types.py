@@ -145,6 +145,8 @@ if TYPE_CHECKING:
 
     from typing_extensions import Literal, TypedDict
 
+    import sentry_sdk
+
     class SDKInfo(TypedDict):
         name: str
         version: str
@@ -242,6 +244,7 @@ if TYPE_CHECKING:
             "type": Literal["check_in", "transaction"],
             "user": dict[str, object],
             "_dropped_spans": int,
+            "_has_gen_ai_span": bool,
         },
         total=False,
     )
@@ -316,6 +319,22 @@ if TYPE_CHECKING:
     )
 
     MetricProcessor = Callable[[Metric, Hint], Optional[Metric]]
+
+    SpanJSON = TypedDict(
+        "SpanJSON",
+        {
+            "trace_id": str,
+            "span_id": str,
+            "parent_span_id": NotRequired[str],
+            "name": str,
+            "status": str,
+            "is_segment": bool,
+            "start_timestamp": float,
+            "end_timestamp": NotRequired[float],
+            "attributes": NotRequired[Attributes],
+            "_segment_span": NotRequired["sentry_sdk.traces.StreamedSpan"],
+        },
+    )
 
     # TODO: Make a proper type definition for this (PRs welcome!)
     Breadcrumb = Dict[str, Any]

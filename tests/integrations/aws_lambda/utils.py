@@ -1,25 +1,24 @@
 import gzip
 import json
 import os
-import shutil
-import subprocess
-import requests
-import sys
-import time
-import threading
-import socket
 import platform
+import shutil
+import socket
+import subprocess
+import sys
+import threading
+import time
 
+import requests
+import uvicorn
 from aws_cdk import (
     CfnResource,
     Stack,
 )
 from constructs import Construct
 from fastapi import FastAPI, Request
-import uvicorn
 
-from scripts.build_aws_lambda_layer import build_packaged_zip, DIST_PATH
-
+from scripts.build_aws_lambda_layer import DIST_PATH, build_packaged_zip
 
 LAMBDA_FUNCTION_DIR = "./tests/integrations/aws_lambda/lambda_functions/"
 LAMBDA_FUNCTION_WITH_EMBEDDED_SDK_DIR = (
@@ -52,20 +51,6 @@ def get_host_ip():
     return host
 
 
-def get_project_root():
-    """
-    Returns the absolute path to the project root directory.
-    """
-    # Start from the current file's directory
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-
-    # Navigate up to the project root (4 levels up from tests/integrations/aws_lambda/)
-    # This is equivalent to the multiple dirname() calls
-    project_root = os.path.abspath(os.path.join(current_dir, "../../../"))
-
-    return project_root
-
-
 class LocalLambdaStack(Stack):
     """
     Uses the AWS CDK to create a local SAM stack containing Lambda functions.
@@ -81,10 +66,8 @@ class LocalLambdaStack(Stack):
 
         print("[LocalLambdaStack] Create Sentry Lambda layer package")
         filename = "sentry-sdk-lambda-layer.zip"
-        build_packaged_zip(
-            make_dist=True,
-            out_zip_filename=filename,
-        )
+        subprocess.check_call(["uv", "build", "-o", DIST_PATH])
+        build_packaged_zip(out_zip_filename=filename)
 
         print(
             "[LocalLambdaStack] Add Sentry Lambda layer containing the Sentry SDK to the SAM stack"
@@ -165,22 +148,16 @@ class LocalLambdaStack(Stack):
                 shutil.copytree(sdk_source, sdk_path)
 
             # Install the requirements of Sentry SDK into the function directory
-            requirements_file = os.path.join(
-                get_project_root(), "requirements-aws-lambda-layer.txt"
-            )
-
-            # Install the package using pip
             subprocess.check_call(
                 [
-                    sys.executable,
-                    "-m",
+                    "uv",
                     "pip",
                     "install",
                     "--upgrade",
+                    "--group",
+                    "aws",
                     "--target",
                     os.path.join(LAMBDA_FUNCTION_WITH_EMBEDDED_SDK_DIR, lambda_dir),
-                    "-r",
-                    requirements_file,
                 ]
             )
 
@@ -241,6 +218,7 @@ class SentryServerForTesting:
 
     def __init__(self, host="0.0.0.0", port=9999, log_level="warning"):
         self.envelopes = []
+        self.span_items = []
         self.host = host
         self.port = port
         self.log_level = log_level
@@ -269,13 +247,22 @@ class SentryServerForTesting:
                     current_line += 1
                     continue
 
-                # skip envelope item header
+                # parse envelope item header
+                item_header = json.loads(lines[current_line])
                 current_line += 1
 
-                # add envelope item to store
-                envelope_item = lines[current_line]
-                if envelope_item.strip():
-                    self.envelopes.append(json.loads(envelope_item))
+                # parse envelope item payload
+                if current_line < len(lines) and lines[current_line].strip():
+                    parsed_item = json.loads(lines[current_line])
+                    if item_header.get("type") == "span":
+                        if "items" in parsed_item:
+                            self.span_items.extend(parsed_item["items"])
+                        else:
+                            self.span_items.append(parsed_item)
+                    else:
+                        self.envelopes.append(parsed_item)
+
+                current_line += 1
 
             return {"status": "ok"}
 
@@ -292,3 +279,4 @@ class SentryServerForTesting:
     def clear_envelopes(self):
         print("[SentryServerForTesting] Clearing envelopes")
         self.envelopes = []
+        self.span_items = []

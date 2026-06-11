@@ -1,7 +1,9 @@
-import sys
 import math
-from collections.abc import Mapping, Sequence, Set
+import sys
+from array import array
+from collections.abc import Mapping
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sentry_sdk.utils import (
     AnnotatedValue,
@@ -12,19 +14,9 @@ from sentry_sdk.utils import (
     strip_string,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from types import TracebackType
-
-    from typing import Any
-    from typing import Callable
-    from typing import ContextManager
-    from typing import Dict
-    from typing import List
-    from typing import Optional
-    from typing import Type
-    from typing import Union
+    from typing import Any, Callable, ContextManager, Dict, List, Optional, Type, Union
 
     from sentry_sdk._types import NotImplementedType
 
@@ -62,7 +54,7 @@ def add_global_repr_processor(processor: "ReprProcessor") -> None:
     global_repr_processors.append(processor)
 
 
-sequence_types: "List[type]" = [Sequence, Set]
+sequence_types: "List[type]" = [tuple, list, set, frozenset, array]
 
 
 def add_repr_sequence_type(ty: type) -> None:
@@ -112,7 +104,7 @@ def serialize(event: "Dict[str, Any]", **kwargs: "Any") -> "Dict[str, Any]":
     * Annotating the payload with the _meta field whenever trimming happens.
 
     :param max_request_body_size: If set to "always", will never trim request bodies.
-    :param max_value_length: The max length to strip strings to, defaults to sentry_sdk.consts.DEFAULT_MAX_VALUE_LENGTH
+    :param max_value_length: The max length to strip strings to, or None to disable string truncation. Defaults to None.
     :param is_vars: If we're serializing vars early, we want to repr() things that are JSON-serializable to make their type more apparent. For example, it's useful to see the difference between a unicode-string and a bytestring when viewing a stacktrace.
     :param custom_repr: A custom repr function that runs before safe_repr on the object to be serialized. If it returns None or throws internally, we will fallback to safe_repr.
 

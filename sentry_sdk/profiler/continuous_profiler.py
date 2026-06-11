@@ -8,10 +8,11 @@ import uuid
 import warnings
 from collections import deque
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
+from sentry_sdk._lru_cache import LRUCache
 from sentry_sdk.consts import VERSION
 from sentry_sdk.envelope import Envelope
-from sentry_sdk._lru_cache import LRUCache
 from sentry_sdk.profiler.utils import (
     DEFAULT_SAMPLING_FREQUENCY,
     extract_stack,
@@ -24,27 +25,19 @@ from sentry_sdk.utils import (
     set_in_app_in_frames,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import Deque
-    from typing import Dict
-    from typing import List
-    from typing import Optional
-    from typing import Set
-    from typing import Type
-    from typing import Union
+    from typing import Any, Callable, Deque, Dict, List, Optional, Set, Type, Union
+
     from typing_extensions import TypedDict
+
     from sentry_sdk._types import ContinuousProfilerMode, SDKInfo
     from sentry_sdk.profiler.utils import (
         ExtractedSample,
         FrameId,
-        StackId,
-        ThreadId,
         ProcessedFrame,
         ProcessedStack,
+        StackId,
+        ThreadId,
     )
 
     ProcessedSample = TypedDict(

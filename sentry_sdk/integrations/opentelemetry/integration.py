@@ -4,10 +4,17 @@ are experimental and not suitable for production use. They may be changed or
 removed at any time without prior notice.
 """
 
+import warnings
+from typing import TYPE_CHECKING
+
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
 from sentry_sdk.integrations.opentelemetry.span_processor import SentrySpanProcessor
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import logger
+
+if TYPE_CHECKING:
+    from typing import Any, Dict, Optional
 
 try:
     from opentelemetry import trace
@@ -17,7 +24,9 @@ except ImportError:
     raise DidNotEnable("opentelemetry not installed")
 
 try:
-    from opentelemetry.instrumentation.django import DjangoInstrumentor  # type: ignore[import-not-found]
+    from opentelemetry.instrumentation.django import (  # type: ignore[import-not-found]
+        DjangoInstrumentor,
+    )
 except ImportError:
     DjangoInstrumentor = None
 
@@ -32,9 +41,24 @@ class OpenTelemetryIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        logger.warning(
-            "[OTel] Initializing highly experimental OpenTelemetry support. "
-            "Use at your own risk."
+        pass
+
+    def setup_once_with_options(
+        self, options: "Optional[Dict[str, Any]]" = None
+    ) -> None:
+        if has_span_streaming_enabled(options):
+            logger.warning(
+                "[OTel] OpenTelemetryIntegration is not compatible with span streaming "
+                "(trace_lifecycle='stream') and will be disabled."
+            )
+            return
+
+        warnings.warn(
+            "OpenTelemetryIntegration is deprecated. "
+            "Please use OTLPIntegration instead: "
+            "https://docs.sentry.io/platforms/python/integrations/otlp/",
+            DeprecationWarning,
+            stacklevel=2,
         )
 
         _setup_sentry_tracing()

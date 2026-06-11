@@ -5,15 +5,15 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk._werkzeug import _get_headers, get_host
 from sentry_sdk.api import continue_trace
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     _filter_headers,
     nullcontext,
 )
-from sentry_sdk.scope import should_send_default_pii, use_isolation_scope
+from sentry_sdk.scope import Scope, should_send_default_pii, use_isolation_scope
 from sentry_sdk.sessions import track_session
-from sentry_sdk.traces import StreamedSpan, SegmentSource
+from sentry_sdk.traces import SegmentSource, StreamedSpan
 from sentry_sdk.tracing import Span, TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -132,7 +132,14 @@ class SentryWsgiMiddleware:
                             sentry_sdk.traces.continue_trace(
                                 dict(_get_headers(environ))
                             )
-                            scope.set_custom_sampling_context({"wsgi_environ": environ})
+                            Scope.set_custom_sampling_context({"wsgi_environ": environ})
+
+                            if should_send_default_pii():
+                                client_ip = get_client_ip(environ)
+                                if client_ip:
+                                    scope.set_attribute(
+                                        SPANDATA.USER_IP_ADDRESS, client_ip
+                                    )
 
                             span_ctx = sentry_sdk.traces.start_span(
                                 name=_DEFAULT_TRANSACTION_NAME,
@@ -174,24 +181,6 @@ class SentryWsgiMiddleware:
                             )
                         except BaseException:
                             reraise(*_capture_exception())
-                        finally:
-                            if isinstance(span, StreamedSpan):
-                                already_set = (
-                                    span.name != _DEFAULT_TRANSACTION_NAME
-                                    and span.get_attributes().get("sentry.span.source")
-                                    in [
-                                        SegmentSource.COMPONENT.value,
-                                        SegmentSource.ROUTE.value,
-                                        SegmentSource.CUSTOM.value,
-                                    ]
-                                )
-                                if not already_set:
-                                    with capture_internal_exceptions():
-                                        span.name = _DEFAULT_TRANSACTION_NAME
-                                        span.set_attribute(
-                                            "sentry.span.source",
-                                            SegmentSource.ROUTE.value,
-                                        )
         finally:
             _wsgi_middleware_applied.set(False)
 
@@ -430,6 +419,5 @@ def _get_request_attributes(
         client_ip = get_client_ip(environ)
         if client_ip:
             attributes["client.address"] = client_ip
-            attributes["user.ip_address"] = client_ip
 
     return attributes

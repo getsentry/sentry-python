@@ -1,11 +1,12 @@
 from copy import deepcopy
 
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
@@ -13,13 +14,17 @@ from sentry_sdk.utils import (
 )
 
 try:
+    from pydantic import BaseModel  # type: ignore
     from starlite import Request, Starlite, State  # type: ignore
     from starlite.handlers.base import BaseRouteHandler  # type: ignore
     from starlite.middleware import DefineMiddleware  # type: ignore
     from starlite.plugins.base import get_plugin_for_value  # type: ignore
     from starlite.routes.http import HTTPRoute  # type: ignore
-    from starlite.utils import ConnectionDataExtractor, is_async_callable, Ref  # type: ignore
-    from pydantic import BaseModel  # type: ignore
+    from starlite.utils import (  # type: ignore
+        ConnectionDataExtractor,
+        Ref,
+        is_async_callable,
+    )
 except ImportError:
     raise DidNotEnable("Starlite is not installed")
 
@@ -27,6 +32,8 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Optional, Union
+
+    from starlite import MiddlewareProtocol
     from starlite.types import (  # type: ignore
         ASGIApp,
         Hint,
@@ -35,11 +42,13 @@ if TYPE_CHECKING:
         Message,
         Middleware,
         Receive,
-        Scope as StarliteScope,
         Send,
         WebSocketReceiveMessage,
     )
-    from starlite import MiddlewareProtocol
+    from starlite.types import (
+        Scope as StarliteScope,
+    )
+
     from sentry_sdk._types import Event
 
 
@@ -133,16 +142,34 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
         receive: "Receive",
         send: "Send",
     ) -> None:
-        if sentry_sdk.get_client().get_integration(StarliteIntegration) is None:
+        client = sentry_sdk.get_client()
+        if client.get_integration(StarliteIntegration) is None:
             return await old_call(self, scope, receive, send)
 
         middleware_name = self.__class__.__name__
-        with sentry_sdk.start_span(
-            op=OP.MIDDLEWARE_STARLITE,
-            name=middleware_name,
-            origin=StarliteIntegration.origin,
+        is_span_streaming_enabled = has_span_streaming_enabled(client.options)
+
+        def _start_middleware_span(op: str, name: str) -> "Any":
+            if is_span_streaming_enabled:
+                return sentry_sdk.traces.start_span(
+                    name=name,
+                    attributes={
+                        "sentry.op": op,
+                        "sentry.origin": StarliteIntegration.origin,
+                        SPANDATA.MIDDLEWARE_NAME: middleware_name,
+                    },
+                )
+            return sentry_sdk.start_span(
+                op=op,
+                name=name,
+                origin=StarliteIntegration.origin,
+            )
+
+        with _start_middleware_span(
+            op=OP.MIDDLEWARE_STARLITE, name=middleware_name
         ) as middleware_span:
-            middleware_span.set_tag("starlite.middleware_name", middleware_name)
+            if not is_span_streaming_enabled:
+                middleware_span.set_tag("starlite.middleware_name", middleware_name)
 
             # Creating spans for the "receive" callback
             async def _sentry_receive(
@@ -150,12 +177,12 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
             ) -> "Union[HTTPReceiveMessage, WebSocketReceiveMessage]":
                 if sentry_sdk.get_client().get_integration(StarliteIntegration) is None:
                     return await receive(*args, **kwargs)
-                with sentry_sdk.start_span(
+                with _start_middleware_span(
                     op=OP.MIDDLEWARE_STARLITE_RECEIVE,
                     name=getattr(receive, "__qualname__", str(receive)),
-                    origin=StarliteIntegration.origin,
                 ) as span:
-                    span.set_tag("starlite.middleware_name", middleware_name)
+                    if not is_span_streaming_enabled:
+                        span.set_tag("starlite.middleware_name", middleware_name)
                     return await receive(*args, **kwargs)
 
             receive_name = getattr(receive, "__name__", str(receive))
@@ -166,12 +193,12 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
             async def _sentry_send(message: "Message") -> None:
                 if sentry_sdk.get_client().get_integration(StarliteIntegration) is None:
                     return await send(message)
-                with sentry_sdk.start_span(
+                with _start_middleware_span(
                     op=OP.MIDDLEWARE_STARLITE_SEND,
                     name=getattr(send, "__qualname__", str(send)),
-                    origin=StarliteIntegration.origin,
                 ) as span:
-                    span.set_tag("starlite.middleware_name", middleware_name)
+                    if not is_span_streaming_enabled:
+                        span.set_tag("starlite.middleware_name", middleware_name)
                     return await send(message)
 
             send_name = getattr(send, "__name__", str(send))
@@ -211,9 +238,28 @@ def patch_http_route_handle() -> None:
 
         request_data = await body
 
-        def event_processor(event: "Event", _: "Hint") -> "Event":
-            route_handler = scope.get("route_handler")
+        route_handler = scope.get("route_handler")
 
+        func = None
+        if route_handler.name is not None:
+            name = route_handler.name
+        elif isinstance(route_handler.fn, Ref):
+            func = route_handler.fn.value
+        else:
+            func = route_handler.fn
+        if func is not None:
+            name = transaction_from_function(func)
+
+        source = SOURCE_FOR_STYLE["endpoint"]
+
+        if not name:
+            name = _DEFAULT_TRANSACTION_NAME
+            source = TransactionSource.ROUTE
+
+        sentry_sdk.set_transaction_name(name, source)
+        sentry_scope.set_transaction_name(name, source)
+
+        def event_processor(event: "Event", _: "Hint") -> "Event":
             request_info = event.get("request", {})
             request_info["content_length"] = len(scope.get("_body", b""))
             if should_send_default_pii():
@@ -221,29 +267,7 @@ def patch_http_route_handle() -> None:
             if request_data is not None:
                 request_info["data"] = request_data
 
-            func = None
-            if route_handler.name is not None:
-                tx_name = route_handler.name
-            elif isinstance(route_handler.fn, Ref):
-                func = route_handler.fn.value
-            else:
-                func = route_handler.fn
-            if func is not None:
-                tx_name = transaction_from_function(func)
-
-            tx_info = {"source": SOURCE_FOR_STYLE["endpoint"]}
-
-            if not tx_name:
-                tx_name = _DEFAULT_TRANSACTION_NAME
-                tx_info = {"source": TransactionSource.ROUTE}
-
-            event.update(
-                {
-                    "request": deepcopy(request_info),
-                    "transaction": tx_name,
-                    "transaction_info": tx_info,
-                }
-            )
+            event["request"] = deepcopy(request_info)
             return event
 
         sentry_scope._name = StarliteIntegration.identifier

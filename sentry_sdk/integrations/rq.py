@@ -1,27 +1,29 @@
+import functools
 import weakref
 
 import sentry_sdk
-from sentry_sdk.consts import OP
 from sentry_sdk.api import continue_trace
-from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
+from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.traces import SegmentSource
 from sentry_sdk.tracing import TransactionSource
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
-    ensure_integration_enabled,
     event_from_exception,
     format_timestamp,
     parse_version,
 )
 
 try:
+    from rq.job import JobStatus
     from rq.queue import Queue
     from rq.timeouts import JobTimeoutException
     from rq.version import VERSION as RQ_VERSION
     from rq.worker import Worker
-    from rq.job import JobStatus
 except ImportError:
     raise DidNotEnable("RQ not installed")
 
@@ -38,10 +40,10 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any, Callable
 
+    from rq.job import Job
+
     from sentry_sdk._types import Event, EventProcessor
     from sentry_sdk.utils import ExcInfo
-
-    from rq.job import Job
 
 
 class RqIntegration(Integration):
@@ -61,30 +63,60 @@ class RqIntegration(Integration):
 
         old_perform_job = worker_cls.perform_job
 
-        @ensure_integration_enabled(RqIntegration, old_perform_job)
+        @functools.wraps(old_perform_job)
         def sentry_patched_perform_job(
             self: "Any", job: "Job", *args: "Queue", **kwargs: "Any"
         ) -> bool:
+            client = sentry_sdk.get_client()
+            if client.get_integration(RqIntegration) is None:
+                return old_perform_job(self, job, *args, **kwargs)
+
             with sentry_sdk.new_scope() as scope:
                 scope.clear_breadcrumbs()
                 scope.add_event_processor(_make_event_processor(weakref.ref(job)))
 
-                transaction = continue_trace(
-                    job.meta.get("_sentry_trace_headers") or {},
-                    op=OP.QUEUE_TASK_RQ,
-                    name="unknown RQ task",
-                    source=TransactionSource.TASK,
-                    origin=RqIntegration.origin,
-                )
+                if has_span_streaming_enabled(client.options):
+                    sentry_sdk.traces.continue_trace(
+                        job.meta.get("_sentry_trace_headers") or {}
+                    )
 
-                with capture_internal_exceptions():
-                    transaction.name = job.func_name
+                    Scope.set_custom_sampling_context({"rq_job": job})
 
-                with sentry_sdk.start_transaction(
-                    transaction,
-                    custom_sampling_context={"rq_job": job},
-                ):
-                    rv = old_perform_job(self, job, *args, **kwargs)
+                    func_name = None
+                    with capture_internal_exceptions():
+                        func_name = job.func_name
+
+                    with sentry_sdk.traces.start_span(
+                        name="unknown RQ task" if func_name is None else func_name,
+                        attributes={
+                            "sentry.op": OP.QUEUE_TASK_RQ,
+                            "sentry.origin": RqIntegration.origin,
+                            "sentry.span.source": SegmentSource.TASK,
+                            SPANDATA.MESSAGING_MESSAGE_ID: job.id,
+                        },
+                        parent_span=None,
+                    ) as span:
+                        if func_name is not None:
+                            span.set_attribute(SPANDATA.CODE_FUNCTION_NAME, func_name)
+
+                        rv = old_perform_job(self, job, *args, **kwargs)
+                else:
+                    transaction = continue_trace(
+                        job.meta.get("_sentry_trace_headers") or {},
+                        op=OP.QUEUE_TASK_RQ,
+                        name="unknown RQ task",
+                        source=TransactionSource.TASK,
+                        origin=RqIntegration.origin,
+                    )
+
+                    with capture_internal_exceptions():
+                        transaction.name = job.func_name
+
+                    with sentry_sdk.start_transaction(
+                        transaction,
+                        custom_sampling_context={"rq_job": job},
+                    ):
+                        rv = old_perform_job(self, job, *args, **kwargs)
 
             if self.is_horse:
                 # We're inside of a forked process and RQ is
@@ -116,12 +148,21 @@ class RqIntegration(Integration):
 
         old_enqueue_job = Queue.enqueue_job
 
-        @ensure_integration_enabled(RqIntegration, old_enqueue_job)
+        @functools.wraps(old_enqueue_job)
         def sentry_patched_enqueue_job(
             self: "Queue", job: "Any", **kwargs: "Any"
         ) -> "Any":
+            client = sentry_sdk.get_client()
+            if client.get_integration(RqIntegration) is None:
+                return old_enqueue_job(self, job, **kwargs)
+
             scope = sentry_sdk.get_current_scope()
-            if scope.span is not None:
+            span = (
+                scope.streamed_span
+                if has_span_streaming_enabled(client.options)
+                else scope.span
+            )
+            if span is not None:
                 job.meta["_sentry_trace_headers"] = dict(
                     scope.iter_trace_propagation_headers()
                 )

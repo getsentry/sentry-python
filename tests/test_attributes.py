@@ -174,3 +174,41 @@ def test_scope_attributes_preserialized(sentry_init, capture_items):
     # Attrs originally from the scope are serialized when sent
     assert isinstance(metric["attributes"]["instance"], str)
     assert isinstance(metric["attributes"]["dictionary"], str)
+
+
+def test_user_attributes(sentry_init, capture_items):
+    sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        _experiments={
+            "trace_lifecycle": "stream",
+        },
+    )
+
+    items = capture_items("trace_metric", "span")
+
+    sentry_sdk.set_user(
+        {
+            "id": "123456",
+            "username": "username",
+            "email": "username@example.com",
+            "ip_address": "127.0.0.1",
+        }
+    )
+
+    with sentry_sdk.traces.start_span(name="login"):
+        sentry_sdk.metrics.count("test", 1)
+
+    sentry_sdk.get_client().flush()
+
+    metric, span = [item.payload for item in items]
+
+    assert metric["attributes"]["user.id"] == "123456"
+    assert metric["attributes"]["user.name"] == "username"
+    assert metric["attributes"]["user.email"] == "username@example.com"
+    assert metric["attributes"]["user.ip_address"] == "127.0.0.1"
+
+    assert span["attributes"]["user.id"] == "123456"
+    assert span["attributes"]["user.name"] == "username"
+    assert span["attributes"]["user.email"] == "username@example.com"
+    assert span["attributes"]["user.ip_address"] == "127.0.0.1"

@@ -1,18 +1,21 @@
+from typing import TYPE_CHECKING
+
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
+from sentry_sdk.traces import SegmentSource
 from sentry_sdk.tracing import TransactionSource
-
-from typing import TYPE_CHECKING
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 if TYPE_CHECKING:
     from typing import Callable, Optional
+
     from google.protobuf.message import Message
 
 try:
     import grpc
-    from grpc import ServicerContext, HandlerCallDetails, RpcMethodHandler
+    from grpc import HandlerCallDetails, RpcMethodHandler, ServicerContext
 except ImportError:
     raise DidNotEnable("grpcio is not installed")
 
@@ -45,19 +48,39 @@ class ServerInterceptor(grpc.ServerInterceptor):  # type: ignore
                 if name:
                     metadata = dict(context.invocation_metadata())
 
-                    transaction = sentry_sdk.continue_trace(
-                        metadata,
-                        op=OP.GRPC_SERVER,
-                        name=name,
-                        source=TransactionSource.CUSTOM,
-                        origin=SPAN_ORIGIN,
+                    span_streaming = has_span_streaming_enabled(
+                        sentry_sdk.get_client().options
                     )
+                    if span_streaming:
+                        sentry_sdk.traces.continue_trace(metadata)
 
-                    with sentry_sdk.start_transaction(transaction=transaction):
-                        try:
-                            return handler.unary_unary(request, context)
-                        except BaseException as e:
-                            raise e
+                        with sentry_sdk.traces.start_span(
+                            name=name,
+                            attributes={
+                                "sentry.op": OP.GRPC_SERVER,
+                                "sentry.span.source": SegmentSource.CUSTOM.value,
+                                "sentry.origin": SPAN_ORIGIN,
+                            },
+                            parent_span=None,
+                        ):
+                            try:
+                                return handler.unary_unary(request, context)
+                            except BaseException as e:
+                                raise e
+                    else:
+                        transaction = sentry_sdk.continue_trace(
+                            metadata,
+                            op=OP.GRPC_SERVER,
+                            name=name,
+                            source=TransactionSource.CUSTOM,
+                            origin=SPAN_ORIGIN,
+                        )
+
+                        with sentry_sdk.start_transaction(transaction=transaction):
+                            try:
+                                return handler.unary_unary(request, context)
+                            except BaseException as e:
+                                raise e
                 else:
                     return handler.unary_unary(request, context)
 

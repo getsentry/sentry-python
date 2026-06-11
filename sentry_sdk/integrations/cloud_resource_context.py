@@ -1,11 +1,11 @@
 import json
+from typing import TYPE_CHECKING
+
 import urllib3
 
-from sentry_sdk.integrations import Integration
 from sentry_sdk.api import set_context
+from sentry_sdk.integrations import Integration
 from sentry_sdk.utils import logger
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Dict
@@ -48,6 +48,7 @@ class CLOUD_PLATFORM:  # noqa: N801
     """
 
     AWS_EC2 = "aws_ec2"
+    AWS_LAMBDA = "aws_lambda"
     GCP_COMPUTE_ENGINE = "gcp_compute_engine"
 
 

@@ -1,17 +1,22 @@
 from __future__ import annotations
+
 import contextlib
 import re
-from typing import Any, TypeVar, Callable, Awaitable, Iterator
+from typing import Any, Awaitable, Callable, Iterator, TypeVar, Union
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span
-from sentry_sdk.tracing_utils import add_query_source, record_sql_queries
+from sentry_sdk.tracing_utils import (
+    add_query_source,
+    has_span_streaming_enabled,
+    record_sql_queries,
+)
 from sentry_sdk.utils import (
-    ensure_integration_enabled,
-    parse_version,
     capture_internal_exceptions,
+    parse_version,
 )
 
 try:
@@ -46,8 +51,11 @@ class AsyncPGIntegration(Integration):
         asyncpg.Connection._executemany = _wrap_connection_method(
             asyncpg.Connection._executemany, executemany=True
         )
-        asyncpg.Connection.cursor = _wrap_cursor_creation(asyncpg.Connection.cursor)
         asyncpg.Connection.prepare = _wrap_connection_method(asyncpg.Connection.prepare)
+
+        BaseCursor._bind_exec = _wrap_cursor_method(BaseCursor._bind_exec)
+        BaseCursor._exec = _wrap_cursor_method(BaseCursor._exec)
+
         asyncpg.connect_utils._connect_addr = _wrap_connect_addr(
             asyncpg.connect_utils._connect_addr
         )
@@ -62,7 +70,8 @@ def _normalize_query(query: str) -> str:
 
 def _wrap_execute(f: "Callable[..., Awaitable[T]]") -> "Callable[..., Awaitable[T]]":
     async def _inner(*args: "Any", **kwargs: "Any") -> "T":
-        if sentry_sdk.get_client().get_integration(AsyncPGIntegration) is None:
+        client = sentry_sdk.get_client()
+        if client.get_integration(AsyncPGIntegration) is None:
             return await f(*args, **kwargs)
 
         # Avoid recording calls to _execute twice.
@@ -82,9 +91,13 @@ def _wrap_execute(f: "Callable[..., Awaitable[T]]") -> "Callable[..., Awaitable[
             span_origin=AsyncPGIntegration.origin,
         ) as span:
             res = await f(*args, **kwargs)
+            if isinstance(span, StreamedSpan):
+                with capture_internal_exceptions():
+                    add_query_source(span)
 
-        with capture_internal_exceptions():
-            add_query_source(span)
+        if not isinstance(span, StreamedSpan):
+            with capture_internal_exceptions():
+                add_query_source(span)
 
         return res
 
@@ -101,8 +114,9 @@ def _record(
     params_list: "tuple[Any, ...] | None",
     *,
     executemany: bool = False,
-) -> "Iterator[Span]":
-    integration = sentry_sdk.get_client().get_integration(AsyncPGIntegration)
+) -> "Iterator[Union[Span, StreamedSpan]]":
+    client = sentry_sdk.get_client()
+    integration = client.get_integration(AsyncPGIntegration)
     if integration is not None and not integration._record_params:
         params_list = None
 
@@ -131,28 +145,50 @@ def _wrap_connection_method(
         params_list = args[2] if len(args) > 2 else None
         with _record(None, query, params_list, executemany=executemany) as span:
             _set_db_data(span, args[0])
+
             res = await f(*args, **kwargs)
+
+            if isinstance(span, StreamedSpan):
+                with capture_internal_exceptions():
+                    add_query_source(span)
+
+        if not isinstance(span, StreamedSpan):
+            with capture_internal_exceptions():
+                add_query_source(span)
 
         return res
 
     return _inner
 
 
-def _wrap_cursor_creation(f: "Callable[..., T]") -> "Callable[..., T]":
-    @ensure_integration_enabled(AsyncPGIntegration, f)
-    def _inner(*args: "Any", **kwargs: "Any") -> "T":  # noqa: N807
-        query = args[1]
-        params_list = args[2] if len(args) > 2 else None
+def _wrap_cursor_method(
+    f: "Callable[..., Awaitable[T]]",
+) -> "Callable[..., Awaitable[T]]":
+    async def _inner(*args: "Any", **kwargs: "Any") -> "T":
+        if sentry_sdk.get_client().get_integration(AsyncPGIntegration) is None:
+            return await f(*args, **kwargs)
 
-        with _record(
-            None,
-            query,
-            params_list,
+        cursor = args[0]
+        query = _normalize_query(cursor._query)
+        with record_sql_queries(
+            cursor=cursor,
+            query=query,
+            params_list=None,
+            paramstyle=None,
             executemany=False,
+            record_cursor_repr=True,
+            span_origin=AsyncPGIntegration.origin,
         ) as span:
-            _set_db_data(span, args[0])
-            res = f(*args, **kwargs)
-            span.set_data("db.cursor", res)
+            _set_db_data(span, cursor._connection)
+            res = await f(*args, **kwargs)
+
+            if isinstance(span, StreamedSpan):
+                with capture_internal_exceptions():
+                    add_query_source(span)
+
+        if not isinstance(span, StreamedSpan):
+            with capture_internal_exceptions():
+                add_query_source(span)
 
         return res
 
@@ -163,56 +199,102 @@ def _wrap_connect_addr(
     f: "Callable[..., Awaitable[T]]",
 ) -> "Callable[..., Awaitable[T]]":
     async def _inner(*args: "Any", **kwargs: "Any") -> "T":
-        if sentry_sdk.get_client().get_integration(AsyncPGIntegration) is None:
+        client = sentry_sdk.get_client()
+        if client.get_integration(AsyncPGIntegration) is None:
             return await f(*args, **kwargs)
 
         user = kwargs["params"].user
         database = kwargs["params"].database
+        addr = kwargs.get("addr")
 
-        with sentry_sdk.start_span(
-            op=OP.DB,
-            name="connect",
-            origin=AsyncPGIntegration.origin,
-        ) as span:
-            span.set_data(SPANDATA.DB_SYSTEM, "postgresql")
-            addr = kwargs.get("addr")
+        if has_span_streaming_enabled(client.options):
+            span_attributes = {
+                "sentry.op": OP.DB,
+                "sentry.origin": AsyncPGIntegration.origin,
+                SPANDATA.DB_SYSTEM_NAME: "postgresql",
+                SPANDATA.DB_USER: user,
+                SPANDATA.DB_NAMESPACE: database,
+                SPANDATA.DB_DRIVER_NAME: "asyncpg",
+            }
             if addr:
                 try:
-                    span.set_data(SPANDATA.SERVER_ADDRESS, addr[0])
-                    span.set_data(SPANDATA.SERVER_PORT, addr[1])
+                    span_attributes[SPANDATA.SERVER_ADDRESS] = addr[0]
+                    span_attributes[SPANDATA.SERVER_PORT] = addr[1]
                 except IndexError:
                     pass
-            span.set_data(SPANDATA.DB_NAME, database)
-            span.set_data(SPANDATA.DB_USER, user)
-            span.set_data(SPANDATA.DB_DRIVER_NAME, "asyncpg")
 
-            with capture_internal_exceptions():
-                sentry_sdk.add_breadcrumb(
-                    message="connect", category="query", data=span._data
-                )
-            res = await f(*args, **kwargs)
+            with sentry_sdk.traces.start_span(
+                name="connect", attributes=span_attributes
+            ) as span:
+                with capture_internal_exceptions():
+                    sentry_sdk.add_breadcrumb(
+                        message="connect", category="query", data=span_attributes
+                    )
+                res = await f(*args, **kwargs)
+
+        else:
+            with sentry_sdk.start_span(
+                op=OP.DB,
+                name="connect",
+                origin=AsyncPGIntegration.origin,
+            ) as span:
+                span.set_data(SPANDATA.DB_SYSTEM, "postgresql")
+                if addr:
+                    try:
+                        span.set_data(SPANDATA.SERVER_ADDRESS, addr[0])
+                        span.set_data(SPANDATA.SERVER_PORT, addr[1])
+                    except IndexError:
+                        pass
+                span.set_data(SPANDATA.DB_NAME, database)
+                span.set_data(SPANDATA.DB_USER, user)
+                span.set_data(SPANDATA.DB_DRIVER_NAME, "asyncpg")
+
+                with capture_internal_exceptions():
+                    sentry_sdk.add_breadcrumb(
+                        message="connect", category="query", data=span._data
+                    )
+                res = await f(*args, **kwargs)
 
         return res
 
     return _inner
 
 
-def _set_db_data(span: "Span", conn: "Any") -> None:
-    span.set_data(SPANDATA.DB_SYSTEM, "postgresql")
-    span.set_data(SPANDATA.DB_DRIVER_NAME, "asyncpg")
-
+def _set_db_data(span: "Union[Span, StreamedSpan]", conn: "Any") -> None:
     addr = conn._addr
-    if addr:
-        try:
-            span.set_data(SPANDATA.SERVER_ADDRESS, addr[0])
-            span.set_data(SPANDATA.SERVER_PORT, addr[1])
-        except IndexError:
-            pass
-
     database = conn._params.database
-    if database:
-        span.set_data(SPANDATA.DB_NAME, database)
-
     user = conn._params.user
-    if user:
-        span.set_data(SPANDATA.DB_USER, user)
+
+    if isinstance(span, StreamedSpan):
+        span.set_attribute(SPANDATA.DB_SYSTEM_NAME, "postgresql")
+        span.set_attribute(SPANDATA.DB_DRIVER_NAME, "asyncpg")
+        if addr:
+            try:
+                span.set_attribute(SPANDATA.SERVER_ADDRESS, addr[0])
+                span.set_attribute(SPANDATA.SERVER_PORT, addr[1])
+            except IndexError:
+                pass
+
+        if database:
+            span.set_attribute(SPANDATA.DB_NAMESPACE, database)
+
+        if user:
+            span.set_attribute(SPANDATA.DB_USER, user)
+    else:
+        # Remove this else block once we've completely migrated to streamed spans
+        # The use of deprecated attributes here is to ensure backwards compatibility
+        span.set_data(SPANDATA.DB_SYSTEM, "postgresql")
+        span.set_data(SPANDATA.DB_DRIVER_NAME, "asyncpg")
+
+        if addr:
+            try:
+                span.set_data(SPANDATA.SERVER_ADDRESS, addr[0])
+                span.set_data(SPANDATA.SERVER_PORT, addr[1])
+            except IndexError:
+                pass
+
+        if database:
+            span.set_data(SPANDATA.DB_NAME, database)
+
+        if user:
+            span.set_data(SPANDATA.DB_USER, user)

@@ -376,8 +376,8 @@ class Scope:
     def set_global_attributes(self) -> None:
         from sentry_sdk.client import SDK_INFO
 
-        self.set_attribute("sentry.sdk.name", SDK_INFO["name"])
-        self.set_attribute("sentry.sdk.version", SDK_INFO["version"])
+        self.set_attribute(SPANDATA.SENTRY_SDK_NAME, SDK_INFO["name"])
+        self.set_attribute(SPANDATA.SENTRY_SDK_VERSION, SDK_INFO["version"])
 
         options = sentry_sdk.get_client().options
 
@@ -387,11 +387,11 @@ class Scope:
 
         environment = options.get("environment")
         if environment:
-            self.set_attribute("sentry.environment", environment)
+            self.set_attribute(SPANDATA.SENTRY_ENVIRONMENT, environment)
 
         release = options.get("release")
         if release:
-            self.set_attribute("sentry.release", release)
+            self.set_attribute(SPANDATA.SENTRY_RELEASE, release)
 
     @classmethod
     def last_event_id(cls) -> "Optional[str]":
@@ -719,10 +719,11 @@ class Scope:
             isolation_scope._propagation_context = PropagationContext()
         return isolation_scope._propagation_context
 
+    @classmethod
     def set_custom_sampling_context(
-        self, custom_sampling_context: "dict[str, Any]"
+        cls, custom_sampling_context: "dict[str, Any]"
     ) -> None:
-        self.get_current_scope().get_active_propagation_context()._set_custom_sampling_context(
+        cls.get_current_scope().get_active_propagation_context()._set_custom_sampling_context(
             custom_sampling_context
         )
 
@@ -1740,6 +1741,7 @@ class Scope:
             ("user.id", "id"),
             ("user.name", "username"),
             ("user.email", "email"),
+            ("user.ip_address", "ip_address"),
         ):
             if user_attribute in self._user and attribute_name not in attributes:
                 attributes[attribute_name] = self._user[user_attribute]

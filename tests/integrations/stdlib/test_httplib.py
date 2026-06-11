@@ -1,22 +1,21 @@
+import datetime
 import os
 import socket
-import datetime
 import time
 from http.client import HTTPConnection, HTTPSConnection
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socket import SocketIO
 from threading import Thread
+from unittest import mock
 from urllib.error import HTTPError
 from urllib.request import urlopen
-from unittest import mock
 
 import pytest
 
 import sentry_sdk
-from sentry_sdk import capture_message, start_transaction, continue_trace
+from sentry_sdk import capture_message, continue_trace, start_transaction
 from sentry_sdk.consts import MATCH_ALL, SPANDATA
 from sentry_sdk.integrations.stdlib import StdlibIntegration
-
 from tests.conftest import ApproxDict, create_mock_http_server, get_free_port
 
 PORT = create_mock_http_server()
@@ -873,9 +872,9 @@ def test_no_request_source_if_duration_too_short(
     def add_http_request_source_with_pinned_timestamps(span):
         if span_streaming:
             span._start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
-            span._timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
+            span._end_timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
             result = add_http_request_source(span)
-            span._timestamp = None
+            span._end_timestamp = None
             return result
         else:
             span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
@@ -947,9 +946,9 @@ def test_request_source_if_duration_over_threshold(
     def add_http_request_source_with_pinned_timestamps(span):
         if span_streaming:
             span._start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
-            span._timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
+            span._end_timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
             result = add_http_request_source(span)
-            span._timestamp = None
+            span._end_timestamp = None
             return result
         else:
             span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
@@ -1061,7 +1060,7 @@ def test_span_origin(
             conn.getresponse()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert spans[1]["attributes"]["sentry.origin"] == "manual"
 
         assert spans[0]["attributes"]["sentry.op"] == "http.client"
@@ -1112,7 +1111,7 @@ def test_http_timeout(
                 conn.getresponse()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert len(spans) == 2
         span = spans[0]
         assert span["attributes"]["sentry.op"] == "http.client"
@@ -1159,7 +1158,7 @@ def test_proxy_http_tunnel(
             conn.getresponse()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         (span,) = (
             span
             for span in spans

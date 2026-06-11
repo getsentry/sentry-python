@@ -1,16 +1,16 @@
 from collections.abc import Iterable
-
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from sentry_sdk._types import TextPart
     from typing import Union
 
     from openai.types.chat import (
+        ChatCompletionContentPartParam,
         ChatCompletionMessageParam,
         ChatCompletionSystemMessageParam,
-        ChatCompletionContentPartParam,
     )
+
+    from sentry_sdk._types import TextPart
 
 
 def _is_system_instruction(message: "ChatCompletionMessageParam") -> bool:

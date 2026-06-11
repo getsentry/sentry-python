@@ -1,12 +1,13 @@
 import sys
 from collections.abc import Mapping
 from functools import wraps
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk import isolation_scope
 from sentry_sdk.api import continue_trace
-from sentry_sdk.consts import OP, SPANSTATUS, SPANDATA
-from sentry_sdk.integrations import _check_minimum_version, Integration, DidNotEnable
+from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.celery.beat import (
     _patch_beat_apply_entry,
     _patch_redbeat_apply_async,
@@ -14,8 +15,8 @@ from sentry_sdk.integrations.celery.beat import (
 )
 from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan, _get_current_streamed_span
+from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.traces import StreamedSpan, get_current_span
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, Span, TransactionSource
 from sentry_sdk.tracing_utils import Baggage, has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -25,17 +26,10 @@ from sentry_sdk.utils import (
     reraise,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import List
-    from typing import Optional
-    from typing import TypeVar
-    from typing import Union
+    from typing import Any, Callable, List, Optional, TypeVar, Union
 
-    from sentry_sdk._types import EventProcessor, Event, Hint, ExcInfo
+    from sentry_sdk._types import Event, EventProcessor, ExcInfo, Hint
 
     F = TypeVar("F", bound=Callable[..., Any])
 
@@ -292,7 +286,7 @@ def _wrap_task_run(f: "F") -> "F":
 
         span_mgr: "Union[StreamedSpan, Span, NoOpMgr]" = NoOpMgr()
         if span_streaming:
-            if not task_started_from_beat and _get_current_streamed_span() is not None:
+            if not task_started_from_beat and get_current_span() is not None:
                 span_mgr = sentry_sdk.traces.start_span(
                     name=task_name,
                     attributes={
@@ -361,7 +355,7 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
                 headers = args[3].get("headers") or {}
                 if span_streaming:
                     sentry_sdk.traces.continue_trace(headers)
-                    scope.set_custom_sampling_context(custom_sampling_context)
+                    Scope.set_custom_sampling_context(custom_sampling_context)
                     span = sentry_sdk.traces.start_span(
                         name=task_name,
                         parent_span=None,  # make this a segment
@@ -573,7 +567,7 @@ def _patch_producer_publish() -> None:
 
         span: "Union[StreamedSpan, Span, None]" = None
         if span_streaming:
-            if _get_current_streamed_span() is not None:
+            if get_current_span() is not None:
                 span = sentry_sdk.traces.start_span(
                     name=task_name,
                     attributes={

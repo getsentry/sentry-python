@@ -1,13 +1,11 @@
 from functools import wraps
+from typing import TYPE_CHECKING, Any, Optional, Sequence
 
-from sentry_sdk.integrations import Integration
+from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.utils import parse_version
-from sentry_sdk.integrations import DidNotEnable
 
 from .client import ClientInterceptor
 from .server import ServerInterceptor
-
-from typing import TYPE_CHECKING, Any, Optional, Sequence
 
 try:
     import grpc
@@ -15,13 +13,13 @@ try:
     from grpc.aio import Channel as AsyncChannel
     from grpc.aio import Server as AsyncServer
 
-    from .aio.server import ServerInterceptor as AsyncServerInterceptor
-    from .aio.client import (
-        SentryUnaryUnaryClientInterceptor as AsyncUnaryUnaryClientInterceptor,
-    )
     from .aio.client import (
         SentryUnaryStreamClientInterceptor as AsyncUnaryStreamClientIntercetor,
     )
+    from .aio.client import (
+        SentryUnaryUnaryClientInterceptor as AsyncUnaryUnaryClientInterceptor,
+    )
+    from .aio.server import ServerInterceptor as AsyncServerInterceptor
 except ImportError:
     raise DidNotEnable("grpcio is not installed.")
 
@@ -29,7 +27,7 @@ except ImportError:
 # without introducing a hard dependency on `typing_extensions`
 # from: https://stackoverflow.com/a/71944042/300572
 if TYPE_CHECKING:
-    from typing import ParamSpec, Callable
+    from typing import Callable, ParamSpec
 else:
     # Fake ParamSpec
     class ParamSpec:

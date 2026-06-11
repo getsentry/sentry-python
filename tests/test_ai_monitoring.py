@@ -2,25 +2,25 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk._types import (
-    AnnotatedValue,
     BLOB_DATA_SUBSTITUTE,
+    AnnotatedValue,
 )
 from sentry_sdk.ai.monitoring import ai_track
 from sentry_sdk.ai.utils import (
     MAX_GEN_AI_MESSAGE_BYTES,
     MAX_SINGLE_MESSAGE_CONTENT_CHARS,
-    truncate_and_annotate_messages,
-    truncate_messages_by_size,
     _find_truncation_index,
+    get_modality_from_mime_type,
     parse_data_uri,
     redact_blob_message_parts,
-    get_modality_from_mime_type,
-    transform_openai_content_part,
     transform_anthropic_content_part,
-    transform_google_content_part,
-    transform_generic_content_part,
     transform_content_part,
+    transform_generic_content_part,
+    transform_google_content_part,
     transform_message_content,
+    transform_openai_content_part,
+    truncate_and_annotate_messages,
+    truncate_messages_by_size,
 )
 from sentry_sdk.utils import safe_serialize
 
@@ -922,6 +922,23 @@ class TestRedactBlobMessageParts:
 
         # Should return same list since no blobs
         assert result is messages
+
+    def test_redact_blob_message_parts_image_url_string_shorthand(self):
+        """image_url as a plain string (OpenAI shorthand) must not raise AttributeError"""
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "What is in this image?"},
+                    {
+                        "type": "image_url",
+                        "image_url": "data:image/jpeg;base64,/9j/abc123==",
+                    },
+                ],
+            }
+        ]
+        result = redact_blob_message_parts(messages)
+        assert result[0]["content"][1]["image_url"] == "[Blob substitute]"
 
 
 class TestParseDataUri:

@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 
@@ -7,14 +9,12 @@ from ..utils import (
     _set_input_data,
     _set_output_data,
     _set_usage_data,
-    _create_mcp_execute_tool_spans,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from agents import Agent
     from typing import Any, Optional
+
+    from agents import Agent
 
 
 def ai_client_span(
@@ -30,7 +30,7 @@ def ai_client_span(
 
     span = sentry_sdk.start_span(
         op=OP.GEN_AI_CHAT,
-        description=f"chat {model_name}",
+        name=f"chat {model_name}",
         origin=SPAN_ORIGIN,
     )
     # TODO-anton: remove hardcoded stuff and replace something that also works for embedding and so on
@@ -54,7 +54,6 @@ def update_ai_client_span(
 
     if hasattr(response, "output") and response.output:
         _set_output_data(span, response)
-        _create_mcp_execute_tool_spans(span, response)
 
     if response_model is not None:
         span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)

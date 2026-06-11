@@ -1,18 +1,16 @@
-import boto3
-import docker
 import json
-import pytest
 import subprocess
 import tempfile
 import time
-import yaml
-
 from unittest import mock
 
+import boto3
+import docker
+import pytest
+import yaml
 from aws_cdk import App
 
-from .utils import LocalLambdaStack, SentryServerForTesting, SAM_PORT
-
+from .utils import SAM_PORT, LocalLambdaStack, SentryServerForTesting
 
 DOCKER_NETWORK_NAME = "lambda-test-network"
 SAM_TEMPLATE_FILE = "sam.template.yaml"
@@ -525,6 +523,189 @@ def test_error_has_new_trace_context(
             error_event["contexts"]["trace"]["trace_id"]
             == transaction_event["contexts"]["trace"]["trace_id"]
         )
+
+
+def _get_span_attr(attrs, key):
+    """Extract the value from a span attribute, handling both flat and typed formats."""
+    val = attrs[key]
+    if isinstance(val, dict) and "value" in val:
+        return val["value"]
+    return val
+
+
+def test_span_streaming_no_error(lambda_client, test_environment):
+    lambda_client.invoke(
+        FunctionName="BasicOkSpanStreaming",
+        Payload=json.dumps({}),
+    )
+    envelopes = test_environment["server"].envelopes
+    span_items = test_environment["server"].span_items
+
+    assert len(envelopes) == 0
+
+    segment_spans = [s for s in span_items if s["is_segment"]]
+    assert len(segment_spans) == 1
+    segment_span = segment_spans[0]
+
+    assert segment_span["name"] == "BasicOkSpanStreaming"
+
+    attrs = segment_span["attributes"]
+
+    assert _get_span_attr(attrs, "sentry.op") == "function.aws"
+    assert _get_span_attr(attrs, "sentry.origin") == "auto.function.aws_lambda"
+    assert _get_span_attr(attrs, "sentry.span.source") == "component"
+    assert _get_span_attr(attrs, "cloud.provider") == "aws"
+    assert _get_span_attr(attrs, "cloud.platform") == "aws_lambda"
+    assert (
+        _get_span_attr(attrs, "cloud.resource_id")
+        == "arn:aws:lambda:us-east-1:012345678912:function:BasicOkSpanStreaming"
+    )
+    assert _get_span_attr(attrs, "cloud.region") == "us-east-1"
+    assert _get_span_attr(attrs, "faas.name") == "BasicOkSpanStreaming"
+    assert _get_span_attr(attrs, "faas.version") == "$LATEST"
+    assert "faas.invocation_id" in attrs
+    assert (
+        _get_span_attr(attrs, "aws.lambda.invoked_arn")
+        == "arn:aws:lambda:us-east-1:012345678912:function:BasicOkSpanStreaming"
+    )
+    assert _get_span_attr(attrs, "aws.log.group.names") == [
+        "aws/lambda/BasicOkSpanStreaming"
+    ]
+    assert _get_span_attr(attrs, "aws.log.stream.names") == ["$LATEST"]
+    assert _get_span_attr(attrs, "messaging.batch.message_count") == 1
+
+
+def test_span_streaming_error(lambda_client, test_environment):
+    lambda_client.invoke(
+        FunctionName="RaiseErrorSpanStreaming",
+        Payload=json.dumps({}),
+    )
+    envelopes = test_environment["server"].envelopes
+    span_items = test_environment["server"].span_items
+
+    assert len(envelopes) == 1
+    error_event = envelopes[0]
+    assert error_event["level"] == "error"
+    (exception,) = error_event["exception"]["values"]
+    assert exception["type"] == "Exception"
+    assert exception["value"] == "Oh!"
+    assert exception["mechanism"]["type"] == "aws_lambda"
+    assert not exception["mechanism"]["handled"]
+
+    segment_spans = [s for s in span_items if s["is_segment"]]
+    assert len(segment_spans) == 1
+    segment_span = segment_spans[0]
+
+    assert segment_span["name"] == "RaiseErrorSpanStreaming"
+    assert segment_span["status"] == "error"
+
+    attrs = segment_span["attributes"]
+
+    assert _get_span_attr(attrs, "sentry.op") == "function.aws"
+    assert _get_span_attr(attrs, "sentry.origin") == "auto.function.aws_lambda"
+    assert _get_span_attr(attrs, "sentry.span.source") == "component"
+    assert _get_span_attr(attrs, "cloud.provider") == "aws"
+    assert _get_span_attr(attrs, "cloud.platform") == "aws_lambda"
+    assert (
+        _get_span_attr(attrs, "cloud.resource_id")
+        == "arn:aws:lambda:us-east-1:012345678912:function:RaiseErrorSpanStreaming"
+    )
+    assert _get_span_attr(attrs, "cloud.region") == "us-east-1"
+    assert _get_span_attr(attrs, "faas.name") == "RaiseErrorSpanStreaming"
+    assert _get_span_attr(attrs, "faas.version") == "$LATEST"
+    assert "faas.invocation_id" in attrs
+    assert (
+        _get_span_attr(attrs, "aws.lambda.invoked_arn")
+        == "arn:aws:lambda:us-east-1:012345678912:function:RaiseErrorSpanStreaming"
+    )
+    assert _get_span_attr(attrs, "aws.log.group.names") == [
+        "aws/lambda/RaiseErrorSpanStreaming"
+    ]
+    assert _get_span_attr(attrs, "aws.log.stream.names") == ["$LATEST"]
+    assert _get_span_attr(attrs, "messaging.batch.message_count") == 1
+
+
+def test_span_streaming_trace_continuation(lambda_client, test_environment):
+    trace_id = "471a43a4192642f0b136d5159a501701"
+    parent_span_id = "6e8f22c393e68f19"
+    parent_sampled = 1
+    sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+
+    payload = {
+        "headers": {
+            "sentry-trace": sentry_trace_header,
+        }
+    }
+
+    lambda_client.invoke(
+        FunctionName="RaiseErrorSpanStreaming",
+        Payload=json.dumps(payload),
+    )
+    envelopes = test_environment["server"].envelopes
+    span_items = test_environment["server"].span_items
+
+    assert len(envelopes) == 1
+    error_event = envelopes[0]
+    assert error_event["contexts"]["trace"]["trace_id"] == trace_id
+
+    segment_spans = [s for s in span_items if s["is_segment"]]
+    assert len(segment_spans) == 1
+    segment_span = segment_spans[0]
+    assert segment_span["trace_id"] == trace_id
+    assert segment_span["name"] == "RaiseErrorSpanStreaming"
+    attrs = segment_span["attributes"]
+    assert _get_span_attr(attrs, "sentry.op") == "function.aws"
+    assert _get_span_attr(attrs, "sentry.origin") == "auto.function.aws_lambda"
+    assert _get_span_attr(attrs, "sentry.span.source") == "component"
+    assert _get_span_attr(attrs, "cloud.provider") == "aws"
+    assert _get_span_attr(attrs, "cloud.platform") == "aws_lambda"
+    assert _get_span_attr(attrs, "cloud.region") == "us-east-1"
+    assert _get_span_attr(attrs, "faas.name") == "RaiseErrorSpanStreaming"
+    assert _get_span_attr(attrs, "faas.version") == "$LATEST"
+    assert "faas.invocation_id" in attrs
+
+
+def test_span_streaming_request_attributes(lambda_client, test_environment):
+    payload = {
+        "headers": {
+            "Content-Type": "application/json",
+            "Accept": "text/html",
+        },
+        "httpMethod": "POST",
+        "queryStringParameters": {"foo": "bar", "a-complicated-value": "a=b&c=d"},
+        "path": "/test",
+    }
+
+    lambda_client.invoke(
+        FunctionName="BasicOkSpanStreamingPii",
+        Payload=json.dumps(payload),
+    )
+    span_items = test_environment["server"].span_items
+
+    segment_spans = [s for s in span_items if s["is_segment"]]
+    assert len(segment_spans) == 1
+    segment_span = segment_spans[0]
+    attrs = segment_span["attributes"]
+
+    assert _get_span_attr(attrs, "http.request.method") == "POST"
+    assert (
+        _get_span_attr(attrs, "url.query")
+        == "foo=bar&a-complicated-value=a%3Db%26c%3Dd"
+    )
+    assert (
+        _get_span_attr(attrs, "http.request.header.content-type") == "application/json"
+    )
+    assert _get_span_attr(attrs, "http.request.header.accept") == "text/html"
+    assert _get_span_attr(attrs, "faas.name") == "BasicOkSpanStreamingPii"
+    assert _get_span_attr(attrs, "cloud.provider") == "aws"
+    assert _get_span_attr(attrs, "cloud.platform") == "aws_lambda"
+    assert _get_span_attr(attrs, "cloud.region") == "us-east-1"
+    assert _get_span_attr(attrs, "faas.version") == "$LATEST"
+    assert "faas.invocation_id" in attrs
+    assert _get_span_attr(attrs, "aws.log.group.names") == [
+        "aws/lambda/BasicOkSpanStreamingPii"
+    ]
+    assert _get_span_attr(attrs, "aws.log.stream.names") == ["$LATEST"]
 
 
 @pytest.mark.parametrize(

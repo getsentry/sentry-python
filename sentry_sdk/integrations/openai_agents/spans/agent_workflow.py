@@ -1,9 +1,9 @@
+from typing import TYPE_CHECKING
+
 import sentry_sdk
 from sentry_sdk.ai.utils import get_start_span_function
 
 from ..consts import SPAN_ORIGIN
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import agents

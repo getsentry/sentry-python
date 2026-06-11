@@ -1,23 +1,23 @@
-import json
-import os
 import asyncio
-from urllib.parse import urlparse, parse_qs
-import socket
-import warnings
-import brotli
 import gzip
 import io
-from dataclasses import dataclass
-from threading import Thread
-from contextlib import contextmanager
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from unittest import mock
+import json
+import os
+import socket
+import warnings
 from collections import namedtuple
+from contextlib import contextmanager
+from dataclasses import dataclass
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from threading import Thread
+from unittest import mock
+from urllib.parse import parse_qs, urlparse
 
+import brotli
+import jsonschema
 import pytest
 from pytest_localserver.http import WSGIServer
 from werkzeug.wrappers import Request, Response
-import jsonschema
 
 try:
     from starlette.testclient import TestClient
@@ -67,21 +67,25 @@ except ImportError:
     google = None
 
 
-from tests import _warning_recorder, _warning_recorder_mgr
-
 from typing import TYPE_CHECKING
 
+from tests import _warning_recorder, _warning_recorder_mgr
+
 if TYPE_CHECKING:
-    from typing import Any, Callable, MutableMapping, Optional
     from collections.abc import Iterator
+    from typing import Any, Callable, MutableMapping, Optional
 
 try:
     from httpx import (
         ASGITransport,
-        Request as HttpxRequest,
-        Response as HttpxResponse,
         AsyncByteStream,
         AsyncClient,
+    )
+    from httpx import (
+        Request as HttpxRequest,
+    )
+    from httpx import (
+        Response as HttpxResponse,
     )
 except ImportError:
     ASGITransport = None
@@ -92,13 +96,13 @@ except ImportError:
 
 
 try:
-    from anyio import create_memory_object_stream, create_task_group, EndOfStream
+    from anyio import EndOfStream, create_memory_object_stream, create_task_group
+    from mcp.shared.message import SessionMessage
     from mcp.types import (
         JSONRPCMessage,
         JSONRPCNotification,
         JSONRPCRequest,
     )
-    from mcp.shared.message import SessionMessage
 except ImportError:
     create_memory_object_stream = None
     create_task_group = None
@@ -423,6 +427,52 @@ def capture_events_forksafe(monkeypatch, capture_events, request):
         monkeypatch.setattr(test_client, "flush", flush)
 
         return EventStreamReader(events_r, events_w)
+
+    return inner
+
+
+@pytest.fixture
+def capture_items_forksafe(monkeypatch, capture_items, request):
+    def inner(*types):
+        capture_items(*types)
+
+        items_r, items_w = os.pipe()
+        items_r = os.fdopen(items_r, "rb", 0)
+        items_w = os.fdopen(items_w, "wb", 0)
+
+        test_client = sentry_sdk.get_client()
+        old_capture_envelope = test_client.transport.capture_envelope
+
+        telemetry = []
+
+        def append(envelope):
+            for item in envelope:
+                if types and item.type not in types:
+                    continue
+
+                if item.type in ("metric", "log", "span"):
+                    for i in item.payload.json["items"]:
+                        t = {k: v for k, v in i.items() if k != "attributes"}
+                        t["attributes"] = {
+                            k: v["value"] for k, v in i["attributes"].items()
+                        }
+                        telemetry.append({"type": item.type, "payload": t})
+                else:
+                    telemetry.append({"type": item.type, "payload": item.payload.json})
+
+            return old_capture_envelope(envelope)
+
+        real_flush = test_client.flush
+
+        def flush(timeout=None, callback=None):
+            real_flush(timeout=timeout, callback=callback)
+            items_w.write(json.dumps(telemetry).encode("utf-8") + b"\n")
+            items_w.write(b"flush\n")
+
+        monkeypatch.setattr(test_client.transport, "capture_envelope", append)
+        monkeypatch.setattr(test_client, "flush", flush)
+
+        return EventStreamReader(items_r, items_w)
 
     return inner
 

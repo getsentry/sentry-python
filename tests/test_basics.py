@@ -7,24 +7,23 @@ import time
 from collections import Counter
 
 import pytest
-from sentry_sdk.client import Client
-from sentry_sdk.utils import datetime_from_isoformat
 
 import sentry_sdk
 import sentry_sdk.scope
 from sentry_sdk import (
-    get_client,
-    push_scope,
+    Hub,
+    add_breadcrumb,
     capture_event,
     capture_exception,
     capture_message,
-    start_transaction,
-    last_event_id,
-    add_breadcrumb,
+    get_client,
     isolation_scope,
+    last_event_id,
     new_scope,
-    Hub,
+    push_scope,
+    start_transaction,
 )
+from sentry_sdk.client import Client
 from sentry_sdk.integrations import (
     _AUTO_ENABLING_INTEGRATIONS,
     _DEFAULT_INTEGRATIONS,
@@ -35,8 +34,8 @@ from sentry_sdk.integrations import (
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.scope import add_global_event_processor
-from sentry_sdk.utils import get_sdk_name, reraise
 from sentry_sdk.tracing_utils import has_tracing_enabled
+from sentry_sdk.utils import datetime_from_isoformat, get_sdk_name, reraise
 
 
 class NoOpIntegration(Integration):
@@ -1089,6 +1088,14 @@ def test_classmethod_instance_tracing(sentry_init, capture_events):
 
     (span,) = event["spans"]
     assert span["description"] == "tests.test_basics.TracingTestClass.class_"
+
+
+def test_functions_to_trace_no_dot_does_not_crash(sentry_init):
+    # A qualified_name with no dot should not raise ValueError during sentry_sdk.init()
+    sentry_init(
+        traces_sample_rate=1.0,
+        functions_to_trace=[{"qualified_name": "my_function"}],
+    )
 
 
 def test_last_event_id(sentry_init):

@@ -1,17 +1,18 @@
 import json
-import pytest
 import logging
-
 from io import BytesIO
-from bottle import Bottle, debug as set_debug, abort, redirect, HTTPResponse
-from sentry_sdk import capture_message
-from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
-from sentry_sdk.integrations.bottle import BottleIntegration
-from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 
-from sentry_sdk.integrations.logging import LoggingIntegration
+import pytest
+from bottle import Bottle, HTTPResponse, abort, redirect
+from bottle import debug as set_debug
 from werkzeug.test import Client
 from werkzeug.wrappers import Response
+
+import sentry_sdk
+from sentry_sdk import capture_message
+from sentry_sdk.integrations.bottle import BottleIntegration
+from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 
 
 @pytest.fixture(scope="function")
@@ -121,10 +122,17 @@ def test_errors(
     assert event["exception"]["values"][0]["mechanism"]["handled"] is False
 
 
-def test_large_json_request(sentry_init, capture_events, app, get_client):
-    sentry_init(integrations=[BottleIntegration()], max_request_body_size="always")
+@pytest.mark.parametrize("max_value_length", [1024, None])
+def test_large_json_request(
+    sentry_init, capture_events, app, get_client, max_value_length
+):
+    sentry_init(
+        integrations=[BottleIntegration()],
+        max_request_body_size="always",
+        max_value_length=max_value_length,
+    )
 
-    data = {"foo": {"bar": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10)}}
+    data = {"foo": {"bar": "a" * (1034)}}
 
     @app.route("/", method="POST")
     def index():
@@ -144,15 +152,17 @@ def test_large_json_request(sentry_init, capture_events, app, get_client):
     assert response[1] == "200 OK"
 
     (event,) = events
-    assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
-        "": {
-            "len": DEFAULT_MAX_VALUE_LENGTH + 10,
-            "rem": [
-                ["!limit", "x", DEFAULT_MAX_VALUE_LENGTH - 3, DEFAULT_MAX_VALUE_LENGTH]
-            ],
+
+    if max_value_length:
+        assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
+            "": {
+                "len": 1034,
+                "rem": [["!limit", "x", 1021, 1024]],
+            }
         }
-    }
-    assert len(event["request"]["data"]["foo"]["bar"]) == DEFAULT_MAX_VALUE_LENGTH
+        assert len(event["request"]["data"]["foo"]["bar"]) == 1024
+    else:
+        assert len(event["request"]["data"]["foo"]["bar"]) == 1034
 
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
@@ -179,10 +189,17 @@ def test_empty_json_request(sentry_init, capture_events, app, data, get_client):
     assert event["request"]["data"] == data
 
 
-def test_medium_formdata_request(sentry_init, capture_events, app, get_client):
-    sentry_init(integrations=[BottleIntegration()], max_request_body_size="always")
+@pytest.mark.parametrize("max_value_length", [1024, None])
+def test_medium_formdata_request(
+    sentry_init, capture_events, app, get_client, max_value_length
+):
+    sentry_init(
+        integrations=[BottleIntegration()],
+        max_request_body_size="always",
+        max_value_length=max_value_length,
+    )
 
-    data = {"foo": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10)}
+    data = {"foo": "a" * (1034)}
 
     @app.route("/", method="POST")
     def index():
@@ -199,15 +216,17 @@ def test_medium_formdata_request(sentry_init, capture_events, app, get_client):
     assert response[1] == "200 OK"
 
     (event,) = events
-    assert event["_meta"]["request"]["data"]["foo"] == {
-        "": {
-            "len": DEFAULT_MAX_VALUE_LENGTH + 10,
-            "rem": [
-                ["!limit", "x", DEFAULT_MAX_VALUE_LENGTH - 3, DEFAULT_MAX_VALUE_LENGTH]
-            ],
+
+    if max_value_length:
+        assert event["_meta"]["request"]["data"]["foo"] == {
+            "": {
+                "len": 1034,
+                "rem": [["!limit", "x", 1021, 1024]],
+            }
         }
-    }
-    assert len(event["request"]["data"]["foo"]) == DEFAULT_MAX_VALUE_LENGTH
+        assert len(event["request"]["data"]["foo"]) == 1024
+    else:
+        assert len(event["request"]["data"]["foo"]) == 1034
 
 
 @pytest.mark.parametrize("input_char", ["a", b"a"])
@@ -241,11 +260,16 @@ def test_too_large_raw_request(
     assert not event["request"]["data"]
 
 
-def test_files_and_form(sentry_init, capture_events, app, get_client):
-    sentry_init(integrations=[BottleIntegration()], max_request_body_size="always")
+@pytest.mark.parametrize("max_value_length", [1024, None])
+def test_files_and_form(sentry_init, capture_events, app, get_client, max_value_length):
+    sentry_init(
+        integrations=[BottleIntegration()],
+        max_request_body_size="always",
+        max_value_length=max_value_length,
+    )
 
     data = {
-        "foo": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10),
+        "foo": "a" * (1034),
         "file": (BytesIO(b"hello"), "hello.txt"),
     }
 
@@ -266,15 +290,16 @@ def test_files_and_form(sentry_init, capture_events, app, get_client):
     assert response[1] == "200 OK"
 
     (event,) = events
-    assert event["_meta"]["request"]["data"]["foo"] == {
-        "": {
-            "len": DEFAULT_MAX_VALUE_LENGTH + 10,
-            "rem": [
-                ["!limit", "x", DEFAULT_MAX_VALUE_LENGTH - 3, DEFAULT_MAX_VALUE_LENGTH]
-            ],
+    if max_value_length:
+        assert event["_meta"]["request"]["data"]["foo"] == {
+            "": {
+                "len": 1034,
+                "rem": [["!limit", "x", 1021, 1024]],
+            }
         }
-    }
-    assert len(event["request"]["data"]["foo"]) == DEFAULT_MAX_VALUE_LENGTH
+        assert len(event["request"]["data"]["foo"]) == 1024
+    else:
+        assert len(event["request"]["data"]["foo"]) == 1034
 
     assert event["_meta"]["request"]["data"]["file"] == {
         "": {
@@ -438,23 +463,37 @@ def test_no_exception_on_redirect(sentry_init, capture_events, app, get_client):
     assert not events
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 def test_span_origin(
     sentry_init,
     get_client,
     capture_events,
+    capture_items,
+    span_streaming,
 ):
     sentry_init(
         integrations=[BottleIntegration()],
         traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
-    events = capture_events()
+
+    if span_streaming:
+        items = capture_items("span")
+    else:
+        events = capture_events()
 
     client = get_client()
     client.get("/message")
 
-    (_, event) = events
-
-    assert event["contexts"]["trace"]["origin"] == "auto.http.bottle"
+    if span_streaming:
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        segment = spans[-1]
+        assert segment["is_segment"] is True
+        assert segment["attributes"]["sentry.origin"] == "auto.http.bottle"
+    else:
+        (_, event) = events
+        assert event["contexts"]["trace"]["origin"] == "auto.http.bottle"
 
 
 @pytest.mark.parametrize("raise_error", [True, False])
@@ -532,3 +571,239 @@ def test_failed_request_status_codes_non_http_exception(sentry_init, capture_eve
 
     (event,) = events
     assert event["exception"]["values"][0]["type"] == "ZeroDivisionError"
+
+
+def test_span_streaming_basic(sentry_init, capture_items):
+    sentry_init(
+        integrations=[BottleIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+    items = capture_items("span")
+
+    app = Bottle()
+
+    @app.route("/message")
+    def hi():
+        return "ok"
+
+    client = Client(app)
+    client.get("/message")
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
+
+    segment = spans[0]
+
+    # Segment span (root, created by WSGI middleware)
+    assert segment["is_segment"] is True
+    assert "parent_span_id" not in segment
+    assert segment["status"] == "ok"
+    assert segment["attributes"]["sentry.op"] == "http.server"
+    assert segment["attributes"]["sentry.origin"] == "auto.http.bottle"
+    assert segment["attributes"]["http.request.method"] == "GET"
+    assert segment["attributes"]["http.response.status_code"] == 200
+    assert segment["name"].endswith("hi")
+
+
+@pytest.mark.parametrize(
+    "url,transaction_style,expected_name,expected_source",
+    [
+        ("/message", "endpoint", "hi", "component"),
+        ("/message", "url", "/message", "route"),
+        ("/message/123456", "url", "/message/<message_id>", "route"),
+        ("/message-named-route", "endpoint", "hi", "component"),
+    ],
+)
+def test_span_streaming_transaction_style(
+    sentry_init,
+    capture_items,
+    url,
+    transaction_style,
+    expected_name,
+    expected_source,
+):
+    sentry_init(
+        integrations=[BottleIntegration(transaction_style=transaction_style)],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+    items = capture_items("span")
+
+    app = Bottle()
+
+    @app.route("/message")
+    def hi():
+        return "ok"
+
+    @app.route("/message/<message_id>")
+    def hi_with_id(message_id):
+        return "ok"
+
+    @app.route("/message-named-route", name="hi")
+    def named_hi():
+        return "ok"
+
+    client = Client(app)
+    client.get(url)
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
+
+    segment = spans[0]
+
+    assert segment["is_segment"] is True
+
+    assert segment["name"].endswith(expected_name)
+    assert segment["attributes"]["sentry.span.source"] == expected_source
+
+
+def test_span_streaming_with_error(sentry_init, capture_items):
+    sentry_init(
+        integrations=[BottleIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+    items = capture_items("event", "span")
+
+    app = Bottle()
+
+    @app.route("/error")
+    def error():
+        1 / 0
+
+    client = Client(app)
+    try:
+        client.get("/error")
+    except ZeroDivisionError:
+        pass
+
+    sentry_sdk.flush()
+
+    events = [item.payload for item in items if item.type == "event"]
+    spans = [item.payload for item in items if item.type == "span"]
+    assert len(events) == 1
+    assert len(spans) == 1
+
+    error_event = events[0]
+    segment = spans[0]
+
+    # Confirm the same trace is shared
+    assert segment["trace_id"] == error_event["contexts"]["trace"]["trace_id"]
+
+    # Span hierarchy
+    assert segment["is_segment"] is True
+    assert "parent_span_id" not in segment
+
+    # Error event span_id points to the segment span (where the exception was raised)
+    assert error_event["contexts"]["trace"]["span_id"] == segment["span_id"]
+
+    # Span status
+    assert segment["status"] == "error"
+
+    # Bottle mechanism on the error event
+    assert error_event["exception"]["values"][0]["mechanism"]["type"] == "bottle"
+    assert error_event["exception"]["values"][0]["mechanism"]["handled"] is False
+
+
+@pytest.mark.parametrize(
+    "status_code,expected_span_status",
+    [
+        (200, "ok"),
+        (404, "error"),
+        (500, "error"),
+    ],
+)
+def test_span_streaming_http_error_status(
+    sentry_init,
+    capture_items,
+    status_code,
+    expected_span_status,
+):
+    sentry_init(
+        integrations=[BottleIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+    items = capture_items("span")
+
+    app = Bottle()
+
+    @app.route("/")
+    def handle():
+        return HTTPResponse(status=status_code, body="response")
+
+    client = Client(app)
+    client.get("/")
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
+
+    segment = spans[0]
+
+    assert segment["is_segment"] is True
+
+    assert segment["status"] == expected_span_status
+    assert segment["attributes"]["http.response.status_code"] == status_code
+
+
+@pytest.mark.parametrize("raise_error", [True, False])
+@pytest.mark.parametrize(
+    ("integration_kwargs", "status_code", "should_capture"),
+    (
+        ({}, 500, True),
+        ({}, 400, False),
+        ({"failed_request_status_codes": set()}, 500, False),
+        ({"failed_request_status_codes": {404, *range(500, 600)}}, 404, True),
+        ({"failed_request_status_codes": {404, *range(500, 600)}}, 400, False),
+    ),
+)
+def test_span_streaming_failed_request_status_codes(
+    sentry_init,
+    capture_items,
+    integration_kwargs,
+    status_code,
+    should_capture,
+    raise_error,
+):
+    sentry_init(
+        integrations=[BottleIntegration(**integration_kwargs)],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+    items = capture_items("event", "span")
+
+    app = Bottle()
+
+    @app.route("/")
+    def handle():
+        response = HTTPResponse(status=status_code)
+        if raise_error:
+            raise response
+        return response
+
+    client = Client(app, Response)
+    client.get("/")
+
+    sentry_sdk.flush()
+
+    events = [item.payload for item in items if item.type == "event"]
+    spans = [item.payload for item in items if item.type == "span"]
+    assert len(spans) == 1
+
+    segment = spans[0]
+
+    assert segment["is_segment"] is True
+
+    if should_capture:
+        assert len(events) == 1
+        assert events[0]["exception"]["values"][0]["type"] == "HTTPResponse"
+        assert events[0]["exception"]["values"][0]["mechanism"]["handled"] is True
+    else:
+        assert len(events) == 0

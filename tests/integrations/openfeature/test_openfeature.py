@@ -2,7 +2,6 @@ import concurrent.futures as cf
 import sys
 
 import pytest
-
 from openfeature import api
 from openfeature.provider.in_memory_provider import InMemoryFlag, InMemoryProvider
 
