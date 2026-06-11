@@ -17,7 +17,7 @@
       {% endif %}
       {% if needs_postgres %}
       postgres:
-        image: postgres
+        image: ghcr.io/getsentry/image-mirror-library-postgres:17-alpine
         env:
           POSTGRES_PASSWORD: sentry
         # Set health checks to wait until postgres has started
@@ -32,7 +32,7 @@
       {% endif %}
       {% if needs_redis %}
       redis:
-        image: redis
+        image: ghcr.io/getsentry/image-mirror-library-redis:7.0.8-bullseye
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
