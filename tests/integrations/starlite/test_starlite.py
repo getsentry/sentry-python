@@ -112,6 +112,68 @@ def test_catch_exceptions(
     assert event["exception"]["values"][0]["mechanism"]["type"] == "starlite"
 
 
+@pytest.mark.parametrize(
+    "test_url,expected_tx_name",
+    [
+        (
+            "/some_url",
+            "tests.integrations.starlite.test_starlite.starlite_app_factory.<locals>.homepage_handler",
+        ),
+        (
+            "/custom_error",
+            "custom_name",
+        ),
+        (
+            "/controller/error",
+            "partial(<function tests.integrations.starlite.test_starlite.starlite_app_factory.<locals>.MyController.controller_error>)",
+        ),
+    ],
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_transaction_name_and_source(
+    sentry_init,
+    capture_events,
+    test_url,
+    expected_tx_name,
+    capture_items,
+    span_streaming,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarliteIntegration()],
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
+    starlite_app = starlite_app_factory()
+    client = TestClient(starlite_app)
+
+    if span_streaming:
+        items = capture_items("span")
+
+        try:
+            client.get(test_url)
+        except Exception:
+            pass
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        spans = [span for span in spans if expected_tx_name in span["name"]]
+        assert len(spans) == 1
+        assert spans[0]["attributes"]["sentry.span.source"] == "component"
+    else:
+        events = capture_events()
+
+        try:
+            client.get(test_url)
+        except Exception:
+            pass
+
+        (_, transaction) = events
+        assert expected_tx_name in transaction["transaction"]
+        assert transaction["transaction_info"] == {"source": "component"}
+
+
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_middleware_spans(sentry_init, capture_events, capture_items, span_streaming):
     sentry_init(
