@@ -809,7 +809,7 @@ wheels = [
 
 [[package]]
 name = "launchdarkly-server-sdk"
-version = "9.15.1"
+version = "9.16.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -819,9 +819,9 @@ dependencies = [
     { name = "semver" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b1/af/bca148e1675e2e2a1ea0d35adabb4c917ec3665cadc2ce547b7434f8cee3/launchdarkly_server_sdk-9.15.1.tar.gz", hash = "sha256:61101ef41677ba71061fb974b228412366a02c5a57d05652f5ef419f477154ce", size = 218261, upload-time = "2026-04-14T16:20:24.758Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f0/cc/83abd07fc697c049687a6e945716a99a3afb739814db46cdb84db4e7cdfa/launchdarkly_server_sdk-9.16.0.tar.gz", hash = "sha256:32feb8d7e61184260dbdd97c05200fdc532c535a8de97ceae41676802d017d92", size = 263785, upload-time = "2026-06-08T15:07:27.906Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2e/9e/16434587057c956cebcc3a25617ad2ea7bf12852f9e9d8206cfd0cd79c2f/launchdarkly_server_sdk-9.15.1-py3-none-any.whl", hash = "sha256:ecaf0b55740921261b9ea38defe8c4b0811feef485e5b3a329ebaa26531a9565", size = 293585, upload-time = "2026-04-14T16:20:23.433Z" },
+    { url = "https://files.pythonhosted.org/packages/46/18/401ae634f3acbe56ad6f3c2892d82bfcc8ec1e5d5b059834ef6c8169c973/launchdarkly_server_sdk-9.16.0-py3-none-any.whl", hash = "sha256:0418edbe9d5753e5c0d95df1569b55caeaa622277509428105d92f66129d204c", size = 180787, upload-time = "2026-06-08T15:07:26.415Z" },
 ]
 
 [[package]]

@@ -165,6 +165,10 @@ def test_invalid_transaction_style(asgi3_app):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
+    "should_send_pii",
+    [True, False],
+)
+@pytest.mark.parametrize(
     "span_streaming",
     [True, False],
 )
@@ -174,9 +178,10 @@ async def test_capture_transaction(
     capture_events,
     capture_items,
     span_streaming,
+    should_send_pii,
 ):
     sentry_init(
-        send_default_pii=True,
+        send_default_pii=should_send_pii,
         traces_sample_rate=1.0,
         _experiments={
             "trace_lifecycle": "stream" if span_streaming else "static",
@@ -203,15 +208,20 @@ async def test_capture_transaction(
         assert span["attributes"]["sentry.span.source"] == "url"
         assert span["attributes"]["sentry.op"] == "http.server"
 
-        assert span["attributes"]["url.full"] == "http://localhost/some_url"
         assert span["attributes"]["network.protocol.name"] == "http"
         assert span["attributes"]["http.request.method"] == "GET"
-        assert span["attributes"]["http.query"] == "somevalue=123"
         assert span["attributes"]["http.request.header.host"] == "localhost"
         assert span["attributes"]["http.request.header.remote-addr"] == "127.0.0.1"
         assert (
             span["attributes"]["http.request.header.user-agent"] == "ASGI-Test-Client"
         )
+
+        if should_send_pii:
+            assert (
+                span["attributes"]["url.full"]
+                == "http://localhost/some_url?somevalue=123"
+            )
+            assert span["attributes"]["http.query"] == "somevalue=123"
 
     else:
         (transaction_event,) = events
