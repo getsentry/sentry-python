@@ -932,6 +932,7 @@ async def test_span_streaming_quart_auth_user_id(
     segment = spans[1]
     if send_default_pii and user_id is not None:
         assert segment["attributes"]["user.id"] == user_id
+        print("SEGMENT ATTRS", segment["attributes"])
     else:
         assert "user.id" not in segment.get("attributes", {})
 
