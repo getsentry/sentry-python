@@ -138,6 +138,69 @@ def test_catch_exceptions(
     assert event["exception"]["values"][0]["mechanism"]["type"] == "litestar"
 
 
+@pytest.mark.parametrize(
+    "test_url,expected_tx_name",
+    [
+        (
+            "/some_url",
+            "tests.integrations.litestar.test_litestar.litestar_app_factory.<locals>.homepage_handler",
+        ),
+        (
+            "/custom_error",
+            "custom_name",
+        ),
+        (
+            "/controller/error",
+            "tests.integrations.litestar.test_litestar.litestar_app_factory.<locals>.MyController.controller_error",
+        ),
+    ],
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_transaction_name_and_source(
+    sentry_init,
+    capture_events,
+    test_url,
+    expected_tx_name,
+    capture_items,
+    span_streaming,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[LitestarIntegration()],
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
+    litestar_app = litestar_app_factory()
+    client = TestClient(litestar_app)
+
+    if span_streaming:
+        items = capture_items("span")
+
+        try:
+            client.get(test_url)
+        except Exception:
+            pass
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+
+        spans = [span for span in spans if expected_tx_name in span["name"]]
+        assert len(spans) == 1
+        assert spans[0]["attributes"]["sentry.span.source"] == "component"
+    else:
+        events = capture_events()
+
+        try:
+            client.get(test_url)
+        except Exception:
+            pass
+
+        (_, transaction) = events
+        assert expected_tx_name in transaction["transaction"]
+        assert transaction["transaction_info"] == {"source": "component"}
+
+
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_middleware_spans(
     sentry_init,
