@@ -239,6 +239,33 @@ def test_span_streaming_basic(
     assert span["status"] == "ok"
 
 
+def test_span_streaming_continue_trace(
+    sentry_init,
+    capture_items,
+):
+    """When incoming headers contain sentry-trace, the standalone Chalice
+    path (no AWS Lambda span) continues the trace."""
+    app = _make_span_streaming_app(sentry_init)
+    client = RequestHandler(app)
+    items = capture_items("span")
+
+    trace_id = "471a43a4192642f0b136d5159a501701"
+    parent_span_id = "a00bc7e6637abd57"
+    sentry_trace_header = f"{trace_id}-{parent_span_id}-1"
+
+    response = client.get(
+        "/message", headers={"sentry-trace": sentry_trace_header}
+    )
+    assert response.status_code == 200
+
+    sentry_sdk.flush()
+
+    segment_spans = [s.payload for s in items if s.payload.get("is_segment")]
+    assert len(segment_spans) == 1
+    assert segment_spans[0]["trace_id"] == trace_id
+    assert segment_spans[0]["parent_span_id"] == parent_span_id
+
+
 def test_span_streaming_error(
     sentry_init,
     capture_items,
@@ -287,6 +314,118 @@ def test_span_streaming_error_flush_ordering(
 
     segment_spans = [s.payload for s in items if s.payload.get("is_segment")]
     assert len(segment_spans) == 1
+
+
+def test_span_streaming_existing_span(
+    sentry_init,
+    capture_items,
+):
+    """When a segment already exists (e.g. created by the AWS Lambda
+    integration), Chalice decorates it instead of creating a duplicate."""
+    app = _make_span_streaming_app(sentry_init)
+    client = RequestHandler(app)
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(
+        name="lambda_segment",
+        parent_span=None,
+        attributes={"sentry.origin": "auto.function.aws_lambda"},
+    ):
+        response = client.get("/message")
+        assert response.status_code == 200
+
+    sentry_sdk.flush()
+
+    segment_spans = [s.payload for s in items if s.payload.get("is_segment")]
+    assert len(segment_spans) == 1
+    span = segment_spans[0]
+
+    attrs = span["attributes"]
+    assert attrs["sentry.origin"] == "auto.function.chalice"
+    assert attrs["sentry.op"] == "function.aws"
+    assert attrs["faas.name"] == "api_handler"
+    assert span["status"] == "ok"
+
+
+def test_span_streaming_existing_span_error(
+    sentry_init,
+    capture_items,
+):
+    app = _make_span_streaming_app(sentry_init)
+    client = RequestHandler(app)
+    items = capture_items("event", "span")
+
+    with sentry_sdk.traces.start_span(
+        name="lambda_segment",
+        parent_span=None,
+        attributes={"sentry.origin": "auto.function.aws_lambda"},
+    ):
+        response = client.get("/boom")
+        assert response.status_code == 500
+
+    sentry_sdk.flush()
+
+    error_items = [i for i in items if i.type == "event"]
+    assert len(error_items) == 1
+
+    segment_spans = [
+        s.payload for s in items if s.type == "span" and s.payload.get("is_segment")
+    ]
+    assert len(segment_spans) == 1
+    assert segment_spans[0]["attributes"]["sentry.origin"] == "auto.function.chalice"
+    assert segment_spans[0]["status"] == "error"
+
+
+def test_span_streaming_existing_span_scheduled_event(
+    sentry_init,
+    lambda_context_args,
+    capture_items,
+):
+    sentry_init(
+        integrations=[ChaliceIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+    app = Chalice(app_name="sentry_chalice")
+
+    @app.schedule("rate(1 minutes)")
+    def every_hour(event):
+        raise Exception("schedule event!")
+
+    items = capture_items("event", "span")
+
+    context = _populate_lambda_context(
+        LambdaContext(*lambda_context_args, max_runtime_ms=10000, time_source=time)
+    )
+
+    lambda_event = {
+        "version": "0",
+        "account": "120987654312",
+        "region": "us-west-1",
+        "detail": {},
+        "detail-type": "Scheduled Event",
+        "source": "aws.events",
+        "time": "1970-01-01T00:00:00Z",
+        "id": "event-id",
+        "resources": ["arn:aws:events:us-west-1:120987654312:rule/my-schedule"],
+    }
+    with sentry_sdk.traces.start_span(
+        name="lambda_segment",
+        parent_span=None,
+        attributes={"sentry.origin": "auto.function.aws_lambda"},
+    ):
+        with pytest.raises(Exception) as exc_info:
+            every_hour(lambda_event, context=context)
+        assert str(exc_info.value) == "schedule event!"
+
+    sentry_sdk.flush()
+
+    segment_spans = [
+        s.payload for s in items if s.type == "span" and s.payload.get("is_segment")
+    ]
+    assert len(segment_spans) == 1
+    assert segment_spans[0]["attributes"]["sentry.origin"] == "auto.function.chalice"
+    assert segment_spans[0]["status"] == "error"
 
 
 def test_span_streaming_scheduled_event(

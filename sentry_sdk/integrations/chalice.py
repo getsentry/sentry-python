@@ -11,7 +11,12 @@ from sentry_sdk.integrations.cloud_resource_context import (
     CLOUD_PLATFORM,
     CLOUD_PROVIDER,
 )
-from sentry_sdk.traces import SegmentSource, SpanStatus
+from sentry_sdk.traces import (
+    SegmentSource,
+    SpanStatus,
+    StreamedSpan,
+    get_current_span,
+)
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -51,26 +56,47 @@ class EventSourceHandler(ChaliceEventSourceHandler):  # type: ignore
                 )
 
             if has_span_streaming_enabled(client.options):
-                span = sentry_sdk.traces.start_span(
-                    name=context.function_name,
-                    parent_span=None,
-                    attributes=_get_lambda_span_attributes(context),
-                )
-                try:
-                    return ChaliceEventSourceHandler.__call__(self, event, context)
-                except Exception:
-                    exc_info = sys.exc_info()
-                    span.status = SpanStatus.ERROR.value
-                    sentry_event, hint = event_from_exception(
-                        exc_info,
-                        client_options=client.options,
-                        mechanism={"type": "chalice", "handled": False},
+                current_span = get_current_span()
+                if type(current_span) is StreamedSpan:
+                    # A segment already exists (created by the AWS Lambda
+                    # integration), so decorate it with Chalice attributes
+                    # instead of creating a duplicate root segment. The AWS
+                    # Lambda integration owns the span lifecycle (end + flush).
+                    segment = current_span._segment
+                    segment.set_attributes(_get_lambda_span_attributes(context))
+                    try:
+                        return ChaliceEventSourceHandler.__call__(self, event, context)
+                    except Exception:
+                        exc_info = sys.exc_info()
+                        segment.status = SpanStatus.ERROR.value
+                        sentry_event, hint = event_from_exception(
+                            exc_info,
+                            client_options=client.options,
+                            mechanism={"type": "chalice", "handled": False},
+                        )
+                        sentry_sdk.capture_event(sentry_event, hint=hint)
+                        reraise(*exc_info)
+                else:
+                    span = sentry_sdk.traces.start_span(
+                        name=context.function_name,
+                        parent_span=None,
+                        attributes=_get_lambda_span_attributes(context),
                     )
-                    sentry_sdk.capture_event(sentry_event, hint=hint)
-                    reraise(*exc_info)
-                finally:
-                    span.end()
-                    client.flush()
+                    try:
+                        return ChaliceEventSourceHandler.__call__(self, event, context)
+                    except Exception:
+                        exc_info = sys.exc_info()
+                        span.status = SpanStatus.ERROR.value
+                        sentry_event, hint = event_from_exception(
+                            exc_info,
+                            client_options=client.options,
+                            mechanism={"type": "chalice", "handled": False},
+                        )
+                        sentry_sdk.capture_event(sentry_event, hint=hint)
+                        reraise(*exc_info)
+                    finally:
+                        span.end()
+                        client.flush()
 
             else:
                 try:
@@ -119,32 +145,60 @@ def _get_view_function_response(
                 if "method" in request_dict:
                     additional_attrs["http.request.method"] = request_dict["method"]
 
-                span = sentry_sdk.traces.start_span(
-                    name=aws_context.function_name,
-                    parent_span=None,
-                    attributes={
-                        **_get_lambda_span_attributes(aws_context),
-                        **header_attrs,
-                        **additional_attrs,
-                    },
-                )
-                try:
-                    return view_function(**function_args)
-                except Exception as exc:
-                    if isinstance(exc, ChaliceViewError):
+                attributes = {
+                    **_get_lambda_span_attributes(aws_context),
+                    **header_attrs,
+                    **additional_attrs,
+                }
+
+                current_span = get_current_span()
+                if type(current_span) is StreamedSpan:
+                    # A segment already exists (created by the AWS Lambda
+                    # integration), so decorate it with Chalice attributes
+                    # instead of creating a duplicate root segment. The AWS
+                    # Lambda integration owns the span lifecycle (end + flush),
+                    # but Chalice converts unhandled view exceptions into 500
+                    # responses, so the error must be captured here.
+                    segment = current_span._segment
+                    segment.set_attributes(attributes)
+                    try:
+                        return view_function(**function_args)
+                    except Exception as exc:
+                        if isinstance(exc, ChaliceViewError):
+                            raise
+                        exc_info = sys.exc_info()
+                        segment.status = SpanStatus.ERROR.value
+                        sentry_event, hint = event_from_exception(
+                            exc_info,
+                            client_options=client.options,
+                            mechanism={"type": "chalice", "handled": False},
+                        )
+                        sentry_sdk.capture_event(sentry_event, hint=hint)
                         raise
-                    exc_info = sys.exc_info()
-                    span.status = SpanStatus.ERROR.value
-                    sentry_event, hint = event_from_exception(
-                        exc_info,
-                        client_options=client.options,
-                        mechanism={"type": "chalice", "handled": False},
+                else:
+                    sentry_sdk.traces.continue_trace(headers)
+                    span = sentry_sdk.traces.start_span(
+                        name=aws_context.function_name,
+                        parent_span=None,
+                        attributes=attributes,
                     )
-                    sentry_sdk.capture_event(sentry_event, hint=hint)
-                    raise
-                finally:
-                    span.end()
-                    client.flush()
+                    try:
+                        return view_function(**function_args)
+                    except Exception as exc:
+                        if isinstance(exc, ChaliceViewError):
+                            raise
+                        exc_info = sys.exc_info()
+                        span.status = SpanStatus.ERROR.value
+                        sentry_event, hint = event_from_exception(
+                            exc_info,
+                            client_options=client.options,
+                            mechanism={"type": "chalice", "handled": False},
+                        )
+                        sentry_sdk.capture_event(sentry_event, hint=hint)
+                        raise
+                    finally:
+                        span.end()
+                        client.flush()
             else:
                 scope.set_transaction_name(
                     app.lambda_context.function_name,
