@@ -1060,7 +1060,7 @@ def test_span_origin(
             conn.getresponse()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert spans[1]["attributes"]["sentry.origin"] == "manual"
 
         assert spans[0]["attributes"]["sentry.op"] == "http.client"
@@ -1111,7 +1111,7 @@ def test_http_timeout(
                 conn.getresponse()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert len(spans) == 2
         span = spans[0]
         assert span["attributes"]["sentry.op"] == "http.client"
@@ -1158,7 +1158,7 @@ def test_proxy_http_tunnel(
             conn.getresponse()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         (span,) = (
             span
             for span in spans

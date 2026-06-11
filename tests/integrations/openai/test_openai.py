@@ -2274,7 +2274,7 @@ def test_span_status_error(
     )
 
     if span_streaming or stream_gen_ai_spans:
-        items = capture_items("event", "transaction", "span")
+        items = capture_items("event", "span")
 
         with start_transaction(name="test"):
             client = OpenAI(api_key="z")
@@ -3861,7 +3861,7 @@ def test_ai_client_span_responses_api_no_pii(
                 top_p=0.9,
             )
 
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert len(spans) == 1
         assert spans[0]["attributes"] == {
@@ -4171,7 +4171,7 @@ def test_ai_client_span_responses_api(
                 top_p=0.9,
             )
 
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert len(spans) == 1
 
@@ -4658,7 +4658,7 @@ async def test_ai_client_span_responses_async_api(
                 top_p=0.9,
             )
 
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert len(spans) == 1
 
@@ -4946,7 +4946,7 @@ async def test_ai_client_span_streaming_responses_async_api(
                 pass
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         spans = [
             span
             for span in spans

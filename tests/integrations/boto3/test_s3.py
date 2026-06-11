@@ -47,7 +47,7 @@ def test_basic(
             span.end()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert len(spans) == 2
         span = spans[0]
         assert span["attributes"]["sentry.op"] == "http.client"
@@ -102,7 +102,7 @@ def test_streaming(
             span.end()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert len(spans) == 3
 
         span1 = spans[0]
@@ -196,7 +196,7 @@ def test_streaming_close(
             span.end()
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert len(spans) == 3
         span1 = spans[0]
         assert span1["attributes"]["sentry.op"] == "http.client"
@@ -258,7 +258,7 @@ def test_omit_url_data_if_parsing_fails(
                 span.end()
 
                 sentry_sdk.flush()
-                spans = [item.payload for item in items if item.type == "span"]
+                spans = [item.payload for item in items]
                 assert spans[0]["attributes"] == ApproxDict(
                     {
                         "http.request.method": "GET",
@@ -334,7 +334,7 @@ def test_span_origin(
             _ = [obj for obj in bucket.objects.all()]
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
 
         assert spans[1]["attributes"]["sentry.origin"] == "manual"
         assert spans[0]["attributes"]["sentry.origin"] == "auto.http.boto3"

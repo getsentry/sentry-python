@@ -1,5 +1,64 @@
 # Changelog
 
+## 2.62.0
+
+### New Features ✨
+
+- Add integration for `aiomysql` by @tonal in [#4703](https://github.com/getsentry/sentry-python/pull/4703)
+  
+  We're adding support for the `aiomysql` package. To enable the integration, add it to your `integrations` list:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.aiomysql import AioMySQLIntegration
+
+  sentry_sdk.init(
+      traces_sample_rate=1.0,
+      integrations=[AioMySQLIntegration()],
+  )
+  ```
+
+- Support HTTPX2 by @sentrivana in [#6463](https://github.com/getsentry/sentry-python/pull/6463)
+
+  We're adding out-of-the-box support for HTTPX2. As long as use the package, the Sentry integration
+  will be enabled automatically and you should see your requests instrumented in Sentry.
+
+  ```python
+  import httpx2
+  import sentry_sdk
+
+  sentry_sdk.init(...)
+  
+  with sentry_sdk.start_transaction(name="testing_sentry"):
+      httpx2.get("https://sentry.io/")
+  ```
+
+### Bug Fixes 🐛
+
+- (arq) Never capture control flow exceptions by @alexander-alderman-webb in [#6507](https://github.com/getsentry/sentry-python/pull/6507)
+- (client) Guard against dotless qualified_name in \_setup_instrumentation by @devteamaegis in [#6452](https://github.com/getsentry/sentry-python/pull/6452)
+- (pydantic-ai) Only use hooks when `ModelRequestContext.model` exists by @alexander-alderman-webb in [#6480](https://github.com/getsentry/sentry-python/pull/6480)
+- (rq) Restore `functools.wraps()` for patched functions by @alexander-alderman-webb in [#6532](https://github.com/getsentry/sentry-python/pull/6532)
+- (tracing_utils) Handle baggage values containing '=' in from_incoming_header by @devteamaegis in [#6450](https://github.com/getsentry/sentry-python/pull/6450)
+- (utils) Handle image_url string shorthand in \_is_image_type_with_blob_content by @devteamaegis in [#6478](https://github.com/getsentry/sentry-python/pull/6478)
+
+### Internal Changes 🔧
+
+- (arq) Only pin `fakeredis<2.36.0` in tests by @alexander-alderman-webb in [#6444](https://github.com/getsentry/sentry-python/pull/6444)
+- (flaky) Change env for flaky test detector by @sl0thentr0py in [#6492](https://github.com/getsentry/sentry-python/pull/6492)
+- (pydantic-ai) Create event loop before invoking sync methods by @alexander-alderman-webb in [#6475](https://github.com/getsentry/sentry-python/pull/6475)
+- Use `package-ecosystem: uv` in dependabot by @sentrivana in [#6522](https://github.com/getsentry/sentry-python/pull/6522)
+- 🤖 Update test matrix with new releases (06/08) by @github-actions in [#6519](https://github.com/getsentry/sentry-python/pull/6519)
+- Raise minimum supported `aiomysql` version and update text matrix by @alexander-alderman-webb in [#6496](https://github.com/getsentry/sentry-python/pull/6496)
+- Deprecate OpenTelemetryIntegration in favor of OTLPIntegration and no-op for span first by @sl0thentr0py in [#6494](https://github.com/getsentry/sentry-python/pull/6494)
+- 🤖 Update test matrix with new releases (06/03) by @github-actions in [#6489](https://github.com/getsentry/sentry-python/pull/6489)
+- Raise `update-tox` timeout to 20 minutes by @alexander-alderman-webb in [#6488](https://github.com/getsentry/sentry-python/pull/6488)
+- Prevent `grpcio-tools` source builds when generating test matrices by @alexander-alderman-webb in [#6487](https://github.com/getsentry/sentry-python/pull/6487)
+- Add weekly flaky test detector workflow by @sl0thentr0py in [#6484](https://github.com/getsentry/sentry-python/pull/6484)
+- Pin transitive dependencies for tests on Python>=3.8 by @alexander-alderman-webb in [#6437](https://github.com/getsentry/sentry-python/pull/6437)
+- Install uv in `update-tox` job by @alexander-alderman-webb in [#6453](https://github.com/getsentry/sentry-python/pull/6453)
+- Only pin `setuptools` in relevant tests by @alexander-alderman-webb in [#6467](https://github.com/getsentry/sentry-python/pull/6467)
+
 ## 2.61.1
 
 ### Internal Changes 🔧
