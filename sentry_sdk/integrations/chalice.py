@@ -132,6 +132,8 @@ def _get_view_function_response(
                         mechanism={"type": "chalice", "handled": False},
                     )
                     sentry_sdk.capture_event(sentry_event, hint=hint)
+                    if not segment:
+                        client.flush()
                     raise
             else:
                 scope.set_transaction_name(
