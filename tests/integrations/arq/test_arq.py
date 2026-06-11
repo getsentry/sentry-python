@@ -356,12 +356,16 @@ async def test_job_transaction(
         sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
 
-        assert spans[4]["attributes"]["sentry.op"] == "queue.task.arq"
-        assert spans[4]["name"] == "division"
-        assert spans[4]["attributes"]["sentry.span.source"] == "task"
+        task_spans = [
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == "queue.task.arq"
+        ]
 
-        assert spans[15]["attributes"]["sentry.op"] == "queue.task.arq"
-        assert spans[15]["name"] == "cron:division"
+        division_span = next(span for span in task_spans if span["name"] == "division")
+        assert division_span["attributes"]["sentry.span.source"] == "task"
+
+        assert any(span["name"] == "cron:division" for span in task_spans)
     else:
         events = capture_events()
 
