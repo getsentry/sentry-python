@@ -200,8 +200,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                 )
 
             if finish_reason is not None:
-                set_data_normalized(
-                    span,
+                span.set_data(
                     SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
                     finish_reason,
                 )
@@ -274,8 +273,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                             yield chunk
 
                         if finish_reason is not None:
-                            set_data_normalized(
-                                span,
+                            span.set_data(
                                 SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
                                 finish_reason,
                             )
@@ -353,8 +351,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                             )
 
                         if finish_reason is not None:
-                            set_data_normalized(
-                                span,
+                            span.set_data(
                                 SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
                                 finish_reason,
                             )
