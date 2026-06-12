@@ -104,6 +104,22 @@ class SentryFalconMiddleware:
         scope._name = "falcon"
         scope.add_event_processor(_make_request_event_processor(req, integration))
 
+    def process_resource(
+        self, req: "Any", resp: "Any", resource: "Any", params: "Any"
+    ) -> None:
+        integration = sentry_sdk.get_client().get_integration(FalconIntegration)
+        if integration is None:
+            return
+
+        name_for_style = {
+            "uri_template": req.uri_template,
+            "path": req.path,
+        }
+        name = name_for_style[integration.transaction_style]
+        source = SOURCE_FOR_STYLE[integration.transaction_style]
+        sentry_sdk.set_transaction_name(name, source)
+        sentry_sdk.get_isolation_scope().set_transaction_name(name, source)
+
 
 TRANSACTION_STYLE_VALUES = ("uri_template", "path")
 
@@ -233,23 +249,10 @@ def _has_http_5xx_status(response: "falcon.Response") -> bool:
     return response.status.startswith("5")
 
 
-def _set_transaction_name_and_source(
-    event: "Event", transaction_style: str, request: "falcon.Request"
-) -> None:
-    name_for_style = {
-        "uri_template": request.uri_template,
-        "path": request.path,
-    }
-    event["transaction"] = name_for_style[transaction_style]
-    event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
-
-
 def _make_request_event_processor(
     req: "falcon.Request", integration: "FalconIntegration"
 ) -> "EventProcessor":
     def event_processor(event: "Event", hint: "dict[str, Any]") -> "Event":
-        _set_transaction_name_and_source(event, integration.transaction_style, req)
-
         with capture_internal_exceptions():
             FalconRequestExtractor(req).extract_into_event(event)
 
