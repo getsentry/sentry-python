@@ -155,6 +155,14 @@ def _request_started(app: "Flask", **kwargs: "Any") -> None:
     )
 
     scope = sentry_sdk.get_isolation_scope()
+
+    with capture_internal_exceptions():
+        if should_send_default_pii():
+            user_properties = _get_flask_user_properties()
+            if user_properties:
+                existing_user_properties = scope._user or {}
+                scope.set_user({**existing_user_properties, **user_properties})
+
     evt_processor = _make_request_event_processor(app, request, integration)
     scope.add_event_processor(evt_processor)
 
@@ -223,43 +231,50 @@ def _capture_exception(
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _add_user_to_event(event: "Event") -> None:
+def _get_flask_user_properties() -> "Dict[str, Any]":
     if flask_login is None:
-        return
+        return {}
 
     user = flask_login.current_user
     if user is None:
-        return
+        return {}
 
+    properties = {}
+
+    try:
+        user_id = user.get_id()
+        if user_id is not None:
+            properties["id"] = user_id
+    except AttributeError:
+        # might happen if:
+        # - flask_login could not be imported
+        # - flask_login is not configured
+        # - no user is logged in
+        pass
+
+    # The following attribute accesses are ineffective for the general
+    # Flask-Login case, because the User interface of Flask-Login does not
+    # care about anything but the ID. However, Flask-User (based on
+    # Flask-Login) documents a few optional extra attributes.
+    #
+    # https://github.com/lingthio/Flask-User/blob/a379fa0a281789618c484b459cb41236779b95b1/docs/source/data_models.rst#fixed-data-model-property-names
+    try:
+        properties["email"] = user.email
+    except Exception:
+        pass
+
+    try:
+        properties["username"] = user.username
+    except Exception:
+        pass
+
+    return properties
+
+
+def _add_user_to_event(event: "Event") -> None:
     with capture_internal_exceptions():
-        # Access this object as late as possible as accessing the user
-        # is relatively costly
-
-        user_info = event.setdefault("user", {})
-
-        try:
-            user_info.setdefault("id", user.get_id())
-            # TODO: more configurable user attrs here
-        except AttributeError:
-            # might happen if:
-            # - flask_login could not be imported
-            # - flask_login is not configured
-            # - no user is logged in
-            pass
-
-        # The following attribute accesses are ineffective for the general
-        # Flask-Login case, because the User interface of Flask-Login does not
-        # care about anything but the ID. However, Flask-User (based on
-        # Flask-Login) documents a few optional extra attributes.
-        #
-        # https://github.com/lingthio/Flask-User/blob/a379fa0a281789618c484b459cb41236779b95b1/docs/source/data_models.rst#fixed-data-model-property-names
-
-        try:
-            user_info.setdefault("email", user.email)
-        except Exception:
-            pass
-
-        try:
-            user_info.setdefault("username", user.username)
-        except Exception:
-            pass
+        user_properties = _get_flask_user_properties()
+        if user_properties:
+            user_info = event.setdefault("user", {})
+            for key, value in user_properties.items():
+                user_info.setdefault(key, value)
