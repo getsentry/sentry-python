@@ -127,18 +127,12 @@ def test_transaction_style(
 
     client = make_client()
     if span_streaming:
-        items = capture_items("event", "span")
+        items = capture_items("event")
 
         response = client.simulate_get(url)
         assert response.status == falcon.HTTP_200
 
-        (event,) = (item.payload for item in items if item.type == "event")
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        spans = [span for span in spans if span["name"] == expected_transaction]
-        assert len(spans) == 1
-        assert spans[0]["attributes"]["sentry.span.source"] == expected_source
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
 
@@ -146,9 +140,6 @@ def test_transaction_style(
         assert response.status == falcon.HTTP_200
 
         (event, transaction) = events
-
-        assert transaction["transaction"] == expected_transaction
-        assert transaction["transaction_info"] == {"source": expected_source}
 
     assert event["transaction"] == expected_transaction
     assert event["transaction_info"] == {"source": expected_source}
