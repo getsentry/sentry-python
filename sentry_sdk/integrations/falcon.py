@@ -263,9 +263,9 @@ def _make_request_event_processor(
     req: "falcon.Request", integration: "FalconIntegration"
 ) -> "EventProcessor":
     def event_processor(event: "Event", hint: "dict[str, Any]") -> "Event":
-        with capture_internal_exceptions():
-            _set_transaction_name_and_source(event, integration.transaction_style, req)
+        _set_transaction_name_and_source(event, integration.transaction_style, req)
 
+        with capture_internal_exceptions():
             FalconRequestExtractor(req).extract_into_event(event)
 
         return event
