@@ -94,7 +94,6 @@ def _get_view_function_response(
                     # The AWS Lambda integration owns the span lifecycle
                     # (end + flush), but Chalice converts unhandled view exceptions
                     # into 500 responses, so the error must be captured here.
-                    aws_context = app.lambda_context
                     request_dict = app.current_request.to_dict()
                     headers = request_dict.get("headers", {})
 
@@ -109,7 +108,7 @@ def _get_view_function_response(
                         additional_attrs["http.request.method"] = request_dict["method"]
 
                     attributes = {
-                        **_get_lambda_span_attributes(aws_context),
+                        "sentry.origin": ChaliceIntegration.origin,
                         **header_attrs,
                         **additional_attrs,
                     }
@@ -194,25 +193,3 @@ class ChaliceIntegration(Integration):
             RestAPIEventHandler._get_view_function_response = sentry_event_response
         # for everything else (like events)
         chalice.app.EventSourceHandler = EventSourceHandler
-
-
-def _get_lambda_span_attributes(aws_context: "Any") -> "Dict[str, Any]":
-    invoked_arn = aws_context.invoked_function_arn
-    split_invoked_arn = invoked_arn.split(":")
-    aws_region = split_invoked_arn[3] if len(split_invoked_arn) > 3 else "unknown"
-
-    return {
-        "sentry.op": OP.FUNCTION_AWS,
-        "sentry.origin": ChaliceIntegration.origin,
-        "sentry.span.source": SegmentSource.COMPONENT,
-        "cloud.platform": CLOUD_PLATFORM.AWS_LAMBDA,
-        "cloud.provider": CLOUD_PROVIDER.AWS,
-        "faas.name": aws_context.function_name,
-        "cloud.region": aws_region,
-        "cloud.resource_id": invoked_arn,
-        "aws.lambda.invoked_arn": invoked_arn,
-        "faas.invocation_id": aws_context.aws_request_id,
-        "faas.version": aws_context.function_version,
-        "aws.log.group.names": [aws_context.log_group_name],
-        "aws.log.stream.names": [aws_context.log_stream_name],
-    }

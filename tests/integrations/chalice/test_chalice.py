@@ -210,7 +210,11 @@ def test_span_streaming_existing_span(
     with sentry_sdk.traces.start_span(
         name="lambda_segment",
         parent_span=None,
-        attributes={"sentry.origin": "auto.function.aws_lambda"},
+        attributes={
+            "sentry.origin": "auto.function.aws_lambda",
+            "sentry.op": "function.aws",
+            "faas.name": "api_handler",
+        },
     ):
         response = client.get("/message")
         assert response.status_code == 200
