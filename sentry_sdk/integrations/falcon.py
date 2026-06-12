@@ -104,6 +104,21 @@ class SentryFalconMiddleware:
         scope._name = "falcon"
         scope.add_event_processor(_make_request_event_processor(req, integration))
 
+    def process_resource(
+        self, req: "Any", resp: "Any", resource: "Any", params: "Any"
+    ) -> None:
+        integration = sentry_sdk.get_client().get_integration(FalconIntegration)
+        if integration is None:
+            return
+
+        name_for_style = {
+            "uri_template": req.uri_template,
+            "path": req.path,
+        }
+        name = name_for_style[integration.transaction_style]
+        source = SOURCE_FOR_STYLE[integration.transaction_style]
+        sentry_sdk.set_transaction_name(name, source)
+
 
 TRANSACTION_STYLE_VALUES = ("uri_template", "path")
 
