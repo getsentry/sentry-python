@@ -133,7 +133,6 @@ def test_transaction_style(
         response = client.simulate_get(url)
         assert response.status == falcon.HTTP_200
 
-        (event,) = (item.payload for item in items)
         (event,) = (item.payload for item in items if item.type == "event")
 
         sentry_sdk.flush()
@@ -147,7 +146,6 @@ def test_transaction_style(
         response = client.simulate_get(url)
         assert response.status == falcon.HTTP_200
 
-        (event,) = events
         (event, transaction) = events
 
         assert transaction["transaction"] == expected_transaction
