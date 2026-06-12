@@ -231,7 +231,7 @@ def _capture_exception(
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _get_flask_user_properties() -> "Dict[str, Any]":
+def _get_flask_user_properties() -> "Dict[str, str]":
     if flask_login is None:
         return {}
 
