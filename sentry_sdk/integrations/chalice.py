@@ -2,17 +2,11 @@ import sys
 from functools import wraps
 
 import sentry_sdk
-import sentry_sdk.traces
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.aws_lambda import _make_request_event_processor
-from sentry_sdk.integrations.cloud_resource_context import (
-    CLOUD_PLATFORM,
-    CLOUD_PROVIDER,
-)
 from sentry_sdk.traces import (
-    SegmentSource,
     SpanStatus,
     StreamedSpan,
     get_current_span,
