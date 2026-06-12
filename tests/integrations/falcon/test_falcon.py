@@ -126,17 +126,19 @@ def test_transaction_style(
 
     client = make_client()
     if span_streaming:
-        events = capture_items("event")
+        items = capture_items("event")
 
         response = client.simulate_get(url)
         assert response.status == falcon.HTTP_200
+
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
 
         response = client.simulate_get(url)
         assert response.status == falcon.HTTP_200
 
-    (event,) = events
+        (event,) = events
     assert event["transaction"] == expected_transaction
     assert event["transaction_info"] == {"source": expected_source}
 
