@@ -3,8 +3,15 @@ from functools import wraps
 
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.aws_lambda import _make_request_event_processor
+from sentry_sdk.traces import (
+    SpanStatus,
+    StreamedSpan,
+    get_current_span,
+)
 from sentry_sdk.tracing import TransactionSource
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -63,11 +70,6 @@ def _get_view_function_response(
         with sentry_sdk.isolation_scope() as scope:
             with capture_internal_exceptions():
                 configured_time = app.lambda_context.get_remaining_time_in_millis()
-                scope.set_transaction_name(
-                    app.lambda_context.function_name,
-                    source=TransactionSource.COMPONENT,
-                )
-
                 scope.add_event_processor(
                     _make_request_event_processor(
                         app.current_request.to_dict(),
@@ -75,26 +77,81 @@ def _get_view_function_response(
                         configured_time,
                     )
                 )
-            try:
-                return view_function(**function_args)
-            except Exception as exc:
-                if isinstance(exc, ChaliceViewError):
+
+            if has_span_streaming_enabled(client.options):
+                current_span = get_current_span()
+                segment = None
+                if type(current_span) is StreamedSpan:
+                    # A segment already exists (created by the AWS Lambda
+                    # integration), so decorate it with Chalice attributes
+                    # The AWS Lambda integration owns the span lifecycle
+                    # (end + flush), but Chalice converts unhandled view exceptions
+                    # into 500 responses, so the error must be captured here.
+                    request_dict = app.current_request.to_dict()
+                    headers = request_dict.get("headers", {})
+
+                    header_attrs: "Dict[str, Any]" = {}
+                    for header, value in _filter_headers(
+                        headers, use_annotated_value=False
+                    ).items():
+                        header_attrs[f"http.request.header.{header.lower()}"] = value
+
+                    additional_attrs: "Dict[str, Any]" = {}
+                    if "method" in request_dict:
+                        additional_attrs["http.request.method"] = request_dict["method"]
+
+                    attributes = {
+                        "sentry.origin": ChaliceIntegration.origin,
+                        **header_attrs,
+                        **additional_attrs,
+                    }
+
+                    segment = current_span._segment
+                    segment.set_attributes(attributes)
+
+                try:
+                    return view_function(**function_args)
+                except Exception as exc:
+                    if isinstance(exc, ChaliceViewError):
+                        raise
+                    exc_info = sys.exc_info()
+                    if segment:
+                        segment.status = SpanStatus.ERROR.value
+                    sentry_event, hint = event_from_exception(
+                        exc_info,
+                        client_options=client.options,
+                        mechanism={"type": "chalice", "handled": False},
+                    )
+                    sentry_sdk.capture_event(sentry_event, hint=hint)
+                    if segment is None:
+                        client.flush()
                     raise
-                exc_info = sys.exc_info()
-                event, hint = event_from_exception(
-                    exc_info,
-                    client_options=client.options,
-                    mechanism={"type": "chalice", "handled": False},
+            else:
+                scope.set_transaction_name(
+                    app.lambda_context.function_name,
+                    source=TransactionSource.COMPONENT,
                 )
-                sentry_sdk.capture_event(event, hint=hint)
-                client.flush()
-                raise
+                try:
+                    return view_function(**function_args)
+                except Exception as exc:
+                    if isinstance(exc, ChaliceViewError):
+                        raise
+                    exc_info = sys.exc_info()
+                    sentry_event, hint = event_from_exception(
+                        exc_info,
+                        client_options=client.options,
+                        mechanism={"type": "chalice", "handled": False},
+                    )
+                    sentry_sdk.capture_event(sentry_event, hint=hint)
+                    client.flush()
+                    raise
 
     return wrapped_view_function  # type: ignore
 
 
 class ChaliceIntegration(Integration):
     identifier = "chalice"
+    origin = f"auto.function.{identifier}"
 
     @staticmethod
     def setup_once() -> None:
