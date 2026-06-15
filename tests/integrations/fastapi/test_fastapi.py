@@ -9,7 +9,16 @@ from unittest import mock
 import fastapi
 import pytest
 import starlette
-from fastapi import Body, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import (
+    APIRouter,
+    Body,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+)
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.testclient import TestClient
 
@@ -723,6 +732,56 @@ def test_transaction_name(
             transaction_event["transaction_info"]["source"]
             == expected_transaction_source
         )
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_transaction_name_with_prefix(
+    sentry_init,
+    capture_envelopes,
+    capture_items,
+    span_streaming,
+):
+    sentry_init(
+        auto_enabling_integrations=False,
+        integrations=[
+            StarletteIntegration(transaction_style="url"),
+            FastApiIntegration(transaction_style="url"),
+        ],
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
+
+    if span_streaming:
+        items = capture_items("span")
+    else:
+        envelopes = capture_envelopes()
+
+    app = FastAPI()
+    router = APIRouter()
+
+    @router.get("/users/{user_id}")
+    async def get_user(user_id: int):
+        return {"user_id": user_id}
+
+    app.include_router(router, prefix="/api")
+
+    client = TestClient(app)
+    client.get("/api/users/123")
+
+    if span_streaming:
+        sentry_sdk.flush()
+        segments = [item.payload for item in items if item.payload.get("is_segment")]
+        assert len(segments) == 1
+        segment = segments[0]
+        assert segment["name"] == "/api/users/{user_id}"
+        assert segment["attributes"]["sentry.span.source"] == "route"
+    else:
+        (transaction_envelope,) = envelopes
+        transaction_event = transaction_envelope.get_transaction_event()
+        assert transaction_event["transaction"] == "/api/users/{user_id}"
+        assert transaction_event["transaction_info"]["source"] == "route"
 
 
 def test_route_endpoint_equal_dependant_call(sentry_init):
