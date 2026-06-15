@@ -1088,3 +1088,44 @@ async def test_feature_flags(sentry_init, capture_events):
             found = True
 
     assert found, "No event with exception found"
+
+
+def test_sync_endpoint_does_not_crash_after_many_requests(sentry_init):
+    """
+    Regression: FastAPI >= 0.137 changed include_router() to preserve a router
+    tree instead of flattening routes, causing get_request_handler() to be
+    called on every request rather than once at registration. Sentry's
+    patch_get_request_handler() mutates dependant.call in-place, accumulating
+    one _sentry_call wrapper per request. After ~987 requests Python's
+    recursion limit is hit and the sync endpoint starts returning 500.
+
+    Async endpoints are unaffected; only sync (def) endpoints are vulnerable.
+    """
+    sentry_init(
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    from fastapi import APIRouter
+
+    router = APIRouter(prefix="/api")
+
+    @router.get("/health")
+    def _health():
+        return {"status": "ok"}
+
+    app = FastAPI()
+    for i in range(10):
+        app.include_router(APIRouter(prefix=f"/unused{i}"))
+    app.include_router(router)
+
+    client = TestClient(app, raise_server_exceptions=False)
+
+    for i in range(1, 1001):
+        response = client.get("/api/health")
+        assert response.status_code == 200, (
+            f"Request {i} returned {response.status_code} — "
+            "sync endpoint crashed, likely due to _sentry_call wrapper accumulation "
+            "(patch_get_request_handler re-wraps dependant.call on every request "
+            "with FastAPI >= 0.137's router-tree architecture)."
+        )

@@ -145,6 +145,12 @@ def patch_get_request_handler() -> None:
             dependant
             and dependant.call is not None
             and not iscoroutinefunction(dependant.call)
+            # FastAPI >= 0.137 calls get_request_handler() on every request
+            # (router-tree traversal) rather than once at registration. Guard
+            # against accumulating _sentry_call wrappers on the shared
+            # dependant object, which would cause a RecursionError after ~987
+            # requests as the call chain grows past Python's recursion limit.
+            and not getattr(dependant.call, "_sentry_is_patched", False)
         ):
             old_call = dependant.call
 
@@ -169,6 +175,7 @@ def patch_get_request_handler() -> None:
 
                 return old_call(*args, **kwargs)
 
+            _sentry_call._sentry_is_patched = True  # type: ignore[attr-defined]
             dependant.call = _sentry_call
 
         old_app = old_get_request_handler(*args, **kwargs)
