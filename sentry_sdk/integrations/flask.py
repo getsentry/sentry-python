@@ -259,12 +259,14 @@ def _get_flask_user_properties() -> "Dict[str, str]":
     #
     # https://github.com/lingthio/Flask-User/blob/a379fa0a281789618c484b459cb41236779b95b1/docs/source/data_models.rst#fixed-data-model-property-names
     try:
-        properties["email"] = user.email
+        if user.email is not None:
+            properties["email"] = user.email
     except Exception:
         pass
 
     try:
-        properties["username"] = user.username
+        if user.username is not None:
+            properties["username"] = user.username
     except Exception:
         pass
 
