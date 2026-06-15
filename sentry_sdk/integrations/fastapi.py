@@ -62,10 +62,23 @@ def _set_transaction_name_and_source(
 
     elif transaction_style == "url":
         route = request.scope.get("route")
+
         if route:
-            path = getattr(route, "path", None)
-            if path is not None:
-                name = path
+            # FastAPI >= 0.137 stores the prefix-resolved path on an
+            # effective_route_context in scope["fastapi"], while
+            # scope["route"].path holds the unprefixed original.
+            # Prefer the effective context path when available.
+            effective_route_context = request.scope.get("fastapi", {}).get(
+                "effective_route_context"
+            )
+            context_path = getattr(effective_route_context, "path", None)
+
+            if context_path:
+                name = context_path
+            else:
+                path = getattr(route, "path", None)
+                if path is not None:
+                    name = path
 
     if not name:
         name = _DEFAULT_TRANSACTION_NAME
