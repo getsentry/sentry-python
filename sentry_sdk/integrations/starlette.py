@@ -143,7 +143,8 @@ class StarletteIntegration(Integration):
             )
 
         patch_middlewares()
-        patch_asgi_app()
+        path_includes_root_path = version >= (0, 33)
+        patch_asgi_app(path_includes_root_path=path_includes_root_path)
         patch_request_response()
 
         if version >= (0, 24):
@@ -427,7 +428,7 @@ def patch_middlewares() -> None:
         Middleware.__init__ = _sentry_middleware_init
 
 
-def patch_asgi_app() -> None:
+def patch_asgi_app(path_includes_root_path: "bool") -> None:
     """
     Instrument Starlette ASGI app using the SentryAsgiMiddleware.
     """
@@ -451,6 +452,7 @@ def patch_asgi_app() -> None:
                 else DEFAULT_HTTP_METHODS_TO_CAPTURE
             ),
             asgi_version=3,
+            path_includes_root_path=path_includes_root_path,
         )
 
         return await middleware(scope, receive, send)

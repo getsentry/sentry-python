@@ -32,6 +32,7 @@ def _get_url(
     asgi_scope: "Dict[str, Any]",
     default_scheme: "Literal['ws', 'http']",
     host: "Optional[Union[AnnotatedValue, str]]",
+    path_includes_root_path: "bool" = True,
 ) -> str:
     """
     Extract URL from the ASGI scope, without also including the querystring.
@@ -39,7 +40,11 @@ def _get_url(
     scheme = asgi_scope.get("scheme", default_scheme)
 
     server = asgi_scope.get("server", None)
-    path = asgi_scope.get("root_path", "") + asgi_scope.get("path", "")
+    path = (
+        asgi_scope.get("path", "")
+        if path_includes_root_path
+        else asgi_scope.get("root_path", "") + asgi_scope.get("path", "")
+    )
 
     if host:
         return "%s://%s%s" % (scheme, host, path)

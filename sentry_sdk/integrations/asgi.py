@@ -105,6 +105,7 @@ class SentryAsgiMiddleware:
         "mechanism_type",
         "span_origin",
         "http_methods_to_capture",
+        "path_includes_root_path",
     )
 
     def __init__(
@@ -116,6 +117,7 @@ class SentryAsgiMiddleware:
         span_origin: str = "manual",
         http_methods_to_capture: "Tuple[str, ...]" = DEFAULT_HTTP_METHODS_TO_CAPTURE,
         asgi_version: "Optional[int]" = None,
+        path_includes_root_path: bool = True,
     ) -> None:
         """
         Instrument an ASGI application with Sentry. Provides HTTP/websocket
@@ -152,6 +154,7 @@ class SentryAsgiMiddleware:
         self.span_origin = span_origin
         self.app = app
         self.http_methods_to_capture = http_methods_to_capture
+        self.path_includes_root_path = path_includes_root_path
 
         if asgi_version is None:
             if _looks_like_asgi3(app):
@@ -447,7 +450,12 @@ class SentryAsgiMiddleware:
             if endpoint:
                 name = transaction_from_function(endpoint) or ""
             else:
-                name = _get_url(asgi_scope, "http" if ty == "http" else "ws", host=None)
+                name = _get_url(
+                    asgi_scope,
+                    "http" if ty == "http" else "ws",
+                    host=None,
+                    path_includes_root_path=self.path_includes_root_path,
+                )
                 source = TransactionSource.URL
 
         elif transaction_style == "url":
@@ -459,7 +467,12 @@ class SentryAsgiMiddleware:
                 if path is not None:
                     name = path
             else:
-                name = _get_url(asgi_scope, "http" if ty == "http" else "ws", host=None)
+                name = _get_url(
+                    asgi_scope,
+                    "http" if ty == "http" else "ws",
+                    host=None,
+                    path_includes_root_path=self.path_includes_root_path,
+                )
                 source = TransactionSource.URL
 
         if name is None:
@@ -484,7 +497,12 @@ class SentryAsgiMiddleware:
             if endpoint:
                 name = qualname_from_function(endpoint) or ""
             else:
-                name = _get_url(asgi_scope, "http" if ty == "http" else "ws", host=None)
+                name = _get_url(
+                    asgi_scope,
+                    "http" if ty == "http" else "ws",
+                    host=None,
+                    path_includes_root_path=self.path_includes_root_path,
+                )
                 source = SegmentSource.URL.value
 
         elif segment_style == "url":
@@ -496,7 +514,12 @@ class SentryAsgiMiddleware:
                 if path is not None:
                     name = path
             else:
-                name = _get_url(asgi_scope, "http" if ty == "http" else "ws", host=None)
+                name = _get_url(
+                    asgi_scope,
+                    "http" if ty == "http" else "ws",
+                    host=None,
+                    path_includes_root_path=self.path_includes_root_path,
+                )
                 source = SegmentSource.URL.value
 
         if name is None:
