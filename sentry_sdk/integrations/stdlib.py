@@ -6,6 +6,7 @@ from http.client import HTTPConnection, HTTPResponse
 from typing import TYPE_CHECKING
 
 import sentry_sdk
+from sentry_sdk.api import get_current_scope
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
@@ -52,7 +53,22 @@ class StdlibIntegration(Integration):
         def add_python_runtime_context(
             event: "Event", hint: "Hint"
         ) -> "Optional[Event]":
-            if sentry_sdk.get_client().get_integration(StdlibIntegration) is not None:
+            client = sentry_sdk.get_client()
+            if client.get_integration(StdlibIntegration) is not None:
+                is_span_streaming_enabled = has_span_streaming_enabled(client.options)
+                if is_span_streaming_enabled:
+                    current_scope = get_current_scope()
+                    segment = (
+                        current_scope.streamed_span._segment
+                        if current_scope.streamed_span
+                        else None
+                    )
+
+                    if segment:
+                        segment.set_attribute(
+                            "process.runtime.description", sys.version
+                        )
+
                 contexts = event.setdefault("contexts", {})
                 if isinstance(contexts, dict) and "runtime" not in contexts:
                     contexts["runtime"] = _RUNTIME_CONTEXT

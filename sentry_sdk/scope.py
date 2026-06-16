@@ -388,7 +388,6 @@ class Scope:
             "process.runtime.version",
             f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         )
-        self.set_attribute("process.runtime.description", sys.version)
 
         options = sentry_sdk.get_client().options
 
