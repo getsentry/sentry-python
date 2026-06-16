@@ -156,12 +156,11 @@ def _request_started(app: "Flask", **kwargs: "Any") -> None:
 
     scope = sentry_sdk.get_isolation_scope()
 
-    with capture_internal_exceptions():
-        if should_send_default_pii():
+    if should_send_default_pii():
+        with capture_internal_exceptions():
             user_properties = _get_flask_user_properties()
             if user_properties:
-                existing_user_properties = scope._user or {}
-                scope.set_user({**existing_user_properties, **user_properties})
+                scope.set_user(user_properties)
 
     evt_processor = _make_request_event_processor(app, request, integration)
     scope.add_event_processor(evt_processor)
