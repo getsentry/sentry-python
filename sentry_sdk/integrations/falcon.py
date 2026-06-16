@@ -108,6 +108,9 @@ class SentryFalconMiddleware:
     def process_resource(
         self, req: "Any", resp: "Any", resource: "Any", params: "Any"
     ) -> None:
+        """
+        Sets the transaction name as the route is resolved when this runs.
+        """
         client = sentry_sdk.get_client()
         integration = client.get_integration(FalconIntegration)
         if integration is None or not has_span_streaming_enabled(client.options):
