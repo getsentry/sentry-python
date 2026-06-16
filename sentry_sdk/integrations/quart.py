@@ -9,7 +9,10 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import SOURCE_FOR_STYLE
+from sentry_sdk.traces import SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE
+from sentry_sdk.traces import StreamedSpan, get_current_span
+from sentry_sdk.tracing import SOURCE_FOR_STYLE as TRANSACTION_SOURCE_FOR_STYLE
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -117,9 +120,15 @@ def patch_scaffold_route() -> None:
                 @wraps(old_func)
                 @ensure_integration_enabled(QuartIntegration, old_func)
                 def _sentry_func(*args: "Any", **kwargs: "Any") -> "Any":
-                    current_scope = sentry_sdk.get_current_scope()
-                    if current_scope.transaction is not None:
-                        current_scope.transaction.update_active_thread()
+                    client = sentry_sdk.get_client()
+                    if has_span_streaming_enabled(client.options):
+                        span = get_current_span()
+                        if span is not None and hasattr(span, "_segment"):
+                            span._segment._update_active_thread()
+                    else:
+                        current_scope = sentry_sdk.get_current_scope()
+                        if current_scope.transaction is not None:
+                            current_scope.transaction.update_active_thread()
 
                     sentry_scope = sentry_sdk.get_isolation_scope()
                     if sentry_scope.profile is not None:
@@ -144,9 +153,16 @@ def _set_transaction_name_and_source(
             "url": request.url_rule.rule,
             "endpoint": request.url_rule.endpoint,
         }
+
+        source = (
+            SEGMENT_SOURCE_FOR_STYLE[transaction_style]
+            if has_span_streaming_enabled(sentry_sdk.get_client().options)
+            else TRANSACTION_SOURCE_FOR_STYLE[transaction_style]
+        )
+
         scope.set_transaction_name(
-            name_for_style[transaction_style],
-            source=SOURCE_FOR_STYLE[transaction_style],
+            name=name_for_style[transaction_style],
+            source=source,
         )
     except Exception:
         pass
@@ -169,6 +185,46 @@ async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
     )
 
     scope = sentry_sdk.get_isolation_scope()
+
+    if has_span_streaming_enabled(sentry_sdk.get_client().options):
+        current_span = get_current_span()
+        if type(current_span) is StreamedSpan:
+            segment = current_span._segment
+
+            segment.set_attribute("http.request.method", request_websocket.method)
+            header_attributes: "dict[str, Any]" = {}
+
+            for header, header_value in _filter_headers(
+                dict(request_websocket.headers), use_annotated_value=False
+            ).items():
+                header_attributes[f"http.request.header.{header.lower()}"] = (
+                    header_value
+                )
+
+            segment.set_attributes(header_attributes)
+
+            if should_send_default_pii():
+                segment.set_attribute("url.full", request_websocket.url)
+                segment.set_attribute(
+                    "url.query",
+                    request_websocket.query_string.decode("utf-8", errors="replace"),
+                )
+
+                user_properties = {}
+                if len(request_websocket.access_route) >= 1:
+                    segment.set_attribute(
+                        "client.address", request_websocket.access_route[0]
+                    )
+                    user_properties["ip_address"] = request_websocket.access_route[0]
+
+                current_user_id = _get_current_user_id_from_quart()
+                if current_user_id:
+                    user_properties["id"] = current_user_id
+
+                if user_properties:
+                    existing_user_properties = scope._user or {}
+                    scope.set_user({**existing_user_properties, **user_properties})
+
     evt_processor = _make_request_event_processor(app, request_websocket, integration)
     scope.add_event_processor(evt_processor)
 
@@ -194,8 +250,13 @@ def _make_request_event_processor(
             request_info["headers"] = _filter_headers(dict(request.headers))
 
             if should_send_default_pii():
-                request_info["env"] = {"REMOTE_ADDR": request.access_route[0]}
-                _add_user_to_event(event)
+                if len(request.access_route) >= 1:
+                    request_info["env"] = {"REMOTE_ADDR": request.access_route[0]}
+
+                current_user_id = _get_current_user_id_from_quart()
+                if current_user_id:
+                    user_info = event.setdefault("user", {})
+                    user_info["id"] = current_user_id
 
         return event
 
@@ -218,15 +279,14 @@ async def _capture_exception(
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _add_user_to_event(event: "Event") -> None:
+def _get_current_user_id_from_quart() -> "str | None":
     if quart_auth is None:
-        return
+        return None
 
-    user = quart_auth.current_user
-    if user is None:
-        return
+    if quart_auth.current_user is None:
+        return None
 
-    with capture_internal_exceptions():
-        user_info = event.setdefault("user", {})
-
-        user_info["id"] = quart_auth.current_user._auth_id
+    try:
+        return quart_auth.current_user._auth_id
+    except Exception:
+        return None

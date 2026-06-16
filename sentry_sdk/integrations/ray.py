@@ -5,7 +5,9 @@ import sys
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
+from sentry_sdk.traces import SegmentSource
 from sentry_sdk.tracing import TransactionSource
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     event_from_exception,
     logger,
@@ -88,25 +90,52 @@ def _patch_ray_remote() -> None:
             ) -> "Any":
                 _check_sentry_initialized()
 
-                transaction = sentry_sdk.continue_trace(
-                    _sentry_tracing or {},
-                    op=OP.QUEUE_TASK_RAY,
-                    name=qualname_from_function(user_f),
-                    origin=RayIntegration.origin,
-                    source=TransactionSource.TASK,
+                span_streaming = has_span_streaming_enabled(
+                    sentry_sdk.get_client().options
                 )
+                if span_streaming:
+                    sentry_sdk.traces.continue_trace(_sentry_tracing or {})
 
-                with sentry_sdk.start_transaction(transaction) as transaction:
-                    try:
-                        result = user_f(*f_args, **f_kwargs)
-                        transaction.set_status(SPANSTATUS.OK)
-                    except Exception:
-                        transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
-                        exc_info = sys.exc_info()
-                        _capture_exception(exc_info)
-                        reraise(*exc_info)
+                    function_name = qualname_from_function(user_f)
+                    with sentry_sdk.traces.start_span(
+                        name="unknown Ray task"
+                        if function_name is None
+                        else function_name,
+                        attributes={
+                            "sentry.op": OP.QUEUE_TASK_RAY,
+                            "sentry.origin": RayIntegration.origin,
+                            "sentry.span.source": SegmentSource.TASK,
+                        },
+                        parent_span=None,
+                    ):
+                        try:
+                            result = user_f(*f_args, **f_kwargs)
+                        except Exception:
+                            exc_info = sys.exc_info()
+                            _capture_exception(exc_info)
+                            reraise(*exc_info)
 
-                    return result
+                        return result
+                else:
+                    transaction = sentry_sdk.continue_trace(
+                        _sentry_tracing or {},
+                        op=OP.QUEUE_TASK_RAY,
+                        name=qualname_from_function(user_f),
+                        origin=RayIntegration.origin,
+                        source=TransactionSource.TASK,
+                    )
+
+                    with sentry_sdk.start_transaction(transaction) as transaction:
+                        try:
+                            result = user_f(*f_args, **f_kwargs)
+                            transaction.set_status(SPANSTATUS.OK)
+                        except Exception:
+                            transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
+                            exc_info = sys.exc_info()
+                            _capture_exception(exc_info)
+                            reraise(*exc_info)
+
+                        return result
 
             _insert_sentry_tracing_in_signature(new_func)
 
@@ -122,27 +151,56 @@ def _patch_ray_remote() -> None:
                 """
                 Ray Client
                 """
-                with sentry_sdk.start_span(
-                    op=OP.QUEUE_SUBMIT_RAY,
-                    name=qualname_from_function(user_f),
-                    origin=RayIntegration.origin,
-                ) as span:
-                    tracing = {
-                        k: v
-                        for k, v in sentry_sdk.get_current_scope().iter_trace_propagation_headers()
-                    }
-                    try:
-                        result = old_remote_method(
-                            *args, **kwargs, _sentry_tracing=tracing
-                        )
-                        span.set_status(SPANSTATUS.OK)
-                    except Exception:
-                        span.set_status(SPANSTATUS.INTERNAL_ERROR)
-                        exc_info = sys.exc_info()
-                        _capture_exception(exc_info)
-                        reraise(*exc_info)
+                span_streaming = has_span_streaming_enabled(
+                    sentry_sdk.get_client().options
+                )
+                if span_streaming:
+                    function_name = qualname_from_function(user_f)
+                    with sentry_sdk.traces.start_span(
+                        name="unknown Ray task"
+                        if function_name is None
+                        else function_name,
+                        attributes={
+                            "sentry.op": OP.QUEUE_SUBMIT_RAY,
+                            "sentry.origin": RayIntegration.origin,
+                        },
+                    ):
+                        tracing = {
+                            k: v
+                            for k, v in sentry_sdk.get_current_scope().iter_trace_propagation_headers()
+                        }
+                        try:
+                            result = old_remote_method(
+                                *args, **kwargs, _sentry_tracing=tracing
+                            )
+                        except Exception:
+                            exc_info = sys.exc_info()
+                            _capture_exception(exc_info)
+                            reraise(*exc_info)
 
-                    return result
+                        return result
+                else:
+                    with sentry_sdk.start_span(
+                        op=OP.QUEUE_SUBMIT_RAY,
+                        name=qualname_from_function(user_f),
+                        origin=RayIntegration.origin,
+                    ) as span:
+                        tracing = {
+                            k: v
+                            for k, v in sentry_sdk.get_current_scope().iter_trace_propagation_headers()
+                        }
+                        try:
+                            result = old_remote_method(
+                                *args, **kwargs, _sentry_tracing=tracing
+                            )
+                            span.set_status(SPANSTATUS.OK)
+                        except Exception:
+                            span.set_status(SPANSTATUS.INTERNAL_ERROR)
+                            exc_info = sys.exc_info()
+                            _capture_exception(exc_info)
+                            reraise(*exc_info)
+
+                        return result
 
             rv.remote = _remote_method_with_header_propagation
 

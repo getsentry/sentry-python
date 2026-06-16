@@ -1741,6 +1741,7 @@ class Scope:
             ("user.id", "id"),
             ("user.name", "username"),
             ("user.email", "email"),
+            ("user.ip_address", "ip_address"),
         ):
             if user_attribute in self._user and attribute_name not in attributes:
                 attributes[attribute_name] = self._user[user_attribute]
