@@ -602,10 +602,13 @@ async def _handler_wrapper(
                     uri = None
                     if params is not None:
                         uri = getattr(params, "uri", None)
-                    elif original_args:
-                        uri = original_args[0]
-                    else:
-                        uri = original_kwargs.get("uri")
+
+                    # v1 scenario
+                    if ServerRequestContext is None:
+                        if original_args:
+                            uri = original_args[0]
+                        else:
+                            uri = original_kwargs.get("uri")
 
                     protocol = None
                     if uri is not None and hasattr(uri, "scheme"):
