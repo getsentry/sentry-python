@@ -1,4 +1,6 @@
 import logging
+import platform
+import sys
 import warnings
 
 import pytest
@@ -537,6 +539,8 @@ def test_logger_with_all_attributes(sentry_init, capture_items):
         "logger.name": "test-logger",
         "sentry.origin": "auto.log.stdlib",
         "sentry.message.template": "log #%d",
+        "process.runtime.name": platform.python_implementation(),
+        "process.runtime.version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         "sentry.message.parameter.0": 1,
         "sentry.environment": "production",
         "sentry.sdk.version": VERSION,

@@ -1,4 +1,5 @@
 import asyncio
+import platform
 import re
 import sys
 import time
@@ -1722,4 +1723,12 @@ def test_default_attributes(sentry_init, capture_envelopes):
         "sentry.dist": {"value": "1.0", "type": "string"},
         "sentry.origin": {"value": "manual", "type": "string"},
         "sentry.sdk.integrations": {"value": mock.ANY, "type": "array"},
+        "process.runtime.name": {
+            "type": "string",
+            "value": platform.python_implementation(),
+        },
+        "process.runtime.version": {
+            "type": "string",
+            "value": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+        },
     }

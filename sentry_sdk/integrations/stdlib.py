@@ -58,11 +58,7 @@ class StdlibIntegration(Integration):
                 is_span_streaming_enabled = has_span_streaming_enabled(client.options)
                 if is_span_streaming_enabled:
                     current_scope = get_current_scope()
-                    segment = (
-                        current_scope.streamed_span._segment
-                        if current_scope.streamed_span
-                        else None
-                    )
+                    segment = getattr(current_scope.streamed_span, "_segment", None)
 
                     if segment:
                         segment.set_attribute(

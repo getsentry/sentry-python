@@ -1,5 +1,6 @@
 import logging
 import os
+import platform
 import sys
 import time
 from unittest import mock
@@ -495,6 +496,14 @@ def test_transport_format(sentry_init, capture_envelopes):
                         "type": "integer",
                         "value": 13,
                     },
+                    "process.runtime.name": {
+                        "type": "string",
+                        "value": platform.python_implementation(),
+                    },
+                    "process.runtime.version": {
+                        "type": "string",
+                        "value": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+                    },
                     "sentry.severity_text": {
                         "type": "string",
                         "value": "warn",
@@ -573,6 +582,14 @@ def test_batcher_drops_logs(sentry_init, monkeypatch):
                         "sentry.severity_number": {
                             "type": "integer",
                             "value": 9,
+                        },
+                        "process.runtime.name": {
+                            "type": "string",
+                            "value": platform.python_implementation(),
+                        },
+                        "process.runtime.version": {
+                            "type": "string",
+                            "value": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
                         },
                         "sentry.severity_text": {
                             "type": "string",

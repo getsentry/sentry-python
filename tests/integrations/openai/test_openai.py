@@ -1,4 +1,6 @@
 import json
+import platform
+import sys
 
 import pytest
 
@@ -4975,6 +4977,8 @@ async def test_ai_client_span_streaming_responses_async_api(
             "sentry.environment": "production",
             "sentry.op": "gen_ai.responses",
             "sentry.origin": "auto.ai.openai",
+            "process.runtime.name": platform.python_implementation(),
+            "process.runtime.version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
             "sentry.release": mock.ANY,
             "sentry.sdk.name": "sentry.python",
             "sentry.sdk.version": mock.ANY,

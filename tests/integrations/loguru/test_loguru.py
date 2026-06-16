@@ -1,4 +1,6 @@
+import platform
 import re
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -466,6 +468,8 @@ def test_logger_with_all_attributes(
         "logger.name": "tests.integrations.loguru.test_loguru",
         "sentry.origin": "auto.log.loguru",
         "sentry.environment": "production",
+        "process.runtime.name": platform.python_implementation(),
+        "process.runtime.version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         "sentry.sdk.version": VERSION,
         "sentry.severity_number": 13,
         "sentry.severity_text": "warn",

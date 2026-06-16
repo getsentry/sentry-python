@@ -1,4 +1,5 @@
 import os
+import platform
 import sys
 from unittest import mock
 
@@ -283,6 +284,14 @@ def test_transport_format(sentry_init, capture_envelopes):
                     "sentry.release": {
                         "type": "string",
                         "value": "1.0.0",
+                    },
+                    "process.runtime.name": {
+                        "type": "string",
+                        "value": platform.python_implementation(),
+                    },
+                    "process.runtime.version": {
+                        "type": "string",
+                        "value": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
                     },
                     "sentry.sdk.name": {
                         "type": "string",
