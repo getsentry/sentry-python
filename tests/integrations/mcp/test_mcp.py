@@ -11,8 +11,9 @@ This test suite covers:
 - Span data validation
 - Origin tracking
 
-The tests mock the MCP server components and request context to verify
-that the integration properly instruments MCP handlers with Sentry spans.
+The tests drive real MCP servers over the stdio, StreamableHTTP, and SSE
+transports to verify that the integration properly instruments MCP handlers
+with Sentry spans.
 """
 
 import asyncio
@@ -1807,306 +1808,188 @@ async def test_sse_transport_detection(
     assert data[SPANDATA.MCP_SESSION_ID] == session_id
 
 
-class _FakeServerRequestContext:
+@pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.skipif(not IS_MCP_V2, reason="MCP v2 SSE transport detection")
+async def test_sse_transport_detection_v2(
+    sentry_init, capture_events, capture_items, span_streaming, json_rpc_sse
+):
+    """Test that SSE transport is detected on MCP v2.
+
+    In v2 the request context is carried by the ServerRequestContext built per
+    request (request=metadata.request_context), and the SSE session id rides the
+    `?session_id=` query parameter.
+
+    Note: only transport/session detection is asserted. Sentry scope propagation
+    is wired through StreamableHTTPServerTransport.handle_request, not SSE, so the
+    SSE path does not get scope override.
     """
-    Stands in for MCP SDK v2's ServerRequestContext, which doesn't exist in v1.
-    Used to test that _handler_wrapper extracts context from original_args
-    when the first arg is a ServerRequestContext instance.
+    sentry_init(
+        integrations=[MCPIntegration()],
+        traces_sample_rate=1.0,
+        _experiments=_experiments_for(span_streaming),
+    )
+
+    server = Server("test-server")
+    sse = SseServerTransport("/messages/")
+
+    sse_connection_closed = asyncio.Event()
+
+    async def handle_sse(request):
+        async with sse.connect_sse(
+            request.scope, request.receive, request._send
+        ) as streams:
+            async with anyio.create_task_group() as tg:
+
+                async def run_server():
+                    await server.run(
+                        streams[0], streams[1], server.create_initialization_options()
+                    )
+
+                tg.start_soon(run_server)
+
+        sse_connection_closed.set()
+        return Response()
+
+    app = Starlette(
+        routes=[
+            Route("/sse", endpoint=handle_sse, methods=["GET"]),
+            Mount("/messages/", app=sse.handle_post_message),
+        ],
+    )
+
+    async def test_tool(ctx, params):
+        return CallToolResult(
+            content=[TextContent(type="text", text="success")],
+            structured_content={"result": "success"},
+        )
+
+    server.add_request_handler("tools/call", CallToolRequestParams, test_tool)
+
+    if span_streaming:
+        items = capture_items("span")
+    else:
+        events = capture_events()
+
+    keep_sse_alive = asyncio.Event()
+    app_task, session_id, result = await json_rpc_sse(
+        app,
+        method="tools/call",
+        params={
+            "name": "sse_tool",
+            "arguments": {},
+        },
+        request_id="req-sse-v2",
+        keep_sse_alive=keep_sse_alive,
+    )
+
+    await sse_connection_closed.wait()
+    await app_task
+
+    assert result["result"]["structuredContent"] == {"result": "success"}
+
+    if span_streaming:
+        sentry_sdk.flush()
+        span = _find_mcp_span(items, method_name="tools/call")
+        assert span is not None
+        data = span["attributes"]
+    else:
+        # v2 SSE does not propagate Sentry scopes (only StreamableHTTP does), so
+        # the handler runs without an active transaction and the MCP span becomes
+        # its own root transaction (data lives on the trace context) rather than a
+        # child span of the "/sse" request transaction. Accept either shape.
+        data = None
+        for event in events:
+            if event.get("type") != "transaction":
+                continue
+            trace = event["contexts"]["trace"]
+            if (
+                trace.get("op") == OP.MCP_SERVER
+                and trace.get("data", {}).get(SPANDATA.MCP_METHOD_NAME) == "tools/call"
+            ):
+                data = trace["data"]
+                break
+            for span in event.get("spans", []):
+                if span["data"].get(SPANDATA.MCP_METHOD_NAME) == "tools/call":
+                    data = span["data"]
+                    break
+            if data is not None:
+                break
+        assert data is not None
+
+    assert data[SPANDATA.MCP_TRANSPORT] == "sse"
+    assert data[SPANDATA.NETWORK_TRANSPORT] == "tcp"
+    assert data[SPANDATA.MCP_SESSION_ID] == session_id
+
+
+@pytest.mark.asyncio
+async def test_streamable_http_scope_propagation(sentry_init, capture_events, json_rpc):
+    """Errors raised inside an HTTP handler attach to the MCP transaction's trace.
+
+    StreamableHTTPServerTransport.handle_request stashes the active isolation and
+    current scopes in the ASGI scope state; the handler wrapper then re-activates
+    them so the span (and any captured error) belongs to the same trace as the
+    HTTP request.
     """
+    sentry_init(
+        integrations=[MCPIntegration()],
+        traces_sample_rate=1.0,
+    )
 
-    def __init__(self, request_id=None, request=None):
-        self.request_id = request_id
-        self.request = request
+    server = Server("test-server")
 
+    if IS_MCP_V2:
 
-class TestHandlerWrapperWithExplicitContext:
-    """
-    Tests that _handler_wrapper correctly extracts request context data from
-    original_args when the first argument is a ServerRequestContext (MCP SDK v2
-    pattern), rather than relying on the request_ctx ContextVar.
-    """
+        async def failing_tool(ctx, params):
+            raise ValueError("Tool execution failed")
 
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("span_streaming", [True, False])
-    async def test_http_context_extracted_from_args(
-        self, sentry_init, capture_events, capture_items, span_streaming
-    ):
-        """When a ServerRequestContext with HTTP headers is in original_args,
-        span data reflects the request_id, session_id, and http transport."""
-        sentry_init(
-            integrations=[MCPIntegration()],
-            traces_sample_rate=1.0,
-            _experiments=_experiments_for(span_streaming),
+        server.add_request_handler("tools/call", CallToolRequestParams, failing_tool)
+    else:
+
+        @server.call_tool()
+        def failing_tool(tool_name, arguments):
+            raise ValueError("Tool execution failed")
+
+    session_manager = StreamableHTTPSessionManager(
+        app=server,
+        json_response=True,
+    )
+
+    app = Starlette(
+        routes=[
+            Mount("/mcp", app=session_manager.handle_request),
+        ],
+        lifespan=lambda app: session_manager.run(),
+    )
+
+    events = capture_events()
+    json_rpc(
+        app,
+        method="tools/call",
+        params={"name": "bad_tool", "arguments": {}},
+        request_id="req-scope",
+    )
+
+    error_events = [e for e in events if e.get("type") != "transaction"]
+    mcp_transactions = [
+        e
+        for e in events
+        if e.get("type") == "transaction"
+        and any(
+            span["data"].get(SPANDATA.MCP_METHOD_NAME) == "tools/call"
+            for span in e.get("spans", [])
         )
+    ]
 
-        import sentry_sdk.integrations.mcp as mcp_module
+    assert len(error_events) == 1
+    assert len(mcp_transactions) == 1
 
-        request = mock.MagicMock()
-        request.headers = {"mcp-session-id": "session-abc"}
-        request.query_params = {}
-        request.scope = {"state": {}}
+    error_event = error_events[0]
+    assert error_event["exception"]["values"][0]["type"] == "ValueError"
 
-        ctx = _FakeServerRequestContext(request_id="req-42", request=request)
-
-        async def dummy_tool(ctx, name, arguments):
-            return {"result": "ok"}
-
-        with mock.patch.object(
-            mcp_module, "ServerRequestContext", _FakeServerRequestContext
-        ):
-            if span_streaming:
-                items = capture_items("span")
-                with sentry_sdk.traces.start_span(name="test tx"):
-                    await mcp_module._handler_wrapper(
-                        "tool",
-                        dummy_tool,
-                        (ctx, "my_tool", {"x": 1}),
-                        force_await=False,
-                    )
-                sentry_sdk.flush()
-                span = _find_mcp_span(items, method_name="tools/call")
-                assert span is not None
-                data = span["attributes"]
-            else:
-                events = capture_events()
-                with start_transaction(name="test tx"):
-                    await mcp_module._handler_wrapper(
-                        "tool",
-                        dummy_tool,
-                        (ctx, "my_tool", {"x": 1}),
-                        force_await=False,
-                    )
-                (tx,) = events
-                data = tx["spans"][0]["data"]
-
-        assert data[SPANDATA.MCP_REQUEST_ID] == "req-42"
-        assert data[SPANDATA.MCP_SESSION_ID] == "session-abc"
-        assert data[SPANDATA.MCP_TRANSPORT] == "http"
-        assert data[SPANDATA.NETWORK_TRANSPORT] == "tcp"
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("span_streaming", [True, False])
-    async def test_sse_context_extracted_from_args(
-        self, sentry_init, capture_events, capture_items, span_streaming
-    ):
-        """When a ServerRequestContext with SSE query params is in original_args,
-        span data reflects sse transport and session_id."""
-        sentry_init(
-            integrations=[MCPIntegration()],
-            traces_sample_rate=1.0,
-            _experiments=_experiments_for(span_streaming),
-        )
-
-        import sentry_sdk.integrations.mcp as mcp_module
-
-        request = mock.MagicMock()
-        request.headers = {}
-        request.query_params = {"session_id": "sse-session-456"}
-        request.scope = {"state": {}}
-
-        ctx = _FakeServerRequestContext(request_id="req-99", request=request)
-
-        async def dummy_tool(ctx, name, arguments):
-            return {"result": "ok"}
-
-        with mock.patch.object(
-            mcp_module, "ServerRequestContext", _FakeServerRequestContext
-        ):
-            if span_streaming:
-                items = capture_items("span")
-                with sentry_sdk.traces.start_span(name="test tx"):
-                    await mcp_module._handler_wrapper(
-                        "tool",
-                        dummy_tool,
-                        (ctx, "my_tool", {}),
-                        force_await=False,
-                    )
-                sentry_sdk.flush()
-                span = _find_mcp_span(items, method_name="tools/call")
-                assert span is not None
-                data = span["attributes"]
-            else:
-                events = capture_events()
-                with start_transaction(name="test tx"):
-                    await mcp_module._handler_wrapper(
-                        "tool",
-                        dummy_tool,
-                        (ctx, "my_tool", {}),
-                        force_await=False,
-                    )
-                (tx,) = events
-                data = tx["spans"][0]["data"]
-
-        assert data[SPANDATA.MCP_REQUEST_ID] == "req-99"
-        assert data[SPANDATA.MCP_SESSION_ID] == "sse-session-456"
-        assert data[SPANDATA.MCP_TRANSPORT] == "sse"
-        assert data[SPANDATA.NETWORK_TRANSPORT] == "tcp"
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("span_streaming", [True, False])
-    async def test_stdio_fallback_when_no_context_in_args(
-        self, sentry_init, capture_events, capture_items, span_streaming
-    ):
-        """When original_args has no ServerRequestContext (v1 style),
-        falls back to ContextVar / stdio defaults."""
-        sentry_init(
-            integrations=[MCPIntegration()],
-            traces_sample_rate=1.0,
-            _experiments=_experiments_for(span_streaming),
-        )
-
-        import sentry_sdk.integrations.mcp as mcp_module
-
-        async def dummy_tool(name, arguments):
-            return {"result": "ok"}
-
-        if span_streaming:
-            items = capture_items("span")
-            with sentry_sdk.traces.start_span(name="test tx"):
-                await mcp_module._handler_wrapper(
-                    "tool",
-                    dummy_tool,
-                    ("my_tool", {"x": 1}),
-                    force_await=False,
-                )
-            sentry_sdk.flush()
-            span = _find_mcp_span(items, method_name="tools/call")
-            assert span is not None
-            data = span["attributes"]
-        else:
-            events = capture_events()
-            with start_transaction(name="test tx"):
-                await mcp_module._handler_wrapper(
-                    "tool",
-                    dummy_tool,
-                    ("my_tool", {"x": 1}),
-                    force_await=False,
-                )
-            (tx,) = events
-            data = tx["spans"][0]["data"]
-
-        assert data[SPANDATA.MCP_TRANSPORT] == "stdio"
-        assert data[SPANDATA.NETWORK_TRANSPORT] == "pipe"
-        assert SPANDATA.MCP_SESSION_ID not in data
-
-    @pytest.mark.asyncio
-    async def test_scopes_extracted_from_context_request_state(
-        self, sentry_init, capture_events
-    ):
-        """When a ServerRequestContext carries Sentry scopes in its request
-        state, _handler_wrapper uses those scopes for the span."""
-        sentry_init(
-            integrations=[MCPIntegration()],
-            traces_sample_rate=1.0,
-        )
-
-        import sentry_sdk.integrations.mcp as mcp_module
-
-        isolation_scope = sentry_sdk.get_isolation_scope()
-        current_scope = sentry_sdk.get_current_scope()
-
-        request = mock.MagicMock()
-        request.headers = {"mcp-session-id": "session-scopes"}
-        request.query_params = {}
-        request.scope = {
-            "state": {
-                "sentry_sdk.isolation_scope": isolation_scope,
-                "sentry_sdk.current_scope": current_scope,
-            }
-        }
-
-        ctx = _FakeServerRequestContext(request_id="req-scope", request=request)
-
-        async def dummy_tool(ctx, name, arguments):
-            return {"result": "ok"}
-
-        with mock.patch.object(
-            mcp_module, "ServerRequestContext", _FakeServerRequestContext
-        ):
-            events = capture_events()
-            with start_transaction(name="test tx"):
-                await mcp_module._handler_wrapper(
-                    "tool",
-                    dummy_tool,
-                    (ctx, "my_tool", {"x": 1}),
-                    force_await=False,
-                )
-            (tx,) = events
-            span = tx["spans"][0]
-
-        assert span["op"] == OP.MCP_SERVER
-        assert span["data"][SPANDATA.MCP_SESSION_ID] == "session-scopes"
-
-    @pytest.mark.asyncio
-    async def test_no_scopes_when_context_has_no_request(
-        self, sentry_init, capture_events
-    ):
-        """When a ServerRequestContext has no request (stdio-like),
-        _handler_wrapper still works without scope override."""
-        sentry_init(
-            integrations=[MCPIntegration()],
-            traces_sample_rate=1.0,
-        )
-
-        import sentry_sdk.integrations.mcp as mcp_module
-
-        ctx = _FakeServerRequestContext(request_id="req-no-request")
-        ctx.request = None
-
-        async def dummy_tool(ctx, name, arguments):
-            return {"result": "ok"}
-
-        with mock.patch.object(
-            mcp_module, "ServerRequestContext", _FakeServerRequestContext
-        ):
-            events = capture_events()
-            with start_transaction(name="test tx"):
-                await mcp_module._handler_wrapper(
-                    "tool",
-                    dummy_tool,
-                    (ctx, "my_tool", {}),
-                    force_await=False,
-                )
-            (tx,) = events
-            span = tx["spans"][0]
-
-        assert span["op"] == OP.MCP_SERVER
-        assert span["data"][SPANDATA.MCP_TRANSPORT] == "stdio"
-
-    @pytest.mark.asyncio
-    async def test_v2_context_without_params_uses_unknown_handler_name(
-        self, sentry_init, capture_events
-    ):
-        """When v2 is detected (ServerRequestContext as first arg) but no
-        params object is present, handler_name should be 'unknown' instead
-        of the ServerRequestContext object."""
-        sentry_init(
-            integrations=[MCPIntegration()],
-            traces_sample_rate=1.0,
-        )
-
-        import sentry_sdk.integrations.mcp as mcp_module
-
-        ctx = _FakeServerRequestContext(request_id="req-no-params")
-        ctx.request = None
-
-        async def dummy_tool(ctx):
-            return {"result": "ok"}
-
-        with mock.patch.object(
-            mcp_module, "ServerRequestContext", _FakeServerRequestContext
-        ):
-            events = capture_events()
-            with start_transaction(name="test tx"):
-                await mcp_module._handler_wrapper(
-                    "tool",
-                    dummy_tool,
-                    (ctx,),
-                    force_await=False,
-                )
-            (tx,) = events
-            span = tx["spans"][0]
-
-        assert span["op"] == OP.MCP_SERVER
-        assert span["description"] == "tools/call unknown"
-        assert span["data"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
+    # The captured error shares the trace of the MCP transaction, proving the
+    # handler executed under the propagated request scope.
+    assert (
+        error_event["contexts"]["trace"]["trace_id"]
+        == mcp_transactions[0]["contexts"]["trace"]["trace_id"]
+    )
