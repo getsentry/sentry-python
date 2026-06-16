@@ -2,7 +2,7 @@
 <html lang="en" data-accent-color="violet" data-content_root="../../">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.scope - sentry-python 2.62.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>sentry_sdk.scope - sentry-python 2.63.0 documentation</title><link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=e1a1ceaf" />
@@ -777,7 +777,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="622">        <span class="k">if</span> <span class="p">(</span>
 </span><span data-line="623">            <span class="n">has_tracing_enabled</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_client</span><span class="p">()</span><span class="o">.</span><span class="n">options</span><span class="p">)</span>
 </span><span data-line="624">            <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-</span><span data-line="625">            <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_span</span><span class="p">,</span> <span class="n">NoOpStreamedSpan</span><span class="p">)</span>
+</span><span data-line="625">            <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_span</span><span class="p">,</span> <span class="p">(</span><span class="n">NoOpStreamedSpan</span><span class="p">,</span> <span class="n">NoOpSpan</span><span class="p">))</span>
 </span><span data-line="626">        <span class="p">):</span>
 </span><span data-line="627">            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_span</span><span class="o">.</span><span class="n">_get_trace_context</span><span class="p">()</span>
 </span><span data-line="628">
@@ -857,7 +857,7 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="693">        <span class="k">if</span> <span class="p">(</span>
 </span><span data-line="694">            <span class="n">has_tracing_enabled</span><span class="p">(</span><span class="n">client</span><span class="o">.</span><span class="n">options</span><span class="p">)</span>
 </span><span data-line="695">            <span class="ow">and</span> <span class="n">span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-</span><span data-line="696">            <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">span</span><span class="p">,</span> <span class="n">NoOpStreamedSpan</span><span class="p">)</span>
+</span><span data-line="696">            <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">span</span><span class="p">,</span> <span class="p">(</span><span class="n">NoOpStreamedSpan</span><span class="p">,</span> <span class="n">NoOpSpan</span><span class="p">))</span>
 </span><span data-line="697">        <span class="p">):</span>
 </span><span data-line="698">            <span class="k">for</span> <span class="n">header</span> <span class="ow">in</span> <span class="n">span</span><span class="o">.</span><span class="n">_iter_headers</span><span class="p">():</span>
 </span><span data-line="699">                <span class="k">yield</span> <span class="n">header</span>
@@ -1993,459 +1993,458 @@ data-aria-dark="Switch to auto color mode">
 </span><span data-line="1741">            <span class="p">(</span><span class="s2">&quot;user.id&quot;</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">),</span>
 </span><span data-line="1742">            <span class="p">(</span><span class="s2">&quot;user.name&quot;</span><span class="p">,</span> <span class="s2">&quot;username&quot;</span><span class="p">),</span>
 </span><span data-line="1743">            <span class="p">(</span><span class="s2">&quot;user.email&quot;</span><span class="p">,</span> <span class="s2">&quot;email&quot;</span><span class="p">),</span>
-</span><span data-line="1744">        <span class="p">):</span>
-</span><span data-line="1745">            <span class="k">if</span> <span class="n">user_attribute</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="ow">and</span> <span class="n">attribute_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">attributes</span><span class="p">:</span>
-</span><span data-line="1746">                <span class="n">attributes</span><span class="p">[</span><span class="n">attribute_name</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_user</span><span class="p">[</span><span class="n">user_attribute</span><span class="p">]</span>
-</span><span data-line="1747">
-</span><span data-line="1748">    <span class="k">def</span><span class="w"> </span><span class="nf">_drop</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cause</span><span class="p">:</span> <span class="s2">&quot;Any&quot;</span><span class="p">,</span> <span class="n">ty</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Optional[Any]&quot;</span><span class="p">:</span>
-</span><span data-line="1749">        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> (</span><span class="si">%s</span><span class="s2">) dropped event&quot;</span><span class="p">,</span> <span class="n">ty</span><span class="p">,</span> <span class="n">cause</span><span class="p">)</span>
-</span><span data-line="1750">        <span class="k">return</span> <span class="kc">None</span>
-</span><span data-line="1751">
+</span><span data-line="1744">            <span class="p">(</span><span class="s2">&quot;user.ip_address&quot;</span><span class="p">,</span> <span class="s2">&quot;ip_address&quot;</span><span class="p">),</span>
+</span><span data-line="1745">        <span class="p">):</span>
+</span><span data-line="1746">            <span class="k">if</span> <span class="n">user_attribute</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="ow">and</span> <span class="n">attribute_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">attributes</span><span class="p">:</span>
+</span><span data-line="1747">                <span class="n">attributes</span><span class="p">[</span><span class="n">attribute_name</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_user</span><span class="p">[</span><span class="n">user_attribute</span><span class="p">]</span>
+</span><span data-line="1748">
+</span><span data-line="1749">    <span class="k">def</span><span class="w"> </span><span class="nf">_drop</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cause</span><span class="p">:</span> <span class="s2">&quot;Any&quot;</span><span class="p">,</span> <span class="n">ty</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Optional[Any]&quot;</span><span class="p">:</span>
+</span><span data-line="1750">        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> (</span><span class="si">%s</span><span class="s2">) dropped event&quot;</span><span class="p">,</span> <span class="n">ty</span><span class="p">,</span> <span class="n">cause</span><span class="p">)</span>
+</span><span data-line="1751">        <span class="k">return</span> <span class="kc">None</span>
+</span><span data-line="1752">
 <div class="viewcode-block" id="Scope.run_error_processors">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.api.Scope.run_error_processors">[docs]</a>
-</span><span data-line="1752">    <span class="k">def</span><span class="w"> </span><span class="nf">run_error_processors</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="s2">&quot;Event&quot;</span><span class="p">,</span> <span class="n">hint</span><span class="p">:</span> <span class="s2">&quot;Hint&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Optional[Event]&quot;</span><span class="p">:</span>
-</span><span data-line="1753"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="1754"><span class="sd">        Runs the error processors on the event and returns the modified event.</span>
-</span><span data-line="1755"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span data-line="1756">        <span class="n">exc_info</span> <span class="o">=</span> <span class="n">hint</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;exc_info&quot;</span><span class="p">)</span>
-</span><span data-line="1757">        <span class="k">if</span> <span class="n">exc_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1758">            <span class="n">error_processors</span> <span class="o">=</span> <span class="n">chain</span><span class="p">(</span>
-</span><span data-line="1759">                <span class="bp">self</span><span class="o">.</span><span class="n">get_global_scope</span><span class="p">()</span><span class="o">.</span><span class="n">_error_processors</span><span class="p">,</span>
-</span><span data-line="1760">                <span class="bp">self</span><span class="o">.</span><span class="n">get_isolation_scope</span><span class="p">()</span><span class="o">.</span><span class="n">_error_processors</span><span class="p">,</span>
-</span><span data-line="1761">                <span class="bp">self</span><span class="o">.</span><span class="n">get_current_scope</span><span class="p">()</span><span class="o">.</span><span class="n">_error_processors</span><span class="p">,</span>
-</span><span data-line="1762">            <span class="p">)</span>
-</span><span data-line="1763">
-</span><span data-line="1764">            <span class="k">for</span> <span class="n">error_processor</span> <span class="ow">in</span> <span class="n">error_processors</span><span class="p">:</span>
-</span><span data-line="1765">                <span class="n">new_event</span> <span class="o">=</span> <span class="n">error_processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">exc_info</span><span class="p">)</span>
-</span><span data-line="1766">                <span class="k">if</span> <span class="n">new_event</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1767">                    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_drop</span><span class="p">(</span><span class="n">error_processor</span><span class="p">,</span> <span class="s2">&quot;error processor&quot;</span><span class="p">)</span>
-</span><span data-line="1768">
-</span><span data-line="1769">                <span class="n">event</span> <span class="o">=</span> <span class="n">new_event</span>
-</span><span data-line="1770">
-</span><span data-line="1771">        <span class="k">return</span> <span class="n">event</span></div>
+</span><span data-line="1753">    <span class="k">def</span><span class="w"> </span><span class="nf">run_error_processors</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="s2">&quot;Event&quot;</span><span class="p">,</span> <span class="n">hint</span><span class="p">:</span> <span class="s2">&quot;Hint&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Optional[Event]&quot;</span><span class="p">:</span>
+</span><span data-line="1754"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="1755"><span class="sd">        Runs the error processors on the event and returns the modified event.</span>
+</span><span data-line="1756"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="1757">        <span class="n">exc_info</span> <span class="o">=</span> <span class="n">hint</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;exc_info&quot;</span><span class="p">)</span>
+</span><span data-line="1758">        <span class="k">if</span> <span class="n">exc_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1759">            <span class="n">error_processors</span> <span class="o">=</span> <span class="n">chain</span><span class="p">(</span>
+</span><span data-line="1760">                <span class="bp">self</span><span class="o">.</span><span class="n">get_global_scope</span><span class="p">()</span><span class="o">.</span><span class="n">_error_processors</span><span class="p">,</span>
+</span><span data-line="1761">                <span class="bp">self</span><span class="o">.</span><span class="n">get_isolation_scope</span><span class="p">()</span><span class="o">.</span><span class="n">_error_processors</span><span class="p">,</span>
+</span><span data-line="1762">                <span class="bp">self</span><span class="o">.</span><span class="n">get_current_scope</span><span class="p">()</span><span class="o">.</span><span class="n">_error_processors</span><span class="p">,</span>
+</span><span data-line="1763">            <span class="p">)</span>
+</span><span data-line="1764">
+</span><span data-line="1765">            <span class="k">for</span> <span class="n">error_processor</span> <span class="ow">in</span> <span class="n">error_processors</span><span class="p">:</span>
+</span><span data-line="1766">                <span class="n">new_event</span> <span class="o">=</span> <span class="n">error_processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">exc_info</span><span class="p">)</span>
+</span><span data-line="1767">                <span class="k">if</span> <span class="n">new_event</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1768">                    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_drop</span><span class="p">(</span><span class="n">error_processor</span><span class="p">,</span> <span class="s2">&quot;error processor&quot;</span><span class="p">)</span>
+</span><span data-line="1769">
+</span><span data-line="1770">                <span class="n">event</span> <span class="o">=</span> <span class="n">new_event</span>
+</span><span data-line="1771">
+</span><span data-line="1772">        <span class="k">return</span> <span class="n">event</span></div>
 
-</span><span data-line="1772">
+</span><span data-line="1773">
 <div class="viewcode-block" id="Scope.run_event_processors">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.api.Scope.run_event_processors">[docs]</a>
-</span><span data-line="1773">    <span class="k">def</span><span class="w"> </span><span class="nf">run_event_processors</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="s2">&quot;Event&quot;</span><span class="p">,</span> <span class="n">hint</span><span class="p">:</span> <span class="s2">&quot;Hint&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Optional[Event]&quot;</span><span class="p">:</span>
-</span><span data-line="1774"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="1775"><span class="sd">        Runs the event processors on the event and returns the modified event.</span>
-</span><span data-line="1776"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span data-line="1777">        <span class="n">ty</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span>
-</span><span data-line="1778">        <span class="n">is_check_in</span> <span class="o">=</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">&quot;check_in&quot;</span>
-</span><span data-line="1779">
-</span><span data-line="1780">        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_check_in</span><span class="p">:</span>
-</span><span data-line="1781">            <span class="c1"># Get scopes without creating them to prevent infinite recursion</span>
-</span><span data-line="1782">            <span class="n">isolation_scope</span> <span class="o">=</span> <span class="n">_isolation_scope</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
-</span><span data-line="1783">            <span class="n">current_scope</span> <span class="o">=</span> <span class="n">_current_scope</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
-</span><span data-line="1784">
-</span><span data-line="1785">            <span class="n">event_processors</span> <span class="o">=</span> <span class="n">chain</span><span class="p">(</span>
-</span><span data-line="1786">                <span class="n">global_event_processors</span><span class="p">,</span>
-</span><span data-line="1787">                <span class="n">_global_scope</span> <span class="ow">and</span> <span class="n">_global_scope</span><span class="o">.</span><span class="n">_event_processors</span> <span class="ow">or</span> <span class="p">[],</span>
-</span><span data-line="1788">                <span class="n">isolation_scope</span> <span class="ow">and</span> <span class="n">isolation_scope</span><span class="o">.</span><span class="n">_event_processors</span> <span class="ow">or</span> <span class="p">[],</span>
-</span><span data-line="1789">                <span class="n">current_scope</span> <span class="ow">and</span> <span class="n">current_scope</span><span class="o">.</span><span class="n">_event_processors</span> <span class="ow">or</span> <span class="p">[],</span>
-</span><span data-line="1790">            <span class="p">)</span>
-</span><span data-line="1791">
-</span><span data-line="1792">            <span class="k">for</span> <span class="n">event_processor</span> <span class="ow">in</span> <span class="n">event_processors</span><span class="p">:</span>
-</span><span data-line="1793">                <span class="n">new_event</span> <span class="o">=</span> <span class="n">event</span>
-</span><span data-line="1794">                <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
-</span><span data-line="1795">                    <span class="n">new_event</span> <span class="o">=</span> <span class="n">event_processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
-</span><span data-line="1796">                <span class="k">if</span> <span class="n">new_event</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1797">                    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_drop</span><span class="p">(</span><span class="n">event_processor</span><span class="p">,</span> <span class="s2">&quot;event processor&quot;</span><span class="p">)</span>
-</span><span data-line="1798">                <span class="n">event</span> <span class="o">=</span> <span class="n">new_event</span>
-</span><span data-line="1799">
-</span><span data-line="1800">        <span class="k">return</span> <span class="n">event</span></div>
+</span><span data-line="1774">    <span class="k">def</span><span class="w"> </span><span class="nf">run_event_processors</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="s2">&quot;Event&quot;</span><span class="p">,</span> <span class="n">hint</span><span class="p">:</span> <span class="s2">&quot;Hint&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Optional[Event]&quot;</span><span class="p">:</span>
+</span><span data-line="1775"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="1776"><span class="sd">        Runs the event processors on the event and returns the modified event.</span>
+</span><span data-line="1777"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="1778">        <span class="n">ty</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span>
+</span><span data-line="1779">        <span class="n">is_check_in</span> <span class="o">=</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">&quot;check_in&quot;</span>
+</span><span data-line="1780">
+</span><span data-line="1781">        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_check_in</span><span class="p">:</span>
+</span><span data-line="1782">            <span class="c1"># Get scopes without creating them to prevent infinite recursion</span>
+</span><span data-line="1783">            <span class="n">isolation_scope</span> <span class="o">=</span> <span class="n">_isolation_scope</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+</span><span data-line="1784">            <span class="n">current_scope</span> <span class="o">=</span> <span class="n">_current_scope</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+</span><span data-line="1785">
+</span><span data-line="1786">            <span class="n">event_processors</span> <span class="o">=</span> <span class="n">chain</span><span class="p">(</span>
+</span><span data-line="1787">                <span class="n">global_event_processors</span><span class="p">,</span>
+</span><span data-line="1788">                <span class="n">_global_scope</span> <span class="ow">and</span> <span class="n">_global_scope</span><span class="o">.</span><span class="n">_event_processors</span> <span class="ow">or</span> <span class="p">[],</span>
+</span><span data-line="1789">                <span class="n">isolation_scope</span> <span class="ow">and</span> <span class="n">isolation_scope</span><span class="o">.</span><span class="n">_event_processors</span> <span class="ow">or</span> <span class="p">[],</span>
+</span><span data-line="1790">                <span class="n">current_scope</span> <span class="ow">and</span> <span class="n">current_scope</span><span class="o">.</span><span class="n">_event_processors</span> <span class="ow">or</span> <span class="p">[],</span>
+</span><span data-line="1791">            <span class="p">)</span>
+</span><span data-line="1792">
+</span><span data-line="1793">            <span class="k">for</span> <span class="n">event_processor</span> <span class="ow">in</span> <span class="n">event_processors</span><span class="p">:</span>
+</span><span data-line="1794">                <span class="n">new_event</span> <span class="o">=</span> <span class="n">event</span>
+</span><span data-line="1795">                <span class="k">with</span> <span class="n">capture_internal_exceptions</span><span class="p">():</span>
+</span><span data-line="1796">                    <span class="n">new_event</span> <span class="o">=</span> <span class="n">event_processor</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
+</span><span data-line="1797">                <span class="k">if</span> <span class="n">new_event</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1798">                    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_drop</span><span class="p">(</span><span class="n">event_processor</span><span class="p">,</span> <span class="s2">&quot;event processor&quot;</span><span class="p">)</span>
+</span><span data-line="1799">                <span class="n">event</span> <span class="o">=</span> <span class="n">new_event</span>
+</span><span data-line="1800">
+</span><span data-line="1801">        <span class="k">return</span> <span class="n">event</span></div>
 
-</span><span data-line="1801">
+</span><span data-line="1802">
 <div class="viewcode-block" id="Scope.apply_to_event">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.api.Scope.apply_to_event">[docs]</a>
-</span><span data-line="1802">    <span class="nd">@_disable_capture</span>
-</span><span data-line="1803">    <span class="k">def</span><span class="w"> </span><span class="nf">apply_to_event</span><span class="p">(</span>
-</span><span data-line="1804">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="1805">        <span class="n">event</span><span class="p">:</span> <span class="s2">&quot;Event&quot;</span><span class="p">,</span>
-</span><span data-line="1806">        <span class="n">hint</span><span class="p">:</span> <span class="s2">&quot;Hint&quot;</span><span class="p">,</span>
-</span><span data-line="1807">        <span class="n">options</span><span class="p">:</span> <span class="s2">&quot;Optional[Dict[str, Any]]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="1808">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Optional[Event]&quot;</span><span class="p">:</span>
-</span><span data-line="1809"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Applies the information contained on the scope to the given event.&quot;&quot;&quot;</span>
-</span><span data-line="1810">        <span class="n">ty</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span>
-</span><span data-line="1811">        <span class="n">is_transaction</span> <span class="o">=</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">&quot;transaction&quot;</span>
-</span><span data-line="1812">        <span class="n">is_check_in</span> <span class="o">=</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">&quot;check_in&quot;</span>
-</span><span data-line="1813">
-</span><span data-line="1814">        <span class="c1"># put all attachments into the hint. This lets callbacks play around</span>
-</span><span data-line="1815">        <span class="c1"># with attachments. We also later pull this out of the hint when we</span>
-</span><span data-line="1816">        <span class="c1"># create the envelope.</span>
-</span><span data-line="1817">        <span class="n">attachments_to_send</span> <span class="o">=</span> <span class="n">hint</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;attachments&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[]</span>
-</span><span data-line="1818">        <span class="k">for</span> <span class="n">attachment</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_attachments</span><span class="p">:</span>
-</span><span data-line="1819">            <span class="k">if</span> <span class="ow">not</span> <span class="n">is_transaction</span> <span class="ow">or</span> <span class="n">attachment</span><span class="o">.</span><span class="n">add_to_transactions</span><span class="p">:</span>
-</span><span data-line="1820">                <span class="n">attachments_to_send</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">attachment</span><span class="p">)</span>
-</span><span data-line="1821">        <span class="n">hint</span><span class="p">[</span><span class="s2">&quot;attachments&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">attachments_to_send</span>
-</span><span data-line="1822">
-</span><span data-line="1823">        <span class="bp">self</span><span class="o">.</span><span class="n">_apply_contexts_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
-</span><span data-line="1824">
-</span><span data-line="1825">        <span class="k">if</span> <span class="n">is_check_in</span><span class="p">:</span>
-</span><span data-line="1826">            <span class="c1"># Check-ins only support the trace context, strip all others</span>
-</span><span data-line="1827">            <span class="n">event</span><span class="p">[</span><span class="s2">&quot;contexts&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
-</span><span data-line="1828">                <span class="s2">&quot;trace&quot;</span><span class="p">:</span> <span class="n">event</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;contexts&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;trace&quot;</span><span class="p">,</span> <span class="p">{})</span>
-</span><span data-line="1829">            <span class="p">}</span>
-</span><span data-line="1830">
-</span><span data-line="1831">        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_check_in</span><span class="p">:</span>
-</span><span data-line="1832">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_level_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
-</span><span data-line="1833">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_fingerprint_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
-</span><span data-line="1834">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_user_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
-</span><span data-line="1835">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_transaction_name_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
-</span><span data-line="1836">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_transaction_info_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
-</span><span data-line="1837">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_tags_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
-</span><span data-line="1838">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_extra_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
-</span><span data-line="1839">
-</span><span data-line="1840">        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_transaction</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">is_check_in</span><span class="p">:</span>
-</span><span data-line="1841">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_breadcrumbs_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
-</span><span data-line="1842">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_flags_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
-</span><span data-line="1843">
-</span><span data-line="1844">        <span class="n">event</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_error_processors</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
-</span><span data-line="1845">        <span class="k">if</span> <span class="n">event</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1846">            <span class="k">return</span> <span class="kc">None</span>
-</span><span data-line="1847">
-</span><span data-line="1848">        <span class="n">event</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_event_processors</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
-</span><span data-line="1849">        <span class="k">if</span> <span class="n">event</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1850">            <span class="k">return</span> <span class="kc">None</span>
-</span><span data-line="1851">
-</span><span data-line="1852">        <span class="k">return</span> <span class="n">event</span></div>
+</span><span data-line="1803">    <span class="nd">@_disable_capture</span>
+</span><span data-line="1804">    <span class="k">def</span><span class="w"> </span><span class="nf">apply_to_event</span><span class="p">(</span>
+</span><span data-line="1805">        <span class="bp">self</span><span class="p">,</span>
+</span><span data-line="1806">        <span class="n">event</span><span class="p">:</span> <span class="s2">&quot;Event&quot;</span><span class="p">,</span>
+</span><span data-line="1807">        <span class="n">hint</span><span class="p">:</span> <span class="s2">&quot;Hint&quot;</span><span class="p">,</span>
+</span><span data-line="1808">        <span class="n">options</span><span class="p">:</span> <span class="s2">&quot;Optional[Dict[str, Any]]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="1809">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Optional[Event]&quot;</span><span class="p">:</span>
+</span><span data-line="1810"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Applies the information contained on the scope to the given event.&quot;&quot;&quot;</span>
+</span><span data-line="1811">        <span class="n">ty</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span>
+</span><span data-line="1812">        <span class="n">is_transaction</span> <span class="o">=</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">&quot;transaction&quot;</span>
+</span><span data-line="1813">        <span class="n">is_check_in</span> <span class="o">=</span> <span class="n">ty</span> <span class="o">==</span> <span class="s2">&quot;check_in&quot;</span>
+</span><span data-line="1814">
+</span><span data-line="1815">        <span class="c1"># put all attachments into the hint. This lets callbacks play around</span>
+</span><span data-line="1816">        <span class="c1"># with attachments. We also later pull this out of the hint when we</span>
+</span><span data-line="1817">        <span class="c1"># create the envelope.</span>
+</span><span data-line="1818">        <span class="n">attachments_to_send</span> <span class="o">=</span> <span class="n">hint</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;attachments&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[]</span>
+</span><span data-line="1819">        <span class="k">for</span> <span class="n">attachment</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_attachments</span><span class="p">:</span>
+</span><span data-line="1820">            <span class="k">if</span> <span class="ow">not</span> <span class="n">is_transaction</span> <span class="ow">or</span> <span class="n">attachment</span><span class="o">.</span><span class="n">add_to_transactions</span><span class="p">:</span>
+</span><span data-line="1821">                <span class="n">attachments_to_send</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">attachment</span><span class="p">)</span>
+</span><span data-line="1822">        <span class="n">hint</span><span class="p">[</span><span class="s2">&quot;attachments&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">attachments_to_send</span>
+</span><span data-line="1823">
+</span><span data-line="1824">        <span class="bp">self</span><span class="o">.</span><span class="n">_apply_contexts_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+</span><span data-line="1825">
+</span><span data-line="1826">        <span class="k">if</span> <span class="n">is_check_in</span><span class="p">:</span>
+</span><span data-line="1827">            <span class="c1"># Check-ins only support the trace context, strip all others</span>
+</span><span data-line="1828">            <span class="n">event</span><span class="p">[</span><span class="s2">&quot;contexts&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+</span><span data-line="1829">                <span class="s2">&quot;trace&quot;</span><span class="p">:</span> <span class="n">event</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">&quot;contexts&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;trace&quot;</span><span class="p">,</span> <span class="p">{})</span>
+</span><span data-line="1830">            <span class="p">}</span>
+</span><span data-line="1831">
+</span><span data-line="1832">        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_check_in</span><span class="p">:</span>
+</span><span data-line="1833">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_level_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+</span><span data-line="1834">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_fingerprint_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+</span><span data-line="1835">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_user_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+</span><span data-line="1836">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_transaction_name_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+</span><span data-line="1837">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_transaction_info_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+</span><span data-line="1838">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_tags_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+</span><span data-line="1839">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_extra_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+</span><span data-line="1840">
+</span><span data-line="1841">        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_transaction</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">is_check_in</span><span class="p">:</span>
+</span><span data-line="1842">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_breadcrumbs_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+</span><span data-line="1843">            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_flags_to_event</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+</span><span data-line="1844">
+</span><span data-line="1845">        <span class="n">event</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_error_processors</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
+</span><span data-line="1846">        <span class="k">if</span> <span class="n">event</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1847">            <span class="k">return</span> <span class="kc">None</span>
+</span><span data-line="1848">
+</span><span data-line="1849">        <span class="n">event</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_event_processors</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">hint</span><span class="p">)</span>
+</span><span data-line="1850">        <span class="k">if</span> <span class="n">event</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1851">            <span class="k">return</span> <span class="kc">None</span>
+</span><span data-line="1852">
+</span><span data-line="1853">        <span class="k">return</span> <span class="n">event</span></div>
 
-</span><span data-line="1853">
-</span><span data-line="1854">    <span class="nd">@_disable_capture</span>
-</span><span data-line="1855">    <span class="k">def</span><span class="w"> </span><span class="nf">apply_to_telemetry</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">telemetry</span><span class="p">:</span> <span class="s2">&quot;Union[Log, Metric, StreamedSpan]&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1856">        <span class="c1"># Attributes-based events and telemetry go through here (logs, metrics,</span>
-</span><span data-line="1857">        <span class="c1"># spansV2)</span>
-</span><span data-line="1858">        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">telemetry</span><span class="p">,</span> <span class="n">StreamedSpan</span><span class="p">):</span>
-</span><span data-line="1859">            <span class="n">trace_context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_trace_context</span><span class="p">()</span>
-</span><span data-line="1860">            <span class="n">trace_id</span> <span class="o">=</span> <span class="n">trace_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;trace_id&quot;</span><span class="p">)</span>
-</span><span data-line="1861">            <span class="k">if</span> <span class="n">telemetry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;trace_id&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1862">                <span class="n">telemetry</span><span class="p">[</span><span class="s2">&quot;trace_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-</span><span data-line="1863">                    <span class="n">trace_id</span> <span class="ow">or</span> <span class="s2">&quot;00000000-0000-0000-0000-000000000000&quot;</span>
-</span><span data-line="1864">                <span class="p">)</span>
-</span><span data-line="1865">
-</span><span data-line="1866">            <span class="c1"># span_id should only be populated if there&#39;s an active span. We can&#39;t</span>
-</span><span data-line="1867">            <span class="c1"># use the trace_context here because it synthesizes a span_id if there</span>
-</span><span data-line="1868">            <span class="c1"># isn&#39;t one</span>
-</span><span data-line="1869">            <span class="k">if</span> <span class="n">telemetry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;span_id&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1870">                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
-</span><span data-line="1871">                    <span class="bp">self</span><span class="o">.</span><span class="n">_span</span><span class="p">,</span> <span class="n">NoOpStreamedSpan</span>
-</span><span data-line="1872">                <span class="p">):</span>
-</span><span data-line="1873">                    <span class="n">telemetry</span><span class="p">[</span><span class="s2">&quot;span_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_span</span><span class="o">.</span><span class="n">span_id</span>
-</span><span data-line="1874">                <span class="k">else</span><span class="p">:</span>
-</span><span data-line="1875">                    <span class="n">external_propagation_context</span> <span class="o">=</span> <span class="n">get_external_propagation_context</span><span class="p">()</span>
-</span><span data-line="1876">                    <span class="k">if</span> <span class="n">external_propagation_context</span><span class="p">:</span>
-</span><span data-line="1877">                        <span class="n">_</span><span class="p">,</span> <span class="n">span_id</span> <span class="o">=</span> <span class="n">external_propagation_context</span>
-</span><span data-line="1878">                        <span class="k">if</span> <span class="n">span_id</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1879">                            <span class="n">telemetry</span><span class="p">[</span><span class="s2">&quot;span_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">span_id</span>
-</span><span data-line="1880">
-</span><span data-line="1881">        <span class="bp">self</span><span class="o">.</span><span class="n">_apply_scope_attributes_to_telemetry</span><span class="p">(</span><span class="n">telemetry</span><span class="p">)</span>
-</span><span data-line="1882">        <span class="bp">self</span><span class="o">.</span><span class="n">_apply_user_attributes_to_telemetry</span><span class="p">(</span><span class="n">telemetry</span><span class="p">)</span>
-</span><span data-line="1883">
+</span><span data-line="1854">
+</span><span data-line="1855">    <span class="nd">@_disable_capture</span>
+</span><span data-line="1856">    <span class="k">def</span><span class="w"> </span><span class="nf">apply_to_telemetry</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">telemetry</span><span class="p">:</span> <span class="s2">&quot;Union[Log, Metric, StreamedSpan]&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1857">        <span class="c1"># Attributes-based events and telemetry go through here (logs, metrics,</span>
+</span><span data-line="1858">        <span class="c1"># spansV2)</span>
+</span><span data-line="1859">        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">telemetry</span><span class="p">,</span> <span class="n">StreamedSpan</span><span class="p">):</span>
+</span><span data-line="1860">            <span class="n">trace_context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_trace_context</span><span class="p">()</span>
+</span><span data-line="1861">            <span class="n">trace_id</span> <span class="o">=</span> <span class="n">trace_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;trace_id&quot;</span><span class="p">)</span>
+</span><span data-line="1862">            <span class="k">if</span> <span class="n">telemetry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;trace_id&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">trace_id</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1863">                <span class="n">telemetry</span><span class="p">[</span><span class="s2">&quot;trace_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">trace_id</span>
+</span><span data-line="1864">
+</span><span data-line="1865">            <span class="c1"># span_id should only be populated if there&#39;s an active span. We can&#39;t</span>
+</span><span data-line="1866">            <span class="c1"># use the trace_context here because it synthesizes a span_id if there</span>
+</span><span data-line="1867">            <span class="c1"># isn&#39;t one</span>
+</span><span data-line="1868">            <span class="k">if</span> <span class="n">telemetry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;span_id&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1869">                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+</span><span data-line="1870">                    <span class="bp">self</span><span class="o">.</span><span class="n">_span</span><span class="p">,</span> <span class="p">(</span><span class="n">NoOpStreamedSpan</span><span class="p">,</span> <span class="n">NoOpSpan</span><span class="p">)</span>
+</span><span data-line="1871">                <span class="p">):</span>
+</span><span data-line="1872">                    <span class="n">telemetry</span><span class="p">[</span><span class="s2">&quot;span_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_span</span><span class="o">.</span><span class="n">span_id</span>
+</span><span data-line="1873">                <span class="k">else</span><span class="p">:</span>
+</span><span data-line="1874">                    <span class="n">external_propagation_context</span> <span class="o">=</span> <span class="n">get_external_propagation_context</span><span class="p">()</span>
+</span><span data-line="1875">                    <span class="k">if</span> <span class="n">external_propagation_context</span><span class="p">:</span>
+</span><span data-line="1876">                        <span class="n">_</span><span class="p">,</span> <span class="n">span_id</span> <span class="o">=</span> <span class="n">external_propagation_context</span>
+</span><span data-line="1877">                        <span class="k">if</span> <span class="n">span_id</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1878">                            <span class="n">telemetry</span><span class="p">[</span><span class="s2">&quot;span_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">span_id</span>
+</span><span data-line="1879">
+</span><span data-line="1880">        <span class="bp">self</span><span class="o">.</span><span class="n">_apply_scope_attributes_to_telemetry</span><span class="p">(</span><span class="n">telemetry</span><span class="p">)</span>
+</span><span data-line="1881">        <span class="bp">self</span><span class="o">.</span><span class="n">_apply_user_attributes_to_telemetry</span><span class="p">(</span><span class="n">telemetry</span><span class="p">)</span>
+</span><span data-line="1882">
 <div class="viewcode-block" id="Scope.update_from_scope">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.api.Scope.update_from_scope">[docs]</a>
-</span><span data-line="1884">    <span class="k">def</span><span class="w"> </span><span class="nf">update_from_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scope</span><span class="p">:</span> <span class="s2">&quot;Scope&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1885"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Update the scope with another scope&#39;s data.&quot;&quot;&quot;</span>
-</span><span data-line="1886">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1887">            <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_level</span>
-</span><span data-line="1888">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1889">            <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_fingerprint</span>
-</span><span data-line="1890">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_transaction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1891">            <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_transaction</span>
-</span><span data-line="1892">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_transaction_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1893">            <span class="bp">self</span><span class="o">.</span><span class="n">_transaction_info</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_transaction_info</span><span class="p">)</span>
-</span><span data-line="1894">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_user</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1895">            <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_user</span>
-</span><span data-line="1896">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_tags</span><span class="p">:</span>
-</span><span data-line="1897">            <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_tags</span><span class="p">)</span>
-</span><span data-line="1898">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_contexts</span><span class="p">:</span>
-</span><span data-line="1899">            <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_contexts</span><span class="p">)</span>
-</span><span data-line="1900">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_extras</span><span class="p">:</span>
-</span><span data-line="1901">            <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_extras</span><span class="p">)</span>
-</span><span data-line="1902">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">:</span>
-</span><span data-line="1903">            <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">)</span>
-</span><span data-line="1904">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_n_breadcrumbs_truncated</span><span class="p">:</span>
-</span><span data-line="1905">            <span class="bp">self</span><span class="o">.</span><span class="n">_n_breadcrumbs_truncated</span> <span class="o">=</span> <span class="p">(</span>
-</span><span data-line="1906">                <span class="bp">self</span><span class="o">.</span><span class="n">_n_breadcrumbs_truncated</span> <span class="o">+</span> <span class="n">scope</span><span class="o">.</span><span class="n">_n_breadcrumbs_truncated</span>
-</span><span data-line="1907">            <span class="p">)</span>
-</span><span data-line="1908">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_gen_ai_original_message_count</span><span class="p">:</span>
-</span><span data-line="1909">            <span class="bp">self</span><span class="o">.</span><span class="n">_gen_ai_original_message_count</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
-</span><span data-line="1910">                <span class="n">scope</span><span class="o">.</span><span class="n">_gen_ai_original_message_count</span>
-</span><span data-line="1911">            <span class="p">)</span>
-</span><span data-line="1912">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_gen_ai_conversation_id</span><span class="p">:</span>
-</span><span data-line="1913">            <span class="bp">self</span><span class="o">.</span><span class="n">_gen_ai_conversation_id</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_gen_ai_conversation_id</span>
-</span><span data-line="1914">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_span</span><span class="p">:</span>
-</span><span data-line="1915">            <span class="bp">self</span><span class="o">.</span><span class="n">_span</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_span</span>
-</span><span data-line="1916">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_attachments</span><span class="p">:</span>
-</span><span data-line="1917">            <span class="bp">self</span><span class="o">.</span><span class="n">_attachments</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_attachments</span><span class="p">)</span>
-</span><span data-line="1918">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_profile</span><span class="p">:</span>
-</span><span data-line="1919">            <span class="bp">self</span><span class="o">.</span><span class="n">_profile</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_profile</span>
-</span><span data-line="1920">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_propagation_context</span><span class="p">:</span>
-</span><span data-line="1921">            <span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_propagation_context</span>
-</span><span data-line="1922">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_session</span><span class="p">:</span>
-</span><span data-line="1923">            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_session</span>
-</span><span data-line="1924">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_flags</span><span class="p">:</span>
-</span><span data-line="1925">            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_flags</span><span class="p">:</span>
-</span><span data-line="1926">                <span class="bp">self</span><span class="o">.</span><span class="n">_flags</span> <span class="o">=</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_flags</span><span class="p">)</span>
-</span><span data-line="1927">            <span class="k">else</span><span class="p">:</span>
-</span><span data-line="1928">                <span class="k">for</span> <span class="n">flag</span> <span class="ow">in</span> <span class="n">scope</span><span class="o">.</span><span class="n">_flags</span><span class="o">.</span><span class="n">get</span><span class="p">():</span>
-</span><span data-line="1929">                    <span class="bp">self</span><span class="o">.</span><span class="n">_flags</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">flag</span><span class="p">[</span><span class="s2">&quot;flag&quot;</span><span class="p">],</span> <span class="n">flag</span><span class="p">[</span><span class="s2">&quot;result&quot;</span><span class="p">])</span>
-</span><span data-line="1930">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_attributes</span><span class="p">:</span>
-</span><span data-line="1931">            <span class="bp">self</span><span class="o">.</span><span class="n">_attributes</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_attributes</span><span class="p">)</span></div>
+</span><span data-line="1883">    <span class="k">def</span><span class="w"> </span><span class="nf">update_from_scope</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scope</span><span class="p">:</span> <span class="s2">&quot;Scope&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1884"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Update the scope with another scope&#39;s data.&quot;&quot;&quot;</span>
+</span><span data-line="1885">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1886">            <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_level</span>
+</span><span data-line="1887">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1888">            <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_fingerprint</span>
+</span><span data-line="1889">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_transaction</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1890">            <span class="bp">self</span><span class="o">.</span><span class="n">_transaction</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_transaction</span>
+</span><span data-line="1891">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_transaction_info</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1892">            <span class="bp">self</span><span class="o">.</span><span class="n">_transaction_info</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_transaction_info</span><span class="p">)</span>
+</span><span data-line="1893">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_user</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1894">            <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_user</span>
+</span><span data-line="1895">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_tags</span><span class="p">:</span>
+</span><span data-line="1896">            <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_tags</span><span class="p">)</span>
+</span><span data-line="1897">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_contexts</span><span class="p">:</span>
+</span><span data-line="1898">            <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_contexts</span><span class="p">)</span>
+</span><span data-line="1899">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_extras</span><span class="p">:</span>
+</span><span data-line="1900">            <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_extras</span><span class="p">)</span>
+</span><span data-line="1901">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">:</span>
+</span><span data-line="1902">            <span class="bp">self</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_breadcrumbs</span><span class="p">)</span>
+</span><span data-line="1903">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_n_breadcrumbs_truncated</span><span class="p">:</span>
+</span><span data-line="1904">            <span class="bp">self</span><span class="o">.</span><span class="n">_n_breadcrumbs_truncated</span> <span class="o">=</span> <span class="p">(</span>
+</span><span data-line="1905">                <span class="bp">self</span><span class="o">.</span><span class="n">_n_breadcrumbs_truncated</span> <span class="o">+</span> <span class="n">scope</span><span class="o">.</span><span class="n">_n_breadcrumbs_truncated</span>
+</span><span data-line="1906">            <span class="p">)</span>
+</span><span data-line="1907">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_gen_ai_original_message_count</span><span class="p">:</span>
+</span><span data-line="1908">            <span class="bp">self</span><span class="o">.</span><span class="n">_gen_ai_original_message_count</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+</span><span data-line="1909">                <span class="n">scope</span><span class="o">.</span><span class="n">_gen_ai_original_message_count</span>
+</span><span data-line="1910">            <span class="p">)</span>
+</span><span data-line="1911">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_gen_ai_conversation_id</span><span class="p">:</span>
+</span><span data-line="1912">            <span class="bp">self</span><span class="o">.</span><span class="n">_gen_ai_conversation_id</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_gen_ai_conversation_id</span>
+</span><span data-line="1913">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_span</span><span class="p">:</span>
+</span><span data-line="1914">            <span class="bp">self</span><span class="o">.</span><span class="n">_span</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_span</span>
+</span><span data-line="1915">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_attachments</span><span class="p">:</span>
+</span><span data-line="1916">            <span class="bp">self</span><span class="o">.</span><span class="n">_attachments</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_attachments</span><span class="p">)</span>
+</span><span data-line="1917">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_profile</span><span class="p">:</span>
+</span><span data-line="1918">            <span class="bp">self</span><span class="o">.</span><span class="n">_profile</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_profile</span>
+</span><span data-line="1919">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_propagation_context</span><span class="p">:</span>
+</span><span data-line="1920">            <span class="bp">self</span><span class="o">.</span><span class="n">_propagation_context</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_propagation_context</span>
+</span><span data-line="1921">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_session</span><span class="p">:</span>
+</span><span data-line="1922">            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span> <span class="o">=</span> <span class="n">scope</span><span class="o">.</span><span class="n">_session</span>
+</span><span data-line="1923">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_flags</span><span class="p">:</span>
+</span><span data-line="1924">            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_flags</span><span class="p">:</span>
+</span><span data-line="1925">                <span class="bp">self</span><span class="o">.</span><span class="n">_flags</span> <span class="o">=</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_flags</span><span class="p">)</span>
+</span><span data-line="1926">            <span class="k">else</span><span class="p">:</span>
+</span><span data-line="1927">                <span class="k">for</span> <span class="n">flag</span> <span class="ow">in</span> <span class="n">scope</span><span class="o">.</span><span class="n">_flags</span><span class="o">.</span><span class="n">get</span><span class="p">():</span>
+</span><span data-line="1928">                    <span class="bp">self</span><span class="o">.</span><span class="n">_flags</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">flag</span><span class="p">[</span><span class="s2">&quot;flag&quot;</span><span class="p">],</span> <span class="n">flag</span><span class="p">[</span><span class="s2">&quot;result&quot;</span><span class="p">])</span>
+</span><span data-line="1929">        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">_attributes</span><span class="p">:</span>
+</span><span data-line="1930">            <span class="bp">self</span><span class="o">.</span><span class="n">_attributes</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">_attributes</span><span class="p">)</span></div>
 
-</span><span data-line="1932">
+</span><span data-line="1931">
 <div class="viewcode-block" id="Scope.update_from_kwargs">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.api.Scope.update_from_kwargs">[docs]</a>
-</span><span data-line="1933">    <span class="k">def</span><span class="w"> </span><span class="nf">update_from_kwargs</span><span class="p">(</span>
-</span><span data-line="1934">        <span class="bp">self</span><span class="p">,</span>
-</span><span data-line="1935">        <span class="n">user</span><span class="p">:</span> <span class="s2">&quot;Optional[Any]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="1936">        <span class="n">level</span><span class="p">:</span> <span class="s2">&quot;Optional[LogLevelStr]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="1937">        <span class="n">extras</span><span class="p">:</span> <span class="s2">&quot;Optional[Dict[str, Any]]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="1938">        <span class="n">contexts</span><span class="p">:</span> <span class="s2">&quot;Optional[Dict[str, Dict[str, Any]]]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="1939">        <span class="n">tags</span><span class="p">:</span> <span class="s2">&quot;Optional[Dict[str, str]]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="1940">        <span class="n">fingerprint</span><span class="p">:</span> <span class="s2">&quot;Optional[List[str]]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="1941">        <span class="n">attributes</span><span class="p">:</span> <span class="s2">&quot;Optional[Attributes]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span data-line="1942">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1943"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Update the scope&#39;s attributes.&quot;&quot;&quot;</span>
-</span><span data-line="1944">        <span class="k">if</span> <span class="n">level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1945">            <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="n">level</span>
-</span><span data-line="1946">        <span class="k">if</span> <span class="n">user</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1947">            <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="n">user</span>
-</span><span data-line="1948">        <span class="k">if</span> <span class="n">extras</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1949">            <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">extras</span><span class="p">)</span>
-</span><span data-line="1950">        <span class="k">if</span> <span class="n">contexts</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1951">            <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">contexts</span><span class="p">)</span>
-</span><span data-line="1952">        <span class="k">if</span> <span class="n">tags</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1953">            <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">tags</span><span class="p">)</span>
-</span><span data-line="1954">        <span class="k">if</span> <span class="n">fingerprint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1955">            <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="o">=</span> <span class="n">fingerprint</span>
-</span><span data-line="1956">        <span class="k">if</span> <span class="n">attributes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1957">            <span class="bp">self</span><span class="o">.</span><span class="n">_attributes</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">attributes</span><span class="p">)</span></div>
+</span><span data-line="1932">    <span class="k">def</span><span class="w"> </span><span class="nf">update_from_kwargs</span><span class="p">(</span>
+</span><span data-line="1933">        <span class="bp">self</span><span class="p">,</span>
+</span><span data-line="1934">        <span class="n">user</span><span class="p">:</span> <span class="s2">&quot;Optional[Any]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="1935">        <span class="n">level</span><span class="p">:</span> <span class="s2">&quot;Optional[LogLevelStr]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="1936">        <span class="n">extras</span><span class="p">:</span> <span class="s2">&quot;Optional[Dict[str, Any]]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="1937">        <span class="n">contexts</span><span class="p">:</span> <span class="s2">&quot;Optional[Dict[str, Dict[str, Any]]]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="1938">        <span class="n">tags</span><span class="p">:</span> <span class="s2">&quot;Optional[Dict[str, str]]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="1939">        <span class="n">fingerprint</span><span class="p">:</span> <span class="s2">&quot;Optional[List[str]]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="1940">        <span class="n">attributes</span><span class="p">:</span> <span class="s2">&quot;Optional[Attributes]&quot;</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span data-line="1941">    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1942"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Update the scope&#39;s attributes.&quot;&quot;&quot;</span>
+</span><span data-line="1943">        <span class="k">if</span> <span class="n">level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1944">            <span class="bp">self</span><span class="o">.</span><span class="n">_level</span> <span class="o">=</span> <span class="n">level</span>
+</span><span data-line="1945">        <span class="k">if</span> <span class="n">user</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1946">            <span class="bp">self</span><span class="o">.</span><span class="n">_user</span> <span class="o">=</span> <span class="n">user</span>
+</span><span data-line="1947">        <span class="k">if</span> <span class="n">extras</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1948">            <span class="bp">self</span><span class="o">.</span><span class="n">_extras</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">extras</span><span class="p">)</span>
+</span><span data-line="1949">        <span class="k">if</span> <span class="n">contexts</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1950">            <span class="bp">self</span><span class="o">.</span><span class="n">_contexts</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">contexts</span><span class="p">)</span>
+</span><span data-line="1951">        <span class="k">if</span> <span class="n">tags</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1952">            <span class="bp">self</span><span class="o">.</span><span class="n">_tags</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">tags</span><span class="p">)</span>
+</span><span data-line="1953">        <span class="k">if</span> <span class="n">fingerprint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1954">            <span class="bp">self</span><span class="o">.</span><span class="n">_fingerprint</span> <span class="o">=</span> <span class="n">fingerprint</span>
+</span><span data-line="1955">        <span class="k">if</span> <span class="n">attributes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1956">            <span class="bp">self</span><span class="o">.</span><span class="n">_attributes</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">attributes</span><span class="p">)</span></div>
 
-</span><span data-line="1958">
-</span><span data-line="1959">    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span data-line="1960">        <span class="k">return</span> <span class="s2">&quot;&lt;</span><span class="si">%s</span><span class="s2"> id=</span><span class="si">%s</span><span class="s2"> name=</span><span class="si">%s</span><span class="s2"> type=</span><span class="si">%s</span><span class="s2">&gt;&quot;</span> <span class="o">%</span> <span class="p">(</span>
-</span><span data-line="1961">            <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
-</span><span data-line="1962">            <span class="nb">hex</span><span class="p">(</span><span class="nb">id</span><span class="p">(</span><span class="bp">self</span><span class="p">)),</span>
-</span><span data-line="1963">            <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span>
-</span><span data-line="1964">            <span class="bp">self</span><span class="o">.</span><span class="n">_type</span><span class="p">,</span>
-</span><span data-line="1965">        <span class="p">)</span>
-</span><span data-line="1966">
-</span><span data-line="1967">    <span class="nd">@property</span>
-</span><span data-line="1968">    <span class="k">def</span><span class="w"> </span><span class="nf">flags</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;FlagBuffer&quot;</span><span class="p">:</span>
-</span><span data-line="1969">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_flags</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1970">            <span class="n">max_flags</span> <span class="o">=</span> <span class="p">(</span>
-</span><span data-line="1971">                <span class="bp">self</span><span class="o">.</span><span class="n">get_client</span><span class="p">()</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;_experiments&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_flags&quot;</span><span class="p">)</span>
-</span><span data-line="1972">                <span class="ow">or</span> <span class="n">DEFAULT_FLAG_CAPACITY</span>
-</span><span data-line="1973">            <span class="p">)</span>
-</span><span data-line="1974">            <span class="bp">self</span><span class="o">.</span><span class="n">_flags</span> <span class="o">=</span> <span class="n">FlagBuffer</span><span class="p">(</span><span class="n">capacity</span><span class="o">=</span><span class="n">max_flags</span><span class="p">)</span>
-</span><span data-line="1975">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_flags</span>
-</span><span data-line="1976">
+</span><span data-line="1957">
+</span><span data-line="1958">    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span data-line="1959">        <span class="k">return</span> <span class="s2">&quot;&lt;</span><span class="si">%s</span><span class="s2"> id=</span><span class="si">%s</span><span class="s2"> name=</span><span class="si">%s</span><span class="s2"> type=</span><span class="si">%s</span><span class="s2">&gt;&quot;</span> <span class="o">%</span> <span class="p">(</span>
+</span><span data-line="1960">            <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
+</span><span data-line="1961">            <span class="nb">hex</span><span class="p">(</span><span class="nb">id</span><span class="p">(</span><span class="bp">self</span><span class="p">)),</span>
+</span><span data-line="1962">            <span class="bp">self</span><span class="o">.</span><span class="n">_name</span><span class="p">,</span>
+</span><span data-line="1963">            <span class="bp">self</span><span class="o">.</span><span class="n">_type</span><span class="p">,</span>
+</span><span data-line="1964">        <span class="p">)</span>
+</span><span data-line="1965">
+</span><span data-line="1966">    <span class="nd">@property</span>
+</span><span data-line="1967">    <span class="k">def</span><span class="w"> </span><span class="nf">flags</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;FlagBuffer&quot;</span><span class="p">:</span>
+</span><span data-line="1968">        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_flags</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1969">            <span class="n">max_flags</span> <span class="o">=</span> <span class="p">(</span>
+</span><span data-line="1970">                <span class="bp">self</span><span class="o">.</span><span class="n">get_client</span><span class="p">()</span><span class="o">.</span><span class="n">options</span><span class="p">[</span><span class="s2">&quot;_experiments&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_flags&quot;</span><span class="p">)</span>
+</span><span data-line="1971">                <span class="ow">or</span> <span class="n">DEFAULT_FLAG_CAPACITY</span>
+</span><span data-line="1972">            <span class="p">)</span>
+</span><span data-line="1973">            <span class="bp">self</span><span class="o">.</span><span class="n">_flags</span> <span class="o">=</span> <span class="n">FlagBuffer</span><span class="p">(</span><span class="n">capacity</span><span class="o">=</span><span class="n">max_flags</span><span class="p">)</span>
+</span><span data-line="1974">        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_flags</span>
+</span><span data-line="1975">
 <div class="viewcode-block" id="Scope.set_attribute">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.api.Scope.set_attribute">[docs]</a>
-</span><span data-line="1977">    <span class="k">def</span><span class="w"> </span><span class="nf">set_attribute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attribute</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="s2">&quot;AttributeValue&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1978"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="1979"><span class="sd">        Set an attribute on the scope.</span>
-</span><span data-line="1980">
-</span><span data-line="1981"><span class="sd">        Any attributes-based telemetry (logs, metrics) captured while this scope</span>
-</span><span data-line="1982"><span class="sd">        is active will inherit attributes set on the scope.</span>
-</span><span data-line="1983"><span class="sd">        &quot;&quot;&quot;</span>
-</span><span data-line="1984">        <span class="bp">self</span><span class="o">.</span><span class="n">_attributes</span><span class="p">[</span><span class="n">attribute</span><span class="p">]</span> <span class="o">=</span> <span class="n">format_attribute</span><span class="p">(</span><span class="n">value</span><span class="p">)</span></div>
+</span><span data-line="1976">    <span class="k">def</span><span class="w"> </span><span class="nf">set_attribute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attribute</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="s2">&quot;AttributeValue&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1977"><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="1978"><span class="sd">        Set an attribute on the scope.</span>
+</span><span data-line="1979">
+</span><span data-line="1980"><span class="sd">        Any attributes-based telemetry (logs, metrics) captured while this scope</span>
+</span><span data-line="1981"><span class="sd">        is active will inherit attributes set on the scope.</span>
+</span><span data-line="1982"><span class="sd">        &quot;&quot;&quot;</span>
+</span><span data-line="1983">        <span class="bp">self</span><span class="o">.</span><span class="n">_attributes</span><span class="p">[</span><span class="n">attribute</span><span class="p">]</span> <span class="o">=</span> <span class="n">format_attribute</span><span class="p">(</span><span class="n">value</span><span class="p">)</span></div>
 
-</span><span data-line="1985">
+</span><span data-line="1984">
 <div class="viewcode-block" id="Scope.remove_attribute">
 <a class="viewcode-back" href="../../apidocs.html#sentry_sdk.api.Scope.remove_attribute">[docs]</a>
-</span><span data-line="1986">    <span class="k">def</span><span class="w"> </span><span class="nf">remove_attribute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attribute</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span data-line="1987"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Remove an attribute if set on the scope. No-op if there is no such attribute.&quot;&quot;&quot;</span>
-</span><span data-line="1988">        <span class="k">try</span><span class="p">:</span>
-</span><span data-line="1989">            <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">_attributes</span><span class="p">[</span><span class="n">attribute</span><span class="p">]</span>
-</span><span data-line="1990">        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
-</span><span data-line="1991">            <span class="k">pass</span></div>
+</span><span data-line="1985">    <span class="k">def</span><span class="w"> </span><span class="nf">remove_attribute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attribute</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span data-line="1986"><span class="w">        </span><span class="sd">&quot;&quot;&quot;Remove an attribute if set on the scope. No-op if there is no such attribute.&quot;&quot;&quot;</span>
+</span><span data-line="1987">        <span class="k">try</span><span class="p">:</span>
+</span><span data-line="1988">            <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">_attributes</span><span class="p">[</span><span class="n">attribute</span><span class="p">]</span>
+</span><span data-line="1989">        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+</span><span data-line="1990">            <span class="k">pass</span></div>
 </div>
 
+</span><span data-line="1991">
 </span><span data-line="1992">
-</span><span data-line="1993">
 <div class="viewcode-block" id="new_scope">
 <a class="viewcode-back" href="../../api.html#sentry_sdk.api.new_scope">[docs]</a>
-</span><span data-line="1994"><span class="nd">@contextmanager</span>
-</span><span data-line="1995"><span class="k">def</span><span class="w"> </span><span class="nf">new_scope</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="s2">&quot;Generator[Scope, None, None]&quot;</span><span class="p">:</span>
-</span><span data-line="1996"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="1997"><span class="sd">    .. versionadded:: 2.0.0</span>
-</span><span data-line="1998">
-</span><span data-line="1999"><span class="sd">    Context manager that forks the current scope and runs the wrapped code in it.</span>
-</span><span data-line="2000"><span class="sd">    After the wrapped code is executed, the original scope is restored.</span>
-</span><span data-line="2001">
-</span><span data-line="2002"><span class="sd">    Example Usage:</span>
-</span><span data-line="2003">
-</span><span data-line="2004"><span class="sd">    .. code-block:: python</span>
-</span><span data-line="2005">
-</span><span data-line="2006"><span class="sd">        import sentry_sdk</span>
-</span><span data-line="2007">
-</span><span data-line="2008"><span class="sd">        with sentry_sdk.new_scope() as scope:</span>
-</span><span data-line="2009"><span class="sd">            scope.set_tag(&quot;color&quot;, &quot;green&quot;)</span>
-</span><span data-line="2010"><span class="sd">            sentry_sdk.capture_message(&quot;hello&quot;) # will include `color` tag.</span>
-</span><span data-line="2011">
-</span><span data-line="2012"><span class="sd">        sentry_sdk.capture_message(&quot;hello, again&quot;) # will NOT include `color` tag.</span>
-</span><span data-line="2013">
-</span><span data-line="2014"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="2015">    <span class="c1"># fork current scope</span>
-</span><span data-line="2016">    <span class="n">current_scope</span> <span class="o">=</span> <span class="n">Scope</span><span class="o">.</span><span class="n">get_current_scope</span><span class="p">()</span>
-</span><span data-line="2017">    <span class="n">new_scope</span> <span class="o">=</span> <span class="n">current_scope</span><span class="o">.</span><span class="n">fork</span><span class="p">()</span>
-</span><span data-line="2018">    <span class="n">token</span> <span class="o">=</span> <span class="n">_current_scope</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">new_scope</span><span class="p">)</span>
-</span><span data-line="2019">
-</span><span data-line="2020">    <span class="k">try</span><span class="p">:</span>
-</span><span data-line="2021">        <span class="k">yield</span> <span class="n">new_scope</span>
-</span><span data-line="2022">
-</span><span data-line="2023">    <span class="k">finally</span><span class="p">:</span>
-</span><span data-line="2024">        <span class="k">try</span><span class="p">:</span>
-</span><span data-line="2025">            <span class="c1"># restore original scope</span>
-</span><span data-line="2026">            <span class="n">_current_scope</span><span class="o">.</span><span class="n">reset</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
-</span><span data-line="2027">        <span class="k">except</span> <span class="p">(</span><span class="ne">LookupError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
-</span><span data-line="2028">            <span class="n">capture_internal_exception</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">())</span></div>
+</span><span data-line="1993"><span class="nd">@contextmanager</span>
+</span><span data-line="1994"><span class="k">def</span><span class="w"> </span><span class="nf">new_scope</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="s2">&quot;Generator[Scope, None, None]&quot;</span><span class="p">:</span>
+</span><span data-line="1995"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="1996"><span class="sd">    .. versionadded:: 2.0.0</span>
+</span><span data-line="1997">
+</span><span data-line="1998"><span class="sd">    Context manager that forks the current scope and runs the wrapped code in it.</span>
+</span><span data-line="1999"><span class="sd">    After the wrapped code is executed, the original scope is restored.</span>
+</span><span data-line="2000">
+</span><span data-line="2001"><span class="sd">    Example Usage:</span>
+</span><span data-line="2002">
+</span><span data-line="2003"><span class="sd">    .. code-block:: python</span>
+</span><span data-line="2004">
+</span><span data-line="2005"><span class="sd">        import sentry_sdk</span>
+</span><span data-line="2006">
+</span><span data-line="2007"><span class="sd">        with sentry_sdk.new_scope() as scope:</span>
+</span><span data-line="2008"><span class="sd">            scope.set_tag(&quot;color&quot;, &quot;green&quot;)</span>
+</span><span data-line="2009"><span class="sd">            sentry_sdk.capture_message(&quot;hello&quot;) # will include `color` tag.</span>
+</span><span data-line="2010">
+</span><span data-line="2011"><span class="sd">        sentry_sdk.capture_message(&quot;hello, again&quot;) # will NOT include `color` tag.</span>
+</span><span data-line="2012">
+</span><span data-line="2013"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="2014">    <span class="c1"># fork current scope</span>
+</span><span data-line="2015">    <span class="n">current_scope</span> <span class="o">=</span> <span class="n">Scope</span><span class="o">.</span><span class="n">get_current_scope</span><span class="p">()</span>
+</span><span data-line="2016">    <span class="n">new_scope</span> <span class="o">=</span> <span class="n">current_scope</span><span class="o">.</span><span class="n">fork</span><span class="p">()</span>
+</span><span data-line="2017">    <span class="n">token</span> <span class="o">=</span> <span class="n">_current_scope</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">new_scope</span><span class="p">)</span>
+</span><span data-line="2018">
+</span><span data-line="2019">    <span class="k">try</span><span class="p">:</span>
+</span><span data-line="2020">        <span class="k">yield</span> <span class="n">new_scope</span>
+</span><span data-line="2021">
+</span><span data-line="2022">    <span class="k">finally</span><span class="p">:</span>
+</span><span data-line="2023">        <span class="k">try</span><span class="p">:</span>
+</span><span data-line="2024">            <span class="c1"># restore original scope</span>
+</span><span data-line="2025">            <span class="n">_current_scope</span><span class="o">.</span><span class="n">reset</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+</span><span data-line="2026">        <span class="k">except</span> <span class="p">(</span><span class="ne">LookupError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+</span><span data-line="2027">            <span class="n">capture_internal_exception</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">())</span></div>
 
+</span><span data-line="2028">
 </span><span data-line="2029">
-</span><span data-line="2030">
-</span><span data-line="2031"><span class="nd">@contextmanager</span>
-</span><span data-line="2032"><span class="k">def</span><span class="w"> </span><span class="nf">use_scope</span><span class="p">(</span><span class="n">scope</span><span class="p">:</span> <span class="s2">&quot;Scope&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Generator[Scope, None, None]&quot;</span><span class="p">:</span>
-</span><span data-line="2033"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="2034"><span class="sd">    .. versionadded:: 2.0.0</span>
-</span><span data-line="2035">
-</span><span data-line="2036"><span class="sd">    Context manager that uses the given `scope` and runs the wrapped code in it.</span>
-</span><span data-line="2037"><span class="sd">    After the wrapped code is executed, the original scope is restored.</span>
-</span><span data-line="2038">
-</span><span data-line="2039"><span class="sd">    Example Usage:</span>
-</span><span data-line="2040"><span class="sd">    Suppose the variable `scope` contains a `Scope` object, which is not currently</span>
-</span><span data-line="2041"><span class="sd">    the active scope.</span>
-</span><span data-line="2042">
-</span><span data-line="2043"><span class="sd">    .. code-block:: python</span>
-</span><span data-line="2044">
-</span><span data-line="2045"><span class="sd">        import sentry_sdk</span>
-</span><span data-line="2046">
-</span><span data-line="2047"><span class="sd">        with sentry_sdk.use_scope(scope):</span>
-</span><span data-line="2048"><span class="sd">            scope.set_tag(&quot;color&quot;, &quot;green&quot;)</span>
-</span><span data-line="2049"><span class="sd">            sentry_sdk.capture_message(&quot;hello&quot;) # will include `color` tag.</span>
-</span><span data-line="2050">
-</span><span data-line="2051"><span class="sd">        sentry_sdk.capture_message(&quot;hello, again&quot;) # will NOT include `color` tag.</span>
-</span><span data-line="2052">
-</span><span data-line="2053"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="2054">    <span class="c1"># set given scope as current scope</span>
-</span><span data-line="2055">    <span class="n">token</span> <span class="o">=</span> <span class="n">_current_scope</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
-</span><span data-line="2056">
-</span><span data-line="2057">    <span class="k">try</span><span class="p">:</span>
-</span><span data-line="2058">        <span class="k">yield</span> <span class="n">scope</span>
-</span><span data-line="2059">
-</span><span data-line="2060">    <span class="k">finally</span><span class="p">:</span>
-</span><span data-line="2061">        <span class="k">try</span><span class="p">:</span>
-</span><span data-line="2062">            <span class="c1"># restore original scope</span>
-</span><span data-line="2063">            <span class="n">_current_scope</span><span class="o">.</span><span class="n">reset</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
-</span><span data-line="2064">        <span class="k">except</span> <span class="p">(</span><span class="ne">LookupError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
-</span><span data-line="2065">            <span class="n">capture_internal_exception</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">())</span>
+</span><span data-line="2030"><span class="nd">@contextmanager</span>
+</span><span data-line="2031"><span class="k">def</span><span class="w"> </span><span class="nf">use_scope</span><span class="p">(</span><span class="n">scope</span><span class="p">:</span> <span class="s2">&quot;Scope&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Generator[Scope, None, None]&quot;</span><span class="p">:</span>
+</span><span data-line="2032"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="2033"><span class="sd">    .. versionadded:: 2.0.0</span>
+</span><span data-line="2034">
+</span><span data-line="2035"><span class="sd">    Context manager that uses the given `scope` and runs the wrapped code in it.</span>
+</span><span data-line="2036"><span class="sd">    After the wrapped code is executed, the original scope is restored.</span>
+</span><span data-line="2037">
+</span><span data-line="2038"><span class="sd">    Example Usage:</span>
+</span><span data-line="2039"><span class="sd">    Suppose the variable `scope` contains a `Scope` object, which is not currently</span>
+</span><span data-line="2040"><span class="sd">    the active scope.</span>
+</span><span data-line="2041">
+</span><span data-line="2042"><span class="sd">    .. code-block:: python</span>
+</span><span data-line="2043">
+</span><span data-line="2044"><span class="sd">        import sentry_sdk</span>
+</span><span data-line="2045">
+</span><span data-line="2046"><span class="sd">        with sentry_sdk.use_scope(scope):</span>
+</span><span data-line="2047"><span class="sd">            scope.set_tag(&quot;color&quot;, &quot;green&quot;)</span>
+</span><span data-line="2048"><span class="sd">            sentry_sdk.capture_message(&quot;hello&quot;) # will include `color` tag.</span>
+</span><span data-line="2049">
+</span><span data-line="2050"><span class="sd">        sentry_sdk.capture_message(&quot;hello, again&quot;) # will NOT include `color` tag.</span>
+</span><span data-line="2051">
+</span><span data-line="2052"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="2053">    <span class="c1"># set given scope as current scope</span>
+</span><span data-line="2054">    <span class="n">token</span> <span class="o">=</span> <span class="n">_current_scope</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
+</span><span data-line="2055">
+</span><span data-line="2056">    <span class="k">try</span><span class="p">:</span>
+</span><span data-line="2057">        <span class="k">yield</span> <span class="n">scope</span>
+</span><span data-line="2058">
+</span><span data-line="2059">    <span class="k">finally</span><span class="p">:</span>
+</span><span data-line="2060">        <span class="k">try</span><span class="p">:</span>
+</span><span data-line="2061">            <span class="c1"># restore original scope</span>
+</span><span data-line="2062">            <span class="n">_current_scope</span><span class="o">.</span><span class="n">reset</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+</span><span data-line="2063">        <span class="k">except</span> <span class="p">(</span><span class="ne">LookupError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+</span><span data-line="2064">            <span class="n">capture_internal_exception</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">())</span>
+</span><span data-line="2065">
 </span><span data-line="2066">
-</span><span data-line="2067">
-</span><span data-line="2068"><span class="nd">@contextmanager</span>
-</span><span data-line="2069"><span class="k">def</span><span class="w"> </span><span class="nf">isolation_scope</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="s2">&quot;Generator[Scope, None, None]&quot;</span><span class="p">:</span>
-</span><span data-line="2070"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="2071"><span class="sd">    .. versionadded:: 2.0.0</span>
-</span><span data-line="2072">
-</span><span data-line="2073"><span class="sd">    Context manager that forks the current isolation scope and runs the wrapped code in it.</span>
-</span><span data-line="2074"><span class="sd">    The current scope is also forked to not bleed data into the existing current scope.</span>
-</span><span data-line="2075"><span class="sd">    After the wrapped code is executed, the original scopes are restored.</span>
-</span><span data-line="2076">
-</span><span data-line="2077"><span class="sd">    Example Usage:</span>
-</span><span data-line="2078">
-</span><span data-line="2079"><span class="sd">    .. code-block:: python</span>
-</span><span data-line="2080">
-</span><span data-line="2081"><span class="sd">        import sentry_sdk</span>
-</span><span data-line="2082">
-</span><span data-line="2083"><span class="sd">        with sentry_sdk.isolation_scope() as scope:</span>
-</span><span data-line="2084"><span class="sd">            scope.set_tag(&quot;color&quot;, &quot;green&quot;)</span>
-</span><span data-line="2085"><span class="sd">            sentry_sdk.capture_message(&quot;hello&quot;) # will include `color` tag.</span>
-</span><span data-line="2086">
-</span><span data-line="2087"><span class="sd">        sentry_sdk.capture_message(&quot;hello, again&quot;) # will NOT include `color` tag.</span>
-</span><span data-line="2088">
-</span><span data-line="2089"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="2090">    <span class="c1"># fork current scope</span>
-</span><span data-line="2091">    <span class="n">current_scope</span> <span class="o">=</span> <span class="n">Scope</span><span class="o">.</span><span class="n">get_current_scope</span><span class="p">()</span>
-</span><span data-line="2092">    <span class="n">forked_current_scope</span> <span class="o">=</span> <span class="n">current_scope</span><span class="o">.</span><span class="n">fork</span><span class="p">()</span>
-</span><span data-line="2093">    <span class="n">current_token</span> <span class="o">=</span> <span class="n">_current_scope</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">forked_current_scope</span><span class="p">)</span>
-</span><span data-line="2094">
-</span><span data-line="2095">    <span class="c1"># fork isolation scope</span>
-</span><span data-line="2096">    <span class="n">isolation_scope</span> <span class="o">=</span> <span class="n">Scope</span><span class="o">.</span><span class="n">get_isolation_scope</span><span class="p">()</span>
-</span><span data-line="2097">    <span class="n">new_isolation_scope</span> <span class="o">=</span> <span class="n">isolation_scope</span><span class="o">.</span><span class="n">fork</span><span class="p">()</span>
-</span><span data-line="2098">    <span class="n">isolation_token</span> <span class="o">=</span> <span class="n">_isolation_scope</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">new_isolation_scope</span><span class="p">)</span>
-</span><span data-line="2099">
-</span><span data-line="2100">    <span class="k">try</span><span class="p">:</span>
-</span><span data-line="2101">        <span class="k">yield</span> <span class="n">new_isolation_scope</span>
-</span><span data-line="2102">
-</span><span data-line="2103">    <span class="k">finally</span><span class="p">:</span>
-</span><span data-line="2104">        <span class="c1"># restore original scopes</span>
-</span><span data-line="2105">        <span class="k">try</span><span class="p">:</span>
-</span><span data-line="2106">            <span class="n">_current_scope</span><span class="o">.</span><span class="n">reset</span><span class="p">(</span><span class="n">current_token</span><span class="p">)</span>
-</span><span data-line="2107">        <span class="k">except</span> <span class="p">(</span><span class="ne">LookupError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
-</span><span data-line="2108">            <span class="n">capture_internal_exception</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">())</span>
-</span><span data-line="2109">
-</span><span data-line="2110">        <span class="k">try</span><span class="p">:</span>
-</span><span data-line="2111">            <span class="n">_isolation_scope</span><span class="o">.</span><span class="n">reset</span><span class="p">(</span><span class="n">isolation_token</span><span class="p">)</span>
-</span><span data-line="2112">        <span class="k">except</span> <span class="p">(</span><span class="ne">LookupError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
-</span><span data-line="2113">            <span class="n">capture_internal_exception</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">())</span>
+</span><span data-line="2067"><span class="nd">@contextmanager</span>
+</span><span data-line="2068"><span class="k">def</span><span class="w"> </span><span class="nf">isolation_scope</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="s2">&quot;Generator[Scope, None, None]&quot;</span><span class="p">:</span>
+</span><span data-line="2069"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="2070"><span class="sd">    .. versionadded:: 2.0.0</span>
+</span><span data-line="2071">
+</span><span data-line="2072"><span class="sd">    Context manager that forks the current isolation scope and runs the wrapped code in it.</span>
+</span><span data-line="2073"><span class="sd">    The current scope is also forked to not bleed data into the existing current scope.</span>
+</span><span data-line="2074"><span class="sd">    After the wrapped code is executed, the original scopes are restored.</span>
+</span><span data-line="2075">
+</span><span data-line="2076"><span class="sd">    Example Usage:</span>
+</span><span data-line="2077">
+</span><span data-line="2078"><span class="sd">    .. code-block:: python</span>
+</span><span data-line="2079">
+</span><span data-line="2080"><span class="sd">        import sentry_sdk</span>
+</span><span data-line="2081">
+</span><span data-line="2082"><span class="sd">        with sentry_sdk.isolation_scope() as scope:</span>
+</span><span data-line="2083"><span class="sd">            scope.set_tag(&quot;color&quot;, &quot;green&quot;)</span>
+</span><span data-line="2084"><span class="sd">            sentry_sdk.capture_message(&quot;hello&quot;) # will include `color` tag.</span>
+</span><span data-line="2085">
+</span><span data-line="2086"><span class="sd">        sentry_sdk.capture_message(&quot;hello, again&quot;) # will NOT include `color` tag.</span>
+</span><span data-line="2087">
+</span><span data-line="2088"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="2089">    <span class="c1"># fork current scope</span>
+</span><span data-line="2090">    <span class="n">current_scope</span> <span class="o">=</span> <span class="n">Scope</span><span class="o">.</span><span class="n">get_current_scope</span><span class="p">()</span>
+</span><span data-line="2091">    <span class="n">forked_current_scope</span> <span class="o">=</span> <span class="n">current_scope</span><span class="o">.</span><span class="n">fork</span><span class="p">()</span>
+</span><span data-line="2092">    <span class="n">current_token</span> <span class="o">=</span> <span class="n">_current_scope</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">forked_current_scope</span><span class="p">)</span>
+</span><span data-line="2093">
+</span><span data-line="2094">    <span class="c1"># fork isolation scope</span>
+</span><span data-line="2095">    <span class="n">isolation_scope</span> <span class="o">=</span> <span class="n">Scope</span><span class="o">.</span><span class="n">get_isolation_scope</span><span class="p">()</span>
+</span><span data-line="2096">    <span class="n">new_isolation_scope</span> <span class="o">=</span> <span class="n">isolation_scope</span><span class="o">.</span><span class="n">fork</span><span class="p">()</span>
+</span><span data-line="2097">    <span class="n">isolation_token</span> <span class="o">=</span> <span class="n">_isolation_scope</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">new_isolation_scope</span><span class="p">)</span>
+</span><span data-line="2098">
+</span><span data-line="2099">    <span class="k">try</span><span class="p">:</span>
+</span><span data-line="2100">        <span class="k">yield</span> <span class="n">new_isolation_scope</span>
+</span><span data-line="2101">
+</span><span data-line="2102">    <span class="k">finally</span><span class="p">:</span>
+</span><span data-line="2103">        <span class="c1"># restore original scopes</span>
+</span><span data-line="2104">        <span class="k">try</span><span class="p">:</span>
+</span><span data-line="2105">            <span class="n">_current_scope</span><span class="o">.</span><span class="n">reset</span><span class="p">(</span><span class="n">current_token</span><span class="p">)</span>
+</span><span data-line="2106">        <span class="k">except</span> <span class="p">(</span><span class="ne">LookupError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+</span><span data-line="2107">            <span class="n">capture_internal_exception</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">())</span>
+</span><span data-line="2108">
+</span><span data-line="2109">        <span class="k">try</span><span class="p">:</span>
+</span><span data-line="2110">            <span class="n">_isolation_scope</span><span class="o">.</span><span class="n">reset</span><span class="p">(</span><span class="n">isolation_token</span><span class="p">)</span>
+</span><span data-line="2111">        <span class="k">except</span> <span class="p">(</span><span class="ne">LookupError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+</span><span data-line="2112">            <span class="n">capture_internal_exception</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">())</span>
+</span><span data-line="2113">
 </span><span data-line="2114">
-</span><span data-line="2115">
-</span><span data-line="2116"><span class="nd">@contextmanager</span>
-</span><span data-line="2117"><span class="k">def</span><span class="w"> </span><span class="nf">use_isolation_scope</span><span class="p">(</span><span class="n">isolation_scope</span><span class="p">:</span> <span class="s2">&quot;Scope&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Generator[Scope, None, None]&quot;</span><span class="p">:</span>
-</span><span data-line="2118"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-</span><span data-line="2119"><span class="sd">    .. versionadded:: 2.0.0</span>
-</span><span data-line="2120">
-</span><span data-line="2121"><span class="sd">    Context manager that uses the given `isolation_scope` and runs the wrapped code in it.</span>
-</span><span data-line="2122"><span class="sd">    The current scope is also forked to not bleed data into the existing current scope.</span>
-</span><span data-line="2123"><span class="sd">    After the wrapped code is executed, the original scopes are restored.</span>
-</span><span data-line="2124">
-</span><span data-line="2125"><span class="sd">    Example Usage:</span>
-</span><span data-line="2126">
-</span><span data-line="2127"><span class="sd">    .. code-block:: python</span>
-</span><span data-line="2128">
-</span><span data-line="2129"><span class="sd">        import sentry_sdk</span>
-</span><span data-line="2130">
-</span><span data-line="2131"><span class="sd">        with sentry_sdk.isolation_scope() as scope:</span>
-</span><span data-line="2132"><span class="sd">            scope.set_tag(&quot;color&quot;, &quot;green&quot;)</span>
-</span><span data-line="2133"><span class="sd">            sentry_sdk.capture_message(&quot;hello&quot;) # will include `color` tag.</span>
-</span><span data-line="2134">
-</span><span data-line="2135"><span class="sd">        sentry_sdk.capture_message(&quot;hello, again&quot;) # will NOT include `color` tag.</span>
-</span><span data-line="2136">
-</span><span data-line="2137"><span class="sd">    &quot;&quot;&quot;</span>
-</span><span data-line="2138">    <span class="c1"># fork current scope</span>
-</span><span data-line="2139">    <span class="n">current_scope</span> <span class="o">=</span> <span class="n">Scope</span><span class="o">.</span><span class="n">get_current_scope</span><span class="p">()</span>
-</span><span data-line="2140">    <span class="n">forked_current_scope</span> <span class="o">=</span> <span class="n">current_scope</span><span class="o">.</span><span class="n">fork</span><span class="p">()</span>
-</span><span data-line="2141">    <span class="n">current_token</span> <span class="o">=</span> <span class="n">_current_scope</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">forked_current_scope</span><span class="p">)</span>
-</span><span data-line="2142">
-</span><span data-line="2143">    <span class="c1"># set given scope as isolation scope</span>
-</span><span data-line="2144">    <span class="n">isolation_token</span> <span class="o">=</span> <span class="n">_isolation_scope</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">isolation_scope</span><span class="p">)</span>
-</span><span data-line="2145">
-</span><span data-line="2146">    <span class="k">try</span><span class="p">:</span>
-</span><span data-line="2147">        <span class="k">yield</span> <span class="n">isolation_scope</span>
-</span><span data-line="2148">
-</span><span data-line="2149">    <span class="k">finally</span><span class="p">:</span>
-</span><span data-line="2150">        <span class="c1"># restore original scopes</span>
-</span><span data-line="2151">        <span class="k">try</span><span class="p">:</span>
-</span><span data-line="2152">            <span class="n">_current_scope</span><span class="o">.</span><span class="n">reset</span><span class="p">(</span><span class="n">current_token</span><span class="p">)</span>
-</span><span data-line="2153">        <span class="k">except</span> <span class="p">(</span><span class="ne">LookupError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
-</span><span data-line="2154">            <span class="n">capture_internal_exception</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">())</span>
-</span><span data-line="2155">
-</span><span data-line="2156">        <span class="k">try</span><span class="p">:</span>
-</span><span data-line="2157">            <span class="n">_isolation_scope</span><span class="o">.</span><span class="n">reset</span><span class="p">(</span><span class="n">isolation_token</span><span class="p">)</span>
-</span><span data-line="2158">        <span class="k">except</span> <span class="p">(</span><span class="ne">LookupError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
-</span><span data-line="2159">            <span class="n">capture_internal_exception</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">())</span>
+</span><span data-line="2115"><span class="nd">@contextmanager</span>
+</span><span data-line="2116"><span class="k">def</span><span class="w"> </span><span class="nf">use_isolation_scope</span><span class="p">(</span><span class="n">isolation_scope</span><span class="p">:</span> <span class="s2">&quot;Scope&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Generator[Scope, None, None]&quot;</span><span class="p">:</span>
+</span><span data-line="2117"><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span data-line="2118"><span class="sd">    .. versionadded:: 2.0.0</span>
+</span><span data-line="2119">
+</span><span data-line="2120"><span class="sd">    Context manager that uses the given `isolation_scope` and runs the wrapped code in it.</span>
+</span><span data-line="2121"><span class="sd">    The current scope is also forked to not bleed data into the existing current scope.</span>
+</span><span data-line="2122"><span class="sd">    After the wrapped code is executed, the original scopes are restored.</span>
+</span><span data-line="2123">
+</span><span data-line="2124"><span class="sd">    Example Usage:</span>
+</span><span data-line="2125">
+</span><span data-line="2126"><span class="sd">    .. code-block:: python</span>
+</span><span data-line="2127">
+</span><span data-line="2128"><span class="sd">        import sentry_sdk</span>
+</span><span data-line="2129">
+</span><span data-line="2130"><span class="sd">        with sentry_sdk.isolation_scope() as scope:</span>
+</span><span data-line="2131"><span class="sd">            scope.set_tag(&quot;color&quot;, &quot;green&quot;)</span>
+</span><span data-line="2132"><span class="sd">            sentry_sdk.capture_message(&quot;hello&quot;) # will include `color` tag.</span>
+</span><span data-line="2133">
+</span><span data-line="2134"><span class="sd">        sentry_sdk.capture_message(&quot;hello, again&quot;) # will NOT include `color` tag.</span>
+</span><span data-line="2135">
+</span><span data-line="2136"><span class="sd">    &quot;&quot;&quot;</span>
+</span><span data-line="2137">    <span class="c1"># fork current scope</span>
+</span><span data-line="2138">    <span class="n">current_scope</span> <span class="o">=</span> <span class="n">Scope</span><span class="o">.</span><span class="n">get_current_scope</span><span class="p">()</span>
+</span><span data-line="2139">    <span class="n">forked_current_scope</span> <span class="o">=</span> <span class="n">current_scope</span><span class="o">.</span><span class="n">fork</span><span class="p">()</span>
+</span><span data-line="2140">    <span class="n">current_token</span> <span class="o">=</span> <span class="n">_current_scope</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">forked_current_scope</span><span class="p">)</span>
+</span><span data-line="2141">
+</span><span data-line="2142">    <span class="c1"># set given scope as isolation scope</span>
+</span><span data-line="2143">    <span class="n">isolation_token</span> <span class="o">=</span> <span class="n">_isolation_scope</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">isolation_scope</span><span class="p">)</span>
+</span><span data-line="2144">
+</span><span data-line="2145">    <span class="k">try</span><span class="p">:</span>
+</span><span data-line="2146">        <span class="k">yield</span> <span class="n">isolation_scope</span>
+</span><span data-line="2147">
+</span><span data-line="2148">    <span class="k">finally</span><span class="p">:</span>
+</span><span data-line="2149">        <span class="c1"># restore original scopes</span>
+</span><span data-line="2150">        <span class="k">try</span><span class="p">:</span>
+</span><span data-line="2151">            <span class="n">_current_scope</span><span class="o">.</span><span class="n">reset</span><span class="p">(</span><span class="n">current_token</span><span class="p">)</span>
+</span><span data-line="2152">        <span class="k">except</span> <span class="p">(</span><span class="ne">LookupError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+</span><span data-line="2153">            <span class="n">capture_internal_exception</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">())</span>
+</span><span data-line="2154">
+</span><span data-line="2155">        <span class="k">try</span><span class="p">:</span>
+</span><span data-line="2156">            <span class="n">_isolation_scope</span><span class="o">.</span><span class="n">reset</span><span class="p">(</span><span class="n">isolation_token</span><span class="p">)</span>
+</span><span data-line="2157">        <span class="k">except</span> <span class="p">(</span><span class="ne">LookupError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+</span><span data-line="2158">            <span class="n">capture_internal_exception</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">())</span>
+</span><span data-line="2159">
 </span><span data-line="2160">
-</span><span data-line="2161">
-</span><span data-line="2162"><span class="k">def</span><span class="w"> </span><span class="nf">should_send_default_pii</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-</span><span data-line="2163"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Shortcut for `Scope.get_client().should_send_default_pii()`.&quot;&quot;&quot;</span>
-</span><span data-line="2164">    <span class="k">return</span> <span class="n">Scope</span><span class="o">.</span><span class="n">get_client</span><span class="p">()</span><span class="o">.</span><span class="n">should_send_default_pii</span><span class="p">()</span>
+</span><span data-line="2161"><span class="k">def</span><span class="w"> </span><span class="nf">should_send_default_pii</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</span><span data-line="2162"><span class="w">    </span><span class="sd">&quot;&quot;&quot;Shortcut for `Scope.get_client().should_send_default_pii()`.&quot;&quot;&quot;</span>
+</span><span data-line="2163">    <span class="k">return</span> <span class="n">Scope</span><span class="o">.</span><span class="n">get_client</span><span class="p">()</span><span class="o">.</span><span class="n">should_send_default_pii</span><span class="p">()</span>
+</span><span data-line="2164">
 </span><span data-line="2165">
-</span><span data-line="2166">
-</span><span data-line="2167"><span class="c1"># Circular imports</span>
-</span><span data-line="2168"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.client</span><span class="w"> </span><span class="kn">import</span> <span class="n">NonRecordingClient</span>
-</span><span data-line="2169">
-</span><span data-line="2170"><span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
-</span><span data-line="2171">    <span class="kn">import</span><span class="w"> </span><span class="nn">sentry_sdk.client</span>
+</span><span data-line="2166"><span class="c1"># Circular imports</span>
+</span><span data-line="2167"><span class="kn">from</span><span class="w"> </span><span class="nn">sentry_sdk.client</span><span class="w"> </span><span class="kn">import</span> <span class="n">NonRecordingClient</span>
+</span><span data-line="2168">
+</span><span data-line="2169"><span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+</span><span data-line="2170">    <span class="kn">import</span><span class="w"> </span><span class="nn">sentry_sdk.client</span>
 </span></pre></div>
         </article><button class="back-to-top" type="button">
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -2476,7 +2475,7 @@ data-aria-dark="Switch to auto color mode">
     </div>
   </div>
 </footer>
-      <script src="../../_static/documentation_options.js?v=f86a2ac2"></script>
+      <script src="../../_static/documentation_options.js?v=89bf609b"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/shibuya.js?v=50760d75"></script></body>
