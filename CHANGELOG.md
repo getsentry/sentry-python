@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.63.0
+
+### Bug Fixes 🐛
+
+#### Fastapi
+
+- Prevent double wrapping of sync handlers on FastAPI >= 0.137 by @jhonny-on in [#6569](https://github.com/getsentry/sentry-python/pull/6569)
+- Use effective_route_context path for prefixed routers by @ericapisani in [#6572](https://github.com/getsentry/sentry-python/pull/6572)
+
+#### Other
+
+- (asgi) Gate query string and client IP behind send_default_pii by @ericapisani in [#6501](https://github.com/getsentry/sentry-python/pull/6501)
+- (serializer) Avoid creating reference cycles on every call by @Malkiz223 in [#6563](https://github.com/getsentry/sentry-python/pull/6563)
+- (user) Set `user.ip_address` on telemetry if present by @sentrivana in [#6555](https://github.com/getsentry/sentry-python/pull/6555)
+- Remove 0000 trace_id fallbacks by @sl0thentr0py in [#6570](https://github.com/getsentry/sentry-python/pull/6570)
+- MANIFEST.in: Graft tests directory. by @charlesroelli in [#6237](https://github.com/getsentry/sentry-python/pull/6237)
+
+### Internal Changes 🔧
+
+- (fastapi) Verify request info capture with POST endpoints by @alexander-alderman-webb in [#6287](https://github.com/getsentry/sentry-python/pull/6287)
+- (starlette) Verify request info capture with POST endpoints by @alexander-alderman-webb in [#6269](https://github.com/getsentry/sentry-python/pull/6269)
+
 ## 2.62.0
 
 ### New Features ✨
