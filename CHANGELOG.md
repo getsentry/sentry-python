@@ -12,7 +12,6 @@
 #### Other
 
 - (asgi) Gate query string and client IP behind send_default_pii by @ericapisani in [#6501](https://github.com/getsentry/sentry-python/pull/6501)
-- (flask) Set user data on scope at request start by @ericapisani in [#6566](https://github.com/getsentry/sentry-python/pull/6566)
 - (serializer) Avoid creating reference cycles on every call by @Malkiz223 in [#6563](https://github.com/getsentry/sentry-python/pull/6563)
 - (user) Set `user.ip_address` on telemetry if present by @sentrivana in [#6555](https://github.com/getsentry/sentry-python/pull/6555)
 - Remove 0000 trace_id fallbacks by @sl0thentr0py in [#6570](https://github.com/getsentry/sentry-python/pull/6570)
