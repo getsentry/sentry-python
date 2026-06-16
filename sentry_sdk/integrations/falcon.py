@@ -109,7 +109,7 @@ class SentryFalconMiddleware:
         self, req: "Any", resp: "Any", resource: "Any", params: "Any"
     ) -> None:
         """
-        Sets the transaction name as the route is resolved when this runs.
+        Sets the segment name and source as the route is resolved when this runs.
         """
         client = sentry_sdk.get_client()
         integration = client.get_integration(FalconIntegration)
