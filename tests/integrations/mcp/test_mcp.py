@@ -22,6 +22,8 @@ from unittest import mock
 import anyio
 import pytest
 
+from sentry_sdk.utils import package_version
+
 try:
     from unittest.mock import AsyncMock
 except ImportError:
@@ -33,13 +35,30 @@ except ImportError:
 
 from mcp.server.lowlevel import Server
 from mcp.server.lowlevel.helper_types import ReadResourceContents
-from mcp.server.lowlevel.server import request_ctx
 from mcp.types import GetPromptResult, PromptMessage, TextContent
 
+MCP_PACKAGE_VERSION = package_version("mcp")
+IS_MCP_V2 = MCP_PACKAGE_VERSION is not None and MCP_PACKAGE_VERSION >= (2, 0, 0)
+
 try:
-    from mcp.server.lowlevel.server import request_ctx
+    if not IS_MCP_V2:
+        from mcp.server.lowlevel.server import (  # type: ignore[import-not-found]
+            request_ctx,
+        )
+    else:
+        request_ctx = None
 except ImportError:
     request_ctx = None
+
+if IS_MCP_V2:
+    from mcp.types import (
+        CallToolRequestParams,
+        CallToolResult,
+        GetPromptRequestParams,
+        ReadResourceRequestParams,
+        ReadResourceResult,
+        TextResourceContents,
+    )
 
 from mcp.server.sse import SseServerTransport
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
@@ -55,6 +74,14 @@ from sentry_sdk.integrations.mcp import MCPIntegration
 
 def _experiments_for(span_streaming):
     return {"trace_lifecycle": "stream" if span_streaming else "static"}
+
+
+def _get_response(session_message):
+    """Extract the JSON-RPC response from a SessionMessage (v1 or v2)."""
+    msg = session_message.message
+    if hasattr(msg, "root"):
+        return msg.root
+    return msg
 
 
 def _find_mcp_span(items, method_name=None):
@@ -102,20 +129,149 @@ class MockTextContent:
 
 def test_integration_patches_server(sentry_init):
     """Test that MCPIntegration patches the Server class"""
-    # Get original methods before integration
-    original_call_tool = Server.call_tool
-    original_get_prompt = Server.get_prompt
-    original_read_resource = Server.read_resource
+    if IS_MCP_V2:
+        original_add_request_handler = Server.add_request_handler
+        original_init = Server.__init__
+
+        sentry_init(
+            integrations=[MCPIntegration()],
+            traces_sample_rate=1.0,
+        )
+
+        assert Server.add_request_handler is not original_add_request_handler
+        assert Server.__init__ is not original_init
+    else:
+        original_call_tool = Server.call_tool
+        original_get_prompt = Server.get_prompt
+        original_read_resource = Server.read_resource
+
+        sentry_init(
+            integrations=[MCPIntegration()],
+            traces_sample_rate=1.0,
+        )
+
+        assert Server.call_tool is not original_call_tool
+        assert Server.get_prompt is not original_get_prompt
+        assert Server.read_resource is not original_read_resource
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    not IS_MCP_V2, reason="Constructor handler registration is MCP v2 only"
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_tool_handler_constructor_registration(
+    sentry_init, capture_events, capture_items, span_streaming, stdio
+):
+    """v2 handlers registered via the Server(...) constructor are instrumented.
+
+    This is the dominant v2 registration path (used by lowlevel examples and by
+    the in-tree MCPServer), distinct from add_request_handler.
+    """
+    sentry_init(
+        integrations=[MCPIntegration()],
+        traces_sample_rate=1.0,
+        _experiments=_experiments_for(span_streaming),
+    )
+
+    async def test_tool(ctx, params):
+        return CallToolResult(
+            content=[
+                TextContent(
+                    type="text",
+                    text=json.dumps({"result": "success"}),
+                )
+            ],
+            structured_content={"result": "success"},
+        )
+
+    server = Server("test-server", on_call_tool=test_tool)
+
+    if span_streaming:
+        items = capture_items("span")
+        with sentry_sdk.traces.start_span(name="mcp tx"):
+            await stdio(
+                server,
+                method="tools/call",
+                params={"name": "calculate", "arguments": {"x": 10}},
+                request_id="req-ctor",
+            )
+        sentry_sdk.flush()
+        span = _find_mcp_span(items, method_name="tools/call")
+        assert span is not None
+        data = span["attributes"]
+    else:
+        events = capture_events()
+        with start_transaction(name="mcp tx"):
+            await stdio(
+                server,
+                method="tools/call",
+                params={"name": "calculate", "arguments": {"x": 10}},
+                request_id="req-ctor",
+            )
+        (tx,) = events
+        assert len(tx["spans"]) == 1
+        span = tx["spans"][0]
+        assert span["description"] == "tools/call calculate"
+        data = span["data"]
+
+    assert data[SPANDATA.MCP_TOOL_NAME] == "calculate"
+    assert data[SPANDATA.MCP_METHOD_NAME] == "tools/call"
+    assert data[SPANDATA.MCP_REQUEST_ID] == "req-ctor"
+    assert data["mcp.request.argument.x"] == "10"
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(not IS_MCP_V2, reason="MCPServer is MCP v2 only")
+async def test_mcpserver_high_level_tool_instrumented(
+    sentry_init, capture_events, stdio
+):
+    """The in-tree high-level MCPServer wires its handlers through the lowlevel
+    Server(...) constructor, so its tool calls are instrumented too."""
+    from mcp.server import MCPServer
 
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
     )
 
-    # After initialization, the methods should be patched
-    assert Server.call_tool is not original_call_tool
-    assert Server.get_prompt is not original_get_prompt
-    assert Server.read_resource is not original_read_resource
+    mcp_server = MCPServer("test-server")
+
+    @mcp_server.tool()
+    def add(a: int, b: int) -> int:
+        return a + b
+
+    events = capture_events()
+    with start_transaction(name="mcp tx"):
+        await stdio(
+            mcp_server._lowlevel_server,
+            method="tools/call",
+            params={"name": "add", "arguments": {"a": 2, "b": 3}},
+            request_id="req-mcpserver",
+        )
+
+    (tx,) = events
+    assert len(tx["spans"]) == 1
+    span = tx["spans"][0]
+    assert span["op"] == OP.MCP_SERVER
+    assert span["description"] == "tools/call add"
+    assert span["data"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
+
+
+def test_wrap_v2_handler_is_idempotent():
+    """_wrap_v2_handler must not double-wrap a handler registered through more
+    than one path (e.g. MCPServer building a Server, then re-registration)."""
+    import sentry_sdk.integrations.mcp as mcp_module
+
+    async def handler(ctx, params):
+        return None
+
+    wrapped = mcp_module._wrap_v2_handler("tool", handler)
+    assert wrapped is not handler
+    assert getattr(wrapped, "__sentry_mcp_wrapped__", False) is True
+
+    rewrapped = mcp_module._wrap_v2_handler("tool", wrapped)
+    assert rewrapped is wrapped
 
 
 @pytest.mark.asyncio
@@ -143,9 +299,25 @@ async def test_tool_handler_stdio(
 
     server = Server("test-server")
 
-    @server.call_tool()
-    async def test_tool(tool_name, arguments):
-        return {"result": "success", "value": 42}
+    if IS_MCP_V2:
+
+        async def test_tool(ctx, params):
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps({"result": "success", "value": 42}),
+                    )
+                ],
+                structured_content={"result": "success", "value": 42},
+            )
+
+        server.add_request_handler("tools/call", CallToolRequestParams, test_tool)
+    else:
+
+        @server.call_tool()
+        async def test_tool(tool_name, arguments):
+            return {"result": "success", "value": 42}
 
     if span_streaming:
         items = capture_items("span")
@@ -173,10 +345,16 @@ async def test_tool_handler_stdio(
                 request_id="req-123",
             )
 
-    assert result.message.root.result["content"][0]["text"] == json.dumps(
-        {"result": "success", "value": 42},
-        indent=2,
-    )
+    if IS_MCP_V2:
+        assert _get_response(result).result["structuredContent"] == {
+            "result": "success",
+            "value": 42,
+        }
+    else:
+        assert _get_response(result).result["content"][0]["text"] == json.dumps(
+            {"result": "success", "value": 42},
+            indent=2,
+        )
 
     if span_streaming:
         span = _find_mcp_span(items, method_name="tools/call")
@@ -246,6 +424,30 @@ async def test_tool_handler_streamable_http(
 
     server = Server("test-server")
 
+    if IS_MCP_V2:
+
+        async def test_tool_async(ctx, params):
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps({"status": "completed"}),
+                    )
+                ]
+            )
+
+        server.add_request_handler("tools/call", CallToolRequestParams, test_tool_async)
+    else:
+
+        @server.call_tool()
+        async def test_tool_async(tool_name, arguments):
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps({"status": "completed"}),
+                )
+            ]
+
     session_manager = StreamableHTTPSessionManager(
         app=server,
         json_response=True,
@@ -257,15 +459,6 @@ async def test_tool_handler_streamable_http(
         ],
         lifespan=lambda app: session_manager.run(),
     )
-
-    @server.call_tool()
-    async def test_tool_async(tool_name, arguments):
-        return [
-            TextContent(
-                type="text",
-                text=json.dumps({"status": "completed"}),
-            )
-        ]
 
     if span_streaming:
         items = capture_items("span")
@@ -353,9 +546,17 @@ async def test_tool_handler_with_error(
 
     server = Server("test-server")
 
-    @server.call_tool()
-    def failing_tool(tool_name, arguments):
-        raise ValueError("Tool execution failed")
+    if IS_MCP_V2:
+
+        async def failing_tool(ctx, params):
+            raise ValueError("Tool execution failed")
+
+        server.add_request_handler("tools/call", CallToolRequestParams, failing_tool)
+    else:
+
+        @server.call_tool()
+        def failing_tool(tool_name, arguments):
+            raise ValueError("Tool execution failed")
 
     if span_streaming:
         items = capture_items("event", "span")
@@ -371,9 +572,11 @@ async def test_tool_handler_with_error(
             )
         sentry_sdk.flush()
 
-        assert (
-            result.message.root.result["content"][0]["text"] == "Tool execution failed"
-        )
+        resp = _get_response(result)
+        if IS_MCP_V2:
+            assert "Tool execution failed" in resp.error.message
+        else:
+            assert resp.result["content"][0]["text"] == "Tool execution failed"
 
         error_payload = next(item.payload for item in items if item.type == "event")
         span = _find_mcp_span(items, method_name="tools/call")
@@ -400,10 +603,11 @@ async def test_tool_handler_with_error(
                 request_id="req-error",
             )
 
-            assert (
-                result.message.root.result["content"][0]["text"]
-                == "Tool execution failed"
-            )
+            resp = _get_response(result)
+            if IS_MCP_V2:
+                assert "Tool execution failed" in resp.error.message
+            else:
+                assert resp.result["content"][0]["text"] == "Tool execution failed"
 
         # Should have error event and transaction
         assert len(events) == 2
@@ -450,17 +654,27 @@ async def test_prompt_handler_stdio(
 
     server = Server("test-server")
 
-    @server.get_prompt()
-    async def test_prompt(name, arguments):
-        return GetPromptResult(
-            description="A helpful test prompt",
-            messages=[
-                PromptMessage(
-                    role="user",
-                    content=TextContent(type="text", text="Tell me about Python"),
-                ),
-            ],
-        )
+    prompt_result = GetPromptResult(
+        description="A helpful test prompt",
+        messages=[
+            PromptMessage(
+                role="user",
+                content=TextContent(type="text", text="Tell me about Python"),
+            ),
+        ],
+    )
+
+    if IS_MCP_V2:
+
+        async def test_prompt(ctx, params):
+            return prompt_result
+
+        server.add_request_handler("prompts/get", GetPromptRequestParams, test_prompt)
+    else:
+
+        @server.get_prompt()
+        async def test_prompt(name, arguments):
+            return prompt_result
 
     if span_streaming:
         items = capture_items("span")
@@ -488,9 +702,9 @@ async def test_prompt_handler_stdio(
                 request_id="req-prompt",
             )
 
-    assert result.message.root.result["messages"][0]["role"] == "user"
+    assert _get_response(result).result["messages"][0]["role"] == "user"
     assert (
-        result.message.root.result["messages"][0]["content"]["text"]
+        _get_response(result).result["messages"][0]["content"]["text"]
         == "Tell me about Python"
     )
 
@@ -560,6 +774,33 @@ async def test_prompt_handler_streamable_http(
 
     server = Server("test-server")
 
+    prompt_result = GetPromptResult(
+        description="A helpful test prompt",
+        messages=[
+            PromptMessage(
+                role="user",
+                content=TextContent(type="text", text="You are a helpful assistant"),
+            ),
+            PromptMessage(
+                role="user", content=TextContent(type="text", text="What is MCP?")
+            ),
+        ],
+    )
+
+    if IS_MCP_V2:
+
+        async def test_prompt_async(ctx, params):
+            return prompt_result
+
+        server.add_request_handler(
+            "prompts/get", GetPromptRequestParams, test_prompt_async
+        )
+    else:
+
+        @server.get_prompt()
+        async def test_prompt_async(name, arguments):
+            return prompt_result
+
     session_manager = StreamableHTTPSessionManager(
         app=server,
         json_response=True,
@@ -571,23 +812,6 @@ async def test_prompt_handler_streamable_http(
         ],
         lifespan=lambda app: session_manager.run(),
     )
-
-    @server.get_prompt()
-    async def test_prompt_async(name, arguments):
-        return GetPromptResult(
-            description="A helpful test prompt",
-            messages=[
-                PromptMessage(
-                    role="user",
-                    content=TextContent(
-                        type="text", text="You are a helpful assistant"
-                    ),
-                ),
-                PromptMessage(
-                    role="user", content=TextContent(type="text", text="What is MCP?")
-                ),
-            ],
-        )
 
     if span_streaming:
         items = capture_items("span")
@@ -657,9 +881,19 @@ async def test_prompt_handler_with_error(
 
     server = Server("test-server")
 
-    @server.get_prompt()
-    async def failing_prompt(name, arguments):
-        raise RuntimeError("Prompt not found")
+    if IS_MCP_V2:
+
+        async def failing_prompt(ctx, params):
+            raise RuntimeError("Prompt not found")
+
+        server.add_request_handler(
+            "prompts/get", GetPromptRequestParams, failing_prompt
+        )
+    else:
+
+        @server.get_prompt()
+        async def failing_prompt(name, arguments):
+            raise RuntimeError("Prompt not found")
 
     if span_streaming:
         items = capture_items("event", "span")
@@ -675,7 +909,7 @@ async def test_prompt_handler_with_error(
             )
         sentry_sdk.flush()
 
-        assert response.message.root.error.message == "Prompt not found"
+        assert _get_response(response).error.message == "Prompt not found"
 
         error_payload = next(item.payload for item in items if item.type == "event")
         span = _find_mcp_span(items, method_name="prompts/get")
@@ -698,7 +932,7 @@ async def test_prompt_handler_with_error(
                 request_id="req-error-prompt",
             )
 
-        assert response.message.root.error.message == "Prompt not found"
+        assert _get_response(response).error.message == "Prompt not found"
 
         # Should have error event and transaction
         assert len(events) == 2
@@ -730,13 +964,32 @@ async def test_resource_handler_stdio(
 
     server = Server("test-server")
 
-    @server.read_resource()
-    async def test_resource(uri):
-        return [
-            ReadResourceContents(
-                content=json.dumps({"content": "file contents"}), mime_type="text/plain"
+    if IS_MCP_V2:
+
+        async def test_resource(ctx, params):
+            return ReadResourceResult(
+                contents=[
+                    TextResourceContents(
+                        uri=str(params.uri),
+                        text=json.dumps({"content": "file contents"}),
+                        mime_type="text/plain",
+                    )
+                ]
             )
-        ]
+
+        server.add_request_handler(
+            "resources/read", ReadResourceRequestParams, test_resource
+        )
+    else:
+
+        @server.read_resource()
+        async def test_resource(uri):
+            return [
+                ReadResourceContents(
+                    content=json.dumps({"content": "file contents"}),
+                    mime_type="text/plain",
+                )
+            ]
 
     if span_streaming:
         items = capture_items("span")
@@ -762,7 +1015,7 @@ async def test_resource_handler_stdio(
                 request_id="req-resource",
             )
 
-    assert result.message.root.result["contents"][0]["text"] == json.dumps(
+    assert _get_response(result).result["contents"][0]["text"] == json.dumps(
         {"content": "file contents"},
     )
 
@@ -813,6 +1066,33 @@ async def test_resource_handler_streamable_http(
 
     server = Server("test-server")
 
+    if IS_MCP_V2:
+
+        async def test_resource_async(ctx, params):
+            return ReadResourceResult(
+                contents=[
+                    TextResourceContents(
+                        uri=str(params.uri),
+                        text=json.dumps({"data": "resource data"}),
+                        mime_type="text/plain",
+                    )
+                ]
+            )
+
+        server.add_request_handler(
+            "resources/read", ReadResourceRequestParams, test_resource_async
+        )
+    else:
+
+        @server.read_resource()
+        async def test_resource_async(uri):
+            return [
+                ReadResourceContents(
+                    content=json.dumps({"data": "resource data"}),
+                    mime_type="text/plain",
+                )
+            ]
+
     session_manager = StreamableHTTPSessionManager(
         app=server,
         json_response=True,
@@ -824,14 +1104,6 @@ async def test_resource_handler_streamable_http(
         ],
         lifespan=lambda app: session_manager.run(),
     )
-
-    @server.read_resource()
-    async def test_resource_async(uri):
-        return [
-            ReadResourceContents(
-                content=json.dumps({"data": "resource data"}), mime_type="text/plain"
-            )
-        ]
 
     if span_streaming:
         items = capture_items("span")
@@ -899,9 +1171,19 @@ async def test_resource_handler_with_error(
 
     server = Server("test-server")
 
-    @server.read_resource()
-    def failing_resource(uri):
-        raise FileNotFoundError("Resource not found")
+    if IS_MCP_V2:
+
+        async def failing_resource(ctx, params):
+            raise FileNotFoundError("Resource not found")
+
+        server.add_request_handler(
+            "resources/read", ReadResourceRequestParams, failing_resource
+        )
+    else:
+
+        @server.read_resource()
+        def failing_resource(uri):
+            raise FileNotFoundError("Resource not found")
 
     if span_streaming:
         items = capture_items("event", "span")
@@ -977,12 +1259,22 @@ async def test_tool_result_extraction_tuple(
 
     server = Server("test-server")
 
-    @server.call_tool()
-    def test_tool_tuple(tool_name, arguments):
-        # Return CombinationContent: (UnstructuredContent, StructuredContent)
-        unstructured = [MockTextContent("Result text")]
-        structured = {"key": "value", "count": 5}
-        return (unstructured, structured)
+    if IS_MCP_V2:
+
+        async def test_tool_tuple(ctx, params):
+            return CallToolResult(
+                content=[TextContent(type="text", text="Result text")],
+                structured_content={"key": "value", "count": 5},
+            )
+
+        server.add_request_handler("tools/call", CallToolRequestParams, test_tool_tuple)
+    else:
+
+        @server.call_tool()
+        def test_tool_tuple(tool_name, arguments):
+            unstructured = [MockTextContent("Result text")]
+            structured = {"key": "value", "count": 5}
+            return (unstructured, structured)
 
     if span_streaming:
         items = capture_items("span")
@@ -1017,7 +1309,6 @@ async def test_tool_result_extraction_tuple(
         (tx,) = events
         data = tx["spans"][0]["data"]
 
-    # Should extract the structured content (second element of tuple) only with PII
     if send_default_pii and include_prompts:
         assert data[SPANDATA.MCP_TOOL_RESULT_CONTENT] == json.dumps(
             {
@@ -1056,13 +1347,27 @@ async def test_tool_result_extraction_unstructured(
 
     server = Server("test-server")
 
-    @server.call_tool()
-    def test_tool_unstructured(tool_name, arguments):
-        # Return UnstructuredContent as list of content blocks
-        return [
-            MockTextContent("First part"),
-            MockTextContent("Second part"),
-        ]
+    if IS_MCP_V2:
+
+        async def test_tool_unstructured(ctx, params):
+            return CallToolResult(
+                content=[
+                    TextContent(type="text", text="First part"),
+                    TextContent(type="text", text="Second part"),
+                ]
+            )
+
+        server.add_request_handler(
+            "tools/call", CallToolRequestParams, test_tool_unstructured
+        )
+    else:
+
+        @server.call_tool()
+        def test_tool_unstructured(tool_name, arguments):
+            return [
+                MockTextContent("First part"),
+                MockTextContent("Second part"),
+            ]
 
     if span_streaming:
         items = capture_items("span")
@@ -1118,24 +1423,54 @@ async def test_multiple_handlers(
 
     server = Server("test-server")
 
-    @server.call_tool()
-    def tool1(tool_name, arguments):
-        return {"result": "tool1"}
+    if IS_MCP_V2:
 
-    @server.call_tool()
-    def tool2(tool_name, arguments):
-        return {"result": "tool2"}
+        async def tool_handler(ctx, params):
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps({"result": params.name}),
+                    )
+                ]
+            )
 
-    @server.get_prompt()
-    def prompt1(name, arguments):
-        return GetPromptResult(
-            description="A test prompt",
-            messages=[
-                PromptMessage(
-                    role="user", content=TextContent(type="text", text="Test prompt")
-                )
-            ],
+        async def prompt_handler(ctx, params):
+            return GetPromptResult(
+                description="A test prompt",
+                messages=[
+                    PromptMessage(
+                        role="user",
+                        content=TextContent(type="text", text="Test prompt"),
+                    )
+                ],
+            )
+
+        server.add_request_handler("tools/call", CallToolRequestParams, tool_handler)
+        server.add_request_handler(
+            "prompts/get", GetPromptRequestParams, prompt_handler
         )
+    else:
+
+        @server.call_tool()
+        def tool1(tool_name, arguments):
+            return {"result": "tool1"}
+
+        @server.call_tool()
+        def tool2(tool_name, arguments):
+            return {"result": "tool2"}
+
+        @server.get_prompt()
+        def prompt1(name, arguments):
+            return GetPromptResult(
+                description="A test prompt",
+                messages=[
+                    PromptMessage(
+                        role="user",
+                        content=TextContent(type="text", text="Test prompt"),
+                    )
+                ],
+            )
 
     if span_streaming:
         items = capture_items("span")
@@ -1228,14 +1563,30 @@ async def test_prompt_with_dict_result(
 
     server = Server("test-server")
 
-    @server.get_prompt()
-    def test_prompt_dict(name, arguments):
-        # Return dict format instead of GetPromptResult object
-        return {
-            "messages": [
-                {"role": "user", "content": {"text": "Hello from dict"}},
-            ]
-        }
+    if IS_MCP_V2:
+
+        async def test_prompt_dict(ctx, params):
+            return GetPromptResult(
+                messages=[
+                    PromptMessage(
+                        role="user",
+                        content=TextContent(type="text", text="Hello from dict"),
+                    )
+                ]
+            )
+
+        server.add_request_handler(
+            "prompts/get", GetPromptRequestParams, test_prompt_dict
+        )
+    else:
+
+        @server.get_prompt()
+        def test_prompt_dict(name, arguments):
+            return {
+                "messages": [
+                    {"role": "user", "content": {"text": "Hello from dict"}},
+                ]
+            }
 
     if span_streaming:
         items = capture_items("span")
@@ -1296,9 +1647,19 @@ async def test_tool_with_complex_arguments(
 
     server = Server("test-server")
 
-    @server.call_tool()
-    def test_tool_complex(tool_name, arguments):
-        return {"processed": True}
+    if IS_MCP_V2:
+
+        async def test_tool_complex(ctx, params):
+            return CallToolResult(content=[TextContent(type="text", text="processed")])
+
+        server.add_request_handler(
+            "tools/call", CallToolRequestParams, test_tool_complex
+        )
+    else:
+
+        @server.call_tool()
+        def test_tool_complex(tool_name, arguments):
+            return {"processed": True}
 
     complex_args = {
         "nested": {"key": "value", "list": [1, 2, 3]},
@@ -1349,6 +1710,7 @@ async def test_tool_with_complex_arguments(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.skipif(IS_MCP_V2, reason="SSE scope propagation not supported in MCP v2")
 async def test_sse_transport_detection(
     sentry_init, capture_events, capture_items, span_streaming, json_rpc_sse
 ):
@@ -1387,9 +1749,20 @@ async def test_sse_transport_detection(
         ],
     )
 
-    @server.call_tool()
-    async def test_tool(tool_name, arguments):
-        return {"result": "success"}
+    if IS_MCP_V2:
+
+        async def test_tool(ctx, params):
+            return CallToolResult(
+                content=[TextContent(type="text", text="success")],
+                structured_content={"result": "success"},
+            )
+
+        server.add_request_handler("tools/call", CallToolRequestParams, test_tool)
+    else:
+
+        @server.call_tool()
+        async def test_tool(tool_name, arguments):
+            return {"result": "success"}
 
     if span_streaming:
         items = capture_items("span")
@@ -1432,3 +1805,308 @@ async def test_sse_transport_detection(
     assert data[SPANDATA.MCP_TRANSPORT] == "sse"
     assert data[SPANDATA.NETWORK_TRANSPORT] == "tcp"
     assert data[SPANDATA.MCP_SESSION_ID] == session_id
+
+
+class _FakeServerRequestContext:
+    """
+    Stands in for MCP SDK v2's ServerRequestContext, which doesn't exist in v1.
+    Used to test that _handler_wrapper extracts context from original_args
+    when the first arg is a ServerRequestContext instance.
+    """
+
+    def __init__(self, request_id=None, request=None):
+        self.request_id = request_id
+        self.request = request
+
+
+class TestHandlerWrapperWithExplicitContext:
+    """
+    Tests that _handler_wrapper correctly extracts request context data from
+    original_args when the first argument is a ServerRequestContext (MCP SDK v2
+    pattern), rather than relying on the request_ctx ContextVar.
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("span_streaming", [True, False])
+    async def test_http_context_extracted_from_args(
+        self, sentry_init, capture_events, capture_items, span_streaming
+    ):
+        """When a ServerRequestContext with HTTP headers is in original_args,
+        span data reflects the request_id, session_id, and http transport."""
+        sentry_init(
+            integrations=[MCPIntegration()],
+            traces_sample_rate=1.0,
+            _experiments=_experiments_for(span_streaming),
+        )
+
+        import sentry_sdk.integrations.mcp as mcp_module
+
+        request = mock.MagicMock()
+        request.headers = {"mcp-session-id": "session-abc"}
+        request.query_params = {}
+        request.scope = {"state": {}}
+
+        ctx = _FakeServerRequestContext(request_id="req-42", request=request)
+
+        async def dummy_tool(ctx, name, arguments):
+            return {"result": "ok"}
+
+        with mock.patch.object(
+            mcp_module, "ServerRequestContext", _FakeServerRequestContext
+        ):
+            if span_streaming:
+                items = capture_items("span")
+                with sentry_sdk.traces.start_span(name="test tx"):
+                    await mcp_module._handler_wrapper(
+                        "tool",
+                        dummy_tool,
+                        (ctx, "my_tool", {"x": 1}),
+                        force_await=False,
+                    )
+                sentry_sdk.flush()
+                span = _find_mcp_span(items, method_name="tools/call")
+                assert span is not None
+                data = span["attributes"]
+            else:
+                events = capture_events()
+                with start_transaction(name="test tx"):
+                    await mcp_module._handler_wrapper(
+                        "tool",
+                        dummy_tool,
+                        (ctx, "my_tool", {"x": 1}),
+                        force_await=False,
+                    )
+                (tx,) = events
+                data = tx["spans"][0]["data"]
+
+        assert data[SPANDATA.MCP_REQUEST_ID] == "req-42"
+        assert data[SPANDATA.MCP_SESSION_ID] == "session-abc"
+        assert data[SPANDATA.MCP_TRANSPORT] == "http"
+        assert data[SPANDATA.NETWORK_TRANSPORT] == "tcp"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("span_streaming", [True, False])
+    async def test_sse_context_extracted_from_args(
+        self, sentry_init, capture_events, capture_items, span_streaming
+    ):
+        """When a ServerRequestContext with SSE query params is in original_args,
+        span data reflects sse transport and session_id."""
+        sentry_init(
+            integrations=[MCPIntegration()],
+            traces_sample_rate=1.0,
+            _experiments=_experiments_for(span_streaming),
+        )
+
+        import sentry_sdk.integrations.mcp as mcp_module
+
+        request = mock.MagicMock()
+        request.headers = {}
+        request.query_params = {"session_id": "sse-session-456"}
+        request.scope = {"state": {}}
+
+        ctx = _FakeServerRequestContext(request_id="req-99", request=request)
+
+        async def dummy_tool(ctx, name, arguments):
+            return {"result": "ok"}
+
+        with mock.patch.object(
+            mcp_module, "ServerRequestContext", _FakeServerRequestContext
+        ):
+            if span_streaming:
+                items = capture_items("span")
+                with sentry_sdk.traces.start_span(name="test tx"):
+                    await mcp_module._handler_wrapper(
+                        "tool",
+                        dummy_tool,
+                        (ctx, "my_tool", {}),
+                        force_await=False,
+                    )
+                sentry_sdk.flush()
+                span = _find_mcp_span(items, method_name="tools/call")
+                assert span is not None
+                data = span["attributes"]
+            else:
+                events = capture_events()
+                with start_transaction(name="test tx"):
+                    await mcp_module._handler_wrapper(
+                        "tool",
+                        dummy_tool,
+                        (ctx, "my_tool", {}),
+                        force_await=False,
+                    )
+                (tx,) = events
+                data = tx["spans"][0]["data"]
+
+        assert data[SPANDATA.MCP_REQUEST_ID] == "req-99"
+        assert data[SPANDATA.MCP_SESSION_ID] == "sse-session-456"
+        assert data[SPANDATA.MCP_TRANSPORT] == "sse"
+        assert data[SPANDATA.NETWORK_TRANSPORT] == "tcp"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("span_streaming", [True, False])
+    async def test_stdio_fallback_when_no_context_in_args(
+        self, sentry_init, capture_events, capture_items, span_streaming
+    ):
+        """When original_args has no ServerRequestContext (v1 style),
+        falls back to ContextVar / stdio defaults."""
+        sentry_init(
+            integrations=[MCPIntegration()],
+            traces_sample_rate=1.0,
+            _experiments=_experiments_for(span_streaming),
+        )
+
+        import sentry_sdk.integrations.mcp as mcp_module
+
+        async def dummy_tool(name, arguments):
+            return {"result": "ok"}
+
+        if span_streaming:
+            items = capture_items("span")
+            with sentry_sdk.traces.start_span(name="test tx"):
+                await mcp_module._handler_wrapper(
+                    "tool",
+                    dummy_tool,
+                    ("my_tool", {"x": 1}),
+                    force_await=False,
+                )
+            sentry_sdk.flush()
+            span = _find_mcp_span(items, method_name="tools/call")
+            assert span is not None
+            data = span["attributes"]
+        else:
+            events = capture_events()
+            with start_transaction(name="test tx"):
+                await mcp_module._handler_wrapper(
+                    "tool",
+                    dummy_tool,
+                    ("my_tool", {"x": 1}),
+                    force_await=False,
+                )
+            (tx,) = events
+            data = tx["spans"][0]["data"]
+
+        assert data[SPANDATA.MCP_TRANSPORT] == "stdio"
+        assert data[SPANDATA.NETWORK_TRANSPORT] == "pipe"
+        assert SPANDATA.MCP_SESSION_ID not in data
+
+    @pytest.mark.asyncio
+    async def test_scopes_extracted_from_context_request_state(
+        self, sentry_init, capture_events
+    ):
+        """When a ServerRequestContext carries Sentry scopes in its request
+        state, _handler_wrapper uses those scopes for the span."""
+        sentry_init(
+            integrations=[MCPIntegration()],
+            traces_sample_rate=1.0,
+        )
+
+        import sentry_sdk.integrations.mcp as mcp_module
+
+        isolation_scope = sentry_sdk.get_isolation_scope()
+        current_scope = sentry_sdk.get_current_scope()
+
+        request = mock.MagicMock()
+        request.headers = {"mcp-session-id": "session-scopes"}
+        request.query_params = {}
+        request.scope = {
+            "state": {
+                "sentry_sdk.isolation_scope": isolation_scope,
+                "sentry_sdk.current_scope": current_scope,
+            }
+        }
+
+        ctx = _FakeServerRequestContext(request_id="req-scope", request=request)
+
+        async def dummy_tool(ctx, name, arguments):
+            return {"result": "ok"}
+
+        with mock.patch.object(
+            mcp_module, "ServerRequestContext", _FakeServerRequestContext
+        ):
+            events = capture_events()
+            with start_transaction(name="test tx"):
+                await mcp_module._handler_wrapper(
+                    "tool",
+                    dummy_tool,
+                    (ctx, "my_tool", {"x": 1}),
+                    force_await=False,
+                )
+            (tx,) = events
+            span = tx["spans"][0]
+
+        assert span["op"] == OP.MCP_SERVER
+        assert span["data"][SPANDATA.MCP_SESSION_ID] == "session-scopes"
+
+    @pytest.mark.asyncio
+    async def test_no_scopes_when_context_has_no_request(
+        self, sentry_init, capture_events
+    ):
+        """When a ServerRequestContext has no request (stdio-like),
+        _handler_wrapper still works without scope override."""
+        sentry_init(
+            integrations=[MCPIntegration()],
+            traces_sample_rate=1.0,
+        )
+
+        import sentry_sdk.integrations.mcp as mcp_module
+
+        ctx = _FakeServerRequestContext(request_id="req-no-request")
+        ctx.request = None
+
+        async def dummy_tool(ctx, name, arguments):
+            return {"result": "ok"}
+
+        with mock.patch.object(
+            mcp_module, "ServerRequestContext", _FakeServerRequestContext
+        ):
+            events = capture_events()
+            with start_transaction(name="test tx"):
+                await mcp_module._handler_wrapper(
+                    "tool",
+                    dummy_tool,
+                    (ctx, "my_tool", {}),
+                    force_await=False,
+                )
+            (tx,) = events
+            span = tx["spans"][0]
+
+        assert span["op"] == OP.MCP_SERVER
+        assert span["data"][SPANDATA.MCP_TRANSPORT] == "stdio"
+
+    @pytest.mark.asyncio
+    async def test_v2_context_without_params_uses_unknown_handler_name(
+        self, sentry_init, capture_events
+    ):
+        """When v2 is detected (ServerRequestContext as first arg) but no
+        params object is present, handler_name should be 'unknown' instead
+        of the ServerRequestContext object."""
+        sentry_init(
+            integrations=[MCPIntegration()],
+            traces_sample_rate=1.0,
+        )
+
+        import sentry_sdk.integrations.mcp as mcp_module
+
+        ctx = _FakeServerRequestContext(request_id="req-no-params")
+        ctx.request = None
+
+        async def dummy_tool(ctx):
+            return {"result": "ok"}
+
+        with mock.patch.object(
+            mcp_module, "ServerRequestContext", _FakeServerRequestContext
+        ):
+            events = capture_events()
+            with start_transaction(name="test tx"):
+                await mcp_module._handler_wrapper(
+                    "tool",
+                    dummy_tool,
+                    (ctx,),
+                    force_await=False,
+                )
+            (tx,) = events
+            span = tx["spans"][0]
+
+        assert span["op"] == OP.MCP_SERVER
+        assert span["description"] == "tools/call unknown"
+        assert span["data"][SPANDATA.MCP_METHOD_NAME] == "tools/call"

@@ -19,14 +19,20 @@ from sentry_sdk.integrations._wsgi_common import nullcontext
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
-from sentry_sdk.utils import safe_serialize
+from sentry_sdk.utils import package_version, safe_serialize
+
+MCP_PACKAGE_VERSION = package_version("mcp")
 
 try:
     from mcp.server.lowlevel import Server  # type: ignore[import-not-found]
-    from mcp.server.lowlevel.server import request_ctx  # type: ignore[import-not-found]
     from mcp.server.streamable_http import (  # type: ignore[import-not-found]
         StreamableHTTPServerTransport,
     )
+
+    if MCP_PACKAGE_VERSION and MCP_PACKAGE_VERSION < (2, 0, 0):
+        from mcp.server.lowlevel.server import (  # type: ignore[import-not-found]
+            request_ctx,
+        )
 except ImportError:
     raise DidNotEnable("MCP SDK not installed")
 
@@ -34,6 +40,16 @@ try:
     from fastmcp import FastMCP  # type: ignore[import-not-found]
 except ImportError:
     FastMCP = None
+
+if MCP_PACKAGE_VERSION and MCP_PACKAGE_VERSION >= (2, 0, 0):
+    try:
+        from mcp.server.context import (  # type: ignore[import-not-found]
+            ServerRequestContext,
+        )
+    except ImportError:
+        ServerRequestContext = None
+else:
+    ServerRequestContext = None
 
 
 if TYPE_CHECKING:
@@ -71,13 +87,15 @@ class MCPIntegration(Integration):
             _patch_fastmcp()
 
 
-def _get_active_http_scopes() -> (
-    "Optional[Tuple[Optional[sentry_sdk.Scope], Optional[sentry_sdk.Scope]]]"
-):
-    try:
-        ctx = request_ctx.get()
-    except LookupError:
-        return None
+def _get_active_http_scopes(
+    ctx: "Optional[Any]" = None,
+) -> "Optional[Tuple[Optional[sentry_sdk.Scope], Optional[sentry_sdk.Scope]]]":
+    if MCP_PACKAGE_VERSION and MCP_PACKAGE_VERSION < (2, 0, 0):
+        if ctx is None:
+            try:
+                ctx = request_ctx.get()
+            except LookupError:
+                return None
 
     if (
         ctx is None
@@ -93,7 +111,9 @@ def _get_active_http_scopes() -> (
     )
 
 
-def _get_request_context_data() -> "tuple[Optional[str], Optional[str], str]":
+def _get_request_context_data(
+    ctx: "Optional[Any]" = None,
+) -> "tuple[Optional[str], Optional[str], str]":
     """
     Extract request ID, session ID, and MCP transport type from the request context.
 
@@ -106,31 +126,28 @@ def _get_request_context_data() -> "tuple[Optional[str], Optional[str], str]":
     request_id: "Optional[str]" = None
     session_id: "Optional[str]" = None
     mcp_transport: str = "stdio"
+    if MCP_PACKAGE_VERSION and MCP_PACKAGE_VERSION < (2, 0, 0):
+        if ctx is None:
+            try:
+                ctx = request_ctx.get()
+            except LookupError:
+                return request_id, session_id, mcp_transport
 
-    try:
-        ctx = request_ctx.get()
-
-        if ctx is not None:
-            request_id = ctx.request_id
-            if hasattr(ctx, "request") and ctx.request is not None:
-                request = ctx.request
-                # Detect transport type by checking request characteristics
-                if hasattr(request, "query_params") and request.query_params.get(
-                    "session_id"
-                ):
-                    # SSE transport uses query parameter
-                    mcp_transport = "sse"
-                    session_id = request.query_params.get("session_id")
-                elif hasattr(request, "headers") and request.headers.get(
-                    "mcp-session-id"
-                ):
-                    # StreamableHTTP transport uses header
-                    mcp_transport = "http"
-                    session_id = request.headers.get("mcp-session-id")
-
-    except LookupError:
-        # No request context available - default to stdio
-        pass
+    if ctx is not None:
+        request_id = ctx.request_id
+        if hasattr(ctx, "request") and ctx.request is not None:
+            request = ctx.request
+            # Detect transport type by checking request characteristics
+            if hasattr(request, "query_params") and request.query_params.get(
+                "session_id"
+            ):
+                # SSE transport uses query parameter
+                mcp_transport = "sse"
+                session_id = request.query_params.get("session_id")
+            elif hasattr(request, "headers") and request.headers.get("mcp-session-id"):
+                # StreamableHTTP transport uses header
+                mcp_transport = "http"
+                session_id = request.headers.get("mcp-session-id")
 
     return request_id, session_id, mcp_transport
 
@@ -204,12 +221,23 @@ def _extract_tool_result_content(result: "Any") -> "Any":
     Extract meaningful content from MCP tool result.
 
     Tool handlers can return:
+    - CallToolResult (mcp v2+): Has .content list and optional .structured_content
     - tuple (UnstructuredContent, StructuredContent): Return the structured content (dict)
     - dict (StructuredContent): Return as-is
-    - Iterable (UnstructuredContent): Extract text from content blocks
+    - list/Iterable (UnstructuredContent): Extract text from content blocks
     """
     if result is None:
         return None
+
+    # Handle v2 CallToolResult-like objects (has .content list attribute)
+    if hasattr(result, "content") and isinstance(
+        getattr(result, "content", None), list
+    ):
+        # This is only present when a tool declares an output_schema
+        structured = getattr(result, "structured_content", None)
+        if structured is not None:
+            return structured
+        return _extract_text_from_content_blocks(result.content)
 
     # Handle CombinationContent: tuple of (UnstructuredContent, StructuredContent)
     if isinstance(result, tuple) and len(result) == 2:
@@ -221,22 +249,23 @@ def _extract_tool_result_content(result: "Any") -> "Any":
         return result
 
     # Handle UnstructuredContent: iterable of ContentBlock objects
-    # Try to extract text content
     if hasattr(result, "__iter__") and not isinstance(result, (str, bytes, dict)):
-        texts = []
-        try:
-            for item in result:
-                # Try to get text attribute from ContentBlock objects
-                if hasattr(item, "text"):
-                    texts.append(item.text)
-                elif isinstance(item, dict) and "text" in item:
-                    texts.append(item["text"])
-        except Exception:
-            # If extraction fails, return the original
-            return result
-        return " ".join(texts) if texts else result
+        return _extract_text_from_content_blocks(result)
 
     return result
+
+
+def _extract_text_from_content_blocks(content_blocks: "Any") -> "Any":
+    texts = []
+    try:
+        for item in content_blocks:
+            if hasattr(item, "text"):
+                texts.append(item.text)
+            elif isinstance(item, dict) and "text" in item:
+                texts.append(item["text"])
+    except Exception:
+        return content_blocks
+    return " ".join(texts) if texts else content_blocks
 
 
 def _set_span_output_data(
@@ -336,20 +365,54 @@ def _set_span_output_data(
 # Handler data preparation and wrapping
 
 
-def _prepare_handler_data(
+def _is_v2_context(original_args: "tuple[Any, ...]") -> bool:
+    """Check if original_args contains a v2 ServerRequestContext as the first element."""
+    return (
+        ServerRequestContext is not None
+        and bool(original_args)
+        and isinstance(original_args[0], ServerRequestContext)
+    )
+
+
+def _extract_handler_data_from_params(
+    handler_type: str,
+    params: "Any",
+) -> "tuple[str, dict[str, Any]]":
+    """
+    Extract handler name and arguments from a v2 typed params object.
+
+    In MCP SDK v2, handlers receive (ctx, params) where params is a typed
+    Pydantic model (CallToolRequestParams, GetPromptRequestParams, etc.).
+    """
+    if handler_type == "tool":
+        handler_name = getattr(params, "name", "unknown")
+        arguments = getattr(params, "arguments", None) or {}
+    elif handler_type == "prompt":
+        handler_name = getattr(params, "name", "unknown")
+        arguments = getattr(params, "arguments", None) or {}
+        arguments = {"name": handler_name, **arguments}
+    else:  # resource
+        handler_name = str(getattr(params, "uri", "unknown"))
+        arguments = {}
+
+    return handler_name, arguments
+
+
+def _extract_handler_data_from_args(
     handler_type: str,
     original_args: "tuple[Any, ...]",
     original_kwargs: "Optional[dict[str, Any]]" = None,
-) -> "tuple[str, dict[str, Any], str, str, str, Optional[str]]":
+) -> "tuple[str, dict[str, Any]]":
     """
-    Prepare common handler data for both async and sync wrappers.
+    Extract handler name and arguments from v1 positional args.
 
-    Returns:
-        Tuple of (handler_name, arguments, span_data_key, span_name, mcp_method_name, result_data_key)
+    In MCP SDK v1, handlers receive positional args:
+    - Tool: (tool_name, arguments)
+    - Prompt: (name, arguments)
+    - Resource: (uri,)
     """
     original_kwargs = original_kwargs or {}
 
-    # Extract handler-specific data based on handler type
     if handler_type == "tool":
         if original_args:
             handler_name = original_args[0]
@@ -374,7 +437,6 @@ def _prepare_handler_data(
         elif original_kwargs.get("arguments"):
             arguments = original_kwargs["arguments"]
 
-        # Include name in arguments dict for span data
         arguments = {"name": handler_name, **(arguments or {})}
 
     else:  # resource
@@ -386,7 +448,39 @@ def _prepare_handler_data(
 
         arguments = {}
 
-    # Get span configuration
+    return handler_name, arguments
+
+
+def _prepare_handler_data(
+    handler_type: str,
+    original_args: "tuple[Any, ...]",
+    original_kwargs: "Optional[dict[str, Any]]" = None,
+    params: "Optional[Any]" = None,
+) -> "tuple[str, dict[str, Any], str, str, str, Optional[str]]":
+    """
+    Prepare common handler data for both v1 and v2 MCP SDK.
+
+    Args:
+        handler_type: "tool", "prompt", or "resource"
+        original_args: Original positional args (v1 path)
+        original_kwargs: Original keyword args (v1 path)
+        params: Typed params object from v2 ServerRequestContext path
+
+    Returns:
+        Tuple of (handler_name, arguments, span_data_key, span_name, mcp_method_name, result_data_key)
+    """
+    if params is not None:
+        handler_name, arguments = _extract_handler_data_from_params(
+            handler_type, params
+        )
+    elif _is_v2_context(original_args):
+        handler_name = "unknown"
+        arguments = {}
+    else:
+        handler_name, arguments = _extract_handler_data_from_args(
+            handler_type, original_args, original_kwargs
+        )
+
     span_data_key, span_name, mcp_method_name, result_data_key = _get_span_config(
         handler_type, handler_name
     )
@@ -422,6 +516,17 @@ async def _handler_wrapper(
     if original_kwargs is None:
         original_kwargs = {}
 
+    # Detect v1 vs v2: MCP SDK v2 passes (ServerRequestContext, params) to handlers
+    ctx: "Optional[Any]" = None
+    params: "Optional[Any]" = None
+    if (
+        ServerRequestContext is not None
+        and original_args
+        and isinstance(original_args[0], ServerRequestContext)
+    ):
+        ctx = original_args[0]
+        params = original_args[1] if len(original_args) > 1 else None
+
     (
         handler_name,
         arguments,
@@ -429,9 +534,11 @@ async def _handler_wrapper(
         span_name,
         mcp_method_name,
         result_data_key,
-    ) = _prepare_handler_data(handler_type, original_args, original_kwargs)
+    ) = _prepare_handler_data(
+        handler_type, original_args, original_kwargs, params=params
+    )
 
-    scopes = _get_active_http_scopes()
+    scopes = _get_active_http_scopes(ctx=ctx)
 
     isolation_scope_context: "ContextManager[Any]"
     current_scope_context: "ContextManager[Any]"
@@ -454,7 +561,7 @@ async def _handler_wrapper(
         )
 
     # Get request ID, session ID, and transport from context
-    request_id, session_id, mcp_transport = _get_request_context_data()
+    request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
 
@@ -492,7 +599,10 @@ async def _handler_wrapper(
 
                 # For resources, extract and set protocol
                 if handler_type == "resource":
-                    if original_args:
+                    uri = None
+                    if params is not None:
+                        uri = getattr(params, "uri", None)
+                    elif original_args:
                         uri = original_args[0]
                     else:
                         uri = original_kwargs.get("uri")
@@ -569,10 +679,34 @@ def _create_instrumented_decorator(
     return instrumented_decorator
 
 
+_METHOD_TO_HANDLER_TYPE = {
+    "tools/call": "tool",
+    "prompts/get": "prompt",
+    "resources/read": "resource",
+}
+
+# In MCP SDK v2, tool/prompt/resource handlers are most commonly registered via
+# the Server(...) constructor kwargs rather than add_request_handler. The in-tree
+# high-level MCPServer also wires its handlers through these kwargs.
+_KWARG_TO_HANDLER_TYPE = {
+    "on_call_tool": "tool",
+    "on_get_prompt": "prompt",
+    "on_read_resource": "resource",
+}
+
+
 def _patch_lowlevel_server() -> None:
     """
     Patches the mcp.server.lowlevel.Server class to instrument handler execution.
     """
+    if MCP_PACKAGE_VERSION and MCP_PACKAGE_VERSION >= (2, 0, 0):
+        _patch_lowlevel_server_v2()
+    else:
+        _patch_lowlevel_server_v1()
+
+
+def _patch_lowlevel_server_v1() -> None:
+    """Patches v1 Server decorator methods (call_tool, get_prompt, read_resource)."""
     # Patch call_tool decorator
     original_call_tool = Server.call_tool
 
@@ -611,6 +745,69 @@ def _patch_lowlevel_server() -> None:
         )(func)
 
     Server.read_resource = patched_read_resource
+
+
+def _wrap_v2_handler(
+    handler_type: str, handler: "Callable[..., Any]"
+) -> "Callable[..., Any]":
+    """Wrap a v2 (ctx, params) handler with Sentry instrumentation.
+
+    Idempotent: an already-wrapped handler is returned unchanged so handlers
+    registered through more than one path (e.g. MCPServer building a Server)
+    are not double-wrapped.
+    """
+    if getattr(handler, "__sentry_mcp_wrapped__", False):
+        return handler
+
+    @wraps(handler)
+    async def wrapper(*args: "Any", **kwargs: "Any") -> "Any":
+        return await _handler_wrapper(
+            handler_type, handler, args, kwargs, force_await=False
+        )
+
+    wrapper.__sentry_mcp_wrapped__ = True  # type: ignore[attr-defined]
+    return wrapper
+
+
+def _patch_lowlevel_server_v2() -> None:
+    """Patches the v2 Server to wrap tool/prompt/resource handlers.
+
+    Handlers can be registered either via the Server(...) constructor kwargs
+    (on_call_tool/on_get_prompt/on_read_resource) — the path the in-tree
+    MCPServer and most lowlevel examples use — or via add_request_handler.
+    Both are patched.
+    """
+    original_init = Server.__init__
+
+    @wraps(original_init)
+    def patched_init(self: "Server", *args: "Any", **kwargs: "Any") -> None:
+        for kwarg, handler_type in _KWARG_TO_HANDLER_TYPE.items():
+            handler = kwargs.get(kwarg)
+            if handler is not None:
+                kwargs[kwarg] = _wrap_v2_handler(handler_type, handler)
+        original_init(self, *args, **kwargs)
+
+    Server.__init__ = patched_init
+
+    original_add_request_handler = Server.add_request_handler
+
+    def patched_add_request_handler(
+        self: "Server",
+        method: str,
+        params_type: "Any",
+        handler: "Callable[..., Any]",
+        *args: "Any",
+        **kwargs: "Any",
+    ) -> None:
+        handler_type = _METHOD_TO_HANDLER_TYPE.get(method)
+        if handler_type is not None:
+            handler = _wrap_v2_handler(handler_type, handler)
+
+        original_add_request_handler(
+            self, method, params_type, handler, *args, **kwargs
+        )
+
+    Server.add_request_handler = patched_add_request_handler
 
 
 def _patch_handle_request() -> None:
