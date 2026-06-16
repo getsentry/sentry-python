@@ -121,24 +121,36 @@ def test_transaction_style(
     integration = FalconIntegration(transaction_style=transaction_style)
     sentry_init(
         integrations=[integration],
+        traces_sample_rate=1.0,
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
     client = make_client()
     if span_streaming:
         items = capture_items("event")
+        items = capture_items("event", "span")
 
         response = client.simulate_get(url)
         assert response.status == falcon.HTTP_200
 
-        (event,) = (item.payload for item in items)
+        (event,) = (item.payload for item in items if item.type == "event")
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        spans = [span for span in spans if span["name"] == expected_transaction]
+        assert len(spans) == 1
+        assert spans[0]["attributes"]["sentry.span.source"] == expected_source
     else:
         events = capture_events()
 
         response = client.simulate_get(url)
         assert response.status == falcon.HTTP_200
 
-        (event,) = events
+        (event, transaction) = events
+
+        assert transaction["transaction"] == expected_transaction
+        assert transaction["transaction_info"] == {"source": expected_source}
+
     assert event["transaction"] == expected_transaction
     assert event["transaction_info"] == {"source": expected_source}
 
