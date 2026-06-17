@@ -578,6 +578,22 @@ def _truncate_single_message_content_if_present(
     return message
 
 
+class _PydanticEncoder(json.JSONEncoder):
+    """JSON encoder that serializes Pydantic models via model_dump().
+
+    This allows json.dumps() to handle OpenAI/LiteLLM SDK objects such as
+    ResponseFunctionToolCall that callers pass back in follow-up requests.
+    """
+
+    def default(self, obj: "Any") -> "Any":
+        if not inspect.isclass(obj) and hasattr(obj, "model_dump"):
+            try:
+                return obj.model_dump()
+            except Exception:
+                pass
+        return super().default(obj)
+
+
 def _find_truncation_index(messages: "List[Dict[str, Any]]", max_bytes: int) -> int:
     """
     Find the index of the first message that would exceed the max bytes limit.
@@ -586,7 +602,11 @@ def _find_truncation_index(messages: "List[Dict[str, Any]]", max_bytes: int) -> 
     """
     running_sum = 0
     for idx in range(len(messages) - 1, -1, -1):
-        size = len(json.dumps(messages[idx], separators=(",", ":")).encode("utf-8"))
+        size = len(
+            json.dumps(
+                messages[idx], cls=_PydanticEncoder, separators=(",", ":")
+            ).encode("utf-8")
+        )
         running_sum += size
         if running_sum > max_bytes:
             return idx + 1
@@ -715,7 +735,7 @@ def truncate_messages_by_size(
     In the single message case, the serialized message size may exceed `max_bytes`, because
     truncation is based only on character count in that case.
     """
-    serialized_json = json.dumps(messages, separators=(",", ":"))
+    serialized_json = json.dumps(messages, cls=_PydanticEncoder, separators=(",", ":"))
     current_size = len(serialized_json.encode("utf-8"))
 
     if current_size <= max_bytes:

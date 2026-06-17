@@ -411,6 +411,45 @@ class TestTruncateMessagesBySize:
 
         assert result[0]["content"] is content
 
+    def test_pydantic_objects_in_message_list_do_not_raise(self):
+        """Regression test for #5350.
+
+        OpenAI's Responses API returns Pydantic objects (e.g. ResponseFunctionToolCall)
+        that callers pass back in follow-up requests.  truncate_messages_by_size() must
+        not raise TypeError when the messages list contains such objects.
+        """
+
+        class FakePydanticModel:
+            """Minimal stand-in for any pydantic BaseModel with model_dump()."""
+
+            def __init__(self, **kwargs):
+                self._data = kwargs
+
+            def model_dump(self):
+                return self._data
+
+        tool_call = FakePydanticModel(
+            type="function_call",
+            call_id="call_abc123",
+            name="notify_team",
+            arguments='{"message": "hello"}',
+        )
+        messages = [
+            {"role": "user", "content": "Please notify the team"},
+            tool_call,  # Pydantic-like object mixed into the list
+            {"type": "function_call_output", "call_id": "call_abc123", "output": "ok"},
+        ]
+
+        # Must not raise TypeError: Object of type FakePydanticModel is not JSON serializable
+        result, truncation_index = truncate_messages_by_size(messages)
+
+        assert truncation_index == 0
+        assert isinstance(result, list)
+        assert len(result) == 3
+        # The Pydantic object is preserved as-is in the returned list;
+        # the fix only ensures json.dumps() can serialize it for size measurement.
+        assert result[1] is tool_call
+
 
 class TestTruncateAndAnnotateMessages:
     def test_only_keeps_last_message(self, sample_messages):
