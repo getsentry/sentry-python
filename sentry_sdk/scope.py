@@ -622,7 +622,7 @@ class Scope:
         if (
             has_tracing_enabled(self.get_client().options)
             and self._span is not None
-            and not isinstance(self._span, NoOpStreamedSpan)
+            and not isinstance(self._span, (NoOpStreamedSpan, NoOpSpan))
         ):
             return self._span._get_trace_context()
 
@@ -693,7 +693,7 @@ class Scope:
         if (
             has_tracing_enabled(client.options)
             and span is not None
-            and not isinstance(span, NoOpStreamedSpan)
+            and not isinstance(span, (NoOpStreamedSpan, NoOpSpan))
         ):
             for header in span._iter_headers():
                 yield header
@@ -1859,17 +1859,15 @@ class Scope:
         if not isinstance(telemetry, StreamedSpan):
             trace_context = self.get_trace_context()
             trace_id = trace_context.get("trace_id")
-            if telemetry.get("trace_id") is None:
-                telemetry["trace_id"] = (
-                    trace_id or "00000000-0000-0000-0000-000000000000"
-                )
+            if telemetry.get("trace_id") is None and trace_id is not None:
+                telemetry["trace_id"] = trace_id
 
             # span_id should only be populated if there's an active span. We can't
             # use the trace_context here because it synthesizes a span_id if there
             # isn't one
             if telemetry.get("span_id") is None:
                 if self._span is not None and not isinstance(
-                    self._span, NoOpStreamedSpan
+                    self._span, (NoOpStreamedSpan, NoOpSpan)
                 ):
                     telemetry["span_id"] = self._span.span_id
                 else:

@@ -219,6 +219,13 @@ def _capture_internal_warnings():
         if "dns.hash" in str(warning.message) or "dns/namedict" in warning.filename:
             continue
 
+        # On Python < 3.8 we fall back to importing `pkg_resources` to
+        # enumerate installed modules, which emits a DeprecationWarning.
+        if "pkg_resources is deprecated as an API" in str(
+            warning.message
+        ) and warning.filename.endswith("sentry_sdk/utils.py"):
+            continue
+
         raise AssertionError(warning)
 
 

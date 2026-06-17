@@ -27,14 +27,18 @@ class LogBatcher(Batcher["Log"]):
 
         res = {
             "timestamp": int(item["time_unix_nano"]) / 1.0e9,
-            "trace_id": item.get("trace_id", "00000000-0000-0000-0000-000000000000"),
-            "span_id": item.get("span_id"),
             "level": str(item["severity_text"]),
             "body": str(item["body"]),
             "attributes": {
                 k: serialize_attribute(v) for (k, v) in item["attributes"].items()
             },
         }
+
+        if item.get("trace_id") is not None:
+            res["trace_id"] = item["trace_id"]
+
+        if item.get("span_id") is not None:
+            res["span_id"] = item["span_id"]
 
         return res
 
