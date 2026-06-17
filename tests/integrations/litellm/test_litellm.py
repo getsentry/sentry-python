@@ -3414,3 +3414,64 @@ def test_convert_message_parts_image_url_missing_url():
     converted = _convert_message_parts(messages)
     # Should return item unchanged
     assert converted[0]["content"][0]["type"] == "image_url"
+
+
+@pytest.mark.parametrize(
+    "call_type,expected_operation,expected_op",
+    [
+        ("completion", "chat", OP.GEN_AI_CHAT),
+        ("acompletion", "chat", OP.GEN_AI_CHAT),
+        ("embedding", "embeddings", OP.GEN_AI_EMBEDDINGS),
+        ("aembedding", "embeddings", OP.GEN_AI_EMBEDDINGS),
+        ("text_completion", "text_completion", OP.GEN_AI_TEXT_COMPLETION),
+        ("atext_completion", "text_completion", OP.GEN_AI_TEXT_COMPLETION),
+    ],
+)
+def test_input_callback_operation_name_accurate(
+    sentry_init,
+    call_type,
+    expected_operation,
+    expected_op,
+):
+    """_input_callback sets gen_ai.operation.name accurately for known call types."""
+    sentry_init(
+        integrations=[LiteLLMIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    kwargs = {
+        "model": "gpt-4",
+        "call_type": call_type,
+        "litellm_call_id": "test-id-123",
+    }
+    with sentry_sdk.start_transaction(name="test"):
+        _input_callback(kwargs)
+
+    span = kwargs["litellm_params"]["metadata"]["_sentry_span"]
+    # Inspect the span attributes directly before it is finished
+    span_data = getattr(span, "_data", None) or getattr(span, "data", {})
+    assert span_data.get(SPANDATA.GEN_AI_OPERATION_NAME) == expected_operation
+    assert span.op == expected_op
+
+
+def test_input_callback_unknown_call_type_no_operation_name(
+    sentry_init,
+):
+    """For unknown call types, gen_ai.operation.name should not be set to avoid wrong data."""
+    sentry_init(
+        integrations=[LiteLLMIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    kwargs = {
+        "model": "dall-e-3",
+        "call_type": "image_generation",
+        "litellm_call_id": "test-id-456",
+    }
+    with sentry_sdk.start_transaction(name="test"):
+        _input_callback(kwargs)
+
+    span = kwargs["litellm_params"]["metadata"]["_sentry_span"]
+    span_data = getattr(span, "_data", None) or getattr(span, "data", {})
+    # The span should still exist for tracing, but without a misleading operation name
+    assert SPANDATA.GEN_AI_OPERATION_NAME not in span_data

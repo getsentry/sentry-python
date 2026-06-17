@@ -86,33 +86,37 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
         model = full_model
         provider = "unknown"
 
-    call_type = kwargs.get("call_type", None)
-    if call_type == "embedding" or call_type == "aembedding":
-        operation = "embeddings"
-    else:
-        operation = "chat"
+    # Map litellm call_type to the canonical gen_ai operation name and sentry op.
+    # Only map call types we can represent accurately; everything else gets no
+    # operation attribute so we don't record wrong data (see #6442).
+    _CALL_TYPE_TO_OPERATION = {
+        "completion": ("chat", consts.OP.GEN_AI_CHAT),
+        "acompletion": ("chat", consts.OP.GEN_AI_CHAT),
+        "embedding": ("embeddings", consts.OP.GEN_AI_EMBEDDINGS),
+        "aembedding": ("embeddings", consts.OP.GEN_AI_EMBEDDINGS),
+        "text_completion": ("text_completion", consts.OP.GEN_AI_TEXT_COMPLETION),
+        "atext_completion": ("text_completion", consts.OP.GEN_AI_TEXT_COMPLETION),
+    }
+    call_type = kwargs.get("call_type")
+    operation, sentry_op = _CALL_TYPE_TO_OPERATION.get(
+        call_type, (None, consts.OP.GEN_AI_CHAT)
+    )
+
+    span_name = f"{operation or call_type or 'unknown'} {model}"
 
     # Start a new span/transaction
     if has_span_streaming_enabled(client.options):
         span = sentry_sdk.traces.start_span(
-            name=f"{operation} {model}",
+            name=span_name,
             attributes={
-                "sentry.op": (
-                    consts.OP.GEN_AI_CHAT
-                    if operation == "chat"
-                    else consts.OP.GEN_AI_EMBEDDINGS
-                ),
+                "sentry.op": sentry_op,
                 "sentry.origin": LiteLLMIntegration.origin,
             },
         )
     else:
         span = get_start_span_function()(
-            op=(
-                consts.OP.GEN_AI_CHAT
-                if operation == "chat"
-                else consts.OP.GEN_AI_EMBEDDINGS
-            ),
-            name=f"{operation} {model}",
+            op=sentry_op,
+            name=span_name,
             origin=LiteLLMIntegration.origin,
         )
         span.__enter__()
@@ -122,7 +126,8 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
 
     # Set basic data
     set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, provider)
-    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, operation)
+    if operation is not None:
+        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, operation)
 
     # Record input/messages if allowed
     if should_send_default_pii() and integration.include_prompts:
