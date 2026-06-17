@@ -440,8 +440,11 @@ class TestTruncateMessagesBySize:
             {"type": "function_call_output", "call_id": "call_abc123", "output": "ok"},
         ]
 
-        # Must not raise TypeError: Object of type FakePydanticModel is not JSON serializable
-        result, truncation_index = truncate_messages_by_size(messages)
+        # Pass an explicit limit well above the test payload so the assertion is
+        # deterministic regardless of the default constant's value.
+        result, truncation_index = truncate_messages_by_size(
+            messages, max_bytes=100_000
+        )
 
         assert truncation_index == 0
         assert isinstance(result, list)

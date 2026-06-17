@@ -588,13 +588,21 @@ class _PydanticEncoder(json.JSONEncoder):
     def default(self, obj: "Any") -> "Any":
         if not inspect.isclass(obj) and hasattr(obj, "model_dump"):
             try:
-                return obj.model_dump()
+                # mode="json" returns only JSON-native types (converts datetime,
+                # Decimal, etc.) — fall back to plain model_dump() for Pydantic v1
+                # and custom classes that don't accept the kwarg.
+                return obj.model_dump(mode="json")
+            except TypeError:
+                try:
+                    return obj.model_dump()
+                except Exception:
+                    pass
             except Exception:
                 pass
         return super().default(obj)
 
 
-def _find_truncation_index(messages: "List[Dict[str, Any]]", max_bytes: int) -> int:
+def _find_truncation_index(messages: "List[Any]", max_bytes: int) -> int:
     """
     Find the index of the first message that would exceed the max bytes limit.
     Compute the individual message sizes, and return the index of the first message from the back
@@ -721,10 +729,10 @@ def redact_blob_message_parts(
 
 
 def truncate_messages_by_size(
-    messages: "List[Dict[str, Any]]",
+    messages: "List[Any]",
     max_bytes: int = MAX_GEN_AI_MESSAGE_BYTES,
     max_single_message_chars: int = MAX_SINGLE_MESSAGE_CONTENT_CHARS,
-) -> "Tuple[List[Dict[str, Any]], int]":
+) -> "Tuple[List[Any], int]":
     """
     Returns a truncated messages list, consisting of
     - the last message, with its content truncated to `max_single_message_chars` characters,
