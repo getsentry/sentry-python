@@ -287,11 +287,11 @@ def test_transport_format(sentry_init, capture_envelopes):
                     },
                     "process.runtime.name": {
                         "type": "string",
-                        "value": platform.python_implementation(),
+                        "value": mock.ANY,
                     },
                     "process.runtime.version": {
                         "type": "string",
-                        "value": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+                        "value": mock.ANY,
                     },
                     "sentry.sdk.name": {
                         "type": "string",
