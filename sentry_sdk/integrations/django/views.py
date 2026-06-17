@@ -1,4 +1,5 @@
 import functools
+import sys
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -10,10 +11,17 @@ if TYPE_CHECKING:
     from typing import Any
 
 
-try:
-    from asyncio import iscoroutinefunction
-except ImportError:
-    iscoroutinefunction = None  # type: ignore
+# asyncio.iscoroutinefunction() was deprecated in Python 3.12 and is slated for
+# removal in 3.16.  inspect.iscoroutinefunction() is available since Python 3.1
+# and is a full drop-in replacement on 3.12+ (the legacy _is_coroutine marker
+# that asyncio additionally checked was removed in the same release).
+if sys.version_info >= (3, 12):
+    from inspect import iscoroutinefunction
+else:
+    try:
+        from asyncio import iscoroutinefunction
+    except ImportError:
+        iscoroutinefunction = None  # type: ignore[assignment]
 
 
 try:

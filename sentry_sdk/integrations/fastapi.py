@@ -36,7 +36,10 @@ _DEFAULT_TRANSACTION_NAME = "generic FastAPI request"
 
 
 # Vendored: https://github.com/Kludex/starlette/blob/0a29b5ccdcbd1285c75c4fdb5d62ae1d244a21b0/starlette/_utils.py#L11-L17
-if sys.version_info >= (3, 13):  # pragma: no cover
+# asyncio.iscoroutinefunction() was deprecated in Python 3.12 (removal in 3.16).
+# The legacy _is_coroutine marker it additionally checked was also removed in 3.12,
+# so inspect.iscoroutinefunction() is a full drop-in replacement from 3.12 onward.
+if sys.version_info >= (3, 12):  # pragma: no cover
     from inspect import iscoroutinefunction
 else:
     from asyncio import iscoroutinefunction
