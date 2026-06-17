@@ -80,7 +80,9 @@ except ImportError:
     multipart = None
 
 
-# Vendored: https://github.com/Kludex/starlette/blob/0a29b5ccdcbd1285c75c4fdb5d62ae1d244a21b0/starlette/_utils.py#L11-L17
+# Originally vendored from starlette._utils (see
+# https://github.com/Kludex/starlette/blob/0a29b5ccdcbd1285c75c4fdb5d62ae1d244a21b0/starlette/_utils.py#L11-L17),
+# but the version gate has been updated from >= (3, 13) to >= (3, 12):
 # asyncio.iscoroutinefunction() was deprecated in Python 3.12 (removal in 3.16).
 # The legacy _is_coroutine marker it additionally checked was also removed in 3.12,
 # so inspect.iscoroutinefunction() is a full drop-in replacement from 3.12 onward.

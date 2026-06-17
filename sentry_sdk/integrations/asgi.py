@@ -66,9 +66,13 @@ _DEFAULT_TRANSACTION_NAME = "generic ASGI request"
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
 
+# Originally vendored from uvicorn._compat (see
+# https://github.com/Kludex/uvicorn/blob/b224045f5900b7f766743bcb16ba9fc3adea2606/uvicorn/_compat.py#L10-L13),
+# but the version gate has been updated from >= (3, 14) to >= (3, 12):
 # asyncio.iscoroutinefunction() was deprecated in Python 3.12 and is slated for
-# removal in 3.16.  inspect.iscoroutinefunction() behaves identically on 3.12+
-# because the legacy _is_coroutine marker was removed in the same release.
+# removal in 3.16.  The legacy _is_coroutine marker it additionally checked was
+# also removed in 3.12, making inspect.iscoroutinefunction() a full drop-in
+# replacement from 3.12 onward.
 if sys.version_info >= (3, 12):
     from inspect import iscoroutinefunction
 else:
