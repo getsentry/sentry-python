@@ -21,7 +21,6 @@ class MetricsBatcher(Batcher["Metric"]):
     def _to_transport_format(item: "Metric") -> "Any":
         res = {
             "timestamp": item["timestamp"],
-            "trace_id": item["trace_id"],
             "name": item["name"],
             "type": item["type"],
             "value": item["value"],
@@ -29,6 +28,9 @@ class MetricsBatcher(Batcher["Metric"]):
                 k: serialize_attribute(v) for (k, v) in item["attributes"].items()
             },
         }
+
+        if item.get("trace_id") is not None:
+            res["trace_id"] = item["trace_id"]
 
         if item.get("span_id") is not None:
             res["span_id"] = item["span_id"]

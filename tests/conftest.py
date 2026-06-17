@@ -47,7 +47,7 @@ from sentry_sdk.integrations import (  # noqa: F401
 from sentry_sdk.profiler import teardown_profiler
 from sentry_sdk.profiler.continuous_profiler import teardown_continuous_profiler
 from sentry_sdk.transport import Transport
-from sentry_sdk.utils import reraise
+from sentry_sdk.utils import package_version, reraise
 
 try:
     import openai
@@ -103,6 +103,9 @@ try:
         JSONRPCNotification,
         JSONRPCRequest,
     )
+
+    _MCP_VERSION = package_version("mcp")
+    _IS_MCP_V2 = _MCP_VERSION is not None and _MCP_VERSION >= (2, 0, 0)
 except ImportError:
     create_memory_object_stream = None
     create_task_group = None
@@ -112,6 +115,7 @@ except ImportError:
     JSONRPCNotification = None
     JSONRPCRequest = None
     SessionMessage = None
+    _IS_MCP_V2 = False
 
 
 SENTRY_EVENT_SCHEMA = "./checkouts/data-schemas/relay/event.schema.json"
@@ -213,6 +217,13 @@ def _capture_internal_warnings():
             continue
 
         if "dns.hash" in str(warning.message) or "dns/namedict" in warning.filename:
+            continue
+
+        # On Python < 3.8 we fall back to importing `pkg_resources` to
+        # enumerate installed modules, which emits a DeprecationWarning.
+        if "pkg_resources is deprecated as an API" in str(
+            warning.message
+        ) and warning.filename.endswith("sentry_sdk/utils.py"):
             continue
 
         raise AssertionError(warning)
@@ -760,21 +771,27 @@ def suppress_deprecation_warnings():
         yield
 
 
+def _make_session_message(jsonrpc_msg):
+    """Construct a SessionMessage compatible with both MCP v1 and v2."""
+    if _IS_MCP_V2:
+        return SessionMessage(message=jsonrpc_msg)  # type: ignore
+    else:
+        return SessionMessage(message=JSONRPCMessage(root=jsonrpc_msg))  # type: ignore
+
+
 @pytest.fixture
 def get_initialization_payload():
     def inner(request_id: str):
-        return SessionMessage(  # type: ignore
-            message=JSONRPCMessage(  # type: ignore
-                root=JSONRPCRequest(  # type: ignore
-                    jsonrpc="2.0",
-                    id=request_id,
-                    method="initialize",
-                    params={
-                        "protocolVersion": "2025-11-25",
-                        "capabilities": {},
-                        "clientInfo": {"name": "test-client", "version": "1.0.0"},
-                    },
-                )
+        return _make_session_message(
+            JSONRPCRequest(  # type: ignore
+                jsonrpc="2.0",
+                id=request_id,
+                method="initialize",
+                params={
+                    "protocolVersion": "2025-11-25",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test-client", "version": "1.0.0"},
+                },
             )
         )
 
@@ -784,12 +801,10 @@ def get_initialization_payload():
 @pytest.fixture
 def get_initialized_notification_payload():
     def inner():
-        return SessionMessage(  # type: ignore
-            message=JSONRPCMessage(  # type: ignore
-                root=JSONRPCNotification(  # type: ignore
-                    jsonrpc="2.0",
-                    method="notifications/initialized",
-                )
+        return _make_session_message(
+            JSONRPCNotification(  # type: ignore
+                jsonrpc="2.0",
+                method="notifications/initialized",
             )
         )
 
@@ -799,14 +814,12 @@ def get_initialized_notification_payload():
 @pytest.fixture
 def get_mcp_command_payload():
     def inner(method: str, params, request_id: str):
-        return SessionMessage(  # type: ignore
-            message=JSONRPCMessage(  # type: ignore
-                root=JSONRPCRequest(  # type: ignore
-                    jsonrpc="2.0",
-                    id=request_id,
-                    method=method,
-                    params=params,
-                )
+        return _make_session_message(
+            JSONRPCRequest(  # type: ignore
+                jsonrpc="2.0",
+                id=request_id,
+                method=method,
+                params=params,
             )
         )
 

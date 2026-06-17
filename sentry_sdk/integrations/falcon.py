@@ -5,6 +5,7 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -103,6 +104,25 @@ class SentryFalconMiddleware:
         scope = sentry_sdk.get_isolation_scope()
         scope._name = "falcon"
         scope.add_event_processor(_make_request_event_processor(req, integration))
+
+    def process_resource(
+        self, req: "Any", resp: "Any", resource: "Any", params: "Any"
+    ) -> None:
+        """
+        Sets the segment name and source as the route is resolved when this runs.
+        """
+        client = sentry_sdk.get_client()
+        integration = client.get_integration(FalconIntegration)
+        if integration is None or not has_span_streaming_enabled(client.options):
+            return
+
+        name_for_style = {
+            "uri_template": req.uri_template,
+            "path": req.path,
+        }
+        name = name_for_style[integration.transaction_style]
+        source = sentry_sdk.traces.SOURCE_FOR_STYLE[integration.transaction_style]
+        sentry_sdk.set_transaction_name(name, source)
 
 
 TRANSACTION_STYLE_VALUES = ("uri_template", "path")
