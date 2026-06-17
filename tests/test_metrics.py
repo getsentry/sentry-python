@@ -1,5 +1,4 @@
 import os
-import platform
 import sys
 from unittest import mock
 

@@ -1,6 +1,5 @@
 import logging
 import os
-import platform
 import sys
 import time
 from unittest import mock

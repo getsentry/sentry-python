@@ -1,7 +1,5 @@
-import platform
 import re
-import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 from loguru import logger
@@ -468,8 +466,8 @@ def test_logger_with_all_attributes(
         "logger.name": "tests.integrations.loguru.test_loguru",
         "sentry.origin": "auto.log.loguru",
         "sentry.environment": "production",
-        "process.runtime.name": mock.ANY,
-        "process.runtime.version": mock.ANY,
+        "process.runtime.name": ANY,
+        "process.runtime.version": ANY,
         "sentry.sdk.version": VERSION,
         "sentry.severity_number": 13,
         "sentry.severity_text": "warn",

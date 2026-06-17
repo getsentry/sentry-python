@@ -1,7 +1,6 @@
 import logging
-import platform
-import sys
 import warnings
+from unittest import mock
 
 import pytest
 
