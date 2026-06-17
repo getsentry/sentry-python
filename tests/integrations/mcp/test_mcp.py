@@ -259,20 +259,61 @@ async def test_mcpserver_high_level_tool_instrumented(
     assert span["data"][SPANDATA.MCP_METHOD_NAME] == "tools/call"
 
 
-def test_wrap_v2_handler_is_idempotent():
-    """_wrap_v2_handler must not double-wrap a handler registered through more
-    than one path (e.g. MCPServer building a Server, then re-registration)."""
-    import sentry_sdk.integrations.mcp as mcp_module
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    not IS_MCP_V2, reason="Constructor handler registration is MCP v2 only"
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_wrapping_handler_is_idempotent(
+    sentry_init, capture_events, capture_items, span_streaming, stdio
+):
+    """Re-registering an already-wrapped handler via add_request_handler must
+    not double-wrap — invoking it should produce exactly one MCP span."""
+    sentry_init(
+        integrations=[MCPIntegration()],
+        traces_sample_rate=1.0,
+        _experiments=_experiments_for(span_streaming),
+    )
 
-    async def handler(ctx, params):
-        return None
+    async def test_tool(ctx, params):
+        return CallToolResult(
+            content=[TextContent(type="text", text="ok")],
+            structured_content={"result": "ok"},
+        )
 
-    wrapped = mcp_module._wrap_v2_handler("tool", handler)
-    assert wrapped is not handler
-    assert getattr(wrapped, "__sentry_mcp_wrapped__", False) is True
+    server = Server("test-server", on_call_tool=test_tool)
+    entry = server.get_request_handler("tools/call")
+    server.add_request_handler("tools/call", CallToolRequestParams, entry.handler)
 
-    rewrapped = mcp_module._wrap_v2_handler("tool", wrapped)
-    assert rewrapped is wrapped
+    if span_streaming:
+        items = capture_items("span")
+        with sentry_sdk.traces.start_span(name="mcp tx"):
+            await stdio(
+                server,
+                method="tools/call",
+                params={"name": "add", "arguments": {}},
+                request_id="req-idempotent",
+            )
+        sentry_sdk.flush()
+        mcp_spans = [
+            item.payload
+            for item in items
+            if item.type == "span"
+            and item.payload.get("attributes", {}).get("sentry.op") == OP.MCP_SERVER
+        ]
+    else:
+        events = capture_events()
+        with start_transaction(name="mcp tx"):
+            await stdio(
+                server,
+                method="tools/call",
+                params={"name": "add", "arguments": {}},
+                request_id="req-idempotent",
+            )
+        (tx,) = events
+        mcp_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
+
+    assert len(mcp_spans) == 1
 
 
 @pytest.mark.asyncio
