@@ -6,7 +6,6 @@ from http.client import HTTPConnection, HTTPResponse
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.api import get_current_scope
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
