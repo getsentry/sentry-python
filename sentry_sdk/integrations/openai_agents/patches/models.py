@@ -88,6 +88,16 @@ def _get_model(
     request_model_name = model.model if hasattr(model, "model") else str(model)
     agent._sentry_request_model = request_model_name
 
+    # Determine the gen_ai operation name from the model class.
+    # OpenAIResponsesModel uses the Responses API ("responses"); all other
+    # model classes (e.g. OpenAIChatCompletionsModel) use Chat Completions ("chat").
+    try:
+        from agents.models.openai_responses import OpenAIResponsesModel
+
+        _operation = "responses" if isinstance(model, OpenAIResponsesModel) else "chat"
+    except ImportError:
+        _operation = "chat"
+
     # Wrap _fetch_response if it exists (for OpenAI models) to capture response model
     if hasattr(model, "_fetch_response"):
         original_fetch_response = model._fetch_response
@@ -112,7 +122,7 @@ def _get_model(
                 tool for tool in mcp_tools if isinstance(tool, HostedMCPTool)
             ]
 
-        with ai_client_span(agent, kwargs) as span:
+        with ai_client_span(agent, kwargs, operation=_operation) as span:
             for hosted_tool in hosted_tools:
                 _inject_trace_propagation_headers(hosted_tool, span=span)
 
@@ -151,7 +161,7 @@ def _get_model(
                         tool for tool in mcp_tools if isinstance(tool, HostedMCPTool)
                     ]
 
-            with ai_client_span(agent, span_kwargs) as span:
+            with ai_client_span(agent, span_kwargs, operation=_operation) as span:
                 for hosted_tool in hosted_tools:
                     _inject_trace_propagation_headers(hosted_tool, span=span)
 

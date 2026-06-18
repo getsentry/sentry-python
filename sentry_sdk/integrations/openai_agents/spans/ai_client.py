@@ -20,9 +20,10 @@ if TYPE_CHECKING:
 
 
 def ai_client_span(
-    agent: "Agent", get_response_kwargs: "dict[str, Any]"
+    agent: "Agent",
+    get_response_kwargs: "dict[str, Any]",
+    operation: str = "chat",
 ) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
-    # TODO-anton: implement other types of operations. Now "chat" is hardcoded.
     # Get model name from agent.model or fall back to request model (for when agent.model is None/default)
     model_name = None
     if agent.model:
@@ -33,21 +34,20 @@ def ai_client_span(
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
     if span_streaming:
         span = sentry_sdk.traces.start_span(
-            name=f"chat {model_name}",
+            name=f"{operation} {model_name}",
             attributes={
                 "sentry.op": OP.GEN_AI_CHAT,
                 "sentry.origin": SPAN_ORIGIN,
-                SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+                SPANDATA.GEN_AI_OPERATION_NAME: operation,
             },
         )
     else:
         span = sentry_sdk.start_span(
             op=OP.GEN_AI_CHAT,
-            name=f"chat {model_name}",
+            name=f"{operation} {model_name}",
             origin=SPAN_ORIGIN,
         )
-        # TODO-anton: remove hardcoded stuff and replace something that also works for embedding and so on
-        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, operation)
 
     _set_agent_data(span, agent)
     _set_input_data(span, get_response_kwargs)

@@ -246,8 +246,8 @@ async def test_agent_invocation_span_no_pii(
         assert invoke_agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
         assert invoke_agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
 
-        assert ai_client_span["name"] == "chat gpt-4"
-        assert ai_client_span["attributes"]["gen_ai.operation.name"] == "chat"
+        assert ai_client_span["name"] == "responses gpt-4"
+        assert ai_client_span["attributes"]["gen_ai.operation.name"] == "responses"
         assert ai_client_span["attributes"]["gen_ai.system"] == "openai"
         assert ai_client_span["attributes"]["gen_ai.agent.name"] == "test_agent"
         assert ai_client_span["attributes"]["gen_ai.request.max_tokens"] == 100
@@ -309,8 +309,8 @@ async def test_agent_invocation_span_no_pii(
         assert invoke_agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
         assert invoke_agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
 
-        assert ai_client_span["name"] == "chat gpt-4"
-        assert ai_client_span["attributes"]["gen_ai.operation.name"] == "chat"
+        assert ai_client_span["name"] == "responses gpt-4"
+        assert ai_client_span["attributes"]["gen_ai.operation.name"] == "responses"
         assert ai_client_span["attributes"]["gen_ai.system"] == "openai"
         assert ai_client_span["attributes"]["gen_ai.agent.name"] == "test_agent"
         assert ai_client_span["attributes"]["gen_ai.request.max_tokens"] == 100
@@ -362,8 +362,8 @@ async def test_agent_invocation_span_no_pii(
         assert invoke_agent_span["data"]["gen_ai.request.temperature"] == 0.7
         assert invoke_agent_span["data"]["gen_ai.request.top_p"] == 1.0
 
-        assert ai_client_span["description"] == "chat gpt-4"
-        assert ai_client_span["data"]["gen_ai.operation.name"] == "chat"
+        assert ai_client_span["description"] == "responses gpt-4"
+        assert ai_client_span["data"]["gen_ai.operation.name"] == "responses"
         assert ai_client_span["data"]["gen_ai.system"] == "openai"
         assert ai_client_span["data"]["gen_ai.agent.name"] == "test_agent"
         assert ai_client_span["data"]["gen_ai.request.max_tokens"] == 100
@@ -652,8 +652,8 @@ async def test_agent_invocation_span(
         assert invoke_agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
         assert invoke_agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
 
-        assert ai_client_span["name"] == "chat gpt-4"
-        assert ai_client_span["attributes"]["gen_ai.operation.name"] == "chat"
+        assert ai_client_span["name"] == "responses gpt-4"
+        assert ai_client_span["attributes"]["gen_ai.operation.name"] == "responses"
         assert ai_client_span["attributes"]["gen_ai.system"] == "openai"
         assert ai_client_span["attributes"]["gen_ai.agent.name"] == "test_agent"
         assert ai_client_span["attributes"]["gen_ai.request.max_tokens"] == 100
@@ -722,8 +722,8 @@ async def test_agent_invocation_span(
         assert invoke_agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
         assert invoke_agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
 
-        assert ai_client_span["name"] == "chat gpt-4"
-        assert ai_client_span["attributes"]["gen_ai.operation.name"] == "chat"
+        assert ai_client_span["name"] == "responses gpt-4"
+        assert ai_client_span["attributes"]["gen_ai.operation.name"] == "responses"
         assert ai_client_span["attributes"]["gen_ai.system"] == "openai"
         assert ai_client_span["attributes"]["gen_ai.agent.name"] == "test_agent"
         assert ai_client_span["attributes"]["gen_ai.request.max_tokens"] == 100
@@ -788,8 +788,8 @@ async def test_agent_invocation_span(
         assert invoke_agent_span["data"]["gen_ai.request.temperature"] == 0.7
         assert invoke_agent_span["data"]["gen_ai.request.top_p"] == 1.0
 
-        assert ai_client_span["description"] == "chat gpt-4"
-        assert ai_client_span["data"]["gen_ai.operation.name"] == "chat"
+        assert ai_client_span["description"] == "responses gpt-4"
+        assert ai_client_span["data"]["gen_ai.operation.name"] == "responses"
         assert ai_client_span["data"]["gen_ai.system"] == "openai"
         assert ai_client_span["data"]["gen_ai.agent.name"] == "test_agent"
         assert ai_client_span["data"]["gen_ai.request.max_tokens"] == 100
@@ -854,7 +854,7 @@ async def test_client_span_custom_model(
             span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
         )
 
-        assert ai_client_span["name"] == "chat my-custom-model"
+        assert ai_client_span["name"] == "responses my-custom-model"
         assert ai_client_span["attributes"]["gen_ai.request.model"] == "my-custom-model"
     else:
         with patch.object(
@@ -880,7 +880,7 @@ async def test_client_span_custom_model(
         spans = transaction["spans"]
         ai_client_span = next(span for span in spans if span["op"] == OP.GEN_AI_CHAT)
 
-        assert ai_client_span["description"] == "chat my-custom-model"
+        assert ai_client_span["description"] == "responses my-custom-model"
         assert ai_client_span["data"]["gen_ai.request.model"] == "my-custom-model"
 
 
@@ -958,8 +958,8 @@ def test_agent_invocation_span_sync_no_pii(
         assert invoke_agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
         assert invoke_agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
 
-        assert ai_client_span["name"] == "chat gpt-4"
-        assert ai_client_span["attributes"]["gen_ai.operation.name"] == "chat"
+        assert ai_client_span["name"] == "responses gpt-4"
+        assert ai_client_span["attributes"]["gen_ai.operation.name"] == "responses"
         assert ai_client_span["attributes"]["gen_ai.system"] == "openai"
         assert ai_client_span["attributes"]["gen_ai.agent.name"] == "test_agent"
         assert ai_client_span["attributes"]["gen_ai.request.max_tokens"] == 100
@@ -1018,8 +1018,8 @@ def test_agent_invocation_span_sync_no_pii(
         assert invoke_agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
         assert invoke_agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
 
-        assert ai_client_span["name"] == "chat gpt-4"
-        assert ai_client_span["attributes"]["gen_ai.operation.name"] == "chat"
+        assert ai_client_span["name"] == "responses gpt-4"
+        assert ai_client_span["attributes"]["gen_ai.operation.name"] == "responses"
         assert ai_client_span["attributes"]["gen_ai.system"] == "openai"
         assert ai_client_span["attributes"]["gen_ai.agent.name"] == "test_agent"
         assert ai_client_span["attributes"]["gen_ai.request.max_tokens"] == 100
@@ -1070,8 +1070,8 @@ def test_agent_invocation_span_sync_no_pii(
         assert invoke_agent_span["data"]["gen_ai.request.temperature"] == 0.7
         assert invoke_agent_span["data"]["gen_ai.request.top_p"] == 1.0
 
-        assert ai_client_span["description"] == "chat gpt-4"
-        assert ai_client_span["data"]["gen_ai.operation.name"] == "chat"
+        assert ai_client_span["description"] == "responses gpt-4"
+        assert ai_client_span["data"]["gen_ai.operation.name"] == "responses"
         assert ai_client_span["data"]["gen_ai.system"] == "openai"
         assert ai_client_span["data"]["gen_ai.agent.name"] == "test_agent"
         assert ai_client_span["data"]["gen_ai.request.max_tokens"] == 100
@@ -1344,8 +1344,8 @@ def test_agent_invocation_span_sync(
         assert invoke_agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
         assert invoke_agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
 
-        assert ai_client_span["name"] == "chat gpt-4"
-        assert ai_client_span["attributes"]["gen_ai.operation.name"] == "chat"
+        assert ai_client_span["name"] == "responses gpt-4"
+        assert ai_client_span["attributes"]["gen_ai.operation.name"] == "responses"
         assert ai_client_span["attributes"]["gen_ai.system"] == "openai"
         assert ai_client_span["attributes"]["gen_ai.agent.name"] == "test_agent"
         assert ai_client_span["attributes"]["gen_ai.request.max_tokens"] == 100
@@ -1406,8 +1406,8 @@ def test_agent_invocation_span_sync(
         assert invoke_agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
         assert invoke_agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
 
-        assert ai_client_span["name"] == "chat gpt-4"
-        assert ai_client_span["attributes"]["gen_ai.operation.name"] == "chat"
+        assert ai_client_span["name"] == "responses gpt-4"
+        assert ai_client_span["attributes"]["gen_ai.operation.name"] == "responses"
         assert ai_client_span["attributes"]["gen_ai.system"] == "openai"
         assert ai_client_span["attributes"]["gen_ai.agent.name"] == "test_agent"
         assert ai_client_span["attributes"]["gen_ai.request.max_tokens"] == 100
@@ -1466,8 +1466,8 @@ def test_agent_invocation_span_sync(
         assert invoke_agent_span["data"]["gen_ai.request.temperature"] == 0.7
         assert invoke_agent_span["data"]["gen_ai.request.top_p"] == 1.0
 
-        assert ai_client_span["description"] == "chat gpt-4"
-        assert ai_client_span["data"]["gen_ai.operation.name"] == "chat"
+        assert ai_client_span["description"] == "responses gpt-4"
+        assert ai_client_span["data"]["gen_ai.operation.name"] == "responses"
         assert ai_client_span["data"]["gen_ai.system"] == "openai"
         assert ai_client_span["data"]["gen_ai.agent.name"] == "test_agent"
         assert ai_client_span["data"]["gen_ai.request.max_tokens"] == 100
@@ -2006,8 +2006,8 @@ async def test_tool_execution_span(
         assert agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
         assert agent_span["attributes"]["gen_ai.system"] == "openai"
 
-        assert ai_client_span1["name"] == "chat gpt-4"
-        assert ai_client_span1["attributes"]["gen_ai.operation.name"] == "chat"
+        assert ai_client_span1["name"] == "responses gpt-4"
+        assert ai_client_span1["attributes"]["gen_ai.operation.name"] == "responses"
         assert ai_client_span1["attributes"]["gen_ai.system"] == "openai"
         assert ai_client_span1["attributes"]["gen_ai.agent.name"] == "test_agent"
 
@@ -2080,9 +2080,9 @@ async def test_tool_execution_span(
         assert (
             tool_span["attributes"]["gen_ai.tool.output"] == "Tool executed with: hello"
         )
-        assert ai_client_span2["name"] == "chat gpt-4"
+        assert ai_client_span2["name"] == "responses gpt-4"
         assert ai_client_span2["attributes"]["gen_ai.agent.name"] == "test_agent"
-        assert ai_client_span2["attributes"]["gen_ai.operation.name"] == "chat"
+        assert ai_client_span2["attributes"]["gen_ai.operation.name"] == "responses"
 
         ai_client_span2_available_tool = json.loads(
             ai_client_span2["attributes"]["gen_ai.request.available_tools"]
@@ -2238,8 +2238,8 @@ async def test_tool_execution_span(
         assert agent_span["attributes"]["gen_ai.request.top_p"] == 1.0
         assert agent_span["attributes"]["gen_ai.system"] == "openai"
 
-        assert ai_client_span1["name"] == "chat gpt-4"
-        assert ai_client_span1["attributes"]["gen_ai.operation.name"] == "chat"
+        assert ai_client_span1["name"] == "responses gpt-4"
+        assert ai_client_span1["attributes"]["gen_ai.operation.name"] == "responses"
         assert ai_client_span1["attributes"]["gen_ai.system"] == "openai"
         assert ai_client_span1["attributes"]["gen_ai.agent.name"] == "test_agent"
 
@@ -2312,9 +2312,9 @@ async def test_tool_execution_span(
         assert (
             tool_span["attributes"]["gen_ai.tool.output"] == "Tool executed with: hello"
         )
-        assert ai_client_span2["name"] == "chat gpt-4"
+        assert ai_client_span2["name"] == "responses gpt-4"
         assert ai_client_span2["attributes"]["gen_ai.agent.name"] == "test_agent"
-        assert ai_client_span2["attributes"]["gen_ai.operation.name"] == "chat"
+        assert ai_client_span2["attributes"]["gen_ai.operation.name"] == "responses"
 
         ai_client_span2_available_tool = json.loads(
             ai_client_span2["attributes"]["gen_ai.request.available_tools"]
@@ -2463,8 +2463,8 @@ async def test_tool_execution_span(
         assert agent_span["data"]["gen_ai.request.top_p"] == 1.0
         assert agent_span["data"]["gen_ai.system"] == "openai"
 
-        assert ai_client_span1["description"] == "chat gpt-4"
-        assert ai_client_span1["data"]["gen_ai.operation.name"] == "chat"
+        assert ai_client_span1["description"] == "responses gpt-4"
+        assert ai_client_span1["data"]["gen_ai.operation.name"] == "responses"
         assert ai_client_span1["data"]["gen_ai.system"] == "openai"
         assert ai_client_span1["data"]["gen_ai.agent.name"] == "test_agent"
 
@@ -2529,9 +2529,9 @@ async def test_tool_execution_span(
         assert tool_span["data"]["gen_ai.tool.input"] == '{"message": "hello"}'
         assert tool_span["data"]["gen_ai.tool.name"] == "simple_test_tool"
         assert tool_span["data"]["gen_ai.tool.output"] == "Tool executed with: hello"
-        assert ai_client_span2["description"] == "chat gpt-4"
+        assert ai_client_span2["description"] == "responses gpt-4"
         assert ai_client_span2["data"]["gen_ai.agent.name"] == "test_agent"
-        assert ai_client_span2["data"]["gen_ai.operation.name"] == "chat"
+        assert ai_client_span2["data"]["gen_ai.operation.name"] == "responses"
 
         ai_client_span2_available_tool = json.loads(
             ai_client_span2["data"]["gen_ai.request.available_tools"]
@@ -3075,7 +3075,7 @@ async def test_error_handling(
             invoke_agent_span["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
         )
 
-        assert ai_client_span["name"] == "chat gpt-4"
+        assert ai_client_span["name"] == "responses gpt-4"
         assert ai_client_span["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
         assert ai_client_span["status"] == "error"
     elif stream_gen_ai_spans:
@@ -3122,7 +3122,7 @@ async def test_error_handling(
             invoke_agent_span["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
         )
 
-        assert ai_client_span["name"] == "chat gpt-4"
+        assert ai_client_span["name"] == "responses gpt-4"
         assert ai_client_span["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
         assert ai_client_span["status"] == "error"
     else:
@@ -3167,7 +3167,7 @@ async def test_error_handling(
             assert invoke_agent_span["description"] == "invoke_agent test_agent"
             assert invoke_agent_span["origin"] == "auto.ai.openai_agents"
 
-            assert ai_client_span["description"] == "chat gpt-4"
+            assert ai_client_span["description"] == "responses gpt-4"
             assert ai_client_span["origin"] == "auto.ai.openai_agents"
             assert ai_client_span["status"] == "internal_error"
             assert ai_client_span["tags"]["status"] == "internal_error"
@@ -3238,7 +3238,7 @@ async def test_error_captures_input_data(
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ][0]
 
-        assert ai_client_span["name"] == "chat gpt-4"
+        assert ai_client_span["name"] == "responses gpt-4"
         assert ai_client_span["status"] == "error"
 
         assert "gen_ai.request.messages" in ai_client_span["attributes"]
@@ -3282,7 +3282,7 @@ async def test_error_captures_input_data(
         spans = transaction["spans"]
         ai_client_span = [s for s in spans if s["op"] == "gen_ai.chat"][0]
 
-        assert ai_client_span["description"] == "chat gpt-4"
+        assert ai_client_span["description"] == "responses gpt-4"
         assert ai_client_span["status"] == "internal_error"
         assert ai_client_span["tags"]["status"] == "internal_error"
 
@@ -3963,7 +3963,7 @@ async def test_ai_client_span_includes_response_model(
         )
 
         # Verify ai_client span has response model from API response
-        assert ai_client_span["name"] == "chat gpt-4"
+        assert ai_client_span["name"] == "responses gpt-4"
         assert "gen_ai.response.model" in ai_client_span["attributes"]
         assert (
             ai_client_span["attributes"]["gen_ai.response.model"]
@@ -3994,7 +3994,7 @@ async def test_ai_client_span_includes_response_model(
         ai_client_span = next(span for span in spans if span["op"] == OP.GEN_AI_CHAT)
 
         # Verify ai_client span has response model from API response
-        assert ai_client_span["description"] == "chat gpt-4"
+        assert ai_client_span["description"] == "responses gpt-4"
         assert "gen_ai.response.model" in ai_client_span["data"]
         assert ai_client_span["data"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
 
