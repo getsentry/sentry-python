@@ -9,6 +9,7 @@ from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import SOURCE_FOR_STYLE as TRANSACTION_SOURCE_FOR_STYLE
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -75,13 +76,23 @@ class PyramidIntegration(Integration):
         def sentry_patched_call_view(
             registry: "Any", request: "Request", *args: "Any", **kwargs: "Any"
         ) -> "Response":
-            integration = sentry_sdk.get_client().get_integration(PyramidIntegration)
+            client = sentry_sdk.get_client()
+            integration = client.get_integration(PyramidIntegration)
             if integration is None:
                 return old_call_view(registry, request, *args, **kwargs)
 
+            current_scope = sentry_sdk.get_current_scope()
             _set_transaction_name_and_source(
-                sentry_sdk.get_current_scope(), integration.transaction_style, request
+                current_scope, integration.transaction_style, request
             )
+
+            if should_send_default_pii() and has_span_streaming_enabled(client.options):
+                current_span = current_scope.streamed_span
+                user_id = authenticated_userid(request)
+
+                if user_id and type(current_span) is StreamedSpan:
+                    current_span._segment.set_attribute("user.id", user_id)
+
             scope = sentry_sdk.get_isolation_scope()
             scope.add_event_processor(
                 _make_event_processor(weakref.ref(request), integration)
