@@ -494,6 +494,14 @@ def test_transport_format(sentry_init, capture_envelopes):
                         "type": "integer",
                         "value": 13,
                     },
+                    "process.runtime.name": {
+                        "type": "string",
+                        "value": mock.ANY,
+                    },
+                    "process.runtime.version": {
+                        "type": "string",
+                        "value": mock.ANY,
+                    },
                     "sentry.severity_text": {
                         "type": "string",
                         "value": "warn",
@@ -571,6 +579,14 @@ def test_batcher_drops_logs(sentry_init, monkeypatch):
                         "sentry.severity_number": {
                             "type": "integer",
                             "value": 9,
+                        },
+                        "process.runtime.name": {
+                            "type": "string",
+                            "value": mock.ANY,
+                        },
+                        "process.runtime.version": {
+                            "type": "string",
+                            "value": mock.ANY,
                         },
                         "sentry.severity_text": {
                             "type": "string",

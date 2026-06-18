@@ -1,4 +1,5 @@
 import os
+import platform
 import sys
 import warnings
 from collections import deque
@@ -378,6 +379,15 @@ class Scope:
 
         self.set_attribute(SPANDATA.SENTRY_SDK_NAME, SDK_INFO["name"])
         self.set_attribute(SPANDATA.SENTRY_SDK_VERSION, SDK_INFO["version"])
+
+        self.set_attribute(
+            "process.runtime.name",
+            platform.python_implementation(),
+        )
+        self.set_attribute(
+            "process.runtime.version",
+            f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+        )
 
         options = sentry_sdk.get_client().options
 
