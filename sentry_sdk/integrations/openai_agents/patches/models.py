@@ -88,15 +88,14 @@ def _get_model(
     request_model_name = model.model if hasattr(model, "model") else str(model)
     agent._sentry_request_model = request_model_name
 
-    # Determine the gen_ai operation name from the model class.
-    # OpenAIResponsesModel uses the Responses API ("responses"); all other
-    # model classes (e.g. OpenAIChatCompletionsModel) use Chat Completions ("chat").
-    try:
-        from agents.models.openai_responses import OpenAIResponsesModel
-
-        _operation = "responses" if isinstance(model, OpenAIResponsesModel) else "chat"
-    except ImportError:
-        _operation = "chat"
+    # Map model class name -> gen_ai operation name.
+    # This avoids importing internal model classes and is resilient to package
+    # restructuring while remaining explicit about every supported type.
+    _OPERATION_BY_MODEL_CLASS = {
+        "OpenAIResponsesModel": "responses",
+        "OpenAIChatCompletionsModel": "chat",
+    }
+    _operation = _OPERATION_BY_MODEL_CLASS.get(type(model).__name__, "chat")
 
     # Wrap _fetch_response if it exists (for OpenAI models) to capture response model
     if hasattr(model, "_fetch_response"):
