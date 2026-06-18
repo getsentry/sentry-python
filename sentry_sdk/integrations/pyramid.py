@@ -81,19 +81,17 @@ class PyramidIntegration(Integration):
             if integration is None:
                 return old_call_view(registry, request, *args, **kwargs)
 
-            current_scope = sentry_sdk.get_current_scope()
             _set_transaction_name_and_source(
-                current_scope, integration.transaction_style, request
+                sentry_sdk.get_current_scope(), integration.transaction_style, request
             )
 
-            if should_send_default_pii() and has_span_streaming_enabled(client.options):
-                current_span = current_scope.streamed_span
-                user_id = authenticated_userid(request)
-
-                if user_id and type(current_span) is StreamedSpan:
-                    current_span._segment.set_attribute("user.id", user_id)
-
             scope = sentry_sdk.get_isolation_scope()
+
+            if should_send_default_pii() and has_span_streaming_enabled(client.options):
+                user_id = authenticated_userid(request)
+                if user_id:
+                    scope.set_user({"id": user_id})
+
             scope.add_event_processor(
                 _make_event_processor(weakref.ref(request), integration)
             )
