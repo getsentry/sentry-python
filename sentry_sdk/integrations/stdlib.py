@@ -55,16 +55,6 @@ class StdlibIntegration(Integration):
         ) -> "Optional[Event]":
             client = sentry_sdk.get_client()
             if client.get_integration(StdlibIntegration) is not None:
-                is_span_streaming_enabled = has_span_streaming_enabled(client.options)
-                if is_span_streaming_enabled:
-                    current_scope = get_current_scope()
-                    segment = getattr(current_scope.streamed_span, "_segment", None)
-
-                    if segment:
-                        segment.set_attribute(
-                            "process.runtime.description", sys.version
-                        )
-
                 contexts = event.setdefault("contexts", {})
                 if isinstance(contexts, dict) and "runtime" not in contexts:
                     contexts["runtime"] = _RUNTIME_CONTEXT
