@@ -586,13 +586,16 @@ def test_request_url(sentry_init, capture_events, capture_items, span_streaming)
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarliteIntegration()],
+        send_default_pii=True,
         _experiments={
             "trace_lifecycle": "stream" if span_streaming else "static",
         },
     )
 
     starlite_app = starlite_app_factory()
-    client = TestClient(starlite_app, root_path="/root")
+    client = TestClient(
+        starlite_app, base_url="http://testserver.local", root_path="/root"
+    )
 
     if span_streaming:
         items = capture_items("span")
@@ -608,7 +611,7 @@ def test_request_url(sentry_init, capture_events, capture_items, span_streaming)
             if span["attributes"].get("sentry.op") == "http.server"
         )
         assert server_span["attributes"]["url.full"] == (
-            "http://testserver/root/nomessage"
+            "http://testserver.local/root/nomessage"
         )
     else:
         events = capture_events()
@@ -616,4 +619,4 @@ def test_request_url(sentry_init, capture_events, capture_items, span_streaming)
         client.get("/nomessage")
 
         (event,) = events
-        assert event["request"]["url"] == "http://testserver/root/nomessage"
+        assert event["request"]["url"] == "http://testserver.local/root/nomessage"
