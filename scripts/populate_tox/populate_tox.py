@@ -202,10 +202,13 @@ def fetch_package_dependencies(
     python_version: ThreadedVersion,
 ) -> dict:
     """Fetch package dependencies metadata from cache or, failing that, PyPI."""
+    target = TEST_SUITE_CONFIG[integration]["package"]
     constraints = _get_dependency_probe_constraints(
         integration, version, python_version
     )
-    constraints_hash = hashlib.md5("\n".join(constraints).encode("utf-8")).hexdigest()
+    constraints_hash = hashlib.md5(
+        "\n".join([target, *constraints]).encode("utf-8")
+    ).hexdigest()
     package_dependencies = _fetch_package_dependencies_from_cache(
         package, version, python_version, constraints_hash
     )
@@ -226,7 +229,7 @@ def fetch_package_dependencies(
         "-m",
         "pip",
         "install",
-        f"{TEST_SUITE_CONFIG[integration]['package']}=={version}",
+        f"{target}=={version}",
         "--only-binary",
         "grpcio-tools",  # Prevent source builds that hang CI. grpcio-tools is a build-time dependency pinned by apache-beam.
         "--dry-run",
