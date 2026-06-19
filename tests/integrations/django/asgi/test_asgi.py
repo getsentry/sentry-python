@@ -1049,3 +1049,54 @@ async def test_transaction_http_method_custom(
         (event1, event2) = events
         assert event1["request"]["method"] == "OPTIONS"
         assert event2["request"]["method"] == "HEAD"
+
+
+@pytest.mark.parametrize("application", APPS)
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 0), reason="Django ASGI support shipped in 3.0"
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_request_url(
+    sentry_init,
+    capture_events,
+    capture_items,
+    application,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+    )
+    comm = HttpCommunicator(
+        application,
+        "GET",
+        "/root/nomessage",
+    )
+
+    if span_streaming:
+        items = capture_items("span")
+        await comm.get_response()
+        await comm.wait()
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+
+        (server_span,) = (
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == "http.server"
+        )
+        assert server_span["attributes"]["url.full"] == (
+            "http://testserver/root/nomessage"
+        )
+    else:
+        events = capture_events()
+
+        await comm.get_response()
+        await comm.wait()
+
+        (event,) = events
+        assert event["request"]["url"] == "http://testserver/root/nomessage"

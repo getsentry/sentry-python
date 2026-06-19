@@ -62,6 +62,7 @@ from tests.integrations.starlette import test_starlette
 
 def fastapi_app_factory():
     app = FastAPI()
+    mounted_app = FastAPI()
 
     @app.get("/error")
     async def _error():
@@ -74,6 +75,7 @@ def fastapi_app_factory():
         capture_message("Hi")
         return {"message": "Hi"}
 
+    @mounted_app.get("/nomessage")
     @app.delete("/nomessage")
     @app.get("/nomessage")
     @app.head("/nomessage")
@@ -117,6 +119,8 @@ def fastapi_app_factory():
     ):
         capture_message("hi")
         return {"status": "ok"}
+
+    app.mount("/root", mounted_app)
 
     return app
 
@@ -1058,7 +1062,7 @@ def test_request_url(sentry_init, capture_events, capture_items, span_streaming)
 
     starlette_app = fastapi_app_factory()
 
-    client = TestClient(starlette_app, root_path="/root")
+    client = TestClient(starlette_app)
 
     if span_streaming:
         items = capture_items("span")
@@ -1080,7 +1084,6 @@ def test_request_url(sentry_init, capture_events, capture_items, span_streaming)
 
         client.get("/root/nomessage")
 
-        assert len(events) == 1
         (event,) = events
         assert event["request"]["url"] == "http://testserver/root/nomessage"
 

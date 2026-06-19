@@ -146,6 +146,12 @@ def starlette_app_factory(middleware=None, debug=True):
         "TRACE",
     ]
 
+    mounted_app = starlette.applications.Starlette(
+        routes=[
+            starlette.routing.Route("/nomessage", _nomessage, methods=all_methods),
+        ],
+    )
+
     app = starlette.applications.Starlette(
         debug=debug,
         routes=[
@@ -160,6 +166,7 @@ def starlette_app_factory(middleware=None, debug=True):
             starlette.routing.Route("/body/json", _body_json, methods=["POST"]),
             starlette.routing.Route("/body/form", _body_form, methods=["POST"]),
             starlette.routing.Route("/body/raw", _body_raw, methods=["POST"]),
+            starlette.routing.Mount("/root", app=mounted_app),
         ],
         middleware=middleware,
     )
@@ -1492,7 +1499,7 @@ def test_request_url(sentry_init, capture_events, capture_items, span_streaming)
 
     starlette_app = starlette_app_factory()
 
-    client = TestClient(starlette_app, root_path="/root")
+    client = TestClient(starlette_app)
 
     if span_streaming:
         items = capture_items("span")
@@ -1514,7 +1521,6 @@ def test_request_url(sentry_init, capture_events, capture_items, span_streaming)
 
         client.get("/root/nomessage")
 
-        assert len(events) == 1
         (event,) = events
         assert event["request"]["url"] == "http://testserver/root/nomessage"
 

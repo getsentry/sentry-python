@@ -41,6 +41,10 @@ def starlite_app_factory(middleware=None, debug=True, exception_handlers=None):
         capture_message("hi")
         return {"status": "ok"}
 
+    @get("/nomessage")
+    async def nomessage() -> "Dict[str, Any]":
+        return {"status": "ok"}
+
     logging_config = LoggingConfig()
 
     app = Starlite(
@@ -49,6 +53,7 @@ def starlite_app_factory(middleware=None, debug=True, exception_handlers=None):
             custom_error,
             message,
             message_with_id,
+            nomessage,
             MyController,
         ],
         debug=debug,
@@ -574,3 +579,41 @@ def test_starlite_scope_user_on_exception_event(
         }
     else:
         assert "user" not in event
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_request_url(sentry_init, capture_events, capture_items, span_streaming):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarliteIntegration()],
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
+
+    starlite_app = starlite_app_factory()
+    client = TestClient(starlite_app, root_path="/root")
+
+    if span_streaming:
+        items = capture_items("span")
+
+        client.get("/nomessage")
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+
+        (server_span,) = (
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == "http.server"
+        )
+        assert server_span["attributes"]["url.full"] == (
+            "http://testserver/root/nomessage"
+        )
+    else:
+        events = capture_events()
+
+        client.get("/nomessage")
+
+        (event,) = events
+        assert event["request"]["url"] == "http://testserver/root/nomessage"

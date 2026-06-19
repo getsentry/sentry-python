@@ -44,6 +44,10 @@ def quart_app_factory():
         capture_message("hi")
         return "ok"
 
+    @app.route("/nomessage")
+    async def nomessage():
+        return "ok"
+
     @app.route("/message/<message_id>")
     async def hi_with_id(message_id):
         capture_message("hi with id")
@@ -683,6 +687,22 @@ async def test_span_origin(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
+async def test_request_url(sentry_init, capture_events):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[quart_sentry.QuartIntegration()],
+    )
+    app = quart_app_factory()
+    client = app.test_client()
+
+    events = capture_events()
+    await client.get("/root/nomessage", root_path="/root")
+
+    (event,) = events
+    assert event["request"]["url"] == "http://localhost/root/nomessage"
+
+
+@pytest.mark.asyncio
 async def test_span_streaming_basic(sentry_init, capture_items):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
@@ -966,3 +986,28 @@ async def test_span_streaming_sensitive_header_passthrough_with_pii(
         segment["attributes"]["http.request.header.authorization"]
         == "Bearer secret-token"
     )
+
+
+@pytest.mark.asyncio
+async def test_span_streaming_request_url(sentry_init, capture_items):
+    sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        integrations=[quart_sentry.QuartIntegration()],
+        _experiments={
+            "trace_lifecycle": "stream",
+        },
+    )
+    app = quart_app_factory()
+    client = app.test_client()
+
+    items = capture_items("span")
+    await client.get("/root/nomessage", root_path="/root")
+
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+
+    (server_span,) = (
+        span for span in spans if span["attributes"].get("sentry.op") == "http.server"
+    )
+    assert server_span["attributes"]["url.full"] == "http://localhost/root/nomessage"
