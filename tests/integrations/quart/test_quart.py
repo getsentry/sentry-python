@@ -700,15 +700,7 @@ async def test_request_url(sentry_init, capture_events):
     events = capture_events()
 
     # https://github.com/pallets/quart/commit/7be545c
-    url = (
-        "/root/nomessage"
-        if QUART_VERSION
-        >= (
-            0,
-            19,
-        )
-        else "/nomessage"
-    )
+    url = "/root/nomessage" if QUART_VERSION >= (0, 19) else "/nomessage"
     await client.get(url, root_path="/root")
 
     (event,) = events
@@ -1017,15 +1009,7 @@ async def test_span_streaming_request_url(sentry_init, capture_items):
     items = capture_items("span")
 
     # https://github.com/pallets/quart/commit/7be545c
-    url = (
-        "/root/nomessage"
-        if QUART_VERSION
-        >= (
-            0,
-            19,
-        )
-        else "/nomessage"
-    )
+    url = "/root/nomessage" if QUART_VERSION >= (0, 19) else "/nomessage"
     await client.get(url, root_path="/root")
 
     sentry_sdk.flush()

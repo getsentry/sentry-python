@@ -1089,9 +1089,7 @@ async def test_request_url(
             for span in spans
             if span["attributes"].get("sentry.op") == "http.server"
         )
-        assert server_span["attributes"]["url.full"] == (
-            "http://testserver/root/nomessage"
-        )
+        assert server_span["attributes"]["url.full"] == ("/root/nomessage")
     else:
         events = capture_events()
 
@@ -1099,4 +1097,4 @@ async def test_request_url(
         await comm.wait()
 
         (event,) = events
-        assert event["request"]["url"] == "http://testserver/root/nomessage"
+        assert event["request"]["url"] == "/root/nomessage"
