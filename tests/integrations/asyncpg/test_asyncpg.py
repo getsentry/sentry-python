@@ -21,7 +21,7 @@ from asyncpg import Connection, connect
 
 import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
-from sentry_sdk.consts import SPANDATA
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.asyncpg import AsyncPGIntegration
 from sentry_sdk.tracing_utils import record_sql_queries
 from tests.conftest import ApproxDict
@@ -1423,7 +1423,7 @@ async def test_cursor__bind_exec_creates_spans(
         assert segment["name"] == "test_segment"
 
         assert bind_exec_span["attributes"]["sentry.origin"] == "auto.db.asyncpg"
-        assert bind_exec_span["attributes"]["sentry.op"] == "db"
+        assert bind_exec_span["attributes"]["sentry.op"] == OP.DB_CURSOR_ITERATOR
         assert bind_exec_span["attributes"]["db.system.name"] == "postgresql"
         assert bind_exec_span["attributes"]["db.driver.name"] == "asyncpg"
         assert bind_exec_span["attributes"]["server.address"] == PG_HOST
@@ -1488,6 +1488,173 @@ async def test_cursor__bind_exec_creates_spans(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_cursor_iteration_creates_db_cursor_iter_spans(
+    sentry_init, capture_events, capture_items, span_streaming
+) -> None:
+    """
+    Regression test for https://github.com/getsentry/sentry-python/issues/6576
+
+    When iterating a server-side cursor with a small prefetch, asyncpg fetches
+    rows in batches. Each batch triggers BaseCursor._bind_exec (on first query) and
+    BaseCursor._exec (second query onwards) through CursorIterator.__anext__, which creates a
+    span with the same query description. The resulting burst of identical spans
+    causes Sentry's N+1 query detector to raise a false positive.
+
+    To mitigate, we set the "op"/"sentry.op" to `db.cursor.iter` instead of `db`
+    so that the sentry backend can exclude these spans from n+1 detection.
+    """
+    sentry_init(
+        integrations=[AsyncPGIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
+
+    if span_streaming:
+        items = capture_items("span")
+
+        with sentry_sdk.traces.start_span(name="test_segment"):
+            conn: Connection = await connect(PG_CONNECTION_URI)
+
+            await conn.executemany(
+                "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
+                [(f"user-{i}", "pw", datetime.date(1990, 1, 1)) for i in range(20)],
+            )
+
+            async with conn.transaction():
+                async for _record in conn.cursor("SELECT * FROM users", prefetch=5):
+                    pass
+
+            await conn.close()
+
+        sentry_sdk.flush()
+
+        cursor_iter_spans = [
+            item.payload
+            for item in items
+            if item.payload.get("name") == "SELECT * FROM users"
+        ]
+
+        assert len(cursor_iter_spans) == 5
+        for span in cursor_iter_spans:
+            assert span["attributes"]["sentry.op"] == OP.DB_CURSOR_ITERATOR
+    else:
+        events = capture_events()
+
+        with start_transaction(name="test_transaction", sampled=True):
+            conn: Connection = await connect(PG_CONNECTION_URI)
+
+            await conn.executemany(
+                "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
+                [(f"user-{i}", "pw", datetime.date(1990, 1, 1)) for i in range(20)],
+            )
+
+            async with conn.transaction():
+                async for _record in conn.cursor("SELECT * FROM users", prefetch=5):
+                    pass
+
+            await conn.close()
+
+        (event,) = events
+
+        cursor_iter_spans = [
+            s for s in event["spans"] if s.get("description") == "SELECT * FROM users"
+        ]
+
+        assert len(cursor_iter_spans) == 5
+        for span in cursor_iter_spans:
+            assert span["op"] == OP.DB_CURSOR_ITERATOR
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_cursor_fetch_creates_db_cursor_fetch_spans(
+    sentry_init, capture_events, capture_items, span_streaming
+) -> None:
+    """
+    Regression test for https://github.com/getsentry/sentry-python/issues/6576
+
+    When a user invokes "connection.stream" within SQLAlchemy, SQLAlchemy's dialect
+    for asyncpg uses asyncpg's "Cursor.fetch" method instead of the "CursorIterator.__anext__"
+    method.
+
+    Because the "fetch" methods use `_exec` (and our patch for it) under the hood, it makes it appear that
+    the same query is being executed many times when it is in fact iterating over a result set.
+
+    This results in an accidental trigger of our n+1 detection.
+
+    To mitigate, we set the "op"/"sentry.op" to `db.cursor.fetch` instead of `db`
+    so that the sentry backend can exclude these spans from n+1 detection.
+    """
+    sentry_init(
+        integrations=[AsyncPGIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
+
+    if span_streaming:
+        items = capture_items("span")
+
+        with sentry_sdk.traces.start_span(name="test_segment"):
+            conn: Connection = await connect(PG_CONNECTION_URI)
+
+            await conn.executemany(
+                "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
+                [(f"user-{i}", "pw", datetime.date(1990, 1, 1)) for i in range(20)],
+            )
+
+            async with conn.transaction():
+                cur = await conn.cursor("SELECT * FROM users")
+                await cur.fetch(10)
+                await cur.fetch(10)
+
+            await conn.close()
+
+        sentry_sdk.flush()
+
+        cursor_fetch_spans = [
+            item.payload
+            for item in items
+            if item.payload.get("name") == "SELECT * FROM users"
+        ]
+
+        assert len(cursor_fetch_spans) == 2
+        for span in cursor_fetch_spans:
+            assert span["attributes"]["sentry.op"] == OP.DB_CURSOR_FETCH
+    else:
+        events = capture_events()
+
+        with start_transaction(name="test_transaction", sampled=True):
+            conn: Connection = await connect(PG_CONNECTION_URI)
+
+            await conn.executemany(
+                "INSERT INTO users(name, password, dob) VALUES($1, $2, $3)",
+                [(f"user-{i}", "pw", datetime.date(1990, 1, 1)) for i in range(20)],
+            )
+
+            async with conn.transaction():
+                cur = await conn.cursor("SELECT * FROM users")
+                await cur.fetch(10)
+                await cur.fetch(10)
+
+            await conn.close()
+
+        (event,) = events
+
+        cursor_fetch_spans = [
+            s for s in event["spans"] if s.get("description") == "SELECT * FROM users"
+        ]
+
+        assert len(cursor_fetch_spans) == 2
+        for span in cursor_fetch_spans:
+            assert span["op"] == OP.DB_CURSOR_FETCH
+
+
+@pytest.mark.asyncio
 async def test_cursor__exec_methods_create_spans(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
@@ -1543,6 +1710,7 @@ async def test_cursor__exec_methods_create_spans(sentry_init, capture_events) ->
         assert span["data"]["db.cursor"] is not None
         assert span["data"]["db.system"] == "postgresql"
         assert span["data"]["db.driver.name"] == "asyncpg"
+        assert span["op"] == OP.DB
         assert span["origin"] == "auto.db.asyncpg"
         _assert_query_source(
             span,
