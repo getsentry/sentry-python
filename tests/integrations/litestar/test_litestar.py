@@ -848,7 +848,7 @@ def test_request_url(sentry_init, capture_events, capture_items, span_streaming)
         items = capture_items("span")
 
         # https://github.com/litestar-org/litestar/commit/72dda171768bd470adc065c47c1ecf1d80b5e749
-        url = "/root/nomessage" if LITESTAR_VERSION > (2, 5, 3) else "/nomessage"
+        url = "/root/nomessage" if LITESTAR_VERSION >= (2, 5, 3) else "/nomessage"
         client.get(url)
 
         sentry_sdk.flush()
@@ -866,7 +866,7 @@ def test_request_url(sentry_init, capture_events, capture_items, span_streaming)
         events = capture_events()
 
         # https://github.com/litestar-org/litestar/commit/72dda171768bd470adc065c47c1ecf1d80b5e749
-        url = "/root/nomessage" if LITESTAR_VERSION > (2, 5, 3) else "/nomessage"
+        url = "/root/nomessage" if LITESTAR_VERSION >= (2, 5, 3) else "/nomessage"
         client.get(url)
 
         (event,) = events
