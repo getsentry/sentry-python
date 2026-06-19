@@ -16,8 +16,11 @@ from litestar.testing import TestClient
 import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.litestar import LitestarIntegration
+from sentry_sdk.utils import package_version
 from tests.conftest import ApproxDict
 from tests.integrations.conftest import parametrize_test_configurable_status_codes
+
+LITESTAR_VERSION = package_version("litestar")
 
 
 def litestar_app_factory(middleware=None, debug=True, exception_handlers=None):
@@ -844,7 +847,9 @@ def test_request_url(sentry_init, capture_events, capture_items, span_streaming)
     if span_streaming:
         items = capture_items("span")
 
-        client.get("/root/nomessage")
+        # https://github.com/litestar-org/litestar/commit/72dda171768bd470adc065c47c1ecf1d80b5e749
+        url = "/root/nomessage" if LITESTAR_VERSION > (2, 5, 3) else "/nomessage"
+        client.get(url)
 
         sentry_sdk.flush()
         spans = [item.payload for item in items]
@@ -860,7 +865,9 @@ def test_request_url(sentry_init, capture_events, capture_items, span_streaming)
     else:
         events = capture_events()
 
-        client.get("/root/nomessage")
+        # https://github.com/litestar-org/litestar/commit/72dda171768bd470adc065c47c1ecf1d80b5e749
+        url = "/root/nomessage" if LITESTAR_VERSION > (2, 5, 3) else "/nomessage"
+        client.get(url)
 
         (event,) = events
         assert event["request"]["url"] == "http://testserver.local/root/nomessage"
