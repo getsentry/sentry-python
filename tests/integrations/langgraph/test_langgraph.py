@@ -2119,12 +2119,12 @@ def test_langgraph_message_truncation(sentry_init, capture_events):
     assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
 
 
-def test_graph_bubble_up_ignored(sentry_init, capture_events):
+def test_graph_bubble_up_ignored(sentry_init, capture_items):
     sentry_init(
         integrations=[LanggraphIntegration()],
     )
 
-    events = capture_events()
+    events = capture_items("event")
 
     model = InterruptingChatModel()
     with pytest.raises(GraphBubbleUp):
