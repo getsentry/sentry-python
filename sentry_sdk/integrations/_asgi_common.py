@@ -86,7 +86,9 @@ def _get_ip(asgi_scope: "Any") -> str:
     return asgi_scope.get("client")[0]
 
 
-def _get_request_data(asgi_scope: "Any") -> "Dict[str, Any]":
+def _get_request_data(
+    asgi_scope: "Any", path_includes_root_path: "bool" = True
+) -> "Dict[str, Any]":
     """
     Returns data related to the HTTP request from the ASGI scope.
     """
@@ -101,7 +103,10 @@ def _get_request_data(asgi_scope: "Any") -> "Dict[str, Any]":
         request_data["query_string"] = _get_query(asgi_scope)
 
         request_data["url"] = _get_url(
-            asgi_scope, "http" if ty == "http" else "ws", headers.get("host")
+            asgi_scope,
+            "http" if ty == "http" else "ws",
+            headers.get("host"),
+            path_includes_root_path=path_includes_root_path,
         )
 
     client = asgi_scope.get("client")
@@ -111,7 +116,9 @@ def _get_request_data(asgi_scope: "Any") -> "Dict[str, Any]":
     return request_data
 
 
-def _get_request_attributes(asgi_scope: "Any") -> "dict[str, Any]":
+def _get_request_attributes(
+    asgi_scope: "Any", path_includes_root_path: "bool" = True
+) -> "dict[str, Any]":
     """
     Return attributes related to the HTTP request from the ASGI scope.
     """
@@ -132,7 +139,10 @@ def _get_request_attributes(asgi_scope: "Any") -> "dict[str, Any]":
                 attributes["http.query"] = query
 
             url_without_query_string = _get_url(
-                asgi_scope, "http" if ty == "http" else "ws", headers.get("host")
+                asgi_scope,
+                "http" if ty == "http" else "ws",
+                headers.get("host"),
+                path_includes_root_path=path_includes_root_path,
             )
             query_string = _get_query(asgi_scope)
             attributes["url.full"] = (

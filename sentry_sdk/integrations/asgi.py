@@ -322,7 +322,8 @@ class SentryAsgiMiddleware:
                     with span_ctx as span:
                         if isinstance(span, StreamedSpan):
                             for attribute, value in _get_request_attributes(
-                                scope
+                                scope,
+                                path_includes_root_path=self.path_includes_root_path,
                             ).items():
                                 span.set_attribute(attribute, value)
 
@@ -404,7 +405,11 @@ class SentryAsgiMiddleware:
         self, event: "Event", hint: "Hint", asgi_scope: "Any"
     ) -> "Optional[Event]":
         request_data = event.get("request", {})
-        request_data.update(_get_request_data(asgi_scope))
+        request_data.update(
+            _get_request_data(
+                asgi_scope, path_includes_root_path=self.path_includes_root_path
+            )
+        )
         event["request"] = deepcopy(request_data)
 
         # Only set transaction name if not already set by Starlette or FastAPI (or other frameworks)
