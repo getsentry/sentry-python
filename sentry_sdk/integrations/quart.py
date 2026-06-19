@@ -17,6 +17,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    package_version,
 )
 
 if TYPE_CHECKING:
@@ -86,16 +87,23 @@ class QuartIntegration(Integration):
 def patch_asgi_app() -> None:
     old_app = Quart.__call__
 
+    version = package_version("quart")
+
     async def sentry_patched_asgi_app(
         self: "Any", scope: "Any", receive: "Any", send: "Any"
     ) -> "Any":
-        if sentry_sdk.get_client().get_integration(QuartIntegration) is None:
+        if (
+            sentry_sdk.get_client().get_integration(QuartIntegration) is None
+            or version is None
+        ):
             return await old_app(self, scope, receive, send)
 
         middleware = SentryAsgiMiddleware(
             lambda *a, **kw: old_app(self, *a, **kw),
             span_origin=QuartIntegration.origin,
             asgi_version=3,
+            # https://github.com/pallets/quart/commit/7be545c
+            path_includes_root_path=version >= (0, 19),
         )
         return await middleware(scope, receive, send)
 
