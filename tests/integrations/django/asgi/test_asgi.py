@@ -1075,6 +1075,7 @@ async def test_request_url(
         "GET",
         "/root/nomessage",
     )
+    comm.scope["root_path"] = "/root"
 
     if span_streaming:
         items = capture_items("span")
