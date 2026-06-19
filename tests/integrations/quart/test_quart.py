@@ -14,7 +14,9 @@ from sentry_sdk import (
     set_tag,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration
-from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
+from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE, package_version
+
+QUART_VERSION = package_version("quart")
 
 
 def quart_app_factory():
@@ -696,7 +698,18 @@ async def test_request_url(sentry_init, capture_events):
     client = app.test_client()
 
     events = capture_events()
-    await client.get("/root/nomessage", root_path="/root")
+
+    # https://github.com/pallets/quart/commit/7be545c
+    url = (
+        "/root/nomessage"
+        if QUART_VERSION
+        >= (
+            0,
+            19,
+        )
+        else "/nomessage"
+    )
+    await client.get(url, root_path="/root")
 
     (event,) = events
     assert event["request"]["url"] == "http://localhost/root/nomessage"
@@ -1002,7 +1015,18 @@ async def test_span_streaming_request_url(sentry_init, capture_items):
     client = app.test_client()
 
     items = capture_items("span")
-    await client.get("/root/nomessage", root_path="/root")
+
+    # https://github.com/pallets/quart/commit/7be545c
+    url = (
+        "/root/nomessage"
+        if QUART_VERSION
+        >= (
+            0,
+            19,
+        )
+        else "/nomessage"
+    )
+    await client.get(url, root_path="/root")
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
