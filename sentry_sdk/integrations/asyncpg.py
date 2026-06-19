@@ -21,8 +21,8 @@ from sentry_sdk.utils import (
 )
 
 try:
-    import asyncpg  # type: ignore[import-untyped]
-    from asyncpg.cursor import (  # type: ignore[import-untyped]
+    import asyncpg  # type: ignore[import-not-found]
+    from asyncpg.cursor import (  # type: ignore
         BaseCursor,
         Cursor,
         CursorIterator,
