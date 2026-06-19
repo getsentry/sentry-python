@@ -77,7 +77,6 @@ class SentryStarliteASGIMiddleware(SentryAsgiMiddleware):
             mechanism_type="asgi",
             span_origin=span_origin,
             asgi_version=3,
-            # https://github.com/litestar-org/litestar/issues/2077
             path_includes_root_path=False,
         )
 

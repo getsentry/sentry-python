@@ -102,6 +102,8 @@ def patch_asgi_app() -> None:
             lambda *a, **kw: old_app(self, *a, **kw),
             span_origin=QuartIntegration.origin,
             asgi_version=3,
+            # Starting with the commit below, Quart treats any scope["path"]
+            # that does not include scope["root_path"] as invalid.
             # https://github.com/pallets/quart/commit/7be545c
             path_includes_root_path=version >= (0, 19),
         )

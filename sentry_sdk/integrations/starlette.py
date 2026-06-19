@@ -143,7 +143,8 @@ class StarletteIntegration(Integration):
             )
 
         patch_middlewares()
-        # See https://github.com/Kludex/starlette/commit/e8f0dcd54e4ceec47e02c45f5275374e292339ad
+        # Starlette's Mount includes scope["root_path"] in scope["path"] starting with:
+        # https://github.com/Kludex/starlette/commit/e8f0dcd54e4ceec47e02c45f5275374e292339ad.
         path_includes_root_path = version >= (0, 33)
         patch_asgi_app(path_includes_root_path=path_includes_root_path)
         patch_request_response()
