@@ -296,7 +296,7 @@ def test_logs_no_span_id_without_active_span(sentry_init, capture_items):
     get_client().flush()
     logs = [item.payload for item in items]
     assert logs[0]["trace_id"] is not None
-    assert logs[0]["span_id"] is None
+    assert "span_id" not in logs[0]
 
 
 @minimum_python_37
@@ -473,7 +473,6 @@ def test_transport_format(sentry_init, capture_envelopes):
                 "level": "warn",
                 "timestamp": mock.ANY,
                 "trace_id": mock.ANY,
-                "span_id": mock.ANY,
                 "attributes": {
                     "sentry.environment": {
                         "type": "string",
@@ -494,6 +493,14 @@ def test_transport_format(sentry_init, capture_envelopes):
                     "sentry.severity_number": {
                         "type": "integer",
                         "value": 13,
+                    },
+                    "process.runtime.name": {
+                        "type": "string",
+                        "value": mock.ANY,
+                    },
+                    "process.runtime.version": {
+                        "type": "string",
+                        "value": mock.ANY,
                     },
                     "sentry.severity_text": {
                         "type": "string",
@@ -552,7 +559,6 @@ def test_batcher_drops_logs(sentry_init, monkeypatch):
                     "level": "info",
                     "timestamp": mock.ANY,
                     "trace_id": mock.ANY,
-                    "span_id": mock.ANY,
                     "attributes": {
                         "sentry.environment": {
                             "type": "string",
@@ -573,6 +579,14 @@ def test_batcher_drops_logs(sentry_init, monkeypatch):
                         "sentry.severity_number": {
                             "type": "integer",
                             "value": 9,
+                        },
+                        "process.runtime.name": {
+                            "type": "string",
+                            "value": mock.ANY,
+                        },
+                        "process.runtime.version": {
+                            "type": "string",
+                            "value": mock.ANY,
                         },
                         "sentry.severity_text": {
                             "type": "string",

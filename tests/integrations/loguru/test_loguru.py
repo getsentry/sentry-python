@@ -1,5 +1,5 @@
 import re
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 from loguru import logger
@@ -418,8 +418,7 @@ def test_logger_with_all_attributes(
 
     logs = [item.payload for item in items]
 
-    assert "span_id" in logs[0]
-    assert logs[0]["span_id"] is None
+    assert "span_id" not in logs[0]
 
     attributes = logs[0]["attributes"]
 
@@ -466,6 +465,8 @@ def test_logger_with_all_attributes(
         "logger.name": "tests.integrations.loguru.test_loguru",
         "sentry.origin": "auto.log.loguru",
         "sentry.environment": "production",
+        "process.runtime.name": ANY,
+        "process.runtime.version": ANY,
         "sentry.sdk.version": VERSION,
         "sentry.severity_number": 13,
         "sentry.severity_text": "warn",

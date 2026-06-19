@@ -75,14 +75,22 @@ class PyramidIntegration(Integration):
         def sentry_patched_call_view(
             registry: "Any", request: "Request", *args: "Any", **kwargs: "Any"
         ) -> "Response":
-            integration = sentry_sdk.get_client().get_integration(PyramidIntegration)
+            client = sentry_sdk.get_client()
+            integration = client.get_integration(PyramidIntegration)
             if integration is None:
                 return old_call_view(registry, request, *args, **kwargs)
 
             _set_transaction_name_and_source(
                 sentry_sdk.get_current_scope(), integration.transaction_style, request
             )
+
             scope = sentry_sdk.get_isolation_scope()
+
+            if should_send_default_pii() and has_span_streaming_enabled(client.options):
+                user_id = authenticated_userid(request)
+                if user_id:
+                    scope.set_user({"id": user_id})
+
             scope.add_event_processor(
                 _make_event_processor(weakref.ref(request), integration)
             )

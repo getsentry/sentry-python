@@ -1,5 +1,6 @@
 import logging
 import warnings
+from unittest import mock
 
 import pytest
 
@@ -486,8 +487,7 @@ def test_logger_with_all_attributes(sentry_init, capture_items):
 
     logs = [item.payload for item in items]
 
-    assert "span_id" in logs[0]
-    assert logs[0]["span_id"] is None
+    assert "span_id" not in logs[0]
 
     attributes = logs[0]["attributes"]
 
@@ -537,6 +537,8 @@ def test_logger_with_all_attributes(sentry_init, capture_items):
         "logger.name": "test-logger",
         "sentry.origin": "auto.log.stdlib",
         "sentry.message.template": "log #%d",
+        "process.runtime.name": mock.ANY,
+        "process.runtime.version": mock.ANY,
         "sentry.message.parameter.0": 1,
         "sentry.environment": "production",
         "sentry.sdk.version": VERSION,

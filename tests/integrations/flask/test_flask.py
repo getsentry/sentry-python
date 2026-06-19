@@ -219,6 +219,7 @@ def test_flask_login_partially_configured(
     assert event.get("user", {}).get("id") is None
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("user_id", [None, "42", 3])
 def test_flask_login_configured(
@@ -227,14 +228,26 @@ def test_flask_login_configured(
     app,
     user_id,
     capture_events,
+    capture_items,
     monkeypatch,
     integration_enabled_params,
+    span_streaming,
 ):
-    sentry_init(send_default_pii=send_default_pii, **integration_enabled_params)
+    if span_streaming:
+        sentry_init(
+            integrations=[flask_sentry.FlaskIntegration()],
+            send_default_pii=send_default_pii,
+            traces_sample_rate=1.0,
+            _experiments={"trace_lifecycle": "stream"},
+        )
+    else:
+        sentry_init(send_default_pii=send_default_pii, **integration_enabled_params)
 
     class User:
         is_authenticated = is_active = True
         is_anonymous = user_id is not None
+        email = "user@example.com"
+        username = "testuser"
 
         def get_id(self):
             return str(user_id)
@@ -250,19 +263,34 @@ def test_flask_login_configured(
             login_user(User())
         return "ok"
 
-    events = capture_events()
+    if span_streaming:
+        items = capture_items("event", "span")
+    else:
+        events = capture_events()
 
     client = app.test_client()
     assert client.get("/login").status_code == 200
-    assert not events
-
     assert client.get("/message").status_code == 200
 
-    (event,) = events
-    if user_id is None or not send_default_pii:
-        assert event.get("user", {}).get("id") is None
+    if span_streaming:
+        sentry_sdk.flush()
+        spans = [i.payload for i in items if i.type == "span"]
+        segment = next(s for s in spans if s["name"] == "hi")
+
+        if send_default_pii and user_id is not None:
+            assert segment["attributes"]["user.id"] == str(user_id)
+            assert segment["attributes"]["user.email"] == "user@example.com"
+            assert segment["attributes"]["user.name"] == "testuser"
+        else:
+            assert "user.id" not in segment.get("attributes", {})
     else:
-        assert event["user"]["id"] == str(user_id)
+        (event,) = events
+        if user_id is None or not send_default_pii:
+            assert event.get("user", {}).get("id") is None
+        else:
+            assert event["user"]["id"] == str(user_id)
+            assert event["user"]["email"] == "user@example.com"
+            assert event["user"]["username"] == "testuser"
 
 
 @pytest.mark.parametrize("max_value_length", [1024, None])
