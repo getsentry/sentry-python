@@ -154,7 +154,7 @@ TEST_SUITE_CONFIG = {
     "flask": {
         "package": "flask",
         "deps": {
-            "*": ["flask-login", "werkzeug", "blinker"],
+            "*": ["flask-login", "setuptools", "werkzeug", "blinker"],
             # https://github.com/pallets/flask/issues/4455
             "<2.0": [
                 "werkzeug<2.1.0",
