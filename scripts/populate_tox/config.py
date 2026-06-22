@@ -166,6 +166,9 @@ TEST_SUITE_CONFIG = {
     },
     "gql": {
         "package": "gql[all]",
+        "deps": {
+            "*": ["responses"],
+        },
         "num_versions": 2,
     },
     "google_genai": {

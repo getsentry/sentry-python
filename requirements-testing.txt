@@ -9,7 +9,6 @@ pytest-watch
 jsonschema
 executing
 asttokens
-responses
 pysocks
 socksio
 httpcore[http2]
