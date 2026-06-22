@@ -1624,7 +1624,7 @@ class ApproxDict(dict):
 CapturedData = namedtuple("CapturedData", ["path", "event", "envelope", "compressed"])
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def capturing_server():
     assert WSGIServer is not None
 
