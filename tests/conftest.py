@@ -22,7 +22,11 @@ try:
 except ImportError:
     WSGIServer = None
 
-from werkzeug.wrappers import Request, Response
+try:
+    from werkzeug.wrappers import Request, Response
+except ImportError:
+    Request = None
+    Response = None
 
 try:
     from starlette.testclient import TestClient
@@ -1643,6 +1647,9 @@ def capturing_server():
             """
             This is the WSGI application.
             """
+            assert Request is not None
+            assert Response is not None
+
             request = Request(environ)
             event = envelope = None
             content_encoding = request.headers.get("content-encoding")
