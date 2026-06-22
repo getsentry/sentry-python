@@ -513,6 +513,7 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["werkzeug"],
             "<=5.0": ["werkzeug<1.0"],
+            "py3.6": ["dataclasses"],
         },
     },
     "typer": {
