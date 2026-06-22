@@ -24,17 +24,17 @@ def monkeypatched_gevent():
 
 
 @pytest.fixture
-def capturing_server(request, capturing_server):
-    capturing_server.start()
-    request.addfinalizer(capturing_server.stop)
-    return capturing_server
+def capturing_server(request, wsgi_capturing_server):
+    wsgi_capturing_server.start()
+    request.addfinalizer(wsgi_capturing_server.stop)
+    return wsgi_capturing_server
 
 
 @pytest.fixture
-def make_client(request, capturing_server):
+def make_client(request, wsgi_capturing_server):
     def inner(**kwargs):
         return sentry_sdk.Client(
-            "http://foobar@{}/132".format(capturing_server.url[len("http://") :]),
+            "http://foobar@{}/132".format(wsgi_capturing_server.url[len("http://") :]),
             **kwargs,
         )
 

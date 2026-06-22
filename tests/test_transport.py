@@ -71,9 +71,9 @@ def _make_async_transport_options(**overrides):
 
 
 @pytest.fixture(scope="module", autouse=True)
-def make_capturing_server(request, capturing_server):
+def make_capturing_server(request, wsgi_capturing_server):
     global server
-    server = capturing_server
+    server = wsgi_capturing_server
     server.start()
     request.addfinalizer(server.stop)
 

@@ -1625,7 +1625,7 @@ CapturedData = namedtuple("CapturedData", ["path", "event", "envelope", "compres
 
 
 @pytest.fixture(scope="module")
-def capturing_server():
+def wsgi_capturing_server():
     assert WSGIServer is not None
 
     class CapturingServer(WSGIServer):
