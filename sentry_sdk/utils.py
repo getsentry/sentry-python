@@ -1,5 +1,4 @@
 import base64
-import contextvars
 import copy
 import json
 import linecache
@@ -1445,9 +1444,7 @@ requests.
 Please refer to https://docs.sentry.io/platforms/python/contextvars/ for more information.
 """
 
-_is_sentry_internal_task = contextvars.ContextVar(
-    "is_sentry_internal_task", default=False
-)
+_is_sentry_internal_task = ContextVar("is_sentry_internal_task", default=False)
 
 # These exceptions won't set the span status to error if they occur. Use
 # register_control_flow_exception to add to this list
