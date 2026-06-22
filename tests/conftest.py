@@ -14,7 +14,12 @@ from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
 import brotli
-import jsonschema
+
+try:
+    import jsonschema
+except ImportError:
+    jsonschema = None
+
 import pytest
 from pytest_localserver.http import WSGIServer
 from werkzeug.wrappers import Request, Response
@@ -232,6 +237,7 @@ def _capture_internal_warnings():
 @pytest.fixture
 def validate_event_schema(tmpdir):
     def inner(event):
+        assert jsonschema is not None
         if SENTRY_EVENT_SCHEMA:
             jsonschema.validate(instance=event, schema=SENTRY_EVENT_SCHEMA)
 
