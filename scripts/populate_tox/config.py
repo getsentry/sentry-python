@@ -331,6 +331,9 @@ TEST_SUITE_CONFIG = {
     },
     "pure_eval": {
         "package": "pure_eval",
+        "deps": {
+            "*": ["asttokens"],
+        },
         "num_versions": 2,
     },
     "pydantic_ai": {
