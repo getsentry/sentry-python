@@ -42,6 +42,7 @@ setup(
     install_requires=[
         "urllib3>=1.26.11",
         "certifi",
+        "aiocontextvars; python_version < '3.7'",
     ],
     extras_require={
         "aiohttp": ["aiohttp>=3.5"],
