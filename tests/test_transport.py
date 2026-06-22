@@ -10,8 +10,6 @@ from unittest import mock
 
 import pytest
 
-from tests.conftest import CapturingServer
-
 try:
     import httpcore
 except (ImportError, ModuleNotFoundError):
@@ -73,9 +71,9 @@ def _make_async_transport_options(**overrides):
 
 
 @pytest.fixture(scope="module", autouse=True)
-def make_capturing_server(request):
+def make_capturing_server(request, capturing_server):
     global server
-    server = CapturingServer()
+    server = capturing_server
     server.start()
     request.addfinalizer(server.stop)
 
