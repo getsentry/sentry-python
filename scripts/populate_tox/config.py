@@ -154,7 +154,7 @@ TEST_SUITE_CONFIG = {
     "flask": {
         "package": "flask",
         "deps": {
-            "*": ["flask-login", "setuptools", "werkzeug", "blinker"],
+            "*": ["flask-login", "werkzeug", "blinker"],
             # https://github.com/pallets/flask/issues/4455
             "<2.0": [
                 "werkzeug<2.1.0",
@@ -162,6 +162,9 @@ TEST_SUITE_CONFIG = {
                 "itsdangerous>=0.24,<2.0",
                 "jinja2<3.1.1",
             ],
+            "py3.6,py3.7": [
+                "setuptools<82"
+            ],  # Handled by importlib.metadata on Python 3.8+
         },
     },
     "gql": {
@@ -431,7 +434,7 @@ TEST_SUITE_CONFIG = {
     "sanic": {
         "package": "sanic",
         "deps": {
-            "*": ["websockets<11.0", "aiohttp", "setuptools"],
+            "*": ["websockets<11.0", "aiohttp", "setuptools<82"],
             ">=22": ["sanic-testing"],
             "py3.6": ["aiocontextvars==0.2.1"],
             "py3.8": ["tracerite<1.1.2"],
