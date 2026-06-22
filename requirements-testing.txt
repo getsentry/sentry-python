@@ -7,7 +7,6 @@ pytest-localserver
 pytest-timeout
 pytest-watch
 jsonschema
-executing
 asttokens
 responses
 pysocks

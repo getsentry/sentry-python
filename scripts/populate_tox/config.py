@@ -108,6 +108,7 @@ TEST_SUITE_CONFIG = {
                 "djangorestframework",
                 "pytest-django",
                 "Werkzeug",
+                "executing",
             ],
             ">=2.0": ["channels[daphne]"],
             ">=2.2,<3.1": ["six"],
@@ -331,6 +332,9 @@ TEST_SUITE_CONFIG = {
     },
     "pure_eval": {
         "package": "pure_eval",
+        "deps": {
+            "*": ["executing"],
+        },
         "num_versions": 2,
     },
     "pydantic_ai": {
