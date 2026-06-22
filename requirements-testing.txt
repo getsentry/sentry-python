@@ -14,5 +14,4 @@ pysocks
 socksio
 httpcore[http2]
 setuptools
-Brotli
 docker
