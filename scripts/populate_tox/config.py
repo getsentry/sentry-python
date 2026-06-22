@@ -117,6 +117,7 @@ TEST_SUITE_CONFIG = {
                 "Werkzeug<2.1.0",
             ],
             "<3.1": ["pytest-django<4.0"],
+            "py3.6": ["dataclasses"],
             "py3.14,py3.14t": ["coverage==7.11.0"],
         },
     },
