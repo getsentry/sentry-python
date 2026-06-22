@@ -163,6 +163,7 @@ TEST_SUITE_CONFIG = {
                 "itsdangerous>=0.24,<2.0",
                 "jinja2<3.1.1",
             ],
+            "py3.6": ["dataclasses"],
         },
     },
     "gql": {
