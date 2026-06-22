@@ -15,14 +15,13 @@ from sentry_sdk.tracing_utils import (
     record_sql_queries,
 )
 from sentry_sdk.utils import (
-    ContextVar,
     capture_internal_exceptions,
     parse_version,
 )
 
 try:
-    import asyncpg  # type: ignore[import-not-found]
-    from asyncpg.cursor import (  # type: ignore
+    import asyncpg  # type: ignore[import-untyped]
+    from asyncpg.cursor import (  # type: ignore[import-untyped]
         BaseCursor,
         Cursor,
         CursorIterator,
@@ -30,13 +29,6 @@ try:
 
 except ImportError:
     raise DidNotEnable("asyncpg not installed.")
-
-_asyncpg_cursor_iterator_is_invoked = ContextVar(
-    "asyncpg_cursor_iterator_is_invoked", default=False
-)
-_asyncpg_cursor_fetch_is_invoked = ContextVar(
-    "asyncpg_cursor_fetch_is_invoked", default=False
-)
 
 
 class AsyncPGIntegration(Integration):
@@ -65,10 +57,6 @@ class AsyncPGIntegration(Integration):
         )
         asyncpg.Connection.prepare = _wrap_connection_method(asyncpg.Connection.prepare)
 
-        CursorIterator.__anext__ = _wrap_cursor_iterator_method(
-            CursorIterator.__anext__
-        )
-        Cursor.fetch = _wrap_cursor_fetch_method(Cursor.fetch)
         BaseCursor._bind_exec = _wrap_cursor_method(BaseCursor._bind_exec)
         BaseCursor._exec = _wrap_cursor_method(BaseCursor._exec)
 
@@ -177,38 +165,6 @@ def _wrap_connection_method(
     return _inner
 
 
-def _wrap_cursor_fetch_method(
-    f: "Callable[..., Awaitable[T]]",
-) -> "Callable[..., Awaitable[T]]":
-    async def _inner(*args: "Any", **kwargs: "Any") -> "T":
-        if sentry_sdk.get_client().get_integration(AsyncPGIntegration) is None:
-            return await f(*args, **kwargs)
-
-        _asyncpg_cursor_fetch_is_invoked.set(True)
-        try:
-            return await f(*args, **kwargs)
-        finally:
-            _asyncpg_cursor_fetch_is_invoked.set(False)
-
-    return _inner
-
-
-def _wrap_cursor_iterator_method(
-    f: "Callable[..., Awaitable[T]]",
-) -> "Callable[..., Awaitable[T]]":
-    async def _inner(*args: "Any", **kwargs: "Any") -> "T":
-        if sentry_sdk.get_client().get_integration(AsyncPGIntegration) is None:
-            return await f(*args, **kwargs)
-
-        _asyncpg_cursor_iterator_is_invoked.set(True)
-        try:
-            return await f(*args, **kwargs)
-        finally:
-            _asyncpg_cursor_iterator_is_invoked.set(False)
-
-    return _inner
-
-
 def _wrap_cursor_method(
     f: "Callable[..., Awaitable[T]]",
 ) -> "Callable[..., Awaitable[T]]":
@@ -216,14 +172,14 @@ def _wrap_cursor_method(
         if sentry_sdk.get_client().get_integration(AsyncPGIntegration) is None:
             return await f(*args, **kwargs)
 
-        if _asyncpg_cursor_iterator_is_invoked.get():
+        cursor = args[0]
+        if type(cursor) is CursorIterator:
             span_op_override_value = OP.DB_CURSOR_ITERATOR
-        elif _asyncpg_cursor_fetch_is_invoked.get():
+        elif type(cursor) is Cursor:
             span_op_override_value = OP.DB_CURSOR_FETCH
         else:
             span_op_override_value = None
 
-        cursor = args[0]
         query = _normalize_query(cursor._query)
         with record_sql_queries(
             cursor=cursor,
