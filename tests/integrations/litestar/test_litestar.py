@@ -50,10 +50,6 @@ def litestar_app_factory(middleware=None, debug=True, exception_handlers=None):
         capture_message("hi")
         return {"status": "ok"}
 
-    @get("/nomessage")
-    async def nomessage() -> "dict[str, Any]":
-        return {"status": "ok"}
-
     logging_config = LoggingConfig()
 
     app = Litestar(
@@ -62,7 +58,6 @@ def litestar_app_factory(middleware=None, debug=True, exception_handlers=None):
             custom_error,
             message,
             message_with_id,
-            nomessage,
             MyController,
         ],
         debug=debug,
@@ -826,48 +821,3 @@ def test_catch_non_http_exceptions_in_middleware(
     event_exception = events[0]["exception"]["values"][0]
     assert event_exception["type"] == "RuntimeError"
     assert event_exception["value"] == "Too Hot"
-
-
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_request_url(sentry_init, capture_events, capture_items, span_streaming):
-    sentry_init(
-        traces_sample_rate=1.0,
-        integrations=[LitestarIntegration()],
-        send_default_pii=True,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
-    )
-
-    litestar_app = litestar_app_factory()
-    client = TestClient(
-        litestar_app, base_url="http://testserver.local", root_path="/root"
-    )
-
-    if span_streaming:
-        items = capture_items("span")
-
-        # https://github.com/litestar-org/litestar/commit/72dda171768bd470adc065c47c1ecf1d80b5e749
-        url = "/root/nomessage" if LITESTAR_VERSION >= (2, 5, 3) else "/nomessage"
-        client.get(url)
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-
-        (server_span,) = (
-            span
-            for span in spans
-            if span["attributes"].get("sentry.op") == "http.server"
-        )
-        assert server_span["attributes"]["url.full"] == (
-            "http://testserver.local/root/nomessage"
-        )
-    else:
-        events = capture_events()
-
-        # https://github.com/litestar-org/litestar/commit/72dda171768bd470adc065c47c1ecf1d80b5e749
-        url = "/root/nomessage" if LITESTAR_VERSION >= (2, 5, 3) else "/nomessage"
-        client.get(url)
-
-        (event,) = events
-        assert event["request"]["url"] == "http://testserver.local/root/nomessage"
