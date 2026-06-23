@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.redis.consts import SPAN_ORIGIN
 from sentry_sdk.integrations.redis.modules.caches import (
     _compile_cache_span_properties,
@@ -116,6 +116,7 @@ def patch_redis_client(
                     attributes={
                         "sentry.op": cache_properties["op"],
                         "sentry.origin": SPAN_ORIGIN,
+                        SPANDATA.CACHE_KEY: cache_properties["description"],
                     },
                 )
             else:
@@ -135,6 +136,7 @@ def patch_redis_client(
                 attributes={
                     "sentry.op": db_properties["op"],
                     "sentry.origin": SPAN_ORIGIN,
+                    SPANDATA.DB_QUERY_TEXT: db_properties["description"],
                 },
             )
         else:
