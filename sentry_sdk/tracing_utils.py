@@ -168,6 +168,7 @@ def record_sql_queries(
             name="<unknown SQL query>" if query is None else query,
             attributes={
                 "sentry.origin": span_origin,
+                "db.query.text": "<unknown SQL query>" if query is None else query,
                 "sentry.op": span_op_override_value
                 if span_op_override_value
                 else OP.DB,
