@@ -527,7 +527,12 @@ def test_tracing_error(
 
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_span_origin(
-    sentry_init, capture_events, capture_items, get_client, span_streaming
+    sentry_init,
+    pyramid_config,
+    capture_events,
+    capture_items,
+    get_client,
+    span_streaming,
 ):
     sentry_init(
         integrations=[PyramidIntegration()],
@@ -552,3 +557,42 @@ def test_span_origin(
     else:
         (_, event) = events
         assert event["contexts"]["trace"]["origin"] == "auto.http.pyramid"
+
+
+@pytest.mark.parametrize("send_default_pii", [True, False])
+def test_span_sets_user_id_on_segment(
+    sentry_init,
+    pyramid_config,
+    capture_items,
+    get_client,
+    send_default_pii,
+):
+    sentry_init(
+        integrations=[PyramidIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    class AuthenticationPolicy:
+        def authenticated_userid(self, request):
+            return "123-abc"
+
+    pyramid_config.set_authorization_policy(ACLAuthorizationPolicy())
+    pyramid_config.set_authentication_policy(AuthenticationPolicy())
+
+    items = capture_items("span")
+
+    client = get_client()
+    client.get("/message")
+
+    sentry_sdk.flush()
+    spans = [i.payload for i in items if i.type == "span"]
+
+    assert len(spans) == 1
+    (segment,) = spans
+
+    if send_default_pii:
+        assert segment["attributes"]["user.id"] == "123-abc"
+    else:
+        assert "user.id" not in segment["attributes"]

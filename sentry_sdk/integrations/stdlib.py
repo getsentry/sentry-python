@@ -52,7 +52,8 @@ class StdlibIntegration(Integration):
         def add_python_runtime_context(
             event: "Event", hint: "Hint"
         ) -> "Optional[Event]":
-            if sentry_sdk.get_client().get_integration(StdlibIntegration) is not None:
+            client = sentry_sdk.get_client()
+            if client.get_integration(StdlibIntegration) is not None:
                 contexts = event.setdefault("contexts", {})
                 if isinstance(contexts, dict) and "runtime" not in contexts:
                     contexts["runtime"] = _RUNTIME_CONTEXT

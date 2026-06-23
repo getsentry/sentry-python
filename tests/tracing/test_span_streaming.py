@@ -1722,4 +1722,12 @@ def test_default_attributes(sentry_init, capture_envelopes):
         "sentry.dist": {"value": "1.0", "type": "string"},
         "sentry.origin": {"value": "manual", "type": "string"},
         "sentry.sdk.integrations": {"value": mock.ANY, "type": "array"},
+        "process.runtime.name": {
+            "type": "string",
+            "value": mock.ANY,
+        },
+        "process.runtime.version": {
+            "type": "string",
+            "value": mock.ANY,
+        },
     }

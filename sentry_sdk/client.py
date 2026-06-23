@@ -1,7 +1,9 @@
 import json
 import os
+import platform
 import random
 import socket
+import sys
 import uuid
 import warnings
 from collections.abc import Iterable, Mapping
@@ -240,6 +242,11 @@ def _serialized_v1_span_to_serialized_v2_span(
             attributes["sentry.sdk.name"] = sdk_info["name"]
         if "version" in sdk_info:
             attributes["sentry.sdk.version"] = sdk_info["version"]
+
+    attributes["process.runtime.name"] = platform.python_implementation()
+    attributes["process.runtime.version"] = (
+        f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    )
 
     if not attributes:
         return res

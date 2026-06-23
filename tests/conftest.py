@@ -13,8 +13,16 @@ from threading import Thread
 from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
-import brotli
-import jsonschema
+try:
+    import brotli
+except ImportError:
+    brotli = None
+
+try:
+    import jsonschema
+except ImportError:
+    jsonschema = None
+
 import pytest
 from pytest_localserver.http import WSGIServer
 from werkzeug.wrappers import Request, Response
@@ -232,6 +240,7 @@ def _capture_internal_warnings():
 @pytest.fixture
 def validate_event_schema(tmpdir):
     def inner(event):
+        assert jsonschema is not None
         if SENTRY_EVENT_SCHEMA:
             jsonschema.validate(instance=event, schema=SENTRY_EVENT_SCHEMA)
 
@@ -1641,6 +1650,7 @@ class CapturingServer(WSGIServer):
             rdr = gzip.GzipFile(fileobj=io.BytesIO(request.data))
             compressed = True
         elif content_encoding == "br":
+            assert brotli is not None
             rdr = io.BytesIO(brotli.decompress(request.data))
             compressed = True
         else:

@@ -1,5 +1,6 @@
 import logging
 import warnings
+from unittest import mock
 
 import pytest
 
@@ -536,6 +537,8 @@ def test_logger_with_all_attributes(sentry_init, capture_items):
         "logger.name": "test-logger",
         "sentry.origin": "auto.log.stdlib",
         "sentry.message.template": "log #%d",
+        "process.runtime.name": mock.ANY,
+        "process.runtime.version": mock.ANY,
         "sentry.message.parameter.0": 1,
         "sentry.environment": "production",
         "sentry.sdk.version": VERSION,
