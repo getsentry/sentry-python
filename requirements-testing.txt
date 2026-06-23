@@ -3,7 +3,6 @@ pytest-cov
 pytest-forked
 pytest-localserver
 pytest-timeout
-jsonschema
 executing
 asttokens
 responses
