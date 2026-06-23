@@ -102,6 +102,7 @@ def patch_django_asgi_handler_impl(cls: "Any") -> None:
             # https://github.com/django/django/commit/bcd255cd5ca0a1e686d276cca71f45ec400d84a2
             path_includes_root_path=DJANGO_VERSION >= (5, 1),
         )._run_asgi3
+
         return await middleware(scope, receive, send)
 
     cls.__call__ = sentry_patched_asgi_handler
