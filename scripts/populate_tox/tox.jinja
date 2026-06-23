@@ -79,9 +79,10 @@ deps =
 
     # === Common ===
     py3.8-common: hypothesis
+    common: brotli
+    common: pysocks
     common: pytest-asyncio
     common: httpcore[asyncio]
-    common: pysocks
     # See https://github.com/pytest-dev/pytest/issues/9621
     # and https://github.com/pytest-dev/pytest-forked/issues/67
     # for justification of the upper bound on pytest
@@ -98,6 +99,7 @@ deps =
     # for justification of the upper bound on pytest
     {py3.6,py3.7}-gevent: pytest<7.0.0
     {py3.8,py3.9,py3.10,py3.11,py3.12}-gevent: pytest
+    gevent: brotli
     gevent: pysocks
     gevent: pytest-asyncio
     gevent: setuptools<82
