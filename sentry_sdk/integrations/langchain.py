@@ -210,6 +210,8 @@ class LangchainIntegration(Integration):
     identifier = "langchain"
     origin = f"auto.ai.{identifier}"
 
+    _ignored_exceptions: "set[type[Exception]]" = set()
+
     def __init__(
         self: "LangchainIntegration",
         include_prompts: bool = True,
@@ -262,17 +264,22 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 self._exit_span(span, run_id)
 
     def _handle_error(self, run_id: "UUID", error: "Any") -> None:
+        is_ignored = isinstance(error, tuple(LangchainIntegration._ignored_exceptions))
+
         with capture_internal_exceptions():
             if not run_id or run_id not in self.span_map:
                 return
 
             span = self.span_map[run_id]
 
-            sentry_sdk.capture_exception(
-                error, span._scope if isinstance(span, StreamedSpan) else span.scope
-            )
+            if is_ignored:
+                span.__exit__(None, None, None)
+            else:
+                sentry_sdk.capture_exception(
+                    error, span._scope if isinstance(span, StreamedSpan) else span.scope
+                )
+                span.__exit__(type(error), error, error.__traceback__)
 
-            span.__exit__(type(error), error, error.__traceback__)
             del self.span_map[run_id]
 
     def _normalize_langchain_message(self, message: "BaseMessage") -> "Any":

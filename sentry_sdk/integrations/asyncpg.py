@@ -20,8 +20,12 @@ from sentry_sdk.utils import (
 )
 
 try:
-    import asyncpg  # type: ignore[import-not-found]
-    from asyncpg.cursor import BaseCursor  # type: ignore
+    import asyncpg  # type: ignore
+    from asyncpg.cursor import (  # type: ignore
+        BaseCursor,
+        Cursor,
+        CursorIterator,
+    )
 
 except ImportError:
     raise DidNotEnable("asyncpg not installed.")
@@ -169,6 +173,13 @@ def _wrap_cursor_method(
             return await f(*args, **kwargs)
 
         cursor = args[0]
+        if type(cursor) is CursorIterator:
+            span_op_override_value = OP.DB_CURSOR_ITERATOR
+        elif type(cursor) is Cursor:
+            span_op_override_value = OP.DB_CURSOR_FETCH
+        else:
+            span_op_override_value = None
+
         query = _normalize_query(cursor._query)
         with record_sql_queries(
             cursor=cursor,
@@ -178,6 +189,7 @@ def _wrap_cursor_method(
             executemany=False,
             record_cursor_repr=True,
             span_origin=AsyncPGIntegration.origin,
+            span_op_override_value=span_op_override_value,
         ) as span:
             _set_db_data(span, cursor._connection)
             res = await f(*args, **kwargs)
