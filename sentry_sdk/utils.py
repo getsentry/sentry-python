@@ -1,5 +1,4 @@
 import base64
-import contextvars
 import copy
 import json
 import linecache
@@ -83,29 +82,6 @@ epoch = datetime(1970, 1, 1)
 logger = logging.getLogger("sentry_sdk.errors")
 
 _installed_modules = None
-
-_is_sentry_internal_task = contextvars.ContextVar(
-    "is_sentry_internal_task", default=False
-)
-
-# These exceptions won't set the span status to error if they occur. Use
-# register_control_flow_exception to add to this list
-_control_flow_exception_classes: "set[type]" = set()
-
-
-def is_internal_task() -> bool:
-    return _is_sentry_internal_task.get()
-
-
-@contextmanager
-def mark_sentry_task_internal() -> "Generator[None, None, None]":
-    """Context manager to mark a task as Sentry internal."""
-    token = _is_sentry_internal_task.set(True)
-    try:
-        yield
-    finally:
-        _is_sentry_internal_task.reset(token)
-
 
 BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 
@@ -1467,6 +1443,26 @@ requests.
 
 Please refer to https://docs.sentry.io/platforms/python/contextvars/ for more information.
 """
+
+_is_sentry_internal_task = ContextVar("is_sentry_internal_task", default=False)
+
+# These exceptions won't set the span status to error if they occur. Use
+# register_control_flow_exception to add to this list
+_control_flow_exception_classes: "set[type]" = set()
+
+
+def is_internal_task() -> bool:
+    return _is_sentry_internal_task.get()
+
+
+@contextmanager
+def mark_sentry_task_internal() -> "Generator[None, None, None]":
+    """Context manager to mark a task as Sentry internal."""
+    token = _is_sentry_internal_task.set(True)
+    try:
+        yield
+    finally:
+        _is_sentry_internal_task.reset(token)
 
 
 def qualname_from_function(func: "Callable[..., Any]") -> "Optional[str]":
