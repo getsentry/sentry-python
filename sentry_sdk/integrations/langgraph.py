@@ -10,6 +10,9 @@ from sentry_sdk.ai.utils import (
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
+
+# This is fine because langgraph depends on langchain-base, and LangchainIntegration only imports from langchain-base.
+from sentry_sdk.integrations.langchain import LangchainIntegration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
@@ -19,6 +22,7 @@ from sentry_sdk.tracing_utils import (
 from sentry_sdk.utils import safe_serialize
 
 try:
+    from langgraph.errors import GraphBubbleUp
     from langgraph.graph import StateGraph
     from langgraph.pregel import Pregel
 except ImportError:
@@ -34,6 +38,7 @@ class LanggraphIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        LangchainIntegration._ignored_exceptions.add(GraphBubbleUp)
         # LangGraph lets users create agents using a StateGraph or the Functional API.
         # StateGraphs are then compiled to a CompiledStateGraph. Both CompiledStateGraph and
         # the functional API execute on a Pregel instance. Pregel is the runtime for the graph
