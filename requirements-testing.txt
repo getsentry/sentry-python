@@ -7,11 +7,6 @@ jsonschema
 executing
 asttokens
 responses
-<<<<<<< HEAD
-pysocks
-=======
-socksio
->>>>>>> master
 httpcore[http2]
 setuptools
 docker
