@@ -3,6 +3,10 @@ import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import HumanMessage
+from langchain_core.outputs import ChatResult
+from langgraph.errors import GraphBubbleUp
 
 import sentry_sdk
 from sentry_sdk import start_transaction
@@ -123,6 +127,15 @@ class MockPregelInstance:
 
     async def ainvoke(self, state, config=None):
         return {"messages": [MockMessage("Async Pregel response")]}
+
+
+class InterruptingChatModel(BaseChatModel):
+    @property
+    def _llm_type(self) -> str:
+        return "interrupting-chat-model"
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs) -> ChatResult:
+        raise GraphBubbleUp("interrupt")
 
 
 def test_langgraph_integration_init():
@@ -2104,3 +2117,17 @@ def test_langgraph_message_truncation(sentry_init, capture_events):
     assert len(parsed_messages) == 1
     assert "small message 5" in str(parsed_messages[0])
     assert tx["_meta"]["spans"]["0"]["data"]["gen_ai.request.messages"][""]["len"] == 5
+
+
+def test_graph_bubble_up_ignored(sentry_init, capture_items):
+    sentry_init(
+        integrations=[LanggraphIntegration()],
+    )
+
+    events = capture_items("event")
+
+    model = InterruptingChatModel()
+    with pytest.raises(GraphBubbleUp):
+        model.invoke([HumanMessage(content="hi")])
+
+    assert len(events) == 0
