@@ -13,7 +13,11 @@ from threading import Thread
 from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
-import brotli
+try:
+    import brotli
+except ImportError:
+    brotli = None
+
 import jsonschema
 import pytest
 from pytest_localserver.http import WSGIServer
@@ -1641,6 +1645,7 @@ class CapturingServer(WSGIServer):
             rdr = gzip.GzipFile(fileobj=io.BytesIO(request.data))
             compressed = True
         elif content_encoding == "br":
+            assert brotli is not None
             rdr = io.BytesIO(brotli.decompress(request.data))
             compressed = True
         else:
