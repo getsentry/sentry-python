@@ -95,6 +95,8 @@ html_theme = "shibuya"
 # documentation.
 #
 html_theme_options = {
+    "light_logo": "_static/logo-light.svg",
+    "dark_logo": "_static/logo-dark.svg",
     "github_url": "https://github.com/getsentry/sentry-python",
 }
 
