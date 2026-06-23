@@ -7,7 +7,6 @@ jsonschema
 executing
 asttokens
 responses
-socksio
 httpcore[http2]
 setuptools
 docker
