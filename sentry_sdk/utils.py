@@ -83,7 +83,6 @@ logger = logging.getLogger("sentry_sdk.errors")
 
 _installed_modules = None
 
-
 BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 
 FALSY_ENV_VALUES = frozenset(("false", "f", "n", "no", "off", "0"))
