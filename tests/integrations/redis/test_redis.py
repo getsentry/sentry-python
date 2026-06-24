@@ -336,10 +336,16 @@ def test_data_truncation_custom(
 
         assert parent["name"] == "custom parent"
         assert set1["name"] == expected_long
-        assert set1["attributes"][SPANDATA.DB_QUERY_TEXT] == expected_long
+        assert (
+            set1["attributes"][SPANDATA.DB_QUERY_TEXT]
+            == f"SET 'somekey1' '{long_string}'"
+        )
         assert set1["attributes"]["sentry.op"] == "db.redis"
         assert set2["name"] == expected_short
-        assert set2["attributes"][SPANDATA.DB_QUERY_TEXT] == expected_short
+        assert (
+            set2["attributes"][SPANDATA.DB_QUERY_TEXT]
+            == f"SET 'somekey2' '{short_string}'"
+        )
     else:
         events = capture_events()
         with start_transaction():

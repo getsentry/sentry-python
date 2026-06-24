@@ -83,28 +83,34 @@ def test_cache_basic(sentry_init, capture_events, capture_items, span_streaming)
         assert payloads[1]["attributes"]["sentry.op"] == "db.redis"
         assert payloads[1]["attributes"][SPANDATA.DB_OPERATION_NAME] == "GET"
         assert payloads[2]["attributes"]["sentry.op"] == "cache.get"
-        assert payloads[2]["attributes"][SPANDATA.CACHE_KEY] == ["mycachekey"]
+        assert payloads[2]["attributes"][SPANDATA.DB_QUERY_TEXT] == "GET 'mycachekey'"
 
         # set: db then cache.put
         assert payloads[3]["attributes"]["sentry.op"] == "db.redis"
         assert payloads[3]["attributes"][SPANDATA.DB_OPERATION_NAME] == "SET"
         assert payloads[4]["attributes"]["sentry.op"] == "cache.put"
-        assert payloads[4]["attributes"][SPANDATA.CACHE_KEY] == ["mycachekey1"]
+        assert (
+            payloads[4]["attributes"][SPANDATA.DB_QUERY_TEXT]
+            == "SET 'mycachekey1' [Filtered]"
+        )
 
         # setex: db then cache.put
         assert payloads[5]["attributes"]["sentry.op"] == "db.redis"
         assert payloads[5]["attributes"][SPANDATA.DB_OPERATION_NAME] == "SETEX"
         assert payloads[6]["attributes"]["sentry.op"] == "cache.put"
-        assert payloads[6]["attributes"][SPANDATA.CACHE_KEY] == ["mycachekey2"]
+        assert (
+            payloads[6]["attributes"][SPANDATA.DB_QUERY_TEXT]
+            == "SETEX 'mycachekey2' [Filtered] [Filtered]"
+        )
 
         # mget: db then cache.get
         assert payloads[7]["attributes"]["sentry.op"] == "db.redis"
         assert payloads[7]["attributes"][SPANDATA.DB_OPERATION_NAME] == "MGET"
         assert payloads[8]["attributes"]["sentry.op"] == "cache.get"
-        assert payloads[8]["attributes"][SPANDATA.CACHE_KEY] == [
-            "mycachekey1",
-            "mycachekey2",
-        ]
+        assert (
+            payloads[8]["attributes"][SPANDATA.DB_QUERY_TEXT]
+            == "MGET 'mycachekey1' [Filtered]"
+        )
 
         assert payloads[9]["name"] == "custom parent"
     else:
@@ -176,14 +182,14 @@ def test_cache_keys(sentry_init, capture_events, capture_items, span_streaming):
         assert payloads[1]["name"] == "GET 'blub'"
         assert payloads[2]["attributes"]["sentry.op"] == "cache.get"
         assert payloads[2]["name"] == "blub"
-        assert payloads[2]["attributes"][SPANDATA.CACHE_KEY] == ["blub"]
+        assert payloads[2]["attributes"][SPANDATA.DB_QUERY_TEXT] == "GET 'blub'"
 
         # blubkeything: db then cache.get
         assert payloads[3]["attributes"]["sentry.op"] == "db.redis"
         assert payloads[3]["name"] == "GET 'blubkeything'"
         assert payloads[4]["attributes"]["sentry.op"] == "cache.get"
         assert payloads[4]["name"] == "blubkeything"
-        assert payloads[4]["attributes"][SPANDATA.CACHE_KEY] == ["blubkeything"]
+        assert payloads[4]["attributes"][SPANDATA.DB_QUERY_TEXT] == "GET 'blubkeything'"
 
         # bl: db only (no prefix match)
         assert payloads[5]["attributes"]["sentry.op"] == "db.redis"
