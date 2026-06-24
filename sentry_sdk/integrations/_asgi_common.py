@@ -135,6 +135,9 @@ def _get_request_attributes(asgi_scope: "Any") -> "dict[str, Any]":
                 if query_string is not None
                 else url_without_query_string
             )
+            attributes["url.path"] = asgi_scope.get("root_path", "") + asgi_scope.get(
+                "path", ""
+            )
 
     client = asgi_scope.get("client")
     if client and should_send_default_pii():
