@@ -518,6 +518,12 @@ class SPANDATA:
     Example: postgresql
     """
 
+    DB_QUERY_TEXT = "db.query.text"
+    """
+    The database query being executed.
+    Example: "SELECT * FROM users WHERE id = $1"
+    """
+
     DB_SYSTEM_NAME = "db.system.name"
     """
     An identifier for the database management system (DBMS) product being used. See OpenTelemetry's list of well-known DBMS identifiers.

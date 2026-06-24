@@ -164,6 +164,10 @@ def record_sql_queries(
         sentry_sdk.add_breadcrumb(message=query, category="query", data=data)
 
     if has_span_streaming_enabled(client.options):
+        additional_attributes = {}
+        if query is not None:
+            additional_attributes["db.query.text"] = query
+
         with sentry_sdk.traces.start_span(
             name="<unknown SQL query>" if query is None else query,
             attributes={
@@ -171,6 +175,7 @@ def record_sql_queries(
                 "sentry.op": span_op_override_value
                 if span_op_override_value
                 else OP.DB,
+                **additional_attributes,
             },
         ) as span:
             yield span

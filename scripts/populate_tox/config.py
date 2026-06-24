@@ -435,7 +435,7 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["websockets<11.0", "aiohttp"],
             ">=22": ["sanic-testing"],
-            "py3.6": ["aiocontextvars==0.2.1"],
+            "py3.6": ["aiocontextvars==0.2.1", "dataclasses"],
             "py3.8": ["tracerite<1.1.2"],
         },
         "num_versions": 4,
