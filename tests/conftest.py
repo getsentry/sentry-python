@@ -13,8 +13,16 @@ from threading import Thread
 from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
-import brotli
-import jsonschema
+try:
+    import brotli
+except ImportError:
+    brotli = None
+
+try:
+    import jsonschema
+except ImportError:
+    jsonschema = None
+
 import pytest
 
 try:
@@ -241,6 +249,7 @@ def _capture_internal_warnings():
 @pytest.fixture
 def validate_event_schema(tmpdir):
     def inner(event):
+        assert jsonschema is not None
         if SENTRY_EVENT_SCHEMA:
             jsonschema.validate(instance=event, schema=SENTRY_EVENT_SCHEMA)
 
