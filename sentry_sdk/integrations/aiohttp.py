@@ -159,12 +159,7 @@ class AioHttpIntegration(Integration):
                                 header_value
                             )
 
-                        url_attributes = (
-                            {"url.query": request.query_string}
-                            if request.query_string
-                            else {}
-                        )
-
+                        url_attributes = {}
                         if should_send_default_pii():
                             url_attributes["url.full"] = "%s://%s%s" % (
                                 request.scheme,
@@ -172,6 +167,9 @@ class AioHttpIntegration(Integration):
                                 request.path,
                             )
                             url_attributes["url.path"] = request.path
+
+                            if request.query_string:
+                                url_attributes["url.query"] = request.query_string
 
                         client_address_attributes = {}
                         if should_send_default_pii() and request.remote:

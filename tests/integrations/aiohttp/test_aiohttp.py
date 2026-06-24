@@ -1296,12 +1296,14 @@ async def test_sensitive_header_passthrough_with_pii_span_streaming(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("send_pii", [True, False])
 async def test_url_query_attribute_span_streaming(
-    sentry_init, aiohttp_client, capture_items
+    sentry_init, aiohttp_client, capture_items, send_pii
 ):
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
+        send_default_pii=send_pii,
         _experiments={"trace_lifecycle": "stream"},
     )
 
@@ -1322,7 +1324,10 @@ async def test_url_query_attribute_span_streaming(
     assert len(items) == 2
     server_segment, client_segment = [item.payload for item in items]
 
-    assert server_segment["attributes"]["url.query"] == "foo=bar&baz=qux"
+    if send_pii:
+        assert server_segment["attributes"]["url.query"] == "foo=bar&baz=qux"
+    else:
+        assert "url.query" not in server_segment["attributes"]
 
 
 @pytest.mark.asyncio
