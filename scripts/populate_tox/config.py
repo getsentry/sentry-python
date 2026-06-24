@@ -108,8 +108,8 @@ TEST_SUITE_CONFIG = {
                 "djangorestframework",
                 "pytest-django",
                 "Werkzeug",
+                "channels[daphne]",
             ],
-            ">=2.0": ["channels[daphne]"],
             ">=2.2,<3.1": ["six"],
             ">=3.0": ["pytest-asyncio"],
             "<3.3": [
@@ -433,7 +433,7 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["websockets<11.0", "aiohttp"],
             ">=22": ["sanic-testing"],
-            "py3.6": ["aiocontextvars==0.2.1", "dataclasses"],
+            "py3.6": ["aiocontextvars==0.2.1"],
             "py3.8": ["tracerite<1.1.2"],
         },
         "num_versions": 4,
