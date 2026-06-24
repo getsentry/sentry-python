@@ -1,11 +1,9 @@
 pytest>=6.0.0
 pytest-cov
+dataclasses; python_version < "3.7"
 pytest-forked
-pytest-localserver
-pytest-timeout
 executing
 asttokens
 responses
-httpcore[http2]
 setuptools
 docker

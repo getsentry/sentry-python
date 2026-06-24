@@ -108,8 +108,8 @@ TEST_SUITE_CONFIG = {
                 "djangorestframework",
                 "pytest-django",
                 "Werkzeug",
+                "channels[daphne]",
             ],
-            ">=2.0": ["channels[daphne]"],
             ">=2.2,<3.1": ["six"],
             ">=3.0": ["pytest-asyncio"],
             "<3.3": [

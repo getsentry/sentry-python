@@ -6,7 +6,6 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk._compat import PY37, PY38
-from tests.conftest import CapturingServer
 
 pytest.importorskip("gevent")
 
@@ -25,18 +24,17 @@ def monkeypatched_gevent():
 
 
 @pytest.fixture
-def capturing_server(request):
-    server = CapturingServer()
-    server.start()
-    request.addfinalizer(server.stop)
-    return server
+def capturing_server(request, wsgi_capturing_server):
+    wsgi_capturing_server.start()
+    request.addfinalizer(wsgi_capturing_server.stop)
+    return wsgi_capturing_server
 
 
 @pytest.fixture
-def make_client(request, capturing_server):
+def make_client(request, wsgi_capturing_server):
     def inner(**kwargs):
         return sentry_sdk.Client(
-            "http://foobar@{}/132".format(capturing_server.url[len("http://") :]),
+            "http://foobar@{}/132".format(wsgi_capturing_server.url[len("http://") :]),
             **kwargs,
         )
 
