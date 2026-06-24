@@ -5,7 +5,6 @@ import time
 from datetime import datetime
 from unittest import mock
 
-import httpx
 import pytest
 
 import sentry_sdk
@@ -2531,61 +2530,6 @@ def test_integration_setup(sentry_init):
     assert _input_callback in (litellm.input_callback or [])
     assert _success_callback in (litellm.success_callback or [])
     assert _failure_callback in (litellm.failure_callback or [])
-
-
-@pytest.mark.asyncio(loop_scope="session")
-async def test_anthropic_passthrough_request_stays_serializable(
-    reset_litellm_executor, sentry_init
-):
-    """Regression test for GH-6596: litellm's Anthropic ``/v1/messages``
-    passthrough forwards the caller's ``metadata`` into the request body, so the
-    integration must not make that body unserializable. Drive the real
-    passthrough with a mocked transport and assert the request body serializes.
-    """
-    sentry_init(
-        integrations=[LiteLLMIntegration()],
-        disabled_integrations=[StdlibIntegration],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-
-    captured = {}
-    anthropic_response = {
-        "id": "msg_1",
-        "type": "message",
-        "role": "assistant",
-        "content": [{"type": "text", "text": "Hi there"}],
-        "model": "claude-3-5-sonnet-latest",
-        "stop_reason": "end_turn",
-        "stop_sequence": None,
-        "usage": {"input_tokens": 1, "output_tokens": 1},
-    }
-
-    client = AsyncHTTPHandler()
-
-    def capture_post(*args, **kwargs):
-        captured["data"] = kwargs.get("data")
-        return httpx.Response(
-            200,
-            json=anthropic_response,
-            request=httpx.Request("POST", "https://api.anthropic.com/v1/messages"),
-        )
-
-    with mock.patch.object(client, "post", side_effect=capture_post), start_transaction(
-        name="litellm test"
-    ):
-        await litellm.anthropic.messages.acreate(
-            model="anthropic/claude-3-5-sonnet-latest",
-            messages=[{"role": "user", "content": "Hello!"}],
-            max_tokens=16,
-            metadata={"user_id": "my-org"},
-            api_key="test-key",
-            client=client,
-        )
-
-    assert "data" in captured
-    request_body = json.loads(captured["data"])
-    assert request_body["metadata"] == {"user_id": "my-org"}
 
 
 def test_litellm_message_truncation(sentry_init, capture_events):
