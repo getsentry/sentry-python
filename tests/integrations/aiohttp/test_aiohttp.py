@@ -1137,10 +1137,14 @@ async def test_failed_request_status_codes_non_http_exception(
 
 
 @pytest.mark.asyncio
-async def test_tracing_span_streaming(sentry_init, aiohttp_client, capture_items):
+@pytest.mark.parametrize("send_pii", [True, False])
+async def test_tracing_span_streaming(
+    sentry_init, aiohttp_client, capture_items, send_pii
+):
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
+        send_default_pii=send_pii,
         _experiments={"trace_lifecycle": "stream"},
     )
 
@@ -1184,13 +1188,25 @@ async def test_tracing_span_streaming(sentry_init, aiohttp_client, capture_items
 
     # Request attributes derived directly from the aiohttp request.
     assert server_span["attributes"]["http.request.method"] == "GET"
-    # client.address and user.ip_address is gated on send_default_pii (default False), so it must
-    # not be captured here.
-    assert "client.address" not in server_span["attributes"]
-    assert "user.ip_address" not in server_span["attributes"]
-    url_full = server_span["attributes"]["url.full"]
-    assert url_full.startswith("http://127.0.0.1:")
-    assert url_full.endswith("/")
+
+    if send_pii:
+        assert "client.address" in server_span["attributes"]
+        assert "user.ip_address" in server_span["attributes"]
+
+        url_full = server_span["attributes"]["url.full"]
+        assert url_full.startswith("http://127.0.0.1:")
+        assert url_full.endswith("/")
+
+        url_path = server_span["attributes"]["url.path"]
+        assert url_path == "/"
+    else:
+        assert "url.full" not in server_span["attributes"]
+        assert "url.path" not in server_span["attributes"]
+        assert "url.query" not in server_span["attributes"]
+
+        assert "client.address" not in server_span["attributes"]
+        assert "user.ip_address" not in server_span["attributes"]
+
     # aiohttp's test client always sends a Host header; we assert it propagates
     # into the span attributes via _filter_headers.
     assert "http.request.header.host" in server_span["attributes"]
@@ -1486,12 +1502,14 @@ async def test_http_exception_ok_status_not_overridden_span_streaming(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("send_pii", [True, False])
 async def test_outgoing_client_span_span_streaming(
-    sentry_init, aiohttp_raw_server, aiohttp_client, capture_items
+    sentry_init, aiohttp_raw_server, aiohttp_client, capture_items, send_pii
 ):
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
+        send_default_pii=send_pii,
         _experiments={"trace_lifecycle": "stream"},
     )
 
@@ -1536,14 +1554,19 @@ async def test_outgoing_client_span_span_streaming(
     assert inner_client_span["attributes"]["sentry.origin"] == "auto.http.aiohttp"
     assert inner_client_span["attributes"]["http.request.method"] == "GET"
     assert inner_client_span["attributes"]["http.response.status_code"] == 200
-    assert inner_client_span["attributes"]["url.query"] == "foo=bar"
     assert inner_client_span["status"] == "ok"
 
-    url_full = inner_client_span["attributes"]["url.full"]
-    # parse_url() splits the URL — url.full is the base URL only, with the
-    # query string captured separately on url.query.
-    assert url_full.startswith("http://127.0.0.1:")
-    assert url_full.endswith("/")
+    if send_pii:
+        assert inner_client_span["attributes"]["url.query"] == "foo=bar"
+
+        url_full = inner_client_span["attributes"]["url.full"]
+
+        # parse_url() splits the URL — url.full is the base URL only, with the
+        # query string captured separately on url.query.
+        assert url_full.startswith("http://127.0.0.1:")
+        assert url_full.endswith("/")
+
+        assert inner_client_span["attributes"]["url.path"] == "/"
 
 
 @pytest.mark.asyncio

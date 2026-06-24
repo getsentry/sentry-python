@@ -159,11 +159,19 @@ class AioHttpIntegration(Integration):
                                 header_value
                             )
 
-                        url_query_attribute = (
+                        url_attributes = (
                             {"url.query": request.query_string}
                             if request.query_string
                             else {}
                         )
+
+                        if should_send_default_pii():
+                            url_attributes["url.full"] = "%s://%s%s" % (
+                                request.scheme,
+                                request.host,
+                                request.path,
+                            )
+                            url_attributes["url.path"] = request.path
 
                         client_address_attributes = {}
                         if should_send_default_pii() and request.remote:
@@ -180,10 +188,8 @@ class AioHttpIntegration(Integration):
                                 "sentry.op": OP.HTTP_SERVER,
                                 "sentry.origin": AioHttpIntegration.origin,
                                 "sentry.span.source": SegmentSource.ROUTE.value,
-                                "url.full": "%s://%s%s"
-                                % (request.scheme, request.host, request.path),
                                 "http.request.method": request.method,
-                                **url_query_attribute,
+                                **url_attributes,
                                 **client_address_attributes,
                                 **header_attributes,
                             },
@@ -354,8 +360,10 @@ def create_trace_config() -> "TraceConfig":
                 "sentry.origin": AioHttpIntegration.origin,
                 "http.request.method": method,
             }
-            if parsed_url is not None:
+            if parsed_url is not None and should_send_default_pii():
                 attributes["url.full"] = parsed_url.url
+                attributes["url.path"] = params.url.path
+
                 if parsed_url.query:
                     attributes["url.query"] = parsed_url.query
                 if parsed_url.fragment:
