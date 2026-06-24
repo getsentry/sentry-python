@@ -117,7 +117,6 @@ TEST_SUITE_CONFIG = {
                 "Werkzeug<2.1.0",
             ],
             "<3.1": ["pytest-django<4.0"],
-            "py3.6": ["dataclasses"],
             "py3.14,py3.14t": ["coverage==7.11.0"],
         },
     },
@@ -163,7 +162,6 @@ TEST_SUITE_CONFIG = {
                 "itsdangerous>=0.24,<2.0",
                 "jinja2<3.1.1",
             ],
-            "py3.6": ["dataclasses"],
         },
     },
     "gql": {
@@ -435,7 +433,7 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["websockets<11.0", "aiohttp"],
             ">=22": ["sanic-testing"],
-            "py3.6": ["aiocontextvars==0.2.1", "dataclasses"],
+            "py3.6": ["aiocontextvars==0.2.1"],
             "py3.8": ["tracerite<1.1.2"],
         },
         "num_versions": 4,
@@ -514,7 +512,6 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["werkzeug"],
             "<=5.0": ["werkzeug<1.0"],
-            "py3.6": ["dataclasses"],
         },
     },
     "typer": {
