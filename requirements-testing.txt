@@ -1,7 +1,6 @@
 pytest>=6.0.0
 pytest-cov
 pytest-forked
-pytest-timeout
 executing
 asttokens
 responses
