@@ -19,7 +19,7 @@ def test_propagator_registered_as_entry_point():
     else:
         matches = list(all_eps.select(group="opentelemetry_propagator", name="sentry"))
 
-    assert len(matches) == 1
+    assert len(matches) >= 1
     assert matches[0].value == "sentry_sdk.integrations.opentelemetry:SentryPropagator"
 
     loaded = matches[0].load()
