@@ -24,8 +24,17 @@ except ImportError:
     jsonschema = None
 
 import pytest
-from pytest_localserver.http import WSGIServer
-from werkzeug.wrappers import Request, Response
+
+try:
+    from pytest_localserver.http import WSGIServer
+except ImportError:
+    WSGIServer = None
+
+try:
+    from werkzeug.wrappers import Request, Response
+except ImportError:
+    Request = None
+    Response = None
 
 try:
     from starlette.testclient import TestClient
@@ -1624,53 +1633,61 @@ class ApproxDict(dict):
 CapturedData = namedtuple("CapturedData", ["path", "event", "envelope", "compressed"])
 
 
-class CapturingServer(WSGIServer):
-    def __init__(self, host="127.0.0.1", port=0, ssl_context=None):
-        WSGIServer.__init__(self, host, port, self, ssl_context=ssl_context)
-        self.code = 204
-        self.headers = {}
-        self.captured = []
+@pytest.fixture(scope="module")
+def wsgi_capturing_server():
+    assert WSGIServer is not None
 
-    def respond_with(self, code=200, headers=None):
-        self.code = code
-        if headers:
-            self.headers = headers
+    class CapturingServer(WSGIServer):
+        def __init__(self, host="127.0.0.1", port=0, ssl_context=None):
+            WSGIServer.__init__(self, host, port, self, ssl_context=ssl_context)
+            self.code = 204
+            self.headers = {}
+            self.captured = []
 
-    def clear_captured(self):
-        del self.captured[:]
+        def respond_with(self, code=200, headers=None):
+            self.code = code
+            if headers:
+                self.headers = headers
 
-    def __call__(self, environ, start_response):
-        """
-        This is the WSGI application.
-        """
-        request = Request(environ)
-        event = envelope = None
-        content_encoding = request.headers.get("content-encoding")
-        if content_encoding == "gzip":
-            rdr = gzip.GzipFile(fileobj=io.BytesIO(request.data))
-            compressed = True
-        elif content_encoding == "br":
-            assert brotli is not None
-            rdr = io.BytesIO(brotli.decompress(request.data))
-            compressed = True
-        else:
-            rdr = io.BytesIO(request.data)
-            compressed = False
+        def clear_captured(self):
+            del self.captured[:]
 
-        if request.mimetype == "application/json":
-            event = parse_json(rdr.read())
-        else:
-            envelope = Envelope.deserialize_from(rdr)
+        def __call__(self, environ, start_response):
+            """
+            This is the WSGI application.
+            """
+            assert Request is not None
+            assert Response is not None
 
-        self.captured.append(
-            CapturedData(
-                path=request.path,
-                event=event,
-                envelope=envelope,
-                compressed=compressed,
+            request = Request(environ)
+            event = envelope = None
+            content_encoding = request.headers.get("content-encoding")
+            if content_encoding == "gzip":
+                rdr = gzip.GzipFile(fileobj=io.BytesIO(request.data))
+                compressed = True
+            elif content_encoding == "br":
+                rdr = io.BytesIO(brotli.decompress(request.data))
+                compressed = True
+            else:
+                rdr = io.BytesIO(request.data)
+                compressed = False
+
+            if request.mimetype == "application/json":
+                event = parse_json(rdr.read())
+            else:
+                envelope = Envelope.deserialize_from(rdr)
+
+            self.captured.append(
+                CapturedData(
+                    path=request.path,
+                    event=event,
+                    envelope=envelope,
+                    compressed=compressed,
+                )
             )
-        )
 
-        response = Response(status=self.code)
-        response.headers.extend(self.headers)
-        return response(environ, start_response)
+            response = Response(status=self.code)
+            response.headers.extend(self.headers)
+            return response(environ, start_response)
+
+    return CapturingServer()
