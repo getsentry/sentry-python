@@ -1,13 +1,6 @@
 pytest>=6.0.0
 pytest-cov
 pytest-forked
-<<<<<<< HEAD
-pytest-localserver
-pytest-watch
-jsonschema
-=======
-pytest-timeout
->>>>>>> master
 executing
 asttokens
 responses
