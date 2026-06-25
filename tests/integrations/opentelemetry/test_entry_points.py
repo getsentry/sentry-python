@@ -1,18 +1,26 @@
-import importlib
-import os
-from unittest.mock import patch
-
-from opentelemetry import propagate
+try:
+    from importlib.metadata import entry_points
+except ImportError:
+    from importlib_metadata import entry_points
 
 from sentry_sdk.integrations.opentelemetry import SentryPropagator
 
 
-def test_propagator_loaded_if_mentioned_in_environment_variable():
-    try:
-        with patch.dict(os.environ, {"OTEL_PROPAGATORS": "sentry"}):
-            importlib.reload(propagate)
+def test_propagator_registered_as_entry_point():
+    all_eps = entry_points()
 
-            assert len(propagate.propagators) == 1
-            assert isinstance(propagate.propagators[0], SentryPropagator)
-    finally:
-        importlib.reload(propagate)
+    if isinstance(all_eps, dict):
+        # Python 3.7-3.8 stdlib returns a dict keyed by group
+        matches = [
+            ep
+            for ep in all_eps.get("opentelemetry_propagator", [])
+            if ep.name == "sentry"
+        ]
+    else:
+        matches = list(all_eps.select(group="opentelemetry_propagator", name="sentry"))
+
+    assert len(matches) >= 1
+    assert matches[0].value == "sentry_sdk.integrations.opentelemetry:SentryPropagator"
+
+    loaded = matches[0].load()
+    assert loaded is SentryPropagator
