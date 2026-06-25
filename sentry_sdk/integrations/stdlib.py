@@ -140,11 +140,10 @@ def _install_httplib() -> None:
             )
 
             span.set_data(SPANDATA.HTTP_METHOD, method)
-            if parsed_url is not None:
+            if parsed_url is not None and should_send_default_pii():
                 span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
-                if should_send_default_pii():
-                    span.set_data("url", parsed_url.url)
-                    span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
+                span.set_data("url", parsed_url.url)
+                span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
 
             set_on_span = span.set_data
 
