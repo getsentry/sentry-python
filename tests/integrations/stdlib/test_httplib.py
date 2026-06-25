@@ -1204,13 +1204,8 @@ def test_proxy_http_tunnel(
         assert span["data"][SPANDATA.HTTP_METHOD] == "GET"
         assert span["data"][SPANDATA.NETWORK_PEER_ADDRESS] == "localhost"
         assert span["data"][SPANDATA.NETWORK_PEER_PORT] == PROXY_PORT
-
-        if send_default_pii:
-            assert span["data"]["url"] == f"http://api.example.com{port_modifier}/foo"
-            assert span["data"][SPANDATA.HTTP_QUERY] == "bar=1"
-        else:
-            assert "url" not in span["data"]
-            assert SPANDATA.HTTP_QUERY not in span["data"]
+        assert span["data"]["url"] == f"http://api.example.com{port_modifier}/foo"
+        assert span["data"][SPANDATA.HTTP_QUERY] == "bar=1"
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
