@@ -208,6 +208,7 @@ def test_transaction_with_error(
         assert envelope["request"] == error_event["request"]
 
 
+@pytest.mark.parametrize("send_pii", [True, False])
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_transaction_no_error(
     sentry_init,
@@ -215,13 +216,14 @@ def test_transaction_no_error(
     capture_items,
     DictionaryContaining,  # noqa:N803
     span_streaming,
+    send_pii,
 ):
     def dogpark(environ, start_response):
         start_response("200 OK", [])
         return ["Go get the ball! Good dog!"]
 
     sentry_init(
-        send_default_pii=True,
+        send_default_pii=send_pii,
         traces_sample_rate=1.0,
         _experiments={
             "trace_lifecycle": "stream" if span_streaming else "static",
@@ -235,7 +237,7 @@ def test_transaction_no_error(
     else:
         events = capture_events()
 
-    client.get("/dogs/are/great/")
+    client.get("/dogs/are/great?toy=tennisball")
 
     sentry_sdk.flush()
 
@@ -248,9 +250,18 @@ def test_transaction_no_error(
         assert span["attributes"]["sentry.op"] == "http.server"
         assert span["attributes"]["sentry.span.source"] == "route"
         assert span["attributes"]["http.request.method"] == "GET"
-        assert span["attributes"]["url.full"] == "http://localhost/dogs/are/great/"
         assert span["attributes"]["http.response.status_code"] == 200
         assert span["status"] == "ok"
+
+        if send_pii:
+            assert span["attributes"]["url.full"] == "http://localhost/dogs/are/great"
+            assert span["attributes"]["url.path"] == "/dogs/are/great"
+            assert span["attributes"]["http.query"] == "toy=tennisball"
+        else:
+            assert "url.path" not in span["attributes"]
+            assert "url.full" not in span["attributes"]
+            assert "http.query" not in span["attributes"]
+
     else:
         envelope = events[0]
 
@@ -258,7 +269,11 @@ def test_transaction_no_error(
         assert envelope["transaction"] == "generic WSGI request"
         assert envelope["contexts"]["trace"]["op"] == "http.server"
         assert envelope["request"] == DictionaryContaining(
-            {"method": "GET", "url": "http://localhost/dogs/are/great/"}
+            {
+                "method": "GET",
+                "url": "http://localhost/dogs/are/great",
+                "query_string": "toy=tennisball",
+            }
         )
 
 
