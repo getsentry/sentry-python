@@ -79,8 +79,15 @@ deps =
 
     # === Common ===
     py3.8-common: hypothesis
+    common: brotli
+    common: httpcore[asyncio,http2]
+    common: jsonschema
+    common: pysocks
     common: pytest-asyncio
-    common: httpcore[asyncio]
+    common: pytest-timeout
+    common: pytest_localserver
+    common: socksio
+    common: werkzeug
     # See https://github.com/pytest-dev/pytest/issues/9621
     # and https://github.com/pytest-dev/pytest-forked/issues/67
     # for justification of the upper bound on pytest
@@ -97,8 +104,16 @@ deps =
     # for justification of the upper bound on pytest
     {py3.6,py3.7}-gevent: pytest<7.0.0
     {py3.8,py3.9,py3.10,py3.11,py3.12}-gevent: pytest
+    gevent: brotli
+    gevent: httpcore[http2]
+    gevent: jsonschema
+    gevent: pysocks
     gevent: pytest-asyncio
+    gevent: pytest-timeout
+    gevent: pytest_localserver
     gevent: setuptools<82
+    gevent: socksio
+    gevent: werkzeug
     {py3.10,py3.11}-gevent: zope.event<5.0.0
     {py3.10,py3.11}-gevent: zope.interface<8.0
 
