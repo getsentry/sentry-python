@@ -822,6 +822,7 @@ async def test_span_streaming_request_attributes_no_pii(sentry_init, capture_ite
     assert "http.request.header.host" in segment["attributes"]
 
     assert "url.full" not in segment["attributes"]
+    assert "url.path" not in segment["attributes"]
     assert "url.query" not in segment["attributes"]
     assert "client.address" not in segment["attributes"]
     assert "user.ip_address" not in segment["attributes"]
@@ -854,6 +855,7 @@ async def test_span_streaming_request_attributes_with_pii(sentry_init, capture_i
     assert (
         segment["attributes"]["url.full"] == "http://localhost/message?foo=bar&baz=qux"
     )
+    assert segment["attributes"]["url.path"] == "/message"
     assert segment["attributes"]["url.query"] == "foo=bar&baz=qux"
     assert "client.address" in segment["attributes"]
     assert "user.ip_address" in segment["attributes"]
