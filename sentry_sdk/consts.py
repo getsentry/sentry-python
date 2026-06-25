@@ -1328,7 +1328,7 @@ class ClientConstructor:
         before_send_metric: "Optional[Callable[[Metric, Hint], Optional[Metric]]]" = None,
         org_id: "Optional[str]" = None,
         strict_trace_continuation: bool = False,
-        stream_gen_ai_spans: bool = False,
+        stream_gen_ai_spans: bool = True,
     ) -> None:
         """Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.
 
