@@ -2,7 +2,7 @@ from contextlib import contextmanager
 from typing import Any, Generator
 
 import sentry_sdk
-from build.lib.sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk import start_span
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
