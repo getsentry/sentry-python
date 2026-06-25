@@ -96,7 +96,10 @@ def test_sync_client_spans(
         assert span["attributes"]["sentry.origin"] == "auto.http.pyreqwest"
 
         if send_default_pii:
-            assert span["attributes"]["url.full"] == f"http://localhost:{server_port}/hello"
+            assert (
+                span["attributes"]["url.full"]
+                == f"http://localhost:{server_port}/hello"
+            )
             assert span["attributes"][SPANDATA.URL_QUERY] == "q=test"
             assert span["attributes"][SPANDATA.URL_FRAGMENT] == "frag"
         else:

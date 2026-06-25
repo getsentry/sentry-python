@@ -2,10 +2,10 @@ from contextlib import contextmanager
 from typing import Any, Generator
 
 import sentry_sdk
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk import start_span
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
 from sentry_sdk.tracing_utils import (
