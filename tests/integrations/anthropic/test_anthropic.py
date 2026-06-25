@@ -3817,6 +3817,7 @@ def test_anthropic_message_truncation(sentry_init, capture_events):
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=False,
     )
     events = capture_events()
 
@@ -3869,6 +3870,7 @@ async def test_anthropic_message_truncation_async(sentry_init, capture_events):
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=False,
     )
     events = capture_events()
 
@@ -5337,6 +5339,7 @@ def test_message_with_base64_image(sentry_init, capture_events):
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=False,
     )
     events = capture_events()
     client = Anthropic(api_key="z")
@@ -5531,6 +5534,7 @@ def test_message_with_base64_pdf(sentry_init, capture_events):
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=False,
     )
     events = capture_events()
     client = Anthropic(api_key="z")
@@ -5719,6 +5723,7 @@ def test_message_with_mixed_content(sentry_init, capture_events):
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=False,
     )
     events = capture_events()
     client = Anthropic(api_key="z")
@@ -5802,6 +5807,7 @@ def test_message_with_multiple_images_different_formats(sentry_init, capture_eve
         integrations=[AnthropicIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=False,
     )
     events = capture_events()
     client = Anthropic(api_key="z")
