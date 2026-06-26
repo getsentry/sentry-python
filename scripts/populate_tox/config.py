@@ -110,6 +110,7 @@ TEST_SUITE_CONFIG = {
                 "pytest-forked",
                 "Werkzeug",
                 "channels[daphne]",
+                "executing",
             ],
             ">=3.0": ["pytest-asyncio"],
             "<3.3": [
@@ -343,7 +344,7 @@ TEST_SUITE_CONFIG = {
     "pure_eval": {
         "package": "pure_eval",
         "deps": {
-            "*": ["asttokens"],
+            "*": ["asttokens", "executing"],
         },
         "num_versions": 2,
     },
