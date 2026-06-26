@@ -562,6 +562,14 @@ def test_match_regex_list(item, regex_list, expected_result):
     assert match_regex_list(item, regex_list) == expected_result
 
 
+def test_match_regex_list_empty_string_pattern():
+    # An empty-string pattern must not raise IndexError (regression test).
+    result = match_regex_list("anything", [""])
+    assert isinstance(result, bool)
+    assert match_regex_list("foobar", ["foo"]) is False
+    assert match_regex_list("foo", ["foo"]) is True
+
+
 @pytest.mark.parametrize(
     "version,expected_result",
     [
