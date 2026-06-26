@@ -167,6 +167,9 @@ TEST_SUITE_CONFIG = {
     },
     "gql": {
         "package": "gql[all]",
+        "deps": {
+            "*": ["responses"],
+        },
         "num_versions": 2,
     },
     "google_genai": {
@@ -179,7 +182,7 @@ TEST_SUITE_CONFIG = {
     "graphene": {
         "package": "graphene",
         "deps": {
-            "*": ["blinker", "fastapi", "flask", "httpx"],
+            "*": ["blinker", "fastapi[test]", "flask", "httpx"],
             "py3.6": ["aiocontextvars"],
         },
     },

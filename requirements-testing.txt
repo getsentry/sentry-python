@@ -3,5 +3,4 @@ pytest-cov
 dataclasses; python_version < "3.7"
 executing
 asttokens
-responses
 setuptools
