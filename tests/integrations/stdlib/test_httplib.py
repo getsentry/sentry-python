@@ -77,7 +77,7 @@ CHUNKED_PORT = create_chunked_server()
 
 
 def test_crumb_capture(sentry_init, capture_events):
-    sentry_init(integrations=[StdlibIntegration()])
+    sentry_init(integrations=[StdlibIntegration()], send_default_pii=True)
     events = capture_events()
 
     url = "http://localhost:{}/some/random/url".format(PORT)
@@ -113,7 +113,7 @@ def test_crumb_capture(sentry_init, capture_events):
     ],
 )
 def test_crumb_capture_client_error(sentry_init, capture_events, status_code, level):
-    sentry_init(integrations=[StdlibIntegration()])
+    sentry_init(integrations=[StdlibIntegration()], send_default_pii=True)
     events = capture_events()
 
     url = f"http://localhost:{PORT}/status/{status_code}"  # noqa:E231
@@ -151,7 +151,11 @@ def test_crumb_capture_hint(sentry_init, capture_events):
         crumb["data"]["extra"] = "foo"
         return crumb
 
-    sentry_init(integrations=[StdlibIntegration()], before_breadcrumb=before_breadcrumb)
+    sentry_init(
+        integrations=[StdlibIntegration()],
+        before_breadcrumb=before_breadcrumb,
+        send_default_pii=True,
+    )
     events = capture_events()
 
     url = "http://localhost:{}/some/random/url".format(PORT)
@@ -203,7 +207,7 @@ def test_httplib_misuse(sentry_init, capture_events, request):
     wrongly.
     """
 
-    sentry_init()
+    sentry_init(send_default_pii=True)
     events = capture_events()
 
     conn = HTTPConnection("localhost", PORT)
@@ -1136,15 +1140,18 @@ def test_http_timeout(
 
 @pytest.mark.parametrize("tunnel_port", [8080, None])
 @pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("send_default_pii", [True, False])
 def test_proxy_http_tunnel(
     sentry_init,
     capture_events,
     capture_items,
     tunnel_port,
     span_streaming,
+    send_default_pii,
 ):
     sentry_init(
         traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
@@ -1154,7 +1161,7 @@ def test_proxy_http_tunnel(
         with sentry_sdk.traces.start_span(name="custom parent"):
             conn = HTTPConnection("localhost", PROXY_PORT)
             conn.set_tunnel("api.example.com", tunnel_port)
-            conn.request("GET", "/foo")
+            conn.request("GET", "/foo?bar=1")
             conn.getresponse()
 
         sentry_sdk.flush()
@@ -1167,20 +1174,26 @@ def test_proxy_http_tunnel(
 
         port_modifier = f":{tunnel_port}" if tunnel_port else ""
         assert span["name"] == f"GET http://api.example.com{port_modifier}/foo"
-        assert (
-            span["attributes"][SPANDATA.URL_FULL]
-            == f"http://api.example.com{port_modifier}/foo"
-        )
         assert span["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "GET"
         assert span["attributes"][SPANDATA.NETWORK_PEER_ADDRESS] == "localhost"
         assert span["attributes"][SPANDATA.NETWORK_PEER_PORT] == PROXY_PORT
+
+        if send_default_pii:
+            assert (
+                span["attributes"][SPANDATA.URL_FULL]
+                == f"http://api.example.com{port_modifier}/foo"
+            )
+            assert span["attributes"][SPANDATA.URL_QUERY] == "bar=1"
+        else:
+            assert SPANDATA.URL_FULL not in span["attributes"]
+            assert SPANDATA.URL_QUERY not in span["attributes"]
     else:
         events = capture_events()
 
         with start_transaction(name="test_transaction"):
             conn = HTTPConnection("localhost", PROXY_PORT)
             conn.set_tunnel("api.example.com", tunnel_port)
-            conn.request("GET", "/foo")
+            conn.request("GET", "/foo?bar=1")
             conn.getresponse()
 
         (event,) = events
@@ -1188,10 +1201,11 @@ def test_proxy_http_tunnel(
 
         port_modifier = f":{tunnel_port}" if tunnel_port else ""
         assert span["description"] == f"GET http://api.example.com{port_modifier}/foo"
-        assert span["data"]["url"] == f"http://api.example.com{port_modifier}/foo"
         assert span["data"][SPANDATA.HTTP_METHOD] == "GET"
         assert span["data"][SPANDATA.NETWORK_PEER_ADDRESS] == "localhost"
         assert span["data"][SPANDATA.NETWORK_PEER_PORT] == PROXY_PORT
+        assert span["data"]["url"] == f"http://api.example.com{port_modifier}/foo"
+        assert span["data"][SPANDATA.HTTP_QUERY] == "bar=1"
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
