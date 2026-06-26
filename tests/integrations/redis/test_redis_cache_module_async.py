@@ -15,6 +15,7 @@ if FakeRedisAsync is None:
     )
 
 import sentry_sdk
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
 from sentry_sdk.utils import parse_version
 
@@ -83,6 +84,7 @@ async def test_cache_basic(sentry_init, capture_events, capture_items, span_stre
         assert parent_span["name"] == "custom parent"
         assert db_span["attributes"]["sentry.op"] == "db.redis"
         assert cache_span["attributes"]["sentry.op"] == "cache.get"
+        assert cache_span["attributes"][SPANDATA.CACHE_KEY] == ["myasynccachekey"]
     else:
         events = capture_events()
         with sentry_sdk.start_transaction():
@@ -132,12 +134,14 @@ async def test_cache_keys(sentry_init, capture_events, capture_items, span_strea
         assert payloads[1]["name"] == "GET 'ablub'"
         assert payloads[2]["attributes"]["sentry.op"] == "cache.get"
         assert payloads[2]["name"] == "ablub"
+        assert payloads[2]["attributes"][SPANDATA.CACHE_KEY] == ["ablub"]
 
         # ablubkeything: db then cache.get
         assert payloads[3]["attributes"]["sentry.op"] == "db.redis"
         assert payloads[3]["name"] == "GET 'ablubkeything'"
         assert payloads[4]["attributes"]["sentry.op"] == "cache.get"
         assert payloads[4]["name"] == "ablubkeything"
+        assert payloads[4]["attributes"][SPANDATA.CACHE_KEY] == ["ablubkeything"]
 
         # abl: db only (no prefix match)
         assert payloads[5]["attributes"]["sentry.op"] == "db.redis"

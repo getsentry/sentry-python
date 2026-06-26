@@ -139,6 +139,7 @@ def test_sensitive_data(sentry_init, capture_events, capture_items, span_streami
 
             assert parent_span["name"] == "custom parent"
             assert redis_span["name"] == "GET [Filtered]"
+            assert redis_span["attributes"][SPANDATA.DB_QUERY_TEXT] == "GET [Filtered]"
             assert redis_span["attributes"]["sentry.op"] == "db.redis"
         else:
             events = capture_events()
@@ -177,8 +178,10 @@ def test_pii_data_redacted(sentry_init, capture_events, capture_items, span_stre
 
         assert parent["name"] == "custom parent"
         assert set1["name"] == "SET 'somekey1' [Filtered]"
+        assert set1["attributes"][SPANDATA.DB_QUERY_TEXT] == "SET 'somekey1' [Filtered]"
         assert set1["attributes"]["sentry.op"] == "db.redis"
         assert set2["name"] == "SET 'somekey2' [Filtered]"
+        assert set2["attributes"][SPANDATA.DB_QUERY_TEXT] == "SET 'somekey2' [Filtered]"
         assert get["name"] == "GET 'somekey2'"
         assert delete["name"] == "DEL 'somekey1' [Filtered]"
     else:
@@ -223,8 +226,16 @@ def test_pii_data_sent(sentry_init, capture_events, capture_items, span_streamin
 
         assert parent["name"] == "custom parent"
         assert set1["name"] == "SET 'somekey1' 'my secret string1'"
+        assert (
+            set1["attributes"][SPANDATA.DB_QUERY_TEXT]
+            == "SET 'somekey1' 'my secret string1'"
+        )
         assert set1["attributes"]["sentry.op"] == "db.redis"
         assert set2["name"] == "SET 'somekey2' 'my secret string2'"
+        assert (
+            set2["attributes"][SPANDATA.DB_QUERY_TEXT]
+            == "SET 'somekey2' 'my secret string2'"
+        )
         assert get["name"] == "GET 'somekey2'"
         assert delete["name"] == "DEL 'somekey1' 'somekey2'"
     else:
@@ -271,8 +282,16 @@ def test_no_data_truncation_by_default(
 
         assert parent["name"] == "custom parent"
         assert set1["name"] == f"SET 'somekey1' '{long_string}'"
+        assert (
+            set1["attributes"][SPANDATA.DB_QUERY_TEXT]
+            == f"SET 'somekey1' '{long_string}'"
+        )
         assert set1["attributes"]["sentry.op"] == "db.redis"
         assert set2["name"] == f"SET 'somekey2' '{short_string}'"
+        assert (
+            set2["attributes"][SPANDATA.DB_QUERY_TEXT]
+            == f"SET 'somekey2' '{short_string}'"
+        )
     else:
         events = capture_events()
         with start_transaction():
@@ -317,8 +336,16 @@ def test_data_truncation_custom(
 
         assert parent["name"] == "custom parent"
         assert set1["name"] == expected_long
+        assert (
+            set1["attributes"][SPANDATA.DB_QUERY_TEXT]
+            == f"SET 'somekey1' '{long_string}'"
+        )
         assert set1["attributes"]["sentry.op"] == "db.redis"
         assert set2["name"] == expected_short
+        assert (
+            set2["attributes"][SPANDATA.DB_QUERY_TEXT]
+            == f"SET 'somekey2' '{short_string}'"
+        )
     else:
         events = capture_events()
         with start_transaction():
@@ -401,6 +428,7 @@ def test_db_connection_attributes_client(
         assert redis_span["name"] == "GET 'foobar'"
         attrs = redis_span["attributes"]
         assert attrs["sentry.op"] == "db.redis"
+        assert attrs[SPANDATA.DB_QUERY_TEXT] == "GET 'foobar'"
         assert attrs[SPANDATA.DB_SYSTEM_NAME] == "redis"
         assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis-py"
         assert attrs[SPANDATA.DB_NAMESPACE] == "1"
@@ -508,6 +536,9 @@ def test_span_origin(sentry_init, capture_events, capture_items, span_streaming)
         assert parent_span["name"] == "custom parent"
         assert parent_span["attributes"]["sentry.origin"] == "manual"
         assert set_span["attributes"]["sentry.origin"] == "auto.db.redis"
+        assert (
+            set_span["attributes"][SPANDATA.DB_QUERY_TEXT] == "SET 'somekey' [Filtered]"
+        )
         assert pipeline_span["attributes"]["sentry.origin"] == "auto.db.redis"
     else:
         events = capture_events()

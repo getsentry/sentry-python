@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
 from sentry_sdk.tracing_utils import (
     add_http_request_source,
@@ -73,7 +74,7 @@ def _install_httpx2_client() -> None:
             ) as streamed_span:
                 attributes: "Attributes" = {}
 
-                if parsed_url is not None:
+                if parsed_url is not None and should_send_default_pii():
                     attributes["url.full"] = parsed_url.url
                     if parsed_url.query:
                         attributes["url.query"] = parsed_url.query
@@ -183,7 +184,7 @@ def _install_httpx2_async_client() -> None:
             ) as streamed_span:
                 attributes: "Attributes" = {}
 
-                if parsed_url is not None:
+                if parsed_url is not None and should_send_default_pii():
                     attributes["url.full"] = parsed_url.url
                     if parsed_url.query:
                         attributes["url.query"] = parsed_url.query
