@@ -4,6 +4,7 @@ This script populates tox.ini automatically using release data from PyPI.
 See scripts/populate_tox/README.md for more info.
 """
 
+import argparse
 import functools
 import hashlib
 import json
@@ -1165,6 +1166,70 @@ def _exit_if_pip_unavailable():
         raise exc
 
 
+def _parse_rendered_python_versions(rendered: str) -> list[ThreadedVersion]:
+    rendered = rendered.strip("{}")
+    return [
+        ThreadedVersion(
+            version.removeprefix("py").removesuffix("t"), no_gil=version.endswith("t")
+        )
+        for version in rendered.split(",")
+    ]
+
+
+def get_existing_releases_to_test(integration: str) -> list[PackageVersion]:
+    version_pattern = re.compile(
+        rf"^\s*(?P<python_versions>\{{[^}}]+\}})-{re.escape(integration)}-v(?P<version>\S+)\s*$"
+    )
+    releases = {}
+    with open(TOX_FILE) as tox_file:
+        for line in tox_file:
+            match = version_pattern.match(line)
+            if match is None:
+                continue
+            release = PackageVersion(match["version"])
+            release.python_versions = _parse_rendered_python_versions(
+                match["python_versions"]
+            )
+            release.rendered_python_versions = match["python_versions"]
+            release.transitive_dependencies = []
+            releases[release] = release
+
+    return sorted(releases.values())
+
+
+def get_releases_to_test(integration, package) -> list[Version] | None:
+    # Fetch data for the main package
+    pypi_data = fetch_package(package)
+    if pypi_data is None:
+        print("Failed to fetch necessary data from PyPI. Aborting.")
+        sys.exit(1)
+
+    # Get the list of all supported releases
+    releases, latest_prerelease = get_supported_releases(integration, pypi_data)
+
+    if not releases:
+        print("  Found no supported releases.")
+        return None
+
+    _compare_min_version_with_defined(integration, releases)
+
+    # Pick a handful of the supported releases to actually test against
+    # and fetch the PyPI data for each to determine which Python versions
+    # to test it on
+    return pick_releases_to_test(integration, releases, latest_prerelease)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--skip-version-update",
+        nargs="*",
+        default=[],
+        help="Integrations to skip version updates for.",
+    )
+    return parser.parse_args()
+
+
 def main() -> dict[str, list]:
     """
     Generate tox.ini from the tox.jinja template.
@@ -1226,6 +1291,9 @@ def main() -> dict[str, list]:
                 "_accessed": False,
             }
 
+    args = parse_args()
+    skip_version_updates = set(args.skip_version_update)
+
     # Process packages
     packages = defaultdict(list)
 
@@ -1236,31 +1304,16 @@ def main() -> dict[str, list]:
 
             print(f"Processing {integration}...")
 
-            # Figure out the actual main package
             package, extra = _get_package_name(integration)
 
-            # Fetch data for the main package
-            pypi_data = fetch_package(package)
-            if pypi_data is None:
-                print("Failed to fetch necessary data from PyPI. Aborting.")
-                sys.exit(1)
+            test_releases = None
+            if integration in skip_version_updates:
+                test_releases = get_existing_releases_to_test(integration)
+            else:
+                test_releases = get_releases_to_test(integration, package)
 
-            # Get the list of all supported releases
-
-            releases, latest_prerelease = get_supported_releases(integration, pypi_data)
-
-            if not releases:
-                print("  Found no supported releases.")
+            if test_releases is None:
                 continue
-
-            _compare_min_version_with_defined(integration, releases)
-
-            # Pick a handful of the supported releases to actually test against
-            # and fetch the PyPI data for each to determine which Python versions
-            # to test it on
-            test_releases = pick_releases_to_test(
-                integration, releases, latest_prerelease
-            )
 
             for release in test_releases:
                 _add_python_versions_to_release(integration, package, release)
