@@ -1513,9 +1513,10 @@ def test_request_url(sentry_init, capture_events, capture_items, span_streaming)
             for span in spans
             if span["attributes"].get("sentry.op") == "http.server"
         )
-        assert server_span["attributes"]["url.full"] == (
+        assert server_span["attributes"][SPANDATA.URL_FULL] == (
             "http://testserver/root/nomessage"
         )
+        assert server_span["attributes"][SPANDATA.URL_PATH] == "/root/nomessage"
     else:
         events = capture_events()
 
