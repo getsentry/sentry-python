@@ -134,6 +134,7 @@ def record_sql_queries(
     executemany: bool,
     record_cursor_repr: bool = False,
     span_origin: str = "manual",
+    span_op_override_value: "Optional[str]" = None,
 ) -> "Generator[Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan], None, None]":
     # TODO: Bring back capturing of params by default
     client = sentry_sdk.get_client()
@@ -163,17 +164,24 @@ def record_sql_queries(
         sentry_sdk.add_breadcrumb(message=query, category="query", data=data)
 
     if has_span_streaming_enabled(client.options):
+        additional_attributes = {}
+        if query is not None:
+            additional_attributes["db.query.text"] = query
+
         with sentry_sdk.traces.start_span(
             name="<unknown SQL query>" if query is None else query,
             attributes={
                 "sentry.origin": span_origin,
-                "sentry.op": OP.DB,
+                "sentry.op": span_op_override_value
+                if span_op_override_value
+                else OP.DB,
+                **additional_attributes,
             },
         ) as span:
             yield span
     else:
         with sentry_sdk.start_span(
-            op=OP.DB,
+            op=span_op_override_value if span_op_override_value is not None else OP.DB,
             name=query,
             origin=span_origin,
         ) as span:

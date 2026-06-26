@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from sentry_sdk._types import Event, Hint
 
 try:
-    import executing
+    from executing import Source
 except ImportError:
     raise DidNotEnable("executing is not installed")
 
@@ -60,7 +60,7 @@ class ExecutingIntegration(Integration):
 
                 for sentry_frame, tb in zip(sentry_frames, tbs):
                     frame = tb.tb_frame
-                    source = executing.Source.for_frame(frame)
+                    source = Source.for_frame(frame)
                     sentry_frame["function"] = source.code_qualname(frame.f_code)
 
             return event

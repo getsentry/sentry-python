@@ -259,8 +259,6 @@ class SafeRequests:
 ### Node.js
 
 ```javascript
-const axios = require('axios');
-const url = require('url');
 const dns = require('dns').promises;
 
 async function safeFetch(targetUrl) {
@@ -277,9 +275,9 @@ async function safeFetch(targetUrl) {
         throw new Error('Internal IP not allowed');
     }
 
-    return axios.get(targetUrl, {
-        maxRedirects: 0,
-        timeout: 30000
+    return fetch(targetUrl, {
+        redirect: 'error',
+        signal: AbortSignal.timeout(30000)
     });
 }
 ```

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration
-from sentry_sdk.scope import add_global_event_processor
+from sentry_sdk.scope import add_global_event_processor, should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import (
@@ -124,10 +124,10 @@ def _install_httplib() -> None:
                 },
             )
 
-            if parsed_url is not None:
+            if parsed_url is not None and should_send_default_pii():
+                span.set_attribute(SPANDATA.URL_FRAGMENT, parsed_url.fragment)
                 span.set_attribute(SPANDATA.URL_FULL, parsed_url.url)
                 span.set_attribute(SPANDATA.URL_QUERY, parsed_url.query)
-                span.set_attribute(SPANDATA.URL_FRAGMENT, parsed_url.fragment)
 
             set_on_span = span.set_attribute
 
@@ -141,9 +141,9 @@ def _install_httplib() -> None:
 
             span.set_data(SPANDATA.HTTP_METHOD, method)
             if parsed_url is not None:
+                span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
                 span.set_data("url", parsed_url.url)
                 span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-                span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
 
             set_on_span = span.set_data
 

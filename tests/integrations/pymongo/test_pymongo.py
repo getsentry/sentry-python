@@ -162,6 +162,9 @@ def test_segment_span_streaming(sentry_init, capture_items, mongo_server, with_p
     assert insert_success["attributes"]["db.collection.name"] == "test_collection"
     assert insert_fail["attributes"]["db.collection.name"] == "erroneous"
 
+    for span in find, insert_success, insert_fail:
+        assert span["attributes"][SPANDATA.DB_QUERY_TEXT] == span["name"]
+
     if with_pii:
         assert "1" in find["name"]
         assert "2" in insert_success["name"]
@@ -247,6 +250,7 @@ def test_breadcrumbs_span_streaming(sentry_init, capture_items, mongo_server, wi
     assert data["db.driver.name"] == "pymongo"
     assert data["db.operation.name"] == "find"
     assert data["db.collection.name"] == "test_collection"
+    assert data["db.query.text"] == crumb["message"]
     assert data["sentry.op"] == "db"
     assert data["sentry.origin"] == "auto.db.pymongo"
     assert data[SPANDATA.SERVER_ADDRESS] == "localhost"

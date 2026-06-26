@@ -18,10 +18,8 @@ from __future__ import annotations
 
 import base64
 import json
-import os
 import re
 import sys
-import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -55,6 +53,7 @@ OBFUSCATION_PATTERNS: list[tuple[str, str]] = [
     ("Zero-width characters", "Zero-width space, joiner, or non-joiner detected"),
     ("Right-to-left override", "RTL override character can hide text direction"),
     ("Homoglyph characters", "Characters visually similar to ASCII but from different Unicode blocks"),
+    ("Unicode Tag characters", "Tags block (U+E0000-E007F) can encode invisible ASCII text readable by LLMs"),
 ]
 
 SECRET_PATTERNS: list[tuple[str, str, str]] = [
@@ -238,6 +237,23 @@ def check_obfuscation(content: str, filepath: str) -> list[dict[str, Any]]:
                 "category": "Obfuscation",
             })
 
+    # Unicode Tag characters (U+E0000 block) — invisible text readable by LLMs
+    tag_pattern = re.compile(r"[\U000e0001-\U000e007f]")
+    tag_chars = tag_pattern.findall(content)
+    if tag_chars:
+        # Decode the hidden text
+        decoded = "".join(
+            chr(ord(c) - 0xE0000) for c in tag_chars if 0xE0020 <= ord(c) <= 0xE007E
+        )
+        findings.append({
+            "type": "Unicode Tag Smuggling",
+            "severity": "critical",
+            "location": filepath,
+            "description": f"Invisible Unicode Tag characters detected ({len(tag_chars)} chars). "
+                          f"Decoded hidden text: {decoded[:200]}",
+            "category": "Obfuscation",
+        })
+
     # Suspicious base64 strings (long base64 that decodes to text with suspicious keywords)
     b64_pattern = re.compile(r"[A-Za-z0-9+/]{40,}={0,2}")
     for line_num, line in enumerate(lines, 1):
@@ -361,9 +377,151 @@ def extract_urls(content: str, filepath: str) -> list[dict[str, Any]]:
     return urls
 
 
+def check_structural_attacks(skill_dir: Path, content: str, frontmatter: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """Detect structural attack patterns that go beyond text content."""
+    findings: list[dict[str, Any]] = []
+
+    # 1. Symlinks — files that resolve to paths outside the skill directory
+    for path in skill_dir.rglob("*"):
+        if path.is_symlink():
+            target = path.resolve()
+            is_internal = target.is_relative_to(skill_dir.resolve())
+            findings.append({
+                "type": "Symlink Detected",
+                "severity": "medium" if is_internal else "critical",
+                "location": str(path.relative_to(skill_dir)),
+                "description": f"Symlink points to {path.readlink()} (resolves to {str(target)}). "
+                              "Symlinks can trick agents into reading sensitive files (e.g., ~/.ssh/id_rsa) "
+                              "disguised as example/reference files.",
+                "category": "Symlink Exfiltration",
+            })
+
+    # 2. YAML hook exploitation — hooks in frontmatter execute shell commands
+    if frontmatter and "hooks" in frontmatter:
+        hooks = frontmatter["hooks"]
+        hook_types = hooks.keys() if isinstance(hooks, dict) else []
+        for hook_type in hook_types:
+            findings.append({
+                "type": "Frontmatter Hooks",
+                "severity": "critical",
+                "location": "SKILL.md frontmatter",
+                "description": f"Skill defines '{hook_type}' hooks. Hooks execute shell commands "
+                              "automatically on lifecycle events — the model cannot prevent execution. "
+                              "Review all hook commands carefully.",
+                "category": "Hook Exploitation",
+            })
+
+    # 3. !`command` pre-prompt injection — runs at template expansion time
+    bang_pattern = re.compile(r"!\`[^`]+\`")
+    for line_num, line in enumerate(content.split("\n"), 1):
+        for match in bang_pattern.finditer(line):
+            cmd = match.group()[2:-1]  # Strip !` and `
+            findings.append({
+                "type": "Pre-prompt Command",
+                "severity": "high",
+                "location": f"SKILL.md:{line_num}",
+                "description": f"!`command` syntax executes at skill load time before the model sees "
+                              f"the prompt. Command: {cmd}",
+                "evidence": line.strip()[:200],
+                "category": "Pre-prompt Injection",
+            })
+
+    # 4. Test file auto-discovery — conftest.py, test_*.py, *.test.js/ts
+    test_patterns = {
+        "conftest.py": "pytest auto-imports conftest.py at collection time — code runs before any tests",
+        "test_*.py": "pytest discovers and runs test_*.py files automatically",
+        "*_test.py": "pytest discovers and runs *_test.py files automatically",
+        "*.test.js": "Jest/Vitest may discover .test.js files if dot:true glob is set",
+        "*.test.ts": "Jest/Vitest may discover .test.ts files if dot:true glob is set",
+    }
+    for path in skill_dir.rglob("*"):
+        if not path.is_file():
+            continue
+        name = path.name
+        for pattern, desc in test_patterns.items():
+            import fnmatch
+            if fnmatch.fnmatch(name, pattern):
+                findings.append({
+                    "type": "Test File Auto-Discovery",
+                    "severity": "high",
+                    "location": str(path.relative_to(skill_dir)),
+                    "description": f"{desc}. Bundled test files execute as a side effect of running "
+                                  "the test suite — review file contents for hidden payloads.",
+                    "category": "Test File RCE",
+                })
+
+    # 5. npm postinstall — bundled package.json with lifecycle scripts
+    for pkg_json in skill_dir.rglob("package.json"):
+        try:
+            pkg = json.loads(pkg_json.read_text(encoding="utf-8", errors="replace"))
+        except (json.JSONDecodeError, OSError, ValueError):
+            continue
+        scripts = pkg.get("scripts") or {}
+        lifecycle_hooks = ["preinstall", "install", "postinstall", "preuninstall", "postuninstall"]
+        for hook in lifecycle_hooks:
+            if hook in scripts:
+                findings.append({
+                    "type": "npm Lifecycle Hook",
+                    "severity": "critical",
+                    "location": str(pkg_json.relative_to(skill_dir)),
+                    "description": f"package.json defines '{hook}' script: {scripts[hook]}. "
+                                  "npm executes lifecycle hooks automatically on install — "
+                                  "this is a common supply chain attack vector.",
+                    "category": "Supply Chain",
+                })
+
+    # 6. Image metadata — parse PNG chunks properly to find tEXt/iTXt metadata
+    import struct
+    for img_path in skill_dir.rglob("*.png"):
+        try:
+            data = img_path.read_bytes()
+            # PNG files start with 8-byte signature, then chunks
+            # Each chunk: 4-byte length (big-endian), 4-byte type, data, 4-byte CRC
+            if data[:8] != b"\x89PNG\r\n\x1a\n":
+                continue
+            offset = 8
+            while offset + 8 <= len(data):
+                chunk_len = struct.unpack(">I", data[offset:offset + 4])[0]
+                chunk_type = data[offset + 4:offset + 8]
+                chunk_data = data[offset + 8:offset + 8 + chunk_len]
+
+                keyword = ""
+                value = ""
+                if chunk_type == b"tEXt":
+                    # tEXt: keyword\0text
+                    parts = chunk_data.split(b"\x00", 1)
+                    if len(parts) > 1:
+                        keyword = parts[0].decode("ascii", errors="ignore")
+                        value = parts[1][:200].decode("latin-1", errors="ignore")
+                elif chunk_type == b"iTXt":
+                    # iTXt: keyword\0comprFlag\0comprMethod\0langTag\0transKeyword\0text
+                    parts = chunk_data.split(b"\x00", 4)
+                    if len(parts) >= 5:
+                        keyword = parts[0].decode("ascii", errors="ignore")
+                        value = parts[4][:200].decode("utf-8", errors="ignore")
+
+                if keyword and value.strip():
+                            findings.append({
+                                "type": "Image Metadata Text",
+                                "severity": "high",
+                                "location": str(img_path.relative_to(skill_dir)),
+                                "description": f"PNG contains text metadata ('{keyword}'): {value[:100]}. "
+                                              "Hidden instructions in image metadata can be read by "
+                                              "multimodal LLMs when they inspect the file.",
+                                "category": "Image Injection",
+                            })
+
+                # Advance to next chunk: length + type(4) + data + CRC(4)
+                offset += 4 + 4 + chunk_len + 4
+        except (OSError, struct.error):
+            continue
+
+    return findings
+
+
 def compute_description_body_overlap(frontmatter: dict[str, Any] | None, body: str) -> float:
     """Compute keyword overlap between description and body as a heuristic."""
-    if not frontmatter or "description" not in frontmatter:
+    if not frontmatter or "description" not in frontmatter or frontmatter["description"] is None:
         return 0.0
 
     desc_words = set(re.findall(r"\b[a-z]{4,}\b", frontmatter["description"].lower()))
@@ -441,7 +599,10 @@ def scan_skill(skill_dir: Path) -> dict[str, Any]:
 
     all_findings.extend(script_findings)
 
-    # 8. Description-body overlap
+    # 8. Structural attacks (symlinks, hooks, !command, test files, npm, image metadata)
+    all_findings.extend(check_structural_attacks(skill_dir, content, frontmatter))
+
+    # 9. Description-body overlap
     overlap = compute_description_body_overlap(frontmatter, body)
 
     # Build structure info
