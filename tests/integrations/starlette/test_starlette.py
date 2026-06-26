@@ -146,6 +146,12 @@ def starlette_app_factory(middleware=None, debug=True):
         "TRACE",
     ]
 
+    mounted_app = starlette.applications.Starlette(
+        routes=[
+            starlette.routing.Route("/nomessage", _nomessage, methods=all_methods),
+        ],
+    )
+
     app = starlette.applications.Starlette(
         debug=debug,
         routes=[
@@ -160,6 +166,7 @@ def starlette_app_factory(middleware=None, debug=True):
             starlette.routing.Route("/body/json", _body_json, methods=["POST"]),
             starlette.routing.Route("/body/form", _body_form, methods=["POST"]),
             starlette.routing.Route("/body/raw", _body_raw, methods=["POST"]),
+            starlette.routing.Mount("/root", app=mounted_app),
         ],
         middleware=middleware,
     )
@@ -1475,6 +1482,48 @@ def test_transaction_http_method_default(sentry_init, capture_events):
     (event,) = events
 
     assert event["request"]["method"] == "GET"
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_request_url(sentry_init, capture_events, capture_items, span_streaming):
+    sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        integrations=[
+            StarletteIntegration(),
+        ],
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
+
+    starlette_app = starlette_app_factory()
+
+    client = TestClient(starlette_app)
+
+    if span_streaming:
+        items = capture_items("span")
+
+        client.get("/root/nomessage")
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+
+        (server_span,) = (
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == "http.server"
+        )
+        assert server_span["attributes"][SPANDATA.URL_FULL] == (
+            "http://testserver/root/nomessage"
+        )
+        assert server_span["attributes"][SPANDATA.URL_PATH] == "/root/nomessage"
+    else:
+        events = capture_events()
+
+        client.get("/root/nomessage")
+
+        (event,) = events
+        assert event["request"]["url"] == "http://testserver/root/nomessage"
 
 
 @pytest.mark.skipif(

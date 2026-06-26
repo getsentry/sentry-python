@@ -62,6 +62,7 @@ from tests.integrations.starlette import test_starlette
 
 def fastapi_app_factory():
     app = FastAPI()
+    mounted_app = FastAPI()
 
     @app.get("/error")
     async def _error():
@@ -74,6 +75,7 @@ def fastapi_app_factory():
         capture_message("Hi")
         return {"message": "Hi"}
 
+    @mounted_app.get("/nomessage")
     @app.delete("/nomessage")
     @app.get("/nomessage")
     @app.head("/nomessage")
@@ -117,6 +119,8 @@ def fastapi_app_factory():
     ):
         capture_message("hi")
         return {"status": "ok"}
+
+    app.mount("/root", mounted_app)
 
     return app
 
@@ -1041,6 +1045,48 @@ def test_transaction_http_method_custom(sentry_init, capture_events):
 
     assert event1["request"]["method"] == "OPTIONS"
     assert event2["request"]["method"] == "HEAD"
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_request_url(sentry_init, capture_events, capture_items, span_streaming):
+    sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        integrations=[
+            StarletteIntegration(),
+        ],
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
+
+    starlette_app = fastapi_app_factory()
+
+    client = TestClient(starlette_app)
+
+    if span_streaming:
+        items = capture_items("span")
+
+        client.get("/root/nomessage")
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+
+        (server_span,) = (
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == "http.server"
+        )
+        assert server_span["attributes"][SPANDATA.URL_FULL] == (
+            "http://testserver/root/nomessage"
+        )
+        assert server_span["attributes"][SPANDATA.URL_PATH] == "/root/nomessage"
+    else:
+        events = capture_events()
+
+        client.get("/root/nomessage")
+
+        (event,) = events
+        assert event["request"]["url"] == "http://testserver/root/nomessage"
 
 
 @parametrize_test_configurable_status_codes

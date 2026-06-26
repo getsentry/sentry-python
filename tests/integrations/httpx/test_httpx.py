@@ -1119,18 +1119,20 @@ def test_span_origin_span_streaming(
     assert http_span["attributes"]["sentry.origin"] == "auto.http.httpx"
 
 
+@pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize(
     "httpx_client",
     (httpx.Client(), httpx.AsyncClient()),
 )
 def test_http_url_attributes_span_streaming(
-    sentry_init, capture_items, httpx_client, httpx_mock
+    sentry_init, capture_items, httpx_client, httpx_mock, send_default_pii
 ):
     httpx_mock.add_response()
 
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
         _experiments={"trace_lifecycle": "stream"},
     )
 
@@ -1148,24 +1150,32 @@ def test_http_url_attributes_span_streaming(
     http_span = _get_http_client_span(items)
 
     assert http_span["attributes"]["http.request.method"] == "GET"
-    assert http_span["attributes"]["url.full"] == "http://example.com/"
-    assert http_span["attributes"]["url.query"] == "foo=bar"
-    assert http_span["attributes"]["url.fragment"] == "frag"
     assert http_span["attributes"]["http.response.status_code"] == 200
 
+    if send_default_pii:
+        assert http_span["attributes"]["url.full"] == "http://example.com/"
+        assert http_span["attributes"]["url.query"] == "foo=bar"
+        assert http_span["attributes"]["url.fragment"] == "frag"
+    else:
+        assert "url.full" not in http_span["attributes"]
+        assert "url.query" not in http_span["attributes"]
+        assert "url.fragment" not in http_span["attributes"]
 
+
+@pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize(
     "httpx_client",
     (httpx.Client(), httpx.AsyncClient()),
 )
 def test_http_url_attributes_no_query_or_fragment_span_streaming(
-    sentry_init, capture_items, httpx_client, httpx_mock
+    sentry_init, capture_items, httpx_client, httpx_mock, send_default_pii
 ):
     httpx_mock.add_response()
 
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
         _experiments={"trace_lifecycle": "stream"},
     )
 
@@ -1183,7 +1193,11 @@ def test_http_url_attributes_no_query_or_fragment_span_streaming(
     http_span = _get_http_client_span(items)
 
     assert http_span["attributes"]["http.request.method"] == "GET"
-    assert http_span["attributes"]["url.full"] == "http://example.com/"
+    assert http_span["attributes"]["http.response.status_code"] == 200
     assert "url.query" not in http_span["attributes"]
     assert "url.fragment" not in http_span["attributes"]
-    assert http_span["attributes"]["http.response.status_code"] == 200
+
+    if send_default_pii:
+        assert http_span["attributes"]["url.full"] == "http://example.com/"
+    else:
+        assert "url.full" not in http_span["attributes"]

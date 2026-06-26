@@ -5,6 +5,7 @@ import sentry_sdk
 from sentry_sdk import start_span
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
 from sentry_sdk.tracing_utils import (
@@ -95,7 +96,7 @@ def _sentry_pyreqwest_span(request: "Request") -> "Generator[Any, None, None]":
                 SPANDATA.HTTP_REQUEST_METHOD: request.method,
             },
         ) as span:
-            if parsed_url is not None:
+            if parsed_url is not None and should_send_default_pii():
                 span.set_attribute(SPANDATA.URL_FULL, parsed_url.url)
                 span.set_attribute(SPANDATA.URL_QUERY, parsed_url.query)
                 span.set_attribute(SPANDATA.URL_FRAGMENT, parsed_url.fragment)

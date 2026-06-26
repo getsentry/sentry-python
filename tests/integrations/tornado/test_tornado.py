@@ -110,6 +110,7 @@ def test_basic(tornado_testcase, sentry_init, capture_events):
     assert not sentry_sdk.get_isolation_scope()._tags
 
 
+@pytest.mark.parametrize("send_pii", [True, False])
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize(
     "handler,code",
@@ -126,10 +127,12 @@ def test_transactions(
     handler,
     code,
     span_streaming,
+    send_pii,
 ):
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
+        send_default_pii=send_pii,
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
@@ -185,11 +188,18 @@ def test_transactions(
         assert server_segment["attributes"]["http.request.method"] == "POST"
         assert server_segment["attributes"]["http.request.body.data"] == "heyoo"
         assert server_segment["attributes"]["http.response.status_code"] == code
-        assert server_segment["attributes"]["url.query"] == "foo=bar"
-        assert server_segment["attributes"]["url.full"].endswith("/hi?foo=bar")
-        assert server_segment["attributes"]["url.full"].startswith("http://")
         assert server_segment["status"] == ("ok" if code == 200 else "error")
         assert client_segment["trace_id"] == server_segment["trace_id"]
+
+        if send_pii:
+            assert server_segment["attributes"]["url.query"] == "foo=bar"
+            assert server_segment["attributes"]["url.full"].endswith("/hi?foo=bar")
+            assert server_segment["attributes"]["url.full"].startswith("http://")
+            assert server_segment["attributes"]["url.path"] == "/hi"
+        else:
+            assert "url.query" not in server_segment["attributes"]
+            assert "url.full" not in server_segment["attributes"]
+            assert "url.path" not in server_segment["attributes"]
     else:
         if code == 200:
             client_tx, server_tx = events
@@ -227,7 +237,7 @@ def test_transactions(
 
         request = server_tx["request"]
         host = request["headers"]["Host"]
-        assert server_tx["request"] == {
+        expected_request = {
             "env": {"REMOTE_ADDR": "127.0.0.1"},
             "headers": {
                 "Accept-Encoding": "gzip",
@@ -239,6 +249,9 @@ def test_transactions(
             "data": {"heyoo": [""]},
             "url": "http://{host}/hi".format(host=host),
         }
+        if send_pii:
+            expected_request["cookies"] = {}
+        assert server_tx["request"] == expected_request
 
         assert (
             client_tx["contexts"]["trace"]["trace_id"]

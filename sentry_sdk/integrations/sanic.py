@@ -380,10 +380,12 @@ def _get_request_attributes(request: "Request") -> "Dict[str, Any]":
 
     urlparts = urlsplit(request.url)
 
-    if urlparts.query:
-        attributes[SPANDATA.HTTP_QUERY] = urlparts.query
+    if should_send_default_pii():
+        attributes[SPANDATA.URL_FULL] = request.url
+        attributes["url.path"] = urlparts.path
 
-    attributes[SPANDATA.URL_FULL] = request.url
+        if urlparts.query:
+            attributes[SPANDATA.HTTP_QUERY] = urlparts.query
 
     if urlparts.scheme:
         attributes[SPANDATA.NETWORK_PROTOCOL_NAME] = urlparts.scheme
