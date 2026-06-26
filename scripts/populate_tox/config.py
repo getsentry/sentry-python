@@ -165,6 +165,9 @@ TEST_SUITE_CONFIG = {
                 "itsdangerous>=0.24,<2.0",
                 "jinja2<3.1.1",
             ],
+            "py3.6,py3.7": [
+                "setuptools<82"
+            ],  # Handled by importlib.metadata on Python 3.8+
         },
     },
     "gql": {
@@ -185,7 +188,8 @@ TEST_SUITE_CONFIG = {
         "package": "graphene",
         "deps": {
             "*": ["blinker", "fastapi[test]", "flask", "httpx"],
-            "py3.6": ["aiocontextvars"],
+            "py3.6": ["aiocontextvars", "setuptools<82"],
+            "py3.7": ["setuptools<82"],  # Handled by importlib.metadata on Python 3.8+
         },
     },
     "grpc": {
@@ -449,7 +453,8 @@ TEST_SUITE_CONFIG = {
             "*": ["websockets<11.0", "aiohttp"],
             ">=22": ["sanic-testing"],
             "py3.6": ["aiocontextvars==0.2.1"],
-            "py3.8": ["tracerite<1.1.2"],
+            # tracerite imports pkg_resources before https://github.com/sanic-org/tracerite/commit/2f68543fab726d12d5c5d71fab584eb42140f410
+            "py3.8": ["tracerite<1.1.2", "setuptools<82"],
         },
         "num_versions": 4,
     },
