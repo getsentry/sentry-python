@@ -1123,6 +1123,7 @@ def test_http_url_attributes_span_streaming(
     sentry_init(
         integrations=[Httpx2Integration()],
         traces_sample_rate=1.0,
+        send_default_pii=True,
         _experiments={"trace_lifecycle": "stream"},
     )
 
@@ -1158,6 +1159,7 @@ def test_http_url_attributes_no_query_or_fragment_span_streaming(
     sentry_init(
         integrations=[Httpx2Integration()],
         traces_sample_rate=1.0,
+        send_default_pii=True,
         _experiments={"trace_lifecycle": "stream"},
     )
 
@@ -1176,6 +1178,41 @@ def test_http_url_attributes_no_query_or_fragment_span_streaming(
 
     assert http_span["attributes"]["http.request.method"] == "GET"
     assert http_span["attributes"]["url.full"] == "http://example.com/"
+    assert "url.query" not in http_span["attributes"]
+    assert "url.fragment" not in http_span["attributes"]
+    assert http_span["attributes"]["http.response.status_code"] == 200
+
+
+@pytest.mark.parametrize(
+    "httpx2_client",
+    (httpx2.Client(), httpx2.AsyncClient()),
+)
+def test_http_url_attributes_pii_disabled_span_streaming(
+    sentry_init, capture_items, httpx2_client, httpx2_mock
+):
+    httpx2_mock.add_response()
+
+    sentry_init(
+        integrations=[Httpx2Integration()],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    items = capture_items("span")
+
+    url = "http://example.com/?foo=bar#frag"
+
+    if asyncio.iscoroutinefunction(httpx2_client.get):
+        asyncio.run(httpx2_client.get(url))
+    else:
+        httpx2_client.get(url)
+
+    sentry_sdk.flush()
+
+    http_span = _get_http_client_span(items)
+
+    assert http_span["attributes"]["http.request.method"] == "GET"
+    assert "url.full" not in http_span["attributes"]
     assert "url.query" not in http_span["attributes"]
     assert "url.fragment" not in http_span["attributes"]
     assert http_span["attributes"]["http.response.status_code"] == 200
