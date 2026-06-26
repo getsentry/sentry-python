@@ -92,10 +92,6 @@ class SentryLitestarASGIMiddleware(SentryAsgiMiddleware):
             mechanism_type="asgi",
             span_origin=span_origin,
             asgi_version=3,
-            # Unlike Starlette, LiteStar does not extend scope["root_path"] with the mount path.
-            # Since LiteStar handles servers that include and do not include scope["root_path"] in scope["path"]
-            # with the commit below, keep the existing behavior for compatibility.
-            # https://github.com/litestar-org/litestar/commit/72dda171768bd470adc065c47c1ecf1d80b5e749
             path_includes_root_path=False,
         )
 

@@ -14,9 +14,7 @@ from sentry_sdk import (
     set_tag,
 )
 from sentry_sdk.integrations.logging import LoggingIntegration
-from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE, package_version
-
-QUART_VERSION = package_version("quart")
+from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 
 
 def quart_app_factory():
@@ -44,10 +42,6 @@ def quart_app_factory():
     @app.route("/message")
     async def hi():
         capture_message("hi")
-        return "ok"
-
-    @app.route("/nomessage")
-    async def nomessage():
         return "ok"
 
     @app.route("/message/<message_id>")
@@ -689,25 +683,6 @@ async def test_span_origin(sentry_init, capture_events):
 
 
 @pytest.mark.asyncio
-async def test_request_url(sentry_init, capture_events):
-    sentry_init(
-        traces_sample_rate=1.0,
-        integrations=[quart_sentry.QuartIntegration()],
-    )
-    app = quart_app_factory()
-    client = app.test_client()
-
-    events = capture_events()
-
-    # https://github.com/pallets/quart/commit/7be545c
-    url = "/root/nomessage" if QUART_VERSION >= (0, 19) else "/nomessage"
-    await client.get(url, root_path="/root")
-
-    (event,) = events
-    assert event["request"]["url"] == "http://localhost/root/nomessage"
-
-
-@pytest.mark.asyncio
 async def test_span_streaming_basic(sentry_init, capture_items):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
@@ -991,31 +966,3 @@ async def test_span_streaming_sensitive_header_passthrough_with_pii(
         segment["attributes"]["http.request.header.authorization"]
         == "Bearer secret-token"
     )
-
-
-@pytest.mark.asyncio
-async def test_span_streaming_request_url(sentry_init, capture_items):
-    sentry_init(
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-        integrations=[quart_sentry.QuartIntegration()],
-        _experiments={
-            "trace_lifecycle": "stream",
-        },
-    )
-    app = quart_app_factory()
-    client = app.test_client()
-
-    items = capture_items("span")
-
-    # https://github.com/pallets/quart/commit/7be545c
-    url = "/root/nomessage" if QUART_VERSION >= (0, 19) else "/nomessage"
-    await client.get(url, root_path="/root")
-
-    sentry_sdk.flush()
-    spans = [item.payload for item in items]
-
-    (server_span,) = (
-        span for span in spans if span["attributes"].get("sentry.op") == "http.server"
-    )
-    assert server_span["attributes"]["url.full"] == "http://localhost/root/nomessage"

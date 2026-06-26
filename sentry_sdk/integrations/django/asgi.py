@@ -11,7 +11,6 @@ import functools
 import inspect
 from typing import TYPE_CHECKING
 
-from django import VERSION as DJANGO_VERSION
 from django.core.handlers.wsgi import WSGIRequest
 
 import sentry_sdk
@@ -97,10 +96,7 @@ def patch_django_asgi_handler_impl(cls: "Any") -> None:
             unsafe_context_data=True,
             span_origin=DjangoIntegration.origin,
             http_methods_to_capture=integration.http_methods_to_capture,
-            # From Django 5.1 onwards, ASGI request.path is taken directly from scope["path"] without prepending scope["root_path"].
-            # Assume that scope["path"] includes scope["root_path"] for these versions, as otherwise request.path is also incorrect.
-            # https://github.com/django/django/commit/bcd255cd5ca0a1e686d276cca71f45ec400d84a2
-            path_includes_root_path=DJANGO_VERSION >= (5, 1),
+            path_includes_root_path=False,
         )._run_asgi3
 
         return await middleware(scope, receive, send)

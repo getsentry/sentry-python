@@ -16,11 +16,8 @@ from litestar.testing import TestClient
 import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk.integrations.litestar import LitestarIntegration
-from sentry_sdk.utils import package_version
 from tests.conftest import ApproxDict
 from tests.integrations.conftest import parametrize_test_configurable_status_codes
-
-LITESTAR_VERSION = package_version("litestar")
 
 
 def litestar_app_factory(middleware=None, debug=True, exception_handlers=None):
