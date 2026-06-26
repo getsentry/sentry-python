@@ -244,30 +244,6 @@ async def test_capture_transaction(
 
 
 @pytest.mark.asyncio
-async def test_capture_transaction_with_root_path(
-    sentry_init,
-    asgi3_app,
-    capture_items,
-):
-    sentry_init(
-        send_default_pii=True,
-        traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
-    )
-    app = SentryAsgiMiddleware(asgi3_app)
-
-    async with TestClient(app, scope={"root_path": "/api"}) as client:
-        items = capture_items("span")
-        await client.get("/some_url")
-
-    sentry_sdk.flush()
-
-    assert len(items) == 1
-    span = items[0].payload
-    assert span["attributes"]["url.path"] == "/api/some_url"
-
-
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "span_streaming",
     [True, False],

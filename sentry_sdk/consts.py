@@ -1020,6 +1020,12 @@ class SPANDATA:
     Example: "details"
     """
 
+    URL_PATH = "url.path"
+    """
+    The URI path component.
+    Example: "/foo"
+    """
+
     URL_QUERY = "url.query"
     """
     The query string present in the URL. Note that this does not contain the leading ? character, while the `http.query` attribute does.
