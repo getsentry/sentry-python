@@ -197,10 +197,12 @@ def _get_request_attributes(request: "Any") -> "Dict[str, Any]":
     for header, value in headers.items():
         attributes[f"{SPANDATA.HTTP_REQUEST_HEADER}.{header.lower()}"] = value
 
-    if request.query:
-        attributes[SPANDATA.URL_QUERY] = request.query
+    if should_send_default_pii():
+        attributes[SPANDATA.URL_FULL] = request.full_url()
+        attributes["url.path"] = request.path
 
-    attributes[SPANDATA.URL_FULL] = request.full_url()
+        if request.query:
+            attributes[SPANDATA.URL_QUERY] = request.query
 
     if request.protocol:
         attributes[SPANDATA.NETWORK_PROTOCOL_NAME] = request.protocol
