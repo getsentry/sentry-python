@@ -118,7 +118,7 @@ TEST_SUITE_CONFIG = {
             ],
             # Import six when pytest-django<4.0 as six was moved out of install_requires in
             # https://github.com/pytest-dev/pytest-django/commit/f2ea236a70873fe763a5b6d50678743e2238b297
-            "<3.1": ["pytest-django[testing]<4.0", "six"],
+            "<3.1": ["pytest-django<4.0", "six"],
             "py3.14,py3.14t": ["coverage==7.11.0"],
         },
     },
