@@ -152,6 +152,7 @@ def patch_channels_asgi_handler_impl(cls: "Any") -> None:
                 unsafe_context_data=True,
                 span_origin=DjangoIntegration.origin,
                 http_methods_to_capture=integration.http_methods_to_capture,
+                path_includes_root_path=False,
             )
 
             return await middleware(self.scope)(receive, send)  # type: ignore
