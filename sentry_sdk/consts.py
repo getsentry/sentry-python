@@ -518,6 +518,12 @@ class SPANDATA:
     Example: postgresql
     """
 
+    DB_QUERY_TEXT = "db.query.text"
+    """
+    The database query being executed.
+    Example: "SELECT * FROM users WHERE id = $1"
+    """
+
     DB_SYSTEM_NAME = "db.system.name"
     """
     An identifier for the database management system (DBMS) product being used. See OpenTelemetry's list of well-known DBMS identifiers.
@@ -1014,6 +1020,12 @@ class SPANDATA:
     Example: "details"
     """
 
+    URL_PATH = "url.path"
+    """
+    The URI path component.
+    Example: "/foo"
+    """
+
     URL_QUERY = "url.query"
     """
     The query string present in the URL. Note that this does not contain the leading ? character, while the `http.query` attribute does.
@@ -1180,6 +1192,8 @@ class OP:
     COHERE_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.cohere"
     COHERE_EMBEDDINGS_CREATE = "ai.embeddings.create.cohere"
     DB = "db"
+    DB_CURSOR_ITERATOR = "db.cursor.iter"
+    DB_CURSOR_FETCH = "db.cursor.fetch"
     DB_REDIS = "db.redis"
     EVENT_DJANGO = "event.django"
     FUNCTION = "function"

@@ -109,8 +109,8 @@ TEST_SUITE_CONFIG = {
                 "pytest-django",
                 "pytest-forked",
                 "Werkzeug",
+                "channels[daphne]",
             ],
-            ">=2.0": ["channels[daphne]"],
             ">=2.2,<3.1": ["six"],
             ">=3.0": ["pytest-asyncio"],
             "<3.3": [

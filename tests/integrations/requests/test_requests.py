@@ -13,7 +13,7 @@ PORT = create_mock_http_server()
 
 
 def test_crumb_capture(sentry_init, capture_events):
-    sentry_init(integrations=[StdlibIntegration()])
+    sentry_init(integrations=[StdlibIntegration()], send_default_pii=True)
     events = capture_events()
 
     url = f"http://localhost:{PORT}/hello-world"  # noqa:E231
@@ -51,7 +51,7 @@ def test_crumb_capture(sentry_init, capture_events):
     ],
 )
 def test_crumb_capture_client_error(sentry_init, capture_events, status_code, level):
-    sentry_init(integrations=[StdlibIntegration()])
+    sentry_init(integrations=[StdlibIntegration()], send_default_pii=True)
 
     events = capture_events()
 
