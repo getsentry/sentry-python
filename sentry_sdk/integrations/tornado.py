@@ -5,6 +5,7 @@ from inspect import iscoroutinefunction
 import sentry_sdk
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.data_collection import scrub_query_string
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import (
     RequestExtractor,
@@ -13,7 +14,7 @@ from sentry_sdk.integrations._wsgi_common import (
     request_body_within_bounds,
 )
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.scope import should_collect_user_info
 from sentry_sdk.traces import SegmentSource, StreamedSpan
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
@@ -130,7 +131,7 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
             sentry_sdk.traces.continue_trace(dict(headers))
             scope.set_custom_sampling_context({"tornado_request": self.request})
 
-            if should_send_default_pii() and self.request.remote_ip:
+            if should_collect_user_info() and self.request.remote_ip:
                 scope.set_attribute(SPANDATA.USER_IP_ADDRESS, self.request.remote_ip)
 
             span_ctx = sentry_sdk.traces.start_span(
@@ -205,7 +206,7 @@ def _get_request_attributes(request: "Any") -> "Dict[str, Any]":
     if request.protocol:
         attributes[SPANDATA.NETWORK_PROTOCOL_NAME] = request.protocol
 
-    if should_send_default_pii() and request.remote_ip:
+    if should_collect_user_info() and request.remote_ip:
         attributes[SPANDATA.CLIENT_ADDRESS] = request.remote_ip
 
     with capture_internal_exceptions():
@@ -271,12 +272,24 @@ def _make_event_processor(
                 request.path,
             )
 
-            request_info["query_string"] = request.query
+            # Event request.query_string is set unconditionally in legacy mode;
+            # when data_collection is explicit it is governed by query_params.
+            dc = sentry_sdk.get_client().data_collection
+            if dc.explicit:
+                scrubbed_qs = (
+                    scrub_query_string(request.query, dc.query_params)
+                    if request.query
+                    else None
+                )
+                if scrubbed_qs is not None:
+                    request_info["query_string"] = scrubbed_qs
+            else:
+                request_info["query_string"] = request.query
             request_info["method"] = request.method
             request_info["env"] = {"REMOTE_ADDR": request.remote_ip}
             request_info["headers"] = _filter_headers(dict(request.headers))
 
-        if should_send_default_pii():
+        if should_collect_user_info():
             try:
                 current_user = handler.current_user
             except Exception:

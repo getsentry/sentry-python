@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk._types import OVER_SIZE_LIMIT_SUBSTITUTE
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.data_collection import COLLECTION_OFF, apply_key_value_collection
 from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     DidNotEnable,
@@ -22,7 +23,7 @@ from sentry_sdk.integrations._wsgi_common import (
     request_body_within_bounds,
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.scope import should_collect_user_info, should_send_default_pii
 from sentry_sdk.traces import StreamedSpan, get_current_span
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
@@ -354,7 +355,7 @@ def _add_user_to_sentry_scope(scope: "Dict[str, Any]") -> None:
     if "user" not in scope:
         return
 
-    if not should_send_default_pii():
+    if not should_collect_user_info():
         return
 
     user_info: "Dict[str, Any]" = {}
@@ -703,7 +704,11 @@ class StarletteRequestExtractor:
         self: "StarletteRequestExtractor",
     ) -> "Optional[Dict[str, Any]]":
         cookies: "Optional[Dict[str, Any]]" = None
-        if should_send_default_pii():
+        dc = sentry_sdk.get_client().data_collection
+        if dc.explicit:
+            if dc.cookies.mode != COLLECTION_OFF:
+                cookies = apply_key_value_collection(dict(self.cookies()), dc.cookies)
+        elif should_send_default_pii():
             cookies = self.cookies()
 
         return cookies
@@ -717,7 +722,13 @@ class StarletteRequestExtractor:
 
         with capture_internal_exceptions():
             # Add cookies
-            if should_send_default_pii():
+            dc = client.data_collection
+            if dc.explicit:
+                if dc.cookies.mode != COLLECTION_OFF:
+                    request_info["cookies"] = apply_key_value_collection(
+                        dict(self.cookies()), dc.cookies
+                    )
+            elif should_send_default_pii():
                 request_info["cookies"] = self.cookies()
 
             # If there is no body, just return the cookies

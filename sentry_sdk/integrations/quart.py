@@ -5,10 +5,15 @@ from functools import wraps
 from typing import TYPE_CHECKING
 
 import sentry_sdk
+from sentry_sdk.data_collection import scrub_query_string
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.integrations._wsgi_common import _filter_headers
+from sentry_sdk.integrations._wsgi_common import (
+    _filter_headers,
+    collect_query_string,
+    should_collect_url,
+)
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.scope import should_collect_user_info
 from sentry_sdk.traces import SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE
 from sentry_sdk.traces import StreamedSpan, get_current_span
 from sentry_sdk.tracing import SOURCE_FOR_STYLE as TRANSACTION_SOURCE_FOR_STYLE
@@ -203,13 +208,16 @@ async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
 
             segment.set_attributes(header_attributes)
 
-            if should_send_default_pii():
+            if should_collect_url():
                 segment.set_attribute("url.full", request_websocket.url)
-                segment.set_attribute(
-                    "url.query",
-                    request_websocket.query_string.decode("utf-8", errors="replace"),
-                )
 
+            query_string = collect_query_string(
+                request_websocket.query_string.decode("utf-8", errors="replace")
+            )
+            if query_string:
+                segment.set_attribute("url.query", query_string)
+
+            if should_collect_user_info():
                 user_properties = {}
                 if len(request_websocket.access_route) >= 1:
                     segment.set_attribute(
@@ -245,11 +253,27 @@ def _make_request_event_processor(
 
             request_info = event.setdefault("request", {})
             request_info["url"] = request.url
-            request_info["query_string"] = request.query_string
+            # Event request.query_string is set unconditionally in legacy mode;
+            # when data_collection is explicit it is governed by query_params.
+            query_string = request.query_string
+            dc = sentry_sdk.get_client().data_collection
+            if dc.explicit:
+                scrubbed_qs = (
+                    scrub_query_string(
+                        query_string.decode("utf-8", errors="replace"),
+                        dc.query_params,
+                    )
+                    if query_string
+                    else None
+                )
+                if scrubbed_qs is not None:
+                    request_info["query_string"] = scrubbed_qs
+            else:
+                request_info["query_string"] = query_string
             request_info["method"] = request.method
             request_info["headers"] = _filter_headers(dict(request.headers))
 
-            if should_send_default_pii():
+            if should_collect_user_info():
                 if len(request.access_route) >= 1:
                     request_info["env"] = {"REMOTE_ADDR": request.access_route[0]}
 

@@ -13,7 +13,7 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.scope import add_global_event_processor, should_send_default_pii
+from sentry_sdk.scope import add_global_event_processor, should_collect_user_info
 from sentry_sdk.serializer import add_global_repr_processor, add_repr_sequence_type
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
@@ -468,7 +468,7 @@ def _after_get_response(request: "WSGIRequest") -> None:
         _attempt_resolve_again(request, scope, integration.transaction_style)
 
     span_streaming = has_span_streaming_enabled(client.options)
-    if span_streaming and should_send_default_pii():
+    if span_streaming and should_collect_user_info():
         user = getattr(request, "user", None)
 
         # Evaluating a SimpleLazyObject in an async view can raise django.core.exceptions.SynchronousOnlyOperation.
@@ -544,7 +544,7 @@ def _make_wsgi_request_event_processor(
         with capture_internal_exceptions():
             DjangoRequestExtractor(request).extract_into_event(event)
 
-        if should_send_default_pii():
+        if should_collect_user_info():
             with capture_internal_exceptions():
                 _set_user_info(request, event)
 

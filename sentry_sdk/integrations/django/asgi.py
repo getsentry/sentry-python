@@ -16,7 +16,7 @@ from django.core.handlers.wsgi import WSGIRequest
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.scope import should_collect_user_info
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -70,7 +70,7 @@ def _make_asgi_request_event_processor(request: "ASGIRequest") -> "EventProcesso
         with capture_internal_exceptions():
             DjangoRequestExtractor(request).extract_into_event(event)
 
-        if should_send_default_pii():
+        if should_collect_user_info():
             with capture_internal_exceptions():
                 _set_user_info(request, event)
 

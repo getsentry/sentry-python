@@ -1,8 +1,10 @@
 import urllib
 from typing import TYPE_CHECKING
 
+import sentry_sdk
+from sentry_sdk.data_collection import scrub_query_string
 from sentry_sdk.integrations._wsgi_common import _filter_headers
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.scope import should_collect_user_info, should_send_default_pii
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional, Union
@@ -93,14 +95,29 @@ def _get_request_data(asgi_scope: "Any") -> "Dict[str, Any]":
         request_data["headers"] = headers = _filter_headers(
             _get_headers(asgi_scope),
         )
-        request_data["query_string"] = _get_query(asgi_scope)
+
+        # Event request.query_string is set unconditionally in legacy mode. When
+        # data_collection is set explicitly, the query_params behavior governs
+        # whether/how it is collected.
+        dc = sentry_sdk.get_client().data_collection
+        if dc.explicit:
+            raw_query = _get_query(asgi_scope)
+            scrubbed_query = (
+                scrub_query_string(raw_query, dc.query_params)
+                if raw_query is not None
+                else None
+            )
+            if scrubbed_query is not None:
+                request_data["query_string"] = scrubbed_query
+        else:
+            request_data["query_string"] = _get_query(asgi_scope)
 
         request_data["url"] = _get_url(
             asgi_scope, "http" if ty == "http" else "ws", headers.get("host")
         )
 
     client = asgi_scope.get("client")
-    if client and should_send_default_pii():
+    if client and should_collect_user_info():
         request_data["env"] = {"REMOTE_ADDR": _get_ip(asgi_scope)}
 
     return request_data
@@ -121,7 +138,28 @@ def _get_request_attributes(asgi_scope: "Any") -> "dict[str, Any]":
         for header, value in headers.items():
             attributes[f"http.request.header.{header.lower()}"] = value
 
-        if should_send_default_pii():
+        dc = sentry_sdk.get_client().data_collection
+        if dc.explicit:
+            url_without_query_string = _get_url(
+                asgi_scope, "http" if ty == "http" else "ws", headers.get("host")
+            )
+            raw_query = _get_query(asgi_scope)
+            scrubbed_query = (
+                scrub_query_string(raw_query, dc.query_params)
+                if raw_query is not None
+                else None
+            )
+            if scrubbed_query is not None:
+                attributes["http.query"] = scrubbed_query
+                attributes["url.full"] = f"{url_without_query_string}?{scrubbed_query}"
+            else:
+                attributes["url.full"] = url_without_query_string
+            # url.path never contains a query string, so it is unaffected by
+            # query_params and is collected as technical context.
+            attributes["url.path"] = asgi_scope.get("root_path", "") + asgi_scope.get(
+                "path", ""
+            )
+        elif should_send_default_pii():
             query = _get_query(asgi_scope)
             if query:
                 attributes["http.query"] = query
@@ -140,7 +178,7 @@ def _get_request_attributes(asgi_scope: "Any") -> "dict[str, Any]":
             )
 
     client = asgi_scope.get("client")
-    if client and should_send_default_pii():
+    if client and should_collect_user_info():
         ip = _get_ip(asgi_scope)
         attributes["client.address"] = ip
 

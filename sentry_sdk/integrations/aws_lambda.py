@@ -11,13 +11,18 @@ from urllib.parse import urlencode
 import sentry_sdk
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
+from sentry_sdk.data_collection import COLLECTION_OFF, apply_key_value_collection
 from sentry_sdk.integrations import Integration
-from sentry_sdk.integrations._wsgi_common import _filter_headers
+from sentry_sdk.integrations._wsgi_common import _filter_headers, collect_query_string
 from sentry_sdk.integrations.cloud_resource_context import (
     CLOUD_PLATFORM,
     CLOUD_PROVIDER,
 )
-from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.scope import (
+    Scope,
+    should_collect_user_info,
+    should_send_default_pii,
+)
 from sentry_sdk.traces import SegmentSource
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
@@ -164,10 +169,12 @@ def _wrap_handler(handler: "F") -> "F":
                     "httpMethod"
                 ]
 
-            if should_send_default_pii() and "queryStringParameters" in request_data:
+            if "queryStringParameters" in request_data:
                 qs = request_data["queryStringParameters"]
                 if qs:
-                    additional_attributes["url.query"] = urlencode(qs)
+                    query_string = collect_query_string(urlencode(qs))
+                    if query_string:
+                        additional_attributes["url.query"] = query_string
 
             sampling_context = {
                 "aws_event": aws_event,
@@ -409,12 +416,22 @@ def _make_request_event_processor(
         request["url"] = _get_url(aws_event, aws_context)
 
         if "queryStringParameters" in aws_event:
-            request["query_string"] = aws_event["queryStringParameters"]
+            # Event request.query_string is set unconditionally in legacy mode;
+            # when data_collection is explicit it is governed by query_params.
+            qs = aws_event["queryStringParameters"]
+            dc = sentry_sdk.get_client().data_collection
+            if dc.explicit:
+                if qs and dc.query_params.mode != COLLECTION_OFF:
+                    request["query_string"] = apply_key_value_collection(
+                        qs, dc.query_params
+                    )
+            else:
+                request["query_string"] = qs
 
         if "headers" in aws_event:
             request["headers"] = _filter_headers(aws_event["headers"])
 
-        if should_send_default_pii():
+        if should_collect_user_info():
             user_info = sentry_event.setdefault("user", {})
 
             identity = aws_event.get("identity")
@@ -429,6 +446,7 @@ def _make_request_event_processor(
             if ip is not None:
                 user_info.setdefault("ip_address", ip)
 
+        if should_send_default_pii():
             if "body" in aws_event:
                 request["data"] = aws_event.get("body", "")
         else:

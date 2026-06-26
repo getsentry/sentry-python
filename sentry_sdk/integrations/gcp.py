@@ -8,8 +8,9 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
+from sentry_sdk.data_collection import scrub_query_string
 from sentry_sdk.integrations import Integration
-from sentry_sdk.integrations._wsgi_common import _filter_headers
+from sentry_sdk.integrations._wsgi_common import _filter_headers, collect_query_string
 from sentry_sdk.integrations.cloud_resource_context import CLOUD_PROVIDER
 from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.traces import SegmentSource
@@ -100,10 +101,12 @@ def _wrap_func(func: "F") -> "F":
             if hasattr(gcp_event, "method"):
                 additional_attributes["http.request.method"] = gcp_event.method
 
-            if should_send_default_pii() and hasattr(gcp_event, "query_string"):
-                additional_attributes["url.query"] = gcp_event.query_string.decode(
-                    "utf-8", errors="replace"
+            if hasattr(gcp_event, "query_string"):
+                query_string = collect_query_string(
+                    gcp_event.query_string.decode("utf-8", errors="replace")
                 )
+                if query_string:
+                    additional_attributes["url.query"] = query_string
 
             sampling_context = {
                 "gcp_env": {
@@ -235,9 +238,16 @@ def _make_request_event_processor(
             request["method"] = gcp_event.method
 
         if hasattr(gcp_event, "query_string"):
-            request["query_string"] = gcp_event.query_string.decode(
-                "utf-8", errors="replace"
-            )
+            # Event request.query_string is set unconditionally in legacy mode;
+            # when data_collection is explicit it is governed by query_params.
+            qs = gcp_event.query_string.decode("utf-8", errors="replace")
+            dc = sentry_sdk.get_client().data_collection
+            if dc.explicit:
+                scrubbed_qs = scrub_query_string(qs, dc.query_params) if qs else None
+                if scrubbed_qs is not None:
+                    request["query_string"] = scrubbed_qs
+            else:
+                request["query_string"] = qs
 
         if hasattr(gcp_event, "headers"):
             request["headers"] = _filter_headers(gcp_event.headers)

@@ -4,6 +4,14 @@ from copy import deepcopy
 
 import sentry_sdk
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
+from sentry_sdk.data_collection import (
+    BODY_TYPE_INCOMING_REQUEST,
+    COLLECTION_OFF,
+    apply_key_value_collection,
+    filter_request_headers,
+    scrub_query_string,
+    should_collect_body_type,
+)
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import AnnotatedValue, logger
 
@@ -90,15 +98,34 @@ class RequestExtractor:
         if not client.is_active():
             return
 
+        dc = client.data_collection
+
         data: "Optional[Union[AnnotatedValue, Dict[str, Any]]]" = None
 
         content_length = self.content_length()
         request_info = event.get("request", {})
 
-        if should_send_default_pii():
+        # Cookies. When data_collection is set explicitly, collect according to
+        # the cookies behavior (default denyList scrubs sensitive cookie values);
+        # otherwise fall back to the legacy send_default_pii gate.
+        if dc.explicit:
+            if dc.cookies.mode != COLLECTION_OFF:
+                request_info["cookies"] = apply_key_value_collection(
+                    dict(self.cookies()), dc.cookies
+                )
+        elif should_send_default_pii():
             request_info["cookies"] = dict(self.cookies())
 
-        if not request_body_within_bounds(client, content_length):
+        # Request body. When data_collection is set explicitly, only collect the
+        # incoming request body if that body type is enabled; size is still
+        # bounded by max_request_body_size.
+        collect_body = True
+        if dc.explicit:
+            collect_body = should_collect_body_type(dc, BODY_TYPE_INCOMING_REQUEST)
+
+        if not collect_body:
+            data = None
+        elif not request_body_within_bounds(client, content_length):
             data = AnnotatedValue.removed_because_over_size_limit()
         else:
             # First read the raw body data
@@ -213,19 +240,66 @@ def _filter_headers(
     headers: "Mapping[str, str]",
     use_annotated_value: bool = True,
 ) -> "Mapping[str, Union[AnnotatedValue, str]]":
-    if should_send_default_pii():
-        return headers
-
     substitute: "Union[AnnotatedValue, str]" = (
         SENSITIVE_DATA_SUBSTITUTE
         if not use_annotated_value
         else AnnotatedValue.removed_because_over_size_limit()
     )
 
+    dc = sentry_sdk.get_client().data_collection
+    if dc.explicit:
+        # Apply the configured request-header collection behavior (default
+        # denyList scrubs sensitive header values; the raw Cookie/Set-Cookie
+        # header is always filtered).
+        return filter_request_headers(
+            headers, dc.http_headers.request, substitute=substitute
+        )
+
+    # Legacy behavior (data_collection not set explicitly).
+    if should_send_default_pii():
+        return headers
+
     return {
         k: (v if k.upper().replace("-", "_") not in SENSITIVE_HEADERS else substitute)
         for k, v in headers.items()
     }
+
+
+def collect_query_string(
+    raw_query_string: "Optional[str]",
+) -> "Optional[str]":
+    """
+    Return the (possibly scrubbed) query string to attach to span attributes
+    (``http.query`` / ``url.query`` / the query portion of ``url.full``), or
+    ``None`` if the query string should not be collected.
+
+    When ``data_collection`` is set explicitly, the ``query_params`` behavior
+    governs collection/scrubbing. Otherwise the legacy ``send_default_pii`` gate
+    applies (preserving current behavior).
+    """
+    if not raw_query_string:
+        return None
+
+    dc = sentry_sdk.get_client().data_collection
+    if dc.explicit:
+        return scrub_query_string(raw_query_string, dc.query_params)
+
+    if should_send_default_pii():
+        return raw_query_string
+    return None
+
+
+def should_collect_url() -> bool:
+    """
+    Whether to collect non-query URL attributes (``url.full`` base and
+    ``url.path``). These never contain query strings, so they are treated as
+    technical context and collected whenever ``data_collection`` is set
+    explicitly. Otherwise the legacy ``send_default_pii`` gate applies.
+    """
+    dc = sentry_sdk.get_client().data_collection
+    if dc.explicit:
+        return True
+    return should_send_default_pii()
 
 
 def _in_http_status_code_range(

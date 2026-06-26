@@ -5,6 +5,7 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
+from sentry_sdk.data_collection import scrub_query_string
 from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     DidNotEnable,
@@ -13,10 +14,12 @@ from sentry_sdk.integrations import (
 )
 from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
+    collect_query_string,
     request_body_within_bounds,
+    should_collect_url,
 )
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.scope import Scope, should_collect_user_info
 from sentry_sdk.sessions import track_session
 from sentry_sdk.traces import (
     SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE,
@@ -159,8 +162,8 @@ class AioHttpIntegration(Integration):
                                 header_value
                             )
 
-                        url_attributes = {}
-                        if should_send_default_pii():
+                        url_attributes: "dict[str, Any]" = {}
+                        if should_collect_url():
                             url_attributes["url.full"] = "%s://%s%s" % (
                                 request.scheme,
                                 request.host,
@@ -168,11 +171,12 @@ class AioHttpIntegration(Integration):
                             )
                             url_attributes["url.path"] = request.path
 
-                            if request.query_string:
-                                url_attributes["url.query"] = request.query_string
+                        query = collect_query_string(request.query_string)
+                        if query:
+                            url_attributes["url.query"] = query
 
                         client_address_attributes = {}
-                        if should_send_default_pii() and request.remote:
+                        if should_collect_user_info() and request.remote:
                             client_address_attributes["client.address"] = request.remote
                             scope.set_attribute(
                                 SPANDATA.USER_IP_ADDRESS, request.remote
@@ -358,14 +362,17 @@ def create_trace_config() -> "TraceConfig":
                 "sentry.origin": AioHttpIntegration.origin,
                 "http.request.method": method,
             }
-            if parsed_url is not None and should_send_default_pii():
+            if parsed_url is not None and should_collect_url():
                 attributes["url.full"] = parsed_url.url
                 attributes["url.path"] = params.url.path
 
-                if parsed_url.query:
-                    attributes["url.query"] = parsed_url.query
                 if parsed_url.fragment:
                     attributes["url.fragment"] = parsed_url.fragment
+
+            if parsed_url is not None:
+                query = collect_query_string(parsed_url.query)
+                if query:
+                    attributes["url.query"] = query
 
             span = sentry_sdk.traces.start_span(name=span_name, attributes=attributes)
         else:
@@ -458,7 +465,20 @@ def _make_request_processor(
                 request.path,
             )
 
-            request_info["query_string"] = request.query_string
+            # Event request.query_string is set unconditionally in legacy mode;
+            # when data_collection is explicit it is governed by query_params.
+            query_string = request.query_string
+            dc = sentry_sdk.get_client().data_collection
+            if dc.explicit:
+                scrubbed_qs = (
+                    scrub_query_string(query_string, dc.query_params)
+                    if query_string
+                    else None
+                )
+                if scrubbed_qs is not None:
+                    request_info["query_string"] = scrubbed_qs
+            else:
+                request_info["query_string"] = query_string
             request_info["method"] = request.method
             request_info["env"] = {"REMOTE_ADDR": request.remote}
             request_info["headers"] = _filter_headers(dict(request.headers))
