@@ -59,6 +59,7 @@ def clear_captured_requests():
     PyreqwestMockHandler.captured_requests.clear()
 
 
+@pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_sync_client_spans(
     sentry_init,
@@ -66,10 +67,12 @@ def test_sync_client_spans(
     capture_items,
     server_port,
     span_streaming,
+    send_default_pii,
 ):
     sentry_init(
         integrations=[PyreqwestIntegration()],
         traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
@@ -88,12 +91,21 @@ def test_sync_client_spans(
         span = spans[0]
         assert span["attributes"]["sentry.op"] == "http.client"
         assert span["name"] == f"GET http://localhost:{server_port}/hello"
-        assert span["attributes"]["url.full"] == f"http://localhost:{server_port}/hello"
         assert span["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "GET"
         assert span["attributes"][SPANDATA.HTTP_STATUS_CODE] == 200
-        assert span["attributes"][SPANDATA.URL_QUERY] == "q=test"
-        assert span["attributes"][SPANDATA.URL_FRAGMENT] == "frag"
         assert span["attributes"]["sentry.origin"] == "auto.http.pyreqwest"
+
+        if send_default_pii:
+            assert (
+                span["attributes"]["url.full"]
+                == f"http://localhost:{server_port}/hello"
+            )
+            assert span["attributes"][SPANDATA.URL_QUERY] == "q=test"
+            assert span["attributes"][SPANDATA.URL_FRAGMENT] == "frag"
+        else:
+            assert "url.full" not in span["attributes"]
+            assert SPANDATA.URL_QUERY not in span["attributes"]
+            assert SPANDATA.URL_FRAGMENT not in span["attributes"]
     else:
         events = capture_events()
 
@@ -116,6 +128,7 @@ def test_sync_client_spans(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("span_streaming", [True, False])
 async def test_async_client_spans(
     sentry_init,
@@ -123,10 +136,12 @@ async def test_async_client_spans(
     capture_items,
     server_port,
     span_streaming,
+    send_default_pii,
 ):
     sentry_init(
         integrations=[PyreqwestIntegration()],
         traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
@@ -145,10 +160,14 @@ async def test_async_client_spans(
         span = spans[0]
         assert span["attributes"]["sentry.op"] == "http.client"
         assert span["name"] == f"GET {url}"
-        assert span["attributes"]["url.full"] == url
         assert span["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "GET"
         assert span["attributes"][SPANDATA.HTTP_STATUS_CODE] == 200
         assert span["attributes"]["sentry.origin"] == "auto.http.pyreqwest"
+
+        if send_default_pii:
+            assert span["attributes"]["url.full"] == url
+        else:
+            assert "url.full" not in span["attributes"]
     else:
         events = capture_events()
 
@@ -168,6 +187,7 @@ async def test_async_client_spans(
         assert span["origin"] == "auto.http.pyreqwest"
 
 
+@pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_sync_simple_request_spans(
     sentry_init,
@@ -175,10 +195,12 @@ def test_sync_simple_request_spans(
     capture_items,
     server_port,
     span_streaming,
+    send_default_pii,
 ):
     sentry_init(
         integrations=[PyreqwestIntegration()],
         traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
@@ -196,10 +218,14 @@ def test_sync_simple_request_spans(
         span = spans[0]
         assert span["attributes"]["sentry.op"] == "http.client"
         assert span["name"] == f"GET {url}"
-        assert span["attributes"]["url.full"] == url
         assert span["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "GET"
         assert span["attributes"][SPANDATA.HTTP_STATUS_CODE] == 200
         assert span["attributes"]["sentry.origin"] == "auto.http.pyreqwest"
+
+        if send_default_pii:
+            assert span["attributes"]["url.full"] == url
+        else:
+            assert "url.full" not in span["attributes"]
     else:
         events = capture_events()
 
@@ -219,6 +245,7 @@ def test_sync_simple_request_spans(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("span_streaming", [True, False])
 async def test_async_simple_request_spans(
     sentry_init,
@@ -226,10 +253,12 @@ async def test_async_simple_request_spans(
     capture_items,
     server_port,
     span_streaming,
+    send_default_pii,
 ):
     sentry_init(
         integrations=[PyreqwestIntegration()],
         traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
@@ -247,10 +276,14 @@ async def test_async_simple_request_spans(
         span = spans[0]
         assert span["attributes"]["sentry.op"] == "http.client"
         assert span["name"] == f"GET {url}"
-        assert span["attributes"]["url.full"] == url
         assert span["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "GET"
         assert span["attributes"][SPANDATA.HTTP_STATUS_CODE] == 200
         assert span["attributes"]["sentry.origin"] == "auto.http.pyreqwest"
+
+        if send_default_pii:
+            assert span["attributes"]["url.full"] == url
+        else:
+            assert "url.full" not in span["attributes"]
     else:
         events = capture_events()
 
