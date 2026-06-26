@@ -1,18 +1,4 @@
 pytest>=6.0.0
 pytest-cov
-<<<<<<< HEAD
-pytest-forked
-pytest-localserver
-pytest-timeout
-pytest-watch
-jsonschema
-asttokens
-responses
-pysocks
-socksio
-httpcore[http2]
-=======
 dataclasses; python_version < "3.7"
-executing
->>>>>>> master
 setuptools
