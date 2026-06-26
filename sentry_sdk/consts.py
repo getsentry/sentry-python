@@ -56,6 +56,7 @@ if TYPE_CHECKING:
         TracesSampler,
         TransactionProcessor,
     )
+    from sentry_sdk.data_collection import DataCollection
 
     # Experiments are feature flags to enable and disable certain unstable SDK
     # functionality. Changing them from the defaults (`None`) in production
@@ -1272,6 +1273,7 @@ class ClientConstructor:
         transport_queue_size: int = DEFAULT_QUEUE_SIZE,
         sample_rate: float = 1.0,
         send_default_pii: "Optional[bool]" = None,
+        data_collection: "Optional[Union[DataCollection, Dict[str, Any]]]" = None,
         http_proxy: "Optional[str]" = None,
         https_proxy: "Optional[str]" = None,
         ignore_errors: "Sequence[Union[type, str]]" = [],  # noqa: B006
@@ -1425,6 +1427,26 @@ class ClientConstructor:
 
             If you enable this option, be sure to manually remove what you don't want to send using our features for
             managing `Sensitive Data <https://docs.sentry.io/data-management/sensitive-data/>`_.
+
+            .. deprecated::
+                Use `data_collection` instead. `send_default_pii` is still honored when `data_collection` is not set.
+
+        :param data_collection: Structured configuration controlling what data integrations collect automatically,
+            superseding `send_default_pii`. Pass a dict or a :class:`sentry_sdk.DataCollection` instance to enable or
+            restrict collection per category (user identity, cookies, HTTP headers/bodies, query params, generative AI
+            inputs/outputs, stack frame variables, source context).
+
+            When `data_collection` is set, omitted fields use their defaults (most categories are collected, with the
+            sensitive denylist scrubbing values). When it is not set, the SDK derives behavior from `send_default_pii`
+            so that upgrading without configuring `data_collection` changes nothing. If both are set, `data_collection`
+            takes precedence.
+
+            Example::
+
+                sentry_sdk.init(
+                    dsn="...",
+                    data_collection={"user_info": False, "http_bodies": []},
+                )
 
         :param event_scrubber: Scrubs the event payload for sensitive information such as cookies, sessions, and
             passwords from a `denylist`.

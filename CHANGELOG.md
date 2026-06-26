@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- Add the `data_collection` option, a structured configuration that supersedes `send_default_pii` for controlling what data integrations collect automatically (user identity, cookies, HTTP headers, query params, HTTP bodies, generative AI inputs/outputs, stack frame variables, source context). See the [Data Collection spec](https://develop.sentry.dev/sdk/foundations/client/data-collection/).
+  - Adds `sentry_sdk.DataCollection`, `KeyValueCollectionBehavior`, `HttpHeadersCollection`, and `GenAICollection`.
+  - When `data_collection` is not set, behavior is derived from `send_default_pii` (now deprecated), so upgrading without configuring `data_collection` changes nothing.
+  - `frame_context_lines` is now configurable (previously hardcoded to 5); AI integrations' `include_prompts` becomes a per-integration override of `data_collection.gen_ai`.
+
 ## 2.63.0
 
 ### Bug Fixes 🐛

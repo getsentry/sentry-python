@@ -49,6 +49,11 @@ sentry_sdk.init(
     # Set traces_sample_rate to 1.0 to capture 100%
     # of traces for performance monitoring.
     traces_sample_rate=1.0,
+
+    # To disable sending user data and HTTP request/response bodies, uncomment
+    # the line below. For more info visit:
+    # https://docs.sentry.io/platforms/python/configuration/options/#data_collection
+    # data_collection=sentry_sdk.DataCollection(user_info=False, http_bodies=[]),
 )
 ```
 
