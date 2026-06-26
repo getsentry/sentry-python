@@ -363,6 +363,7 @@ class TransactionTestConfig:
 @pytest.mark.skipif(
     not PERFORMANCE_SUPPORTED, reason="Performance not supported on this Sanic version"
 )
+@pytest.mark.parametrize("send_pii", [True, False])
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize(
     "test_config",
@@ -424,6 +425,7 @@ def test_transactions(
     capture_events: "Any",
     capture_items: "Any",
     span_streaming: bool,
+    send_pii: bool,
 ) -> None:
     if span_streaming and not test_config.streaming_compatible:
         pytest.skip("unsampled_statuses is not supported in span streaming mode")
@@ -432,6 +434,7 @@ def test_transactions(
     sentry_init(
         integrations=[SanicIntegration(*test_config.integration_args)],
         traces_sample_rate=1.0,
+        send_default_pii=send_pii,
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
@@ -469,9 +472,6 @@ def test_transactions(
 
             attrs = segment["attributes"]
             assert attrs["http.request.method"] == "GET"
-            assert attrs["url.full"].endswith(test_config.url)
-            if "?" in test_config.url:
-                assert attrs["http.query"] == test_config.url.split("?", 1)[1]
             assert attrs["network.protocol.name"] == "http"
             header_keys = {
                 key[len("http.request.header.") :]
@@ -483,6 +483,18 @@ def test_transactions(
             assert segment["status"] == (
                 "error" if test_config.expected_status >= 400 else "ok"
             )
+
+            if send_pii:
+                assert attrs["url.full"].endswith(test_config.url)
+                assert attrs["url.path"] == test_config.url.split("?")[0]
+                if "?" in test_config.url:
+                    assert attrs["http.query"] == test_config.url.split("?", 1)[1]
+
+            else:
+                assert "url.full" not in attrs
+                assert "url.path" not in attrs
+                assert "http.query" not in attrs
+
     else:
         # Extract the transaction events by inspecting the event types. We should at most have 1 transaction event.
         transaction_events = [

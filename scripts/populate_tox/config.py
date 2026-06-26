@@ -80,7 +80,7 @@ TEST_SUITE_CONFIG = {
     "celery": {
         "package": "celery",
         "deps": {
-            "*": ["newrelic<10.17.0", "redis"],
+            "*": ["newrelic<10.17.0", "redis", "pytest-forked"],
             "py3.6": ["newrelic<8"],
             "py3.7": ["importlib-metadata<5.0"],
         },
@@ -107,17 +107,19 @@ TEST_SUITE_CONFIG = {
                 "psycopg2-binary",
                 "djangorestframework",
                 "pytest-django",
+                "pytest-forked",
                 "Werkzeug",
+                "channels[daphne]",
                 "executing",
             ],
-            ">=2.0": ["channels[daphne]"],
-            ">=2.2,<3.1": ["six"],
             ">=3.0": ["pytest-asyncio"],
             "<3.3": [
                 "djangorestframework>=3.0,<4.0",
                 "Werkzeug<2.1.0",
             ],
-            "<3.1": ["pytest-django<4.0"],
+            # Import six when pytest-django<4.0 as six was moved out of install_requires in
+            # https://github.com/pytest-dev/pytest-django/commit/f2ea236a70873fe763a5b6d50678743e2238b297
+            "<3.1": ["pytest-django<4.0", "six"],
             "py3.14,py3.14t": ["coverage==7.11.0"],
         },
     },
@@ -167,6 +169,9 @@ TEST_SUITE_CONFIG = {
     },
     "gql": {
         "package": "gql[all]",
+        "deps": {
+            "*": ["responses"],
+        },
         "num_versions": 2,
     },
     "google_genai": {
@@ -179,14 +184,20 @@ TEST_SUITE_CONFIG = {
     "graphene": {
         "package": "graphene",
         "deps": {
-            "*": ["blinker", "fastapi", "flask", "httpx"],
+            "*": ["blinker", "fastapi[test]", "flask", "httpx"],
             "py3.6": ["aiocontextvars"],
         },
     },
     "grpc": {
         "package": "grpcio",
         "deps": {
-            "*": ["protobuf", "mypy-protobuf", "types-protobuf", "pytest-asyncio"],
+            "*": [
+                "protobuf",
+                "mypy-protobuf",
+                "types-protobuf",
+                "pytest-asyncio",
+                "pytest-forked",
+            ],
         },
         "python": ">=3.7",
     },
@@ -333,7 +344,7 @@ TEST_SUITE_CONFIG = {
     "pure_eval": {
         "package": "pure_eval",
         "deps": {
-            "*": ["executing"],
+            "*": ["asttokens", "executing"],
         },
         "num_versions": 2,
     },
@@ -372,7 +383,7 @@ TEST_SUITE_CONFIG = {
     "quart": {
         "package": "quart",
         "deps": {
-            "*": ["quart-auth", "pytest-asyncio", "Werkzeug"],
+            "*": ["quart-auth", "pytest-asyncio", "pytest-forked", "Werkzeug"],
             ">=0.19": ["quart-flask-patch"],
             "<0.19": [
                 "blinker<1.6",

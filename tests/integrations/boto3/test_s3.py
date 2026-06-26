@@ -72,16 +72,19 @@ def test_basic(
         assert span["description"] == "aws.s3.ListObjects"
 
 
+@pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_streaming(
     sentry_init,
     capture_events,
     capture_items,
     span_streaming,
+    send_default_pii,
 ):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[Boto3Integration()],
+        send_default_pii=send_default_pii,
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 
@@ -108,26 +111,32 @@ def test_streaming(
         span1 = spans[0]
         assert span1["attributes"]["sentry.op"] == "http.client"
         assert span1["name"] == "aws.s3.GetObject"
-        assert span1["attributes"] == ApproxDict(
-            {
-                "http.request.method": "GET",
-                "rpc.method": "S3/GetObject",
-                "sentry.environment": "production",
-                "sentry.op": "http.client",
-                "sentry.origin": "auto.http.boto3",
-                "sentry.release": mock.ANY,
-                "sentry.sdk.name": "sentry.python",
-                "sentry.sdk.version": mock.ANY,
-                "sentry.segment.id": mock.ANY,
-                "sentry.segment.name": "custom parent",
-                "server.address": mock.ANY,
-                "thread.id": mock.ANY,
-                "thread.name": mock.ANY,
-                "url.full": "https://bucket.s3.amazonaws.com/foo.pdf",
-                "url.fragment": "",
-                "url.query": "",
-            }
-        )
+
+        expected_attrs = {
+            "http.request.method": "GET",
+            "rpc.method": "S3/GetObject",
+            "sentry.environment": "production",
+            "sentry.op": "http.client",
+            "sentry.origin": "auto.http.boto3",
+            "sentry.release": mock.ANY,
+            "sentry.sdk.name": "sentry.python",
+            "sentry.sdk.version": mock.ANY,
+            "sentry.segment.id": mock.ANY,
+            "sentry.segment.name": "custom parent",
+            "server.address": mock.ANY,
+            "thread.id": mock.ANY,
+            "thread.name": mock.ANY,
+        }
+        if send_default_pii:
+            expected_attrs["url.full"] = "https://bucket.s3.amazonaws.com/foo.pdf"
+            expected_attrs["url.fragment"] = ""
+            expected_attrs["url.query"] = ""
+        assert span1["attributes"] == ApproxDict(expected_attrs)
+
+        if not send_default_pii:
+            assert "url.full" not in span1["attributes"]
+            assert "url.fragment" not in span1["attributes"]
+            assert "url.query" not in span1["attributes"]
 
         span2 = spans[1]
         assert span2["attributes"]["sentry.op"] == "http.client.stream"
@@ -233,6 +242,7 @@ def test_omit_url_data_if_parsing_fails(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[Boto3Integration()],
+        send_default_pii=True,
         _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
     )
 

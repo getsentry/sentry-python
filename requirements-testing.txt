@@ -1,7 +1,6 @@
-pip
 pytest>=6.0.0
-tomli;python_version<"3.11"  # Only needed for pytest on Python < 3.11
 pytest-cov
+<<<<<<< HEAD
 pytest-forked
 pytest-localserver
 pytest-timeout
@@ -12,6 +11,8 @@ responses
 pysocks
 socksio
 httpcore[http2]
+=======
+dataclasses; python_version < "3.7"
+executing
+>>>>>>> master
 setuptools
-Brotli
-docker

@@ -16,9 +16,11 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations._asgi_common import (
     _get_headers,
     _get_ip,
+    _get_path,
     _get_request_attributes,
     _get_request_data,
     _get_url,
+    _RootPathInPath,
 )
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
@@ -105,6 +107,7 @@ class SentryAsgiMiddleware:
         "mechanism_type",
         "span_origin",
         "http_methods_to_capture",
+        "root_path_in_path",
     )
 
     def __init__(
@@ -116,6 +119,7 @@ class SentryAsgiMiddleware:
         span_origin: str = "manual",
         http_methods_to_capture: "Tuple[str, ...]" = DEFAULT_HTTP_METHODS_TO_CAPTURE,
         asgi_version: "Optional[int]" = None,
+        root_path_in_path: "_RootPathInPath" = _RootPathInPath.EXCLUDED,
     ) -> None:
         """
         Instrument an ASGI application with Sentry. Provides HTTP/websocket
@@ -152,6 +156,7 @@ class SentryAsgiMiddleware:
         self.span_origin = span_origin
         self.app = app
         self.http_methods_to_capture = http_methods_to_capture
+        self.root_path_in_path = root_path_in_path
 
         if asgi_version is None:
             if _looks_like_asgi3(app):
@@ -319,7 +324,8 @@ class SentryAsgiMiddleware:
                     with span_ctx as span:
                         if isinstance(span, StreamedSpan):
                             for attribute, value in _get_request_attributes(
-                                scope
+                                scope,
+                                root_path_in_path=self.root_path_in_path,
                             ).items():
                                 span.set_attribute(attribute, value)
 
@@ -401,7 +407,9 @@ class SentryAsgiMiddleware:
         self, event: "Event", hint: "Hint", asgi_scope: "Any"
     ) -> "Optional[Event]":
         request_data = event.get("request", {})
-        request_data.update(_get_request_data(asgi_scope))
+        request_data.update(
+            _get_request_data(asgi_scope, root_path_in_path=self.root_path_in_path)
+        )
         event["request"] = deepcopy(request_data)
 
         # Only set transaction name if not already set by Starlette or FastAPI (or other frameworks)
@@ -447,7 +455,14 @@ class SentryAsgiMiddleware:
             if endpoint:
                 name = transaction_from_function(endpoint) or ""
             else:
-                name = _get_url(asgi_scope, "http" if ty == "http" else "ws", host=None)
+                name = _get_url(
+                    asgi_scope,
+                    "http" if ty == "http" else "ws",
+                    host=None,
+                    path=_get_path(
+                        asgi_scope=asgi_scope, root_path_in_path=self.root_path_in_path
+                    ),
+                )
                 source = TransactionSource.URL
 
         elif transaction_style == "url":
@@ -459,7 +474,14 @@ class SentryAsgiMiddleware:
                 if path is not None:
                     name = path
             else:
-                name = _get_url(asgi_scope, "http" if ty == "http" else "ws", host=None)
+                name = _get_url(
+                    asgi_scope,
+                    "http" if ty == "http" else "ws",
+                    host=None,
+                    path=_get_path(
+                        asgi_scope=asgi_scope, root_path_in_path=self.root_path_in_path
+                    ),
+                )
                 source = TransactionSource.URL
 
         if name is None:
@@ -484,7 +506,14 @@ class SentryAsgiMiddleware:
             if endpoint:
                 name = qualname_from_function(endpoint) or ""
             else:
-                name = _get_url(asgi_scope, "http" if ty == "http" else "ws", host=None)
+                name = _get_url(
+                    asgi_scope,
+                    "http" if ty == "http" else "ws",
+                    host=None,
+                    path=_get_path(
+                        asgi_scope=asgi_scope, root_path_in_path=self.root_path_in_path
+                    ),
+                )
                 source = SegmentSource.URL.value
 
         elif segment_style == "url":
@@ -496,7 +525,14 @@ class SentryAsgiMiddleware:
                 if path is not None:
                     name = path
             else:
-                name = _get_url(asgi_scope, "http" if ty == "http" else "ws", host=None)
+                name = _get_url(
+                    asgi_scope,
+                    "http" if ty == "http" else "ws",
+                    host=None,
+                    path=_get_path(
+                        asgi_scope=asgi_scope, root_path_in_path=self.root_path_in_path
+                    ),
+                )
                 source = SegmentSource.URL.value
 
         if name is None:

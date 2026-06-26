@@ -47,7 +47,7 @@ Expected tool sets by skill type:
 ### Workflow Automation Skills
 - **Expected**: `Read, Grep, Glob, Bash`
 - **Bash justification**: Git operations, CI commands, gh CLI
-- **Examples**: commit, create-pr, iterate-pr
+- **Examples**: commit, pr-writer, iterate-pr
 
 ### Content Generation Skills
 - **Expected**: `Read, Grep, Glob, Write` or `Read, Grep, Glob, Bash, Write, Edit`

@@ -31,16 +31,21 @@ except ImportError:
     raise DidNotEnable("LiteLLM not installed")
 
 
-def _get_metadata_dict(kwargs: "Dict[str, Any]") -> "Dict[str, Any]":
-    """Get the metadata dictionary from the kwargs."""
-    litellm_params = kwargs.setdefault("litellm_params", {})
+# Stash the span on a top-level key of the per-request kwargs dict litellm passes
+# to every callback, so it lives and dies with the request.
+_SPAN_KEY = "_sentry_span"
 
-    # we need this weird little dance, as metadata might be set but may be None initially
-    metadata = litellm_params.get("metadata")
-    if metadata is None:
-        metadata = {}
-        litellm_params["metadata"] = metadata
-    return metadata
+
+def _store_span(kwargs: "Dict[str, Any]", span: "Any") -> None:
+    kwargs[_SPAN_KEY] = span
+
+
+def _peek_span(kwargs: "Dict[str, Any]") -> "Any":
+    return kwargs.get(_SPAN_KEY)
+
+
+def _pop_span(kwargs: "Dict[str, Any]") -> "Any":
+    return kwargs.pop(_SPAN_KEY, None)
 
 
 def _convert_message_parts(messages: "List[Dict[str, Any]]") -> "List[Dict[str, Any]]":
@@ -117,8 +122,7 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
         )
         span.__enter__()
 
-    # Store span for later
-    _get_metadata_dict(kwargs)["_sentry_span"] = span
+    _store_span(kwargs, span)
 
     # Set basic data
     set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, provider)
@@ -198,8 +202,7 @@ def _success_callback(
 ) -> None:
     """Handle successful completion."""
 
-    metadata = _get_metadata_dict(kwargs)
-    span = metadata.get("_sentry_span")
+    span = _peek_span(kwargs)
     if span is None:
         return
 
@@ -259,7 +262,7 @@ def _success_callback(
             or "complete_streaming_response" in kwargs
             or "async_complete_streaming_response" in kwargs
         ):
-            span = metadata.pop("_sentry_span", None)
+            span = _pop_span(kwargs)
             if span is not None:
                 span.__exit__(None, None, None)
 
@@ -285,7 +288,7 @@ def _failure_callback(
     end_time: "datetime",
 ) -> None:
     """Handle request failure."""
-    span = _get_metadata_dict(kwargs).get("_sentry_span")
+    span = _pop_span(kwargs)
     if span is None:
         return
 
