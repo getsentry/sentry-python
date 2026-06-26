@@ -111,13 +111,14 @@ TEST_SUITE_CONFIG = {
                 "Werkzeug",
                 "channels[daphne]",
             ],
-            ">=2.2,<3.1": ["six"],
             ">=3.0": ["pytest-asyncio"],
             "<3.3": [
                 "djangorestframework>=3.0,<4.0",
                 "Werkzeug<2.1.0",
             ],
-            "<3.1": ["pytest-django<4.0"],
+            # Import six when pytest-django<4.0 as six was moved out of install_requires in
+            # https://github.com/pytest-dev/pytest-django/commit/f2ea236a70873fe763a5b6d50678743e2238b297
+            "<3.1": ["pytest-django<4.0", "six"],
             "py3.14,py3.14t": ["coverage==7.11.0"],
         },
     },
@@ -341,6 +342,9 @@ TEST_SUITE_CONFIG = {
     },
     "pure_eval": {
         "package": "pure_eval",
+        "deps": {
+            "*": ["asttokens"],
+        },
         "num_versions": 2,
     },
     "pydantic_ai": {
