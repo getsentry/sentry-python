@@ -92,7 +92,6 @@ class SentryLitestarASGIMiddleware(SentryAsgiMiddleware):
             mechanism_type="asgi",
             span_origin=span_origin,
             asgi_version=3,
-            path_includes_root_path=False,
         )
 
     def _capture_request_exception(self, exc: Exception) -> None:

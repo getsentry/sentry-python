@@ -16,9 +16,11 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations._asgi_common import (
     _get_headers,
     _get_ip,
+    _get_path,
     _get_request_attributes,
     _get_request_data,
     _get_url,
+    _RootPathInPath,
 )
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
@@ -105,7 +107,7 @@ class SentryAsgiMiddleware:
         "mechanism_type",
         "span_origin",
         "http_methods_to_capture",
-        "path_includes_root_path",
+        "root_path_in_path",
     )
 
     def __init__(
@@ -117,7 +119,7 @@ class SentryAsgiMiddleware:
         span_origin: str = "manual",
         http_methods_to_capture: "Tuple[str, ...]" = DEFAULT_HTTP_METHODS_TO_CAPTURE,
         asgi_version: "Optional[int]" = None,
-        path_includes_root_path: bool = True,
+        root_path_in_path: "_RootPathInPath" = _RootPathInPath.EXCLUDED,
     ) -> None:
         """
         Instrument an ASGI application with Sentry. Provides HTTP/websocket
@@ -154,7 +156,7 @@ class SentryAsgiMiddleware:
         self.span_origin = span_origin
         self.app = app
         self.http_methods_to_capture = http_methods_to_capture
-        self.path_includes_root_path = path_includes_root_path
+        self.root_path_in_path = root_path_in_path
 
         if asgi_version is None:
             if _looks_like_asgi3(app):
@@ -323,7 +325,7 @@ class SentryAsgiMiddleware:
                         if isinstance(span, StreamedSpan):
                             for attribute, value in _get_request_attributes(
                                 scope,
-                                path_includes_root_path=self.path_includes_root_path,
+                                root_path_in_path=self.root_path_in_path,
                             ).items():
                                 span.set_attribute(attribute, value)
 
@@ -406,9 +408,7 @@ class SentryAsgiMiddleware:
     ) -> "Optional[Event]":
         request_data = event.get("request", {})
         request_data.update(
-            _get_request_data(
-                asgi_scope, path_includes_root_path=self.path_includes_root_path
-            )
+            _get_request_data(asgi_scope, root_path_in_path=self.root_path_in_path)
         )
         event["request"] = deepcopy(request_data)
 
@@ -459,7 +459,9 @@ class SentryAsgiMiddleware:
                     asgi_scope,
                     "http" if ty == "http" else "ws",
                     host=None,
-                    path_includes_root_path=self.path_includes_root_path,
+                    path=_get_path(
+                        asgi_scope=asgi_scope, root_path_in_path=self.root_path_in_path
+                    ),
                 )
                 source = TransactionSource.URL
 
@@ -476,7 +478,9 @@ class SentryAsgiMiddleware:
                     asgi_scope,
                     "http" if ty == "http" else "ws",
                     host=None,
-                    path_includes_root_path=self.path_includes_root_path,
+                    path=_get_path(
+                        asgi_scope=asgi_scope, root_path_in_path=self.root_path_in_path
+                    ),
                 )
                 source = TransactionSource.URL
 
@@ -506,7 +510,9 @@ class SentryAsgiMiddleware:
                     asgi_scope,
                     "http" if ty == "http" else "ws",
                     host=None,
-                    path_includes_root_path=self.path_includes_root_path,
+                    path=_get_path(
+                        asgi_scope=asgi_scope, root_path_in_path=self.root_path_in_path
+                    ),
                 )
                 source = SegmentSource.URL.value
 
@@ -523,7 +529,9 @@ class SentryAsgiMiddleware:
                     asgi_scope,
                     "http" if ty == "http" else "ws",
                     host=None,
-                    path_includes_root_path=self.path_includes_root_path,
+                    path=_get_path(
+                        asgi_scope=asgi_scope, root_path_in_path=self.root_path_in_path
+                    ),
                 )
                 source = SegmentSource.URL.value
 

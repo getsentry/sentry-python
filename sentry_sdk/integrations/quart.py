@@ -96,7 +96,6 @@ def patch_asgi_app() -> None:
             lambda *a, **kw: old_app(self, *a, **kw),
             span_origin=QuartIntegration.origin,
             asgi_version=3,
-            path_includes_root_path=False,
         )
         return await middleware(scope, receive, send)
 

@@ -15,6 +15,7 @@ from sentry_sdk.integrations import (
     DidNotEnable,
     Integration,
 )
+from sentry_sdk.integrations._asgi_common import _RootPathInPath
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     HttpCodeRangeContainer,
@@ -143,10 +144,12 @@ class StarletteIntegration(Integration):
             )
 
         patch_middlewares()
-        # Starlette's Mount includes scope["root_path"] in scope["path"] starting with:
+        # Starlette tolerates both starting with:
         # https://github.com/Kludex/starlette/commit/e8f0dcd54e4ceec47e02c45f5275374e292339ad.
-        path_includes_root_path = version >= (0, 33)
-        patch_asgi_app(path_includes_root_path=path_includes_root_path)
+        root_path_in_path = (
+            _RootPathInPath.EITHER if version >= (0, 33) else _RootPathInPath.EXCLUDED
+        )
+        patch_asgi_app(root_path_in_path=root_path_in_path)
         patch_request_response()
 
         if version >= (0, 24):
@@ -430,7 +433,7 @@ def patch_middlewares() -> None:
         Middleware.__init__ = _sentry_middleware_init
 
 
-def patch_asgi_app(path_includes_root_path: "bool") -> None:
+def patch_asgi_app(root_path_in_path: "_RootPathInPath") -> None:
     """
     Instrument Starlette ASGI app using the SentryAsgiMiddleware.
     """
@@ -454,7 +457,7 @@ def patch_asgi_app(path_includes_root_path: "bool") -> None:
                 else DEFAULT_HTTP_METHODS_TO_CAPTURE
             ),
             asgi_version=3,
-            path_includes_root_path=path_includes_root_path,
+            root_path_in_path=root_path_in_path,
         )
 
         return await middleware(scope, receive, send)

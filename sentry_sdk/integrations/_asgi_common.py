@@ -1,4 +1,5 @@
 import urllib
+from enum import Enum
 from typing import TYPE_CHECKING
 
 from sentry_sdk.integrations._wsgi_common import _filter_headers
@@ -10,6 +11,11 @@ if TYPE_CHECKING:
     from typing_extensions import Literal
 
     from sentry_sdk.utils import AnnotatedValue
+
+
+class _RootPathInPath(Enum):
+    EXCLUDED = "excluded"
+    EITHER = "either"
 
 
 def _get_headers(asgi_scope: "Any") -> "Dict[str, str]":
@@ -28,11 +34,27 @@ def _get_headers(asgi_scope: "Any") -> "Dict[str, str]":
     return headers
 
 
+def _get_path(
+    asgi_scope: "Dict[str, Any]", root_path_in_path: "_RootPathInPath"
+) -> "str":
+    if root_path_in_path is _RootPathInPath.EXCLUDED:
+        return asgi_scope.get("root_path", "") + asgi_scope.get("path", "")
+
+    # Inverse of https://github.com/Kludex/starlette/blob/de970d7b3facb853eb7ad077decbf3d94f2aab6c/starlette/_utils.py#L96
+    path = asgi_scope["path"]
+    root_path = asgi_scope.get("root_path", "")
+
+    if not root_path or path == root_path or path.startswith(root_path + "/"):
+        return path
+
+    return root_path + path
+
+
 def _get_url(
     asgi_scope: "Dict[str, Any]",
     default_scheme: "Literal['ws', 'http']",
     host: "Optional[Union[AnnotatedValue, str]]",
-    path_includes_root_path: "bool" = True,
+    path: str,
 ) -> str:
     """
     Extract URL from the ASGI scope, without also including the querystring.
@@ -40,11 +62,6 @@ def _get_url(
     scheme = asgi_scope.get("scheme", default_scheme)
 
     server = asgi_scope.get("server", None)
-    path = (
-        asgi_scope.get("path", "")
-        if path_includes_root_path
-        else asgi_scope.get("root_path", "") + asgi_scope.get("path", "")
-    )
 
     if host:
         return "%s://%s%s" % (scheme, host, path)
@@ -87,7 +104,7 @@ def _get_ip(asgi_scope: "Any") -> str:
 
 
 def _get_request_data(
-    asgi_scope: "Any", path_includes_root_path: "bool" = True
+    asgi_scope: "Any", root_path_in_path: "_RootPathInPath" = _RootPathInPath.EXCLUDED
 ) -> "Dict[str, Any]":
     """
     Returns data related to the HTTP request from the ASGI scope.
@@ -106,7 +123,7 @@ def _get_request_data(
             asgi_scope,
             "http" if ty == "http" else "ws",
             headers.get("host"),
-            path_includes_root_path=path_includes_root_path,
+            path=_get_path(asgi_scope=asgi_scope, root_path_in_path=root_path_in_path),
         )
 
     client = asgi_scope.get("client")
@@ -117,7 +134,8 @@ def _get_request_data(
 
 
 def _get_request_attributes(
-    asgi_scope: "Any", path_includes_root_path: "bool" = True
+    asgi_scope: "Any",
+    root_path_in_path: "_RootPathInPath" = _RootPathInPath.EXCLUDED,
 ) -> "dict[str, Any]":
     """
     Return attributes related to the HTTP request from the ASGI scope.
@@ -138,22 +156,20 @@ def _get_request_attributes(
             if query:
                 attributes["http.query"] = query
 
+            path = _get_path(asgi_scope=asgi_scope, root_path_in_path=root_path_in_path)
+            attributes["url.path"] = path
+
             url_without_query_string = _get_url(
                 asgi_scope,
                 "http" if ty == "http" else "ws",
                 headers.get("host"),
-                path_includes_root_path=path_includes_root_path,
+                path=path,
             )
             query_string = _get_query(asgi_scope)
             attributes["url.full"] = (
                 f"{url_without_query_string}?{query_string}"
                 if query_string is not None
                 else url_without_query_string
-            )
-            attributes["url.path"] = (
-                asgi_scope.get("path", "")
-                if path_includes_root_path
-                else asgi_scope.get("root_path", "") + asgi_scope.get("path", "")
             )
 
     client = asgi_scope.get("client")
