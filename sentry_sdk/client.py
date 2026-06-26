@@ -62,6 +62,7 @@ from sentry_sdk.utils import (
     get_before_send_metric,
     get_before_send_span,
     get_default_release,
+    get_frame_collection_options,
     get_sdk_name,
     get_type_name,
     handle_in_app,
@@ -894,16 +895,19 @@ class _Client(BaseClient):
             and "threads" not in event
         ):
             with capture_internal_exceptions():
+                include_local_variables, include_source_context, context_lines = (
+                    get_frame_collection_options(self.options)
+                )
                 event["threads"] = {
                     "values": [
                         {
                             "stacktrace": current_stacktrace(
-                                include_local_variables=self.options.get(
-                                    "include_local_variables", True
-                                ),
+                                include_local_variables=include_local_variables,
+                                include_source_context=include_source_context,
                                 max_value_length=self.options.get(
                                     "max_value_length", DEFAULT_MAX_VALUE_LENGTH
                                 ),
+                                context_lines=context_lines,
                             ),
                             "crashed": False,
                             "current": True,

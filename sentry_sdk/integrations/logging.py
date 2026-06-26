@@ -12,6 +12,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     current_stacktrace,
     event_from_exception,
+    get_frame_collection_options,
     has_logs_enabled,
     safe_repr,
     to_string,
@@ -282,14 +283,17 @@ class EventHandler(_BaseHandler):
             event = {}
             hint = {}
             with capture_internal_exceptions():
+                include_local_variables, include_source_context, context_lines = (
+                    get_frame_collection_options(client_options)
+                )
                 event["threads"] = {
                     "values": [
                         {
                             "stacktrace": current_stacktrace(
-                                include_local_variables=client_options[
-                                    "include_local_variables"
-                                ],
+                                include_local_variables=include_local_variables,
+                                include_source_context=include_source_context,
                                 max_value_length=client_options["max_value_length"],
+                                context_lines=context_lines,
                             ),
                             "crashed": False,
                             "current": True,
