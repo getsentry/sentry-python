@@ -6,4 +6,3 @@ executing
 asttokens
 responses
 setuptools
-docker
