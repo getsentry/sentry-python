@@ -2,12 +2,15 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.scope import (
+    should_collect_gen_ai_inputs,
+    should_collect_gen_ai_outputs,
+)
 from sentry_sdk.traces import SpanStatus, StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 from ..consts import SPAN_ORIGIN
-from ..utils import _set_agent_data
+from ..utils import _get_include_prompts, _set_agent_data
 
 if TYPE_CHECKING:
     from typing import Any, Union
@@ -46,7 +49,7 @@ def execute_tool_span(
 
         set_on_span = span.set_data
 
-    if should_send_default_pii():
+    if should_collect_gen_ai_inputs(_get_include_prompts()):
         input = args[1]
         set_on_span(SPANDATA.GEN_AI_TOOL_INPUT, input)
 
@@ -73,7 +76,7 @@ def update_execute_tool_span(
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
     )
 
-    if should_send_default_pii():
+    if should_collect_gen_ai_outputs(_get_include_prompts()):
         set_on_span(SPANDATA.GEN_AI_TOOL_OUTPUT, result)
 
     # Add conversation ID from agent

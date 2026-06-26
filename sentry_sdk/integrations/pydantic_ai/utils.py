@@ -3,7 +3,10 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.scope import (
+    should_collect_gen_ai_inputs,
+    should_collect_gen_ai_outputs,
+)
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.utils import event_from_exception, safe_serialize
 
@@ -49,15 +52,13 @@ def get_is_streaming() -> bool:
     return False
 
 
-def _should_send_prompts() -> bool:
+def _should_send_input_prompts() -> bool:
     """
-    Check if prompts should be sent to Sentry.
+    Check if input prompts/messages should be sent to Sentry.
 
-    This checks both send_default_pii and the include_prompts integration setting.
+    This routes through the gen_ai inputs data collection setting, using the
+    integration's include_prompts as an override.
     """
-    if not should_send_default_pii():
-        return False
-
     from . import PydanticAIIntegration
 
     # Get the integration instance from the client
@@ -66,7 +67,25 @@ def _should_send_prompts() -> bool:
     if integration is None:
         return False
 
-    return getattr(integration, "include_prompts", False)
+    return should_collect_gen_ai_inputs(integration.include_prompts)
+
+
+def _should_send_output_prompts() -> bool:
+    """
+    Check if output completions/responses should be sent to Sentry.
+
+    This routes through the gen_ai outputs data collection setting, using the
+    integration's include_prompts as an override.
+    """
+    from . import PydanticAIIntegration
+
+    # Get the integration instance from the client
+    integration = sentry_sdk.get_client().get_integration(PydanticAIIntegration)
+
+    if integration is None:
+        return False
+
+    return should_collect_gen_ai_outputs(integration.include_prompts)
 
 
 def _set_agent_data(

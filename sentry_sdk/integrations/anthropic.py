@@ -16,7 +16,10 @@ from sentry_sdk.ai.utils import (
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.scope import (
+    should_collect_gen_ai_inputs,
+    should_collect_gen_ai_outputs,
+)
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import (
@@ -146,7 +149,9 @@ class AnthropicIntegration(Integration):
     identifier = "anthropic"
     origin = f"auto.ai.{identifier}"
 
-    def __init__(self: "AnthropicIntegration", include_prompts: bool = True) -> None:
+    def __init__(
+        self: "AnthropicIntegration", include_prompts: "Optional[bool]" = None
+    ) -> None:
         self.include_prompts = include_prompts
 
     @staticmethod
@@ -393,8 +398,7 @@ def _set_common_input_data(
     if (
         messages is not None
         and len(messages) > 0  # type: ignore
-        and should_send_default_pii()
-        and integration.include_prompts
+        and should_collect_gen_ai_inputs(integration.include_prompts)
     ):
         if isinstance(system, str) or isinstance(system, Iterable):
             set_on_span(
@@ -586,7 +590,7 @@ def _set_output_data(
         set_on_span(SPANDATA.GEN_AI_RESPONSE_ID, response_id)
     if finish_reason is not None:
         set_on_span(SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, [finish_reason])
-    if should_send_default_pii() and integration.include_prompts:
+    if should_collect_gen_ai_outputs(integration.include_prompts):
         output_messages: "dict[str, list[Any]]" = {
             "response": [],
             "tool": [],

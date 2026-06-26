@@ -141,7 +141,10 @@ class InterruptingChatModel(BaseChatModel):
 def test_langgraph_integration_init():
     """Test LanggraphIntegration initialization with different parameters."""
     integration = LanggraphIntegration()
-    assert integration.include_prompts is True
+    # Defaults to None (no per-integration override -> defer to the global
+    # data_collection.gen_ai setting). Runtime behavior is unchanged: in legacy
+    # mode this still gates on send_default_pii.
+    assert integration.include_prompts is None
     assert integration.identifier == "langgraph"
     assert integration.origin == "auto.ai.langgraph"
 

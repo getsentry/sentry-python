@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, Any, List, Optional, TypedDict, Union
 
 from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.scope import should_collect_gen_ai_outputs
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.utils import (
     safe_serialize,
@@ -107,10 +107,8 @@ def set_span_data_for_streaming_response(
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
     )
 
-    if (
-        should_send_default_pii()
-        and integration.include_prompts
-        and accumulated_response.get("text")
+    if should_collect_gen_ai_outputs(integration.include_prompts) and (
+        accumulated_response.get("text")
     ):
         set_on_span(
             SPANDATA.GEN_AI_RESPONSE_TEXT,

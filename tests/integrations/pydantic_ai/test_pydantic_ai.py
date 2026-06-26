@@ -3441,9 +3441,12 @@ async def test_set_model_data_with_none_settings_values(sentry_init, capture_ite
 @pytest.mark.asyncio
 async def test_should_send_prompts_without_pii(sentry_init, capture_items):
     """
-    Test that _should_send_prompts returns False when PII disabled.
+    Test that the input/output prompt gates return False when PII disabled.
     """
-    from sentry_sdk.integrations.pydantic_ai.utils import _should_send_prompts
+    from sentry_sdk.integrations.pydantic_ai.utils import (
+        _should_send_input_prompts,
+        _should_send_output_prompts,
+    )
 
     sentry_init(
         integrations=[PydanticAIIntegration(include_prompts=True)],
@@ -3452,8 +3455,8 @@ async def test_should_send_prompts_without_pii(sentry_init, capture_items):
     )
 
     # Should return False
-    result = _should_send_prompts()
-    assert result is False
+    assert _should_send_input_prompts() is False
+    assert _should_send_output_prompts() is False
 
 
 @pytest.mark.asyncio

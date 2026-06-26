@@ -27,7 +27,10 @@ from sentry_sdk.ai.utils import (
     truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.scope import (
+    should_collect_gen_ai_inputs,
+    should_collect_gen_ai_outputs,
+)
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
@@ -899,7 +902,7 @@ def set_span_data_for_request(
     config: "Optional[GenerateContentConfig]" = kwargs.get("config")
 
     # Set input messages/prompts if PII is allowed
-    if should_send_default_pii() and integration.include_prompts:
+    if should_collect_gen_ai_inputs(integration.include_prompts):
         messages = []
 
         # Add system instruction if present
@@ -977,7 +980,7 @@ def set_span_data_for_response(
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
     )
-    if should_send_default_pii() and integration.include_prompts:
+    if should_collect_gen_ai_outputs(integration.include_prompts):
         response_texts = _extract_response_text(response)
         if response_texts:
             # Format as JSON string array as per documentation
@@ -1063,7 +1066,7 @@ def set_span_data_for_embed_request(
 ) -> None:
     """Set span data for embedding request."""
     # Include input contents if PII is allowed
-    if should_send_default_pii() and integration.include_prompts:
+    if should_collect_gen_ai_inputs(integration.include_prompts):
         if contents:
             # For embeddings, contents is typically a list of strings/texts
             input_texts = []

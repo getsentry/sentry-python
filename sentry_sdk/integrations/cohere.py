@@ -10,13 +10,16 @@ from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Iterator, Union
+    from typing import Any, Callable, Iterator, Optional, Union
 
     from sentry_sdk.tracing import Span
 
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.scope import (
+    should_collect_gen_ai_inputs,
+    should_collect_gen_ai_outputs,
+)
 from sentry_sdk.utils import capture_internal_exceptions, event_from_exception, reraise
 
 try:
@@ -73,7 +76,9 @@ class CohereIntegration(Integration):
     identifier = "cohere"
     origin = f"auto.ai.{identifier}"
 
-    def __init__(self: "CohereIntegration", include_prompts: bool = True) -> None:
+    def __init__(
+        self: "CohereIntegration", include_prompts: "Optional[bool]" = None
+    ) -> None:
         self.include_prompts = include_prompts
 
     @staticmethod
@@ -179,7 +184,7 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
             reraise(*exc_info)
 
         with capture_internal_exceptions():
-            if should_send_default_pii() and integration.include_prompts:
+            if should_collect_gen_ai_inputs(integration.include_prompts):
                 set_data_normalized(
                     span,
                     SPANDATA.AI_INPUT_MESSAGES,
@@ -215,8 +220,9 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
                                 collect_chat_response_fields(
                                     span,
                                     x.response,
-                                    include_pii=should_send_default_pii()
-                                    and integration.include_prompts,
+                                    include_pii=should_collect_gen_ai_outputs(
+                                        integration.include_prompts
+                                    ),
                                 )
                             yield x
                     _end_span(span)
@@ -226,8 +232,9 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
                 collect_chat_response_fields(
                     span,
                     res,
-                    include_pii=should_send_default_pii()
-                    and integration.include_prompts,
+                    include_pii=should_collect_gen_ai_outputs(
+                        integration.include_prompts
+                    ),
                 )
                 _end_span(span)
             else:
@@ -265,8 +272,8 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
             )
 
         with span_ctx as span:
-            if "texts" in kwargs and (
-                should_send_default_pii() and integration.include_prompts
+            if "texts" in kwargs and should_collect_gen_ai_inputs(
+                integration.include_prompts
             ):
                 if isinstance(kwargs["texts"], str):
                     set_data_normalized(span, SPANDATA.AI_TEXTS, [kwargs["texts"]])

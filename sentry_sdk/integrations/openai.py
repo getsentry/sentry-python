@@ -33,7 +33,10 @@ from sentry_sdk.ai.utils import (
 )
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.scope import (
+    should_collect_gen_ai_inputs,
+    should_collect_gen_ai_outputs,
+)
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
@@ -108,7 +111,7 @@ class OpenAIIntegration(Integration):
 
     def __init__(
         self: "OpenAIIntegration",
-        include_prompts: bool = True,
+        include_prompts: "Optional[bool]" = None,
         tiktoken_encoding_name: "Optional[str]" = None,
     ) -> None:
         self.include_prompts = include_prompts
@@ -362,7 +365,7 @@ def _set_responses_api_input_data(
         if conversation_id is not None:
             set_on_span(SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id)
 
-    if not should_send_default_pii() or not integration.include_prompts:
+    if not should_collect_gen_ai_inputs(integration.include_prompts):
         set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
         return
 
@@ -490,8 +493,7 @@ def _set_completions_api_input_data(
         set_on_span(SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
 
     if (
-        not should_send_default_pii()
-        or not integration.include_prompts
+        not should_collect_gen_ai_inputs(integration.include_prompts)
         or messages is None
     ):
         set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
@@ -567,8 +569,7 @@ def _set_embeddings_input_data(
         set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
     if (
-        not should_send_default_pii()
-        or not integration.include_prompts
+        not should_collect_gen_ai_inputs(integration.include_prompts)
         or messages is None
     ):
         set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
@@ -630,7 +631,7 @@ def _set_common_output_data(
 
     # Chat Completions API
     if hasattr(response, "choices") and response.choices is not None:
-        if should_send_default_pii() and integration.include_prompts:
+        if should_collect_gen_ai_outputs(integration.include_prompts):
             response_text = [
                 choice.message.model_dump()
                 for choice in response.choices
@@ -653,7 +654,7 @@ def _set_common_output_data(
 
     # Responses API
     elif hasattr(response, "output"):
-        if should_send_default_pii() and integration.include_prompts:
+        if should_collect_gen_ai_outputs(integration.include_prompts):
             output_messages: "dict[str, list[Any]]" = {
                 "response": [],
                 "tool": [],
@@ -937,7 +938,7 @@ def _wrap_synchronous_completions_chunk_iterator(
         all_responses = None
         if len(data_buf) > 0:
             all_responses = ["".join(chunk) for chunk in data_buf]
-            if should_send_default_pii() and integration.include_prompts:
+            if should_collect_gen_ai_outputs(integration.include_prompts):
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
 
         _calculate_completions_token_usage(
@@ -1002,7 +1003,7 @@ async def _wrap_asynchronous_completions_chunk_iterator(
         all_responses = None
         if len(data_buf) > 0:
             all_responses = ["".join(chunk) for chunk in data_buf]
-            if should_send_default_pii() and integration.include_prompts:
+            if should_collect_gen_ai_outputs(integration.include_prompts):
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
 
         _calculate_completions_token_usage(
@@ -1069,7 +1070,7 @@ def _wrap_synchronous_responses_event_iterator(
             )
         if len(data_buf) > 0:
             all_responses = ["".join(chunk) for chunk in data_buf]
-            if should_send_default_pii() and integration.include_prompts:
+            if should_collect_gen_ai_outputs(integration.include_prompts):
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
 
             if count_tokens_manually:
@@ -1136,7 +1137,7 @@ async def _wrap_asynchronous_responses_event_iterator(
             )
         if len(data_buf) > 0:
             all_responses = ["".join(chunk) for chunk in data_buf]
-            if should_send_default_pii() and integration.include_prompts:
+            if should_collect_gen_ai_outputs(integration.include_prompts):
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
             if count_tokens_manually:
                 _calculate_responses_token_usage(

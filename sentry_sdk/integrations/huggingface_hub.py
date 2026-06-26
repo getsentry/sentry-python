@@ -12,7 +12,10 @@ from sentry_sdk.ai.utils import (
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.scope import (
+    should_collect_gen_ai_inputs,
+    should_collect_gen_ai_outputs,
+)
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -22,7 +25,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Iterable, Union
+    from typing import Any, Callable, Iterable, Optional, Union
 
     from sentry_sdk.tracing import Span
 
@@ -37,7 +40,8 @@ class HuggingfaceHubIntegration(Integration):
     origin = f"auto.ai.{identifier}"
 
     def __init__(
-        self: "HuggingfaceHubIntegration", include_prompts: bool = True
+        self: "HuggingfaceHubIntegration",
+        include_prompts: "Optional[bool]" = None,
     ) -> None:
         self.include_prompts = include_prompts
 
@@ -114,7 +118,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
             _set_span_data_attribute(span, SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
         # Input attributes
-        if should_send_default_pii() and integration.include_prompts:
+        if should_collect_gen_ai_inputs(integration.include_prompts):
             set_data_normalized(
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, prompt, unpack=False
             )
@@ -206,7 +210,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                     finish_reason,
                 )
 
-            if should_send_default_pii() and integration.include_prompts:
+            if should_collect_gen_ai_outputs(integration.include_prompts):
                 if tool_calls is not None and len(tool_calls) > 0:
                     set_data_normalized(
                         span,
@@ -280,7 +284,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                                 finish_reason,
                             )
 
-                        if should_send_default_pii() and integration.include_prompts:
+                        if should_collect_gen_ai_outputs(integration.include_prompts):
                             if len(response_text_buffer) > 0:
                                 text_response = "".join(response_text_buffer)
                                 if text_response:
@@ -359,7 +363,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                                 finish_reason,
                             )
 
-                        if should_send_default_pii() and integration.include_prompts:
+                        if should_collect_gen_ai_outputs(integration.include_prompts):
                             if tool_calls is not None and len(tool_calls) > 0:
                                 set_data_normalized(
                                     span,

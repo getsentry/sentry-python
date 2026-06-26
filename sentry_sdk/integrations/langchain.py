@@ -17,7 +17,10 @@ from sentry_sdk.ai.utils import (
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.scope import (
+    should_collect_gen_ai_inputs,
+    should_collect_gen_ai_outputs,
+)
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
     _get_value,
@@ -214,7 +217,7 @@ class LangchainIntegration(Integration):
 
     def __init__(
         self: "LangchainIntegration",
-        include_prompts: bool = True,
+        include_prompts: "Optional[bool]" = None,
         max_spans: "Optional[int]" = None,
     ) -> None:
         self.include_prompts = include_prompts
@@ -251,7 +254,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     """Callback handler that creates Sentry spans."""
 
     def __init__(
-        self, max_span_map_size: "Optional[int]", include_prompts: bool
+        self, max_span_map_size: "Optional[int]", include_prompts: "Optional[bool]"
     ) -> None:
         self.span_map: "OrderedDict[UUID, Union[sentry_sdk.tracing.Span, StreamedSpan]]" = OrderedDict()
         self.max_span_map_size = max_span_map_size
@@ -401,7 +404,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             _set_tools_on_span(span, all_params.get("tools"))
 
-            if should_send_default_pii() and self.include_prompts:
+            if should_collect_gen_ai_inputs(self.include_prompts):
                 normalized_messages = [
                     {
                         "role": GEN_AI_ALLOWED_MESSAGE_ROLES.USER,
@@ -484,7 +487,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             _set_tools_on_span(span, all_params.get("tools"))
 
-            if should_send_default_pii() and self.include_prompts:
+            if should_collect_gen_ai_inputs(self.include_prompts):
                 system_instructions = _get_system_instructions(messages)
                 if len(system_instructions) > 0:
                     set_on_span(
@@ -532,7 +535,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             span = self.span_map[run_id]
 
-            if should_send_default_pii() and self.include_prompts:
+            if should_collect_gen_ai_outputs(self.include_prompts):
                 set_data_normalized(
                     span,
                     SPANDATA.GEN_AI_RESPONSE_TEXT,
@@ -588,7 +591,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     pass
 
                 try:
-                    if should_send_default_pii() and self.include_prompts:
+                    if should_collect_gen_ai_outputs(self.include_prompts):
                         tool_calls = getattr(generation.message, "tool_calls", None)
                         if tool_calls is not None and tool_calls != []:
                             set_data_normalized(
@@ -600,7 +603,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                 except AttributeError:
                     pass
 
-            if should_send_default_pii() and self.include_prompts:
+            if should_collect_gen_ai_outputs(self.include_prompts):
                 set_data_normalized(
                     span,
                     SPANDATA.GEN_AI_RESPONSE_TEXT,
@@ -643,7 +646,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             span = self.span_map[run_id]
 
-            if should_send_default_pii() and self.include_prompts:
+            if should_collect_gen_ai_outputs(self.include_prompts):
                 set_data_normalized(
                     span, SPANDATA.GEN_AI_RESPONSE_TEXT, finish.return_values.items()
                 )
@@ -695,7 +698,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     run_name,
                 )
 
-            if should_send_default_pii() and self.include_prompts:
+            if should_collect_gen_ai_inputs(self.include_prompts):
                 set_data_normalized(
                     span,
                     SPANDATA.GEN_AI_TOOL_INPUT,
@@ -712,7 +715,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
             span = self.span_map[run_id]
 
-            if should_send_default_pii() and self.include_prompts:
+            if should_collect_gen_ai_outputs(self.include_prompts):
                 set_data_normalized(span, SPANDATA.GEN_AI_TOOL_OUTPUT, output)
 
             self._exit_span(span, run_id)
@@ -1038,10 +1041,8 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
                 result = f(self, *args, **kwargs)
 
                 input = result.get("input")
-                if (
-                    input is not None
-                    and should_send_default_pii()
-                    and integration.include_prompts
+                if input is not None and should_collect_gen_ai_inputs(
+                    integration.include_prompts
                 ):
                     normalized_messages = normalize_message_roles([input])
 
@@ -1061,10 +1062,8 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
                         )
 
                 output = result.get("output")
-                if (
-                    output is not None
-                    and should_send_default_pii()
-                    and integration.include_prompts
+                if output is not None and should_collect_gen_ai_outputs(
+                    integration.include_prompts
                 ):
                     set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
@@ -1089,10 +1088,8 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
                 result = f(self, *args, **kwargs)
 
                 input = result.get("input")
-                if (
-                    input is not None
-                    and should_send_default_pii()
-                    and integration.include_prompts
+                if input is not None and should_collect_gen_ai_inputs(
+                    integration.include_prompts
                 ):
                     normalized_messages = normalize_message_roles([input])
 
@@ -1112,10 +1109,8 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
                         )
 
                 output = result.get("output")
-                if (
-                    output is not None
-                    and should_send_default_pii()
-                    and integration.include_prompts
+                if output is not None and should_collect_gen_ai_outputs(
+                    integration.include_prompts
                 ):
                     set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
@@ -1166,10 +1161,8 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
         _set_tools_on_span(span, tools)
 
         input = args[0].get("input") if len(args) >= 1 else None
-        if (
-            input is not None
-            and should_send_default_pii()
-            and integration.include_prompts
+        if input is not None and should_collect_gen_ai_inputs(
+            integration.include_prompts
         ):
             normalized_messages = normalize_message_roles([input])
 
@@ -1204,10 +1197,8 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
                 except Exception:
                     output = None
 
-                if (
-                    output is not None
-                    and should_send_default_pii()
-                    and integration.include_prompts
+                if output is not None and should_collect_gen_ai_outputs(
+                    integration.include_prompts
                 ):
                     set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
@@ -1229,10 +1220,8 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
                 except Exception:
                     output = None
 
-                if (
-                    output is not None
-                    and should_send_default_pii()
-                    and integration.include_prompts
+                if output is not None and should_collect_gen_ai_outputs(
+                    integration.include_prompts
                 ):
                     set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
@@ -1300,8 +1289,7 @@ def _wrap_embedding_method(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
                 # Capture input if PII is allowed
                 if (
-                    should_send_default_pii()
-                    and integration.include_prompts
+                    should_collect_gen_ai_inputs(integration.include_prompts)
                     and len(args) > 0
                 ):
                     input_data = args[0]
@@ -1325,8 +1313,7 @@ def _wrap_embedding_method(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
                 # Capture input if PII is allowed
                 if (
-                    should_send_default_pii()
-                    and integration.include_prompts
+                    should_collect_gen_ai_inputs(integration.include_prompts)
                     and len(args) > 0
                 ):
                     input_data = args[0]
@@ -1370,8 +1357,7 @@ def _wrap_async_embedding_method(f: "Callable[..., Any]") -> "Callable[..., Any]
 
                 # Capture input if PII is allowed
                 if (
-                    should_send_default_pii()
-                    and integration.include_prompts
+                    should_collect_gen_ai_inputs(integration.include_prompts)
                     and len(args) > 0
                 ):
                     input_data = args[0]
@@ -1395,8 +1381,7 @@ def _wrap_async_embedding_method(f: "Callable[..., Any]") -> "Callable[..., Any]
 
                 # Capture input if PII is allowed
                 if (
-                    should_send_default_pii()
-                    and integration.include_prompts
+                    should_collect_gen_ai_inputs(integration.include_prompts)
                     and len(args) > 0
                 ):
                     input_data = args[0]
