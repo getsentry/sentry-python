@@ -5,6 +5,7 @@ from typing import (
     Callable,
     Iterator,
     List,
+    Optional,
 )
 
 import sentry_sdk
@@ -41,7 +42,10 @@ class GoogleGenAIIntegration(Integration):
     identifier = IDENTIFIER
     origin = ORIGIN
 
-    def __init__(self: "GoogleGenAIIntegration", include_prompts: bool = True) -> None:
+    def __init__(
+        self: "GoogleGenAIIntegration",
+        include_prompts: "Optional[bool]" = None,
+    ) -> None:
         self.include_prompts = include_prompts
 
     @staticmethod

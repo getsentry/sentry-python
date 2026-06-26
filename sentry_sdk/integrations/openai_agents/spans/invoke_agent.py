@@ -8,7 +8,10 @@ from sentry_sdk.ai.utils import (
     truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.scope import (
+    should_collect_gen_ai_inputs,
+    should_collect_gen_ai_outputs,
+)
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
@@ -17,7 +20,7 @@ from sentry_sdk.tracing_utils import (
 from sentry_sdk.utils import safe_serialize
 
 from ..consts import SPAN_ORIGIN
-from ..utils import _set_agent_data, _set_usage_data
+from ..utils import _get_include_prompts, _set_agent_data, _set_usage_data
 
 if TYPE_CHECKING:
     from typing import Any, Union
@@ -49,7 +52,7 @@ def invoke_agent_span(
 
         span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
 
-    if should_send_default_pii():
+    if should_collect_gen_ai_inputs(_get_include_prompts()):
         messages = []
         if agent.instructions:
             message = (
@@ -110,7 +113,7 @@ def update_invoke_agent_span(
     if hasattr(context, "usage"):
         _set_usage_data(span, context.usage)
 
-    if should_send_default_pii():
+    if should_collect_gen_ai_outputs(_get_include_prompts()):
         set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output, unpack=False)
 
     # Add conversation ID from agent

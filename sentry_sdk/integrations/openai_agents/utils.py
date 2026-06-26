@@ -16,13 +16,16 @@ from sentry_sdk.ai.utils import (
 )
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.scope import (
+    should_collect_gen_ai_inputs,
+    should_collect_gen_ai_outputs,
+)
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import should_truncate_gen_ai_input
 from sentry_sdk.utils import event_from_exception, safe_serialize
 
 if TYPE_CHECKING:
-    from typing import Any, Union
+    from typing import Any, Optional, Union
 
     from agents import TResponseInputItem, Usage
 
@@ -116,11 +119,18 @@ def _set_usage_data(
     set_on_span(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens)
 
 
+def _get_include_prompts() -> "Optional[bool]":
+    from sentry_sdk.integrations.openai_agents import OpenAIAgentsIntegration
+
+    integration = sentry_sdk.get_client().get_integration(OpenAIAgentsIntegration)
+    return integration.include_prompts if integration is not None else None
+
+
 def _set_input_data(
     span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
     get_response_kwargs: "dict[str, Any]",
 ) -> None:
-    if not should_send_default_pii():
+    if not should_collect_gen_ai_inputs(_get_include_prompts()):
         return
     request_messages = []
 
@@ -207,7 +217,7 @@ def _set_input_data(
 def _set_output_data(
     span: "Union[sentry_sdk.tracing.Span, StreamedSpan]", result: "Any"
 ) -> None:
-    if not should_send_default_pii():
+    if not should_collect_gen_ai_outputs(_get_include_prompts()):
         return
 
     output_messages: "dict[str, list[Any]]" = {

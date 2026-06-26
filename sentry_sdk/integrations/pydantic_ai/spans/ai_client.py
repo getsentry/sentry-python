@@ -18,7 +18,8 @@ from ..utils import (
     _set_agent_data,
     _set_available_tools,
     _set_model_data,
-    _should_send_prompts,
+    _should_send_input_prompts,
+    _should_send_output_prompts,
     get_current_agent,
     get_is_streaming,
 )
@@ -103,7 +104,7 @@ def _set_input_messages(
     span: "Union[sentry_sdk.tracing.Span, StreamedSpan]", messages: "Any"
 ) -> None:
     """Set input messages data on a span."""
-    if not _should_send_prompts():
+    if not _should_send_input_prompts():
         return
 
     if not messages:
@@ -216,7 +217,7 @@ def _set_output_data(
     span: "Union[sentry_sdk.tracing.Span, StreamedSpan]", response: "Any"
 ) -> None:
     """Set output data on a span."""
-    if not _should_send_prompts():
+    if not _should_send_output_prompts():
         return
 
     if not response:

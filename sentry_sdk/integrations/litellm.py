@@ -13,7 +13,10 @@ from sentry_sdk.ai.utils import (
 )
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.scope import (
+    should_collect_gen_ai_inputs,
+    should_collect_gen_ai_outputs,
+)
 from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
     should_truncate_gen_ai_input,
@@ -22,7 +25,7 @@ from sentry_sdk.utils import event_from_exception
 
 if TYPE_CHECKING:
     from datetime import datetime
-    from typing import Any, Dict, List
+    from typing import Any, Dict, List, Optional
 
 try:
     import litellm  # type: ignore[import-not-found]
@@ -129,7 +132,7 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
     set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, operation)
 
     # Record input/messages if allowed
-    if should_send_default_pii() and integration.include_prompts:
+    if should_collect_gen_ai_inputs(integration.include_prompts):
         if operation == "embeddings":
             # For embeddings, look for the 'input' parameter
             embedding_input = kwargs.get("input")
@@ -218,7 +221,7 @@ def _success_callback(
             )
 
         # Record response content if allowed
-        if should_send_default_pii() and integration.include_prompts:
+        if should_collect_gen_ai_outputs(integration.include_prompts):
             if hasattr(completion_response, "choices"):
                 response_messages = []
                 for choice in completion_response.choices:
@@ -353,7 +356,9 @@ class LiteLLMIntegration(Integration):
     identifier = "litellm"
     origin = f"auto.ai.{identifier}"
 
-    def __init__(self: "LiteLLMIntegration", include_prompts: bool = True) -> None:
+    def __init__(
+        self: "LiteLLMIntegration", include_prompts: "Optional[bool]" = None
+    ) -> None:
         self.include_prompts = include_prompts
 
     @staticmethod

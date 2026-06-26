@@ -13,7 +13,10 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 
 # This is fine because langgraph depends on langchain-base, and LangchainIntegration only imports from langchain-base.
 from sentry_sdk.integrations.langchain import LangchainIntegration
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.scope import (
+    should_collect_gen_ai_inputs,
+    should_collect_gen_ai_outputs,
+)
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
@@ -33,7 +36,9 @@ class LanggraphIntegration(Integration):
     identifier = "langgraph"
     origin = f"auto.ai.{identifier}"
 
-    def __init__(self: "LanggraphIntegration", include_prompts: bool = True) -> None:
+    def __init__(
+        self: "LanggraphIntegration", include_prompts: "Optional[bool]" = None
+    ) -> None:
         self.include_prompts = include_prompts
 
     @staticmethod
@@ -188,10 +193,8 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
                 # Store input messages to later compare with output
                 input_messages = None
-                if (
-                    len(args) > 0
-                    and should_send_default_pii()
-                    and integration.include_prompts
+                if len(args) > 0 and should_collect_gen_ai_inputs(
+                    integration.include_prompts
                 ):
                     input_messages = _parse_langgraph_messages(args[0])
                     if input_messages:
@@ -235,10 +238,8 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
                 # Store input messages to later compare with output
                 input_messages = None
-                if (
-                    len(args) > 0
-                    and should_send_default_pii()
-                    and integration.include_prompts
+                if len(args) > 0 and should_collect_gen_ai_inputs(
+                    integration.include_prompts
                 ):
                     input_messages = _parse_langgraph_messages(args[0])
                     if input_messages:
@@ -299,10 +300,8 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, graph_name)
 
                 input_messages = None
-                if (
-                    len(args) > 0
-                    and should_send_default_pii()
-                    and integration.include_prompts
+                if len(args) > 0 and should_collect_gen_ai_inputs(
+                    integration.include_prompts
                 ):
                     input_messages = _parse_langgraph_messages(args[0])
                     if input_messages:
@@ -345,10 +344,8 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
 
             input_messages = None
-            if (
-                len(args) > 0
-                and should_send_default_pii()
-                and integration.include_prompts
+            if len(args) > 0 and should_collect_gen_ai_inputs(
+                integration.include_prompts
             ):
                 input_messages = _parse_langgraph_messages(args[0])
                 if input_messages:
@@ -494,7 +491,7 @@ def _set_response_attributes(
     _set_usage_data(span, new_messages)
     _set_response_model_name(span, new_messages)
 
-    if not (should_send_default_pii() and integration.include_prompts):
+    if not should_collect_gen_ai_outputs(integration.include_prompts):
         return
 
     llm_response_text = _extract_llm_response_text(new_messages)

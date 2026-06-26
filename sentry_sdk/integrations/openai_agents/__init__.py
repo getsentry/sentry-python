@@ -41,7 +41,7 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, Optional
 
     from agents.run_internal.run_steps import SingleStepResult
 
@@ -88,6 +88,12 @@ class OpenAIAgentsIntegration(Integration):
     """
 
     identifier = "openai_agents"
+
+    def __init__(
+        self: "OpenAIAgentsIntegration",
+        include_prompts: "Optional[bool]" = None,
+    ) -> None:
+        self.include_prompts = include_prompts
 
     @staticmethod
     def setup_once() -> None:

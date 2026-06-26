@@ -21,7 +21,7 @@ from .patches import (
 from .spans.ai_client import ai_client_span, update_ai_client_span
 
 if TYPE_CHECKING:
-    from typing import Any
+    from typing import Any, Optional
 
     from pydantic_ai import ModelRequestContext, RunContext
     from pydantic_ai.capabilities import Hooks  # type: ignore
@@ -132,14 +132,17 @@ class PydanticAIIntegration(Integration):
     using_request_hooks = False
 
     def __init__(
-        self, include_prompts: bool = True, handled_tool_call_exceptions: bool = True
+        self,
+        include_prompts: "Optional[bool]" = None,
+        handled_tool_call_exceptions: bool = True,
     ) -> None:
         """
         Initialize the Pydantic AI integration.
 
         Args:
             include_prompts: Whether to include prompts and messages in span data.
-                Requires send_default_pii=True. Defaults to True.
+                Requires send_default_pii=True. Overrides the global gen_ai data
+                collection setting when set. Defaults to None (use global setting).
             handled_tool_exceptions: Capture tool call exceptions that Pydantic AI
                 internally prevents from bubbling up.
         """

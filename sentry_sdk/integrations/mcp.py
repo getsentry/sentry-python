@@ -16,7 +16,9 @@ from sentry_sdk.ai.utils import _set_span_data_attribute, get_start_span_functio
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import nullcontext
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.scope import (
+    should_collect_gen_ai_outputs,
+)
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import package_version, safe_serialize
@@ -65,13 +67,15 @@ class MCPIntegration(Integration):
     identifier = "mcp"
     origin = "auto.ai.mcp"
 
-    def __init__(self, include_prompts: bool = True) -> None:
+    def __init__(self, include_prompts: "Optional[bool]" = None) -> None:
         """
         Initialize the MCP integration.
 
         Args:
-            include_prompts: Whether to include prompts (tool results and prompt content)
-                             in span data. Requires send_default_pii=True. Default is True.
+            include_prompts: Override for whether to include prompts (tool results and
+                             prompt content) in span data. Requires send_default_pii=True.
+                             None (default) means no override; the global gen_ai
+                             data_collection setting is used.
         """
         self.include_prompts = include_prompts
 
@@ -283,8 +287,8 @@ def _set_span_output_data(
     if integration is None:
         return
 
-    # Check if we should include sensitive data
-    should_include_data = should_send_default_pii() and integration.include_prompts
+    # Check if we should include sensitive output data
+    should_include_data = should_collect_gen_ai_outputs(integration.include_prompts)
 
     # For tools, extract the meaningful content
     if handler_type == "tool":
