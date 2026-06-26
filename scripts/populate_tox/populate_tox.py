@@ -1191,7 +1191,6 @@ def get_existing_releases_to_test(integration: str) -> list[PackageVersion]:
                 match["python_versions"]
             )
             release.rendered_python_versions = match["python_versions"]
-            release.transitive_dependencies = []
             releases[release] = release
 
     return sorted(releases.values())
@@ -1216,7 +1215,12 @@ def get_releases_to_test(integration, package) -> list[Version] | None:
     # Pick a handful of the supported releases to actually test against
     # and fetch the PyPI data for each to determine which Python versions
     # to test it on
-    return pick_releases_to_test(integration, releases, latest_prerelease)
+    test_releases = pick_releases_to_test(integration, releases, latest_prerelease)
+
+    for release in test_releases:
+        _add_python_versions_to_release(integration, package, release)
+
+    return test_releases
 
 
 def parse_args() -> argparse.Namespace:
@@ -1315,8 +1319,8 @@ def main() -> dict[str, list]:
             if test_releases is None:
                 continue
 
+            # Only reads from cache when `integration in skip_version_updates`
             for release in test_releases:
-                _add_python_versions_to_release(integration, package, release)
                 if not release.python_versions:
                     print(f"  Release {release} has no Python versions, skipping.")
                     continue
