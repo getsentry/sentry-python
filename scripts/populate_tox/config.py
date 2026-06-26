@@ -182,8 +182,8 @@ TEST_SUITE_CONFIG = {
     "graphene": {
         "package": "graphene",
         "deps": {
-            "*": ["blinker", "fastapi", "flask", "httpx"],
-            "py3.6": ["aiocontextvars"],
+            "*": ["blinker", "fastapi[test]", "flask", "httpx"],
+            "py3.6": ["aiocontextvars", "requests"],
         },
     },
     "grpc": {
