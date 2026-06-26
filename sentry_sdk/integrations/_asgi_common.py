@@ -104,7 +104,8 @@ def _get_ip(asgi_scope: "Any") -> str:
 
 
 def _get_request_data(
-    asgi_scope: "Any", root_path_in_path: "_RootPathInPath" = _RootPathInPath.EXCLUDED
+    asgi_scope: "Any",
+    root_path_in_path: "_RootPathInPath",
 ) -> "Dict[str, Any]":
     """
     Returns data related to the HTTP request from the ASGI scope.
@@ -135,7 +136,7 @@ def _get_request_data(
 
 def _get_request_attributes(
     asgi_scope: "Any",
-    root_path_in_path: "_RootPathInPath" = _RootPathInPath.EXCLUDED,
+    root_path_in_path: "_RootPathInPath",
 ) -> "dict[str, Any]":
     """
     Return attributes related to the HTTP request from the ASGI scope.
