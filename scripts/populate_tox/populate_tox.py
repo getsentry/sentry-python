@@ -1166,7 +1166,7 @@ def _exit_if_pip_unavailable():
         raise exc
 
 
-def _parse_rendered_python_versions(rendered: str) -> list[ThreadedVersion]:
+def parse_rendered_python_versions(rendered: str) -> list[ThreadedVersion]:
     rendered = rendered.strip("{}")
     return [
         ThreadedVersion(
@@ -1187,7 +1187,7 @@ def get_existing_releases_to_test(integration: str) -> list[PackageVersion]:
             if match is None:
                 continue
             release = PackageVersion(match["version"])
-            release.python_versions = _parse_rendered_python_versions(
+            release.python_versions = parse_rendered_python_versions(
                 match["python_versions"]
             )
             release.rendered_python_versions = match["python_versions"]
