@@ -188,7 +188,8 @@ TEST_SUITE_CONFIG = {
         "package": "graphene",
         "deps": {
             "*": ["blinker", "fastapi[test]", "flask", "httpx"],
-            "py3.6": ["aiocontextvars"],
+            "py3.6": ["aiocontextvars", "setuptools<82"],
+            "py3.7": ["setuptools<82"],  # Handled by importlib.metadata on Python 3.8+
         },
     },
     "grpc": {
