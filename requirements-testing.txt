@@ -1,7 +1,6 @@
 pytest>=6.0.0
 pytest-cov
 dataclasses; python_version < "3.7"
-pytest-forked
 executing
 asttokens
 responses
