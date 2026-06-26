@@ -155,6 +155,7 @@ class CommandTracer(monitoring.CommandListener):
                 span_first_data = {
                     "db.operation.name": operation_name,
                     "db.collection.name": collection_name,
+                    SPANDATA.DB_QUERY_TEXT: query,
                     "sentry.op": OP.DB,
                     "sentry.origin": PyMongoIntegration.origin,
                     **db_data,

@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.redis.consts import SPAN_ORIGIN
 from sentry_sdk.integrations.redis.modules.caches import (
     _compile_cache_span_properties,
@@ -9,6 +9,7 @@ from sentry_sdk.integrations.redis.modules.caches import (
 )
 from sentry_sdk.integrations.redis.modules.queries import _compile_db_span_properties
 from sentry_sdk.integrations.redis.utils import (
+    _get_safe_command,
     _set_client_data,
     _set_pipeline_data,
 )
@@ -108,6 +109,12 @@ def patch_redis_client(
             integration,
         )
 
+        additional_cache_span_attributes = {}
+        with capture_internal_exceptions():
+            additional_cache_span_attributes[SPANDATA.DB_QUERY_TEXT] = (
+                _get_safe_command(name, args)
+            )
+
         cache_span: "Optional[Union[Span, StreamedSpan]]" = None
         if cache_properties["is_cache_key"] and cache_properties["op"] is not None:
             if span_streaming:
@@ -116,6 +123,7 @@ def patch_redis_client(
                     attributes={
                         "sentry.op": cache_properties["op"],
                         "sentry.origin": SPAN_ORIGIN,
+                        **additional_cache_span_attributes,
                     },
                 )
             else:
@@ -128,6 +136,12 @@ def patch_redis_client(
 
         db_properties = _compile_db_span_properties(integration, name, args)
 
+        additional_db_span_attributes = {}
+        with capture_internal_exceptions():
+            additional_db_span_attributes[SPANDATA.DB_QUERY_TEXT] = _get_safe_command(
+                name, args
+            )
+
         db_span: "Union[Span, StreamedSpan]"
         if span_streaming:
             db_span = sentry_sdk.traces.start_span(
@@ -135,6 +149,7 @@ def patch_redis_client(
                 attributes={
                     "sentry.op": db_properties["op"],
                     "sentry.origin": SPAN_ORIGIN,
+                    **additional_db_span_attributes,
                 },
             )
         else:

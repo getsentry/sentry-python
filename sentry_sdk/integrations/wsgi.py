@@ -394,12 +394,6 @@ def _get_request_attributes(
     for header, value in headers.items():
         attributes[f"http.request.header.{header.lower()}"] = value
 
-    query_string = environ.get("QUERY_STRING")
-    if query_string:
-        attributes["http.query"] = query_string
-
-    attributes["url.full"] = get_request_url(environ, use_x_forwarded_for)
-
     url_scheme = environ.get("wsgi.url_scheme")
     if url_scheme:
         attributes["network.protocol.name"] = url_scheme
@@ -419,5 +413,15 @@ def _get_request_attributes(
         client_ip = get_client_ip(environ)
         if client_ip:
             attributes["client.address"] = client_ip
+
+        query_string = environ.get("QUERY_STRING")
+        if query_string:
+            attributes["http.query"] = query_string
+
+        path = environ.get("PATH_INFO", "")
+        if path:
+            attributes["url.path"] = path
+
+        attributes["url.full"] = get_request_url(environ, use_x_forwarded_for)
 
     return attributes

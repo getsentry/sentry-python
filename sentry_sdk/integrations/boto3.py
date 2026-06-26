@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
@@ -74,7 +75,7 @@ def _sentry_request_created(
                 SPANDATA.RPC_METHOD: f"{service_id}/{operation_name}",
             },
         )
-        if request.url is not None:
+        if request.url is not None and should_send_default_pii():
             with capture_internal_exceptions():
                 parsed_url = parse_url(request.url, sanitize=False)
                 span.set_attribute(SPANDATA.URL_FULL, parsed_url.url)

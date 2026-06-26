@@ -80,7 +80,7 @@ TEST_SUITE_CONFIG = {
     "celery": {
         "package": "celery",
         "deps": {
-            "*": ["newrelic<10.17.0", "redis"],
+            "*": ["newrelic<10.17.0", "redis", "pytest-forked"],
             "py3.6": ["newrelic<8"],
             "py3.7": ["importlib-metadata<5.0"],
         },
@@ -107,9 +107,10 @@ TEST_SUITE_CONFIG = {
                 "psycopg2-binary",
                 "djangorestframework",
                 "pytest-django",
+                "pytest-forked",
                 "Werkzeug",
+                "channels[daphne]",
             ],
-            ">=2.0": ["channels[daphne]"],
             ">=2.2,<3.1": ["six"],
             ">=3.0": ["pytest-asyncio"],
             "<3.3": [
@@ -188,7 +189,13 @@ TEST_SUITE_CONFIG = {
     "grpc": {
         "package": "grpcio",
         "deps": {
-            "*": ["protobuf", "mypy-protobuf", "types-protobuf", "pytest-asyncio"],
+            "*": [
+                "protobuf",
+                "mypy-protobuf",
+                "types-protobuf",
+                "pytest-asyncio",
+                "pytest-forked",
+            ],
         },
         "python": ">=3.7",
     },
@@ -371,7 +378,7 @@ TEST_SUITE_CONFIG = {
     "quart": {
         "package": "quart",
         "deps": {
-            "*": ["quart-auth", "pytest-asyncio", "Werkzeug"],
+            "*": ["quart-auth", "pytest-asyncio", "pytest-forked", "Werkzeug"],
             ">=0.19": ["quart-flask-patch"],
             "<0.19": [
                 "blinker<1.6",

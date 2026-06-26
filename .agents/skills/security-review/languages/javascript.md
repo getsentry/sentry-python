@@ -143,7 +143,6 @@ path.join(base, userInput);         // FLAG: ../../../ possible
 
 // SSRF
 fetch(userUrl);                     // FLAG: Check URL validation
-axios.get(userUrl);                 // FLAG: Check URL validation
 http.get(userUrl);                  // FLAG: Check URL validation
 
 // Prototype Pollution

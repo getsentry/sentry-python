@@ -90,6 +90,7 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
                 attributes={
                     "sentry.op": OP.DB,
                     "sentry.origin": ClickhouseDriverIntegration.origin,
+                    SPANDATA.DB_QUERY_TEXT: str(query),
                 },
             )
         else:
