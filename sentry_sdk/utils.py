@@ -36,6 +36,7 @@ from sentry_sdk.consts import (
     DEFAULT_MAX_STACK_FRAMES,
     EndpointType,
 )
+from sentry_sdk.data_collection import DEFAULT_FRAME_CONTEXT_LINES
 
 if TYPE_CHECKING:
     from types import FrameType, TracebackType
@@ -466,8 +467,8 @@ def get_lines_from_file(
     max_length: "Optional[int]" = None,
     loader: "Optional[Any]" = None,
     module: "Optional[str]" = None,
+    context_lines: int = DEFAULT_FRAME_CONTEXT_LINES,
 ) -> "Tuple[List[Annotated[str]], Optional[Annotated[str]], List[Annotated[str]]]":
-    context_lines = 5
     source = None
     if loader is not None and hasattr(loader, "get_source"):
         try:
@@ -509,6 +510,7 @@ def get_source_context(
     frame: "FrameType",
     tb_lineno: "Optional[int]",
     max_value_length: "Optional[int]" = None,
+    context_lines: int = DEFAULT_FRAME_CONTEXT_LINES,
 ) -> "Tuple[List[Annotated[str]], Optional[Annotated[str]], List[Annotated[str]]]":
     try:
         abs_path: "Optional[str]" = frame.f_code.co_filename
@@ -526,7 +528,12 @@ def get_source_context(
     if tb_lineno is not None and abs_path:
         lineno = tb_lineno - 1
         return get_lines_from_file(
-            abs_path, lineno, max_value_length, loader=loader, module=module
+            abs_path,
+            lineno,
+            max_value_length,
+            loader=loader,
+            module=module,
+            context_lines=context_lines,
         )
 
     return [], None, []
@@ -571,6 +578,31 @@ def filename_for_module(
         return abs_path
 
 
+def get_frame_collection_options(
+    client_options: "Optional[Dict[str, Any]]",
+) -> "Tuple[bool, bool, int]":
+    """
+    Derive (include_local_variables, include_source_context, context_lines) from
+    client options. Prefers the resolved ``data_collection`` config (which folds
+    in the legacy ``include_local_variables`` / ``include_source_context``
+    options), falling back to those options directly when ``data_collection`` is
+    absent.
+    """
+    if client_options is None:
+        return True, True, DEFAULT_FRAME_CONTEXT_LINES
+
+    data_collection = client_options.get("data_collection")
+    if data_collection is not None:
+        include_local_variables = bool(data_collection.stack_frame_variables)
+        context_lines = data_collection.frame_context_lines
+        return include_local_variables, context_lines > 0, context_lines
+
+    include_local_variables = client_options.get("include_local_variables", True)
+    include_source_context = client_options.get("include_source_context", True)
+    context_lines = DEFAULT_FRAME_CONTEXT_LINES if include_source_context else 0
+    return include_local_variables, include_source_context, context_lines
+
+
 def serialize_frame(
     frame: "FrameType",
     tb_lineno: "Optional[int]" = None,
@@ -578,6 +610,7 @@ def serialize_frame(
     include_source_context: bool = True,
     max_value_length: "Optional[int]" = None,
     custom_repr: "Optional[Callable[..., Optional[str]]]" = None,
+    context_lines: int = DEFAULT_FRAME_CONTEXT_LINES,
 ) -> "Dict[str, Any]":
     f_code = getattr(frame, "f_code", None)
     if not f_code:
@@ -609,7 +642,7 @@ def serialize_frame(
 
     if include_source_context:
         rv["pre_context"], rv["context_line"], rv["post_context"] = get_source_context(
-            frame, tb_lineno, max_value_length
+            frame, tb_lineno, max_value_length, context_lines=context_lines
         )
 
     if include_local_variables:
@@ -626,6 +659,7 @@ def current_stacktrace(
     include_local_variables: bool = True,
     include_source_context: bool = True,
     max_value_length: "Optional[int]" = None,
+    context_lines: int = DEFAULT_FRAME_CONTEXT_LINES,
 ) -> "Dict[str, Any]":
     __tracebackhide__ = True
     frames = []
@@ -639,6 +673,7 @@ def current_stacktrace(
                     include_local_variables=include_local_variables,
                     include_source_context=include_source_context,
                     max_value_length=max_value_length,
+                    context_lines=context_lines,
                 )
             )
         f = f.f_back
@@ -725,14 +760,13 @@ def single_exception_from_error_tuple(
     exception_value["type"] = get_type_name(exc_type)
     exception_value["value"] = get_error_message(exc_value)
 
+    include_local_variables, include_source_context, context_lines = (
+        get_frame_collection_options(client_options)
+    )
     if client_options is None:
-        include_local_variables = True
-        include_source_context = True
         max_value_length = None  # fallback
         custom_repr = None
     else:
-        include_local_variables = client_options["include_local_variables"]
-        include_source_context = client_options["include_source_context"]
         max_value_length = client_options["max_value_length"]
         custom_repr = client_options.get("custom_repr")
 
@@ -744,6 +778,7 @@ def single_exception_from_error_tuple(
             include_source_context=include_source_context,
             max_value_length=max_value_length,
             custom_repr=custom_repr,
+            context_lines=context_lines,
         )
         # Process at most MAX_STACK_FRAMES + 1 frames, to avoid hanging on
         # processing a super-long stacktrace.
@@ -1165,9 +1200,14 @@ def event_from_exception(
     hint = event_hint_with_exc_info(exc_info)
 
     if client_options and client_options.get("add_full_stack", DEFAULT_ADD_FULL_STACK):
+        include_local_variables, include_source_context, context_lines = (
+            get_frame_collection_options(client_options)
+        )
         full_stack = current_stacktrace(
-            include_local_variables=client_options["include_local_variables"],
+            include_local_variables=include_local_variables,
+            include_source_context=include_source_context,
             max_value_length=client_options["max_value_length"],
+            context_lines=context_lines,
         )["frames"]
     else:
         full_stack = None
