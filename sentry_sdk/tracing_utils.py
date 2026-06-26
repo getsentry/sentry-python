@@ -121,7 +121,7 @@ def should_truncate_gen_ai_input(options: "Optional[dict[str, Any]]") -> bool:
         return True
 
     return not options.get(
-        "stream_gen_ai_spans", False
+        "stream_gen_ai_spans", True
     ) and not has_span_streaming_enabled(options)
 
 

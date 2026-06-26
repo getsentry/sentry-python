@@ -2539,6 +2539,7 @@ def test_litellm_message_truncation(sentry_init, capture_events):
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=False,
     )
     events = capture_events()
 

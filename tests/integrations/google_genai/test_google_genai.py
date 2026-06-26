@@ -1503,6 +1503,7 @@ def test_google_genai_message_truncation(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=False,
     )
     events = capture_events()
 
@@ -2672,6 +2673,7 @@ def test_generate_content_with_function_response(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=False,
     )
     events = capture_events()
 
@@ -2727,6 +2729,7 @@ def test_generate_content_with_mixed_string_and_content(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=False,
     )
     events = capture_events()
 
@@ -2837,6 +2840,7 @@ def test_generate_content_with_list_of_dicts(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=False,
     )
     events = capture_events()
 
