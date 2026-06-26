@@ -2,9 +2,10 @@ from copy import deepcopy
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.data_collection import COLLECTION_OFF, apply_key_value_collection
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.scope import should_collect_user_info, should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -262,7 +263,13 @@ def patch_http_route_handle() -> None:
         def event_processor(event: "Event", _: "Hint") -> "Event":
             request_info = event.get("request", {})
             request_info["content_length"] = len(scope.get("_body", b""))
-            if should_send_default_pii():
+            dc = sentry_sdk.get_client().data_collection
+            if dc.explicit:
+                if dc.cookies.mode != COLLECTION_OFF:
+                    request_info["cookies"] = apply_key_value_collection(
+                        dict(extracted_request_data["cookies"]), dc.cookies
+                    )
+            elif should_send_default_pii():
                 request_info["cookies"] = extracted_request_data["cookies"]
             if request_data is not None:
                 request_info["data"] = request_data
@@ -299,7 +306,7 @@ def retrieve_user_from_scope(scope: "StarliteScope") -> "Optional[dict[str, Any]
 @ensure_integration_enabled(StarliteIntegration)
 def exception_handler(exc: Exception, scope: "StarliteScope", _: "State") -> None:
     user_info: "Optional[dict[str, Any]]" = None
-    if should_send_default_pii():
+    if should_collect_user_info():
         user_info = retrieve_user_from_scope(scope)
     if user_info and isinstance(user_info, dict):
         sentry_scope = sentry_sdk.get_isolation_scope()

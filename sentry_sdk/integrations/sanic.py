@@ -8,10 +8,11 @@ from urllib.parse import urlsplit
 import sentry_sdk
 from sentry_sdk import continue_trace
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.data_collection import scrub_query_string
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
 from sentry_sdk.integrations.logging import ignore_logger
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.scope import should_collect_user_info
 from sentry_sdk.traces import SegmentSource, StreamedSpan
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
@@ -192,7 +193,7 @@ async def _context_enter(request: "Request") -> None:
         sentry_sdk.traces.continue_trace(dict(request.headers))
         scope.set_custom_sampling_context({"sanic_request": request})
 
-        if should_send_default_pii() and request.remote_addr:
+        if should_collect_user_info() and request.remote_addr:
             scope.set_attribute(SPANDATA.USER_IP_ADDRESS, request.remote_addr)
 
         span = sentry_sdk.traces.start_span(
@@ -388,7 +389,7 @@ def _get_request_attributes(request: "Request") -> "Dict[str, Any]":
     if urlparts.scheme:
         attributes[SPANDATA.NETWORK_PROTOCOL_NAME] = urlparts.scheme
 
-    if should_send_default_pii() and request.remote_addr:
+    if should_collect_user_info() and request.remote_addr:
         attributes[SPANDATA.CLIENT_ADDRESS] = request.remote_addr
 
     return attributes
@@ -419,7 +420,19 @@ def _make_request_processor(weak_request: "Callable[[], Request]") -> "EventProc
                 urlparts.path,
             )
 
-            request_info["query_string"] = urlparts.query
+            # Event request.query_string is set unconditionally in legacy mode;
+            # when data_collection is explicit it is governed by query_params.
+            dc = sentry_sdk.get_client().data_collection
+            if dc.explicit:
+                scrubbed_qs = (
+                    scrub_query_string(urlparts.query, dc.query_params)
+                    if urlparts.query
+                    else None
+                )
+                if scrubbed_qs is not None:
+                    request_info["query_string"] = scrubbed_qs
+            else:
+                request_info["query_string"] = urlparts.query
             request_info["method"] = request.method
             request_info["env"] = {"REMOTE_ADDR": request.remote_addr}
             request_info["headers"] = _filter_headers(dict(request.headers))

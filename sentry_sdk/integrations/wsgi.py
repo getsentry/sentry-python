@@ -6,12 +6,19 @@ import sentry_sdk
 from sentry_sdk._werkzeug import _get_headers, get_host
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.data_collection import scrub_query_string
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     _filter_headers,
+    collect_query_string,
     nullcontext,
+    should_collect_url,
 )
-from sentry_sdk.scope import Scope, should_send_default_pii, use_isolation_scope
+from sentry_sdk.scope import (
+    Scope,
+    should_collect_user_info,
+    use_isolation_scope,
+)
 from sentry_sdk.sessions import track_session
 from sentry_sdk.traces import SegmentSource, StreamedSpan
 from sentry_sdk.tracing import Span, TransactionSource
@@ -134,7 +141,7 @@ class SentryWsgiMiddleware:
                             )
                             Scope.set_custom_sampling_context({"wsgi_environ": environ})
 
-                            if should_send_default_pii():
+                            if should_collect_user_info():
                                 client_ip = get_client_ip(environ)
                                 if client_ip:
                                     scope.set_attribute(
@@ -241,7 +248,7 @@ def _get_environ(environ: "Dict[str, str]") -> "Iterator[Tuple[str, str]]":
     capture (server name, port and remote addr if pii is enabled).
     """
     keys = ["SERVER_NAME", "SERVER_PORT"]
-    if should_send_default_pii():
+    if should_collect_user_info():
         # make debugging of proxy setup easier. Proxy headers are
         # in headers.
         keys += ["REMOTE_ADDR"]
@@ -361,13 +368,25 @@ def _make_wsgi_event_processor(
             # if the code below fails halfway through we at least have some data
             request_info = event.setdefault("request", {})
 
-            if should_send_default_pii():
+            if should_collect_user_info():
                 user_info = event.setdefault("user", {})
                 if client_ip:
                     user_info.setdefault("ip_address", client_ip)
 
             request_info["url"] = request_url
-            request_info["query_string"] = query_string
+            # Event request.query_string is set unconditionally in legacy mode;
+            # when data_collection is explicit it is governed by query_params.
+            dc = sentry_sdk.get_client().data_collection
+            if dc.explicit:
+                scrubbed_qs = (
+                    scrub_query_string(query_string, dc.query_params)
+                    if query_string
+                    else None
+                )
+                if scrubbed_qs is not None:
+                    request_info["query_string"] = scrubbed_qs
+            else:
+                request_info["query_string"] = query_string
             request_info["method"] = method
             request_info["env"] = env
             request_info["headers"] = headers
@@ -409,15 +428,16 @@ def _get_request_attributes(
         except ValueError:
             pass
 
-    if should_send_default_pii():
+    if should_collect_user_info():
         client_ip = get_client_ip(environ)
         if client_ip:
             attributes["client.address"] = client_ip
 
-        query_string = environ.get("QUERY_STRING")
-        if query_string:
-            attributes["http.query"] = query_string
+    query_string = collect_query_string(environ.get("QUERY_STRING"))
+    if query_string:
+        attributes["http.query"] = query_string
 
+    if should_collect_url():
         path = environ.get("PATH_INFO", "")
         if path:
             attributes["url.path"] = path

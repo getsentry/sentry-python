@@ -7,7 +7,7 @@ import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.scope import should_collect_user_info
 from sentry_sdk.traces import SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE
 from sentry_sdk.tracing import SOURCE_FOR_STYLE as TRANSACTION_SOURCE_FOR_STYLE
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
@@ -86,7 +86,9 @@ class PyramidIntegration(Integration):
 
             scope = sentry_sdk.get_isolation_scope()
 
-            if should_send_default_pii() and has_span_streaming_enabled(client.options):
+            if should_collect_user_info() and has_span_streaming_enabled(
+                client.options
+            ):
                 user_id = authenticated_userid(request)
                 if user_id:
                     scope.set_user({"id": user_id})
@@ -229,7 +231,7 @@ def _make_event_processor(
         with capture_internal_exceptions():
             PyramidRequestExtractor(request).extract_into_event(event)
 
-        if should_send_default_pii():
+        if should_collect_user_info():
             with capture_internal_exceptions():
                 user_info = event.setdefault("user", {})
                 user_info.setdefault("id", authenticated_userid(request))

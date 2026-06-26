@@ -24,7 +24,7 @@ from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     nullcontext,
 )
-from sentry_sdk.scope import Scope, should_send_default_pii
+from sentry_sdk.scope import Scope, should_collect_user_info
 from sentry_sdk.sessions import track_session
 from sentry_sdk.traces import (
     SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE,
@@ -248,7 +248,7 @@ class SentryAsgiMiddleware:
                             "network.protocol.name": ty,
                         }
 
-                        if scope.get("client") and should_send_default_pii():
+                        if scope.get("client") and should_collect_user_info():
                             sentry_scope.set_attribute(
                                 SPANDATA.USER_IP_ADDRESS, _get_ip(scope)
                             )

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
+from sentry_sdk.data_collection import COLLECTION_OFF, apply_key_value_collection
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan, get_current_span
@@ -118,8 +119,15 @@ async def _wrap_async_handler(
             # Extract information from request
             request_info = event.get("request", {})
             if info:
-                if "cookies" in info and should_send_default_pii():
-                    request_info["cookies"] = info["cookies"]
+                if "cookies" in info:
+                    dc = sentry_sdk.get_client().data_collection
+                    if dc.explicit:
+                        if dc.cookies.mode != COLLECTION_OFF:
+                            request_info["cookies"] = apply_key_value_collection(
+                                info["cookies"], dc.cookies
+                            )
+                    elif should_send_default_pii():
+                        request_info["cookies"] = info["cookies"]
                 if "data" in info:
                     request_info["data"] = info["data"]
             event["request"] = deepcopy(request_info)
