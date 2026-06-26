@@ -55,7 +55,7 @@ yarn.lock
   "dependencies": {
     "lodash": "^4.0.0",    // Could get 4.999.0
     "express": "*",         // Any version
-    "axios": "latest"       // Always latest
+    "left-pad": "latest"    // Always latest
   }
 }
 ```
