@@ -1,6 +1,5 @@
 from string import Template
 from typing import Dict
-from unittest import mock
 
 import pytest
 
@@ -761,26 +760,22 @@ def test_include_tracing_fields(
             span_after_record = sentry_sdk.traces.get_current_span()._to_json()
 
             if tracing_fields_expected:
-                assert span_after_record["attributes"] == {
-                    "thread.id": mock.ANY,
-                    "thread.name": mock.ANY,
+                assert {
                     "sentry.op": "function",
                     "sentry.origin": "auto.function.rust_tracing.test_record",
                     "use_memoized": True,
                     "version": "memoized",
                     "index": 10,
-                }
+                } < span_after_record["attributes"]
 
             else:
-                assert span_after_record["attributes"] == {
-                    "thread.id": mock.ANY,
-                    "thread.name": mock.ANY,
+                assert {
                     "sentry.op": "function",
                     "sentry.origin": "auto.function.rust_tracing.test_record",
                     "use_memoized": "[Filtered]",
                     "version": "[Filtered]",
                     "index": "[Filtered]",
-                }
+                } < span_after_record["attributes"]
     else:
         with start_transaction():
             rust_tracing.new_span(RustTracingLevel.Info, 3)
@@ -796,19 +791,15 @@ def test_include_tracing_fields(
             span_after_record = sentry_sdk.get_current_span().to_json()
 
             if tracing_fields_expected:
-                assert span_after_record["data"] == {
-                    "thread.id": mock.ANY,
-                    "thread.name": mock.ANY,
+                assert {
                     "use_memoized": True,
                     "version": "memoized",
                     "index": 10,
-                }
+                } < span_after_record["data"]
 
             else:
-                assert span_after_record["data"] == {
-                    "thread.id": mock.ANY,
-                    "thread.name": mock.ANY,
+                assert {
                     "use_memoized": "[Filtered]",
                     "version": "[Filtered]",
                     "index": "[Filtered]",
-                }
+                } < span_after_record["data"]

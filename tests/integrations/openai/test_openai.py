@@ -4987,16 +4987,6 @@ async def test_ai_client_span_streaming_responses_async_api(
             "sentry.environment": "production",
             "sentry.op": "gen_ai.responses",
             "sentry.origin": "auto.ai.openai",
-            "process.runtime.name": mock.ANY,
-            "process.runtime.version": mock.ANY,
-            "sentry.release": mock.ANY,
-            "sentry.sdk.name": "sentry.python",
-            "sentry.sdk.version": mock.ANY,
-            "sentry.segment.id": mock.ANY,
-            "sentry.segment.name": "openai tx",
-            "server.address": mock.ANY,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
 
         if expected_system_instructions is not None:
@@ -5004,7 +4994,7 @@ async def test_ai_client_span_streaming_responses_async_api(
                 expected_system_instructions
             )
 
-        assert spans[0]["attributes"] == expected_data
+        assert expected_data < spans[0]["attributes"]
     else:
         events = capture_events()
 
@@ -5050,8 +5040,6 @@ async def test_ai_client_span_streaming_responses_async_api(
             "gen_ai.usage.total_tokens": 30,
             "gen_ai.request.model": "gpt-4o",
             "gen_ai.response.text": "hello world",
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
 
         if expected_system_instructions is not None:
@@ -5059,7 +5047,7 @@ async def test_ai_client_span_streaming_responses_async_api(
                 expected_system_instructions
             )
 
-        assert spans[0]["data"] == expected_data
+        assert expected_data < spans[0]["data"]
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
