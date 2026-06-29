@@ -4734,6 +4734,7 @@ def test_openai_agents_message_truncation(sentry_init, capture_items):
         integrations=[OpenAIAgentsIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=False,
     )
 
     test_messages = [
