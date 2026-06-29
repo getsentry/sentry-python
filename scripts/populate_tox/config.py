@@ -122,6 +122,7 @@ TEST_SUITE_CONFIG = {
             "<3.1": ["pytest-django<4.0", "six"],
             "py3.14,py3.14t": ["coverage==7.11.0"],
         },
+        "include": "<6.1b1",
     },
     "dramatiq": {
         "package": "dramatiq",
