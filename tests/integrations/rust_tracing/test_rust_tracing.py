@@ -760,22 +760,24 @@ def test_include_tracing_fields(
             span_after_record = sentry_sdk.traces.get_current_span()._to_json()
 
             if tracing_fields_expected:
-                assert {
-                    "sentry.op": "function",
-                    "sentry.origin": "auto.function.rust_tracing.test_record",
-                    "use_memoized": True,
-                    "version": "memoized",
-                    "index": 10,
-                } < span_after_record["attributes"]
+                assert span_after_record["attributes"]["sentry.op"] == "function"
+                assert (
+                    span_after_record["attributes"]["sentry.origin"]
+                    == "auto.function.rust_tracing.test_record"
+                )
+                assert span_after_record["attributes"]["use_memoized"] is True
+                assert span_after_record["attributes"]["version"] == "memoized"
+                assert span_after_record["attributes"]["index"] == 10
 
             else:
-                assert {
-                    "sentry.op": "function",
-                    "sentry.origin": "auto.function.rust_tracing.test_record",
-                    "use_memoized": "[Filtered]",
-                    "version": "[Filtered]",
-                    "index": "[Filtered]",
-                } < span_after_record["attributes"]
+                assert span_after_record["attributes"]["sentry.op"] == "function"
+                assert (
+                    span_after_record["attributes"]["sentry.origin"]
+                    == "auto.function.rust_tracing.test_record"
+                )
+                assert span_after_record["attributes"]["use_memoized"] == "[Filtered]"
+                assert span_after_record["attributes"]["version"] == "[Filtered]"
+                assert span_after_record["attributes"]["index"] == "[Filtered]"
     else:
         with start_transaction():
             rust_tracing.new_span(RustTracingLevel.Info, 3)
@@ -791,15 +793,11 @@ def test_include_tracing_fields(
             span_after_record = sentry_sdk.get_current_span().to_json()
 
             if tracing_fields_expected:
-                assert {
-                    "use_memoized": True,
-                    "version": "memoized",
-                    "index": 10,
-                } < span_after_record["data"]
+                assert span_after_record["data"]["use_memoized"] is True
+                assert span_after_record["data"]["version"] == "memoized"
+                assert span_after_record["data"]["index"] == 10
 
             else:
-                assert {
-                    "use_memoized": "[Filtered]",
-                    "version": "[Filtered]",
-                    "index": "[Filtered]",
-                } < span_after_record["data"]
+                assert span_after_record["data"]["use_memoized"] == "[Filtered]"
+                assert span_after_record["data"]["version"] == "[Filtered]"
+                assert span_after_record["data"]["index"] == "[Filtered]"

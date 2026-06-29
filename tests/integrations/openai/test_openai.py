@@ -4994,7 +4994,8 @@ async def test_ai_client_span_streaming_responses_async_api(
                 expected_system_instructions
             )
 
-        assert expected_data < spans[0]["attributes"]
+        for attr, value in expected_data.items():
+            assert spans[0]["attributes"][attr] == value
     else:
         events = capture_events()
 
@@ -5047,7 +5048,8 @@ async def test_ai_client_span_streaming_responses_async_api(
                 expected_system_instructions
             )
 
-        assert expected_data < spans[0]["data"]
+        for attr, value in expected_data.items():
+            assert spans[0]["data"][attr] == value
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
