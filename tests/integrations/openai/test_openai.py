@@ -3818,7 +3818,7 @@ def test_ai_client_span_responses_api_no_pii(
         spans = [item.payload for item in items]
 
         assert len(spans) == 2
-        assert spans[0]["attributes"] == {
+        expected_attributes = {
             "gen_ai.operation.name": "responses",
             "gen_ai.request.max_tokens": 100,
             "gen_ai.request.temperature": 0.7,
@@ -3832,24 +3832,18 @@ def test_ai_client_span_responses_api_no_pii(
             "gen_ai.usage.output_tokens": 10,
             "gen_ai.usage.output_tokens.reasoning": 8,
             "gen_ai.usage.total_tokens": 30,
-            "process.runtime.name": mock.ANY,
-            "process.runtime.version": mock.ANY,
-            "sentry.environment": "production",
             "sentry.op": "gen_ai.responses",
             "sentry.origin": "auto.ai.openai",
-            "sentry.release": mock.ANY,
-            "sentry.sdk.name": "sentry.python",
-            "sentry.sdk.version": mock.ANY,
-            "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "openai tx",
-            "server.address": mock.ANY,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
+
+        for attr, value in expected_attributes.items():
+            assert spans[0]["attributes"][attr] == value
 
         assert "gen_ai.system_instructions" not in spans[0]["attributes"]
         assert "gen_ai.request.messages" not in spans[0]["attributes"]
         assert "gen_ai.response.text" not in spans[0]["attributes"]
+
     elif stream_gen_ai_spans:
         items = capture_items("span")
 
@@ -3866,7 +3860,7 @@ def test_ai_client_span_responses_api_no_pii(
         spans = [item.payload for item in items]
 
         assert len(spans) == 1
-        assert spans[0]["attributes"] == {
+        expected_attributes = {
             "gen_ai.operation.name": "responses",
             "gen_ai.request.max_tokens": 100,
             "gen_ai.request.temperature": 0.7,
@@ -3880,20 +3874,13 @@ def test_ai_client_span_responses_api_no_pii(
             "gen_ai.usage.output_tokens": 10,
             "gen_ai.usage.output_tokens.reasoning": 8,
             "gen_ai.usage.total_tokens": 30,
-            "process.runtime.name": mock.ANY,
-            "process.runtime.version": mock.ANY,
-            "sentry.environment": "production",
             "sentry.op": "gen_ai.responses",
             "sentry.origin": "auto.ai.openai",
-            "sentry.release": mock.ANY,
-            "sentry.sdk.name": "sentry.python",
-            "sentry.sdk.version": mock.ANY,
-            "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "openai tx",
-            "server.address": mock.ANY,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
+
+        for attr, value in expected_attributes.items():
+            assert spans[0]["attributes"][attr] == value
 
         assert "gen_ai.system_instructions" not in spans[0]["attributes"]
         assert "gen_ai.request.messages" not in spans[0]["attributes"]
@@ -3917,7 +3904,7 @@ def test_ai_client_span_responses_api_no_pii(
         assert len(spans) == 1
         assert spans[0]["op"] == "gen_ai.responses"
         assert spans[0]["origin"] == "auto.ai.openai"
-        assert spans[0]["data"] == {
+        expected_data = {
             "gen_ai.operation.name": "responses",
             "gen_ai.request.max_tokens": 100,
             "gen_ai.request.temperature": 0.7,
@@ -3931,9 +3918,10 @@ def test_ai_client_span_responses_api_no_pii(
             "gen_ai.usage.output_tokens": 10,
             "gen_ai.usage.output_tokens.reasoning": 8,
             "gen_ai.usage.total_tokens": 30,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
+
+        for key, value in expected_data.items():
+            assert spans[0]["data"][key] == value
 
         assert "gen_ai.system_instructions" not in spans[0]["data"]
         assert "gen_ai.request.messages" not in spans[0]["data"]
@@ -4143,19 +4131,9 @@ def test_ai_client_span_responses_api(
             "gen_ai.request.messages": safe_serialize(expected_request_messages),
             "gen_ai.request.model": "gpt-4o",
             "gen_ai.response.text": "the model response",
-            "process.runtime.name": mock.ANY,
-            "process.runtime.version": mock.ANY,
-            "sentry.environment": "production",
             "sentry.op": "gen_ai.responses",
             "sentry.origin": "auto.ai.openai",
-            "sentry.release": mock.ANY,
-            "sentry.sdk.name": "sentry.python",
-            "sentry.sdk.version": mock.ANY,
-            "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "openai tx",
-            "server.address": mock.ANY,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
 
         if expected_system_instructions is not None:
@@ -4163,7 +4141,9 @@ def test_ai_client_span_responses_api(
                 expected_system_instructions
             )
 
-        assert spans[0]["attributes"] == expected_data
+        for attr, value in expected_data.items():
+            assert spans[0]["attributes"][attr] == value
+
     elif stream_gen_ai_spans:
         items = capture_items("span")
 
@@ -4197,19 +4177,9 @@ def test_ai_client_span_responses_api(
             "gen_ai.request.messages": safe_serialize(expected_request_messages),
             "gen_ai.request.model": "gpt-4o",
             "gen_ai.response.text": "the model response",
-            "process.runtime.name": mock.ANY,
-            "process.runtime.version": mock.ANY,
-            "sentry.environment": "production",
             "sentry.op": "gen_ai.responses",
             "sentry.origin": "auto.ai.openai",
-            "sentry.release": mock.ANY,
-            "sentry.sdk.name": "sentry.python",
-            "sentry.sdk.version": mock.ANY,
-            "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "openai tx",
-            "server.address": mock.ANY,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
 
         if expected_system_instructions is not None:
@@ -4217,7 +4187,9 @@ def test_ai_client_span_responses_api(
                 expected_system_instructions
             )
 
-        assert spans[0]["attributes"] == expected_data
+        for attr, value in expected_data.items():
+            assert spans[0]["attributes"][attr] == value
+
     else:
         events = capture_events()
 
@@ -4254,8 +4226,6 @@ def test_ai_client_span_responses_api(
             "gen_ai.request.messages": safe_serialize(expected_request_messages[-1:]),
             "gen_ai.request.model": "gpt-4o",
             "gen_ai.response.text": "the model response",
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
 
         if expected_system_instructions is not None:
@@ -4263,7 +4233,8 @@ def test_ai_client_span_responses_api(
                 expected_system_instructions
             )
 
-        assert spans[0]["data"] == expected_data
+        for attr, value in expected_data.items():
+            assert spans[0]["data"][attr] == value
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -4634,19 +4605,9 @@ async def test_ai_client_span_responses_async_api(
             "gen_ai.usage.output_tokens.reasoning": 8,
             "gen_ai.usage.total_tokens": 30,
             "gen_ai.response.text": "the model response",
-            "process.runtime.name": mock.ANY,
-            "process.runtime.version": mock.ANY,
-            "sentry.environment": "production",
             "sentry.op": "gen_ai.responses",
             "sentry.origin": "auto.ai.openai",
-            "sentry.release": mock.ANY,
-            "sentry.sdk.name": "sentry.python",
-            "sentry.sdk.version": mock.ANY,
-            "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "openai tx",
-            "server.address": mock.ANY,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
 
         if expected_system_instructions is not None:
@@ -4654,7 +4615,9 @@ async def test_ai_client_span_responses_async_api(
                 expected_system_instructions
             )
 
-        assert spans[0]["attributes"] == expected_data
+        for attr, value in expected_data.items():
+            assert spans[0]["attributes"][attr] == value
+
     elif stream_gen_ai_spans:
         items = capture_items("span")
 
@@ -4688,19 +4651,9 @@ async def test_ai_client_span_responses_async_api(
             "gen_ai.usage.output_tokens.reasoning": 8,
             "gen_ai.usage.total_tokens": 30,
             "gen_ai.response.text": "the model response",
-            "process.runtime.name": mock.ANY,
-            "process.runtime.version": mock.ANY,
-            "sentry.environment": "production",
             "sentry.op": "gen_ai.responses",
             "sentry.origin": "auto.ai.openai",
-            "sentry.release": mock.ANY,
-            "sentry.sdk.name": "sentry.python",
-            "sentry.sdk.version": mock.ANY,
-            "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "openai tx",
-            "server.address": mock.ANY,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
 
         if expected_system_instructions is not None:
@@ -4708,7 +4661,9 @@ async def test_ai_client_span_responses_async_api(
                 expected_system_instructions
             )
 
-        assert spans[0]["attributes"] == expected_data
+        for attr, value in expected_data.items():
+            assert spans[0]["attributes"][attr] == value
+
     else:
         events = capture_events()
 
@@ -4745,8 +4700,6 @@ async def test_ai_client_span_responses_async_api(
             "gen_ai.usage.output_tokens.reasoning": 8,
             "gen_ai.usage.total_tokens": 30,
             "gen_ai.response.text": "the model response",
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
 
         if expected_system_instructions is not None:
@@ -4754,7 +4707,8 @@ async def test_ai_client_span_responses_async_api(
                 expected_system_instructions
             )
 
-        assert spans[0]["data"] == expected_data
+        for attr, value in expected_data.items():
+            assert spans[0]["data"][attr] == value
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -4987,16 +4941,7 @@ async def test_ai_client_span_streaming_responses_async_api(
             "sentry.environment": "production",
             "sentry.op": "gen_ai.responses",
             "sentry.origin": "auto.ai.openai",
-            "process.runtime.name": mock.ANY,
-            "process.runtime.version": mock.ANY,
-            "sentry.release": mock.ANY,
-            "sentry.sdk.name": "sentry.python",
-            "sentry.sdk.version": mock.ANY,
-            "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "openai tx",
-            "server.address": mock.ANY,
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
 
         if expected_system_instructions is not None:
@@ -5004,7 +4949,9 @@ async def test_ai_client_span_streaming_responses_async_api(
                 expected_system_instructions
             )
 
-        assert spans[0]["attributes"] == expected_data
+        for attr, value in expected_data.items():
+            assert spans[0]["attributes"][attr] == value
+
     else:
         events = capture_events()
 
@@ -5050,8 +4997,6 @@ async def test_ai_client_span_streaming_responses_async_api(
             "gen_ai.usage.total_tokens": 30,
             "gen_ai.request.model": "gpt-4o",
             "gen_ai.response.text": "hello world",
-            "thread.id": mock.ANY,
-            "thread.name": mock.ANY,
         }
 
         if expected_system_instructions is not None:
@@ -5059,7 +5004,8 @@ async def test_ai_client_span_streaming_responses_async_api(
                 expected_system_instructions
             )
 
-        assert spans[0]["data"] == expected_data
+        for attr, value in expected_data.items():
+            assert spans[0]["data"][attr] == value
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])

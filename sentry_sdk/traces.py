@@ -275,6 +275,7 @@ class StreamedSpan:
         self._active: bool = active
         self._attributes: "Attributes" = {
             "sentry.origin": "manual",
+            "sentry.trace_lifecycle": "stream",
         }
 
         if attributes:
