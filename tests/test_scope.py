@@ -68,6 +68,32 @@ def test_scope_flags_copy():
     ]
 
 
+def test_set_user(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    sentry_sdk.get_isolation_scope().set_user({"id": "42", "email": "bob@example.com"})
+    capture_exception(NameError())
+    assert events[-1]["user"] == {"id": "42", "email": "bob@example.com"}
+
+    sentry_sdk.get_isolation_scope().set_user(None)
+    capture_exception(NameError())
+    assert "user" not in events[-1]
+
+
+def test_set_user_none_values_are_dropped_when_copying_to_attributes(
+    sentry_init, capture_events
+):
+    sentry_init()
+    events = capture_events()
+
+    sentry_sdk.get_isolation_scope().set_user(
+        {"email": "ada@beans.com", "username": None}
+    )
+    capture_exception(NameError())
+    assert events[-1]["user"] == {"email": "ada@beans.com"}
+
+
 def test_merging(sentry_init, capture_events):
     sentry_init()
 

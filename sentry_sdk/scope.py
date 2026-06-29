@@ -890,7 +890,14 @@ class Scope:
 
     def set_user(self, value: "Optional[Dict[str, Any]]") -> None:
         """Sets a user for the scope."""
-        self._user = value
+        if value is not None:
+            self._user = {}
+            for k, v in value.items():
+                if v is not None:
+                    self._user[k] = v
+        else:
+            self._user = None
+
         session = self.get_isolation_scope()._session
         if session is not None:
             session.update(user=value)
