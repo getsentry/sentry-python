@@ -4131,6 +4131,8 @@ def test_ai_client_span_responses_api(
             "gen_ai.request.messages": safe_serialize(expected_request_messages),
             "gen_ai.request.model": "gpt-4o",
             "gen_ai.response.text": "the model response",
+            "sentry.op": "gen_ai.responses",
+            "sentry.origin": "auto.ai.openai",
             "sentry.segment.name": "openai tx",
         }
 
@@ -4939,6 +4941,7 @@ async def test_ai_client_span_streaming_responses_async_api(
             "sentry.environment": "production",
             "sentry.op": "gen_ai.responses",
             "sentry.origin": "auto.ai.openai",
+            "sentry.segment.name": "openai tx",
         }
 
         if expected_system_instructions is not None:
