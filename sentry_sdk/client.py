@@ -23,6 +23,12 @@ from sentry_sdk.consts import (
     VERSION,
     ClientConstructor,
 )
+from sentry_sdk.data_collection import (
+    OFF_DATA_COLLECTION,
+    DataCollection,
+    _map_from_send_default_pii,
+    resolve_data_collection,
+)
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
 from sentry_sdk.integrations.dedupe import DedupeIntegration
@@ -345,11 +351,11 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
     if rv["enable_tracing"] is True and rv["traces_sample_rate"] is None:
         rv["traces_sample_rate"] = 1.0
 
+    rv["data_collection"] = resolve_data_collection(rv)
+
     if rv["event_scrubber"] is None:
         rv["event_scrubber"] = EventScrubber(
-            send_default_pii=(
-                False if rv["send_default_pii"] is None else rv["send_default_pii"]
-            )
+            send_default_pii=rv["data_collection"].user_info
         )
 
     if rv["socket_options"] and not isinstance(rv["socket_options"], list):
@@ -423,6 +429,23 @@ class BaseClient:
         return None
 
     def should_send_default_pii(self) -> bool:
+        return False
+
+    @property
+    def data_collection(self) -> "DataCollection":
+        return OFF_DATA_COLLECTION
+
+    def should_collect_user_info(self) -> bool:
+        return False
+
+    def should_collect_gen_ai_inputs(
+        self, include_prompts: "Optional[bool]" = None
+    ) -> bool:
+        return False
+
+    def should_collect_gen_ai_outputs(
+        self, include_prompts: "Optional[bool]" = None
+    ) -> bool:
         return False
 
     def is_active(self) -> bool:
@@ -614,6 +637,17 @@ class _Client(BaseClient):
                 self.options["error_sampler"] = sample_all
                 self.options["traces_sampler"] = sample_all
                 self.options["profiles_sampler"] = sample_all
+                # data_collection was resolved in _get_options() before this
+                # spotlight override flipped send_default_pii on. Re-derive it so
+                # the should_collect_* accessors agree with should_send_default_pii()
+                # in DSN-less spotlight mode (only when the user did not set
+                # data_collection explicitly).
+                if not self.options["data_collection"].explicit:
+                    self.options["data_collection"] = _map_from_send_default_pii(
+                        True,
+                        self.options["include_local_variables"] is not False,
+                        self.options["include_source_context"] is not False,
+                    )
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
@@ -723,6 +757,59 @@ class _Client(BaseClient):
         Returns whether the client should send default PII (Personally Identifiable Information) data to Sentry.
         """
         return self.options.get("send_default_pii") or False
+
+    @property
+    def data_collection(self) -> "DataCollection":
+        """
+        Returns the resolved :class:`~sentry_sdk.data_collection.DataCollection`
+        config for this client.
+        """
+        dc = self.options.get("data_collection")
+        return dc if dc is not None else OFF_DATA_COLLECTION
+
+    def should_collect_user_info(self) -> bool:
+        """
+        Returns whether the SDK should automatically populate ``user.*`` fields
+        (id, email, username, ip_address) from instrumentation.
+        """
+        return bool(self.data_collection.user_info)
+
+    def should_collect_gen_ai_inputs(
+        self, include_prompts: "Optional[bool]" = None
+    ) -> bool:
+        """
+        Returns whether the SDK should collect generative AI input content.
+
+        ``include_prompts`` is the integration-level override (if set, it takes
+        precedence over the global ``data_collection.gen_ai.inputs`` setting).
+        """
+        return self._should_collect_gen_ai_content("inputs", include_prompts)
+
+    def should_collect_gen_ai_outputs(
+        self, include_prompts: "Optional[bool]" = None
+    ) -> bool:
+        """
+        Returns whether the SDK should collect generative AI output content.
+
+        ``include_prompts`` is the integration-level override (if set, it takes
+        precedence over the global ``data_collection.gen_ai.outputs`` setting).
+        """
+        return self._should_collect_gen_ai_content("outputs", include_prompts)
+
+    def _should_collect_gen_ai_content(
+        self, direction: str, include_prompts: "Optional[bool]"
+    ) -> bool:
+        dc = self.data_collection
+        if dc.explicit:
+            # Integration-level override wins over the global gen_ai setting.
+            if include_prompts is not None:
+                return include_prompts
+            return bool(getattr(dc.gen_ai, direction))
+        # Legacy (data_collection not set): preserve the historical gate
+        # `should_send_default_pii() and integration.include_prompts`.
+        # `include_prompts is None` means "no integration-level override", which
+        # falls back to the legacy default of True (collect when PII is on).
+        return self.should_send_default_pii() and (include_prompts is not False)
 
     @property
     def dsn(self) -> "Optional[str]":
