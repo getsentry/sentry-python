@@ -32,8 +32,9 @@ DJANGO_SUPPORTS_ASYNC_MIDDLEWARE = DJANGO_VERSION >= (3, 1)
 
 if not DJANGO_SUPPORTS_ASYNC_MIDDLEWARE:
     _asgi_middleware_mixin_factory = lambda _: object
+    iscoroutinefunction = lambda _: False
 else:
-    from .asgi import _asgi_middleware_mixin_factory
+    from .asgi import _asgi_middleware_mixin_factory, iscoroutinefunction
 
 
 def patch_django_middlewares() -> None:
@@ -104,15 +105,39 @@ def _wrap_middleware(middleware: "Any", middleware_name: str) -> "Any":
 
     def _get_wrapped_method(old_method: "F") -> "F":
         with capture_internal_exceptions():
+            # Middleware hooks (e.g. `process_view`, `process_exception`) may be
+            # `async def` when the middleware is async. A synchronous wrapper
+            # would hide the coroutine from Django's `iscoroutinefunction` check,
+            # causing Django to call the hook synchronously and never await the
+            # returned coroutine. Wrap async hooks with an async wrapper so the
+            # wrapped method continues to report as a coroutine function.
+            if iscoroutinefunction is not None and iscoroutinefunction(old_method):
 
-            def sentry_wrapped_method(*args: "Any", **kwargs: "Any") -> "Any":
-                middleware_span = _check_middleware_span(old_method)
+                async def async_sentry_wrapped_method(
+                    *args: "Any", **kwargs: "Any"
+                ) -> "Any":
+                    middleware_span = _check_middleware_span(old_method)
 
-                if middleware_span is None:
-                    return old_method(*args, **kwargs)
+                    if middleware_span is None:
+                        return await old_method(*args, **kwargs)
 
-                with middleware_span:
-                    return old_method(*args, **kwargs)
+                    with middleware_span:
+                        return await old_method(*args, **kwargs)
+
+                sentry_wrapped_method = async_sentry_wrapped_method
+
+            else:
+
+                def sync_sentry_wrapped_method(*args: "Any", **kwargs: "Any") -> "Any":
+                    middleware_span = _check_middleware_span(old_method)
+
+                    if middleware_span is None:
+                        return old_method(*args, **kwargs)
+
+                    with middleware_span:
+                        return old_method(*args, **kwargs)
+
+                sentry_wrapped_method = sync_sentry_wrapped_method
 
             try:
                 # fails for __call__ of function on Python 2 (see py2.7-django-1.11)

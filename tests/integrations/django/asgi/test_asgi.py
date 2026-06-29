@@ -1049,3 +1049,50 @@ async def test_transaction_http_method_custom(
         (event1, event2) = events
         assert event1["request"]["method"] == "OPTIONS"
         assert event2["request"]["method"] == "HEAD"
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 1),
+    reason="async views/middleware introduced in Django 3.1",
+)
+async def test_async_middleware_process_view_is_awaited(
+    sentry_init, settings, make_asgi_application
+):
+    """Regression test for async ``process_view`` being coerced to sync."""
+    sentry_init(integrations=[DjangoIntegration()])
+
+    settings.MIDDLEWARE = [
+        "tests.integrations.django.myapp.middleware.AsyncProcessViewMiddleware"
+    ]
+    application = make_asgi_application()
+
+    comm = HttpCommunicator(application, "GET", "/simple_async_view")
+    response = await comm.get_response()
+    await comm.wait()
+
+    assert response["status"] == 200
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 1),
+    reason="async views/middleware introduced in Django 3.1",
+)
+async def test_async_middleware_process_exception_is_awaited(
+    sentry_init, settings, make_asgi_application
+):
+    """Regression test for async ``process_exception`` being coerced to sync."""
+    sentry_init(integrations=[DjangoIntegration()])
+
+    settings.MIDDLEWARE = [
+        "tests.integrations.django.myapp.middleware.AsyncProcessExceptionMiddleware"
+    ]
+    application = make_asgi_application()
+
+    comm = HttpCommunicator(application, "GET", "/view-exc")
+    response = await comm.get_response()
+    await comm.wait()
+
+    assert response["status"] == 200
+    assert response["body"] == b"handled by async process_exception"
