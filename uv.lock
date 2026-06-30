@@ -31,7 +31,8 @@ docs = [
 test = [
     { name = "dataclasses", marker = "python_full_version < '3.7'" },
     { name = "pytest", specifier = ">=6.0.0" },
-    { name = "pytest-cov", specifier = ">=7.1.0" },
+    { name = "pytest-cov", marker = "python_full_version < '3.9'", specifier = "<7.1.0" },
+    { name = "pytest-cov", marker = "python_full_version >= '3.9'", specifier = ">=7.1.0" },
 ]
 toxgen = [
     { name = "jinja2" },
