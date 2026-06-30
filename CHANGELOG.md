@@ -2,6 +2,10 @@
 
 ## 2.64.0
 
+The SDK now extracts all `gen_ai` spans out of a transaction and sends them as v2 envelope items by default. This prevents `gen_ai` spans from being dropped when the transaction payload exceeds size limits. Because they are no longer constrained by transaction size limits, AI message data is also no longer truncated. To keep the previous behavior, set `stream_gen_ai_spans=False`.
+
+Self-hosted Sentry users should opt out with `stream_gen_ai_spans=False`, since streamed `gen_ai` spans may not be ingested by their Sentry instance.
+
 ### Bug Fixes 🐛
 
 - (asyncpg) Use distinct span ops for cursor iteration and fetch to prevent N+1 false positives by @ericapisani in [#6609](https://github.com/getsentry/sentry-python/pull/6609)
