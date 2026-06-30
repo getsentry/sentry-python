@@ -891,6 +891,7 @@ class Scope:
     def set_user(self, value: "Optional[Dict[str, Any]]") -> None:
         """Sets a user for the scope."""
         self._user = value
+
         session = self.get_isolation_scope()._session
         if session is not None:
             session.update(user=value)
@@ -1753,7 +1754,11 @@ class Scope:
             ("user.email", "email"),
             ("user.ip_address", "ip_address"),
         ):
-            if user_attribute in self._user and attribute_name not in attributes:
+            if (
+                user_attribute in self._user
+                and attribute_name not in attributes
+                and self._user[user_attribute] is not None
+            ):
                 attributes[attribute_name] = self._user[user_attribute]
 
     def _drop(self, cause: "Any", ty: str) -> "Optional[Any]":
