@@ -16,7 +16,7 @@ Resolution precedence (see :func:`resolve_data_collection`):
 * ``data_collection`` set, ``send_default_pii`` unset -> honor ``data_collection``
   using the spec defaults for any omitted field.
 * ``send_default_pii`` set, ``data_collection`` unset -> derive a
-  ``DataCollection`` that mirrors what ``send_default_pii`` collects today.
+  resolved ``DataCollection`` that mirrors what ``send_default_pii`` collects today.
 * neither set -> treated as ``send_default_pii=False``.
 * both set -> ``data_collection`` wins (it is the single source of truth); a
   ``DeprecationWarning`` is emitted for ``send_default_pii``.
@@ -24,12 +24,12 @@ Resolution precedence (see :func:`resolve_data_collection`):
 The new collection-time filtering mechanisms (the partial-match sensitive
 denylist and allow/deny key-value modes) only become active when
 ``data_collection`` is provided explicitly. Otherwise the SDK keeps its existing
-behavior so that upgrading without configuring ``data_collection`` changes
+behaviour so that upgrading without configuring ``data_collection`` changes
 nothing.
 """
 
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from urllib.parse import parse_qsl, urlencode
 
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
@@ -37,41 +37,34 @@ from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Mapping, Optional
 
+    from typing_extensions import Literal
 
-__all__ = [
-    "DataCollection",
-    "KeyValueCollectionBehavior",
-    "GenAICollection",
-    "HttpHeadersCollection",
-    "SENSITIVE_DENYLIST",
-    "EXTENDED_GDPR_DENYLIST",
-]
-
-
-#: Body type identifiers accepted by ``DataCollection.http_bodies``. These match
-#: the spec's camelCase string values so configuration is portable across SDKs.
-BODY_TYPE_INCOMING_REQUEST = "incomingRequest"
-BODY_TYPE_OUTGOING_REQUEST = "outgoingRequest"
-BODY_TYPE_INCOMING_RESPONSE = "incomingResponse"
-BODY_TYPE_OUTGOING_RESPONSE = "outgoingResponse"
+    from sentry_sdk._types import (
+        DatabaseCollectionBehaviour,
+        DataCollection,
+        DataCollectionUserOptions,
+        GenAICollectionBehaviour,
+        GraphQLCollectionBehaviour,
+        HttpHeadersCollectionBehaviour,
+        KeyValueCollectionBehaviour,
+    )
 
 #: All valid body types. ``http_bodies`` defaults to this (collect everything the
 #: platform supports); an empty list is the explicit opt-out.
-ALL_BODY_TYPES = [
-    BODY_TYPE_INCOMING_REQUEST,
-    BODY_TYPE_OUTGOING_REQUEST,
-    BODY_TYPE_INCOMING_RESPONSE,
-    BODY_TYPE_OUTGOING_RESPONSE,
+ALL_HTTP_BODY_TYPES = [
+    "incoming_request",
+    "outgoing_request",
+    "incoming_response",
+    "outgoing_response",
 ]
 
 #: Default number of source lines captured above and below a stack frame.
 DEFAULT_FRAME_CONTEXT_LINES = 5
 
 #: Collection modes for key-value data (cookies, headers, query params).
-COLLECTION_OFF = "off"
-COLLECTION_DENYLIST = "denyList"
-COLLECTION_ALLOWLIST = "allowList"
-_VALID_MODES = (COLLECTION_OFF, COLLECTION_DENYLIST, COLLECTION_ALLOWLIST)
+#: snake_case (Python-only deviation from the spec's camelCase); never
+#: serialized to Sentry.
+_VALID_KEY_VALUE_COLLECTION_BEHAVIOUR_MODES = ("off", "deny_list", "allow_list")
 
 #: Canonical sensitive denylist from the spec. Values of keys that contain any of
 #: these terms (partial, case-insensitive) are always replaced with
@@ -96,173 +89,6 @@ SENSITIVE_DENYLIST = [
     "identity",
 ]
 
-#: Additional GDPR-sensitive terms users may opt into via custom deny terms.
-#: Not applied automatically; documented here for convenience.
-EXTENDED_GDPR_DENYLIST = ["forwarded", "-ip", "remote-", "via", "-user"]
-
-
-class KeyValueCollectionBehavior:
-    """
-    Controls which *values* of key-value data (cookies, headers, query params)
-    are sent in plaintext versus replaced with ``"[Filtered]"``. Key names are
-    always retained.
-
-    :param mode: one of ``"off"``, ``"denyList"`` (default), ``"allowList"``.
-    :param terms: deny or allow terms (depending on ``mode``) that extend the
-        built-in sensitive denylist. Matched as a partial, case-insensitive
-        substring of the key name.
-    """
-
-    __slots__ = ("mode", "terms")
-
-    def __init__(self, mode: str = "denyList", terms: "Optional[List[str]]" = None):
-        if mode not in _VALID_MODES:
-            raise ValueError(
-                "Invalid KeyValueCollectionBehavior mode {!r}. Must be one of {}.".format(
-                    mode, _VALID_MODES
-                )
-            )
-        self.mode = mode
-        self.terms: "List[str]" = list(terms) if terms else []
-
-    def __repr__(self) -> str:
-        return "KeyValueCollectionBehavior(mode={!r}, terms={!r})".format(
-            self.mode, self.terms
-        )
-
-
-class GenAICollection:
-    """
-    Controls capture of generative AI input and output *content*. Metadata such
-    as model name and token counts is always collected regardless of these
-    settings.
-    """
-
-    __slots__ = ("inputs", "outputs")
-
-    def __init__(self, inputs: bool = True, outputs: bool = True):
-        self.inputs = inputs
-        self.outputs = outputs
-
-    def __repr__(self) -> str:
-        return "GenAICollection(inputs={!r}, outputs={!r})".format(
-            self.inputs, self.outputs
-        )
-
-
-class HttpHeadersCollection:
-    """
-    Configures request and response header collection independently. Each
-    direction is a :class:`KeyValueCollectionBehavior`.
-    """
-
-    __slots__ = ("request", "response")
-
-    def __init__(
-        self,
-        request: "Optional[KeyValueCollectionBehavior]" = None,
-        response: "Optional[KeyValueCollectionBehavior]" = None,
-    ):
-        self.request: "KeyValueCollectionBehavior" = (
-            request if request is not None else KeyValueCollectionBehavior()
-        )
-        self.response: "KeyValueCollectionBehavior" = (
-            response if response is not None else KeyValueCollectionBehavior()
-        )
-
-    def __repr__(self) -> str:
-        return "HttpHeadersCollection(request={!r}, response={!r})".format(
-            self.request, self.response
-        )
-
-
-class DataCollection:
-    """
-    The ``data_collection`` client option.
-
-    Pass an instance to ``sentry_sdk.init(data_collection=...)``. Any field left
-    as ``None`` is filled in with its spec default during resolution (see
-    :func:`resolve_data_collection`). After resolution the instance stored on the
-    client has concrete values for every field.
-
-    :param user_info: automatically populate ``user.*`` fields (id, email,
-        username, ip_address) from instrumentation. Default ``True``.
-    :param cookies: cookie collection behavior. Default ``denyList``.
-    :param http_headers: request/response header collection. Default
-        ``denyList`` for both directions.
-    :param http_bodies: list of body types to collect. ``None`` -> all valid
-        types; ``[]`` -> off.
-    :param query_params: URL query parameter collection. Default ``denyList``.
-    :param gen_ai: generative AI input/output content collection. Default both
-        ``True``.
-    :param stack_frame_variables: include local variable values in stack frames.
-        Default ``True`` (falls back to ``include_local_variables``).
-    :param frame_context_lines: number of source lines above/below each frame.
-        Default ``5`` (falls back to ``include_source_context``).
-    """
-
-    __slots__ = (
-        "user_info",
-        "cookies",
-        "http_headers",
-        "http_bodies",
-        "query_params",
-        "gen_ai",
-        "stack_frame_variables",
-        "frame_context_lines",
-        "explicit",
-    )
-
-    def __init__(
-        self,
-        user_info: bool = True,
-        cookies: "Optional[KeyValueCollectionBehavior]" = None,
-        http_headers: "Optional[HttpHeadersCollection]" = None,
-        http_bodies: "Optional[List[str]]" = None,
-        query_params: "Optional[KeyValueCollectionBehavior]" = None,
-        gen_ai: "Optional[GenAICollection]" = None,
-        stack_frame_variables: "Optional[bool]" = None,
-        frame_context_lines: "Optional[int]" = None,
-    ):
-        # Fields with no legacy fallback default to their spec value, so they are
-        # always concrete (never None) on a constructed instance.
-        self.user_info = user_info
-        self.cookies = cookies if cookies is not None else KeyValueCollectionBehavior()
-        self.http_headers = (
-            http_headers if http_headers is not None else HttpHeadersCollection()
-        )
-        # http_bodies is None == "all valid types"; [] == off.
-        self.http_bodies = http_bodies
-        self.query_params = (
-            query_params if query_params is not None else KeyValueCollectionBehavior()
-        )
-        self.gen_ai = gen_ai if gen_ai is not None else GenAICollection()
-        # Frame fields keep None as "inherit from include_local_variables /
-        # include_source_context" so resolution can apply the legacy fallback.
-        self.stack_frame_variables = stack_frame_variables
-        self.frame_context_lines = frame_context_lines
-        # Whether the user supplied ``data_collection`` explicitly. Set during
-        # resolution. Collection-time filtering only changes from legacy behavior
-        # when this is True.
-        self.explicit: bool = False
-
-    def __repr__(self) -> str:
-        return (
-            "DataCollection(user_info={!r}, cookies={!r}, http_headers={!r}, "
-            "http_bodies={!r}, query_params={!r}, gen_ai={!r}, "
-            "stack_frame_variables={!r}, frame_context_lines={!r}, explicit={!r})"
-        ).format(
-            self.user_info,
-            self.cookies,
-            self.http_headers,
-            self.http_bodies,
-            self.query_params,
-            self.gen_ai,
-            self.stack_frame_variables,
-            self.frame_context_lines,
-            self.explicit,
-        )
-
 
 def is_sensitive_key(key: str, extra_terms: "Optional[List[str]]" = None) -> bool:
     """
@@ -285,41 +111,42 @@ def is_sensitive_key(key: str, extra_terms: "Optional[List[str]]" = None) -> boo
 
 def apply_key_value_collection(
     items: "Mapping[str, Any]",
-    behavior: "KeyValueCollectionBehavior",
+    behaviour: "KeyValueCollectionBehaviour",
     substitute: "Any" = SENSITIVE_DATA_SUBSTITUTE,
 ) -> "Dict[str, Any]":
     """
-    Apply a :class:`KeyValueCollectionBehavior` to a mapping of key-value pairs.
+    Apply a :class:`KeyValueCollectionBehaviour` to a mapping of key-value pairs.
 
     Returns a new dict. Key names are always retained (except for ``off`` mode,
     which collects nothing). Sensitive keys (built-in denylist) are always
-    scrubbed, even under ``allowList`` mode.
+    scrubbed, even under ``allow_list`` mode.
     """
-    if behavior.mode == COLLECTION_OFF:
+    mode = behaviour.get("mode", "deny_list")
+    terms = behaviour.get("terms") or []
+
+    if mode == "off":
         return {}
 
     result: "Dict[str, Any]" = {}
 
-    if behavior.mode == COLLECTION_ALLOWLIST:
-        # behavior.terms is the ALLOW list here (not deny terms). A key sends its
+    if mode == "allow_list":
+        # ``terms`` is the ALLOW list here (not deny terms). A key sends its
         # real value only if it matches an allow term AND is not sensitive (the
         # built-in sensitive denylist always wins, even for allow-listed keys).
         for key, value in items.items():
             allowed = False
             if isinstance(key, str):
                 lowered = key.lower()
-                allowed = any(
-                    term and term.lower() in lowered for term in behavior.terms
-                )
+                allowed = any(term and term.lower() in lowered for term in terms)
             if allowed and not is_sensitive_key(key):
                 result[key] = value
             else:
                 result[key] = substitute
         return result
 
-    # denyList (default): collect everything, scrub sensitive values.
+    # deny_list (default): collect everything, scrub sensitive values.
     for key, value in items.items():
-        if isinstance(key, str) and is_sensitive_key(key, behavior.terms):
+        if isinstance(key, str) and is_sensitive_key(key, terms):
             result[key] = substitute
         else:
             result[key] = value
@@ -335,14 +162,14 @@ _ALWAYS_FILTERED_HEADERS = ("cookie", "set-cookie")
 
 def filter_request_headers(
     headers: "Mapping[str, Any]",
-    behavior: "KeyValueCollectionBehavior",
+    behaviour: "KeyValueCollectionBehaviour",
     substitute: "Any" = SENSITIVE_DATA_SUBSTITUTE,
 ) -> "Dict[str, Any]":
     """
-    Apply a header :class:`KeyValueCollectionBehavior`, additionally always
+    Apply a header :class:`KeyValueCollectionBehaviour`, additionally always
     filtering the raw Cookie/Set-Cookie header values.
     """
-    filtered = apply_key_value_collection(headers, behavior, substitute=substitute)
+    filtered = apply_key_value_collection(headers, behaviour, substitute=substitute)
     for key in filtered:
         if isinstance(key, str) and key.lower() in _ALWAYS_FILTERED_HEADERS:
             filtered[key] = substitute
@@ -351,17 +178,20 @@ def filter_request_headers(
 
 def scrub_query_string(
     query_string: str,
-    behavior: "KeyValueCollectionBehavior",
+    behaviour: "KeyValueCollectionBehaviour",
 ) -> "Optional[str]":
     """
-    Apply a query-param :class:`KeyValueCollectionBehavior` to a raw query
+    Apply a query-param :class:`KeyValueCollectionBehaviour` to a raw query
     string.
 
     Returns ``None`` when the mode is ``off`` (do not collect the query string at
     all), the scrubbed query string otherwise. An unparseable query string is
     replaced entirely with ``"[Filtered]"``.
     """
-    if behavior.mode == COLLECTION_OFF:
+    mode = behaviour.get("mode", "deny_list")
+    terms = behaviour.get("terms") or []
+
+    if mode == "off":
         return None
 
     try:
@@ -374,10 +204,8 @@ def scrub_query_string(
 
     scrubbed = []
     for key, value in pairs:
-        if behavior.mode == COLLECTION_ALLOWLIST:
-            allowed = any(
-                term and term.lower() in key.lower() for term in behavior.terms
-            )
+        if mode == "allow_list":
+            allowed = any(term and term.lower() in key.lower() for term in terms)
             scrubbed.append(
                 (
                     key,
@@ -386,12 +214,12 @@ def scrub_query_string(
                     else SENSITIVE_DATA_SUBSTITUTE,
                 )
             )
-        else:  # denyList
+        else:  # deny_list
             scrubbed.append(
                 (
                     key,
                     SENSITIVE_DATA_SUBSTITUTE
-                    if is_sensitive_key(key, behavior.terms)
+                    if is_sensitive_key(key, terms)
                     else value,
                 )
             )
@@ -403,7 +231,7 @@ def should_collect_body_type(
     body_type: str,
 ) -> bool:
     """Return whether the given body type should be collected."""
-    bodies = data_collection.http_bodies
+    bodies = data_collection.get("http_bodies")
     if bodies is None:
         return True
     return body_type in bodies
@@ -415,48 +243,52 @@ def _map_from_send_default_pii(
     include_source_context: bool,
 ) -> "DataCollection":
     """
-    Build a fully-resolved :class:`DataCollection` that mirrors the data
+    Build a fully-resolved ``DataCollection`` dict that mirrors the data
     ``send_default_pii`` collects today. Used when ``data_collection`` is not
-    provided explicitly (resolution cases B and C).
+    provided explicitly.
+
+    PII-bearing content gates on ``send_default_pii``: ``graphql.variables`` and
+    ``database.query_params`` follow it, while ``graphql.document`` stays ``True``.
     """
-    resolved = DataCollection(
-        user_info=send_default_pii,
-        cookies=KeyValueCollectionBehavior(
-            COLLECTION_DENYLIST if send_default_pii else COLLECTION_OFF
-        ),
+    kv_mode = "deny_list" if send_default_pii else "off"  # type: Literal["off", "deny_list", "allow_list"]
+    return {
+        "provided_by_user": False,
+        "user_info": send_default_pii,
+        "cookies": {"mode": kv_mode},
         # Headers are collected in both PII modes today (sensitive ones filtered
         # when PII is off), so this never maps to "off".
-        http_headers=HttpHeadersCollection(),
+        "http_headers": {
+            "request": {"mode": "deny_list"},
+            "response": {"mode": "deny_list"},
+        },
         # Bodies are collected regardless of PII today, bounded by
         # ``max_request_body_size``.
-        http_bodies=list(ALL_BODY_TYPES),
-        query_params=KeyValueCollectionBehavior(
-            COLLECTION_DENYLIST if send_default_pii else COLLECTION_OFF
-        ),
-        gen_ai=GenAICollection(inputs=send_default_pii, outputs=send_default_pii),
-        stack_frame_variables=include_local_variables,
-        frame_context_lines=(
+        "http_bodies": list(ALL_HTTP_BODY_TYPES),
+        "query_params": {"mode": kv_mode},
+        "graphql": {"document": True, "variables": send_default_pii},
+        "gen_ai": {"inputs": send_default_pii, "outputs": send_default_pii},
+        "database": {"query_params": send_default_pii},
+        "stack_frame_variables": include_local_variables,
+        "frame_context_lines": (
             DEFAULT_FRAME_CONTEXT_LINES if include_source_context else 0
         ),
-    )
-    resolved.explicit = False
-    return resolved
+    }
 
 
 def _resolve_explicit(
-    user_dc: "DataCollection",
+    user_dc: "DataCollectionUserOptions",
     include_local_variables: bool,
     include_source_context: bool,
 ) -> "DataCollection":
     """
-    Fill in any omitted fields of a user-supplied ``DataCollection`` with their
-    spec defaults (resolution case A). Frame fields fall back to the legacy
+    Fill in any omitted fields of a user-supplied ``DataCollection`` dict with
+    their spec defaults. Frame fields fall back to the legacy
     ``include_local_variables`` / ``include_source_context`` options when unset.
     """
     # frame_context_lines accepts an integer or a boolean fallback (spec: True
     # -> platform default of 5, False -> 0). bool is a subclass of int, so
     # coerce explicitly before treating it as a line count.
-    frame_context_lines = user_dc.frame_context_lines
+    frame_context_lines = user_dc.get("frame_context_lines")
     if frame_context_lines is None:
         frame_context_lines = (
             DEFAULT_FRAME_CONTEXT_LINES if include_source_context else 0
@@ -464,107 +296,170 @@ def _resolve_explicit(
     elif isinstance(frame_context_lines, bool):
         frame_context_lines = DEFAULT_FRAME_CONTEXT_LINES if frame_context_lines else 0
 
-    resolved = DataCollection(
-        # These fields are always concrete on a constructed DataCollection.
-        user_info=user_dc.user_info,
-        cookies=user_dc.cookies,
-        http_headers=user_dc.http_headers,
-        query_params=user_dc.query_params,
-        gen_ai=user_dc.gen_ai,
-        # http_bodies: None means "all valid types"; materialize for clarity.
-        http_bodies=(
-            list(user_dc.http_bodies)
-            if user_dc.http_bodies is not None
-            else list(ALL_BODY_TYPES)
-        ),
-        # Frame fields fall back to the legacy options when unset.
-        stack_frame_variables=(
-            user_dc.stack_frame_variables
-            if user_dc.stack_frame_variables is not None
-            else include_local_variables
-        ),
-        frame_context_lines=frame_context_lines,
+    stack_frame_variables = user_dc.get("stack_frame_variables")
+    if stack_frame_variables is None:
+        stack_frame_variables = include_local_variables
+
+    # http_bodies: omitted means "all valid types"; [] is the explicit opt-out.
+    http_bodies = user_dc.get("http_bodies")
+    http_bodies = (
+        list(http_bodies) if http_bodies is not None else list(ALL_HTTP_BODY_TYPES)
     )
-    resolved.explicit = True
-    return resolved
+
+    return {
+        "provided_by_user": True,
+        "user_info": user_dc.get("user_info", True),
+        "cookies": user_dc.get("cookies") or _kvcb_from_value("deny_list"),
+        "http_headers": user_dc.get("http_headers")
+        or _http_headers_from_value("deny_list"),
+        "http_bodies": http_bodies,
+        "query_params": user_dc.get("query_params") or _kvcb_from_value("deny_list"),
+        "graphql": user_dc.get("graphql") or _graphql_from_value({}),
+        "gen_ai": user_dc.get("gen_ai") or _gen_ai_from_value({}),
+        "database": user_dc.get("database") or _database_from_value({}),
+        "stack_frame_variables": stack_frame_variables,
+        "frame_context_lines": frame_context_lines,
+    }
 
 
-def _data_collection_from_dict(d: "Dict[str, Any]") -> "DataCollection":
-    """Convert a plain dict into a :class:`DataCollection`."""
-    kwargs: "Dict[str, Any]" = {}
+def _data_collection_from_dict(d: "Dict[str, Any]") -> "DataCollectionUserOptions":
+    """
+    Normalize only the keys the user supplied into a partial
+    ``DataCollectionUserOptions`` dict. Nested config values are coerced (and
+    their own defaults filled) by the per-field helpers.
+    """
+    result: "DataCollectionUserOptions" = {}
 
     if "user_info" in d:
-        kwargs["user_info"] = d["user_info"]
+        result["user_info"] = d["user_info"]
     if "cookies" in d:
-        kwargs["cookies"] = _kvcb_from_value(d["cookies"])
+        result["cookies"] = _kvcb_from_value(d["cookies"])
     if "http_headers" in d:
-        kwargs["http_headers"] = _http_headers_from_value(d["http_headers"])
+        result["http_headers"] = _http_headers_from_value(d["http_headers"])
     if "http_bodies" in d:
-        kwargs["http_bodies"] = d["http_bodies"]
+        result["http_bodies"] = d["http_bodies"]
     if "query_params" in d:
-        kwargs["query_params"] = _kvcb_from_value(d["query_params"])
+        result["query_params"] = _kvcb_from_value(d["query_params"])
+    if "graphql" in d:
+        result["graphql"] = _graphql_from_value(d["graphql"])
     if "gen_ai" in d:
-        kwargs["gen_ai"] = _gen_ai_from_value(d["gen_ai"])
+        result["gen_ai"] = _gen_ai_from_value(d["gen_ai"])
+    if "database" in d:
+        result["database"] = _database_from_value(d["database"])
     if "stack_frame_variables" in d:
-        kwargs["stack_frame_variables"] = d["stack_frame_variables"]
+        result["stack_frame_variables"] = d["stack_frame_variables"]
     if "frame_context_lines" in d:
-        kwargs["frame_context_lines"] = d["frame_context_lines"]
+        result["frame_context_lines"] = d["frame_context_lines"]
 
-    return DataCollection(**kwargs)
+    return result
 
 
-def _kvcb_from_value(val: "Any") -> "KeyValueCollectionBehavior":
-    """Coerce a string or dict to :class:`KeyValueCollectionBehavior`."""
-    if isinstance(val, KeyValueCollectionBehavior):
-        return val
+def _kvcb_from_value(val: "Any") -> "KeyValueCollectionBehaviour":
+    """
+    Coerce a string or dict to a ``KeyValueCollectionBehaviour`` dict, defaulting
+    ``mode`` to ``deny_list`` and validating it against the known modes.
+    """
     if isinstance(val, str):
-        return KeyValueCollectionBehavior(mode=val)
-    if isinstance(val, dict):
-        return KeyValueCollectionBehavior(**val)
+        mode = val
+        terms = None
+    elif isinstance(val, dict):
+        mode = val.get("mode", "deny_list")
+        terms = val.get("terms")
+    else:
+        raise TypeError(
+            "Expected a string or dict for key-value collection behaviour, "
+            "got {!r}".format(type(val).__name__)
+        )
+
+    if mode not in _VALID_KEY_VALUE_COLLECTION_BEHAVIOUR_MODES:
+        raise ValueError(
+            "Invalid collection mode {!r}. Must be one of {}.".format(
+                mode, _VALID_KEY_VALUE_COLLECTION_BEHAVIOUR_MODES
+            )
+        )
+
+    behaviour = {"mode": mode}  # type: Dict[str, Any]
+    if terms is not None:
+        behaviour["terms"] = list(terms)
+    return cast("KeyValueCollectionBehaviour", behaviour)
+
+
+def _http_headers_from_value(val: "Any") -> "HttpHeadersCollectionBehaviour":
+    """
+    Coerce a value to an ``HttpHeadersCollectionBehaviour`` dict.
+
+    Accepts ``{"request": ..., "response": ...}`` (each direction defaulting to
+    ``deny_list``) or a shorthand — a string or single key-value behaviour dict —
+    applied to both directions.
+    """
+    if isinstance(val, dict) and ("request" in val or "response" in val):
+        return {
+            "request": (
+                _kvcb_from_value(val["request"])
+                if "request" in val
+                else _kvcb_from_value("deny_list")
+            ),
+            "response": (
+                _kvcb_from_value(val["response"])
+                if "response" in val
+                else _kvcb_from_value("deny_list")
+            ),
+        }
+    if isinstance(val, (str, dict)):
+        # Shorthand: a single behaviour applies to both directions.
+        return {
+            "request": _kvcb_from_value(val),
+            "response": _kvcb_from_value(val),
+        }
     raise TypeError(
-        "Expected a KeyValueCollectionBehavior, string, or dict, got {!r}".format(
+        "Expected a dict or string for http_headers, got {!r}".format(
             type(val).__name__
         )
     )
 
 
-def _http_headers_from_value(val: "Any") -> "HttpHeadersCollection":
-    """Coerce a dict to :class:`HttpHeadersCollection`."""
-    if isinstance(val, HttpHeadersCollection):
-        return val
-    if isinstance(val, dict):
-        kwargs: "Dict[str, Any]" = {}
-        if "request" in val:
-            kwargs["request"] = _kvcb_from_value(val["request"])
-        if "response" in val:
-            kwargs["response"] = _kvcb_from_value(val["response"])
-        return HttpHeadersCollection(**kwargs)
-    raise TypeError(
-        "Expected an HttpHeadersCollection or dict, got {!r}".format(type(val).__name__)
-    )
+def _gen_ai_from_value(val: "Any") -> "GenAICollectionBehaviour":
+    """Coerce a dict to a ``GenAICollectionBehaviour`` dict; ``inputs``/``outputs`` default to ``True``."""
+    if not isinstance(val, dict):
+        raise TypeError(
+            "Expected a dict for gen_ai, got {!r}".format(type(val).__name__)
+        )
+    return {
+        "inputs": val.get("inputs", True),
+        "outputs": val.get("outputs", True),
+    }
 
 
-def _gen_ai_from_value(val: "Any") -> "GenAICollection":
-    """Coerce a dict to :class:`GenAICollection`."""
-    if isinstance(val, GenAICollection):
-        return val
-    if isinstance(val, dict):
-        return GenAICollection(**val)
-    raise TypeError(
-        "Expected a GenAICollection or dict, got {!r}".format(type(val).__name__)
-    )
+def _graphql_from_value(val: "Any") -> "GraphQLCollectionBehaviour":
+    """Coerce a dict to a ``GraphQLCollectionBehaviour`` dict; ``document``/``variables`` default to ``True``."""
+    if not isinstance(val, dict):
+        raise TypeError(
+            "Expected a dict for graphql, got {!r}".format(type(val).__name__)
+        )
+    return {
+        "document": val.get("document", True),
+        "variables": val.get("variables", True),
+    }
+
+
+def _database_from_value(val: "Any") -> "DatabaseCollectionBehaviour":
+    """Coerce a dict to a ``DatabaseCollectionBehaviour`` dict; ``query_params`` defaults to ``True``."""
+    if not isinstance(val, dict):
+        raise TypeError(
+            "Expected a dict for database, got {!r}".format(type(val).__name__)
+        )
+    return {"query_params": val.get("query_params", True)}
 
 
 def resolve_data_collection(options: "Dict[str, Any]") -> "DataCollection":
     """
-    Resolve the effective :class:`DataCollection` from client ``options``.
+    Resolve the effective ``DataCollection`` dict from client ``options``.
 
     Reads ``data_collection``, ``send_default_pii``, ``include_local_variables``
-    and ``include_source_context`` and returns a fully-resolved instance with
+    and ``include_source_context`` and returns a fully-resolved dict with
     concrete values for every field.
 
-    ``data_collection`` may be a :class:`DataCollection` instance or a plain
-    ``dict`` (which is converted automatically).
+    ``data_collection`` must be a plain ``dict``.
     """
     user_dc = options.get("data_collection")
     send_default_pii = options.get("send_default_pii")
@@ -576,12 +471,11 @@ def resolve_data_collection(options: "Dict[str, Any]") -> "DataCollection":
         include_source_context = True
 
     if user_dc is not None:
-        if isinstance(user_dc, dict):
-            user_dc = _data_collection_from_dict(user_dc)
-        elif not isinstance(user_dc, DataCollection):
+        if not isinstance(user_dc, dict):
             raise TypeError(
-                "`data_collection` must be a dict or sentry_sdk.DataCollection "
-                "instance, got {!r}.".format(type(user_dc).__name__)
+                "`data_collection` must be a dict, got {!r}.".format(
+                    type(user_dc).__name__
+                )
             )
         if send_default_pii is not None:
             warnings.warn(
@@ -592,15 +486,13 @@ def resolve_data_collection(options: "Dict[str, Any]") -> "DataCollection":
                 stacklevel=2,
             )
         return _resolve_explicit(
-            user_dc, include_local_variables, include_source_context
+            _data_collection_from_dict(user_dc),
+            include_local_variables,
+            include_source_context,
         )
 
     return _map_from_send_default_pii(
-        bool(send_default_pii), include_local_variables, include_source_context
+        send_default_pii=bool(send_default_pii),
+        include_local_variables=include_local_variables,
+        include_source_context=include_source_context,
     )
-
-
-#: Safe default used by non-recording clients: collect nothing PII-gated.
-#: This is a shared, process-wide singleton. Treat it as read-only — do not
-#: mutate the returned ``DataCollection`` or its nested config objects.
-OFF_DATA_COLLECTION = _map_from_send_default_pii(False, True, True)
