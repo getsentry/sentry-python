@@ -2,12 +2,6 @@ from sentry_sdk import metrics, profiler
 
 from sentry_sdk.scope import Scope  # isort: skip
 from sentry_sdk.client import Client  # isort: skip
-from sentry_sdk.data_collection import (  # isort: skip
-    DataCollection,
-    GenAICollection,
-    HttpHeadersCollection,
-    KeyValueCollectionBehavior,
-)
 from sentry_sdk.consts import VERSION
 from sentry_sdk.transport import HttpTransport, Transport
 
@@ -17,10 +11,6 @@ __all__ = [  # noqa
     "Hub",
     "Scope",
     "Client",
-    "DataCollection",
-    "GenAICollection",
-    "HttpHeadersCollection",
-    "KeyValueCollectionBehavior",
     "Transport",
     "HttpTransport",
     "VERSION",
