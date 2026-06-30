@@ -68,6 +68,11 @@ typing = [
     "botocore-stubs",
     "werkzeug",
 ]
+test = [
+    "dataclasses ; python_full_version < '3.7'",
+    "pytest>=6.0.0",
+    "pytest-cov>=7.1.0",
+]
 
 #
 # Tool: Coverage
