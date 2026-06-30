@@ -168,7 +168,7 @@ def _get_additional_test_dependencies(
     release: Version,
     python_version: ThreadedVersion,
 ) -> tuple[str, ...]:
-    constraints = []
+    additional_dependencies = []
     for rule, dependencies in TEST_SUITE_CONFIG[integration].get("deps", {}).items():
         # Skip if rule does not apply to current package or Python version
         if rule != "*" and (
@@ -180,8 +180,8 @@ def _get_additional_test_dependencies(
         ):
             continue
 
-        constraints += dependencies
-    return tuple(constraints)
+        additional_dependencies += dependencies
+    return tuple(additional_dependencies)
 
 
 @functools.cache
