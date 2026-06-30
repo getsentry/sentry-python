@@ -87,6 +87,7 @@ if TYPE_CHECKING:
         AttributeValue,
         Breadcrumb,
         BreadcrumbHint,
+        DataCollection,
         ErrorProcessor,
         Event,
         EventProcessor,
@@ -98,7 +99,6 @@ if TYPE_CHECKING:
         SamplingContext,
         Type,
     )
-    from sentry_sdk.data_collection import DataCollection
     from sentry_sdk.tracing import TransactionKwargs
 
     P = ParamSpec("P")
@@ -2177,21 +2177,6 @@ def use_isolation_scope(isolation_scope: "Scope") -> "Generator[Scope, None, Non
 def should_send_default_pii() -> bool:
     """Shortcut for `Scope.get_client().should_send_default_pii()`."""
     return Scope.get_client().should_send_default_pii()
-
-
-def should_collect_user_info() -> bool:
-    """Shortcut for `Scope.get_client().should_collect_user_info()`."""
-    return Scope.get_client().should_collect_user_info()
-
-
-def should_collect_gen_ai_inputs(include_prompts: "Optional[bool]" = None) -> bool:
-    """Shortcut for `Scope.get_client().should_collect_gen_ai_inputs(...)`."""
-    return Scope.get_client().should_collect_gen_ai_inputs(include_prompts)
-
-
-def should_collect_gen_ai_outputs(include_prompts: "Optional[bool]" = None) -> bool:
-    """Shortcut for `Scope.get_client().should_collect_gen_ai_outputs(...)`."""
-    return Scope.get_client().should_collect_gen_ai_outputs(include_prompts)
 
 
 def get_data_collection() -> "DataCollection":

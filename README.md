@@ -53,7 +53,7 @@ sentry_sdk.init(
     # To disable sending user data and HTTP request/response bodies, uncomment
     # the line below. For more info visit:
     # https://docs.sentry.io/platforms/python/configuration/options/#data_collection
-    # data_collection=sentry_sdk.DataCollection(user_info=False, http_bodies=[]),
+    # data_collection={"user_info": False, "http_bodies": []},
 )
 ```
 
