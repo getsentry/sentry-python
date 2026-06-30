@@ -5,7 +5,7 @@ from sentry_sdk import start_span
 
 
 def test_conversation_id_propagates_to_span_with_gen_ai_operation_name(
-    self, sentry_init, capture_events
+    sentry_init, capture_events
 ):
     """Span with gen_ai.operation.name data should get conversation_id."""
     sentry_init(traces_sample_rate=1.0)
@@ -23,9 +23,7 @@ def test_conversation_id_propagates_to_span_with_gen_ai_operation_name(
     assert span_data.get("gen_ai.conversation.id") == "conv-op-name-test"
 
 
-def test_conversation_id_propagates_to_span_with_ai_op(
-    self, sentry_init, capture_events
-):
+def test_conversation_id_propagates_to_span_with_ai_op(sentry_init, capture_events):
     """Span with ai.* op should get conversation_id."""
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
@@ -44,7 +42,7 @@ def test_conversation_id_propagates_to_span_with_ai_op(
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_conversation_id_propagates_to_span_with_gen_ai_op(
-    self, sentry_init, capture_events, capture_items, stream_gen_ai_spans
+    sentry_init, capture_events, capture_items, stream_gen_ai_spans
 ):
     """Span with gen_ai.* op should get conversation_id."""
     sentry_init(
@@ -80,9 +78,7 @@ def test_conversation_id_propagates_to_span_with_gen_ai_op(
     assert span_data.get("gen_ai.conversation.id") == "conv-gen-ai-op-test"
 
 
-def test_conversation_id_not_propagated_to_non_ai_span(
-    self, sentry_init, capture_events
-):
+def test_conversation_id_not_propagated_to_non_ai_span(sentry_init, capture_events):
     """Non-AI span should NOT get conversation_id."""
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
@@ -99,7 +95,7 @@ def test_conversation_id_not_propagated_to_non_ai_span(
     assert "gen_ai.conversation.id" not in span_data
 
 
-def test_conversation_id_not_propagated_when_not_set(self, sentry_init, capture_events):
+def test_conversation_id_not_propagated_when_not_set(sentry_init, capture_events):
     """AI span should not have conversation_id if not set on scope."""
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
@@ -117,9 +113,7 @@ def test_conversation_id_not_propagated_when_not_set(self, sentry_init, capture_
     assert "gen_ai.conversation.id" not in span_data
 
 
-def test_conversation_id_not_propagated_to_span_without_op(
-    self, sentry_init, capture_events
-):
+def test_conversation_id_not_propagated_to_span_without_op(sentry_init, capture_events):
     """Span without op and without gen_ai.operation.name should NOT get conversation_id."""
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
@@ -137,7 +131,7 @@ def test_conversation_id_not_propagated_to_span_without_op(
 
 
 def test_conversation_id_propagates_with_gen_ai_operation_name_no_op(
-    self, sentry_init, capture_events
+    sentry_init, capture_events
 ):
     """Span with gen_ai.operation.name but no op should still get conversation_id."""
     sentry_init(traces_sample_rate=1.0)
@@ -156,7 +150,7 @@ def test_conversation_id_propagates_with_gen_ai_operation_name_no_op(
 
 
 def test_conversation_id_propagates_to_transaction_with_ai_op(
-    self, sentry_init, capture_events
+    sentry_init, capture_events
 ):
     """Transaction with ai.* op should get conversation_id."""
     sentry_init(traces_sample_rate=1.0)
@@ -174,7 +168,7 @@ def test_conversation_id_propagates_to_transaction_with_ai_op(
 
 
 def test_conversation_id_not_propagated_to_non_ai_transaction(
-    self, sentry_init, capture_events
+    sentry_init, capture_events
 ):
     """Non-AI transaction should NOT get conversation_id."""
     sentry_init(traces_sample_rate=1.0)
