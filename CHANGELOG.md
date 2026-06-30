@@ -1,5 +1,81 @@
 # Changelog
 
+## 2.64.0
+
+### New Features ✨
+
+- (.agents) Update project agent lockfiles by @ericapisani in [#6662](https://github.com/getsentry/sentry-python/pull/6662)
+- (clickhouse_driver) Add db.query.text to streamed query spans by @ericapisani in [#6635](https://github.com/getsentry/sentry-python/pull/6635)
+- (redis) Set db.query.text span attributes by @ericapisani in [#6639](https://github.com/getsentry/sentry-python/pull/6639)
+- (scope) Add process runtime attributes to span context by @ericapisani in [#6564](https://github.com/getsentry/sentry-python/pull/6564)
+
+### Bug Fixes 🐛
+
+#### Asyncpg
+
+- Add db.query.text to streamed query spans by @ericapisani in [#6633](https://github.com/getsentry/sentry-python/pull/6633)
+- Use distinct span ops for cursor iteration and fetch to prevent N+1 false positives by @ericapisani in [#6609](https://github.com/getsentry/sentry-python/pull/6609)
+
+#### Other
+
+- (aiohttp) Gate url.full, url.path, url.query on send_default_pii by @ericapisani in [#6650](https://github.com/getsentry/sentry-python/pull/6650)
+- (asgi) Add url.path to ASGI request span attributes by @ericapisani in [#6652](https://github.com/getsentry/sentry-python/pull/6652)
+- (boto3) Gate url.full, url.query, url.fragment behind send_default_pii by @ericapisani in [#6674](https://github.com/getsentry/sentry-python/pull/6674)
+- (httpx) Gate url.full, url.query, and url.fragment behind send_default_pii by @ericapisani in [#6668](https://github.com/getsentry/sentry-python/pull/6668)
+- (httpx2) Gate url.full, url.query on send_default_pii by @ericapisani in [#6670](https://github.com/getsentry/sentry-python/pull/6670)
+- (langgraph) Ignore `GraphBubbleUp` exceptions by @alexander-alderman-webb in [#6608](https://github.com/getsentry/sentry-python/pull/6608)
+- (litellm) Store span off-band, not in forwarded metadata by @jgreer013 in [#6598](https://github.com/getsentry/sentry-python/pull/6598)
+- (mcp) Support MCP SDK v2 handler signature and removed request_ctx by @ericapisani in [#6583](https://github.com/getsentry/sentry-python/pull/6583)
+- (pydantic-ai) Stop truncating in the streaming trace lifecycle by @alexander-alderman-webb in [#6659](https://github.com/getsentry/sentry-python/pull/6659)
+- (pymongo) Add db.query.text to streamed query spans by @ericapisani in [#6637](https://github.com/getsentry/sentry-python/pull/6637)
+- (pyreqwest) Gate url.full, url.query, url.fragment on send_default_pii by @ericapisani in [#6673](https://github.com/getsentry/sentry-python/pull/6673)
+- (sanic) Gate url.full, url.path, and http.query behind send_default_pii by @ericapisani in [#6663](https://github.com/getsentry/sentry-python/pull/6663)
+- (starlette) Stop duplicating `scope["root_path"]` in URLs by @alexander-alderman-webb in [#6579](https://github.com/getsentry/sentry-python/pull/6579)
+- (stdlib) Gate url.full and http.query behind send_default_pii by @ericapisani in [#6666](https://github.com/getsentry/sentry-python/pull/6666)
+- (tests) Fix flaky OTel propagator entry point test by @ericapisani in [#6655](https://github.com/getsentry/sentry-python/pull/6655)
+- (tornado) Gate url.full, url.path, url.query on send_default_pii by @ericapisani in [#6664](https://github.com/getsentry/sentry-python/pull/6664)
+- (wsgi) Gate url.full, url.path, and http.query behind send_default_pii by @ericapisani in [#6654](https://github.com/getsentry/sentry-python/pull/6654)
+- Stop unconditionally importing `contextvars` by @alexander-alderman-webb in [#6625](https://github.com/getsentry/sentry-python/pull/6625)
+
+### Documentation 📚
+
+- Add light/dark logos by @hwhsu1231 in [#6627](https://github.com/getsentry/sentry-python/pull/6627)
+- Fix typos by @juliosuas in [#6602](https://github.com/getsentry/sentry-python/pull/6602)
+
+### Internal Changes 🔧
+
+- (aiomysql) Add span streaming variants to aiomysql tests by @ericapisani in [#6601](https://github.com/getsentry/sentry-python/pull/6601)
+- (mcp) Pin mcp package to <2.0.0 while alphas are in flight by @ericapisani in [#6687](https://github.com/getsentry/sentry-python/pull/6687)
+- 🤖 Update test matrix with new releases (06/29) by @github-actions in [#6682](https://github.com/getsentry/sentry-python/pull/6682)
+- Make `stream_gen_ai_spans` opt out by @alexander-alderman-webb in [#6658](https://github.com/getsentry/sentry-python/pull/6658)
+- Remove `setuptools` from `requirements-testing.txt` by @alexander-alderman-webb in [#6618](https://github.com/getsentry/sentry-python/pull/6618)
+- Remove `executing` from `requirements-testing.txt` by @alexander-alderman-webb in [#6619](https://github.com/getsentry/sentry-python/pull/6619)
+- Remove `asttokens` from `requirements-testing.txt` by @alexander-alderman-webb in [#6615](https://github.com/getsentry/sentry-python/pull/6615)
+- Remove `responses` from `requirements-testing.txt` by @alexander-alderman-webb in [#6621](https://github.com/getsentry/sentry-python/pull/6621)
+- Remove `pytest-forked` from `requirements-testing.txt` by @alexander-alderman-webb in [#6611](https://github.com/getsentry/sentry-python/pull/6611)
+- Remove `docker` from `requirements-testing.txt` by @alexander-alderman-webb in [#6616](https://github.com/getsentry/sentry-python/pull/6616)
+- Add `--skip-version-update` option to `populate_tox.py` by @alexander-alderman-webb in [#6675](https://github.com/getsentry/sentry-python/pull/6675)
+- Remove `httpcore` from `requirements-testing.txt` by @alexander-alderman-webb in [#6622](https://github.com/getsentry/sentry-python/pull/6622)
+- Remove `pytest-timeout` from `requirements-testing.txt` by @alexander-alderman-webb in [#6613](https://github.com/getsentry/sentry-python/pull/6613)
+- Remove `pytest-localserver` from `requirements-testing.txt` by @alexander-alderman-webb in [#6612](https://github.com/getsentry/sentry-python/pull/6612)
+- Remove `jsonschema` from `requirements-testing.txt` by @alexander-alderman-webb in [#6620](https://github.com/getsentry/sentry-python/pull/6620)
+- Remove `socksio` from `requirements-testing.txt` by @alexander-alderman-webb in [#6617](https://github.com/getsentry/sentry-python/pull/6617)
+- Remove `pysocks` from `requirements-testing.txt` by @alexander-alderman-webb in [#6623](https://github.com/getsentry/sentry-python/pull/6623)
+- Remove `brotli` from `requirements-testing.txt` by @alexander-alderman-webb in [#6614](https://github.com/getsentry/sentry-python/pull/6614)
+- Remove `tomli` from `requirements-testing.txt` by @alexander-alderman-webb in [#6630](https://github.com/getsentry/sentry-python/pull/6630)
+- Remove `pytest-watch` from `requirements-testing.txt` by @alexander-alderman-webb in [#6624](https://github.com/getsentry/sentry-python/pull/6624)
+- Remove `pip` from `requirements-testing.txt` by @alexander-alderman-webb in [#6629](https://github.com/getsentry/sentry-python/pull/6629)
+- 🤖 Update test matrix with new releases (06/22) by @github-actions in [#6610](https://github.com/getsentry/sentry-python/pull/6610)
+- Pin test dependencies including package extras by @alexander-alderman-webb in [#6607](https://github.com/getsentry/sentry-python/pull/6607)
+- 🤖 Update test matrix with new releases (06/15) by @github-actions in [#6567](https://github.com/getsentry/sentry-python/pull/6567)
+- Bump deps for test-lambda-locally by @sl0thentr0py in [#6594](https://github.com/getsentry/sentry-python/pull/6594)
+- Catch pkg_resource warning by @sl0thentr0py in [#6595](https://github.com/getsentry/sentry-python/pull/6595)
+
+### Other
+
+- (test): exclude django 6.1 alphas and betas from tox by @ericapisani in [#6690](https://github.com/getsentry/sentry-python/pull/6690)
+- (test): need to include the alpha tag for mcp package inclusion by @ericapisani in [#6688](https://github.com/getsentry/sentry-python/pull/6688)
+
 ## 2.63.0
 
 ### Bug Fixes 🐛
