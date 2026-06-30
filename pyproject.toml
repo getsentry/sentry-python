@@ -71,8 +71,7 @@ typing = [
 test = [
     "dataclasses ; python_full_version < '3.7'",
     "pytest>=6.0.0",
-    "pytest-cov<7.1.0 ; python_full_version < '3.9'",
-    "pytest-cov>=7.1.0 ; python_full_version >= '3.9'",
+    "pytest-cov>=4.0.0",
 ]
 
 #
