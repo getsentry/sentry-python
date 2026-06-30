@@ -2,22 +2,9 @@
 
 ## 2.64.0
 
-### New Features ✨
-
-- (.agents) Update project agent lockfiles by @ericapisani in [#6662](https://github.com/getsentry/sentry-python/pull/6662)
-- (clickhouse_driver) Add db.query.text to streamed query spans by @ericapisani in [#6635](https://github.com/getsentry/sentry-python/pull/6635)
-- (redis) Set db.query.text span attributes by @ericapisani in [#6639](https://github.com/getsentry/sentry-python/pull/6639)
-- (scope) Add process runtime attributes to span context by @ericapisani in [#6564](https://github.com/getsentry/sentry-python/pull/6564)
-
 ### Bug Fixes 🐛
 
-#### Asyncpg
-
-- Add db.query.text to streamed query spans by @ericapisani in [#6633](https://github.com/getsentry/sentry-python/pull/6633)
-- Use distinct span ops for cursor iteration and fetch to prevent N+1 false positives by @ericapisani in [#6609](https://github.com/getsentry/sentry-python/pull/6609)
-
-#### Other
-
+- (asyncpg) Use distinct span ops for cursor iteration and fetch to prevent N+1 false positives by @ericapisani in [#6609](https://github.com/getsentry/sentry-python/pull/6609)
 - (aiohttp) Gate url.full, url.path, url.query on send_default_pii by @ericapisani in [#6650](https://github.com/getsentry/sentry-python/pull/6650)
 - (asgi) Add url.path to ASGI request span attributes by @ericapisani in [#6652](https://github.com/getsentry/sentry-python/pull/6652)
 - (boto3) Gate url.full, url.query, url.fragment behind send_default_pii by @ericapisani in [#6674](https://github.com/getsentry/sentry-python/pull/6674)
@@ -36,6 +23,7 @@
 - (tornado) Gate url.full, url.path, url.query on send_default_pii by @ericapisani in [#6664](https://github.com/getsentry/sentry-python/pull/6664)
 - (wsgi) Gate url.full, url.path, and http.query behind send_default_pii by @ericapisani in [#6654](https://github.com/getsentry/sentry-python/pull/6654)
 - Stop unconditionally importing `contextvars` by @alexander-alderman-webb in [#6625](https://github.com/getsentry/sentry-python/pull/6625)
+- (.agents) Update project agent lockfiles by @ericapisani in [#6662](https://github.com/getsentry/sentry-python/pull/6662)
 
 ### Documentation 📚
 
@@ -44,7 +32,6 @@
 
 ### Internal Changes 🔧
 
-- (aiomysql) Add span streaming variants to aiomysql tests by @ericapisani in [#6601](https://github.com/getsentry/sentry-python/pull/6601)
 - (mcp) Pin mcp package to <2.0.0 while alphas are in flight by @ericapisani in [#6687](https://github.com/getsentry/sentry-python/pull/6687)
 - 🤖 Update test matrix with new releases (06/29) by @github-actions in [#6682](https://github.com/getsentry/sentry-python/pull/6682)
 - Make `stream_gen_ai_spans` opt out by @alexander-alderman-webb in [#6658](https://github.com/getsentry/sentry-python/pull/6658)
