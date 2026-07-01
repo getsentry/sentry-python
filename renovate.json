@@ -26,10 +26,10 @@
       "enabled": false
     },
     {
-      "description": "Group GitHub Actions updates.",
+      "description": "Group GitHub workflow updates.",
       "matchManagers": ["custom.regex", "github-actions"],
-      "groupName": "GitHub Actions",
-      "groupSlug": "github-actions",
+      "groupName": "GitHub Workflows",
+      "groupSlug": "github-workflows",
       "separateMajorMinor": false,
       "separateMinorPatch": false,
       "separateMultipleMajor": false
