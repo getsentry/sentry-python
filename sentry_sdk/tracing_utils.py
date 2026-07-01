@@ -437,6 +437,14 @@ def extract_sentrytrace_data(
     if not header:
         return None
 
+    if "," in header:
+        # Multiple headers may have been combined into one comma-separated value (RFC 7230 3.2.2); use the first non-empty one.
+        parts = [part.strip() for part in header.split(",")]
+        header = next((part for part in parts if part), "")
+
+    if not header:
+        return None
+
     if header.startswith("00-") and header.endswith("-00"):
         header = header[3:-3]
 
