@@ -5,7 +5,8 @@
   "includePaths": [
     "pyproject.toml",
     "uv.lock",
-    "scripts/split_tox_gh_actions/templates/test_group.jinja"
+    "scripts/split_tox_gh_actions/templates/test_group.jinja",
+    "scripts/split_tox_gh_actions/templates/test_orchestrator.jinja"
   ],
   "lockFileMaintenance": {
     "enabled": true
@@ -36,7 +37,7 @@
       "customType": "regex",
       "description": "Update GitHub Actions in test_group.jinja",
       "managerFilePatterns": [
-        "/^scripts\\/split_tox_gh_actions\\/templates\\/test_group\\.jinja$/"
+        "/^scripts\\/split_tox_gh_actions\\/templates\\/(test_group|test_orchestrator)\\.jinja$/"
       ],
       "matchStrings": [
         "(?<indent>\\s+(?:-\\s+)?uses:\\s+)(?<depName>[A-Za-z0-9_.-]+\\/[A-Za-z0-9_.-]+(?:\\/[A-Za-z0-9_.-]+)*)@(?<currentDigest>[a-f0-9]{40})\\s+#\\s+(?<currentValue>v?\\d+(?:\\.\\d+){0,2})"
