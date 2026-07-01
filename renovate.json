@@ -15,18 +15,14 @@
   },
   "packageRules": [
     {
-      "description": "Group package updates.",
+      "description": "Disable pyproject.toml version updates.",
       "matchManagers": ["pep621"],
-      "groupName": "Packages",
-      "groupSlug": "packages",
-      "separateMajorMinor": false,
-      "separateMinorPatch": false,
-      "separateMultipleMajor": false
+      "matchUpdateTypes": ["major", "minor", "patch", "pin"],
+      "enabled": false
     },
     {
       "description": "Group GitHub Actions updates.",
       "matchManagers": ["custom.regex", "github-actions"],
-      "matchDatasources": ["github-tags"],
       "groupName": "GitHub Actions",
       "groupSlug": "github-actions",
       "separateMajorMinor": false,
@@ -37,16 +33,16 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Update GitHub Actions in test_group.jinja",
+      "description": "Update GitHub Actions in templates.",
       "managerFilePatterns": [
         "/^scripts\\/split_tox_gh_actions\\/templates\\/(test_group|test_orchestrator)\\.jinja$/"
       ],
       "matchStrings": [
-        "(?<indent>\\s+(?:-\\s+)?uses:\\s+)(?<depName>[A-Za-z0-9_.-]+\\/[A-Za-z0-9_.-]+(?:\\/[A-Za-z0-9_.-]+)*)@(?<currentDigest>[a-f0-9]{40})\\s+#\\s+(?<currentValue>v?\\d+(?:\\.\\d+){0,2})"
+        "(?<depName>[A-Za-z0-9_.-]+\\/[A-Za-z0-9_.-]+(?:\\/[A-Za-z0-9_.-]+)*)@(?<currentDigest>[a-f0-9]{40})[ \\t]+#[ \\t]+(?<currentValue>v?\\d+(?:\\.\\d+){0,2})"
       ],
       "datasourceTemplate": "github-tags",
-      "versioningTemplate": "semver-coerced",
-      "autoReplaceStringTemplate": "{{{indent}}}{{{depName}}}@{{{newDigest}}} # {{{newValue}}}"
+      "versioningTemplate": "github-actions",
+      "autoReplaceStringTemplate": "{{{depName}}}@{{{newDigest}}} # {{{newValue}}}"
     }
   ]
 }
