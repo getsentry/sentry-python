@@ -38,6 +38,27 @@ def test_sentrytrace_extraction(sampling_decision):
     }
 
 
+def test_sentrytrace_extraction_multiple_headers():
+    sentrytrace_header = (
+        "12312012123120121231201212312012-0415201309082013-1,"
+        "12312012123120121231201212312012-0000000000000000-0"
+    )
+    assert extract_sentrytrace_data(sentrytrace_header) == {
+        "trace_id": "12312012123120121231201212312012",
+        "parent_span_id": "0415201309082013",
+        "parent_sampled": True,
+    }
+
+
+def test_sentrytrace_extraction_leading_empty_fragment():
+    sentrytrace_header = ",12312012123120121231201212312012-0415201309082013-1"
+    assert extract_sentrytrace_data(sentrytrace_header) == {
+        "trace_id": "12312012123120121231201212312012",
+        "parent_span_id": "0415201309082013",
+        "parent_sampled": True,
+    }
+
+
 def test_iter_headers(monkeypatch):
     monkeypatch.setattr(
         Transaction,
