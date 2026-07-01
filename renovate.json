@@ -7,8 +7,7 @@
     "uv.lock",
     "scripts/split_tox_gh_actions/templates/test_group.jinja",
     "scripts/split_tox_gh_actions/templates/test_orchestrator.jinja",
-    ".github/workflows/test.yml",
-    ".github/workflows/test-integrations-*.yml"
+    ".github/workflows/*.yml"
   ],
   "lockFileMaintenance": {
     "enabled": true
@@ -18,6 +17,12 @@
       "description": "Disable pyproject.toml version updates.",
       "matchManagers": ["pep621"],
       "matchUpdateTypes": ["major", "minor", "patch", "pin"],
+      "enabled": false
+    },
+    {
+      "description": "Disable Ubuntu image updates.",
+      "matchManagers": ["github-actions"],
+      "matchDatasources": ["github-runners"],
       "enabled": false
     },
     {
@@ -43,6 +48,19 @@
       "datasourceTemplate": "github-tags",
       "versioningTemplate": "github-actions",
       "autoReplaceStringTemplate": "{{{depName}}}@{{{newDigest}}} # {{{newValue}}}"
+    },
+    {
+      "customType": "regex",
+      "description": "Update Docker (some) Docker images in templates.",
+      "managerFilePatterns": [
+        "/^scripts\\/split_tox_gh_actions\\/templates\\/test_group\\.jinja$/"
+      ],
+      "matchStrings": [
+        "(?<depName>ghcr\\.io\\/getsentry\\/image-mirror-library-[A-Za-z0-9_.-]+):(?<currentValue>[A-Za-z0-9_.-]+)"
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker",
+      "autoReplaceStringTemplate": "{{{depName}}}:{{{newValue}}}"
     }
   ]
 }
