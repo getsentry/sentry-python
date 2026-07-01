@@ -21,7 +21,7 @@ jobs:
         os: [ubuntu-22.04]
     services:
       postgres:
-        image: ghcr.io/getsentry/image-mirror-library-postgres:17-alpine
+        image: ghcr.io/getsentry/image-mirror-library-postgres:18-alpine
         env:
           POSTGRES_PASSWORD: sentry
         # Set health checks to wait until postgres has started
