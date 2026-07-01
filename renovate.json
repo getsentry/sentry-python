@@ -1,6 +1,49 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended"
+  "extends": ["config:recommended"],
+  "enabledManagers": ["custom.regex", "pep621"],
+  "includePaths": [
+    "pyproject.toml",
+    "uv.lock",
+    "scripts/split_tox_gh_actions/templates/test_group.jinja"
+  ],
+  "lockFileMaintenance": {
+    "enabled": true
+  },
+  "packageRules": [
+    {
+      "description": "Group package updates.",
+      "matchManagers": ["pep621"],
+      "groupName": "Packages",
+      "groupSlug": "packages",
+      "separateMajorMinor": false,
+      "separateMinorPatch": false,
+      "separateMultipleMajor": false
+    },
+    {
+      "description": "Group GitHub Actions updates.",
+      "matchManagers": ["custom.regex"],
+      "matchDatasources": ["github-tags"],
+      "groupName": "GitHub Actions",
+      "groupSlug": "github-actions",
+      "separateMajorMinor": false,
+      "separateMinorPatch": false,
+      "separateMultipleMajor": false
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update GitHub Actions in test_group.jinja",
+      "managerFilePatterns": [
+        "/^scripts\\/split_tox_gh_actions\\/templates\\/test_group\\.jinja$/"
+      ],
+      "matchStrings": [
+        "(?<indent>\\s+(?:-\\s+)?uses:\\s+)(?<depName>[A-Za-z0-9_.-]+\\/[A-Za-z0-9_.-]+(?:\\/[A-Za-z0-9_.-]+)*)@(?<currentDigest>[a-f0-9]{40})\\s+#\\s+(?<currentValue>v?\\d+(?:\\.\\d+){0,2})"
+      ],
+      "datasourceTemplate": "github-tags",
+      "versioningTemplate": "semver-coerced",
+      "autoReplaceStringTemplate": "{{{indent}}}{{{depName}}}@{{{newDigest}}} # {{{newValue}}}"
+    }
   ]
 }
