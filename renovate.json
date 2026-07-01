@@ -1,12 +1,14 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
-  "enabledManagers": ["custom.regex", "pep621"],
+  "enabledManagers": ["custom.regex", "github-actions", "pep621"],
   "includePaths": [
     "pyproject.toml",
     "uv.lock",
     "scripts/split_tox_gh_actions/templates/test_group.jinja",
-    "scripts/split_tox_gh_actions/templates/test_orchestrator.jinja"
+    "scripts/split_tox_gh_actions/templates/test_orchestrator.jinja",
+    ".github/workflows/test.yml",
+    ".github/workflows/test-integrations-*.yml"
   ],
   "lockFileMaintenance": {
     "enabled": true
@@ -23,7 +25,7 @@
     },
     {
       "description": "Group GitHub Actions updates.",
-      "matchManagers": ["custom.regex"],
+      "matchManagers": ["custom.regex", "github-actions"],
       "matchDatasources": ["github-tags"],
       "groupName": "GitHub Actions",
       "groupSlug": "github-actions",
