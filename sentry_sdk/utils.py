@@ -1736,6 +1736,8 @@ def match_regex_list(
         return False
 
     for item_matcher in regex_list:
+        if not item_matcher:
+            continue
         if not substring_matching and item_matcher[-1] != "$":
             item_matcher += "$"
 
