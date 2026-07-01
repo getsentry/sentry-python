@@ -112,7 +112,7 @@ jobs:
       - misc
     # Report whatever coverage exists, even if some test jobs failed.
     if: ${{ !cancelled() }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - name: Install uv
@@ -159,7 +159,7 @@ jobs:
       - misc
     # Always run so it can gate merges even when a dependency failed.
     if: always()
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Check for failures
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
