@@ -43,7 +43,7 @@
         "/^scripts\\/split_tox_gh_actions\\/templates\\/(test_group|test_orchestrator)\\.jinja$/"
       ],
       "matchStrings": [
-        "(?<depName>[A-Za-z0-9_.-]+\\/[A-Za-z0-9_.-]+(?:\\/[A-Za-z0-9_.-]+)*)@(?<currentDigest>[a-f0-9]{40})[ \\t]+#[ \\t]+(?<currentValue>v?\\d+(?:\\.\\d+){0,2})"
+        "(?<depName>[A-Za-z0-9-]+\\/[A-Za-z0-9_.-]+(?:\\/[A-Za-z0-9_.-]+)*)@(?<currentDigest>[a-f0-9]{40})[ \\t]+#[ \\t]+(?<currentValue>v?\\d+(?:\\.\\d+){0,2})"
       ],
       "datasourceTemplate": "github-tags",
       "versioningTemplate": "github-actions",
@@ -56,7 +56,7 @@
         "/^scripts\\/split_tox_gh_actions\\/templates\\/test_group\\.jinja$/"
       ],
       "matchStrings": [
-        "(?<depName>ghcr\\.io\\/getsentry\\/image-mirror-library-[A-Za-z0-9_.-]+):(?<currentValue>[A-Za-z0-9_.-]+)"
+        "(?<depName>ghcr\\.io\\/getsentry\\/image-mirror-library-[a-z0-9_.-]+):(?<currentValue>[A-Za-z0-9_.-]+)"
       ],
       "datasourceTemplate": "docker",
       "versioningTemplate": "docker",
