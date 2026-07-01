@@ -16,7 +16,7 @@ dev = [
 
 toxgen = [
     "jinja2",
-    "packaging<26.0",
+    "packaging<26.3",
     "pip",
     "requests",
 ]
@@ -24,7 +24,7 @@ toxgen = [
 docs = [
     "gevent",
     "shibuya",
-    "sphinx<8.2",
+    "sphinx<9.2",
     "sphinx-autodoc-typehints[type_comments]>=2.3.0",
     "typing-extensions",
 ]
@@ -37,7 +37,7 @@ aws = [
     # https://github.com/boto/botocore/blob/develop/setup.cfg
     # So we pin this here to make our Lambda layer work with
     # Lambda Function using Python 3.7+
-    "urllib3<1.27; python_version < '3.10'",
+    "urllib3<2.8; python_version < '3.10'",
 ]
 
 typing = [
@@ -51,7 +51,7 @@ typing = [
     "types-gevent",
     "types-greenlet",
     "types-redis",
-    "types-setuptools<71",
+    "types-setuptools<83",
     "types-webob",
     "opentelemetry-distro[otlp]",
     "pymongo",
@@ -60,7 +60,7 @@ typing = [
     "launchdarkly-server-sdk",
     "openfeature-sdk",
     "statsig",
-    "UnleashClient<6",
+    "UnleashClient<7",
     "typer",
     "strawberry-graphql",
     "httpx",
