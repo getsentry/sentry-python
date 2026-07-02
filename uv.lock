@@ -52,6 +52,7 @@ typing = [
     { name = "openfeature-sdk" },
     { name = "opentelemetry-distro", extras = ["otlp"] },
     { name = "pymongo" },
+    { name = "starlette", specifier = ">=1.3.1" },
     { name = "statsig" },
     { name = "strawberry-graphql" },
     { name = "typer" },
