@@ -172,7 +172,7 @@ class StarletteIntegration(Integration):
 def _enable_span_for_middleware(
     middleware_class: "_MiddlewareClass",
 ) -> "_MiddlewareClass":
-    old_call = middleware_class.__call__
+    old_call: "Callable[..., Awaitable[Any]]" = middleware_class.__call__
 
     async def _create_span_call(
         app: "Any",
