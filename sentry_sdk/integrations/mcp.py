@@ -55,7 +55,7 @@ else:
 if TYPE_CHECKING:
     from typing import Any, Callable, ContextManager, Optional, Tuple, Union
 
-    from starlette.types import Receive, Scope, Send  # type: ignore[import-not-found]
+    from starlette.types import Receive, Scope, Send
 
     from sentry_sdk.traces import StreamedSpan
     from sentry_sdk.tracing import Span

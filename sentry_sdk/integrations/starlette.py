@@ -42,8 +42,9 @@ from sentry_sdk.utils import (
 if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable, Container, Dict, Optional, Tuple, Union
 
-    from sentry_sdk._types import Event, HttpStatusCodeRange
+    from starlette.middleware import _MiddlewareFactory
 
+    from sentry_sdk._types import Event, HttpStatusCodeRange
 try:
     import starlette
     from starlette import __version__ as STARLETTE_VERSION
@@ -156,7 +157,7 @@ class StarletteIntegration(Integration):
             patch_templates()
 
 
-def _enable_span_for_middleware(middleware_class: "Any") -> type:
+def _enable_span_for_middleware(middleware_class: "Any") -> _MiddlewareFactory[...,]:
     old_call = middleware_class.__call__
 
     async def _create_span_call(
@@ -700,8 +701,6 @@ class StarletteRequestExtractor:
     Extracts useful information from the Starlette request
     (like form data or cookies) and adds it to the Sentry event.
     """
-
-    request: "Request" = None
 
     def __init__(self: "StarletteRequestExtractor", request: "Request") -> None:
         self.request = request
