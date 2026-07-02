@@ -189,12 +189,12 @@ if TYPE_CHECKING:
     class DataCollectionUserOptions(TypedDict, total=False):
         user_info: bool
         cookies: "KeyValueCollectionBehaviour"
-        http_headers: "HttpHeadersCollectionBehaviour"
+        http_headers: "HttpHeadersCollectionUserOptions"
         http_bodies: "List[str]"
         query_params: "KeyValueCollectionBehaviour"
-        graphql: "GraphQLCollectionBehaviour"
-        gen_ai: "GenAICollectionBehaviour"
-        database: "DatabaseCollectionBehaviour"
+        graphql: "GraphQLCollectionUserOptions"
+        gen_ai: "GenAICollectionUserOptions"
+        database: "DatabaseCollectionUserOptions"
         stack_frame_variables: bool
         frame_context_lines: int
 
