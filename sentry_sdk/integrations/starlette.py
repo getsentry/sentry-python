@@ -81,12 +81,12 @@ try:
     # Optional dependency of Starlette to parse form data.
     try:
         # python-multipart 0.0.13 and later
-        import python_multipart as multipart  # type: ignore
+        import python_multipart as multipart
     except ImportError:
         # python-multipart 0.0.12 and earlier
         import multipart  # type: ignore
 except ImportError:
-    multipart = None
+    multipart = None  # type: ignore[assignment]
 
 
 # Vendored: https://github.com/Kludex/starlette/blob/0a29b5ccdcbd1285c75c4fdb5d62ae1d244a21b0/starlette/_utils.py#L11-L17
