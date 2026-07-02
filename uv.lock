@@ -47,7 +47,7 @@ typing = [
     { name = "httpx2" },
     { name = "launchdarkly-server-sdk" },
     { name = "loguru" },
-    { name = "mcp" },
+    { name = "mcp", specifier = ">=1.28.1" },
     { name = "mypy" },
     { name = "openfeature-sdk" },
     { name = "opentelemetry-distro", extras = ["otlp"] },
