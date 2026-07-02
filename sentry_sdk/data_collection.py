@@ -23,7 +23,7 @@ Resolution precedence (see :func:`resolve_data_collection`):
 """
 
 import warnings
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, cast, Literal
 
 if TYPE_CHECKING:
     from typing import Any, Dict
