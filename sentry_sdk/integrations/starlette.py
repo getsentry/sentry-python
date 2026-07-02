@@ -157,7 +157,7 @@ class StarletteIntegration(Integration):
             patch_templates()
 
 
-def _enable_span_for_middleware(middleware_class: "Any") -> _MiddlewareFactory[...,]:
+def _enable_span_for_middleware(middleware_class: "Any") -> "_MiddlewareFactory[...,]":
     old_call = middleware_class.__call__
 
     async def _create_span_call(
