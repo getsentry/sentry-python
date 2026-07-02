@@ -42,13 +42,13 @@ def test_http_headers_collection_defaults():
 
 
 def test_http_headers_use_default_in_setting_with_missing_config():
-    data_collection_config: "DataCollectionUserOptions" = {
-        "http_headers": {
-            "request": {"mode": "allow_list", "terms": ["x-id"]},
+    sentry_sdk.init(
+        data_collection={
+            "http_headers": {
+                "request": {"mode": "allow_list", "terms": ["x-id"]},
+            }
         }
-    }
-
-    sentry_sdk.init(data_collection=data_collection_config)
+    )
 
     client = sentry_sdk.get_client()
 
@@ -62,14 +62,14 @@ def test_http_headers_use_default_in_setting_with_missing_config():
 
 
 def test_http_headers_both_set():
-    data_collection_config: "DataCollectionUserOptions" = {
-        "http_headers": {
-            "request": {"mode": "allow_list", "terms": ["x-id"]},
-            "response": {"mode": "allow_list", "terms": ["foo"]},
+    sentry_sdk.init(
+        data_collection={
+            "http_headers": {
+                "request": {"mode": "allow_list", "terms": ["x-id"]},
+                "response": {"mode": "allow_list", "terms": ["foo"]},
+            }
         }
-    }
-
-    sentry_sdk.init(data_collection=data_collection_config)
+    )
 
     client = sentry_sdk.get_client()
 
