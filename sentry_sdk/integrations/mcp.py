@@ -55,7 +55,7 @@ else:
 if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable, ContextManager, Optional, Tuple, Union
 
-    from mcp.types import (
+    from mcp_types import (
         CallToolResult,
         GetPromptResult,
         InputRequiredResult,
