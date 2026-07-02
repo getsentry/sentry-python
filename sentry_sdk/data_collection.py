@@ -35,7 +35,7 @@ from urllib.parse import parse_qsl, urlencode
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Mapping, Optional
+    from typing import Any, Dict, List, Literal, Mapping, Optional
 
     from sentry_sdk._types import (
         DatabaseCollectionBehaviour,
@@ -236,6 +236,7 @@ def should_collect_body_type(
 
 
 def _map_from_send_default_pii(
+    *,
     send_default_pii: bool,
     include_local_variables: bool,
     include_source_context: bool,
@@ -461,12 +462,9 @@ def resolve_data_collection(options: "Dict[str, Any]") -> "DataCollection":
     """
     user_dc = options.get("data_collection")
     send_default_pii = options.get("send_default_pii")
-    include_local_variables = options.get("include_local_variables")
-    if include_local_variables is None:
-        include_local_variables = True
-    include_source_context = options.get("include_source_context")
-    if include_source_context is None:
-        include_source_context = True
+
+    include_local_variables = options.get("include_local_variables", True)
+    include_source_context = options.get("include_source_context", True)
 
     if user_dc is not None:
         if not isinstance(user_dc, dict):
@@ -478,8 +476,7 @@ def resolve_data_collection(options: "Dict[str, Any]") -> "DataCollection":
         if send_default_pii is not None:
             warnings.warn(
                 "`send_default_pii` is deprecated and ignored when "
-                "`data_collection` is set. `data_collection` is the single "
-                "source of truth for automatic data collection.",
+                "`data_collection` is set.",
                 DeprecationWarning,
                 stacklevel=2,
             )
