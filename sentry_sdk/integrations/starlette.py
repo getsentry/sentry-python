@@ -48,13 +48,8 @@ if TYPE_CHECKING:
         Dict,
         Optional,
         Tuple,
-        TypeVar,
         Union,
     )
-
-    from starlette.middleware import _MiddlewareFactory
-
-    _MiddlewareClass = TypeVar("_MiddlewareClass", bound=_MiddlewareFactory[...])
 
     from sentry_sdk._types import Event, HttpStatusCodeRange
 try:
@@ -170,8 +165,8 @@ class StarletteIntegration(Integration):
 
 
 def _enable_span_for_middleware(
-    middleware_class: "_MiddlewareClass",
-) -> "_MiddlewareClass":
+    middleware_class: "Any",
+) -> "Any":
     old_call: "Callable[..., Awaitable[Any]]" = middleware_class.__call__
 
     async def _create_span_call(
@@ -431,7 +426,7 @@ def patch_middlewares() -> None:
     if not_yet_patched:
 
         def _sentry_middleware_init(
-            self: "Any", cls: "_MiddlewareFactory[...]", *args: "Any", **kwargs: "Any"
+            self: "Any", cls: "Any", *args: "Any", **kwargs: "Any"
         ) -> None:
             if cls == SentryAsgiMiddleware:
                 return old_middleware_init(self, cls, *args, **kwargs)
