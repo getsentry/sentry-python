@@ -9,9 +9,6 @@ from sentry_sdk.data_collection import (
     resolve_data_collection,
 )
 
-if TYPE_CHECKING:
-    from sentry_sdk._types import DataCollectionUserOptions
-
 
 def test_kvcb_invalid_mode():
     with pytest.raises(ValueError):
