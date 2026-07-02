@@ -53,8 +53,14 @@ else:
 
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, ContextManager, Optional, Tuple, Union
+    from typing import Any, Awaitable, Callable, ContextManager, Optional, Tuple, Union
 
+    from mcp.types import (
+        CallToolResult,
+        GetPromptResult,
+        InputRequiredResult,
+        ReadResourceResult,
+    )
     from starlette.types import Receive, Scope, Send  # type: ignore[import-not-found]
 
     from sentry_sdk.traces import StreamedSpan
@@ -496,12 +502,12 @@ def _prepare_handler_data(
 
 
 async def _tool_handler_wrapper(
-    func: "Callable[..., Any]",
+    func: "Callable[..., Awaitable[Union[CallToolResult, InputRequiredResult]]]",
     original_args: "tuple[Any, ...]",
     original_kwargs: "Optional[dict[str, Any]]" = None,
     self: "Optional[Any]" = None,
     force_await: bool = True,
-):
+) -> "Union[CallToolResult, InputRequiredResult]":
     """
     Wrapper for MCP tool handlers.
     Creates and manages the MCP span and attaches all attributes on the span.
@@ -614,12 +620,12 @@ async def _tool_handler_wrapper(
 
 
 async def _prompt_handler_wrapper(
-    func: "Callable[..., Any]",
+    func: "Callable[..., Awaitable[Union[GetPromptResult, InputRequiredResult]]]",
     original_args: "tuple[Any, ...]",
     original_kwargs: "Optional[dict[str, Any]]" = None,
     self: "Optional[Any]" = None,
     force_await: bool = True,
-):
+) -> "Union[GetPromptResult, InputRequiredResult]":
     """
     Wrapper for MCP prompt handlers.
     Creates and manages the MCP span and attaches all attributes on the span.
@@ -730,12 +736,12 @@ async def _prompt_handler_wrapper(
 
 
 async def _resource_handler_wrapper(
-    func: "Callable[..., Any]",
+    func: "Callable[..., Awaitable[Union[ReadResourceResult, InputRequiredResult]]]",
     original_args: "tuple[Any, ...]",
     original_kwargs: "Optional[dict[str, Any]]" = None,
     self: "Optional[Any]" = None,
     force_await: bool = True,
-):
+) -> "Union[ReadResourceResult, InputRequiredResult]":
     """
     Wrapper for MCP resource handlers.
     Creates and manages the MCP span and attaches all attributes on the span.
