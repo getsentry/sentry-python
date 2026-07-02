@@ -24,13 +24,13 @@ from sentry_sdk.utils import package_version, safe_serialize
 MCP_PACKAGE_VERSION = package_version("mcp")
 
 try:
-    from mcp.server.lowlevel import Server  # type: ignore[import-not-found]
-    from mcp.server.streamable_http import (  # type: ignore[import-not-found]
+    from mcp.server.lowlevel import Server
+    from mcp.server.streamable_http import (
         StreamableHTTPServerTransport,
     )
 
     if MCP_PACKAGE_VERSION and MCP_PACKAGE_VERSION < (2, 0, 0):
-        from mcp.server.lowlevel.server import (  # type: ignore[import-not-found]
+        from mcp.server.lowlevel.server import (
             request_ctx,
         )
 except ImportError:
@@ -721,7 +721,7 @@ def _patch_lowlevel_server_v1() -> None:
             original_call_tool, "tool", self, **kwargs
         )(func)
 
-    Server.call_tool = patched_call_tool
+    Server.call_tool = patched_call_tool  # type: ignore[method-assign]
 
     # Patch get_prompt decorator
     original_get_prompt = Server.get_prompt
@@ -734,7 +734,7 @@ def _patch_lowlevel_server_v1() -> None:
             original_get_prompt, "prompt", self
         )(func)
 
-    Server.get_prompt = patched_get_prompt
+    Server.get_prompt = patched_get_prompt  # type: ignore[method-assign]
 
     # Patch read_resource decorator
     original_read_resource = Server.read_resource
@@ -747,7 +747,7 @@ def _patch_lowlevel_server_v1() -> None:
             original_read_resource, "resource", self
         )(func)
 
-    Server.read_resource = patched_read_resource
+    Server.read_resource = patched_read_resource  # type: ignore[method-assign]
 
 
 def _wrap_v2_handler(
@@ -829,7 +829,7 @@ def _patch_handle_request() -> None:
         scope["state"]["sentry_sdk.current_scope"] = sentry_sdk.get_current_scope()
         await original_handle_request(self, scope, receive, send)
 
-    StreamableHTTPServerTransport.handle_request = patched_handle_request
+    StreamableHTTPServerTransport.handle_request = patched_handle_request  # type: ignore[method-assign]
 
 
 def _patch_fastmcp() -> None:
