@@ -26,7 +26,7 @@ import warnings
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Literal
+    from typing import Any, Dict
 
     from sentry_sdk._types import (
         DatabaseCollectionBehaviour,
@@ -92,7 +92,7 @@ def _map_from_send_default_pii(
     PII-bearing content gates on ``send_default_pii``: ``graphql.variables`` and
     ``database.query_params`` follow it, while ``graphql.document`` stays ``True``.
     """
-    kv_mode = "deny_list" if send_default_pii else "off"  # type: Literal["off", "deny_list", "allow_list"]
+    kv_mode = "deny_list" if send_default_pii else "off"
     return {
         "provided_by_user": False,
         "user_info": send_default_pii,
