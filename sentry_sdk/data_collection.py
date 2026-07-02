@@ -23,10 +23,10 @@ Resolution precedence (see :func:`resolve_data_collection`):
 """
 
 import warnings
-from typing import TYPE_CHECKING, cast, Literal
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
-    from typing import Any, Dict
+    from typing import Any, Dict, Literal
 
     from sentry_sdk._types import (
         DatabaseCollectionBehaviour,
