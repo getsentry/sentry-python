@@ -610,18 +610,24 @@ class StreamedSpan:
 
 class NoOpStreamedSpan(StreamedSpan):
     __slots__ = (
+        "_trace_id",
+        "_span_id",
         "_finished",
         "_unsampled_reason",
     )
 
     def __init__(
         self,
+        trace_id: "Optional[str]" = None,
         unsampled_reason: "Optional[str]" = None,
         scope: "Optional[sentry_sdk.Scope]" = None,
     ) -> None:
         self._scope = scope  # type: ignore[assignment]
-        self._unsampled_reason = unsampled_reason
 
+        self._trace_id = trace_id
+        self._span_id = None
+
+        self._unsampled_reason = unsampled_reason
         self._finished = False
 
         self._start()
@@ -715,14 +721,6 @@ class NoOpStreamedSpan(StreamedSpan):
     @property
     def active(self) -> bool:
         return True
-
-    @property
-    def span_id(self) -> str:
-        return "0000000000000000"
-
-    @property
-    def trace_id(self) -> str:
-        return "00000000000000000000000000000000"
 
     @property
     def sampled(self) -> "Optional[bool]":

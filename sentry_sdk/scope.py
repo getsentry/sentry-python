@@ -1298,7 +1298,6 @@ class Scope:
         # active span, this is a segment
         if parent_span is None:
             propagation_context = self.get_active_propagation_context()
-
             if is_ignored_span(name, attributes):
                 return NoOpStreamedSpan(
                     scope=self,
@@ -1317,6 +1316,7 @@ class Scope:
             if sampled is False:
                 return NoOpStreamedSpan(
                     scope=self,
+                    trace_id=propagation_context.trace_id,
                     unsampled_reason=outcome,
                 )
 
@@ -1338,11 +1338,15 @@ class Scope:
         with new_scope():
             if is_ignored_span(name, attributes):
                 return NoOpStreamedSpan(
+                    trace_id=parent_span.trace_id,
                     unsampled_reason="ignored",
                 )
 
             if isinstance(parent_span, NoOpStreamedSpan):
-                return NoOpStreamedSpan(unsampled_reason=parent_span._unsampled_reason)
+                return NoOpStreamedSpan(
+                    trace_id=parent_span.trace_id,
+                    unsampled_reason=parent_span._unsampled_reason,
+                )
 
             return StreamedSpan(
                 name=name,
