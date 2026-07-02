@@ -37,8 +37,6 @@ from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Mapping, Optional
 
-    from typing_extensions import Literal
-
     from sentry_sdk._types import (
         DatabaseCollectionBehaviour,
         DataCollection,
