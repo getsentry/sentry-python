@@ -45,26 +45,26 @@ if TYPE_CHECKING:
     from sentry_sdk._types import Event, HttpStatusCodeRange
 
 try:
-    import starlette  # type: ignore
+    import starlette
     from starlette import __version__ as STARLETTE_VERSION
-    from starlette.applications import Starlette  # type: ignore
-    from starlette.datastructures import (  # type: ignore
+    from starlette.applications import Starlette
+    from starlette.datastructures import (
         UploadFile,
     )
-    from starlette.middleware import Middleware  # type: ignore
-    from starlette.middleware.authentication import (  # type: ignore
+    from starlette.middleware import Middleware
+    from starlette.middleware.authentication import (
         AuthenticationMiddleware,
     )
-    from starlette.requests import Request  # type: ignore
-    from starlette.routing import Match  # type: ignore
-    from starlette.types import ASGIApp, Receive, Send  # type: ignore
+    from starlette.requests import Request
+    from starlette.routing import Match
+    from starlette.types import ASGIApp, Receive, Send
     from starlette.types import Scope as StarletteScope
 except ImportError:
     raise DidNotEnable("Starlette is not installed")
 
 try:
     # Starlette 0.20
-    from starlette.middleware.exceptions import ExceptionMiddleware  # type: ignore
+    from starlette.middleware.exceptions import ExceptionMiddleware
 except ImportError:
     # Startlette 0.19.1
     from starlette.exceptions import ExceptionMiddleware  # type: ignore
@@ -430,7 +430,7 @@ def patch_middlewares() -> None:
             if cls == ExceptionMiddleware:
                 patch_exception_middleware(cls)
 
-        Middleware.__init__ = _sentry_middleware_init
+        Middleware.__init__ = _sentry_middleware_init  # type: ignore[method-assign]
 
 
 def patch_asgi_app(root_path_in_path: "_RootPathInPath") -> None:
@@ -462,7 +462,7 @@ def patch_asgi_app(root_path_in_path: "_RootPathInPath") -> None:
 
         return await middleware(scope, receive, send)
 
-    Starlette.__call__ = _sentry_patched_asgi_app
+    Starlette.__call__ = _sentry_patched_asgi_app  # type: ignore[method-assign]
 
 
 # This was vendored in from Starlette to support Starlette 0.19.1 because
@@ -662,7 +662,7 @@ def patch_templates() -> None:
 
     # https://github.com/Kludex/starlette/commit/96479daca2e4bd8157f68d914fd162aa94eff73a
     try:
-        from starlette.templating import Jinja2Templates  # type: ignore
+        from starlette.templating import Jinja2Templates
     except ImportError:
         return
 
@@ -692,7 +692,7 @@ def patch_templates() -> None:
 
             return old_jinja2templates_init(self, *args, **kwargs)
 
-        Jinja2Templates.__init__ = _sentry_jinja2templates_init
+        Jinja2Templates.__init__ = _sentry_jinja2templates_init  # type: ignore[method-assign]
 
 
 class StarletteRequestExtractor:
