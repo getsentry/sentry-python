@@ -67,6 +67,7 @@ typing = [
     "httpx2",
     "botocore-stubs",
     "werkzeug",
+    "mcp",
 ]
 test = [
     "dataclasses ; python_full_version < '3.7'",
