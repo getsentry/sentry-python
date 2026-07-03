@@ -1434,10 +1434,7 @@ class ClientConstructor:
             If you enable this option, be sure to manually remove what you don't want to send using our features for
             managing `Sensitive Data <https://docs.sentry.io/data-management/sensitive-data/>`_.
 
-            .. deprecated::
-                Use `data_collection` instead. `send_default_pii` is still honored when `data_collection` is not set.
-
-        :param data_collection: Structured configuration controlling what data integrations collect automatically,
+        :param data_collection: (EXPERIMENTAL) Structured configuration controlling what data integrations collect automatically,
             superseding `send_default_pii`. Pass a dict to enable or
             restrict collection per category (user identity, cookies, HTTP headers/bodies, query params, generative AI
             inputs/outputs, stack frame variables, source context).

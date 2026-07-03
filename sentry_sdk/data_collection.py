@@ -13,7 +13,7 @@ context).
 
 Resolution precedence (see :func:`resolve_data_collection`):
 
-* ``data_collection`` set, ``send_default_pii`` unset -> honor ``data_collection``
+* ``data_collection`` set, ``send_default_pii`` unset -> honour ``data_collection``
   using the spec defaults for any omitted field.
 * ``send_default_pii`` set, ``data_collection`` unset -> derive a
   resolved ``DataCollection`` that mirrors what ``send_default_pii`` collects today.
@@ -37,7 +37,7 @@ if TYPE_CHECKING:
         KeyValueCollectionBehaviour,
     )
 
-#: All valid body types. ``http_bodies`` defaults to this (collect everything the
+#: ``http_bodies`` defaults to this (collect everything the
 #: platform supports); an empty list is the explicit opt-out.
 ALL_HTTP_BODY_TYPES = [
     "incoming_request",
@@ -90,20 +90,22 @@ def _map_from_send_default_pii(
     provided explicitly.
     """
     kv_mode: "Literal['deny_list', 'off']" = "deny_list" if send_default_pii else "off"
+    terms = [] if send_default_pii else ["forwarded", "-ip", "remote-", "via", "-user"]
+
     return {
         "provided_by_user": False,
         "user_info": send_default_pii,
-        "cookies": {"mode": kv_mode},
+        "cookies": {"mode": kv_mode, "terms": terms},
         # Headers are collected in both PII modes today (sensitive ones filtered
         # when PII is off), so this never maps to "off".
         "http_headers": {
-            "request": {"mode": "deny_list"},
-            "response": {"mode": "deny_list"},
+            "request": {"mode": "deny_list", "terms": terms},
+            "response": {"mode": "deny_list", "terms": terms},
         },
         # Bodies are collected regardless of PII today, bounded by
         # ``max_request_body_size``.
         "http_bodies": list(ALL_HTTP_BODY_TYPES),
-        "query_params": {"mode": kv_mode},
+        "query_params": {"mode": kv_mode, "terms": terms},
         "graphql": {"document": send_default_pii, "variables": send_default_pii},
         "gen_ai": {"inputs": send_default_pii, "outputs": send_default_pii},
         "database": {"query_params": send_default_pii},
