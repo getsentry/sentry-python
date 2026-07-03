@@ -354,7 +354,9 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
 
     if rv["event_scrubber"] is None:
         rv["event_scrubber"] = EventScrubber(
-            send_default_pii=rv["data_collection"]["user_info"]
+            send_default_pii=False
+            if rv["send_default_pii"] is None
+            else rv["send_default_pii"]
         )
 
     if rv["socket_options"] and not isinstance(rv["socket_options"], list):
