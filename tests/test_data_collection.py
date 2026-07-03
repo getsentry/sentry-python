@@ -21,6 +21,8 @@ def test_kvcb_from_dict_defaults_mode():
 
 
 def test_http_headers_collection_defaults():
+    default_terms = ["forwarded", "-ip", "remote-", "via", "-user"]
+
     sentry_sdk.init(data_collection={"http_headers": {}})  # type: ignore Purposely ignoring to test invalid option
     client = sentry_sdk.get_client()
     assert client.data_collection["http_headers"]["request"] == {"mode": "deny_list"}
@@ -33,8 +35,14 @@ def test_http_headers_collection_defaults():
 
     sentry_sdk.init()
     client = sentry_sdk.get_client()
-    assert client.data_collection["http_headers"]["request"] == {"mode": "deny_list"}
-    assert client.data_collection["http_headers"]["response"] == {"mode": "deny_list"}
+    assert client.data_collection["http_headers"]["request"] == {
+        "mode": "deny_list",
+        "terms": default_terms,
+    }
+    assert client.data_collection["http_headers"]["response"] == {
+        "mode": "deny_list",
+        "terms": default_terms,
+    }
 
 
 def test_http_headers_use_default_in_setting_with_missing_config():
