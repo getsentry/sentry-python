@@ -2,6 +2,7 @@ from unittest import mock
 
 import pytest
 
+import sentry_sdk
 from sentry_sdk.tracing import Transaction
 from sentry_sdk.tracing_utils import extract_sentrytrace_data
 
@@ -24,6 +25,34 @@ def test_to_traceparent(sampled):
         assert len(parts) == 2
     else:
         assert parts[2] == "1" if sampled is True else "0"  # sampled
+
+
+@pytest.mark.parametrize("sampled", ["1", "0", ""])
+def test_to_traceparent_span_streaming(sentry_init, sampled):
+    sentry_init(
+        # parent sampling decision takes precedence over traces_sample_rate
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    trace_id = "12312012123120121231201212312012"
+
+    sentry_sdk.traces.continue_trace(
+        {
+            "sentry-trace": f"{trace_id}-b7ad6b7169203331-{sampled}",
+        }
+    )
+
+    with sentry_sdk.traces.start_span(name="/interactions/other-dogs/new-dog"):
+        traceparent = sentry_sdk.get_traceparent()
+
+    parts = traceparent.split("-")
+    assert parts[0] == trace_id
+    assert parts[1] != "0000000000000000"
+    if sampled == "":
+        assert len(parts) == 2
+    else:
+        assert parts[2] == sampled
 
 
 @pytest.mark.parametrize("sampling_decision", [True, False])

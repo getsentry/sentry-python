@@ -718,10 +718,16 @@ class NoOpStreamedSpan(StreamedSpan):
 
     @property
     def span_id(self) -> str:
+        # Note: this dummy span ID should never actually surface in anything
+        # user-facing. If a no-op span is active, we use the propagation context
+        # to get trace propagation data.
         return "0000000000000000"
 
     @property
     def trace_id(self) -> str:
+        # Note: this dummy trace ID should never actually surface in anything
+        # user-facing. If a no-op span is active, we use the propagation context
+        # to get trace propagation data.
         return "00000000000000000000000000000000"
 
     @property
