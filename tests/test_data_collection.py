@@ -190,6 +190,30 @@ def _get(dc, path):
             id="accepts_dict_with_nested_dicts",
         ),
         pytest.param(
+            {
+                "data_collection": {
+                    "cookies": None,
+                    "http_headers": None,
+                    "query_params": None,
+                    "graphql": None,
+                    "gen_ai": None,
+                    "database": None,
+                }
+            },
+            {
+                "cookies.mode": "deny_list",
+                "http_headers.request.mode": "deny_list",
+                "http_headers.response.mode": "deny_list",
+                "query_params.mode": "deny_list",
+                "graphql.document": True,
+                "graphql.variables": True,
+                "gen_ai.inputs": True,
+                "gen_ai.outputs": True,
+                "database.query_params": True,
+            },
+            id="none_values_fall_back_to_spec_defaults",
+        ),
+        pytest.param(
             {"data_collection": {}},
             {
                 "graphql.document": True,

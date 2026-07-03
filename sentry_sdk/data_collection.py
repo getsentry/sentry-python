@@ -151,13 +151,13 @@ def _resolve_explicit(
     return {
         "provided_by_user": True,
         "user_info": d.get("user_info", True),
-        "cookies": _kvcb_from_value(d.get("cookies", {})),
-        "http_headers": _http_headers_from_value(d.get("http_headers", {})),
+        "cookies": _kvcb_from_value(d.get("cookies") or {}),
+        "http_headers": _http_headers_from_value(d.get("http_headers") or {}),
         "http_bodies": http_bodies,
-        "query_params": _kvcb_from_value(d.get("query_params", {})),
-        "graphql": _graphql_from_value(d.get("graphql", {})),
-        "gen_ai": _gen_ai_from_value(d.get("gen_ai", {})),
-        "database": _database_from_value(d.get("database", {})),
+        "query_params": _kvcb_from_value(d.get("query_params") or {}),
+        "graphql": _graphql_from_value(d.get("graphql") or {}),
+        "gen_ai": _gen_ai_from_value(d.get("gen_ai") or {}),
+        "database": _database_from_value(d.get("database") or {}),
         "stack_frame_variables": stack_frame_variables,
         "frame_context_lines": frame_context_lines,
     }
@@ -234,8 +234,16 @@ def resolve_data_collection(options: "Dict[str, Any]") -> "DataCollection":
     user_dc = options.get("data_collection")
     send_default_pii = options.get("send_default_pii")
 
-    include_local_variables = options.get("include_local_variables", True)
-    include_source_context = options.get("include_source_context", True)
+    include_local_variables = (
+        bool(options.get("include_local_variables"))
+        if options.get("include_local_variables") is not None
+        else True
+    )
+    include_source_context = (
+        bool(options.get("include_source_context"))
+        if options.get("include_source_context") is not None
+        else True
+    )
 
     if user_dc is not None:
         if not isinstance(user_dc, dict):
