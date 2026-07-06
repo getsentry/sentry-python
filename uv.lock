@@ -51,6 +51,7 @@ typing = [
     { name = "openfeature-sdk" },
     { name = "opentelemetry-distro", extras = ["otlp"] },
     { name = "pymongo" },
+    { name = "python-multipart", specifier = ">=0.0.32" },
     { name = "starlette", specifier = ">=1.3.1" },
     { name = "statsig" },
     { name = "strawberry-graphql" },
@@ -1396,6 +1397,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ba/7d/778623fc1c6701cd4dd175ce104d085456de5c202b244cdcb795cc2672be/python_discovery-1.3.2.tar.gz", hash = "sha256:d5374db044e97325d49337e4d76f477ac2024ab78ac5ac915e89bd90c67c51d1", size = 68199, upload-time = "2026-05-27T21:15:30.008Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/28/5f/8e66136582fd4b4b224326ed92a8bf8be36d156d367a96b82ad74a0eba21/python_discovery-1.3.2-py3-none-any.whl", hash = "sha256:889d67b010d31fb19331fc723d7cb201c9f77c24c70cd21b0d9cc3255e86bb23", size = 33154, upload-time = "2026-05-27T21:15:28.567Z" },
+]
+
+[[package]]
+name = "python-multipart"
+version = "0.0.32"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/5b/42/55c32bb9b12693c092ad250a0e82edb5b31ddeda6eb772de5f308b3804ad/python_multipart-0.0.32.tar.gz", hash = "sha256:be54b7f3fa167bb83e4fcd936b887b708f4e57fe75911c02aebf53efaf8d938e", size = 46881, upload-time = "2026-06-04T16:18:58.647Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e1/04/e8135ebd1ad02c56ec633277529b2602ff99ff634be76cdba5744cf554fd/python_multipart-0.0.32-py3-none-any.whl", hash = "sha256:ff6d3f776f16878c894e52e107296ffc890e913c611b1a4ec6c44e2821fe2e23", size = 30042, upload-time = "2026-06-04T16:18:57.319Z" },
 ]
 
 [[package]]
