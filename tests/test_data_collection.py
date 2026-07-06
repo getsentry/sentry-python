@@ -14,7 +14,10 @@ def test_kvcb_invalid_mode():
 def test_kvcb_from_dict_defaults_mode():
     sentry_sdk.init(data_collection={"cookies": {"mode": "deny_list", "terms": ["x"]}})
     client = sentry_sdk.get_client()
-    assert client.data_collection["cookies"] == {"mode": "deny_list", "terms": ["x"]}
+    assert client.options["data_collection"]["cookies"] == {
+        "mode": "deny_list",
+        "terms": ["x"],
+    }
 
 
 def test_http_headers_collection_defaults():
@@ -22,15 +25,19 @@ def test_http_headers_collection_defaults():
 
     sentry_sdk.init(data_collection={"http_headers": {}})  # type: ignore Purposely ignoring to test invalid option
     client = sentry_sdk.get_client()
-    assert client.data_collection["http_headers"]["request"] == {"mode": "deny_list"}
+    assert client.options["data_collection"]["http_headers"]["request"] == {
+        "mode": "deny_list"
+    }
 
     sentry_sdk.init(data_collection={"http_headers": "off"})  # type: ignore Purposely ignoring to test invalid option
     client = sentry_sdk.get_client()
-    assert client.data_collection["http_headers"]["request"] == {"mode": "deny_list"}
+    assert client.options["data_collection"]["http_headers"]["request"] == {
+        "mode": "deny_list"
+    }
 
     sentry_sdk.init()
     client = sentry_sdk.get_client()
-    assert client.data_collection["http_headers"]["request"] == {
+    assert client.options["data_collection"]["http_headers"]["request"] == {
         "mode": "deny_list",
         "terms": default_terms,
     }
@@ -47,7 +54,7 @@ def test_http_headers_use_default_in_setting_with_missing_config():
 
     client = sentry_sdk.get_client()
 
-    assert client.data_collection["http_headers"]["request"] == {
+    assert client.options["data_collection"]["http_headers"]["request"] == {
         "mode": "allow_list",
         "terms": ["x-id"],
     }
@@ -55,7 +62,7 @@ def test_http_headers_use_default_in_setting_with_missing_config():
 
 def _initialize_client_with_config(**options):
     sentry_sdk.init(**options)
-    return sentry_sdk.get_client().data_collection
+    return sentry_sdk.get_client().options["data_collection"]
 
 
 def _get(dc, path):
@@ -282,4 +289,4 @@ def test_client_data_collection_settings(init_kwargs, expected):
         if key == "should_send_default_pii":
             assert client.should_send_default_pii() is value
         else:
-            assert client.data_collection[key] is value
+            assert client.options["data_collection"][key] is value

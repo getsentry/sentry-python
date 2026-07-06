@@ -393,12 +393,6 @@ except Exception:
     # Older Python versions
     module_not_found_error = ImportError  # type: ignore
 
-_DISABLED_DATA_COLLECTION_CONFIG = _map_from_send_default_pii(
-    send_default_pii=False,
-    include_local_variables=True,
-    include_source_context=True,
-)
-
 
 class BaseClient:
     """
@@ -437,10 +431,6 @@ class BaseClient:
 
     def should_send_default_pii(self) -> bool:
         return False
-
-    @property
-    def data_collection(self) -> "DataCollection":
-        return _DISABLED_DATA_COLLECTION_CONFIG
 
     def is_active(self) -> bool:
         """
@@ -753,14 +743,6 @@ class _Client(BaseClient):
         Returns whether the client should send default PII (Personally Identifiable Information) data to Sentry.
         """
         return self.options.get("send_default_pii") or False
-
-    @property
-    def data_collection(self) -> "DataCollection":
-        """
-        Returns the resolved :class:`~sentry_sdk.data_collection.DataCollection`
-        config for this client.
-        """
-        return self.options["data_collection"]
 
     @property
     def dsn(self) -> "Optional[str]":
