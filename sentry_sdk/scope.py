@@ -1317,7 +1317,7 @@ class Scope:
             )
 
             if sample_rate is not None:
-                self._update_sample_rate(sample_rate)
+                self._update_sample_rate(sample_rate, sampled)
 
             if sampled is False or sampled is None:
                 return NoOpStreamedSpan(
@@ -1376,7 +1376,7 @@ class Scope:
                 parent_sampled=parent_span.sampled,
             )
 
-    def _update_sample_rate(self, sample_rate: float) -> None:
+    def _update_sample_rate(self, sample_rate: float, sampled: "Optional[bool]") -> None:
         # If we had to adjust the sample rate when setting the sampling decision
         # for a span, it needs to be updated in the propagation context too
         propagation_context = self.get_active_propagation_context()
@@ -1384,6 +1384,8 @@ class Scope:
 
         if baggage is not None:
             baggage.sentry_items["sample_rate"] = str(sample_rate)
+            if sampled is not None:
+                baggage.sentry_items["sampled"] = "true" if sampled else "false"
 
     def continue_trace(
         self,
