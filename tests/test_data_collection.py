@@ -3,10 +3,7 @@ import warnings
 import pytest
 
 import sentry_sdk
-from sentry_sdk.data_collection import (
-    _ALL_HTTP_BODY_TYPES,
-    _resolve_data_collection,
-)
+from sentry_sdk.data_collection import _ALL_HTTP_BODY_TYPES
 
 
 def test_kvcb_invalid_mode():
@@ -87,15 +84,9 @@ def test_http_headers_both_set():
     }
 
 
-def __resolve_data_collection(**options):
-    base = {
-        "data_collection": None,
-        "send_default_pii": None,
-        "include_local_variables": True,
-        "include_source_context": True,
-    }
-    base.update(options)
-    return _resolve_data_collection(base)
+def _initialize_client_with_config(**options):
+    sentry_sdk.init(**options)
+    return sentry_sdk.get_client().data_collection
 
 
 def _get(dc, path):
@@ -267,16 +258,16 @@ def _get(dc, path):
         ),
     ],
 )
-def test__resolve_data_collection(options, expected):
-    dc = __resolve_data_collection(**options)
+def test_initalize_client_data_collection(options, expected):
+    dc = _initialize_client_with_config(**options)
     for path, value in expected.items():
         assert _get(dc, path) == value, f"{path} != {value!r}"
 
 
-def test__resolve_data_collection_overrides_send_default_pii_and_warns():
+def test_initialize_client_data_collection_overrides_send_default_pii_and_warns():
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        dc = __resolve_data_collection(
+        dc = _initialize_client_with_config(
             send_default_pii=True, data_collection={"user_info": False}
         )
     assert dc["user_info"] is False  # data_collection wins
