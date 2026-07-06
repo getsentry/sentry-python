@@ -610,15 +610,37 @@ class StreamedSpan:
 
 class NoOpStreamedSpan(StreamedSpan):
     __slots__ = (
+        "_trace_id",
+        "_span_id",
+        "_sampled",
+        "_segment",
         "_finished",
         "_unsampled_reason",
     )
 
     def __init__(
         self,
+        segment: "Optional[StreamedSpan]" = None,
+        trace_id: "Optional[str]" = None,
+        parent_span_id: "Optional[str]" = None,
+        parent_sampled: "Optional[bool]" = None,
+        baggage: "Optional[Baggage]" = None,
+        sampled: "Optional[bool]" = False,
         unsampled_reason: "Optional[str]" = None,
         scope: "Optional[sentry_sdk.Scope]" = None,
     ) -> None:
+        self._span_id: "Optional[str]" = None
+
+        self._sampled = sampled
+        self._segment = segment or self
+
+        self._trace_id: "Optional[str]" = trace_id
+        self._parent_span_id = parent_span_id
+        self._parent_sampled = parent_sampled
+        self._baggage = baggage
+        self._sample_rand = None
+        self._sample_rate = None
+
         self._scope = scope  # type: ignore[assignment]
         self._unsampled_reason = unsampled_reason
 
@@ -693,9 +715,6 @@ class NoOpStreamedSpan(StreamedSpan):
     def remove_attribute(self, key: str) -> None:
         pass
 
-    def _is_segment(self) -> bool:
-        return self._scope is not None
-
     @property
     def status(self) -> "str":
         return SpanStatus.OK.value
@@ -717,22 +736,8 @@ class NoOpStreamedSpan(StreamedSpan):
         return True
 
     @property
-    def span_id(self) -> str:
-        # Note: this dummy span ID should never actually surface in anything
-        # user-facing. If a no-op span is active, we use the propagation context
-        # to get trace propagation data.
-        return "0000000000000000"
-
-    @property
-    def trace_id(self) -> str:
-        # Note: this dummy trace ID should never actually surface in anything
-        # user-facing. If a no-op span is active, we use the propagation context
-        # to get trace propagation data.
-        return "00000000000000000000000000000000"
-
-    @property
     def sampled(self) -> "Optional[bool]":
-        return False
+        return self._sampled
 
     @property
     def start_timestamp(self) -> "Optional[datetime]":

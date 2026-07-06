@@ -744,8 +744,8 @@ def test_continue_trace_unsampled(sentry_init, capture_items):
 
     assert span.sampled is False
     assert span.name == ""
-    assert span.trace_id == "00000000000000000000000000000000"
-    assert span.span_id == "0000000000000000"
+    assert span.trace_id == trace_id
+    assert span.span_id != "0000000000000000"
 
     sentry_sdk.get_client().flush()
     spans = [item.payload for item in items]
@@ -908,65 +908,213 @@ def test_continue_trace_no_sample_rand(sentry_init, capture_items):
     assert segment["trace_id"] == trace_id
 
 
-def test_outgoing_traceparent_and_baggage(sentry_init, capture_envelopes):
+@pytest.mark.parametrize(
+    "traces_sample_rate",
+    (
+        0.0,
+        1.0,
+        # traces_sample_rate=None means tracing without performance: don't make
+        # any sampling decisions; defer downstream
+        None,
+    )
+)
+def test_outgoing_traceparent_and_baggage_head_sdk(sentry_init, traces_sample_rate):
     sentry_init(
-        traces_sample_rate=1.0,
+        traces_sample_rate=traces_sample_rate,
         _experiments={"trace_lifecycle": "stream"},
     )
 
-    sentry_sdk.traces.new_trace()
+    if traces_sample_rate == 0.0:
+        expected_sampled = False
+    elif traces_sample_rate == 1.0:
+        expected_sampled = True
+    elif traces_sample_rate is None:
+        expected_sampled = None
 
     with sentry_sdk.traces.start_span(name="span") as span:
-        assert span.sampled is True
+        assert span.sampled is expected_sampled
 
         trace_id = span.trace_id
-        span_id = span.span_id
 
         traceparent = sentry_sdk.get_traceparent()
-        assert traceparent == f"{trace_id}-{span_id}-1"
+
+        if expected_sampled is True:
+            span_id = span.span_id
+            assert traceparent == f"{trace_id}-{span_id}-1"
+        elif expected_sampled is False:
+            span_id = span.span_id
+            assert traceparent == f"{trace_id}-{span_id}-0"
+        elif expected_sampled is None:
+            span_id = sentry_sdk.get_isolation_scope().get_active_propagation_context().span_id
+            assert traceparent == f"{trace_id}-{span_id}"
 
         baggage = sentry_sdk.get_baggage()
         baggage_items = dict(tuple(item.split("=")) for item in baggage.split(","))
+
         assert "sentry-trace_id" in baggage_items
         assert baggage_items["sentry-trace_id"] == trace_id
-        assert "sentry-sampled" in baggage_items
-        assert baggage_items["sentry-sampled"] == "true"
+
+        if expected_sampled is None:
+            assert "sentry-sampled" not in baggage_items
+        else:
+            assert "sentry-sampled" in baggage_items
+
+            if expected_sampled is True:
+                assert baggage_items["sentry-sampled"] == "true"
+            elif expected_sampled is False:
+                assert baggage_items["sentry-sampled"] == "false"
 
 
-def test_outgoing_traceparent_and_baggage_when_noop_span_is_active(
-    sentry_init, capture_envelopes
-):
+@pytest.mark.parametrize(
+    "traces_sample_rate,parent_sampled",
+    (
+        (0.0, False),
+        (0.0, True),
+        (1.0, False),
+        (1.0, True),
+        # traces_sample_rate=None means tracing without performance: don't make
+        # any sampling decisions on our end, propagate existing ones
+        (None, False),
+        (None, True),
+    )
+)
+def test_outgoing_traceparent_and_baggage_incoming_trace(sentry_init, traces_sample_rate, parent_sampled):
+    """The SDK respects a positive/negative incoming sampling decision."""
     sentry_init(
-        traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream",
-            "ignore_spans": ["ignored"],
-        },
+        traces_sample_rate=traces_sample_rate,
+        _experiments={"trace_lifecycle": "stream"},
     )
 
-    sentry_sdk.traces.new_trace()
+    trace_id = "0af7651916cd43dd8448eb211c80319c"
+    parent_span_id = "b7ad6b7169203331"
 
-    propagation_context = (
-        sentry_sdk.get_current_scope().get_active_propagation_context()
+    incoming_baggage = {
+        "sentry-trace_id": trace_id,
+    }
+
+    if parent_sampled is True:
+        incoming_sentry_trace = f"{trace_id}-{parent_span_id}-1"
+        incoming_baggage.update({
+            "sentry-sample_rate": "0.75",
+            "sentry-sample_rand": "0.5",
+            "sentry-sampled": "true",
+        })
+    elif parent_sampled is False:
+        incoming_sentry_trace = f"{trace_id}-{parent_span_id}-0"
+        incoming_baggage.update({
+            "sentry-sample_rate": "0.75",
+            "sentry-sample_rand": "0.8",
+            "sentry-sampled": "false",
+        })
+
+    sentry_sdk.traces.continue_trace(
+        {
+            "sentry-trace": incoming_sentry_trace,
+            "baggage": ",".join(sorted([f"{k}={v}" for k,v in incoming_baggage.items()])),
+        }
     )
-    propagation_trace_id = propagation_context.trace_id
-    propagation_span_id = propagation_context.span_id
 
-    with sentry_sdk.traces.start_span(name="ignored") as span:
-        assert span.sampled is False
-
-        noop_trace_id = span.trace_id
-        noop_span_id = span.span_id
+    with sentry_sdk.traces.start_span(name="span") as span:
+        assert span.sampled is parent_sampled
 
         traceparent = sentry_sdk.get_traceparent()
-        assert traceparent != f"{noop_trace_id}-{noop_span_id}"
-        assert traceparent == f"{propagation_trace_id}-{propagation_span_id}"
+
+        if traces_sample_rate is None:
+            # TWP: Span ID will come from the propagation context in this case
+            # (it doesn't even make sense to start a span explicitly as we do in
+            # this test since tracing is turned off, but nothing should break
+            # either)
+            span_id = sentry_sdk.get_current_scope().get_active_propagation_context().span_id
+            assert traceparent == f"{trace_id}-{span_id}"
+        else:
+            span_id = span.span_id
+            if parent_sampled is True:
+                assert traceparent == f"{trace_id}-{span_id}-1"
+            elif parent_sampled is False:
+                assert traceparent == f"{trace_id}-{span_id}-0"
+
+        # As we've received incoming baggage, we mustn't modify it ourselves and
+        # have to propagate it as-is, unless we
+        baggage = sentry_sdk.get_baggage()
+        baggage_items = dict(tuple(item.split("=")) for item in baggage.split(","))
+        assert baggage_items == incoming_baggage
+
+
+@pytest.mark.parametrize(
+    "traces_sample_rate",
+    (
+        0.0,
+        1.0,
+        # traces_sample_rate=None means tracing without performance: don't make
+        # any sampling decisions on our end, propagate existing ones
+        None,
+    )
+)
+def test_outgoing_traceparent_and_baggage_incoming_trace_deferred(sentry_init, traces_sample_rate):
+    """The SDK handles a deferred incoming sampling decision correctly."""
+    sentry_init(
+        traces_sample_rate=traces_sample_rate,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    if traces_sample_rate == 0.0:
+        expected_sampled = False
+    if traces_sample_rate == 1.0:
+        expected_sampled = True
+    if traces_sample_rate is None:
+        expected_sampled = None
+
+    trace_id = "0af7651916cd43dd8448eb211c80319c"
+    parent_span_id = "b7ad6b7169203331"
+
+    incoming_baggage = {
+        "sentry-trace_id": trace_id,
+        "sentry-sample_rand": "0.500000"
+    }
+
+    sentry_sdk.traces.continue_trace(
+        {
+            "sentry-trace": f"{trace_id}-{parent_span_id}-",
+            "baggage": ",".join(sorted([f"{k}={v}" for k,v in incoming_baggage.items()])),
+        }
+    )
+
+    with sentry_sdk.traces.start_span(name="span") as span:
+        assert span.sampled is expected_sampled
+
+        traceparent = sentry_sdk.get_traceparent()
+
+        if traces_sample_rate is None:
+            # TWP: Span ID will come from the propagation context in this case
+            # (it doesn't even make sense to start a span explicitly as we do in
+            # this test since tracing is turned off, but nothing should break
+            # either)
+            span_id = sentry_sdk.get_current_scope().get_active_propagation_context().span_id
+        else:
+            span_id = span.span_id
+
+        if expected_sampled is True:
+            assert traceparent == f"{trace_id}-{span_id}-1"
+        elif expected_sampled is False:
+            assert traceparent == f"{trace_id}-{span_id}-0"
+        elif expected_sampled is None:
+            assert traceparent == f"{trace_id}-{span_id}"
 
         baggage = sentry_sdk.get_baggage()
         baggage_items = dict(tuple(item.split("=")) for item in baggage.split(","))
-        assert "sentry-trace_id" in baggage_items
-        assert baggage_items["sentry-trace_id"] != noop_trace_id
-        assert baggage_items["sentry-trace_id"] == propagation_trace_id
+
+        if traces_sample_rate is not None:
+            # If our sample rate is not None, we're expected to have made
+            # a sampling decision
+            expected_baggage = incoming_baggage
+            expected_baggage.update({
+                "sentry-sample_rate": str(traces_sample_rate),
+                "sentry-sampled": "true" if expected_sampled else "false",
+            })
+            assert baggage_items == expected_baggage
+        else:
+            # If tracing is off, we should have deferred the decision further
+            assert baggage_items == incoming_baggage
 
 
 def test_set_span_status(sentry_init, capture_items):

@@ -857,7 +857,8 @@ class Baggage:
         options = client.options or {}
 
         sentry_items["trace_id"] = segment.trace_id
-        sentry_items["sample_rand"] = f"{segment._sample_rand:.6f}"  # noqa: E231
+        if segment._sample_rand is not None:
+            sentry_items["sample_rand"] = f"{segment._sample_rand:.6f}"
 
         if options.get("environment"):
             sentry_items["environment"] = options["environment"]
@@ -873,8 +874,8 @@ class Baggage:
         if (
             segment.get_attributes().get("sentry.span.source")
             not in LOW_QUALITY_SEGMENT_SOURCES
-        ) and segment._name:
-            sentry_items["transaction"] = segment._name
+        ) and segment.name:
+            sentry_items["transaction"] = segment.name
 
         if segment._sample_rate is not None:
             sentry_items["sample_rate"] = str(segment._sample_rate)
@@ -1542,10 +1543,10 @@ def _make_sampling_decision(
     """
     client = sentry_sdk.get_client()
 
-    if not has_tracing_enabled(client.options):
-        return False, None, None, None
-
     propagation_context = scope.get_active_propagation_context()
+
+    if not has_tracing_enabled(client.options):
+        return propagation_context.parent_sampled, None, None, None
 
     sample_rand = None
     if propagation_context.baggage is not None:
