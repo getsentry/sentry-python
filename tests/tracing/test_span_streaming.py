@@ -1127,7 +1127,6 @@ def test_outgoing_traceparent_and_baggage_incoming_trace_deferred(
             expected_baggage.update(
                 {
                     "sentry-sample_rate": str(traces_sample_rate),
-                    "sentry-sampled": "true" if expected_sampled else "false",
                 }
             )
             assert baggage_items == expected_baggage
