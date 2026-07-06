@@ -180,11 +180,9 @@ if TYPE_CHECKING:
 
     class HttpHeadersCollectionUserOptions(TypedDict, total=False):
         request: "KeyValueCollectionBehaviour"
-        response: "KeyValueCollectionBehaviour"
 
     class HttpHeadersCollectionBehaviour(TypedDict):
         request: "KeyValueCollectionBehaviour"
-        response: "KeyValueCollectionBehaviour"
 
     class DataCollectionUserOptions(TypedDict, total=False):
         user_info: bool

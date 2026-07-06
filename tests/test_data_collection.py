@@ -23,20 +23,14 @@ def test_http_headers_collection_defaults():
     sentry_sdk.init(data_collection={"http_headers": {}})  # type: ignore Purposely ignoring to test invalid option
     client = sentry_sdk.get_client()
     assert client.data_collection["http_headers"]["request"] == {"mode": "deny_list"}
-    assert client.data_collection["http_headers"]["response"] == {"mode": "deny_list"}
 
     sentry_sdk.init(data_collection={"http_headers": "off"})  # type: ignore Purposely ignoring to test invalid option
     client = sentry_sdk.get_client()
     assert client.data_collection["http_headers"]["request"] == {"mode": "deny_list"}
-    assert client.data_collection["http_headers"]["response"] == {"mode": "deny_list"}
 
     sentry_sdk.init()
     client = sentry_sdk.get_client()
     assert client.data_collection["http_headers"]["request"] == {
-        "mode": "deny_list",
-        "terms": default_terms,
-    }
-    assert client.data_collection["http_headers"]["response"] == {
         "mode": "deny_list",
         "terms": default_terms,
     }
@@ -56,31 +50,6 @@ def test_http_headers_use_default_in_setting_with_missing_config():
     assert client.data_collection["http_headers"]["request"] == {
         "mode": "allow_list",
         "terms": ["x-id"],
-    }
-    assert client.data_collection["http_headers"]["response"] == {
-        "mode": "deny_list",
-    }
-
-
-def test_http_headers_both_set():
-    sentry_sdk.init(
-        data_collection={
-            "http_headers": {
-                "request": {"mode": "allow_list", "terms": ["x-id"]},
-                "response": {"mode": "allow_list", "terms": ["foo"]},
-            }
-        }
-    )
-
-    client = sentry_sdk.get_client()
-
-    assert client.data_collection["http_headers"]["request"] == {
-        "mode": "allow_list",
-        "terms": ["x-id"],
-    }
-    assert client.data_collection["http_headers"]["response"] == {
-        "mode": "allow_list",
-        "terms": ["foo"],
     }
 
 
@@ -174,7 +143,6 @@ def _get(dc, path):
                 "query_params.mode": "allow_list",
                 "query_params.terms": ["page"],
                 "http_headers.request.mode": "off",
-                "http_headers.response.mode": "deny_list",
                 "gen_ai.inputs": False,
                 "gen_ai.outputs": True,
             },
@@ -194,7 +162,6 @@ def _get(dc, path):
             {
                 "cookies.mode": "deny_list",
                 "http_headers.request.mode": "deny_list",
-                "http_headers.response.mode": "deny_list",
                 "query_params.mode": "deny_list",
                 "graphql.document": True,
                 "graphql.variables": True,

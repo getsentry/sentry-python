@@ -42,8 +42,6 @@ if TYPE_CHECKING:
 _ALL_HTTP_BODY_TYPES = [
     "incoming_request",
     "outgoing_request",
-    "incoming_response",
-    "outgoing_response",
 ]
 
 #: Default number of source lines captured above and below a stack frame.
@@ -100,7 +98,6 @@ def _map_from_send_default_pii(
         # when PII is off), so this never maps to "off".
         "http_headers": {
             "request": {"mode": "deny_list", "terms": terms},
-            "response": {"mode": "deny_list", "terms": terms},
         },
         # Bodies are collected regardless of PII today, bounded by
         # ``max_request_body_size``.
@@ -189,11 +186,6 @@ def _http_headers_from_value(
         "request": (
             _kvcb_from_value(val["request"])
             if "request" in val
-            else _kvcb_from_value({"mode": "deny_list"})
-        ),
-        "response": (
-            _kvcb_from_value(val["response"])
-            if "response" in val
             else _kvcb_from_value({"mode": "deny_list"})
         ),
     }
