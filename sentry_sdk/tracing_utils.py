@@ -1538,12 +1538,12 @@ def _make_sampling_decision(
     name: str,
     attributes: "Optional[Attributes]",
     scope: "sentry_sdk.Scope",
-) -> "tuple[bool, Optional[float], Optional[float], Optional[str]]":
+) -> "tuple[Optional[bool], Optional[float], Optional[float], Optional[str]]":
     """
     Decide whether a span should be sampled.
 
     Returns a tuple with:
-    1. the sampling decision
+    1. the sampling decision (sampled, unsampled, deferred)
     2. the effective sample rate
     3. the sample rand
     4. the reason for not sampling the span, if unsampled
@@ -1593,7 +1593,7 @@ def _make_sampling_decision(
         logger.warning(f"[Tracing] Discarding {name} because of invalid sample rate.")
         return False, None, None, "sample_rate"
 
-    sample_rate = float(sample_rate)
+    sample_rate = float(sample_rate)  # type: ignore[arg-type]
     if not sample_rate:
         if traces_sampler_defined:
             reason = "traces_sampler returned 0 or False"
