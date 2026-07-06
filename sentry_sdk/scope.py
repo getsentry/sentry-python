@@ -1362,7 +1362,7 @@ class Scope:
                     trace_id=parent_span.trace_id,
                     parent_span_id=parent_span.span_id,
                     parent_sampled=parent_span.sampled,
-                    unsampled_reason=parent_span._unsampled_reason
+                    unsampled_reason=parent_span._unsampled_reason,
                 )
 
             return StreamedSpan(
@@ -1376,7 +1376,9 @@ class Scope:
                 parent_sampled=parent_span.sampled,
             )
 
-    def _update_sample_rate(self, sample_rate: float, sampled: "Optional[bool]") -> None:
+    def _update_sample_rate(
+        self, sample_rate: float, sampled: "Optional[bool]"
+    ) -> None:
         # If we had to adjust the sample rate when setting the sampling decision
         # for a span, it needs to be updated in the propagation context too
         propagation_context = self.get_active_propagation_context()
