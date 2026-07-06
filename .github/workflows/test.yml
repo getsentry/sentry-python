@@ -30,52 +30,68 @@ permissions:
 #     name: DBs
 #     if: false  # TEMP: skipping, see PR #xxxx
 #     uses: ./.github/workflows/test-integrations-dbs.yml
+#     secrets: inherit
 jobs:
   common:
     name: Common
     uses: ./.github/workflows/test-integrations-common.yml
+    secrets: inherit
   mcp:
     name: MCP
     uses: ./.github/workflows/test-integrations-mcp.yml
+    secrets: inherit
   agents:
     name: Agents
     uses: ./.github/workflows/test-integrations-agents.yml
+    secrets: inherit
   ai_workflow:
     name: AI Workflow
     uses: ./.github/workflows/test-integrations-ai-workflow.yml
+    secrets: inherit
   ai:
     name: AI
     uses: ./.github/workflows/test-integrations-ai.yml
+    secrets: inherit
   cloud:
     name: Cloud
     uses: ./.github/workflows/test-integrations-cloud.yml
+    secrets: inherit
   dbs:
     name: DBs
     uses: ./.github/workflows/test-integrations-dbs.yml
+    secrets: inherit
   flags:
     name: Flags
     uses: ./.github/workflows/test-integrations-flags.yml
+    secrets: inherit
   gevent:
     name: Gevent
     uses: ./.github/workflows/test-integrations-gevent.yml
+    secrets: inherit
   graphql:
     name: GraphQL
     uses: ./.github/workflows/test-integrations-graphql.yml
+    secrets: inherit
   network:
     name: Network
     uses: ./.github/workflows/test-integrations-network.yml
+    secrets: inherit
   tasks:
     name: Tasks
     uses: ./.github/workflows/test-integrations-tasks.yml
+    secrets: inherit
   web_1:
     name: Web 1
     uses: ./.github/workflows/test-integrations-web-1.yml
+    secrets: inherit
   web_2:
     name: Web 2
     uses: ./.github/workflows/test-integrations-web-2.yml
+    secrets: inherit
   misc:
     name: Misc
     uses: ./.github/workflows/test-integrations-misc.yml
+    secrets: inherit
   report:
     name: Combine and report coverage
     needs:
