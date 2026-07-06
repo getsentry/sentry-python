@@ -1580,9 +1580,10 @@ def _make_sampling_decision(
         sample_rate = client.options["traces_sampler"](sampling_context)
     else:
         if propagation_context.parent_sampled is not None:
-            sample_rate = (
-                propagation_context._sample_rate() or propagation_context.parent_sampled
-            )
+            if propagation_context._sample_rate() is not None:
+                sample_rate = propagation_context._sample_rate()
+            else:
+                sample_rate = propagation_context.parent_sampled
         else:
             sample_rate = client.options["traces_sample_rate"]
 
