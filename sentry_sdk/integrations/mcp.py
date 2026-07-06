@@ -55,7 +55,6 @@ else:
 if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable, ContextManager, Optional, Tuple, Union
 
-    from mcp.server.context import CallNext, HandlerResult
     from mcp_types import (
         CallToolResult,
         GetPromptResult,
@@ -458,50 +457,6 @@ def _extract_handler_data_from_args(
     return handler_name, arguments
 
 
-def _prepare_handler_data(
-    handler_type: str,
-    original_args: "tuple[Any, ...]",
-    original_kwargs: "Optional[dict[str, Any]]" = None,
-    params: "Optional[Any]" = None,
-) -> "tuple[str, dict[str, Any], str, str, str, Optional[str]]":
-    """
-    Prepare common handler data for both v1 and v2 MCP SDK.
-
-    Args:
-        handler_type: "tool", "prompt", or "resource"
-        original_args: Original positional args (v1 path)
-        original_kwargs: Original keyword args (v1 path)
-        params: Typed params object from v2 ServerRequestContext path
-
-    Returns:
-        Tuple of (handler_name, arguments, span_data_key, span_name, mcp_method_name, result_data_key)
-    """
-    if params is not None:
-        handler_name, arguments = _extract_handler_data_from_params(
-            handler_type, params
-        )
-    elif _is_v2_context(original_args):
-        handler_name = "unknown"
-        arguments = {}
-    else:
-        handler_name, arguments = _extract_handler_data_from_args(
-            handler_type, original_args, original_kwargs
-        )
-
-    span_data_key, span_name, mcp_method_name, result_data_key = _get_span_config(
-        handler_type, handler_name
-    )
-
-    return (
-        handler_name,
-        arguments,
-        span_data_key,
-        span_name,
-        mcp_method_name,
-        result_data_key,
-    )
-
-
 async def _tool_handler_wrapper(
     func: "Callable[..., Awaitable[Union[CallToolResult, InputRequiredResult]]]",
     original_args: "tuple[Any, ...]",
@@ -531,16 +486,20 @@ async def _tool_handler_wrapper(
         and isinstance(original_args[0], ServerRequestContext)
     ):
         ctx = original_args[0]
-        params = original_args[1] if len(original_args) > 1 else None
+        if len(original_args) > 1:
+            params = original_args[1]
+            handler_name, arguments = _extract_handler_data_from_params("tool", params)
+        else:
+            handler_name = "unknown"
+            arguments = {}
+    else:
+        handler_name, arguments = _extract_handler_data_from_args(
+            "tool", original_args, original_kwargs
+        )
 
-    (
-        handler_name,
-        arguments,
-        span_data_key,
-        span_name,
-        mcp_method_name,
-        result_data_key,
-    ) = _prepare_handler_data("tool", original_args, original_kwargs, params=params)
+    span_data_key, span_name, mcp_method_name, result_data_key = _get_span_config(
+        "tool", handler_name
+    )
 
     scopes = _get_active_http_scopes(ctx=ctx)
 
@@ -642,23 +601,27 @@ async def _prompt_handler_wrapper(
 
     # Detect v1 vs v2: MCP SDK v2 passes (ServerRequestContext, params) to handlers
     ctx: "Optional[Any]" = None
-    params: "Optional[Any]" = None
     if (
         ServerRequestContext is not None
         and original_args
         and isinstance(original_args[0], ServerRequestContext)
     ):
         ctx = original_args[0]
-        params = original_args[1] if len(original_args) > 1 else None
+        if len(original_args) > 1:
+            handler_name, arguments = _extract_handler_data_from_params(
+                "prompt", original_args[1]
+            )
+        else:
+            handler_name = "unknown"
+            arguments = {}
+    else:
+        handler_name, arguments = _extract_handler_data_from_args(
+            "prompt", original_args, original_kwargs
+        )
 
-    (
-        handler_name,
-        arguments,
-        span_data_key,
-        span_name,
-        mcp_method_name,
-        result_data_key,
-    ) = _prepare_handler_data("prompt", original_args, original_kwargs, params=params)
+    span_data_key, span_name, mcp_method_name, result_data_key = _get_span_config(
+        "prompt", handler_name
+    )
 
     scopes = _get_active_http_scopes(ctx=ctx)
 
@@ -765,16 +728,22 @@ async def _resource_handler_wrapper(
         and isinstance(original_args[0], ServerRequestContext)
     ):
         ctx = original_args[0]
-        params = original_args[1] if len(original_args) > 1 else None
+        if len(original_args) > 1:
+            params = original_args[1]
+            handler_name, arguments = _extract_handler_data_from_params(
+                "resource", params
+            )
+        else:
+            handler_name = "unknown"
+            arguments = {}
+    else:
+        handler_name, arguments = _extract_handler_data_from_args(
+            "resource", original_args, original_kwargs
+        )
 
-    (
-        handler_name,
-        arguments,
-        span_data_key,
-        span_name,
-        mcp_method_name,
-        result_data_key,
-    ) = _prepare_handler_data("resource", original_args, original_kwargs, params=params)
+    span_data_key, span_name, mcp_method_name, result_data_key = _get_span_config(
+        "resource", handler_name
+    )
 
     scopes = _get_active_http_scopes(ctx=ctx)
 
@@ -944,21 +913,6 @@ def _patch_lowlevel_server_v1() -> None:
     Server.read_resource = patched_read_resource  # type: ignore[attr-defined]
 
 
-async def _sentry_middleware(
-    ctx: "ServerRequestContext[Any, Any]", call_next: "CallNext"
-) -> "HandlerResult":
-    if ctx.method == "tools/call":
-        return await _tool_handler_wrapper(call_next, ctx)
-
-    if ctx.method == "prompts/get":
-        return await _prompt_handler_wrapper(call_next, ctx)
-
-    if ctx.method == "resources/read":
-        return await _resource_handler_wrapper(call_next, ctx)
-
-    return await call_next(ctx)
-
-
 def _patch_lowlevel_server_v2() -> None:
     """Patches the v2 Server to wrap tool/prompt/resource handlers.
 
@@ -971,10 +925,112 @@ def _patch_lowlevel_server_v2() -> None:
 
     @wraps(original_init)
     def patched_init(self: "Server", *args: "Any", **kwargs: "Any") -> None:
+        on_tool_call = kwargs.get("on_call_tool")
+        if on_tool_call is not None and not getattr(
+            on_tool_call, "__sentry_mcp_wrapped__", False
+        ):
+
+            @wraps(on_tool_call)
+            async def wrapper(*args: "Any", **kwargs: "Any") -> "Any":
+                return await _tool_handler_wrapper(
+                    on_tool_call, args, kwargs, force_await=False
+                )
+
+            wrapper.__sentry_mcp_wrapped__ = True  # type: ignore[attr-defined]
+            kwargs["on_call_tool"] = wrapper
+
+        on_get_prompt = kwargs.get("on_get_prompt")
+        if on_get_prompt is not None and not getattr(
+            on_get_prompt, "__sentry_mcp_wrapped__", False
+        ):
+
+            @wraps(on_get_prompt)
+            async def wrapper(*args: "Any", **kwargs: "Any") -> "Any":
+                return await _prompt_handler_wrapper(
+                    on_get_prompt, args, kwargs, force_await=False
+                )
+
+            wrapper.__sentry_mcp_wrapped__ = True  # type: ignore[attr-defined]
+            kwargs["on_get_prompt"] = wrapper
+
+        on_read_resource = kwargs.get("on_read_resource")
+        if on_read_resource is not None and not getattr(
+            on_read_resource, "__sentry_mcp_wrapped__", False
+        ):
+
+            @wraps(on_read_resource)
+            async def wrapper(*args: "Any", **kwargs: "Any") -> "Any":
+                return await _resource_handler_wrapper(
+                    on_read_resource, args, kwargs, force_await=False
+                )
+
+            wrapper.__sentry_mcp_wrapped__ = True  # type: ignore[attr-defined]
+            kwargs["on_read_resource"] = wrapper
+
         original_init(self, *args, **kwargs)
-        self.middleware.append(_sentry_middleware)
 
     Server.__init__ = patched_init  # type: ignore[method-assign]
+
+    original_add_request_handler = Server.add_request_handler
+
+    def patched_add_request_handler(
+        self: "Server",
+        method: str,
+        params_type: "Any",
+        handler: "Callable[..., Any]",
+        *args: "Any",
+        **kwargs: "Any",
+    ) -> None:
+        if getattr(handler, "__sentry_mcp_wrapped__", False):
+            return original_add_request_handler(
+                self, method, params_type, handler, *args, **kwargs
+            )
+
+        if method == "tools/call":
+
+            @wraps(handler)
+            async def wrapper(*args: "Any", **kwargs: "Any") -> "Any":
+                return await _tool_handler_wrapper(
+                    handler, args, kwargs, force_await=False
+                )
+
+            wrapper.__sentry_mcp_wrapped__ = True  # type: ignore[attr-defined]
+
+            return original_add_request_handler(
+                self, method, params_type, wrapper, *args, **kwargs
+            )
+        if method == "prompts/get":
+
+            @wraps(handler)
+            async def wrapper(*args: "Any", **kwargs: "Any") -> "Any":
+                return await _prompt_handler_wrapper(
+                    handler, args, kwargs, force_await=False
+                )
+
+            wrapper.__sentry_mcp_wrapped__ = True  # type: ignore[attr-defined]
+
+            return original_add_request_handler(
+                self, method, params_type, wrapper, *args, **kwargs
+            )
+        if method == "resources/read":
+
+            @wraps(handler)
+            async def wrapper(*args: "Any", **kwargs: "Any") -> "Any":
+                return await _resource_handler_wrapper(
+                    handler, args, kwargs, force_await=False
+                )
+
+            wrapper.__sentry_mcp_wrapped__ = True  # type: ignore[attr-defined]
+
+            return original_add_request_handler(
+                self, method, params_type, wrapper, *args, **kwargs
+            )
+
+        original_add_request_handler(
+            self, method, params_type, handler, *args, **kwargs
+        )
+
+    Server.add_request_handler = patched_add_request_handler  # type: ignore[method-assign]
 
 
 def _patch_handle_request() -> None:
