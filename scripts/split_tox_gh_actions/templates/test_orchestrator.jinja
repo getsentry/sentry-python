@@ -35,13 +35,11 @@ permissions:
 #     name: DBs
 #     if: false  # TEMP: skipping, see PR #xxxx
 #     uses: ./.github/workflows/test-integrations-dbs.yml
-#     secrets: inherit
 jobs:
 {% for g in orchestrated_groups %}
   {{ g.id }}:
     name: {{ g.name }}
     uses: ./.github/workflows/test-integrations-{{ g.slug }}.yml
-    secrets: inherit
 {% endfor %}
 
   report:
