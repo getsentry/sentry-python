@@ -664,7 +664,8 @@ class PropagationContext:
 
         # Get the sample rate and compute the transformation that will map the random value
         # to the desired range: [0, 1), [0, sample_rate), or [sample_rate, 1).
-        lower, upper = _sample_rand_range(self.parent_sampled, self._sample_rate())
+        sample_rate = self._sample_rate()
+        lower, upper = _sample_rand_range(self.parent_sampled, sample_rate)
 
         try:
             sample_rand = _generate_sample_rand(self.trace_id, interval=(lower, upper))
