@@ -1200,16 +1200,20 @@ class Transaction(Span):
         # we would have bailed already if neither `traces_sampler` nor
         # `traces_sample_rate` were defined, so one of these should work; prefer
         # the hook if so
-        sample_rate = (
-            client.options["traces_sampler"](sampling_context)
-            if callable(client.options.get("traces_sampler"))
+        if callable(client.options.get("traces_sampler")):
+            sample_rate = client.options["traces_sampler"](sampling_context)
+        else:
             # default inheritance behavior
-            else (
-                sampling_context["parent_sampled"]
-                if sampling_context["parent_sampled"] is not None
-                else client.options["traces_sample_rate"]
-            )
-        )
+            if sampling_context["parent_sampled"] is not None:
+                propagation_context = (
+                    sentry_sdk.get_current_scope().get_active_propagation_context()
+                )
+                if propagation_context._sample_rate() is not None:
+                    sample_rate = propagation_context._sample_rate()
+                else:
+                    sample_rate = sampling_context["parent_sampled"]
+            else:
+                sample_rate = client.options["traces_sample_rate"]
 
         # Since this is coming from the user (or from a function provided by the
         # user), who knows what we might get. (The only valid values are
