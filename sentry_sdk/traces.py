@@ -747,6 +747,14 @@ class NoOpStreamedSpan(StreamedSpan):
     def end_timestamp(self) -> "Optional[datetime]":
         return None
 
+    def _get_trace_context(self) -> "dict[str, Any]":
+        return {
+            "trace_id": self.trace_id,
+            "span_id": self.span_id,
+            "parent_span_id": self._parent_span_id,
+            "dynamic_sampling_context": self._dynamic_sampling_context(),
+        }
+
 
 if TYPE_CHECKING:
 
