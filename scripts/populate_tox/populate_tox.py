@@ -12,7 +12,6 @@ import os
 import re
 import subprocess
 import sys
-import tempfile
 import time
 from bisect import bisect_left
 from collections import defaultdict
@@ -22,7 +21,6 @@ from importlib.metadata import PackageMetadata, distributions
 from pathlib import Path
 from typing import Optional, Union
 
-from packaging.requirements import Requirement
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
@@ -165,12 +163,12 @@ def fetch_release(package: str, version: Version) -> Optional[dict]:
     return release
 
 
-def _get_dependency_probe_constraints(
+def _get_additional_test_dependencies(
     integration: str,
     release: Version,
     python_version: ThreadedVersion,
 ) -> tuple[str, ...]:
-    constraints = []
+    additional_dependencies = []
     for rule, dependencies in TEST_SUITE_CONFIG[integration].get("deps", {}).items():
         # Skip if rule does not apply to current package or Python version
         if rule != "*" and (
@@ -182,17 +180,8 @@ def _get_dependency_probe_constraints(
         ):
             continue
 
-        for dependency in dependencies:
-            requirement = Requirement(dependency)
-
-            # Constraints are useful only when they actually constrain versions.
-            if (
-                requirement.specifier
-                and not requirement.extras
-                and requirement.url is None
-            ):
-                constraints.append(dependency)
-    return tuple(constraints)
+        additional_dependencies += dependencies
+    return tuple(additional_dependencies)
 
 
 @functools.cache
@@ -201,56 +190,57 @@ def fetch_package_dependencies(
     package: str,
     version: Version,
     python_version: ThreadedVersion,
+    install_additional_targets: bool = False,
 ) -> dict:
-    """Fetch package dependencies metadata from cache or, failing that, PyPI."""
+    """
+    Fetch package dependencies metadata from cache or, failing that, PyPI.
+
+    With `install_additional_targets`, dependencies in `config.py` are also included (test dependencies).
+    """
     target = TEST_SUITE_CONFIG[integration]["package"]
-    constraints = _get_dependency_probe_constraints(
-        integration, version, python_version
-    )
-    constraints_hash = hashlib.md5(
-        "\n".join([target, *constraints]).encode("utf-8")
-    ).hexdigest()
+    targets = [f"{target}=={version}"]
+    if install_additional_targets:
+        targets += _get_additional_test_dependencies(
+            integration, version, python_version
+        )
+
+    install_targets_hash = hashlib.md5("\n".join(targets).encode("utf-8")).hexdigest()
+
     package_dependencies = _fetch_package_dependencies_from_cache(
-        package, version, python_version, constraints_hash
+        package, version, python_version, install_targets_hash
     )
     if package_dependencies is not None:
         return package_dependencies
 
+    print(f"  Resolving dependencies: {package}=={version} on Python {python_version}")
+
     # Removing non-report output with -qqq may be brittle, but avoids file I/O.
     # Currently -qqq supresses all non-report output that would break json.loads().
-    cmd = [
-        "uv",
-        "run",
-        "--no-project",
-        "--python",
-        str(python_version),
-        "--with",
-        "pip",
-        "python",
-        "-m",
-        "pip",
-        "install",
-        f"{target}=={version}",
-        "--only-binary",
-        "grpcio-tools",  # Prevent source builds that hang CI. grpcio-tools is a build-time dependency pinned by apache-beam.
-        "--dry-run",
-        "--ignore-installed",
-        "--report",
-        "-",
-        "-qqq",
-    ]
-
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8") as f:
-        f.write("\n".join(constraints))
-        f.flush()
-        print(
-            f"  Resolving dependencies: {package}=={version} on Python {python_version}"
-        )
-        result = subprocess.run(
-            [*cmd, "--constraint", f.name],
-            capture_output=True,
-            text=True,
-        )
+    result = subprocess.run(
+        [
+            "uv",
+            "run",
+            "--no-project",
+            "--python",
+            str(python_version),
+            "--with",
+            "pip",
+            "python",
+            "-m",
+            "pip",
+            "install",
+            *targets,
+            "--only-binary",
+            "grpcio-tools",  # Prevent source builds that hang CI. grpcio-tools is a build-time dependency pinned by apache-beam.
+            "--dry-run",
+            "--ignore-installed",
+            "--report",
+            "-",
+            "-qqq",
+        ],
+        capture_output=True,
+        text=True,
+    )
 
     if result.returncode != 0:
         # Some failures are expected because uv installs packages which pip rejects for having bad metadata.
@@ -263,7 +253,7 @@ def fetch_package_dependencies(
         version,
         python_version,
         dependencies_info,
-        constraints_hash,
+        install_targets_hash,
     )
 
     return dependencies_info
@@ -282,13 +272,11 @@ def _fetch_package_dependencies_from_cache(
     package: str,
     version: Version,
     python_version: ThreadedVersion,
-    constraints_hash: str,
+    install_targets_hash: str,
 ) -> Optional[dict]:
     package = _normalize_name(package)
-    cache_entry = (
-        DEPENDENCIES_CACHE[package].get(str(version), {}).get(str(python_version), None)
-    )
-    if cache_entry is not None and cache_entry["constraints_hash"] == constraints_hash:
+    cache_entry = DEPENDENCIES_CACHE[str(python_version)].get(install_targets_hash)
+    if cache_entry is not None:
         cache_entry["_accessed"] = True
         return cache_entry["dependencies"]
 
@@ -308,7 +296,7 @@ def _save_to_package_dependencies_cache(
     version: Version,
     python_version: ThreadedVersion,
     release: Optional[dict],
-    constraints_hash: str,
+    install_targets_hash: str,
 ) -> None:
     normalized_dependencies = _normalize_package_dependencies(release)
 
@@ -316,21 +304,16 @@ def _save_to_package_dependencies_cache(
         releases_cache.write(
             json.dumps(
                 {
-                    "name": package,
-                    "version": str(version),
                     "python_version": str(python_version),
                     "dependencies": normalized_dependencies,
-                    "constraints_hash": constraints_hash,
+                    "install_targets_hash": install_targets_hash,
                 }
             )
             + "\n"
         )
 
-    DEPENDENCIES_CACHE[_normalize_name(package)].setdefault(str(version), {})[
-        str(python_version)
-    ] = {
+    DEPENDENCIES_CACHE[str(python_version)][install_targets_hash] = {
         "dependencies": normalized_dependencies,
-        "constraints_hash": constraints_hash,
         "_accessed": True,
     }
 
@@ -996,6 +979,7 @@ def _render_transitive_dependencies(
         package,
         release,
         python_version,
+        install_additional_targets=True,
     ):
         name = dependency["metadata"]["name"]
         version = dependency["metadata"]["version"]
@@ -1286,12 +1270,9 @@ def main() -> dict[str, list]:
     with open(DEPENDENCIES_CACHE_FILE) as dependencies_cache:
         for line in dependencies_cache:
             release = json.loads(line)
-            name = _normalize_name(release["name"])
-            version = release["version"]
             python_version = release["python_version"]
-            DEPENDENCIES_CACHE[name].setdefault(version, {})[python_version] = {
+            DEPENDENCIES_CACHE[python_version][release["install_targets_hash"]] = {
                 "dependencies": release["dependencies"],
-                "constraints_hash": release["constraints_hash"],
                 "_accessed": False,
             }
 
@@ -1379,13 +1360,13 @@ def main() -> dict[str, list]:
     releases = []
     with open(DEPENDENCIES_CACHE_FILE) as releases_cache:
         releases = [json.loads(line) for line in releases_cache]
-    releases.sort(key=lambda r: (r["name"], r["version"]))
+    releases.sort(key=lambda r: (r["python_version"], r["install_targets_hash"]))
     with open(DEPENDENCIES_CACHE_FILE, "w") as releases_cache:
         for release in releases:
             if (
-                DEPENDENCIES_CACHE[_normalize_name(release["name"])][
-                    release["version"]
-                ][release["python_version"]]["_accessed"]
+                DEPENDENCIES_CACHE[release["python_version"]][
+                    release["install_targets_hash"]
+                ]["_accessed"]
                 is True
             ):
                 releases_cache.write(json.dumps(release) + "\n")
