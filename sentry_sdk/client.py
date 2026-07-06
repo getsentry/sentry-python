@@ -25,7 +25,7 @@ from sentry_sdk.consts import (
 )
 from sentry_sdk.data_collection import (
     _map_from_send_default_pii,
-    resolve_data_collection,
+    _resolve_data_collection,
 )
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
@@ -350,7 +350,7 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
     if rv["enable_tracing"] is True and rv["traces_sample_rate"] is None:
         rv["traces_sample_rate"] = 1.0
 
-    rv["data_collection"] = resolve_data_collection(rv)
+    rv["data_collection"] = _resolve_data_collection(rv)
 
     if rv["event_scrubber"] is None:
         rv["event_scrubber"] = EventScrubber(

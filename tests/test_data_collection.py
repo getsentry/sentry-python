@@ -4,8 +4,8 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk.data_collection import (
-    ALL_HTTP_BODY_TYPES,
-    resolve_data_collection,
+    _ALL_HTTP_BODY_TYPES,
+    _resolve_data_collection,
 )
 
 
@@ -87,7 +87,7 @@ def test_http_headers_both_set():
     }
 
 
-def _resolve_data_collection(**options):
+def __resolve_data_collection(**options):
     base = {
         "data_collection": None,
         "send_default_pii": None,
@@ -95,7 +95,7 @@ def _resolve_data_collection(**options):
         "include_source_context": True,
     }
     base.update(options)
-    return resolve_data_collection(base)
+    return _resolve_data_collection(base)
 
 
 def _get(dc, path):
@@ -117,7 +117,7 @@ def _get(dc, path):
                 "cookies.mode": "off",
                 "query_params.mode": "off",
                 "http_headers.request.mode": "deny_list",
-                "http_bodies": ALL_HTTP_BODY_TYPES,
+                "http_bodies": _ALL_HTTP_BODY_TYPES,
                 "frame_context_lines": 5,
             },
             id="no_options_collects_no_pii",
@@ -146,7 +146,7 @@ def _get(dc, path):
                 "gen_ai.outputs": True,
                 "cookies.mode": "deny_list",
                 "query_params.mode": "deny_list",
-                "http_bodies": ALL_HTTP_BODY_TYPES,
+                "http_bodies": _ALL_HTTP_BODY_TYPES,
             },
             id="explicit_data_collection_uses_spec_defaults",
         ),
@@ -267,16 +267,16 @@ def _get(dc, path):
         ),
     ],
 )
-def test_resolve_data_collection(options, expected):
-    dc = _resolve_data_collection(**options)
+def test__resolve_data_collection(options, expected):
+    dc = __resolve_data_collection(**options)
     for path, value in expected.items():
         assert _get(dc, path) == value, f"{path} != {value!r}"
 
 
-def test_resolve_data_collection_overrides_send_default_pii_and_warns():
+def test__resolve_data_collection_overrides_send_default_pii_and_warns():
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        dc = _resolve_data_collection(
+        dc = __resolve_data_collection(
             send_default_pii=True, data_collection={"user_info": False}
         )
     assert dc["user_info"] is False  # data_collection wins

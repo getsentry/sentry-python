@@ -11,7 +11,7 @@ collected data by category (user identity, cookies, HTTP headers, query params,
 HTTP bodies, generative AI inputs/outputs, stack frame variables, source
 context).
 
-Resolution precedence (see :func:`resolve_data_collection`):
+Resolution precedence (see :func:`_resolve_data_collection`):
 
 * ``data_collection`` set, ``send_default_pii`` unset -> honour ``data_collection``
   using the spec defaults for any omitted field.
@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 
 #: ``http_bodies`` defaults to this (collect everything the
 #: platform supports); an empty list is the explicit opt-out.
-ALL_HTTP_BODY_TYPES = [
+_ALL_HTTP_BODY_TYPES = [
     "incoming_request",
     "outgoing_request",
     "incoming_response",
@@ -47,7 +47,7 @@ ALL_HTTP_BODY_TYPES = [
 ]
 
 #: Default number of source lines captured above and below a stack frame.
-DEFAULT_FRAME_CONTEXT_LINES = 5
+_DEFAULT_FRAME_CONTEXT_LINES = 5
 
 #: Collection modes for key-value data (cookies, headers, query params).
 #: snake_case (Python-only deviation from the spec's camelCase); never
@@ -57,7 +57,7 @@ _VALID_KEY_VALUE_COLLECTION_BEHAVIOUR_MODES = ("off", "deny_list", "allow_list")
 #: Values of keys that contain any of
 #: these terms (partial, case-insensitive) are always replaced with
 #: ``"[Filtered]"`` regardless of the configured collection mode.
-SENSITIVE_DENYLIST = [
+_SENSITIVE_DENYLIST = [
     "auth",
     "token",
     "secret",
@@ -104,14 +104,14 @@ def _map_from_send_default_pii(
         },
         # Bodies are collected regardless of PII today, bounded by
         # ``max_request_body_size``.
-        "http_bodies": list(ALL_HTTP_BODY_TYPES),
+        "http_bodies": list(_ALL_HTTP_BODY_TYPES),
         "query_params": {"mode": kv_mode, "terms": terms},
         "graphql": {"document": send_default_pii, "variables": send_default_pii},
         "gen_ai": {"inputs": send_default_pii, "outputs": send_default_pii},
         "database": {"query_params": send_default_pii},
         "stack_frame_variables": include_local_variables,
         "frame_context_lines": (
-            DEFAULT_FRAME_CONTEXT_LINES if include_source_context else 0
+            _DEFAULT_FRAME_CONTEXT_LINES if include_source_context else 0
         ),
     }
 
@@ -133,10 +133,10 @@ def _resolve_explicit(
     frame_context_lines = d.get("frame_context_lines")
     if frame_context_lines is None:
         frame_context_lines = (
-            DEFAULT_FRAME_CONTEXT_LINES if include_source_context else 0
+            _DEFAULT_FRAME_CONTEXT_LINES if include_source_context else 0
         )
     elif isinstance(frame_context_lines, bool):
-        frame_context_lines = DEFAULT_FRAME_CONTEXT_LINES if frame_context_lines else 0
+        frame_context_lines = _DEFAULT_FRAME_CONTEXT_LINES if frame_context_lines else 0
 
     stack_frame_variables = d.get("stack_frame_variables")
     if stack_frame_variables is None:
@@ -145,7 +145,7 @@ def _resolve_explicit(
     # http_bodies: omitted means "all valid types"; [] is the explicit opt-out.
     http_bodies = d.get("http_bodies")
     http_bodies = (
-        list(http_bodies) if http_bodies is not None else list(ALL_HTTP_BODY_TYPES)
+        list(http_bodies) if http_bodies is not None else list(_ALL_HTTP_BODY_TYPES)
     )
 
     return {
@@ -221,7 +221,7 @@ def _database_from_value(
     return {"query_params": val.get("query_params", True)}
 
 
-def resolve_data_collection(options: "Dict[str, Any]") -> "DataCollection":
+def _resolve_data_collection(options: "Dict[str, Any]") -> "DataCollection":
     """
     Resolve the effective ``DataCollection`` dict from client ``options``.
 
