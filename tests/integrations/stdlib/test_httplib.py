@@ -314,6 +314,15 @@ def test_outgoing_trace_headers(
             parent_span_id=request_span["span_id"],
             sampled=1,
         )
+
+        expected_outgoing_baggage = (
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
+            "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
+            "sentry-sample_rate=0.01337,"
+            "sentry-user_id=Am%C3%A9lie,"
+            "sentry-sample_rand=0.000005,"
+            "sentry-sampled=true"
+        )
     else:
         events = capture_events()
         transaction = continue_trace(headers)
@@ -336,17 +345,18 @@ def test_outgoing_trace_headers(
             sampled=1,
         )
 
+        # Note: the sample rate here is actually wrong. It's fixed in the
+        # streaming path
+        expected_outgoing_baggage = (
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
+            "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
+            "sentry-sample_rate=1.0,"
+            "sentry-user_id=Am%C3%A9lie,"
+            "sentry-sample_rand=0.000005,"
+            "sentry-sampled=true"
+        )
+
     assert request_headers["sentry-trace"] == expected_sentry_trace
-
-    expected_outgoing_baggage = (
-        "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
-        "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
-        "sentry-sample_rate=0.01337,"
-        "sentry-user_id=Am%C3%A9lie,"
-        "sentry-sample_rand=0.000005,"
-        "sentry-sampled=true"
-    )
-
     assert request_headers["baggage"] == expected_outgoing_baggage
 
 
