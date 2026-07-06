@@ -664,8 +664,7 @@ class PropagationContext:
 
         # Get the sample rate and compute the transformation that will map the random value
         # to the desired range: [0, 1), [0, sample_rate), or [sample_rate, 1).
-        sample_rate = try_convert(float, self.baggage.sentry_items.get("sample_rate"))
-        lower, upper = _sample_rand_range(self.parent_sampled, sample_rate)
+        lower, upper = _sample_rand_range(self.parent_sampled, self._sample_rate())
 
         try:
             sample_rand = _generate_sample_rand(self.trace_id, interval=(lower, upper))
@@ -688,6 +687,13 @@ class PropagationContext:
             return None
 
         return self.baggage.sentry_items.get("sample_rand")
+
+    def _sample_rate(self) -> "Optional[float]":
+        """Convenience method to get the sample_ value from the baggage."""
+        if self.baggage is None:
+            return None
+
+        return try_convert(float, self.baggage.sentry_items.get("sample_rate"))
 
 
 class Baggage:
@@ -1573,7 +1579,7 @@ def _make_sampling_decision(
         sample_rate = client.options["traces_sampler"](sampling_context)
     else:
         if propagation_context.parent_sampled is not None:
-            sample_rate = propagation_context.parent_sampled
+            sample_rate = propagation_context._sample_rate()
         else:
             sample_rate = client.options["traces_sample_rate"]
 

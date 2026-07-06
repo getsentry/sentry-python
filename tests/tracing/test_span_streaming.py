@@ -996,14 +996,14 @@ def test_outgoing_traceparent_and_baggage_incoming_trace(sentry_init, traces_sam
         incoming_sentry_trace = f"{trace_id}-{parent_span_id}-1"
         incoming_baggage.update({
             "sentry-sample_rate": "0.75",
-            "sentry-sample_rand": "0.5",
+            "sentry-sample_rand": "0.500000",
             "sentry-sampled": "true",
         })
     elif parent_sampled is False:
         incoming_sentry_trace = f"{trace_id}-{parent_span_id}-0"
         incoming_baggage.update({
             "sentry-sample_rate": "0.75",
-            "sentry-sample_rand": "0.8",
+            "sentry-sample_rand": "0.800000",
             "sentry-sampled": "false",
         })
 
