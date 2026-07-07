@@ -821,7 +821,7 @@ def _patch_lowlevel_server_v1() -> None:
                 return await _tool_handler_wrapper(func, args, force_await=False)
 
             # Then register it with the original MCP decorator
-            return original_call_tool(self)(wrapper)
+            return original_call_tool(self, **kwargs)(wrapper)
 
         return instrumented_decorator
 
