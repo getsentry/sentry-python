@@ -87,7 +87,6 @@ if TYPE_CHECKING:
         AttributeValue,
         Breadcrumb,
         BreadcrumbHint,
-        DataCollection,
         ErrorProcessor,
         Event,
         EventProcessor,
