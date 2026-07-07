@@ -705,6 +705,48 @@ def test_user_information_transaction_no_pii(sentry_init, capture_events):
     assert "user" not in transaction_event
 
 
+def test_user_information_does_not_clobber_app_set_user(sentry_init, capture_events):
+    """
+    Regression test for PY-2596/GH-6756: the AuthenticationMiddleware patch must add the
+    request-derived user *before* the request handler runs, so that a user the app
+    sets during the request (via ``sentry_sdk.set_user``) is preserved rather than
+    overwritten. Starlette's ``SimpleUser`` only carries a username, so an app-set
+    ``id``/``email`` would otherwise be lost.
+    """
+    sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        integrations=[StarletteIntegration()],
+    )
+
+    async def _set_user(request):
+        sentry_sdk.set_user(
+            {
+                "id": "user_42",
+                "email": "ada@beans.com",
+                "username": "Ada",
+            }
+        )
+        return starlette.responses.JSONResponse({"status": "ok"})
+
+    app = starlette.applications.Starlette(
+        routes=[starlette.routing.Route("/set_user", _set_user)],
+        middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())],
+    )
+
+    events = capture_events()
+
+    client = TestClient(app, raise_server_exceptions=False)
+    client.get("/set_user", auth=("Ada", "hello123"))
+
+    (transaction_event,) = events
+    user = transaction_event.get("user", None)
+    assert user
+    assert user["username"] == "Ada"
+    assert user["id"] == "user_42"
+    assert user["email"] == "ada@beans.com"
+
+
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_middleware_spans(sentry_init, capture_events, capture_items, span_streaming):
     sentry_init(
