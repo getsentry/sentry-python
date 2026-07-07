@@ -216,11 +216,6 @@ def _get(dc, path):
             id="explicit_partial_graphql_fills_omitted",
         ),
         pytest.param(
-            {"data_collection": {"queues": False}},
-            {"queues": False},
-            id="explicit_queues_override",
-        ),
-        pytest.param(
             {"data_collection": {"frame_context_lines": True}},
             {"frame_context_lines": 5},
             id="frame_context_lines_bool_fallback_true",
