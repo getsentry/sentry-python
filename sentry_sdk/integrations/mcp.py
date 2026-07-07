@@ -478,50 +478,6 @@ def _extract_handler_data_from_args(
     return handler_name, arguments
 
 
-def _prepare_handler_data(
-    handler_type: str,
-    original_args: "tuple[Any, ...]",
-    original_kwargs: "Optional[dict[str, Any]]" = None,
-    params: "Optional[Any]" = None,
-) -> "tuple[str, dict[str, Any], str, str, str, Optional[str]]":
-    """
-    Prepare common handler data for both v1 and v2 MCP SDK.
-
-    Args:
-        handler_type: "tool", "prompt", or "resource"
-        original_args: Original positional args (v1 path)
-        original_kwargs: Original keyword args (v1 path)
-        params: Typed params object from v2 ServerRequestContext path
-
-    Returns:
-        Tuple of (handler_name, arguments, span_data_key, span_name, mcp_method_name, result_data_key)
-    """
-    if params is not None:
-        handler_name, arguments = _extract_handler_data_from_params(
-            handler_type, params
-        )
-    elif _is_v2_context(original_args):
-        handler_name = "unknown"
-        arguments = {}
-    else:
-        handler_name, arguments = _extract_handler_data_from_args(
-            handler_type, original_args, original_kwargs
-        )
-
-    span_data_key, span_name, mcp_method_name, result_data_key = _get_span_config(
-        handler_type, handler_name
-    )
-
-    return (
-        handler_name,
-        arguments,
-        span_data_key,
-        span_name,
-        mcp_method_name,
-        result_data_key,
-    )
-
-
 async def _tool_handler_wrapper(
     func: "Callable[..., Awaitable[Union[CallToolResult, InputRequiredResult]]]",
     original_args: "tuple[Any, ...]",
@@ -551,16 +507,20 @@ async def _tool_handler_wrapper(
         and isinstance(original_args[0], ServerRequestContext)
     ):
         ctx = original_args[0]
-        params = original_args[1] if len(original_args) > 1 else None
+        if len(original_args) > 1:
+            params = original_args[1]
+            handler_name, arguments = _extract_handler_data_from_params("tool", params)
+        else:
+            handler_name = "unknown"
+            arguments = {}
+    else:
+        handler_name, arguments = _extract_handler_data_from_args(
+            "tool", original_args, original_kwargs
+        )
 
-    (
-        handler_name,
-        arguments,
-        span_data_key,
-        span_name,
-        mcp_method_name,
-        result_data_key,
-    ) = _prepare_handler_data("tool", original_args, original_kwargs, params=params)
+    span_data_key, span_name, mcp_method_name, result_data_key = _get_span_config(
+        "tool", handler_name
+    )
 
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
@@ -640,23 +600,27 @@ async def _prompt_handler_wrapper(
 
     # Detect v1 vs v2: MCP SDK v2 passes (ServerRequestContext, params) to handlers
     ctx: "Optional[Any]" = None
-    params: "Optional[Any]" = None
     if (
         ServerRequestContext is not None
         and original_args
         and isinstance(original_args[0], ServerRequestContext)
     ):
         ctx = original_args[0]
-        params = original_args[1] if len(original_args) > 1 else None
+        if len(original_args) > 1:
+            handler_name, arguments = _extract_handler_data_from_params(
+                "prompt", original_args[1]
+            )
+        else:
+            handler_name = "unknown"
+            arguments = {}
+    else:
+        handler_name, arguments = _extract_handler_data_from_args(
+            "prompt", original_args, original_kwargs
+        )
 
-    (
-        handler_name,
-        arguments,
-        span_data_key,
-        span_name,
-        mcp_method_name,
-        result_data_key,
-    ) = _prepare_handler_data("prompt", original_args, original_kwargs, params=params)
+    span_data_key, span_name, mcp_method_name, result_data_key = _get_span_config(
+        "prompt", handler_name
+    )
 
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
@@ -741,16 +705,22 @@ async def _resource_handler_wrapper(
         and isinstance(original_args[0], ServerRequestContext)
     ):
         ctx = original_args[0]
-        params = original_args[1] if len(original_args) > 1 else None
+        if len(original_args) > 1:
+            params = original_args[1]
+            handler_name, arguments = _extract_handler_data_from_params(
+                "resource", params
+            )
+        else:
+            handler_name = "unknown"
+            arguments = {}
+    else:
+        handler_name, arguments = _extract_handler_data_from_args(
+            "resource", original_args, original_kwargs
+        )
 
-    (
-        handler_name,
-        arguments,
-        span_data_key,
-        span_name,
-        mcp_method_name,
-        result_data_key,
-    ) = _prepare_handler_data("resource", original_args, original_kwargs, params=params)
+    span_data_key, span_name, mcp_method_name, result_data_key = _get_span_config(
+        "resource", handler_name
+    )
 
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
