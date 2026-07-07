@@ -269,41 +269,6 @@ def _extract_text_from_content_blocks(content_blocks: "Any") -> "Any":
     return " ".join(texts) if texts else content_blocks
 
 
-# Handler data preparation and wrapping
-
-
-def _is_v2_context(original_args: "tuple[Any, ...]") -> bool:
-    """Check if original_args contains a v2 ServerRequestContext as the first element."""
-    return (
-        ServerRequestContext is not None
-        and bool(original_args)
-        and isinstance(original_args[0], ServerRequestContext)
-    )
-
-
-def _extract_handler_data_from_params(
-    handler_type: str,
-    params: "Any",
-) -> "tuple[str, dict[str, Any]]":
-    """
-    Extract handler name and arguments from a v2 typed params object.
-
-    In MCP SDK v2, handlers receive (ctx, params) where params is a typed
-    Pydantic model (CallToolRequestParams, GetPromptRequestParams, etc.).
-    """
-    if handler_type == "tool":
-        handler_name = getattr(params, "name", "unknown")
-        arguments = getattr(params, "arguments", None) or {}
-    elif handler_type == "prompt":
-        handler_name = getattr(params, "name", "unknown")
-        arguments = getattr(params, "arguments", None) or {}
-    else:  # resource
-        handler_name = str(getattr(params, "uri", "unknown"))
-        arguments = {}
-
-    return handler_name, arguments
-
-
 def _extract_handler_data_from_args(
     handler_type: str,
     original_args: "tuple[Any, ...]",
