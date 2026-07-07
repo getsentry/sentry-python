@@ -14,7 +14,7 @@ from sentry_sdk.utils import (
 )
 
 try:
-    from pydantic import BaseModel  # type: ignore
+    from pydantic import BaseModel
     from starlite import Request, Starlite, State  # type: ignore
     from starlite.handlers.base import BaseRouteHandler  # type: ignore
     from starlite.middleware import DefineMiddleware  # type: ignore

@@ -24,13 +24,13 @@ from sentry_sdk.utils import package_version, safe_serialize
 MCP_PACKAGE_VERSION = package_version("mcp")
 
 try:
-    from mcp.server.lowlevel import Server  # type: ignore[import-not-found]
-    from mcp.server.streamable_http import (  # type: ignore[import-not-found]
+    from mcp.server.lowlevel import Server
+    from mcp.server.streamable_http import (
         StreamableHTTPServerTransport,
     )
 
     if MCP_PACKAGE_VERSION and MCP_PACKAGE_VERSION < (2, 0, 0):
-        from mcp.server.lowlevel.server import (  # type: ignore[import-not-found]
+        from mcp.server.lowlevel.server import (  # type: ignore[attr-defined]
             request_ctx,
         )
 except ImportError:
@@ -43,19 +43,19 @@ except ImportError:
 
 if MCP_PACKAGE_VERSION and MCP_PACKAGE_VERSION >= (2, 0, 0):
     try:
-        from mcp.server.context import (  # type: ignore[import-not-found]
+        from mcp.server.context import (
             ServerRequestContext,
         )
     except ImportError:
-        ServerRequestContext = None
+        ServerRequestContext = None  # type: ignore[assignment,misc]
 else:
-    ServerRequestContext = None
+    ServerRequestContext = None  # type: ignore[assignment,misc]
 
 
 if TYPE_CHECKING:
     from typing import Any, Callable, ContextManager, Optional, Tuple, Union
 
-    from starlette.types import Receive, Scope, Send  # type: ignore[import-not-found]
+    from starlette.types import Receive, Scope, Send
 
     from sentry_sdk.traces import StreamedSpan
     from sentry_sdk.tracing import Span
@@ -711,7 +711,7 @@ def _patch_lowlevel_server() -> None:
 def _patch_lowlevel_server_v1() -> None:
     """Patches v1 Server decorator methods (call_tool, get_prompt, read_resource)."""
     # Patch call_tool decorator
-    original_call_tool = Server.call_tool
+    original_call_tool = Server.call_tool  # type: ignore[attr-defined]
 
     def patched_call_tool(
         self: "Server", **kwargs: "Any"
@@ -721,10 +721,10 @@ def _patch_lowlevel_server_v1() -> None:
             original_call_tool, "tool", self, **kwargs
         )(func)
 
-    Server.call_tool = patched_call_tool
+    Server.call_tool = patched_call_tool  # type: ignore[attr-defined]
 
     # Patch get_prompt decorator
-    original_get_prompt = Server.get_prompt
+    original_get_prompt = Server.get_prompt  # type: ignore[attr-defined]
 
     def patched_get_prompt(
         self: "Server",
@@ -734,10 +734,10 @@ def _patch_lowlevel_server_v1() -> None:
             original_get_prompt, "prompt", self
         )(func)
 
-    Server.get_prompt = patched_get_prompt
+    Server.get_prompt = patched_get_prompt  # type: ignore[attr-defined]
 
     # Patch read_resource decorator
-    original_read_resource = Server.read_resource
+    original_read_resource = Server.read_resource  # type: ignore[attr-defined]
 
     def patched_read_resource(
         self: "Server",
@@ -747,7 +747,7 @@ def _patch_lowlevel_server_v1() -> None:
             original_read_resource, "resource", self
         )(func)
 
-    Server.read_resource = patched_read_resource
+    Server.read_resource = patched_read_resource  # type: ignore[attr-defined]
 
 
 def _wrap_v2_handler(
@@ -790,7 +790,7 @@ def _patch_lowlevel_server_v2() -> None:
                 kwargs[kwarg] = _wrap_v2_handler(handler_type, handler)
         original_init(self, *args, **kwargs)
 
-    Server.__init__ = patched_init
+    Server.__init__ = patched_init  # type: ignore[method-assign]
 
     original_add_request_handler = Server.add_request_handler
 
@@ -810,7 +810,7 @@ def _patch_lowlevel_server_v2() -> None:
             self, method, params_type, handler, *args, **kwargs
         )
 
-    Server.add_request_handler = patched_add_request_handler
+    Server.add_request_handler = patched_add_request_handler  # type: ignore[method-assign]
 
 
 def _patch_handle_request() -> None:
@@ -829,7 +829,7 @@ def _patch_handle_request() -> None:
         scope["state"]["sentry_sdk.current_scope"] = sentry_sdk.get_current_scope()
         await original_handle_request(self, scope, receive, send)
 
-    StreamableHTTPServerTransport.handle_request = patched_handle_request
+    StreamableHTTPServerTransport.handle_request = patched_handle_request  # type: ignore[method-assign]
 
 
 def _patch_fastmcp() -> None:
