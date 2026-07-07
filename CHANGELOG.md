@@ -66,6 +66,7 @@ Self-hosted Sentry users should opt out with `stream_gen_ai_spans=False`, since 
 
 - (test): exclude django 6.1 alphas and betas from tox by @ericapisani in [#6690](https://github.com/getsentry/sentry-python/pull/6690)
 - (test): need to include the alpha tag for mcp package inclusion by @ericapisani in [#6688](https://github.com/getsentry/sentry-python/pull/6688)
+
 ## 2.63.0
 
 ### Bug Fixes 🐛

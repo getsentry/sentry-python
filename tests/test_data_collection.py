@@ -12,10 +12,10 @@ def test_kvcb_invalid_mode():
 
 
 def test_kvcb_from_dict_defaults_mode():
-    sentry_sdk.init(data_collection={"cookies": {"mode": "deny_list", "terms": ["x"]}})
+    sentry_sdk.init(data_collection={"cookies": {"mode": "denylist", "terms": ["x"]}})
     client = sentry_sdk.get_client()
     assert client.options["data_collection"]["cookies"] == {
-        "mode": "deny_list",
+        "mode": "denylist",
         "terms": ["x"],
     }
 
@@ -26,19 +26,19 @@ def test_http_headers_collection_defaults():
     sentry_sdk.init(data_collection={"http_headers": {}})  # type: ignore Purposely ignoring to test invalid option
     client = sentry_sdk.get_client()
     assert client.options["data_collection"]["http_headers"]["request"] == {
-        "mode": "deny_list"
+        "mode": "denylist"
     }
 
     sentry_sdk.init(data_collection={"http_headers": "off"})  # type: ignore Purposely ignoring to test invalid option
     client = sentry_sdk.get_client()
     assert client.options["data_collection"]["http_headers"]["request"] == {
-        "mode": "deny_list"
+        "mode": "denylist"
     }
 
     sentry_sdk.init()
     client = sentry_sdk.get_client()
     assert client.options["data_collection"]["http_headers"]["request"] == {
-        "mode": "deny_list",
+        "mode": "denylist",
         "terms": default_terms,
     }
 
@@ -47,7 +47,7 @@ def test_http_headers_use_default_in_setting_with_missing_config():
     sentry_sdk.init(
         data_collection={
             "http_headers": {
-                "request": {"mode": "allow_list", "terms": ["x-id"]},
+                "request": {"mode": "allowlist", "terms": ["x-id"]},
             }
         }
     )
@@ -55,7 +55,7 @@ def test_http_headers_use_default_in_setting_with_missing_config():
     client = sentry_sdk.get_client()
 
     assert client.options["data_collection"]["http_headers"]["request"] == {
-        "mode": "allow_list",
+        "mode": "allowlist",
         "terms": ["x-id"],
     }
 
@@ -83,7 +83,7 @@ def _get(dc, path):
                 "gen_ai.outputs": False,
                 "cookies.mode": "off",
                 "query_params.mode": "off",
-                "http_headers.request.mode": "deny_list",
+                "http_headers.request.mode": "denylist",
                 "http_bodies": _ALL_HTTP_BODY_TYPES,
                 "frame_context_lines": 5,
             },
@@ -95,8 +95,8 @@ def _get(dc, path):
                 "user_info": True,
                 "gen_ai.inputs": True,
                 "gen_ai.outputs": True,
-                "cookies.mode": "deny_list",
-                "query_params.mode": "deny_list",
+                "cookies.mode": "denylist",
+                "query_params.mode": "denylist",
             },
             id="send_default_pii_true_collects_pii",
         ),
@@ -111,8 +111,8 @@ def _get(dc, path):
                 "user_info": True,
                 "gen_ai.inputs": True,
                 "gen_ai.outputs": True,
-                "cookies.mode": "deny_list",
-                "query_params.mode": "deny_list",
+                "cookies.mode": "denylist",
+                "query_params.mode": "denylist",
                 "http_bodies": _ALL_HTTP_BODY_TYPES,
             },
             id="explicit_data_collection_uses_spec_defaults",
@@ -123,7 +123,7 @@ def _get(dc, path):
                 "user_info": False,
                 "http_bodies": [],
                 "gen_ai.inputs": True,
-                "cookies.mode": "deny_list",
+                "cookies.mode": "denylist",
             },
             id="explicit_partial_fills_omitted_with_spec_defaults",
         ),
@@ -140,14 +140,14 @@ def _get(dc, path):
             {
                 "data_collection": {
                     "cookies": {"mode": "off"},
-                    "query_params": {"mode": "allow_list", "terms": ["page"]},
+                    "query_params": {"mode": "allowlist", "terms": ["page"]},
                     "http_headers": {"request": {"mode": "off"}},
                     "gen_ai": {"inputs": False, "outputs": True},
                 }
             },
             {
                 "cookies.mode": "off",
-                "query_params.mode": "allow_list",
+                "query_params.mode": "allowlist",
                 "query_params.terms": ["page"],
                 "http_headers.request.mode": "off",
                 "gen_ai.inputs": False,
@@ -167,9 +167,9 @@ def _get(dc, path):
                 }
             },
             {
-                "cookies.mode": "deny_list",
-                "http_headers.request.mode": "deny_list",
-                "query_params.mode": "deny_list",
+                "cookies.mode": "denylist",
+                "http_headers.request.mode": "denylist",
+                "query_params.mode": "denylist",
                 "graphql.document": True,
                 "graphql.variables": True,
                 "gen_ai.inputs": True,

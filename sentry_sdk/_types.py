@@ -153,7 +153,7 @@ if TYPE_CHECKING:
         packages: "Sequence[Mapping[str, str]]"
 
     class KeyValueCollectionBehaviour(TypedDict):
-        mode: 'Literal["off", "deny_list", "allow_list"]'
+        mode: 'Literal["off", "denylist", "allowlist"]'
         terms: "NotRequired[List[str]]"
 
     class GenAICollectionUserOptions(TypedDict, total=False):

@@ -37,24 +37,26 @@ if TYPE_CHECKING:
         KeyValueCollectionBehaviour,
     )
 
-#: ``http_bodies`` defaults to this (collect everything the
-#: platform supports); an empty list is the explicit opt-out.
+# ``http_bodies`` defaults to this (collect everything the
+# platform supports); an empty list is the explicit opt-out.
+# response bodyies are not included here because we don't
+# currently capture them (as of Jul 7 2026)
 _ALL_HTTP_BODY_TYPES = [
     "incoming_request",
     "outgoing_request",
 ]
 
-#: Default number of source lines captured above and below a stack frame.
+# Default number of source lines captured above and below a stack frame.
 _DEFAULT_FRAME_CONTEXT_LINES = 5
 
-#: Collection modes for key-value data (cookies, headers, query params).
-#: snake_case (Python-only deviation from the spec's camelCase); never
-#: serialized to Sentry.
-_VALID_KEY_VALUE_COLLECTION_BEHAVIOUR_MODES = ("off", "deny_list", "allow_list")
+# Collection modes for key-value data (cookies, headers, query params).
+# snake_case (Python-only deviation from the spec's camelCase); never
+# serialized to Sentry.
+_VALID_KEY_VALUE_COLLECTION_BEHAVIOUR_MODES = ("off", "denylist", "allowlist")
 
-#: Values of keys that contain any of
-#: these terms (partial, case-insensitive) are always replaced with
-#: ``"[Filtered]"`` regardless of the configured collection mode.
+# Values of keys that contain any of
+# these terms (partial, case-insensitive) are always replaced with
+# ``"[Filtered]"`` regardless of the configured collection mode.
 _SENSITIVE_DENYLIST = [
     "auth",
     "token",
@@ -87,7 +89,7 @@ def _map_from_send_default_pii(
     ``send_default_pii`` collects today. Used when ``data_collection`` is not
     provided explicitly.
     """
-    kv_mode: "Literal['deny_list', 'off']" = "deny_list" if send_default_pii else "off"
+    kv_mode: "Literal['denylist', 'off']" = "denylist" if send_default_pii else "off"
     terms = [] if send_default_pii else ["forwarded", "-ip", "remote-", "via", "-user"]
 
     return {
@@ -97,7 +99,7 @@ def _map_from_send_default_pii(
         # Headers are collected in both PII modes today (sensitive ones filtered
         # when PII is off), so this never maps to "off".
         "http_headers": {
-            "request": {"mode": "deny_list", "terms": terms},
+            "request": {"mode": "denylist", "terms": terms},
         },
         # Bodies are collected regardless of PII today, bounded by
         # ``max_request_body_size``.
@@ -163,7 +165,7 @@ def _resolve_explicit(
 def _kvcb_from_value(
     val: "dict[str, Any]",
 ) -> "KeyValueCollectionBehaviour":
-    mode = val.get("mode", "deny_list")
+    mode = val.get("mode", "denylist")
     terms = val.get("terms", None)
 
     if mode not in _VALID_KEY_VALUE_COLLECTION_BEHAVIOUR_MODES:
@@ -186,7 +188,7 @@ def _http_headers_from_value(
         "request": (
             _kvcb_from_value(val["request"])
             if "request" in val
-            else _kvcb_from_value({"mode": "deny_list"})
+            else _kvcb_from_value({"mode": "denylist"})
         ),
     }
 

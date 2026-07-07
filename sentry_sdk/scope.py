@@ -2179,11 +2179,6 @@ def should_send_default_pii() -> bool:
     return Scope.get_client().should_send_default_pii()
 
 
-def get_data_collection() -> "DataCollection":
-    """Return the resolved DataCollection config of the active client."""
-    return Scope.get_client().data_collection
-
-
 # Circular imports
 from sentry_sdk.client import NonRecordingClient
 

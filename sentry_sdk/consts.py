@@ -1451,6 +1451,8 @@ class ClientConstructor:
                     data_collection={"user_info": False, "http_bodies": []},
                 )
 
+            See https://docs.sentry.io/platforms/python/configuration/options/#data_collection for more details.
+
         :param event_scrubber: Scrubs the event payload for sensitive information such as cookies, sessions, and
             passwords from a `denylist`.
 
