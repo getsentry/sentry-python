@@ -247,100 +247,6 @@ def _extract_text_from_content_blocks(content_blocks: "Any") -> "Any":
     return " ".join(texts) if texts else content_blocks
 
 
-def _set_span_output_data(
-    span: "Union[StreamedSpan, Span]",
-    result: "Any",
-    result_data_key: "Optional[str]",
-    handler_type: str,
-) -> None:
-    """Set output span data for MCP handlers."""
-    if result is None:
-        return
-
-    # Get integration to check PII settings
-    integration = sentry_sdk.get_client().get_integration(MCPIntegration)
-    if integration is None:
-        return
-
-    # Check if we should include sensitive data
-    should_include_data = should_send_default_pii() and integration.include_prompts
-
-    # For tools, extract the meaningful content
-    if handler_type == "tool":
-        extracted = _extract_tool_result_content(result)
-        if (
-            extracted is not None
-            and should_include_data
-            and result_data_key is not None
-        ):
-            _set_span_data_attribute(span, result_data_key, safe_serialize(extracted))
-            # Set content count if result is a dict
-            if isinstance(extracted, dict):
-                _set_span_data_attribute(
-                    span, SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT, len(extracted)
-                )
-    elif handler_type == "prompt":
-        # For prompts, count messages and set role/content only for single-message prompts
-        try:
-            messages: "Optional[list[str]]" = None
-            message_count = 0
-
-            # Check if result has messages attribute (GetPromptResult)
-            if hasattr(result, "messages") and result.messages:
-                messages = result.messages
-                message_count = len(messages)
-            # Also check if result is a dict with messages
-            elif isinstance(result, dict) and result.get("messages"):
-                messages = result["messages"]
-                message_count = len(messages)
-
-            # Always set message count if we found messages
-            if message_count > 0:
-                _set_span_data_attribute(
-                    span, SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT, message_count
-                )
-
-            # Only set role and content for single-message prompts if PII is allowed
-            if message_count == 1 and should_include_data and messages:
-                first_message = messages[0]
-                # Extract role
-                role = None
-                if hasattr(first_message, "role"):
-                    role = first_message.role
-                elif isinstance(first_message, dict) and "role" in first_message:
-                    role = first_message["role"]
-
-                if role:
-                    _set_span_data_attribute(
-                        span, SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE, role
-                    )
-
-                # Extract content text
-                content_text = None
-                if hasattr(first_message, "content"):
-                    msg_content = first_message.content
-                    # Content can be a TextContent object or similar
-                    if hasattr(msg_content, "text"):
-                        content_text = msg_content.text
-                    elif isinstance(msg_content, dict) and "text" in msg_content:
-                        content_text = msg_content["text"]
-                    elif isinstance(msg_content, str):
-                        content_text = msg_content
-                elif isinstance(first_message, dict) and "content" in first_message:
-                    msg_content = first_message["content"]
-                    if isinstance(msg_content, dict) and "text" in msg_content:
-                        content_text = msg_content["text"]
-                    elif isinstance(msg_content, str):
-                        content_text = msg_content
-
-                if content_text and result_data_key is not None:
-                    _set_span_data_attribute(span, result_data_key, content_text)
-        except Exception:
-            # Silently ignore if we can't extract message info
-            pass
-    # Resources don't capture result content (result_data_key is None)
-
-
 # Handler data preparation and wrapping
 
 
@@ -543,9 +449,29 @@ async def _tool_handler_wrapper(
                 sentry_sdk.capture_exception(e)
                 raise
 
-            _set_span_output_data(
-                span, result, SPANDATA.MCP_TOOL_RESULT_CONTENT, "tool"
+            if result is None:
+                return result
+
+            # Get integration to check PII settings
+            integration = sentry_sdk.get_client().get_integration(MCPIntegration)
+            if integration is None:
+                return result
+
+            # Check if we should include sensitive data
+            should_include_data = (
+                should_send_default_pii() and integration.include_prompts
             )
+
+            extracted = _extract_tool_result_content(result)
+            if extracted is not None and should_include_data:
+                _set_span_data_attribute(
+                    span, SPANDATA.MCP_TOOL_RESULT_CONTENT, safe_serialize(extracted)
+                )
+                # Set content count if result is a dict
+                if isinstance(extracted, dict):
+                    _set_span_data_attribute(
+                        span, SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT, len(extracted)
+                    )
 
     return result
 
@@ -661,9 +587,81 @@ async def _prompt_handler_wrapper(
                 sentry_sdk.capture_exception(e)
                 raise
 
-            _set_span_output_data(
-                span, result, SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT, "prompt"
+            if result is None:
+                return result
+
+            # Get integration to check PII settings
+            integration = sentry_sdk.get_client().get_integration(MCPIntegration)
+            if integration is None:
+                return result
+
+            # Check if we should include sensitive data
+            should_include_data = (
+                should_send_default_pii() and integration.include_prompts
             )
+
+            # For prompts, count messages and set role/content only for single-message prompts
+            try:
+                messages: "Optional[list[str]]" = None
+                message_count = 0
+
+                # Check if result has messages attribute (GetPromptResult)
+                if hasattr(result, "messages") and result.messages:
+                    messages = result.messages  # type: ignore[assignment]
+                    message_count = len(messages)  # type: ignore[arg-type]
+                # Also check if result is a dict with messages
+                elif isinstance(result, dict) and result.get("messages"):
+                    messages = result["messages"]
+                    message_count = len(messages)
+
+                # Always set message count if we found messages
+                if message_count > 0:
+                    _set_span_data_attribute(
+                        span, SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT, message_count
+                    )
+
+                # Only set role and content for single-message prompts if PII is allowed
+                if message_count == 1 and should_include_data and messages:
+                    first_message = messages[0]
+                    # Extract role
+                    role = None
+                    if hasattr(first_message, "role"):
+                        role = first_message.role
+                    elif isinstance(first_message, dict) and "role" in first_message:
+                        role = first_message["role"]
+
+                    if role:
+                        _set_span_data_attribute(
+                            span, SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE, role
+                        )
+
+                    # Extract content text
+                    content_text = None
+                    if hasattr(first_message, "content"):
+                        msg_content = first_message.content
+                        # Content can be a TextContent object or similar
+                        if hasattr(msg_content, "text"):
+                            content_text = msg_content.text
+                        elif isinstance(msg_content, dict) and "text" in msg_content:
+                            content_text = msg_content["text"]
+                        elif isinstance(msg_content, str):
+                            content_text = msg_content
+                    elif isinstance(first_message, dict) and "content" in first_message:
+                        msg_content = first_message["content"]
+                        if isinstance(msg_content, dict) and "text" in msg_content:
+                            content_text = msg_content["text"]
+                        elif isinstance(msg_content, str):
+                            content_text = msg_content
+
+                    if content_text:
+                        _set_span_data_attribute(
+                            span,
+                            SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT,
+                            content_text,
+                        )
+            except Exception:
+                # Silently ignore if we can't extract message info
+                pass
 
     return result
 
@@ -799,8 +797,6 @@ async def _resource_handler_wrapper(
             except Exception as e:
                 sentry_sdk.capture_exception(e)
                 raise
-
-            _set_span_output_data(span, result, None, "resource")
 
     return result
 
