@@ -74,7 +74,6 @@ if TYPE_CHECKING:
     from sentry_sdk._log_batcher import LogBatcher
     from sentry_sdk._metrics_batcher import MetricsBatcher
     from sentry_sdk._types import (
-        DataCollection,
         Event,
         EventDataCategory,
         Hint,
