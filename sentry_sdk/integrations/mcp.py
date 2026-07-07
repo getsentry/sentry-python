@@ -158,33 +158,6 @@ def _get_request_context_data(
     return request_id, session_id, mcp_transport
 
 
-def _get_span_config(
-    handler_type: str, item_name: str
-) -> "tuple[str, str, str, Optional[str]]":
-    """
-    Get span configuration based on handler type.
-
-    Returns:
-        Tuple of (span_data_key, span_name, mcp_method_name, result_data_key)
-        Note: result_data_key is None for resources
-    """
-    if handler_type == "tool":
-        span_data_key = SPANDATA.MCP_TOOL_NAME
-        mcp_method_name = "tools/call"
-        result_data_key = SPANDATA.MCP_TOOL_RESULT_CONTENT
-    elif handler_type == "prompt":
-        span_data_key = SPANDATA.MCP_PROMPT_NAME
-        mcp_method_name = "prompts/get"
-        result_data_key = SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT
-    else:  # resource
-        span_data_key = SPANDATA.MCP_RESOURCE_URI
-        mcp_method_name = "resources/read"
-        result_data_key = None  # Resources don't capture result content
-
-    span_name = f"{mcp_method_name} {item_name}"
-    return span_data_key, span_name, mcp_method_name, result_data_key
-
-
 def _set_span_input_data(
     span: "Union[StreamedSpan, Span]",
     handler_name: str,
@@ -497,10 +470,6 @@ async def _tool_handler_wrapper(
             "tool", original_args, original_kwargs
         )
 
-    span_data_key, span_name, mcp_method_name, result_data_key = _get_span_config(
-        "tool", handler_name
-    )
-
     scopes = _get_active_http_scopes(ctx=ctx)
 
     isolation_scope_context: "ContextManager[Any]"
@@ -533,7 +502,7 @@ async def _tool_handler_wrapper(
         span_mgr: "Union[Span, StreamedSpan]"
         if span_streaming:
             span_mgr = sentry_sdk.traces.start_span(
-                name=span_name,
+                name=f"tools/call {handler_name}",
                 attributes={
                     "sentry.op": OP.MCP_SERVER,
                     "sentry.origin": MCPIntegration.origin,
@@ -542,7 +511,7 @@ async def _tool_handler_wrapper(
         else:
             span_mgr = get_start_span_function()(
                 op=OP.MCP_SERVER,
-                name=span_name,
+                name=f"tools/call {handler_name}",
                 origin=MCPIntegration.origin,
             )
 
@@ -551,8 +520,8 @@ async def _tool_handler_wrapper(
             _set_span_input_data(
                 span,
                 handler_name,
-                span_data_key,
-                mcp_method_name,
+                SPANDATA.MCP_TOOL_NAME,
+                "tools/call",
                 arguments,
                 request_id,
                 session_id,
@@ -574,7 +543,9 @@ async def _tool_handler_wrapper(
                 sentry_sdk.capture_exception(e)
                 raise
 
-            _set_span_output_data(span, result, result_data_key, "tool")
+            _set_span_output_data(
+                span, result, SPANDATA.MCP_TOOL_RESULT_CONTENT, "tool"
+            )
 
     return result
 
@@ -619,10 +590,6 @@ async def _prompt_handler_wrapper(
             "prompt", original_args, original_kwargs
         )
 
-    span_data_key, span_name, mcp_method_name, result_data_key = _get_span_config(
-        "prompt", handler_name
-    )
-
     scopes = _get_active_http_scopes(ctx=ctx)
 
     isolation_scope_context: "ContextManager[Any]"
@@ -655,7 +622,7 @@ async def _prompt_handler_wrapper(
         span_mgr: "Union[Span, StreamedSpan]"
         if span_streaming:
             span_mgr = sentry_sdk.traces.start_span(
-                name=span_name,
+                name=f"prompts/get {handler_name}",
                 attributes={
                     "sentry.op": OP.MCP_SERVER,
                     "sentry.origin": MCPIntegration.origin,
@@ -664,7 +631,7 @@ async def _prompt_handler_wrapper(
         else:
             span_mgr = get_start_span_function()(
                 op=OP.MCP_SERVER,
-                name=span_name,
+                name=f"prompts/get {handler_name}",
                 origin=MCPIntegration.origin,
             )
 
@@ -673,8 +640,8 @@ async def _prompt_handler_wrapper(
             _set_span_input_data(
                 span,
                 handler_name,
-                span_data_key,
-                mcp_method_name,
+                SPANDATA.MCP_PROMPT_NAME,
+                "prompts/get",
                 arguments,
                 request_id,
                 session_id,
@@ -694,7 +661,9 @@ async def _prompt_handler_wrapper(
                 sentry_sdk.capture_exception(e)
                 raise
 
-            _set_span_output_data(span, result, result_data_key, "prompt")
+            _set_span_output_data(
+                span, result, SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT, "prompt"
+            )
 
     return result
 
@@ -741,10 +710,6 @@ async def _resource_handler_wrapper(
             "resource", original_args, original_kwargs
         )
 
-    span_data_key, span_name, mcp_method_name, result_data_key = _get_span_config(
-        "resource", handler_name
-    )
-
     scopes = _get_active_http_scopes(ctx=ctx)
 
     isolation_scope_context: "ContextManager[Any]"
@@ -777,7 +742,7 @@ async def _resource_handler_wrapper(
         span_mgr: "Union[Span, StreamedSpan]"
         if span_streaming:
             span_mgr = sentry_sdk.traces.start_span(
-                name=span_name,
+                name=f"resources/read {handler_name}",
                 attributes={
                     "sentry.op": OP.MCP_SERVER,
                     "sentry.origin": MCPIntegration.origin,
@@ -786,7 +751,7 @@ async def _resource_handler_wrapper(
         else:
             span_mgr = get_start_span_function()(
                 op=OP.MCP_SERVER,
-                name=span_name,
+                name=f"resources/read {handler_name}",
                 origin=MCPIntegration.origin,
             )
 
@@ -795,8 +760,8 @@ async def _resource_handler_wrapper(
             _set_span_input_data(
                 span,
                 handler_name,
-                span_data_key,
-                mcp_method_name,
+                SPANDATA.MCP_RESOURCE_URI,
+                "resources/read",
                 arguments,
                 request_id,
                 session_id,
@@ -835,7 +800,7 @@ async def _resource_handler_wrapper(
                 sentry_sdk.capture_exception(e)
                 raise
 
-            _set_span_output_data(span, result, result_data_key, "resource")
+            _set_span_output_data(span, result, None, "resource")
 
     return result
 
