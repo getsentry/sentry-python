@@ -134,18 +134,7 @@ class MockTextContent:
 
 def test_integration_patches_server(sentry_init):
     """Test that MCPIntegration patches the Server class"""
-    if IS_MCP_V2:
-        original_add_request_handler = Server.add_request_handler
-        original_init = Server.__init__
-
-        sentry_init(
-            integrations=[MCPIntegration()],
-            traces_sample_rate=1.0,
-        )
-
-        assert Server.add_request_handler is not original_add_request_handler
-        assert Server.__init__ is not original_init
-    else:
+    if not IS_MCP_V2:
         original_call_tool = Server.call_tool
         original_get_prompt = Server.get_prompt
         original_read_resource = Server.read_resource
