@@ -97,7 +97,7 @@ class MCPIntegration(Integration):
 
 
 @contextmanager
-def _with_active_http_scopes(
+def _active_http_scopes(
     ctx: "Any" = None,
 ) -> "Iterator[None]":
     """
@@ -352,7 +352,7 @@ async def _tool_handler_wrapper(
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
 
     # Start span and execute
-    with _with_active_http_scopes():
+    with _active_http_scopes():
         span_mgr: "Union[Span, StreamedSpan]"
         if span_streaming:
             span_mgr = sentry_sdk.traces.start_span(
@@ -446,7 +446,7 @@ async def _instrument_v2_tool_call(
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
 
     # Start span and execute
-    with _with_active_http_scopes(ctx=ctx):
+    with _active_http_scopes(ctx=ctx):
         span_mgr: "Union[Span, StreamedSpan]"
         if span_streaming:
             span_mgr = sentry_sdk.traces.start_span(
@@ -551,7 +551,7 @@ async def _prompt_handler_wrapper(
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
 
     # Start span and execute
-    with _with_active_http_scopes():
+    with _active_http_scopes():
         span_mgr: "Union[Span, StreamedSpan]"
         if span_streaming:
             span_mgr = sentry_sdk.traces.start_span(
@@ -695,7 +695,7 @@ async def _instrument_v2_prompt_get(
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
 
     # Start span and execute
-    with _with_active_http_scopes(ctx=ctx):
+    with _active_http_scopes(ctx=ctx):
         span_mgr: "Union[Span, StreamedSpan]"
         if span_streaming:
             span_mgr = sentry_sdk.traces.start_span(
@@ -840,7 +840,7 @@ async def _resource_handler_wrapper(
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
 
     # Start span and execute
-    with _with_active_http_scopes():
+    with _active_http_scopes():
         span_mgr: "Union[Span, StreamedSpan]"
         if span_streaming:
             span_mgr = sentry_sdk.traces.start_span(
@@ -918,7 +918,7 @@ async def _instrument_v2_resource_read(
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
 
     # Start span and execute
-    with _with_active_http_scopes(ctx=ctx):
+    with _active_http_scopes(ctx=ctx):
         span_mgr: "Union[Span, StreamedSpan]"
         if span_streaming:
             span_mgr = sentry_sdk.traces.start_span(
