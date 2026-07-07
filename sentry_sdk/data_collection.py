@@ -108,6 +108,7 @@ def _map_from_send_default_pii(
         "graphql": {"document": send_default_pii, "variables": send_default_pii},
         "gen_ai": {"inputs": send_default_pii, "outputs": send_default_pii},
         "database": {"query_params": send_default_pii},
+        "queues": send_default_pii,
         "stack_frame_variables": include_local_variables,
         "frame_context_lines": (
             _DEFAULT_FRAME_CONTEXT_LINES if include_source_context else 0
@@ -157,6 +158,7 @@ def _resolve_explicit(
         "graphql": _graphql_from_value(d.get("graphql") or {}),
         "gen_ai": _gen_ai_from_value(d.get("gen_ai") or {}),
         "database": _database_from_value(d.get("database") or {}),
+        "queues": d.get("queues", True),
         "stack_frame_variables": stack_frame_variables,
         "frame_context_lines": frame_context_lines,
     }
