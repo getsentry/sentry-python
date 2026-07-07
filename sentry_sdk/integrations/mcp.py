@@ -479,7 +479,7 @@ async def _tool_handler_wrapper(
 async def _v2_tool_handler(
     ctx: "ServerRequestContext[Any, Any]",
     call_next: "CallNext",
-):
+) -> "HandlerResult":
     """
     Wrapper for MCP tool handlers.
     Creates and manages the MCP span and attaches all attributes on the span.
@@ -490,6 +490,9 @@ async def _v2_tool_handler(
         original_kwargs: Original keyword arguments passed to the handler
         self: Optional instance for bound methods
     """
+    if ctx.params is None:
+        return await call_next(ctx)
+
     handler_name = ctx.params["name"]
     arguments = ctx.params["arguments"]
 
@@ -789,7 +792,7 @@ async def _prompt_handler_wrapper(
 async def _v2_prompt_handler(
     ctx: "ServerRequestContext[Any, Any]",
     call_next: "CallNext",
-):
+) -> "HandlerResult":
     """
     Wrapper for MCP prompt handlers.
     Creates and manages the MCP span and attaches all attributes on the span.
@@ -800,6 +803,9 @@ async def _v2_prompt_handler(
         original_kwargs: Original keyword arguments passed to the handler
         self: Optional instance for bound methods
     """
+    if ctx.params is None:
+        return await call_next(ctx)
+
     handler_name = ctx.params["name"]
     arguments = {"name": handler_name, **ctx.params["arguments"]}
 
@@ -887,8 +893,8 @@ async def _v2_prompt_handler(
 
                 # Check if result has messages attribute (GetPromptResult)
                 if hasattr(result, "messages") and result.messages:
-                    messages = result.messages  # type: ignore[assignment]
-                    message_count = len(messages)  # type: ignore[arg-type]
+                    messages = result.messages
+                    message_count = len(messages)
                 # Also check if result is a dict with messages
                 elif isinstance(result, dict) and result.get("messages"):
                     messages = result["messages"]
@@ -1084,7 +1090,7 @@ async def _resource_handler_wrapper(
 async def _v2_resource_handler(
     ctx: "ServerRequestContext[Any, Any]",
     call_next: "CallNext",
-):
+) -> "HandlerResult":
     """
     Wrapper for MCP resource handlers.
     Creates and manages the MCP span and attaches all attributes on the span.
@@ -1095,6 +1101,9 @@ async def _v2_resource_handler(
         original_kwargs: Original keyword arguments passed to the handler
         self: Optional instance for bound methods
     """
+    if ctx.params is None:
+        return await call_next(ctx)
+
     handler_name = ctx.params["uri"]
 
     scopes = _get_active_http_scopes(ctx=ctx)
