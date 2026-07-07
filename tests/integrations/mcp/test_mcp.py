@@ -36,7 +36,6 @@ except ImportError:
 
 from mcp.server.lowlevel import Server
 from mcp.server.lowlevel.helper_types import ReadResourceContents
-from mcp.types import GetPromptResult, PromptMessage, TextContent
 
 MCP_PACKAGE_VERSION = package_version("mcp")
 IS_MCP_V2 = MCP_PACKAGE_VERSION is not None and MCP_PACKAGE_VERSION >= (2, 0, 0)
@@ -52,14 +51,19 @@ except ImportError:
     request_ctx = None
 
 if IS_MCP_V2:
-    from mcp.types import (
+    from mcp_types import (
         CallToolRequestParams,
         CallToolResult,
         GetPromptRequestParams,
+        GetPromptResult,
+        PromptMessage,
         ReadResourceRequestParams,
         ReadResourceResult,
+        TextContent,
         TextResourceContents,
     )
+else:
+    from mcp.types import GetPromptResult, PromptMessage, TextContent
 
 from mcp.server.sse import SseServerTransport
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
