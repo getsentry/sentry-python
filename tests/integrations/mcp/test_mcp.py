@@ -777,7 +777,6 @@ async def test_prompt_handler_stdio(
     assert data[SPANDATA.MCP_METHOD_NAME] == "prompts/get"
     assert data[SPANDATA.MCP_TRANSPORT] == "stdio"
     assert data[SPANDATA.MCP_REQUEST_ID] == "req-prompt"
-    assert data["mcp.request.argument.name"] == "code_help"
     assert data["mcp.request.argument.language"] == "python"
 
     # Message count is always captured

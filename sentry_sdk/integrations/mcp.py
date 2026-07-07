@@ -275,7 +275,6 @@ def _extract_handler_data_from_params(
     elif handler_type == "prompt":
         handler_name = getattr(params, "name", "unknown")
         arguments = getattr(params, "arguments", None) or {}
-        arguments = {"name": handler_name, **arguments}
     else:  # resource
         handler_name = str(getattr(params, "uri", "unknown"))
         arguments = {}
