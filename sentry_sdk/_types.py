@@ -172,12 +172,6 @@ if TYPE_CHECKING:
         document: bool
         variables: bool
 
-    class DatabaseCollectionUserOptions(TypedDict, total=False):
-        query_params: bool
-
-    class DatabaseCollectionBehaviour(TypedDict):
-        query_params: bool
-
     class HttpHeadersCollectionUserOptions(TypedDict, total=False):
         request: "KeyValueCollectionBehaviour"
 
@@ -192,7 +186,7 @@ if TYPE_CHECKING:
         query_params: "KeyValueCollectionBehaviour"
         graphql: "GraphQLCollectionUserOptions"
         gen_ai: "GenAICollectionUserOptions"
-        database: "DatabaseCollectionUserOptions"
+        database: bool
         queues: bool
         stack_frame_variables: bool
         frame_context_lines: int
@@ -206,7 +200,7 @@ if TYPE_CHECKING:
         query_params: "KeyValueCollectionBehaviour"
         graphql: "GraphQLCollectionBehaviour"
         gen_ai: "GenAICollectionBehaviour"
-        database: "DatabaseCollectionBehaviour"
+        database: bool
         queues: bool
         stack_frame_variables: bool
         frame_context_lines: int
