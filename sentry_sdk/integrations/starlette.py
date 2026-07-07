@@ -81,12 +81,12 @@ try:
     # Optional dependency of Starlette to parse form data.
     try:
         # python-multipart 0.0.13 and later
-        import python_multipart as multipart  # type: ignore
+        import python_multipart as multipart
     except ImportError:
         # python-multipart 0.0.12 and earlier
         import multipart  # type: ignore
 except ImportError:
-    multipart = None
+    multipart = None  # type: ignore[assignment]
 
 
 # Vendored: https://github.com/Kludex/starlette/blob/0a29b5ccdcbd1285c75c4fdb5d62ae1d244a21b0/starlette/_utils.py#L11-L17
@@ -408,8 +408,8 @@ def patch_authentication_middleware(middleware_class: "Any") -> None:
             receive: "Callable[[], Awaitable[Dict[str, Any]]]",
             send: "Callable[[Dict[str, Any]], Awaitable[None]]",
         ) -> None:
-            await old_call(self, scope, receive, send)
             _add_user_to_sentry_scope(scope)
+            await old_call(self, scope, receive, send)
 
         middleware_class.__call__ = _sentry_authenticationmiddleware_call
 
@@ -422,7 +422,6 @@ def patch_middlewares() -> None:
     old_middleware_init = Middleware.__init__
 
     not_yet_patched = "_sentry_middleware_init" not in str(old_middleware_init)
-
     if not_yet_patched:
 
         def _sentry_middleware_init(
