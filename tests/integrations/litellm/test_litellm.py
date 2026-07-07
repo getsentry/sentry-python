@@ -2477,6 +2477,7 @@ def test_response_without_usage(
             kwargs = {
                 "model": "gpt-3.5-turbo",
                 "messages": messages,
+                "call_type": "completion",
             }
 
             _input_callback(kwargs)
@@ -2500,6 +2501,7 @@ def test_response_without_usage(
             kwargs = {
                 "model": "gpt-3.5-turbo",
                 "messages": messages,
+                "call_type": "completion",
             }
 
             _input_callback(kwargs)
@@ -3415,3 +3417,81 @@ def test_convert_message_parts_image_url_missing_url():
     converted = _convert_message_parts(messages)
     # Should return item unchanged
     assert converted[0]["content"][0]["type"] == "image_url"
+
+
+@pytest.mark.parametrize(
+    "call_type,expected_operation,expected_op",
+    [
+        ("completion", "chat", OP.GEN_AI_CHAT),
+        ("acompletion", "chat", OP.GEN_AI_CHAT),
+        ("text_completion", "text_completion", OP.GEN_AI_TEXT_COMPLETION),
+        ("atext_completion", "text_completion", OP.GEN_AI_TEXT_COMPLETION),
+        ("embedding", "embeddings", OP.GEN_AI_EMBEDDINGS),
+        ("aembedding", "embeddings", OP.GEN_AI_EMBEDDINGS),
+        ("responses", "responses", OP.GEN_AI_RESPONSES),
+        ("aresponses", "responses", OP.GEN_AI_RESPONSES),
+    ],
+)
+def test_operation_name_mapped_from_call_type(
+    sentry_init, capture_events, call_type, expected_operation, expected_op
+):
+    """Known call types map to their actual operation, not the chat fallback."""
+    sentry_init(
+        integrations=[LiteLLMIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=False,
+    )
+    events = capture_events()
+
+    with start_transaction(name="litellm test"):
+        kwargs = {
+            "model": "gpt-3.5-turbo",
+            "call_type": call_type,
+        }
+
+        _input_callback(kwargs)
+        _success_callback(
+            kwargs,
+            MockCompletionResponse(),
+            datetime.now(),
+            datetime.now(),
+        )
+
+    (tx,) = events
+    (span,) = [s for s in tx["spans"] if s["origin"] == "auto.ai.litellm"]
+
+    assert span["op"] == expected_op
+    assert span["description"] == f"{expected_operation} gpt-3.5-turbo"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == expected_operation
+
+
+def test_operation_name_not_set_for_unknown_call_type(sentry_init, capture_events):
+    """Call types with no accurate operation name get none, instead of "chat"."""
+    sentry_init(
+        integrations=[LiteLLMIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=False,
+    )
+    events = capture_events()
+
+    with start_transaction(name="litellm test"):
+        kwargs = {
+            "model": "dall-e-3",
+            "call_type": "image_generation",
+        }
+
+        _input_callback(kwargs)
+        _success_callback(
+            kwargs,
+            MockCompletionResponse(model="dall-e-3"),
+            datetime.now(),
+            datetime.now(),
+        )
+
+    (tx,) = events
+    (span,) = [s for s in tx["spans"] if s["origin"] == "auto.ai.litellm"]
+
+    assert span["description"] == "image_generation dall-e-3"
+    assert SPANDATA.GEN_AI_OPERATION_NAME not in span["data"]
