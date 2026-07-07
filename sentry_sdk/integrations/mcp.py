@@ -750,7 +750,7 @@ async def _instrument_v2_prompt_get(
         return await call_next(ctx)
 
     handler_name = ctx.params["name"]
-    arguments = {"name": handler_name, **ctx.params["arguments"]}
+    arguments = ctx.params["arguments"]
 
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
