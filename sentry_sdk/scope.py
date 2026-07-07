@@ -1329,6 +1329,8 @@ class Scope:
                     baggage=propagation_context.baggage,
                     sampled=sampled,
                     unsampled_reason=outcome,
+                    sample_rand=sample_rand,
+                    sample_rate=sample_rate,
                 )
 
             return StreamedSpan(

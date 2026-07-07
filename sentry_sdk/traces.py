@@ -501,9 +501,9 @@ class StreamedSpan:
         return self._segment._get_baggage().dynamic_sampling_context()
 
     def _to_traceparent(self) -> str:
-        if self.sampled is True:
+        if self._segment.sampled is True:
             sampled = "1"
-        elif self.sampled is False:
+        elif self._segment.sampled is False:
             sampled = "0"
         else:
             sampled = None
@@ -628,6 +628,8 @@ class NoOpStreamedSpan(StreamedSpan):
         sampled: "Optional[bool]" = False,
         unsampled_reason: "Optional[str]" = None,
         scope: "Optional[sentry_sdk.Scope]" = None,
+        sample_rand: "Optional[float]" = None,
+        sample_rate: "Optional[float]" = None,
     ) -> None:
         self._span_id: "Optional[str]" = None
 
@@ -638,8 +640,8 @@ class NoOpStreamedSpan(StreamedSpan):
         self._parent_span_id = parent_span_id
         self._parent_sampled = parent_sampled
         self._baggage = baggage
-        self._sample_rand = None
-        self._sample_rate = None
+        self._sample_rand = sample_rand
+        self._sample_rate = sample_rate
 
         self._scope = scope  # type: ignore[assignment]
         self._unsampled_reason = unsampled_reason

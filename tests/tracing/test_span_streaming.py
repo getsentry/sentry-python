@@ -919,17 +919,19 @@ def test_continue_trace_no_sample_rand(sentry_init, capture_items):
     ),
 )
 def test_outgoing_traceparent_and_baggage_head_sdk(sentry_init, traces_sample_rate):
-    sentry_init(
-        traces_sample_rate=traces_sample_rate,
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
     if traces_sample_rate == 0.0:
         expected_sampled = False
     elif traces_sample_rate == 1.0:
         expected_sampled = True
     elif traces_sample_rate is None:
         expected_sampled = None
+
+    sentry_init(
+        traces_sample_rate=traces_sample_rate,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    sentry_sdk.traces.new_trace()
 
     with sentry_sdk.traces.start_span(name="span") as span:
         assert span.sampled is expected_sampled
@@ -945,10 +947,10 @@ def test_outgoing_traceparent_and_baggage_head_sdk(sentry_init, traces_sample_ra
             span_id = span.span_id
             assert traceparent == f"{trace_id}-{span_id}-0"
         elif expected_sampled is None:
+            # Tracing without performance, span ID comes from the propagation
+            # context on the scope
             span_id = (
-                sentry_sdk.get_isolation_scope()
-                .get_active_propagation_context()
-                .span_id
+                sentry_sdk.get_current_scope().get_active_propagation_context().span_id
             )
             assert traceparent == f"{trace_id}-{span_id}"
 
@@ -961,8 +963,10 @@ def test_outgoing_traceparent_and_baggage_head_sdk(sentry_init, traces_sample_ra
         if expected_sampled is None:
             assert "sentry-sampled" not in baggage_items
         else:
-            assert "sentry-sampled" in baggage_items
+            assert baggage_items["sentry-sample_rate"] == str(traces_sample_rate)
+            assert "sentry-sample_rand" in baggage_items
 
+            assert "sentry-sampled" in baggage_items
             if expected_sampled is True:
                 assert baggage_items["sentry-sampled"] == "true"
             elif expected_sampled is False:
@@ -986,6 +990,9 @@ def test_outgoing_traceparent_and_baggage_incoming_trace(
     sentry_init, traces_sample_rate, parent_sampled
 ):
     """The SDK respects a positive/negative incoming sampling decision."""
+    # The case where the incoming trace has a deferred sampling decision is
+    # tested separately in
+    # test_outgoing_traceparent_and_baggage_incoming_trace_deferred
     sentry_init(
         traces_sample_rate=traces_sample_rate,
         _experiments={"trace_lifecycle": "stream"},
@@ -1042,10 +1049,9 @@ def test_outgoing_traceparent_and_baggage_incoming_trace(
             assert traceparent == f"{trace_id}-{span_id}"
         else:
             span_id = span.span_id
-            if parent_sampled is True:
-                assert traceparent == f"{trace_id}-{span_id}-1"
-            elif parent_sampled is False:
-                assert traceparent == f"{trace_id}-{span_id}-0"
+            assert (
+                traceparent == f"{trace_id}-{span_id}-{'1' if parent_sampled else '0'}"
+            )
 
         # As we've received incoming baggage, we mustn't modify it ourselves and
         # have to propagate it as-is, unless we
@@ -1075,9 +1081,9 @@ def test_outgoing_traceparent_and_baggage_incoming_trace_deferred(
 
     if traces_sample_rate == 0.0:
         expected_sampled = False
-    if traces_sample_rate == 1.0:
+    elif traces_sample_rate == 1.0:
         expected_sampled = True
-    if traces_sample_rate is None:
+    elif traces_sample_rate is None:
         expected_sampled = None
 
     trace_id = "0af7651916cd43dd8448eb211c80319c"

@@ -1601,7 +1601,7 @@ def _make_sampling_decision(
             reason = "traces_sample_rate is set to 0"
 
         logger.debug(f"[Tracing] Discarding {name} because {reason}")
-        return False, 0.0, None, "sample_rate"
+        return False, 0.0, sample_rand, "sample_rate"
 
     # Adjust sample rate if we're under backpressure
     sample_rate_before_backpressure = sample_rate
