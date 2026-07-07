@@ -8,6 +8,8 @@ Supports the low-level `mcp.server.lowlevel.Server` API.
 """
 
 import inspect
+from collections.abc import Iterator
+from contextlib import contextmanager
 from functools import wraps
 from typing import TYPE_CHECKING
 
@@ -53,7 +55,7 @@ else:
 
 
 if TYPE_CHECKING:
-    from typing import Any, Awaitable, Callable, ContextManager, Optional, Tuple, Union
+    from typing import Any, Awaitable, Callable, Optional, Union
 
     from mcp_types import (
         CallToolResult,
@@ -93,15 +95,21 @@ class MCPIntegration(Integration):
             _patch_fastmcp()
 
 
-def _get_active_http_scopes(
-    ctx: "Optional[Any]" = None,
-) -> "Optional[Tuple[Optional[sentry_sdk.Scope], Optional[sentry_sdk.Scope]]]":
+@contextmanager
+def _with_active_http_scopes(
+    ctx: "Any" = None,
+) -> "Iterator[None]":
+    """
+    Use isolation and current scopes that were stored before the in-memory MCP request queue.
+    This ensures that MCP spans are nested under the HTTP server span when using the Streamable HTTP transport.
+    """
     if MCP_PACKAGE_VERSION and MCP_PACKAGE_VERSION < (2, 0, 0):
         if ctx is None:
             try:
                 ctx = request_ctx.get()
             except LookupError:
-                return None
+                yield None
+                return
 
     if (
         ctx is None
@@ -109,12 +117,25 @@ def _get_active_http_scopes(
         or ctx.request is None
         or "state" not in ctx.request.scope
     ):
-        return None
+        yield
+        return
 
-    return (
-        ctx.request.scope["state"].get("sentry_sdk.isolation_scope"),
-        ctx.request.scope["state"].get("sentry_sdk.current_scope"),
+    isolation_scope = ctx.request.scope["state"].get("sentry_sdk.isolation_scope")
+    current_scope = ctx.request.scope["state"].get("sentry_sdk.current_scope")
+
+    isolation_scope_context = (
+        nullcontext()
+        if isolation_scope is None
+        else sentry_sdk.scope.use_isolation_scope(isolation_scope)
     )
+    current_scope_context = (
+        nullcontext()
+        if current_scope is None
+        else sentry_sdk.scope.use_scope(current_scope)
+    )
+
+    with isolation_scope_context, current_scope_context:
+        yield
 
 
 def _get_request_context_data(
@@ -375,35 +396,13 @@ async def _tool_handler_wrapper(
             "tool", original_args, original_kwargs
         )
 
-    scopes = _get_active_http_scopes(ctx=ctx)
-
-    isolation_scope_context: "ContextManager[Any]"
-    current_scope_context: "ContextManager[Any]"
-
-    if scopes is None:
-        isolation_scope_context = nullcontext()
-        current_scope_context = nullcontext()
-    else:
-        isolation_scope, current_scope = scopes
-
-        isolation_scope_context = (
-            nullcontext()
-            if isolation_scope is None
-            else sentry_sdk.scope.use_isolation_scope(isolation_scope)
-        )
-        current_scope_context = (
-            nullcontext()
-            if current_scope is None
-            else sentry_sdk.scope.use_scope(current_scope)
-        )
-
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
 
     # Start span and execute
-    with isolation_scope_context, current_scope_context:
+    with _with_active_http_scopes(ctx=ctx):
         span_mgr: "Union[Span, StreamedSpan]"
         if span_streaming:
             span_mgr = sentry_sdk.traces.start_span(
@@ -515,35 +514,13 @@ async def _prompt_handler_wrapper(
             "prompt", original_args, original_kwargs
         )
 
-    scopes = _get_active_http_scopes(ctx=ctx)
-
-    isolation_scope_context: "ContextManager[Any]"
-    current_scope_context: "ContextManager[Any]"
-
-    if scopes is None:
-        isolation_scope_context = nullcontext()
-        current_scope_context = nullcontext()
-    else:
-        isolation_scope, current_scope = scopes
-
-        isolation_scope_context = (
-            nullcontext()
-            if isolation_scope is None
-            else sentry_sdk.scope.use_isolation_scope(isolation_scope)
-        )
-        current_scope_context = (
-            nullcontext()
-            if current_scope is None
-            else sentry_sdk.scope.use_scope(current_scope)
-        )
-
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
 
     # Start span and execute
-    with isolation_scope_context, current_scope_context:
+    with _with_active_http_scopes(ctx=ctx):
         span_mgr: "Union[Span, StreamedSpan]"
         if span_streaming:
             span_mgr = sentry_sdk.traces.start_span(
@@ -707,35 +684,13 @@ async def _resource_handler_wrapper(
             "resource", original_args, original_kwargs
         )
 
-    scopes = _get_active_http_scopes(ctx=ctx)
-
-    isolation_scope_context: "ContextManager[Any]"
-    current_scope_context: "ContextManager[Any]"
-
-    if scopes is None:
-        isolation_scope_context = nullcontext()
-        current_scope_context = nullcontext()
-    else:
-        isolation_scope, current_scope = scopes
-
-        isolation_scope_context = (
-            nullcontext()
-            if isolation_scope is None
-            else sentry_sdk.scope.use_isolation_scope(isolation_scope)
-        )
-        current_scope_context = (
-            nullcontext()
-            if current_scope is None
-            else sentry_sdk.scope.use_scope(current_scope)
-        )
-
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
 
     # Start span and execute
-    with isolation_scope_context, current_scope_context:
+    with _with_active_http_scopes(ctx=ctx):
         span_mgr: "Union[Span, StreamedSpan]"
         if span_streaming:
             span_mgr = sentry_sdk.traces.start_span(
@@ -826,7 +781,7 @@ def _patch_lowlevel_server_v1() -> None:
                 return await _tool_handler_wrapper(func, args, force_await=False)
 
             # Then register it with the original MCP decorator
-            return original_call_tool(self)(wrapper)
+            return original_call_tool(self, **kwargs)(wrapper)
 
         return instrumented_decorator
 
