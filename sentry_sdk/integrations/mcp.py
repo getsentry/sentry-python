@@ -377,33 +377,17 @@ async def _tool_handler_wrapper(
     if original_kwargs is None:
         original_kwargs = {}
 
-    # Detect v1 vs v2: MCP SDK v2 passes (ServerRequestContext, params) to handlers
-    ctx: "Optional[Any]" = None
-    params: "Optional[Any]" = None
-    if (
-        ServerRequestContext is not None
-        and original_args
-        and isinstance(original_args[0], ServerRequestContext)
-    ):
-        ctx = original_args[0]
-        if len(original_args) > 1:
-            params = original_args[1]
-            handler_name, arguments = _extract_handler_data_from_params("tool", params)
-        else:
-            handler_name = "unknown"
-            arguments = {}
-    else:
-        handler_name, arguments = _extract_handler_data_from_args(
-            "tool", original_args, original_kwargs
-        )
+    handler_name, arguments = _extract_handler_data_from_args(
+        "tool", original_args, original_kwargs
+    )
 
     # Get request ID, session ID, and transport from context
-    request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
+    request_id, session_id, mcp_transport = _get_request_context_data()
 
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
 
     # Start span and execute
-    with _with_active_http_scopes(ctx=ctx):
+    with _with_active_http_scopes():
         span_mgr: "Union[Span, StreamedSpan]"
         if span_streaming:
             span_mgr = sentry_sdk.traces.start_span(
@@ -590,33 +574,17 @@ async def _prompt_handler_wrapper(
     if original_kwargs is None:
         original_kwargs = {}
 
-    # Detect v1 vs v2: MCP SDK v2 passes (ServerRequestContext, params) to handlers
-    ctx: "Optional[Any]" = None
-    if (
-        ServerRequestContext is not None
-        and original_args
-        and isinstance(original_args[0], ServerRequestContext)
-    ):
-        ctx = original_args[0]
-        if len(original_args) > 1:
-            handler_name, arguments = _extract_handler_data_from_params(
-                "prompt", original_args[1]
-            )
-        else:
-            handler_name = "unknown"
-            arguments = {}
-    else:
-        handler_name, arguments = _extract_handler_data_from_args(
-            "prompt", original_args, original_kwargs
-        )
+    handler_name, arguments = _extract_handler_data_from_args(
+        "prompt", original_args, original_kwargs
+    )
 
     # Get request ID, session ID, and transport from context
-    request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
+    request_id, session_id, mcp_transport = _get_request_context_data()
 
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
 
     # Start span and execute
-    with _with_active_http_scopes(ctx=ctx):
+    with _with_active_http_scopes():
         span_mgr: "Union[Span, StreamedSpan]"
         if span_streaming:
             span_mgr = sentry_sdk.traces.start_span(
@@ -893,35 +861,17 @@ async def _resource_handler_wrapper(
     if original_kwargs is None:
         original_kwargs = {}
 
-    # Detect v1 vs v2: MCP SDK v2 passes (ServerRequestContext, params) to handlers
-    ctx: "Optional[Any]" = None
-    params: "Optional[Any]" = None
-    if (
-        ServerRequestContext is not None
-        and original_args
-        and isinstance(original_args[0], ServerRequestContext)
-    ):
-        ctx = original_args[0]
-        if len(original_args) > 1:
-            params = original_args[1]
-            handler_name, arguments = _extract_handler_data_from_params(
-                "resource", params
-            )
-        else:
-            handler_name = "unknown"
-            arguments = {}
-    else:
-        handler_name, arguments = _extract_handler_data_from_args(
-            "resource", original_args, original_kwargs
-        )
+    handler_name, arguments = _extract_handler_data_from_args(
+        "resource", original_args, original_kwargs
+    )
 
     # Get request ID, session ID, and transport from context
-    request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
+    request_id, session_id, mcp_transport = _get_request_context_data()
 
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
 
     # Start span and execute
-    with _with_active_http_scopes(ctx=ctx):
+    with _with_active_http_scopes():
         span_mgr: "Union[Span, StreamedSpan]"
         if span_streaming:
             span_mgr = sentry_sdk.traces.start_span(
@@ -951,16 +901,10 @@ async def _resource_handler_wrapper(
                 mcp_transport,
             )
 
-            uri = None
-            if params is not None:
-                uri = getattr(params, "uri", None)
-
-            # v1 scenario
-            if ServerRequestContext is None:
-                if original_args:
-                    uri = original_args[0]
-                else:
-                    uri = original_kwargs.get("uri")
+            if original_args:
+                uri = original_args[0]
+            else:
+                uri = original_kwargs.get("uri")
 
             protocol = None
             if uri is not None and hasattr(uri, "scheme"):
