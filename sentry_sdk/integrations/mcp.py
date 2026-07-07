@@ -475,19 +475,13 @@ async def _tool_handler_wrapper(
     return result
 
 
-async def _v2_tool_handler(
+async def _instrument_v2_tool_call(
     ctx: "ServerRequestContext[Any, Any]",
     call_next: "CallNext",
 ) -> "HandlerResult":
     """
-    Wrapper for MCP tool handlers.
+    Instrument a tool call as observed by the MCP Server middleware.
     Creates and manages the MCP span and attaches all attributes on the span.
-
-    Args:
-        func: The handler function to wrap
-        original_args: Original arguments passed to the handler
-        original_kwargs: Original keyword arguments passed to the handler
-        self: Optional instance for bound methods
     """
     if ctx.params is None:
         return await call_next(ctx)
@@ -495,35 +489,13 @@ async def _v2_tool_handler(
     handler_name = ctx.params["name"]
     arguments = ctx.params["arguments"]
 
-    scopes = _get_active_http_scopes(ctx=ctx)
-
-    isolation_scope_context: "ContextManager[Any]"
-    current_scope_context: "ContextManager[Any]"
-
-    if scopes is None:
-        isolation_scope_context = nullcontext()
-        current_scope_context = nullcontext()
-    else:
-        isolation_scope, current_scope = scopes
-
-        isolation_scope_context = (
-            nullcontext()
-            if isolation_scope is None
-            else sentry_sdk.scope.use_isolation_scope(isolation_scope)
-        )
-        current_scope_context = (
-            nullcontext()
-            if current_scope is None
-            else sentry_sdk.scope.use_scope(current_scope)
-        )
-
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
 
     # Start span and execute
-    with isolation_scope_context, current_scope_context:
+    with _with_active_http_scopes(ctx=ctx):
         span_mgr: "Union[Span, StreamedSpan]"
         if span_streaming:
             span_mgr = sentry_sdk.traces.start_span(
@@ -766,19 +738,13 @@ async def _prompt_handler_wrapper(
     return result
 
 
-async def _v2_prompt_handler(
+async def _instrument_v2_prompt_get(
     ctx: "ServerRequestContext[Any, Any]",
     call_next: "CallNext",
 ) -> "HandlerResult":
     """
-    Wrapper for MCP prompt handlers.
+    Instrument a prompt retrieval as observed by the MCP Server middleware.
     Creates and manages the MCP span and attaches all attributes on the span.
-
-    Args:
-        func: The handler function to wrap
-        original_args: Original arguments passed to the handler
-        original_kwargs: Original keyword arguments passed to the handler
-        self: Optional instance for bound methods
     """
     if ctx.params is None:
         return await call_next(ctx)
@@ -786,35 +752,13 @@ async def _v2_prompt_handler(
     handler_name = ctx.params["name"]
     arguments = {"name": handler_name, **ctx.params["arguments"]}
 
-    scopes = _get_active_http_scopes(ctx=ctx)
-
-    isolation_scope_context: "ContextManager[Any]"
-    current_scope_context: "ContextManager[Any]"
-
-    if scopes is None:
-        isolation_scope_context = nullcontext()
-        current_scope_context = nullcontext()
-    else:
-        isolation_scope, current_scope = scopes
-
-        isolation_scope_context = (
-            nullcontext()
-            if isolation_scope is None
-            else sentry_sdk.scope.use_isolation_scope(isolation_scope)
-        )
-        current_scope_context = (
-            nullcontext()
-            if current_scope is None
-            else sentry_sdk.scope.use_scope(current_scope)
-        )
-
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
 
     # Start span and execute
-    with isolation_scope_context, current_scope_context:
+    with _with_active_http_scopes(ctx=ctx):
         span_mgr: "Union[Span, StreamedSpan]"
         if span_streaming:
             span_mgr = sentry_sdk.traces.start_span(
@@ -1042,46 +986,18 @@ async def _resource_handler_wrapper(
     return result
 
 
-async def _v2_resource_handler(
+async def _instrument_v2_resource_read(
     ctx: "ServerRequestContext[Any, Any]",
     call_next: "CallNext",
 ) -> "HandlerResult":
     """
-    Wrapper for MCP resource handlers.
+    Instrument getting a resource as observed by the MCP Server middleware.
     Creates and manages the MCP span and attaches all attributes on the span.
-
-    Args:
-        func: The handler function to wrap
-        original_args: Original arguments passed to the handler
-        original_kwargs: Original keyword arguments passed to the handler
-        self: Optional instance for bound methods
     """
     if ctx.params is None:
         return await call_next(ctx)
 
     handler_name = ctx.params["uri"]
-
-    scopes = _get_active_http_scopes(ctx=ctx)
-
-    isolation_scope_context: "ContextManager[Any]"
-    current_scope_context: "ContextManager[Any]"
-
-    if scopes is None:
-        isolation_scope_context = nullcontext()
-        current_scope_context = nullcontext()
-    else:
-        isolation_scope, current_scope = scopes
-
-        isolation_scope_context = (
-            nullcontext()
-            if isolation_scope is None
-            else sentry_sdk.scope.use_isolation_scope(isolation_scope)
-        )
-        current_scope_context = (
-            nullcontext()
-            if current_scope is None
-            else sentry_sdk.scope.use_scope(current_scope)
-        )
 
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
@@ -1089,7 +1005,7 @@ async def _v2_resource_handler(
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
 
     # Start span and execute
-    with isolation_scope_context, current_scope_context:
+    with _with_active_http_scopes(ctx=ctx):
         span_mgr: "Union[Span, StreamedSpan]"
         if span_streaming:
             span_mgr = sentry_sdk.traces.start_span(
@@ -1218,13 +1134,13 @@ async def _sentry_middleware(
     ctx: "ServerRequestContext[Any, Any]", call_next: "CallNext"
 ) -> "HandlerResult":
     if ctx.method == "tools/call":
-        return await _v2_tool_handler(ctx, call_next)
+        return await _instrument_v2_tool_call(ctx, call_next)
 
     if ctx.method == "prompts/get":
-        return await _v2_prompt_handler(ctx, call_next)
+        return await _instrument_v2_prompt_get(ctx, call_next)
 
     if ctx.method == "resources/read":
-        return await _v2_resource_handler(ctx, call_next)
+        return await _instrument_v2_resource_read(ctx, call_next)
 
     return await call_next(ctx)
 
