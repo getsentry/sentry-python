@@ -432,11 +432,13 @@ async def _instrument_v2_tool_call(
     Instrument a tool call as observed by the MCP Server middleware.
     Creates and manages the MCP span and attaches all attributes on the span.
     """
-    if ctx.params is None:
+    if ctx.params is None or ctx.params.get("name") is None:
         return await call_next(ctx)
 
     handler_name = ctx.params["name"]
-    arguments = ctx.params["arguments"]
+    arguments = ctx.params.get("arguments")
+    if arguments is None:
+        arguments = {}
 
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
@@ -679,11 +681,13 @@ async def _instrument_v2_prompt_get(
     Instrument a prompt retrieval as observed by the MCP Server middleware.
     Creates and manages the MCP span and attaches all attributes on the span.
     """
-    if ctx.params is None:
+    if ctx.params is None or ctx.params.get("name") is None:
         return await call_next(ctx)
 
     handler_name = ctx.params["name"]
-    arguments = ctx.params["arguments"]
+    arguments = ctx.params.get("arguments")
+    if arguments is None:
+        arguments = {}
 
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
@@ -903,7 +907,7 @@ async def _instrument_v2_resource_read(
     Instrument getting a resource as observed by the MCP Server middleware.
     Creates and manages the MCP span and attaches all attributes on the span.
     """
-    if ctx.params is None:
+    if ctx.params is None or ctx.params.get("uri") is None:
         return await call_next(ctx)
 
     handler_name = ctx.params["uri"]
