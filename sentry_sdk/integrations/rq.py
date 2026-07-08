@@ -99,6 +99,11 @@ class RqIntegration(Integration):
                         if func_name is not None:
                             span.set_attribute(SPANDATA.CODE_FUNCTION_NAME, func_name)
 
+                        if args:
+                            span.set_attribute(
+                                SPANDATA.MESSAGING_DESTINATION_NAME, args[0].name
+                            )
+
                         rv = old_perform_job(self, job, *args, **kwargs)
                 else:
                     transaction = continue_trace(
@@ -115,7 +120,12 @@ class RqIntegration(Integration):
                     with sentry_sdk.start_transaction(
                         transaction,
                         custom_sampling_context={"rq_job": job},
-                    ):
+                    ) as span:
+                        if args:
+                            span.set_data(
+                                SPANDATA.MESSAGING_DESTINATION_NAME, args[0].name
+                            )
+
                         rv = old_perform_job(self, job, *args, **kwargs)
 
             if self.is_horse:
