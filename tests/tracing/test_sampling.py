@@ -127,6 +127,7 @@ def test_uses_traces_sample_rate_correctly_span_streaming(
 
     sentry_sdk.traces.continue_trace(
         {
+            "sentry-trace": "0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331",
             "baggage": "sentry-sample_rand=0.500000",
         }
     )
@@ -169,6 +170,7 @@ def test_uses_traces_sampler_return_value_correctly_span_streaming(
 
     sentry_sdk.traces.continue_trace(
         {
+            "sentry-trace": "0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331",
             "baggage": "sentry-sample_rand=0.500000",
         }
     )
