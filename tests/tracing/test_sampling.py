@@ -368,7 +368,7 @@ def test_inherits_parent_sampling_decision_when_traces_sampler_undefined_span_st
     # make sure the parent sampling decision is the opposite of what
     # traces_sample_rate would produce, to prove the inheritance takes
     # precedence
-    mock_random_value = 0.25 if parent_sampling_decision is False else 0.75
+    mock_random_value = 0.25 if parent_sampling_decision == "0" else 0.75
     with mock.patch.object(random, "random", return_value=mock_random_value):
         span = sentry_sdk.traces.start_span(name="dogpark")
         assert span.sampled is bool(int(parent_sampling_decision))
