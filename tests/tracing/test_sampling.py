@@ -305,7 +305,7 @@ def test_ignores_inherited_sample_decision_when_traces_sampler_defined_span_stre
 ):
     # make traces_sampler pick the opposite of the inherited decision, to prove
     # that traces_sampler takes precedence
-    traces_sampler = mock.Mock(return_value=not parent_sampling_decision)
+    traces_sampler = mock.Mock(return_value=not bool(int(parent_sampling_decision)))
     sentry_init(
         traces_sampler=traces_sampler,
         _experiments={"trace_lifecycle": "stream"},
@@ -317,7 +317,7 @@ def test_ignores_inherited_sample_decision_when_traces_sampler_defined_span_stre
         }
     )
     span = sentry_sdk.traces.start_span(name="dogpark")
-    assert span.sampled is not parent_sampling_decision
+    assert span.sampled is not bool(int(parent_sampling_decision))
 
 
 @pytest.mark.parametrize("explicit_decision", [True, False])
