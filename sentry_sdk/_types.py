@@ -193,6 +193,7 @@ if TYPE_CHECKING:
         graphql: "GraphQLCollectionUserOptions"
         gen_ai: "GenAICollectionUserOptions"
         database: "DatabaseCollectionUserOptions"
+        queues: bool
         stack_frame_variables: bool
         frame_context_lines: int
 
@@ -206,6 +207,7 @@ if TYPE_CHECKING:
         graphql: "GraphQLCollectionBehaviour"
         gen_ai: "GenAICollectionBehaviour"
         database: "DatabaseCollectionBehaviour"
+        queues: bool
         stack_frame_variables: bool
         frame_context_lines: int
 
