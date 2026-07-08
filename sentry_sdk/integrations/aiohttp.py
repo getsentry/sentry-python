@@ -150,7 +150,7 @@ class AioHttpIntegration(Integration):
 
                         header_attributes: "dict[str, Any]" = {}
                         for header, header_value in _filter_headers(
-                            headers, use_annotated_value=False
+                            headers
                         ).items():
                             header_attributes[
                                 f"http.request.header.{header.lower()}"

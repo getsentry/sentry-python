@@ -195,7 +195,7 @@ async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
             header_attributes: "dict[str, Any]" = {}
 
             for header, header_value in _filter_headers(
-                dict(request_websocket.headers), use_annotated_value=False
+                dict(request_websocket.headers)
             ).items():
                 header_attributes[f"http.request.header.{header.lower()}"] = (
                     header_value
