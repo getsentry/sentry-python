@@ -193,7 +193,7 @@ def _get_request_attributes(request: "Any") -> "Dict[str, Any]":
     if request.method:
         attributes[SPANDATA.HTTP_REQUEST_METHOD] = request.method.upper()
 
-    headers = _filter_headers(dict(request.headers), use_annotated_value=False)
+    headers = _filter_headers(dict(request.headers))
     for header, value in headers.items():
         attributes[f"{SPANDATA.HTTP_REQUEST_HEADER}.{header.lower()}"] = value
 
