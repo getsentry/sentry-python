@@ -29,7 +29,6 @@ if TYPE_CHECKING:
     from typing import Any, Dict, Literal
 
     from sentry_sdk._types import (
-        DatabaseCollectionBehaviour,
         DataCollection,
         GenAICollectionBehaviour,
         GraphQLCollectionBehaviour,
@@ -107,7 +106,7 @@ def _map_from_send_default_pii(
         "query_params": {"mode": kv_mode, "terms": terms},
         "graphql": {"document": send_default_pii, "variables": send_default_pii},
         "gen_ai": {"inputs": send_default_pii, "outputs": send_default_pii},
-        "database": {"query_params": send_default_pii},
+        "database_query_data": send_default_pii,
         "queues": send_default_pii,
         "stack_frame_variables": include_local_variables,
         "frame_context_lines": (
@@ -157,7 +156,7 @@ def _resolve_explicit(
         "query_params": _kvcb_from_value(d.get("query_params") or {}),
         "graphql": _graphql_from_value(d.get("graphql") or {}),
         "gen_ai": _gen_ai_from_value(d.get("gen_ai") or {}),
-        "database": _database_from_value(d.get("database") or {}),
+        "database_query_data": d.get("database_query_data", True),
         "queues": d.get("queues", True),
         "stack_frame_variables": stack_frame_variables,
         "frame_context_lines": frame_context_lines,
@@ -209,12 +208,6 @@ def _graphql_from_value(
         "document": val.get("document", True),
         "variables": val.get("variables", True),
     }
-
-
-def _database_from_value(
-    val: "dict[str, Any]",
-) -> "DatabaseCollectionBehaviour":
-    return {"query_params": val.get("query_params", True)}
 
 
 def _resolve_data_collection(options: "Dict[str, Any]") -> "DataCollection":
