@@ -1141,6 +1141,100 @@ def test_outgoing_traceparent_and_baggage_incoming_trace_deferred(
             assert baggage_items == incoming_baggage
 
 
+def test_outgoing_traceparent_and_baggage_ignored_segment(sentry_init):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream",
+            "ignore_spans": [
+                "ignored",
+            ],
+        },
+    )
+
+    trace_id = "0af7651916cd43dd8448eb211c80319c"
+    parent_span_id = "b7ad6b7169203331"
+
+    incoming_baggage = {
+        "sentry-trace_id": trace_id,
+        "sentry-sample_rand": "0.500000",
+        "sentry-sampled": "true",
+        "sentry-sample_rate": "1.0",
+    }
+
+    sentry_sdk.traces.continue_trace(
+        {
+            "sentry-trace": f"{trace_id}-{parent_span_id}-1",
+            "baggage": ",".join(
+                sorted([f"{k}={v}" for k, v in incoming_baggage.items()])
+            ),
+        }
+    )
+
+    with sentry_sdk.traces.start_span(name="ignored") as span:
+        assert span.sampled is False
+
+        traceparent = sentry_sdk.get_traceparent()
+        assert traceparent == f"{trace_id}-{span.span_id}-0"
+
+        baggage = sentry_sdk.get_baggage()
+        baggage_items = dict(tuple(item.split("=")) for item in baggage.split(","))
+
+        for incoming_key, incoming_value in incoming_baggage.items():
+            assert incoming_key in baggage_items
+            assert baggage_items[incoming_key] == incoming_value
+
+
+def test_outgoing_traceparent_and_baggage_ignored_child_span(sentry_init):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream",
+            "ignore_spans": [
+                "ignored",
+            ],
+        },
+    )
+
+    trace_id = "0af7651916cd43dd8448eb211c80319c"
+    parent_span_id = "b7ad6b7169203331"
+
+    incoming_baggage = {
+        "sentry-trace_id": trace_id,
+        "sentry-sample_rand": "0.500000",
+        "sentry-sample_rate": "1.0",
+    }
+
+    sentry_sdk.traces.continue_trace(
+        {
+            "sentry-trace": f"{trace_id}-{parent_span_id}-1",
+            "baggage": ",".join(
+                sorted([f"{k}={v}" for k, v in incoming_baggage.items()])
+            ),
+        }
+    )
+
+    with sentry_sdk.traces.start_span(name="span") as segment:
+        assert segment.sampled is True
+
+        with sentry_sdk.traces.start_span(name="ignored") as child:
+            assert child.sampled is False
+
+            traceparent = sentry_sdk.get_traceparent()
+
+            # The parent span ID in the traceparent will be the segment's ID,
+            # NOT the child. As the child is ignored, it's not set on scope at
+            # all.
+            assert traceparent == f"{trace_id}-{segment.span_id}-1"
+
+            baggage = sentry_sdk.get_baggage()
+            baggage_items = dict(tuple(item.split("=")) for item in baggage.split(","))
+
+            for incoming_key, incoming_value in incoming_baggage.items():
+                assert incoming_key in baggage_items
+                assert baggage_items[incoming_key] == incoming_value
+
+
 def test_set_span_status(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,

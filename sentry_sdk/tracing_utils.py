@@ -690,7 +690,7 @@ class PropagationContext:
         return self.baggage.sentry_items.get("sample_rand")
 
     def _sample_rate(self) -> "Optional[float]":
-        """Convenience method to get the sample_ value from the baggage."""
+        """Convenience method to get the sample_rate value from the baggage."""
         if self.baggage is None:
             return None
 
