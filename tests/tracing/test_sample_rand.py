@@ -101,7 +101,7 @@ def test_transaction_uses_incoming_sample_rand_span_streaming(
     items = capture_items()
 
     sentry_sdk.traces.continue_trace(
-        {"baggage": "sentry-sample_rand={sample_rand:.6f}"}
+        {"baggage": f"sentry-sample_rand={sample_rand:.6f}"}
     )
 
     with sentry_sdk.traces.start_span(name="span") as span:
