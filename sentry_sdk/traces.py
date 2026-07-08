@@ -504,11 +504,6 @@ class StreamedSpan:
         if self._segment.sampled is True:
             sampled = "1"
         elif self._segment.sampled is False:
-            if (
-                isinstance(self._segment, NoOpStreamedSpan)
-                and self._segment._unsampled_reason == "ignored"
-            ):
-                sampled = ...
             sampled = "0"
         else:
             sampled = None
