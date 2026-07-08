@@ -1,6 +1,7 @@
 import gc
 import re
 from array import array
+from collections.abc import Mapping
 
 import pytest
 
@@ -151,6 +152,34 @@ def test_trim_databag_breadth(body_normalizer):
     assert len(result) == MAX_DATABAG_BREADTH
     for key, value in result.items():
         assert data.get(key) == value
+
+
+def test_trim_databag_breadth_does_not_copy_entire_mapping(body_normalizer):
+    class CountingMapping(Mapping):
+        def __init__(self, size):
+            self.data = {"key{}".format(i): "value{}".format(i) for i in range(size)}
+            self.iterated = 0
+            self.lookups = 0
+
+        def __len__(self):
+            return len(self.data)
+
+        def __iter__(self):
+            for key in self.data:
+                self.iterated += 1
+                yield key
+
+        def __getitem__(self, key):
+            self.lookups += 1
+            return self.data[key]
+
+    data = CountingMapping(MAX_DATABAG_BREADTH + 5)
+
+    result = body_normalizer(data)
+
+    assert len(result) == MAX_DATABAG_BREADTH
+    assert data.iterated == MAX_DATABAG_BREADTH + 1
+    assert data.lookups == MAX_DATABAG_BREADTH + 1
 
 
 def test_no_trimming_if_max_request_body_size_is_always(body_normalizer):

@@ -3,6 +3,7 @@ import sys
 from array import array
 from collections.abc import Mapping
 from datetime import datetime
+from itertools import islice
 from typing import TYPE_CHECKING
 
 from sentry_sdk.utils import (
@@ -301,14 +302,18 @@ class _Serializer:
         elif isinstance(obj, Mapping):
             # Create temporary copy here to avoid calling too much code that
             # might mutate our dictionary while we're still iterating over it.
-            obj = dict(obj.items())
+            obj_len = len(obj)
+            if isinstance(remaining_breadth, int):
+                obj = dict(islice(obj.items(), remaining_breadth + 1))
+            else:
+                obj = dict(obj.items())
 
             rv_dict: "Dict[str, Any]" = {}
             i = 0
 
             for k, v in obj.items():
                 if remaining_breadth is not None and i >= remaining_breadth:
-                    self._annotate(len=len(obj))
+                    self._annotate(len=obj_len)
                     break
 
                 str_k = str(k)
