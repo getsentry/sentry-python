@@ -408,8 +408,8 @@ def patch_authentication_middleware(middleware_class: "Any") -> None:
             receive: "Callable[[], Awaitable[Dict[str, Any]]]",
             send: "Callable[[Dict[str, Any]], Awaitable[None]]",
         ) -> None:
-            await old_call(self, scope, receive, send)
             _add_user_to_sentry_scope(scope)
+            await old_call(self, scope, receive, send)
 
         middleware_class.__call__ = _sentry_authenticationmiddleware_call
 
@@ -422,7 +422,6 @@ def patch_middlewares() -> None:
     old_middleware_init = Middleware.__init__
 
     not_yet_patched = "_sentry_middleware_init" not in str(old_middleware_init)
-
     if not_yet_patched:
 
         def _sentry_middleware_init(
