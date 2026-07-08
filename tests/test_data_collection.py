@@ -184,7 +184,7 @@ def _get(dc, path):
             {
                 "graphql.document": True,
                 "graphql.variables": True,
-                "database": True,
+                "database_query_data": True,
             },
             id="explicit_graphql_database_defaults",
         ),
@@ -193,7 +193,7 @@ def _get(dc, path):
             {
                 "graphql.document": False,
                 "graphql.variables": False,
-                "database": False,
+                "database_query_data": False,
                 "queues": False,
             },
             id="legacy_pii_off_gates_graphql_database_and_queues",
@@ -203,7 +203,7 @@ def _get(dc, path):
             {
                 "graphql.document": True,
                 "graphql.variables": True,
-                "database": True,
+                "database_query_data": True,
                 "queues": True,
             },
             id="legacy_pii_on_collects_graphql_database_and_queues",

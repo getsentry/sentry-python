@@ -186,7 +186,7 @@ if TYPE_CHECKING:
         query_params: "KeyValueCollectionBehaviour"
         graphql: "GraphQLCollectionUserOptions"
         gen_ai: "GenAICollectionUserOptions"
-        database: bool
+        database_query_data: bool
         queues: bool
         stack_frame_variables: bool
         frame_context_lines: int
@@ -200,7 +200,7 @@ if TYPE_CHECKING:
         query_params: "KeyValueCollectionBehaviour"
         graphql: "GraphQLCollectionBehaviour"
         gen_ai: "GenAICollectionBehaviour"
-        database: bool
+        database_query_data: bool
         queues: bool
         stack_frame_variables: bool
         frame_context_lines: int
