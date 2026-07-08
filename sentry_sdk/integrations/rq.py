@@ -65,11 +65,11 @@ class RqIntegration(Integration):
 
         @functools.wraps(old_perform_job)
         def sentry_patched_perform_job(
-            self: "Any", job: "Job", *args: "Queue", **kwargs: "Any"
+            self: "Any", job: "Job", queue: "Queue", *args: "Any", **kwargs: "Any"
         ) -> bool:
             client = sentry_sdk.get_client()
             if client.get_integration(RqIntegration) is None:
-                return old_perform_job(self, job, *args, **kwargs)
+                return old_perform_job(self, job, queue, *args, **kwargs)
 
             with sentry_sdk.new_scope() as scope:
                 scope.clear_breadcrumbs()
@@ -93,18 +93,14 @@ class RqIntegration(Integration):
                             "sentry.origin": RqIntegration.origin,
                             "sentry.span.source": SegmentSource.TASK,
                             SPANDATA.MESSAGING_MESSAGE_ID: job.id,
+                            SPANDATA.MESSAGING_DESTINATION_NAME: queue.name,
                         },
                         parent_span=None,
                     ) as span:
                         if func_name is not None:
                             span.set_attribute(SPANDATA.CODE_FUNCTION_NAME, func_name)
 
-                        if args:
-                            span.set_attribute(
-                                SPANDATA.MESSAGING_DESTINATION_NAME, args[0].name
-                            )
-
-                        rv = old_perform_job(self, job, *args, **kwargs)
+                        rv = old_perform_job(self, job, queue, *args, **kwargs)
                 else:
                     transaction = continue_trace(
                         job.meta.get("_sentry_trace_headers") or {},
@@ -121,12 +117,9 @@ class RqIntegration(Integration):
                         transaction,
                         custom_sampling_context={"rq_job": job},
                     ) as span:
-                        if args:
-                            span.set_data(
-                                SPANDATA.MESSAGING_DESTINATION_NAME, args[0].name
-                            )
+                        span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, queue.name)
 
-                        rv = old_perform_job(self, job, *args, **kwargs)
+                        rv = old_perform_job(self, job, queue, *args, **kwargs)
 
             if self.is_horse:
                 # We're inside of a forked process and RQ is
