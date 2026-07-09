@@ -141,7 +141,7 @@ if TYPE_CHECKING:
     from collections.abc import Container, MutableMapping, Sequence
     from datetime import datetime
     from types import TracebackType
-    from typing import Any, Callable, Dict, Mapping, NotRequired, Optional, Type
+    from typing import Any, Callable, Dict, List, Mapping, NotRequired, Optional, Type
 
     from typing_extensions import Literal, TypedDict
 
@@ -151,6 +151,59 @@ if TYPE_CHECKING:
         name: str
         version: str
         packages: "Sequence[Mapping[str, str]]"
+
+    class KeyValueCollectionBehaviour(TypedDict):
+        mode: 'Literal["off", "denylist", "allowlist"]'
+        terms: "NotRequired[List[str]]"
+
+    class GenAICollectionUserOptions(TypedDict, total=False):
+        inputs: bool
+        outputs: bool
+
+    class GenAICollectionBehaviour(TypedDict):
+        inputs: bool
+        outputs: bool
+
+    class GraphQLCollectionUserOptions(TypedDict, total=False):
+        document: bool
+        variables: bool
+
+    class GraphQLCollectionBehaviour(TypedDict):
+        document: bool
+        variables: bool
+
+    class HttpHeadersCollectionUserOptions(TypedDict, total=False):
+        request: "KeyValueCollectionBehaviour"
+
+    class HttpHeadersCollectionBehaviour(TypedDict):
+        request: "KeyValueCollectionBehaviour"
+
+    class DataCollectionUserOptions(TypedDict, total=False):
+        user_info: bool
+        cookies: "KeyValueCollectionBehaviour"
+        http_headers: "HttpHeadersCollectionUserOptions"
+        http_bodies: "List[str]"
+        query_params: "KeyValueCollectionBehaviour"
+        graphql: "GraphQLCollectionUserOptions"
+        gen_ai: "GenAICollectionUserOptions"
+        database_query_data: bool
+        queues: bool
+        stack_frame_variables: bool
+        frame_context_lines: int
+
+    class DataCollection(TypedDict):
+        provided_by_user: bool
+        user_info: bool
+        cookies: "KeyValueCollectionBehaviour"
+        http_headers: "HttpHeadersCollectionBehaviour"
+        http_bodies: "List[str]"
+        query_params: "KeyValueCollectionBehaviour"
+        graphql: "GraphQLCollectionBehaviour"
+        gen_ai: "GenAICollectionBehaviour"
+        database_query_data: bool
+        queues: bool
+        stack_frame_variables: bool
+        frame_context_lines: int
 
     # "critical" is an alias of "fatal" recognized by Relay
     LogLevelStr = Literal["fatal", "critical", "error", "warning", "info", "debug"]

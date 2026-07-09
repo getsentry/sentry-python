@@ -23,6 +23,10 @@ from sentry_sdk.consts import (
     VERSION,
     ClientConstructor,
 )
+from sentry_sdk.data_collection import (
+    _map_from_send_default_pii,
+    _resolve_data_collection,
+)
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
 from sentry_sdk.integrations.dedupe import DedupeIntegration
@@ -345,11 +349,13 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
     if rv["enable_tracing"] is True and rv["traces_sample_rate"] is None:
         rv["traces_sample_rate"] = 1.0
 
+    rv["data_collection"] = _resolve_data_collection(rv)
+
     if rv["event_scrubber"] is None:
         rv["event_scrubber"] = EventScrubber(
-            send_default_pii=(
-                False if rv["send_default_pii"] is None else rv["send_default_pii"]
-            )
+            send_default_pii=False
+            if rv["send_default_pii"] is None
+            else rv["send_default_pii"]
         )
 
     if rv["socket_options"] and not isinstance(rv["socket_options"], list):
@@ -614,6 +620,19 @@ class _Client(BaseClient):
                 self.options["error_sampler"] = sample_all
                 self.options["traces_sampler"] = sample_all
                 self.options["profiles_sampler"] = sample_all
+                # data_collection was resolved in _get_options() before this
+                # spotlight override flipped send_default_pii on. Re-derive it so
+                # data_collection agrees with should_send_default_pii() in
+                # DSN-less spotlight mode (only when the user did not set
+                # data_collection explicitly).
+                if not self.options["data_collection"]["provided_by_user"]:
+                    self.options["data_collection"] = _map_from_send_default_pii(
+                        send_default_pii=True,
+                        include_local_variables=self.options["include_local_variables"]
+                        is not False,
+                        include_source_context=self.options["include_source_context"]
+                        is not False,
+                    )
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 

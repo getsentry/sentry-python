@@ -45,6 +45,7 @@ if TYPE_CHECKING:
     from sentry_sdk._types import (
         BreadcrumbProcessor,
         ContinuousProfilerMode,
+        DataCollectionUserOptions,
         Event,
         EventProcessor,
         Hint,
@@ -1278,6 +1279,7 @@ class ClientConstructor:
         transport_queue_size: int = DEFAULT_QUEUE_SIZE,
         sample_rate: float = 1.0,
         send_default_pii: "Optional[bool]" = None,
+        data_collection: "Optional[DataCollectionUserOptions]" = None,
         http_proxy: "Optional[str]" = None,
         https_proxy: "Optional[str]" = None,
         ignore_errors: "Sequence[Union[type, str]]" = [],  # noqa: B006
@@ -1431,6 +1433,25 @@ class ClientConstructor:
 
             If you enable this option, be sure to manually remove what you don't want to send using our features for
             managing `Sensitive Data <https://docs.sentry.io/data-management/sensitive-data/>`_.
+
+        :param data_collection: (EXPERIMENTAL) Structured configuration controlling what data integrations collect automatically,
+            superseding `send_default_pii`. Pass a dict to enable or
+            restrict collection per category (user identity, cookies, HTTP headers/bodies, query params, generative AI
+            inputs/outputs, stack frame variables, source context).
+
+            When `data_collection` is set, omitted fields use their defaults (most categories are collected, with the
+            sensitive denylist scrubbing values). When it is not set, the SDK derives behaviour from `send_default_pii`
+            so that upgrading without configuring `data_collection` changes nothing. If both are set, `data_collection`
+            takes precedence.
+
+            Example::
+
+                sentry_sdk.init(
+                    dsn="...",
+                    data_collection={"user_info": False, "http_bodies": []},
+                )
+
+            See https://docs.sentry.io/platforms/python/configuration/options/#data_collection for more details.
 
         :param event_scrubber: Scrubs the event payload for sensitive information such as cookies, sessions, and
             passwords from a `denylist`.
