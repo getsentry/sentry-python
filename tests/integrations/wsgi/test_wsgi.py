@@ -859,6 +859,256 @@ def test_get_request_url_x_forwarded_proto(environ, use_x_forwarded_for, expecte
 
 
 @pytest.mark.parametrize("send_default_pii", [True, False])
+def test_request_headers_data_collection_default_redacts_sensitive(
+    sentry_init, crashing_app, capture_events, send_default_pii
+):
+    """
+    When ``data_collection`` is configured (even as ``None``, i.e. spec
+    defaults), the WSGI event processor routes request headers through the
+    data-collection filtering path. Sensitive headers are redacted regardless
+    of ``send_default_pii`` -- the value of that legacy option must not change
+    the outcome.
+    """
+    sentry_init(
+        send_default_pii=send_default_pii,
+        _experiments={"data_collection": None},
+    )
+    app = SentryWsgiMiddleware(crashing_app)
+    client = Client(app)
+    events = capture_events()
+
+    with pytest.raises(ZeroDivisionError):
+        client.get(
+            "/",
+            headers={
+                "Authorization": "Bearer secret-token",
+                "X-Custom-Header": "passthrough",
+            },
+        )
+
+    (event,) = events
+    headers = event["request"]["headers"]
+
+    assert headers["Authorization"] == "[Filtered]"
+    assert headers["X-Custom-Header"] == "passthrough"
+
+
+def test_request_headers_legacy_no_pii_redacts_sensitive(
+    sentry_init, crashing_app, capture_events
+):
+    """
+    With no ``data_collection`` configured, ``_filter_headers`` falls back to
+    the legacy ``send_default_pii`` behaviour. When PII is disabled, headers in
+    ``SENSITIVE_HEADERS`` are replaced with an ``AnnotatedValue`` (the default
+    ``use_annotated_value=True`` on the event-processor call site), which
+    serializes to an emptied value plus a ``_meta`` annotation. Non-sensitive
+    headers pass through untouched.
+
+    ``X-Forwarded-For`` is used because it is in ``SENSITIVE_HEADERS`` but is
+    not scrubbed by the default ``EventScrubber``, so the substitution we are
+    asserting on can only come from ``_filter_headers``.
+    """
+    sentry_init(send_default_pii=False)
+    app = SentryWsgiMiddleware(crashing_app)
+    client = Client(app)
+    events = capture_events()
+
+    with pytest.raises(ZeroDivisionError):
+        client.get(
+            "/",
+            headers={
+                "X-Forwarded-For": "1.2.3.4",
+                "X-Custom-Header": "passthrough",
+            },
+        )
+
+    (event,) = events
+
+    assert event["request"]["headers"]["X-Forwarded-For"] == ""
+    assert event["request"]["headers"]["X-Custom-Header"] == "passthrough"
+
+    # The emptied value is accompanied by a `_meta` annotation marking it as
+    # removed, confirming the substitution came from the AnnotatedValue path.
+    assert event["_meta"]["request"]["headers"]["X-Forwarded-For"] == {
+        "": {"rem": [["!config", "x"]]}
+    }
+
+
+def test_request_headers_data_collection_off_collects_no_headers(
+    sentry_init, crashing_app, capture_events
+):
+    """
+    With ``http_headers.request`` mode set to ``off``, no request headers are
+    collected at all -- the filtering returns an empty mapping.
+    """
+    sentry_init(
+        _experiments={
+            "data_collection": {"http_headers": {"request": {"mode": "off"}}}
+        },
+    )
+    app = SentryWsgiMiddleware(crashing_app)
+    client = Client(app)
+    events = capture_events()
+
+    with pytest.raises(ZeroDivisionError):
+        client.get(
+            "/",
+            headers={
+                "X-Forwarded-For": "1.2.3.4",
+                "X-Custom-Header": "passthrough",
+            },
+        )
+
+    (event,) = events
+
+    assert event["request"]["headers"] == {}
+
+
+def test_request_headers_data_collection_allowlist_redacts_all_but_allowed_terms(
+    sentry_init, crashing_app, capture_events
+):
+    """
+    An ``allowlist`` allows through only headers matching a configured term
+    (partial, case-insensitive); every other header key is kept but its value
+    is redacted.
+    """
+    sentry_init(
+        _experiments={
+            "data_collection": {
+                "http_headers": {"request": {"mode": "allowlist", "terms": ["custom"]}}
+            }
+        },
+    )
+    app = SentryWsgiMiddleware(crashing_app)
+    client = Client(app)
+    events = capture_events()
+
+    with pytest.raises(ZeroDivisionError):
+        client.get(
+            "/",
+            headers={
+                "X-Forwarded-For": "1.2.3.4",
+                "X-Custom-Header": "passthrough",
+            },
+        )
+
+    (event,) = events
+    headers = event["request"]["headers"]
+
+    assert headers["X-Custom-Header"] == "passthrough"
+    assert headers["X-Forwarded-For"] == "[Filtered]"
+    assert headers["Host"] == "[Filtered]"
+
+
+def test_request_headers_data_collection_denylist_redacts_only_matched_terms(
+    sentry_init, crashing_app, capture_events
+):
+    """
+    A ``denylist`` passes headers through by default, redacting only those
+    matching a configured term (partial, case-insensitive).
+    """
+    sentry_init(
+        _experiments={
+            "data_collection": {
+                "http_headers": {"request": {"mode": "denylist", "terms": ["custom"]}}
+            }
+        },
+    )
+    app = SentryWsgiMiddleware(crashing_app)
+    client = Client(app)
+    events = capture_events()
+
+    with pytest.raises(ZeroDivisionError):
+        client.get(
+            "/",
+            headers={
+                "X-Forwarded-For": "1.2.3.4",
+                "X-Custom-Header": "passthrough",
+            },
+        )
+
+    (event,) = events
+    headers = event["request"]["headers"]
+
+    assert headers["X-Custom-Header"] == "[Filtered]"
+    assert headers["X-Forwarded-For"] == "1.2.3.4"
+    assert headers["Host"] == "localhost"
+
+
+def test_request_headers_data_collection_cookie_always_redacted(
+    sentry_init, crashing_app, capture_events
+):
+    """
+    The ``cookie``/``set-cookie`` headers are always redacted in the
+    data-collection path, even when explicitly allowlisted. A sibling header
+    (``custom``) that is also allowlisted passes through, isolating the
+    cookie override.
+
+    The middleware is driven with an explicit environ because werkzeug's test
+    ``Client`` manages its own cookie jar and strips the ``Cookie`` header.
+    """
+    sentry_init(
+        _experiments={
+            "data_collection": {
+                "http_headers": {
+                    "request": {"mode": "allowlist", "terms": ["cookie", "custom"]}
+                }
+            }
+        },
+    )
+    app = SentryWsgiMiddleware(crashing_app)
+    events = capture_events()
+
+    environ = {
+        "REQUEST_METHOD": "GET",
+        "PATH_INFO": "/",
+        "SERVER_NAME": "localhost",
+        "SERVER_PORT": "80",
+        "wsgi.url_scheme": "http",
+        "HTTP_COOKIE": "sessionid=secret",
+        "HTTP_X_CUSTOM_HEADER": "passthrough",
+    }
+
+    with pytest.raises(ZeroDivisionError):
+        list(app(environ, lambda status, headers: None))
+
+    (event,) = events
+    headers = event["request"]["headers"]
+
+    assert headers["Cookie"] == "[Filtered]"
+    assert headers["X-Custom-Header"] == "passthrough"
+
+
+def test_request_headers_legacy_pii_passes_headers_through(
+    sentry_init, crashing_app, capture_events
+):
+    """
+    With no ``data_collection`` configured and ``send_default_pii`` enabled,
+    the legacy path returns all headers unchanged -- including those in
+    ``SENSITIVE_HEADERS``.
+    """
+    sentry_init(send_default_pii=True)
+    app = SentryWsgiMiddleware(crashing_app)
+    client = Client(app)
+    events = capture_events()
+
+    with pytest.raises(ZeroDivisionError):
+        client.get(
+            "/",
+            headers={
+                "X-Forwarded-For": "1.2.3.4",
+                "X-Custom-Header": "passthrough",
+            },
+        )
+
+    (event,) = events
+    headers = event["request"]["headers"]
+
+    assert headers["X-Forwarded-For"] == "1.2.3.4"
+    assert headers["X-Custom-Header"] == "passthrough"
+
+
+@pytest.mark.parametrize("send_default_pii", [True, False])
 def test_user_ip_address_on_all_spans(sentry_init, capture_items, send_default_pii):
     def dogpark(environ, start_response):
         with sentry_sdk.traces.start_span(name="child-span"):
