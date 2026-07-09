@@ -115,10 +115,13 @@ def _get_request_data(
     if ty in ("http", "websocket"):
         request_data["method"] = asgi_scope.get("method")
 
-        request_data["headers"] = headers = _filter_headers(
-            _get_headers(asgi_scope),
+        headers = _get_headers(asgi_scope)
+
+        request_data["headers"] = _filter_headers(
+            headers,
             use_annotated_value=False,
         )
+
         request_data["query_string"] = _get_query(asgi_scope)
 
         request_data["url"] = _get_url(
@@ -149,8 +152,10 @@ def _get_request_attributes(
         if asgi_scope.get("method"):
             attributes["http.request.method"] = asgi_scope["method"].upper()
 
-        headers = _filter_headers(_get_headers(asgi_scope))
-        for header, value in headers.items():
+        headers = _get_headers(asgi_scope)
+
+        filtered_headers = _filter_headers(headers, use_annotated_value=False)
+        for header, value in filtered_headers.items():
             attributes[f"http.request.header.{header.lower()}"] = value
 
         if should_send_default_pii():

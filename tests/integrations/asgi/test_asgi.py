@@ -5,7 +5,13 @@ from async_asgi_testclient import TestClient
 
 import sentry_sdk
 from sentry_sdk import capture_message
-from sentry_sdk.integrations._asgi_common import _get_headers, _get_ip
+from sentry_sdk.integrations._asgi_common import (
+    _get_headers,
+    _get_ip,
+    _get_request_attributes,
+    _get_request_data,
+    _RootPathInPath,
+)
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware, _looks_like_asgi3
 from sentry_sdk.tracing import TransactionSource
 
@@ -829,6 +835,61 @@ def test_get_headers():
         "x-real-ip": "10.10.10.10",
         "some_header": "123, abc",
     }
+
+
+def test_get_request_data_url_with_filtered_host(sentry_init):
+    # allowlist mode in data collection that does not allow "host" scrubs the host header value,
+    # but the reported URL must still resolve via rather than embedding the substituted "[Filtered]" value.
+    sentry_init(
+        _experiments={
+            "data_collection": {
+                "http_headers": {"request": {"mode": "allowlist", "terms": []}}
+            }
+        }
+    )
+
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "scheme": "http",
+        "server": ("example.com", 80),
+        "path": "/foo",
+        "query_string": b"",
+        "headers": [(b"host", b"example.com")],
+    }
+
+    request_data = _get_request_data(scope, _RootPathInPath.EXCLUDED)
+
+    assert request_data["headers"]["host"] == "[Filtered]"
+    assert request_data["url"] == "http://example.com/foo"
+
+
+def test_get_request_attributes_url_with_filtered_host(sentry_init):
+    # As with _get_request_data, an allowlist mode that does not allow "host"
+    # scrubs the host header value, but "url.full" must still resolve rather than embedding the substituted value.
+    sentry_init(
+        send_default_pii=True,
+        _experiments={
+            "data_collection": {
+                "http_headers": {"request": {"mode": "allowlist", "terms": []}}
+            }
+        },
+    )
+
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "scheme": "http",
+        "server": ("example.com", 80),
+        "path": "/foo",
+        "query_string": b"somevalue=123",
+        "headers": [(b"host", b"example.com")],
+    }
+
+    attributes = _get_request_attributes(scope, _RootPathInPath.EXCLUDED)
+
+    assert attributes["http.request.header.host"] == "[Filtered]"
+    assert attributes["url.full"] == "http://example.com/foo?somevalue=123"
 
 
 @pytest.mark.asyncio
