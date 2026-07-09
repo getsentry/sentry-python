@@ -581,7 +581,8 @@ class StreamedSpan:
         self.set_attribute(
             SPANDATA.SENTRY_SDK_INTEGRATIONS, sorted(client.integrations.keys())
         )
-        self.set_attribute("sentry.span.source", SegmentSource.CUSTOM.value)
+        if not self.get_attributes().get("sentry.span.source"):
+            self.set_attribute("sentry.span.source", SegmentSource.CUSTOM.value)
 
         if client.options.get("dist") and SPANDATA.SENTRY_DIST not in self._attributes:
             self.set_attribute(
