@@ -278,7 +278,7 @@ def _resolve_data_collection(options: "Dict[str, Any]") -> "DataCollection":
 
     ``data_collection`` must be a plain ``dict``.
     """
-    user_dc = options.get("data_collection")
+    user_dc = options.get("_experiments", {}).get("data_collection")
     send_default_pii = options.get("send_default_pii")
 
     include_local_variables = (
