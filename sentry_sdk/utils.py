@@ -2080,6 +2080,13 @@ def has_logs_enabled(options: "Optional[dict[str, Any]]") -> bool:
     )
 
 
+def has_data_collection_enabled(options: "Optional[dict[str, Any]]") -> bool:
+    if options is None:
+        return False
+
+    return "data_collection" in options.get("_experiments", {})
+
+
 def get_before_send_log(
     options: "Optional[dict[str, Any]]",
 ) -> "Optional[Callable[[Log, Hint], Optional[Log]]]":
