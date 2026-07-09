@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import Event, HttpStatusCodeRange
 
+
 SENSITIVE_ENV_KEYS = (
     "REMOTE_ADDR",
     "HTTP_X_FORWARDED_FOR",
@@ -212,7 +213,7 @@ def _is_json_content_type(ct: "Optional[str]") -> bool:
 def _filter_headers(
     headers: "Mapping[str, str]",
     use_annotated_value: bool = True,
-) -> "Mapping[str, Union[str, AnnotatedValue]]":
+) -> "Mapping[str, Union[AnnotatedValue, str]]":
     client_options = sentry_sdk.get_client().options
 
     if has_data_collection_enabled(client_options):
