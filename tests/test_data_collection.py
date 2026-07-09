@@ -320,9 +320,12 @@ def test_has_data_collection_enabled_gates_on_presence():
     assert (
         has_data_collection_enabled({"_experiments": {"data_collection": {}}}) is True
     )
+    assert (
+        has_data_collection_enabled({"_experiments": {"data_collection": None}}) is True
+    )
 
 
-def test_no_experiments_falls_back_to_send_default_pii():
+def test_no_experiments_data_collection_values_fall_back_to_send_default_pii_configuration():
     sentry_sdk.init(send_default_pii=True)
     client = sentry_sdk.get_client()
     dc = client.options["data_collection"]
