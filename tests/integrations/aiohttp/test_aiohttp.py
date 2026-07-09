@@ -1379,8 +1379,10 @@ async def test_sensitive_header_passthrough_with_pii_span_streaming(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=options["send_default_pii"],
-        data_collection=options["data_collection"],
-        _experiments={"trace_lifecycle": "stream"},
+        _experiments={
+            "trace_lifecycle": "stream",
+            "data_collection": options["data_collection"],
+        },
     )
 
     async def hello(request):
@@ -1431,6 +1433,43 @@ async def test_sensitive_header_passthrough_with_pii_span_streaming(
     else:
         assert "user.ip_address" not in server_span["attributes"]
         assert "client.address" not in server_span["attributes"]
+
+
+@pytest.mark.asyncio
+async def test_sensitive_header_passthrough_with_pii_span_streaming_without_data_collection(
+    sentry_init, aiohttp_client, capture_items
+):
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    async def hello(request):
+        return web.Response(text="hello")
+
+    app = web.Application()
+    app.router.add_get("/", hello)
+
+    items = capture_items("span")
+
+    client = await aiohttp_client(app)
+    await client.get("/", headers={"Authorization": "Bearer secret-token"})
+
+    sentry_sdk.flush()
+
+    server_span, _client_segment = [item.payload for item in items]
+
+    # With send_default_pii=True, _filter_headers is a no-op and the original
+    # value reaches the span attribute.
+    assert (
+        server_span["attributes"]["http.request.header.authorization"]
+        == "Bearer secret-token"
+    )
+    # client.address and user.ip_address is captured under send_default_pii=True.
+    assert server_span["attributes"]["client.address"] == "127.0.0.1"
+    assert server_span["attributes"]["user.ip_address"] == "127.0.0.1"
 
 
 @pytest.mark.asyncio

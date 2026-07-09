@@ -7,6 +7,7 @@ from unittest import mock
 import pytest
 
 import sentry_sdk
+from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 import sentry_sdk.integrations.quart as quart_sentry
 from sentry_sdk import (
     capture_exception,
@@ -981,8 +982,10 @@ async def test_span_streaming_sensitive_header_scrubbing(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=options["send_default_pii"],
-        data_collection=options["data_collection"],
-        _experiments={"trace_lifecycle": "stream"},
+        _experiments={
+            "trace_lifecycle": "stream",
+            "data_collection": options["data_collection"],
+        },
     )
     items = capture_items("span")
 
@@ -1017,6 +1020,42 @@ async def test_span_streaming_sensitive_header_scrubbing(
             == expected["custom"]
         )
         assert segment["attributes"]["http.request.header.cookie"] == expected["cookie"]
+
+
+@pytest.mark.asyncio
+async def test_span_streaming_sensitive_header_without_data_collection(
+    sentry_init, capture_items
+):
+    sentry_init(
+        integrations=[quart_sentry.QuartIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=False,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+    items = capture_items("span")
+
+    app = quart_app_factory()
+    client = app.test_client()
+    response = await client.get(
+        "/message",
+        headers={
+            "Authorization": "Bearer secret-token",
+            "X-Custom-Header": "passthrough",
+        },
+    )
+    assert response.status_code == 200
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
+
+    segment = spans[0]
+    assert (
+        segment["attributes"]["http.request.header.authorization"]
+        == SENSITIVE_DATA_SUBSTITUTE
+    )
+    assert segment["attributes"]["http.request.header.x-custom-header"] == "passthrough"
 
 
 @pytest.mark.asyncio
@@ -1060,3 +1099,35 @@ async def test_span_streaming_quart_auth_user_id(
         assert segment["attributes"]["user.id"] == user_id
     else:
         assert "user.id" not in segment.get("attributes", {})
+
+
+@pytest.mark.asyncio
+async def test_span_streaming_sensitive_header_passthrough_with_pii_and_no_data_collection(
+    sentry_init, capture_items
+):
+    sentry_init(
+        integrations=[quart_sentry.QuartIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+    items = capture_items("span")
+
+    app = quart_app_factory()
+    client = app.test_client()
+    response = await client.get(
+        "/message",
+        headers={"Authorization": "Bearer secret-token"},
+    )
+    assert response.status_code == 200
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
+
+    segment = spans[0]
+    assert (
+        segment["attributes"]["http.request.header.authorization"]
+        == "Bearer secret-token"
+    )

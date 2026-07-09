@@ -5,7 +5,7 @@ import sentry_sdk
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.data_collection import _apply_key_value_collection_filtering
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import AnnotatedValue, logger
+from sentry_sdk.utils import AnnotatedValue, has_data_collection_enabled, logger
 
 try:
     from django.http.request import RawPostDataException
@@ -22,6 +22,21 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import Event, HttpStatusCodeRange
 
+SENSITIVE_ENV_KEYS = (
+    "REMOTE_ADDR",
+    "HTTP_X_FORWARDED_FOR",
+    "HTTP_SET_COOKIE",
+    "HTTP_COOKIE",
+    "HTTP_AUTHORIZATION",
+    "HTTP_PROXY_AUTHORIZATION",
+    "HTTP_X_API_KEY",
+    "HTTP_X_FORWARDED_FOR",
+    "HTTP_X_REAL_IP",
+)
+
+SENSITIVE_HEADERS = tuple(
+    x[len("HTTP_") :] for x in SENSITIVE_ENV_KEYS if x.startswith("HTTP_")
+)
 
 DEFAULT_HTTP_METHODS_TO_CAPTURE = (
     "CONNECT",
@@ -189,19 +204,41 @@ def _is_json_content_type(ct: "Optional[str]") -> bool:
 
 def _filter_headers(
     headers: "Mapping[str, str]",
-) -> "Mapping[str, str]":
-    data_collection_configuration = sentry_sdk.get_client().options["data_collection"]
+    use_annotated_value: bool = True,
+) -> "Mapping[str, Union[str, AnnotatedValue]]":
+    client_options = sentry_sdk.get_client().options
 
-    filtered = _apply_key_value_collection_filtering(
-        items=headers,
-        behaviour=data_collection_configuration["http_headers"]["request"],
-    )
+    if has_data_collection_enabled(client_options):
+        data_collection_configuration = client_options["data_collection"]
 
-    for key in filtered:
-        if isinstance(key, str) and key.lower() in ("cookie", "set-cookie"):
-            filtered[key] = SENSITIVE_DATA_SUBSTITUTE
+        filtered = _apply_key_value_collection_filtering(
+            items=headers,
+            behaviour=data_collection_configuration["http_headers"]["request"],
+        )
 
-    return filtered
+        for key in filtered:
+            if isinstance(key, str) and key.lower() in ("cookie", "set-cookie"):
+                filtered[key] = SENSITIVE_DATA_SUBSTITUTE
+
+        return filtered
+    else:
+        if should_send_default_pii():
+            return headers
+
+        substitute: "Union[AnnotatedValue, str]" = (
+            SENSITIVE_DATA_SUBSTITUTE
+            if not use_annotated_value
+            else AnnotatedValue.removed_because_over_size_limit()
+        )
+
+        return {
+            k: (
+                v
+                if k.upper().replace("-", "_") not in SENSITIVE_HEADERS
+                else substitute
+            )
+            for k, v in headers.items()
+        }
 
 
 def _in_http_status_code_range(
