@@ -92,7 +92,7 @@ def _get_view_function_response(
 
                     header_attrs: "Dict[str, Any]" = {}
                     for header, value in _filter_headers(
-                        headers
+                        headers, use_annotated_value=False
                     ).items():
                         header_attrs[f"http.request.header.{header.lower()}"] = value
 

@@ -117,6 +117,7 @@ def _get_request_data(
 
         request_data["headers"] = headers = _filter_headers(
             _get_headers(asgi_scope),
+            use_annotated_value=False,
         )
         request_data["query_string"] = _get_query(asgi_scope)
 
