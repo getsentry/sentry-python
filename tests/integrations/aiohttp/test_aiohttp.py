@@ -1407,7 +1407,7 @@ async def test_sensitive_header_passthrough_with_pii_span_streaming(
 
     server_span, _client_segment = [item.payload for item in items]
 
-    if request.node.callspec.id == "data_collection_off_does_not_add_headers":
+    if request.node.callspec.id.endswith("data_collection_off_does_not_add_headers"):
         assert "http.request.header.authorization" not in server_span["attributes"]
         assert "http.request.header.cookie" not in server_span["attributes"]
     else:

@@ -7,13 +7,13 @@ from unittest import mock
 import pytest
 
 import sentry_sdk
-from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 import sentry_sdk.integrations.quart as quart_sentry
 from sentry_sdk import (
     capture_exception,
     capture_message,
     set_tag,
 )
+from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.integrations.logging import LoggingIntegration
 
 
