@@ -1,0 +1,66 @@
+from typing import TYPE_CHECKING
+
+import sentry_sdk
+from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.scope import add_global_event_processor
+from sentry_sdk.utils import iter_stacks, walk_exception_chain
+
+if TYPE_CHECKING:
+    from typing import Optional
+
+    from sentry_sdk._types import Event, Hint
+
+try:
+    from executing import Source
+except ImportError:
+    raise DidNotEnable("executing is not installed")
+
+
+class ExecutingIntegration(Integration):
+    identifier = "executing"
+
+    @staticmethod
+    def setup_once() -> None:
+        @add_global_event_processor
+        def add_executing_info(
+            event: "Event", hint: "Optional[Hint]"
+        ) -> "Optional[Event]":
+            if sentry_sdk.get_client().get_integration(ExecutingIntegration) is None:
+                return event
+
+            if hint is None:
+                return event
+
+            exc_info = hint.get("exc_info", None)
+
+            if exc_info is None:
+                return event
+
+            exception = event.get("exception", None)
+
+            if exception is None:
+                return event
+
+            values = exception.get("values", None)
+
+            if values is None:
+                return event
+
+            for exception, (_exc_type, _exc_value, exc_tb) in zip(
+                reversed(values), walk_exception_chain(exc_info)
+            ):
+                sentry_frames = [
+                    frame
+                    for frame in exception.get("stacktrace", {}).get("frames", [])
+                    if frame.get("function")
+                ]
+                tbs = list(iter_stacks(exc_tb))
+                if len(sentry_frames) != len(tbs):
+                    continue
+
+                for sentry_frame, tb in zip(sentry_frames, tbs):
+                    frame = tb.tb_frame
+                    source = Source.for_frame(frame)
+                    sentry_frame["function"] = source.code_qualname(frame.f_code)
+
+            return event
