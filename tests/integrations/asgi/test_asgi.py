@@ -892,6 +892,32 @@ def test_get_request_attributes_url_with_filtered_host(sentry_init):
     assert attributes["url.full"] == "http://example.com/foo?somevalue=123"
 
 
+def test_get_request_attributes_url_with_headers_off(sentry_init):
+    # "off" mode in data collection captures no headers at all, but "url.full"
+    # must still resolve via the (uncaptured) host header rather than being dropped.
+    sentry_init(
+        send_default_pii=True,
+        _experiments={
+            "data_collection": {"http_headers": {"request": {"mode": "off"}}}
+        },
+    )
+
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "scheme": "http",
+        "server": ("example.com", 80),
+        "path": "/foo",
+        "query_string": b"somevalue=123",
+        "headers": [(b"host", b"example.com")],
+    }
+
+    attributes = _get_request_attributes(scope, _RootPathInPath.EXCLUDED)
+
+    assert not any(key.startswith("http.request.header.") for key in attributes)
+    assert attributes["url.full"] == "http://example.com/foo?somevalue=123"
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "request_url,transaction_style,expected_transaction_name,expected_transaction_source",
