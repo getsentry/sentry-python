@@ -87,6 +87,7 @@ if TYPE_CHECKING:
                 Callable[[SpanJSON, Hint], Optional[SpanJSON]]
             ],
             "suppress_asgi_chained_exceptions": Optional[bool],
+            "enable_data_collection": Optional[bool],
         },
         total=False,
     )
@@ -1435,7 +1436,10 @@ class ClientConstructor:
             managing `Sensitive Data <https://docs.sentry.io/data-management/sensitive-data/>`_.
 
         :param data_collection: (EXPERIMENTAL) Structured configuration controlling what data integrations collect automatically,
-            superseding `send_default_pii`. Pass a dict to enable or
+            superseding `send_default_pii`. This option only takes effect when the
+            `enable_data_collection` experiment is turned on via
+            `_experiments={"enable_data_collection": True}`; otherwise the SDK
+            continues to derive behaviour from `send_default_pii`. Pass a dict to enable or
             restrict collection per category (user identity, cookies, HTTP headers/bodies, query params, generative AI
             inputs/outputs, stack frame variables, source context).
 
