@@ -1099,8 +1099,8 @@ def test_outgoing_traceparent_and_baggage_ignored_child_span(sentry_init):
             traceparent = sentry_sdk.get_traceparent()
 
             # The parent span ID in the traceparent will be the segment's ID,
-            # NOT the child. As the child is ignored, it's not set on scope at
-            # all.
+            # NOT the child. As the child is ignored, it's not set on the scope
+            # at all.
             assert traceparent == f"{trace_id}-{segment.span_id}-1"
 
             baggage = sentry_sdk.get_baggage()
