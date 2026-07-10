@@ -1113,6 +1113,9 @@ def create_streaming_span_decorator(
         """
         Decorator to create a span for the given function.
         """
+        new_attributes = attributes or {}
+        if "sentry.op" not in new_attributes:
+            new_attributes["sentry.op"] = OP.FUNCTION
 
         @functools.wraps(f)
         async def async_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
@@ -1127,7 +1130,7 @@ def create_streaming_span_decorator(
             span_name = name or qualname_from_function(f) or ""
 
             with start_streaming_span(
-                name=span_name, attributes=attributes, active=active
+                name=span_name, attributes=new_attributes, active=active
             ):
                 result = await f(*args, **kwargs)
                 return result
@@ -1150,7 +1153,7 @@ def create_streaming_span_decorator(
             span_name = name or qualname_from_function(f) or ""
 
             with start_streaming_span(
-                name=span_name, attributes=attributes, active=active
+                name=span_name, attributes=new_attributes, active=active
             ):
                 return f(*args, **kwargs)
 
