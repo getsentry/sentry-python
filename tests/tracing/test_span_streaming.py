@@ -945,7 +945,7 @@ def test_outgoing_traceparent_and_baggage_incoming_trace(
             )
 
         # As we've received incoming baggage, we mustn't modify it ourselves and
-        # have to propagate it as-is, unless we
+        # have to propagate it as-is
         baggage = sentry_sdk.get_baggage()
         baggage_items = dict(tuple(item.split("=")) for item in baggage.split(","))
         assert baggage_items == incoming_baggage
@@ -1017,19 +1017,7 @@ def test_outgoing_traceparent_and_baggage_incoming_trace_deferred(
         baggage = sentry_sdk.get_baggage()
         baggage_items = dict(tuple(item.split("=")) for item in baggage.split(","))
 
-        if traces_sample_rate is not None:
-            # If our sample rate is not None, we're expected to have made
-            # a sampling decision
-            expected_baggage = incoming_baggage
-            expected_baggage.update(
-                {
-                    "sentry-sample_rate": str(traces_sample_rate),
-                }
-            )
-            assert baggage_items == expected_baggage
-        else:
-            # If tracing is off, we should have deferred the decision further
-            assert baggage_items == incoming_baggage
+        assert baggage_items == incoming_baggage
 
 
 def test_outgoing_traceparent_and_baggage_ignored_segment(sentry_init):
