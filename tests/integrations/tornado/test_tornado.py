@@ -6,6 +6,7 @@ from tornado.web import Application, HTTPError, RequestHandler
 
 import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
+from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.integrations.tornado import TornadoIntegration
 
 
@@ -108,6 +109,137 @@ def test_basic(tornado_testcase, sentry_init, capture_events):
     assert event["transaction_info"] == {"source": "component"}
 
     assert not sentry_sdk.get_isolation_scope()._tags
+
+
+# Sent by every data-collection cookie test below. Mixes benign cookies
+# (``theme``, ``lang``) with ones whose names match the data-collection
+# sensitive denylist (``jwt``, ``identity``). Those two names are deliberately
+# NOT in the ``EventScrubber`` denylist (which matches keys exactly), so any
+# filtering we observe on them comes from the extractor's data-collection
+# logic, not the always-on scrubber.
+COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
+
+# Sentinel meaning "the request payload should have no ``cookies`` key at all",
+# as opposed to an empty ``{}`` dict.
+NO_COOKIES = object()
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_cookies",
+    [
+        pytest.param(
+            {"send_default_pii": True},
+            {
+                "jwt": "tokenval",
+                "theme": "dark",
+                "lang": "en",
+                "identity": "alice",
+            },
+            id="send_default_pii_true",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            NO_COOKIES,
+            id="send_default_pii_false",
+        ),
+        pytest.param(
+            {},
+            NO_COOKIES,
+            id="defaults",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"cookies": {"mode": "off"}}}},
+            {},
+            id="data_collection_off",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"cookies": {"mode": "denylist"}}}},
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": "dark",
+                "lang": "en",
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "cookies": {"mode": "denylist", "terms": ["theme"]}
+                    }
+                }
+            },
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": SENSITIVE_DATA_SUBSTITUTE,
+                "lang": "en",
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_denylist_custom_terms",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "cookies": {"mode": "allowlist", "terms": ["theme"]}
+                    }
+                }
+            },
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": "dark",
+                "lang": SENSITIVE_DATA_SUBSTITUTE,
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "cookies": {"mode": "allowlist", "terms": ["identity"]}
+                    }
+                }
+            },
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": SENSITIVE_DATA_SUBSTITUTE,
+                "lang": SENSITIVE_DATA_SUBSTITUTE,
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_allowlist_sensitive_term",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": False,
+                "_experiments": {"data_collection": {"cookies": {"mode": "denylist"}}},
+            },
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": "dark",
+                "lang": "en",
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_wins_over_send_default_pii",
+        ),
+    ],
+)
+def test_cookie_data_collection(
+    tornado_testcase, sentry_init, capture_events, init_kwargs, expected_cookies
+):
+    sentry_init(integrations=[TornadoIntegration()], **init_kwargs)
+    events = capture_events()
+    client = tornado_testcase(Application([(r"/hi", CrashingHandler)]))
+
+    response = client.fetch("/hi", headers={"Cookie": COOKIE_HEADER})
+    assert response.code == 500
+
+    (event,) = events
+    if expected_cookies is NO_COOKIES:
+        assert "cookies" not in event["request"]
+    else:
+        assert event["request"]["cookies"] == expected_cookies
 
 
 @pytest.mark.parametrize("send_pii", [True, False])

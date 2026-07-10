@@ -99,3 +99,115 @@ def test_scrub_django_custom_session_cookies_filtered(
         "csrf_secret": "[Filtered]",
         "foo": "bar",
     }
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator()
+@pytest.mark.parametrize(
+    "cookies_to_set, data_collection, expected_cookies",
+    [
+        pytest.param(
+            {"sessionid": "123", "csrftoken": "456", "foo": "bar"},
+            {"cookies": {"mode": "off"}},
+            {},
+            id="off",
+        ),
+        pytest.param(
+            {"sessionid": "123", "csrftoken": "456", "foo": "bar"},
+            {"cookies": {"mode": "denylist"}},
+            {
+                "sessionid": "[Filtered]",
+                "csrftoken": "[Filtered]",
+                "foo": "bar",
+            },
+            id="denylist-default",
+        ),
+        pytest.param(
+            {"sessionid": "123", "csrftoken": "456", "foo": "bar"},
+            {"cookies": {"mode": "denylist", "terms": ["foo"]}},
+            {
+                "sessionid": "[Filtered]",
+                "csrftoken": "[Filtered]",
+                "foo": "[Filtered]",
+            },
+            id="denylist-extra-terms",
+        ),
+        pytest.param(
+            {"sessionid": "123", "csrftoken": "456", "foo": "bar", "bar": "baz"},
+            {"cookies": {"mode": "allowlist", "terms": ["foo"]}},
+            {
+                "sessionid": "[Filtered]",
+                "csrftoken": "[Filtered]",
+                "foo": "bar",
+                "bar": "[Filtered]",
+            },
+            id="allowlist",
+        ),
+        pytest.param(
+            {"sessionid": "123", "csrftoken": "456", "foo": "bar", "bar": "baz"},
+            {"cookies": {"mode": "allowlist", "terms": ["sessionid", "foo"]}},
+            {
+                "sessionid": "[Filtered]",
+                "csrftoken": "[Filtered]",
+                "foo": "bar",
+                "bar": "[Filtered]",
+            },
+            id="allowlist-cannot-override-sensitive",
+        ),
+        pytest.param(
+            {"sessionid": "123", "csrftoken": "456", "foo": "bar"},
+            {},
+            {
+                "sessionid": "[Filtered]",
+                "csrftoken": "[Filtered]",
+                "foo": "bar",
+            },
+            id="cookies-omitted-defaults-to-denylist",
+        ),
+    ],
+)
+def test_data_collection_cookies(
+    sentry_init,
+    client,
+    capture_items,
+    cookies_to_set,
+    data_collection,
+    expected_cookies,
+):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        _experiments={"data_collection": data_collection},
+    )
+    items = capture_items("event")
+    for name, value in cookies_to_set.items():
+        werkzeug_set_cookie(client, "localhost", name, value)
+    client.get(reverse("view_exc"))
+
+    (event,) = (item.payload for item in items if item.type == "event")
+    assert event["request"]["cookies"] == expected_cookies
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator()
+def test_data_collection_cookies_precedence_over_send_default_pii(
+    sentry_init, client, capture_items
+):
+    # ``data_collection`` is the single source of truth: even with
+    # ``send_default_pii=False``, the configured cookie behaviour still applies.
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        send_default_pii=False,
+        _experiments={"data_collection": {"cookies": {"mode": "denylist"}}},
+    )
+    items = capture_items("event")
+    werkzeug_set_cookie(client, "localhost", "sessionid", "123")
+    werkzeug_set_cookie(client, "localhost", "csrftoken", "456")
+    werkzeug_set_cookie(client, "localhost", "foo", "bar")
+    client.get(reverse("view_exc"))
+
+    (event,) = (item.payload for item in items if item.type == "event")
+    assert event["request"]["cookies"] == {
+        "sessionid": "[Filtered]",
+        "csrftoken": "[Filtered]",
+        "foo": "bar",
+    }
