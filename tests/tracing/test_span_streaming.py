@@ -1058,10 +1058,7 @@ def test_outgoing_traceparent_and_baggage_ignored_segment(sentry_init):
 
         baggage = sentry_sdk.get_baggage()
         baggage_items = dict(tuple(item.split("=")) for item in baggage.split(","))
-
-        for incoming_key, incoming_value in incoming_baggage.items():
-            assert incoming_key in baggage_items
-            assert baggage_items[incoming_key] == incoming_value
+        assert baggage_items == incoming_baggage
 
 
 def test_outgoing_traceparent_and_baggage_ignored_child_span(sentry_init):
@@ -1108,10 +1105,7 @@ def test_outgoing_traceparent_and_baggage_ignored_child_span(sentry_init):
 
             baggage = sentry_sdk.get_baggage()
             baggage_items = dict(tuple(item.split("=")) for item in baggage.split(","))
-
-            for incoming_key, incoming_value in incoming_baggage.items():
-                assert incoming_key in baggage_items
-                assert baggage_items[incoming_key] == incoming_value
+            assert baggage_items == incoming_baggage
 
 
 def test_set_span_status(sentry_init, capture_items):
