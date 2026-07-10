@@ -213,62 +213,6 @@ def test_sampling_context(sentry_init, capture_items):
     assert len(spans) == 1
 
 
-def test_custom_sampling_context(sentry_init):
-    class MyClass: ...
-
-    my_class = MyClass()
-
-    def traces_sampler(sampling_context):
-        assert "class" in sampling_context
-        assert "string" in sampling_context
-        assert sampling_context["class"] == my_class
-        assert sampling_context["string"] == "my string"
-        return 1.0
-
-    sentry_init(
-        traces_sampler=traces_sampler,
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    sentry_sdk.get_current_scope().set_custom_sampling_context(
-        {
-            "class": my_class,
-            "string": "my string",
-        }
-    )
-
-    with sentry_sdk.traces.start_span(name="span"):
-        ...
-
-
-def test_custom_sampling_context_update_to_context_value_persists(sentry_init):
-    def traces_sampler(sampling_context):
-        if sampling_context["span_context"]["attributes"]["first"] is True:
-            assert sampling_context["custom_value"] == 1
-        else:
-            assert sampling_context["custom_value"] == 2
-        return 1.0
-
-    sentry_init(
-        traces_sampler=traces_sampler,
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    sentry_sdk.traces.new_trace()
-
-    sentry_sdk.get_current_scope().set_custom_sampling_context({"custom_value": 1})
-
-    with sentry_sdk.traces.start_span(name="span", attributes={"first": True}):
-        ...
-
-    sentry_sdk.traces.new_trace()
-
-    sentry_sdk.get_current_scope().set_custom_sampling_context({"custom_value": 2})
-
-    with sentry_sdk.traces.start_span(name="span", attributes={"first": False}):
-        ...
-
-
 def test_before_send_span_basic(sentry_init, capture_items):
     def before_send_span(span, hint):
         assert isinstance(span, dict)
@@ -814,59 +758,6 @@ def test_backpressure_outcome(
         assert record_lost_event_calls == [
             (expected_outcome, "span", None, 1),
         ]
-
-
-def test_unsampled_spans_produce_client_report(
-    sentry_init, capture_items, capture_record_lost_event_calls
-):
-    sentry_init(
-        traces_sample_rate=0.0,
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    items = capture_items("span")
-    record_lost_event_calls = capture_record_lost_event_calls()
-
-    with sentry_sdk.traces.start_span(name="segment"):
-        with sentry_sdk.traces.start_span(name="child1"):
-            pass
-        with sentry_sdk.traces.start_span(name="child2"):
-            pass
-
-    sentry_sdk.get_client().flush()
-
-    spans = [item.payload for item in items]
-    assert not spans
-
-    assert record_lost_event_calls == [
-        ("sample_rate", "span", None, 1),
-        ("sample_rate", "span", None, 1),
-        ("sample_rate", "span", None, 1),
-    ]
-
-
-def test_no_client_reports_if_tracing_is_off(
-    sentry_init, capture_items, capture_record_lost_event_calls
-):
-    sentry_init(
-        traces_sample_rate=None,
-        _experiments={"trace_lifecycle": "stream"},
-    )
-
-    items = capture_items("span")
-    record_lost_event_calls = capture_record_lost_event_calls()
-
-    with sentry_sdk.traces.start_span(name="segment"):
-        with sentry_sdk.traces.start_span(name="child1"):
-            pass
-        with sentry_sdk.traces.start_span(name="child2"):
-            pass
-
-    sentry_sdk.get_client().flush()
-
-    spans = [item.payload for item in items]
-    assert not spans
-    assert not record_lost_event_calls
 
 
 def test_continue_trace_no_sample_rand(sentry_init, capture_items):

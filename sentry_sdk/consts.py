@@ -45,6 +45,7 @@ if TYPE_CHECKING:
     from sentry_sdk._types import (
         BreadcrumbProcessor,
         ContinuousProfilerMode,
+        DataCollectionUserOptions,
         Event,
         EventProcessor,
         Hint,
@@ -86,6 +87,7 @@ if TYPE_CHECKING:
                 Callable[[SpanJSON, Hint], Optional[SpanJSON]]
             ],
             "suppress_asgi_chained_exceptions": Optional[bool],
+            "data_collection": Optional[DataCollectionUserOptions],
         },
         total=False,
     )
@@ -1755,7 +1757,25 @@ class ClientConstructor:
         :param stream_gen_ai_spans: When set, generative AI spans are sent in a new transport format to
             reduce downstream data loss.
 
-        :param _experiments:
+        :param _experiments: Dictionary of experimental, opt-in features that are not yet stable.
+
+            ``data_collection`` (EXPERIMENTAL): structured configuration controlling what data integrations
+            collect automatically, superseding `send_default_pii`. Passing a dict under
+            `_experiments={"data_collection": {...}}` opts into the feature; omitted fields use their
+            defaults (most categories are collected, with the sensitive denylist scrubbing values).
+            When it is not set, the SDK derives behaviour from `send_default_pii` so that upgrading
+            changes nothing. Restrict collection per category (user identity, cookies, HTTP
+            headers/bodies, query params, generative AI inputs/outputs, stack frame variables, source
+            context). If `send_default_pii` is also set, `data_collection` takes precedence.
+
+            Example::
+
+                sentry_sdk.init(
+                    dsn="...",
+                    _experiments={"data_collection": {"user_info": False, "http_bodies": []}},
+                )
+
+            See https://docs.sentry.io/platforms/python/configuration/options/#data_collection for more details.
         """
         pass
 
