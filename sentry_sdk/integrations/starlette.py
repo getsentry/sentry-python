@@ -741,10 +741,12 @@ class StarletteRequestExtractor:
         with capture_internal_exceptions():
             # Add cookies
             if has_data_collection_enabled(client.options):
-                request_info["cookies"] = _apply_key_value_collection_filtering(
+                cookies = _apply_key_value_collection_filtering(
                     items=self.cookies(),
                     behaviour=client.options["data_collection"]["cookies"],
                 )
+                if cookies:
+                    request_info["cookies"] = cookies
             elif should_send_default_pii():
                 request_info["cookies"] = self.cookies()
 

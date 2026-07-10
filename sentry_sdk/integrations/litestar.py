@@ -316,10 +316,12 @@ def patch_http_route_handle() -> None:
             request_info = event.get("request", {})
             request_info["content_length"] = len(scope.get("_body", b""))
             if has_data_collection_enabled(client.options):
-                request_info["cookies"] = _apply_key_value_collection_filtering(
+                cookies = _apply_key_value_collection_filtering(
                     items=extracted_request_data["cookies"],
                     behaviour=client.options["data_collection"]["cookies"],
                 )
+                if cookies:
+                    request_info["cookies"] = cookies
             elif should_send_default_pii():
                 request_info["cookies"] = extracted_request_data["cookies"]
             if request_data is not None:

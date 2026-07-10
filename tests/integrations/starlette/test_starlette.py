@@ -570,7 +570,7 @@ async def test_request_info_no_pii(sentry_init, capture_events):
         ),
         pytest.param(
             {"_experiments": {"data_collection": {"cookies": {"mode": "off"}}}},
-            {},
+            NO_COOKIES,
             id="data_collection_off",
         ),
         pytest.param(

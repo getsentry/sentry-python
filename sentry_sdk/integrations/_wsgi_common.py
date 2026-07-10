@@ -90,10 +90,12 @@ class RequestExtractor:
         request_info = event.get("request", {})
 
         if has_data_collection_enabled(client.options):
-            request_info["cookies"] = _apply_key_value_collection_filtering(
+            cookies = _apply_key_value_collection_filtering(
                 items=dict(self.cookies()),
                 behaviour=client.options["data_collection"]["cookies"],
             )
+            if cookies:
+                request_info["cookies"] = cookies
         elif should_send_default_pii():
             request_info["cookies"] = dict(self.cookies())
 
