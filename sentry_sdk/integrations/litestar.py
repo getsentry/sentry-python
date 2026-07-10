@@ -3,6 +3,7 @@ from copy import deepcopy
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.data_collection import _apply_key_value_collection_filtering
 from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     DidNotEnable,
@@ -16,6 +17,7 @@ from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
+    has_data_collection_enabled,
     transaction_from_function,
 )
 
@@ -273,7 +275,8 @@ def patch_http_route_handle() -> None:
     async def handle_wrapper(
         self: "HTTPRoute", scope: "HTTPScope", receive: "Receive", send: "Send"
     ) -> None:
-        if sentry_sdk.get_client().get_integration(LitestarIntegration) is None:
+        client = sentry_sdk.get_client()
+        if client.get_integration(LitestarIntegration) is None:
             return await old_handle(self, scope, receive, send)
 
         sentry_scope = sentry_sdk.get_isolation_scope()
@@ -312,7 +315,12 @@ def patch_http_route_handle() -> None:
         def event_processor(event: "Event", _: "Hint") -> "Event":
             request_info = event.get("request", {})
             request_info["content_length"] = len(scope.get("_body", b""))
-            if should_send_default_pii():
+            if has_data_collection_enabled(client.options):
+                request_info["cookies"] = _apply_key_value_collection_filtering(
+                    items=extracted_request_data["cookies"],
+                    behaviour=client.options["data_collection"]["cookies"],
+                )
+            elif should_send_default_pii():
                 request_info["cookies"] = extracted_request_data["cookies"]
             if request_data is not None:
                 request_info["data"] = request_data
