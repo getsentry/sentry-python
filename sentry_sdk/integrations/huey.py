@@ -213,6 +213,7 @@ def patch_execute() -> None:
                         "sentry.op": OP.QUEUE_TASK_HUEY,
                         "sentry.origin": HueyIntegration.origin,
                         "sentry.span.source": SegmentSource.TASK,
+                        SPANDATA.MESSAGING_DESTINATION_NAME: self.name,
                         "messaging.message.id": task.id,
                         "messaging.message.system": "huey",
                         "messaging.message.retry.count": (task.default_retries or 0)
@@ -230,6 +231,7 @@ def patch_execute() -> None:
                 )
                 transaction.set_status(SPANSTATUS.OK)
                 span_ctx = sentry_sdk.start_transaction(transaction)
+                span_ctx.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, self.name)
 
             if not getattr(task, "_sentry_is_patched", False):
                 task.execute = _wrap_task_execute(task.execute)
