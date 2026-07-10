@@ -410,7 +410,7 @@ def test_dynamic_sampling_head_sdk_creates_dsc_span_streaming(
         "sample_rate": str(sample_rate),
         "sample_rand": "0.250000",
         "sampled": "true" if segment.sampled else "false",
-        "transaction": "Head SDK tx",
+        "transaction": "Head SDK segment",
         "trace_id": trace_id,
     }
 
