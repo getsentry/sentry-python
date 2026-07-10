@@ -609,7 +609,7 @@ NO_COOKIES = object()
         ),
         pytest.param(
             {"_experiments": {"data_collection": {"cookies": {"mode": "off"}}}},
-            {},
+            NO_COOKIES,
             id="data_collection_off",
         ),
         pytest.param(
