@@ -22,7 +22,7 @@ from sentry_sdk.utils import event_from_exception
 
 if TYPE_CHECKING:
     from datetime import datetime
-    from typing import Any, Dict, List, Optional, Tuple
+    from typing import Any, Dict, List, Tuple
 
 try:
     import litellm  # type: ignore[import-not-found]
@@ -36,8 +36,8 @@ except ImportError:
 _SPAN_KEY = "_sentry_span"
 
 # Call types whose gen_ai operation name we can determine accurately. Everything
-# else gets no gen_ai.operation.name attribute, since guessing records wrong data.
-_CALL_TYPE_OPERATIONS: "Dict[Any, Tuple[Optional[str], str]]" = {
+# else is not instrumented, since guessing records wrong data.
+_CALL_TYPE_OPERATIONS: "Dict[Any, Tuple[str, str]]" = {
     "completion": ("chat", consts.OP.GEN_AI_CHAT),
     "acompletion": ("chat", consts.OP.GEN_AI_CHAT),
     "text_completion": ("text_completion", consts.OP.GEN_AI_TEXT_COMPLETION),
@@ -96,6 +96,12 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
     if integration is None:
         return
 
+    call_type = kwargs.get("call_type", None)
+    if call_type not in _CALL_TYPE_OPERATIONS:
+        return
+
+    operation, span_op = _CALL_TYPE_OPERATIONS[call_type]
+
     # Get key parameters
     full_model = kwargs.get("model", "")
     try:
@@ -104,11 +110,7 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
         model = full_model
         provider = "unknown"
 
-    call_type = kwargs.get("call_type", None)
-    operation, span_op = _CALL_TYPE_OPERATIONS.get(
-        call_type, (None, consts.OP.GEN_AI_CHAT)
-    )
-    span_name = f"{operation or call_type or 'unknown'} {model}"
+    span_name = f"{operation} {model}"
 
     # Start a new span/transaction
     if has_span_streaming_enabled(client.options):
@@ -131,8 +133,7 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
 
     # Set basic data
     set_data_normalized(span, SPANDATA.GEN_AI_SYSTEM, provider)
-    if operation is not None:
-        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, operation)
+    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, operation)
 
     # Record input/messages if allowed
     if should_send_default_pii() and integration.include_prompts:

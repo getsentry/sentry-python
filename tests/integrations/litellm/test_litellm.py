@@ -34,7 +34,8 @@ from litellm.litellm_core_utils import (
 from litellm.litellm_core_utils.logging_worker import GLOBAL_LOGGING_WORKER
 from litellm.llms.custom_httpx.http_handler import AsyncHTTPHandler, HTTPHandler
 from openai import AsyncOpenAI, OpenAI
-from openai.types import CompletionUsage
+from openai.types import Completion, CompletionUsage, Image, ImagesResponse
+from openai.types.completion_choice import CompletionChoice
 
 from sentry_sdk import start_transaction
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
@@ -2561,6 +2562,7 @@ def test_litellm_message_truncation(sentry_init, capture_events):
         kwargs = {
             "model": "gpt-3.5-turbo",
             "messages": messages,
+            "call_type": "completion",
         }
 
         _input_callback(kwargs)
@@ -3419,23 +3421,13 @@ def test_convert_message_parts_image_url_missing_url():
     assert converted[0]["content"][0]["type"] == "image_url"
 
 
-@pytest.mark.parametrize(
-    "call_type,expected_operation,expected_op",
-    [
-        ("completion", "chat", OP.GEN_AI_CHAT),
-        ("acompletion", "chat", OP.GEN_AI_CHAT),
-        ("text_completion", "text_completion", OP.GEN_AI_TEXT_COMPLETION),
-        ("atext_completion", "text_completion", OP.GEN_AI_TEXT_COMPLETION),
-        ("embedding", "embeddings", OP.GEN_AI_EMBEDDINGS),
-        ("aembedding", "embeddings", OP.GEN_AI_EMBEDDINGS),
-        ("responses", "responses", OP.GEN_AI_RESPONSES),
-        ("aresponses", "responses", OP.GEN_AI_RESPONSES),
-    ],
-)
-def test_operation_name_mapped_from_call_type(
-    sentry_init, capture_events, call_type, expected_operation, expected_op
+def test_text_completion_operation_name(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    reset_litellm_executor,
 ):
-    """Known call types map to their actual operation, not the chat fallback."""
+    """text_completion calls get the text_completion op, not the chat fallback."""
     sentry_init(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
@@ -3444,30 +3436,56 @@ def test_operation_name_mapped_from_call_type(
     )
     events = capture_events()
 
-    with start_transaction(name="litellm test"):
-        kwargs = {
-            "model": "gpt-3.5-turbo",
-            "call_type": call_type,
-        }
+    client = OpenAI(api_key="test-key")
 
-        _input_callback(kwargs)
-        _success_callback(
-            kwargs,
-            MockCompletionResponse(),
-            datetime.now(),
-            datetime.now(),
+    model_response = get_model_response(
+        Completion(
+            id="cmpl-test",
+            choices=[
+                CompletionChoice(finish_reason="stop", index=0, text="Test response")
+            ],
+            created=1234567890,
+            model="gpt-3.5-turbo-instruct",
+            object="text_completion",
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
+        ),
+        serialize_pydantic=True,
+        request_headers={"X-Stainless-Raw-Response": "true"},
+    )
+
+    with mock.patch.object(
+        client.completions._client._client,
+        "send",
+        return_value=model_response,
+    ), start_transaction(name="litellm test"):
+        litellm.text_completion(
+            model="gpt-3.5-turbo-instruct",
+            prompt="Hello!",
+            client=client,
         )
 
-    (tx,) = events
-    (span,) = [s for s in tx["spans"] if s["origin"] == "auto.ai.litellm"]
+        litellm_utils.executor.shutdown(wait=True)
 
-    assert span["op"] == expected_op
-    assert span["description"] == f"{expected_operation} gpt-3.5-turbo"
-    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == expected_operation
+    (event,) = events
+    (span,) = [s for s in event["spans"] if s["origin"] == "auto.ai.litellm"]
+
+    assert span["op"] == OP.GEN_AI_TEXT_COMPLETION
+    assert span["description"] == "text_completion gpt-3.5-turbo-instruct"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "text_completion"
 
 
-def test_operation_name_not_set_for_unknown_call_type(sentry_init, capture_events):
-    """Call types with no accurate operation name get none, instead of "chat"."""
+def test_responses_operation_name(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    nonstreaming_responses_model_response,
+    reset_litellm_executor,
+):
+    """Responses API calls get the responses op, not the chat fallback."""
     sentry_init(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
@@ -3476,22 +3494,72 @@ def test_operation_name_not_set_for_unknown_call_type(sentry_init, capture_event
     )
     events = capture_events()
 
-    with start_transaction(name="litellm test"):
-        kwargs = {
-            "model": "dall-e-3",
-            "call_type": "image_generation",
-        }
+    client = HTTPHandler()
 
-        _input_callback(kwargs)
-        _success_callback(
-            kwargs,
-            MockCompletionResponse(model="dall-e-3"),
-            datetime.now(),
-            datetime.now(),
+    model_response = get_model_response(
+        nonstreaming_responses_model_response,
+        serialize_pydantic=True,
+    )
+
+    with mock.patch.object(
+        client,
+        "post",
+        return_value=model_response,
+    ), start_transaction(name="litellm test"):
+        litellm.responses(
+            model="gpt-4",
+            input="Hello!",
+            client=client,
+            api_key="test-key",
         )
 
-    (tx,) = events
-    (span,) = [s for s in tx["spans"] if s["origin"] == "auto.ai.litellm"]
+        litellm_utils.executor.shutdown(wait=True)
 
-    assert span["description"] == "image_generation dall-e-3"
-    assert SPANDATA.GEN_AI_OPERATION_NAME not in span["data"]
+    (event,) = events
+    (span,) = [s for s in event["spans"] if s["origin"] == "auto.ai.litellm"]
+
+    assert span["op"] == OP.GEN_AI_RESPONSES
+    assert span["description"] == "responses gpt-4"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "responses"
+
+
+def test_unknown_call_type_is_not_instrumented(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    reset_litellm_executor,
+):
+    """Call types with no accurate operation name emit no span at all."""
+    sentry_init(
+        integrations=[LiteLLMIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=False,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="test-key")
+
+    model_response = get_model_response(
+        ImagesResponse(
+            created=1234567890,
+            data=[Image(url="https://example.com/image.png")],
+        ),
+        serialize_pydantic=True,
+    )
+
+    with mock.patch.object(
+        client.images._client._client,
+        "send",
+        return_value=model_response,
+    ), start_transaction(name="litellm test"):
+        litellm.image_generation(
+            model="dall-e-3",
+            prompt="A cat",
+            client=client,
+        )
+
+        litellm_utils.executor.shutdown(wait=True)
+
+    (event,) = events
+    assert [s for s in event["spans"] if s["origin"] == "auto.ai.litellm"] == []
