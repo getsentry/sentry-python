@@ -86,6 +86,7 @@ def patch_enqueue() -> None:
                 attributes={
                     "sentry.op": OP.QUEUE_SUBMIT_HUEY,
                     "sentry.origin": HueyIntegration.origin,
+                    SPANDATA.MESSAGING_DESTINATION_NAME: self.name,
                 },
             )
         else:
@@ -94,6 +95,7 @@ def patch_enqueue() -> None:
                 name=span_name,
                 origin=HueyIntegration.origin,
             )
+            span_ctx.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, self.name)
 
         no_headers_types = (PeriodicTask,) + tuple(
             t for t in [HueyGroup, HueyChord] if t is not None

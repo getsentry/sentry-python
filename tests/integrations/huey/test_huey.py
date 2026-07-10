@@ -97,6 +97,9 @@ def test_task_transaction_or_segment(
         enqueue_span, execute_span = payloads
 
         assert enqueue_span["attributes"]["sentry.op"] == OP.QUEUE_SUBMIT_HUEY
+        assert (
+            enqueue_span["attributes"][SPANDATA.MESSAGING_DESTINATION_NAME] == huey.name
+        )
         assert execute_span["is_segment"]
         assert execute_span["attributes"]["sentry.op"] == OP.QUEUE_TASK_HUEY
         assert (
@@ -315,6 +318,7 @@ def test_huey_enqueue(init_huey, capture_events):
     assert len(event["spans"])
     assert event["spans"][0]["op"] == "queue.submit.huey"
     assert event["spans"][0]["description"] == "different_task_name"
+    assert event["spans"][0]["data"][SPANDATA.MESSAGING_DESTINATION_NAME] == huey.name
 
 
 def test_huey_propagate_trace(init_huey, capture_events):

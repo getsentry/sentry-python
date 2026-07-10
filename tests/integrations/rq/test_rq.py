@@ -416,6 +416,7 @@ def test_transaction_no_error(
 
         assert span["attributes"]["sentry.op"] == "queue.task.rq"
         assert span["name"] == "tests.integrations.rq.test_rq.do_trick"
+        assert span["attributes"][SPANDATA.MESSAGING_DESTINATION_NAME] == queue.name
     else:
         events = capture_events()
 
@@ -427,6 +428,10 @@ def test_transaction_no_error(
         assert envelope["type"] == "transaction"
         assert envelope["contexts"]["trace"]["op"] == "queue.task.rq"
         assert envelope["transaction"] == "tests.integrations.rq.test_rq.do_trick"
+        assert (
+            envelope["contexts"]["trace"]["data"][SPANDATA.MESSAGING_DESTINATION_NAME]
+            == queue.name
+        )
         assert envelope["extra"]["rq-job"] == DictionaryContaining(
             {
                 "args": ["Maisey"] if send_default_pii else SENSITIVE_DATA_SUBSTITUTE,
