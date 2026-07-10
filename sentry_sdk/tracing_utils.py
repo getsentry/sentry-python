@@ -1113,7 +1113,7 @@ def create_streaming_span_decorator(
         """
         Decorator to create a span for the given function.
         """
-        new_attributes = attributes or {}
+        new_attributes = dict(attributes) if attributes else {}
         if "sentry.op" not in new_attributes:
             new_attributes["sentry.op"] = OP.FUNCTION
 
