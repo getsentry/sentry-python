@@ -3,7 +3,7 @@ from typing import TypeVar
 
 import sentry_sdk
 from sentry_sdk.api import continue_trace, get_baggage, get_traceparent
-from sentry_sdk.consts import OP, SPANSTATUS
+from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import request_body_within_bounds
 from sentry_sdk.traces import SegmentSource
@@ -140,6 +140,7 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
                     "sentry.op": OP.QUEUE_TASK_DRAMATIQ,
                     "sentry.origin": DramatiqIntegration.origin,
                     "sentry.span.source": SegmentSource.TASK.value,
+                    SPANDATA.MESSAGING_DESTINATION_NAME: message.queue_name,
                 },
                 parent_span=None,
             )
@@ -160,6 +161,9 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
                 source=TransactionSource.TASK,
             )
             transaction.__enter__()
+            transaction.set_data(
+                SPANDATA.MESSAGING_DESTINATION_NAME, message.queue_name
+            )
             message._sentry_span_ctx = transaction
 
     def after_process_message(
