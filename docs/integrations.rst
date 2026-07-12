@@ -4,6 +4,11 @@ Integrations
 
 TBD
 
+Lilya
+=====
+
+.. autoclass:: sentry_sdk.integrations.lilya.LilyaIntegration
+
 Logging
 =======
 

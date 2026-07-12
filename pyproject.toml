@@ -70,6 +70,7 @@ typing = [
     "mcp>=2.0.0b1",
     "starlette>=1.3.1",
     "python-multipart>=0.0.32",
+    "lilya>=0.27.0",
     "pydantic>=2.13.4",
 ]
 test = [
@@ -195,6 +196,10 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "google.genai.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "lilya.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

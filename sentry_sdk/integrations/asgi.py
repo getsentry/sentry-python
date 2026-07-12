@@ -466,23 +466,28 @@ class SentryAsgiMiddleware:
                 source = TransactionSource.URL
 
         elif transaction_style == "url":
-            # FastAPI includes the route object in the scope to let Sentry extract the
-            # path from it for the transaction name
-            route = asgi_scope.get("route")
-            if route:
-                path = getattr(route, "path", None)
-                if path is not None:
-                    name = path
+            route_path_template = asgi_scope.get("route_path_template")
+            if route_path_template is not None:
+                name = route_path_template
             else:
-                name = _get_url(
-                    asgi_scope,
-                    "http" if ty == "http" else "ws",
-                    host=None,
-                    path=_get_path(
-                        asgi_scope=asgi_scope, root_path_in_path=self.root_path_in_path
-                    ),
-                )
-                source = TransactionSource.URL
+                # FastAPI includes the route object in the scope to let Sentry extract the
+                # path from it for the transaction name
+                route = asgi_scope.get("route")
+                if route:
+                    path = getattr(route, "path", None)
+                    if path is not None:
+                        name = path
+                else:
+                    name = _get_url(
+                        asgi_scope,
+                        "http" if ty == "http" else "ws",
+                        host=None,
+                        path=_get_path(
+                            asgi_scope=asgi_scope,
+                            root_path_in_path=self.root_path_in_path,
+                        ),
+                    )
+                    source = TransactionSource.URL
 
         if name is None:
             name = _DEFAULT_TRANSACTION_NAME
@@ -517,23 +522,28 @@ class SentryAsgiMiddleware:
                 source = SegmentSource.URL.value
 
         elif segment_style == "url":
-            # FastAPI includes the route object in the scope to let Sentry extract the
-            # path from it for the transaction name
-            route = asgi_scope.get("route")
-            if route:
-                path = getattr(route, "path", None)
-                if path is not None:
-                    name = path
+            route_path_template = asgi_scope.get("route_path_template")
+            if route_path_template is not None:
+                name = route_path_template
             else:
-                name = _get_url(
-                    asgi_scope,
-                    "http" if ty == "http" else "ws",
-                    host=None,
-                    path=_get_path(
-                        asgi_scope=asgi_scope, root_path_in_path=self.root_path_in_path
-                    ),
-                )
-                source = SegmentSource.URL.value
+                # FastAPI includes the route object in the scope to let Sentry extract the
+                # path from it for the transaction name
+                route = asgi_scope.get("route")
+                if route:
+                    path = getattr(route, "path", None)
+                    if path is not None:
+                        name = path
+                else:
+                    name = _get_url(
+                        asgi_scope,
+                        "http" if ty == "http" else "ws",
+                        host=None,
+                        path=_get_path(
+                            asgi_scope=asgi_scope,
+                            root_path_in_path=self.root_path_in_path,
+                        ),
+                    )
+                    source = SegmentSource.URL.value
 
         if name is None:
             name = _DEFAULT_TRANSACTION_NAME

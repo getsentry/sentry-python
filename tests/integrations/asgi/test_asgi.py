@@ -1,4 +1,5 @@
 from collections import Counter
+from types import SimpleNamespace
 
 import pytest
 from async_asgi_testclient import TestClient
@@ -685,6 +686,51 @@ async def test_transaction_style(
 
         assert transaction_event["transaction"] == expected_transaction
         assert transaction_event["transaction_info"] == {"source": expected_source}
+
+
+@pytest.mark.parametrize(
+    "span_streaming",
+    [True, False],
+)
+@pytest.mark.asyncio
+async def test_route_path_template_preferred_over_route_path(
+    sentry_init,
+    asgi3_app,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        },
+    )
+    app = SentryAsgiMiddleware(asgi3_app, transaction_style="url")
+    scope = {
+        "endpoint": asgi3_app,
+        "route": SimpleNamespace(path="/route-object/{value}"),
+        "route_path_template": "/scope-template/{value}",
+        "client": ("127.0.0.1", 60457),
+    }
+
+    async with TestClient(app, scope=scope) as client:
+        if span_streaming:
+            items = capture_items("span")
+        else:
+            events = capture_events()
+        await client.get("/scope-template/123")
+
+    sentry_sdk.flush()
+
+    if span_streaming:
+        (span,) = [item.payload for item in items]
+        assert span["name"] == "/scope-template/{value}"
+        assert span["attributes"]["sentry.span.source"] == "route"
+    else:
+        (transaction_event,) = events
+        assert transaction_event["transaction"] == "/scope-template/{value}"
+        assert transaction_event["transaction_info"] == {"source": "route"}
 
 
 def mock_asgi2_app():

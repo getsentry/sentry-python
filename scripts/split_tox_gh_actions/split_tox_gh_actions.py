@@ -154,6 +154,7 @@ GROUPS = {
         "asgi",
         "bottle",
         "falcon",
+        "lilya",
         "litestar",
         "pyramid",
         "quart",

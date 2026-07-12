@@ -6,6 +6,10 @@ The SDK now extracts all `gen_ai` spans out of a transaction and sends them as v
 
 Self-hosted Sentry users should opt out with `stream_gen_ai_spans=False`, since streamed `gen_ai` spans may not be ingested by their Sentry instance.
 
+### Features
+
+- Add first-class Lilya framework integration.
+
 ### Bug Fixes 🐛
 
 - (asyncpg) Use distinct span ops for cursor iteration and fetch to prevent N+1 false positives by @ericapisani in [#6609](https://github.com/getsentry/sentry-python/pull/6609)

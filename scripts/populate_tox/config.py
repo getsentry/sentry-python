@@ -276,6 +276,17 @@ TEST_SUITE_CONFIG = {
         "package": "launchdarkly-server-sdk",
         "num_versions": 2,
     },
+    "lilya": {
+        "package": "lilya",
+        "deps": {
+            "*": [
+                "httpx",
+                "pytest-asyncio",
+                "anyio>=3,<5",
+            ],
+        },
+        "python": ">=3.10",
+    },
     "litellm": {
         "package": "litellm",
         "deps": {

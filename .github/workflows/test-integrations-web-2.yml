@@ -53,6 +53,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-falcon"
+      - name: Test lilya
+        run: |
+          set -x # print commands that are executed
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-lilya"
       - name: Test litestar
         run: |
           set -x # print commands that are executed
