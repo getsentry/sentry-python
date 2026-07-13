@@ -179,33 +179,34 @@ def _wrap_connect(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
                 "sentry.origin": AioMySQLIntegration.origin,
             } | breadcrumb_data
 
+            if sentry_sdk.traces.get_current_span() is None:
+                return await f(self)
+
             with sentry_sdk.traces.start_span(
                 name="connect", attributes=span_attributes
-            ) as span:
+            ):
                 with capture_internal_exceptions():
                     sentry_sdk.add_breadcrumb(
                         message="connect", category="query", data=breadcrumb_data
                     )
-                res = await f(self)
-        else:
-            connect_data = _get_connect_data(self)
+                return await f(self)
 
-            with sentry_sdk.start_span(
-                op=OP.DB,
-                name="connect",
-                origin=AioMySQLIntegration.origin,
-            ) as span:
-                _set_db_data(span, self)
+        connect_data = _get_connect_data(self)
 
-                with capture_internal_exceptions():
-                    sentry_sdk.add_breadcrumb(
-                        message="connect",
-                        category="query",
-                        data=connect_data,
-                    )
-                res = await f(self)
+        with sentry_sdk.start_span(
+            op=OP.DB,
+            name="connect",
+            origin=AioMySQLIntegration.origin,
+        ) as span:
+            _set_db_data(span, self)
 
-        return res
+            with capture_internal_exceptions():
+                sentry_sdk.add_breadcrumb(
+                    message="connect",
+                    category="query",
+                    data=connect_data,
+                )
+            return await f(self)
 
     return _inner
 

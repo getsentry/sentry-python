@@ -152,6 +152,9 @@ class CommandTracer(monitoring.CommandListener):
             query = json.dumps(command, default=str)
 
             if has_span_streaming_enabled(client.options):
+                if sentry_sdk.traces.get_current_span() is None:
+                    return
+
                 span_first_data = {
                     "db.operation.name": operation_name,
                     "db.collection.name": collection_name,
