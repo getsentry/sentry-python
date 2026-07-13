@@ -914,23 +914,30 @@ def _hello_world(word):
 
 
 def test_functions_to_trace(sentry_init, capture_events):
+    global _hello_world
+
     functions_to_trace = [
         {"qualified_name": "tests.test_basics._hello_world"},
         {"qualified_name": "time.sleep"},
     ]
 
-    sentry_init(
-        traces_sample_rate=1.0,
-        functions_to_trace=functions_to_trace,
-    )
+    try:
+        sentry_init(
+            traces_sample_rate=1.0,
+            functions_to_trace=functions_to_trace,
+        )
 
-    events = capture_events()
+        events = capture_events()
 
-    with start_transaction(name="something"):
-        time.sleep(0)
+        with start_transaction(name="something"):
+            time.sleep(0)
 
-        for word in ["World", "You"]:
-            _hello_world(word)
+            for word in ["World", "You"]:
+                _hello_world(word)
+
+    finally:
+        _hello_world = _hello_world.__wrapped__
+        time.sleep = time.sleep.__wrapped__
 
     assert len(events) == 1
 
@@ -955,17 +962,21 @@ def test_functions_to_trace_with_class(sentry_init, capture_events):
         {"qualified_name": "tests.test_basics.WorldGreeter.greet"},
     ]
 
-    sentry_init(
-        traces_sample_rate=1.0,
-        functions_to_trace=functions_to_trace,
-    )
+    try:
+        sentry_init(
+            traces_sample_rate=1.0,
+            functions_to_trace=functions_to_trace,
+        )
 
-    events = capture_events()
+        events = capture_events()
 
-    with start_transaction(name="something"):
-        wg = WorldGreeter("World")
-        wg.greet()
-        wg.greet("You")
+        with start_transaction(name="something"):
+            wg = WorldGreeter("World")
+            wg.greet()
+            wg.greet("You")
+
+    finally:
+        WorldGreeter.greet = WorldGreeter.greet.__wrapped__
 
     assert len(events) == 1
 
