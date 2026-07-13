@@ -733,10 +733,11 @@ def test_outgoing_trace_headers_span_streaming(
 
     items = capture_items("span")
 
-    if asyncio.iscoroutinefunction(httpx2_client.get):
-        response = asyncio.run(httpx2_client.get(url))
-    else:
-        response = httpx2_client.get(url)
+    with sentry_sdk.traces.start_span(name="test"):
+        if asyncio.iscoroutinefunction(httpx2_client.get):
+            response = asyncio.run(httpx2_client.get(url))
+        else:
+            response = httpx2_client.get(url)
 
     sentry_sdk.flush()
 
@@ -775,12 +776,13 @@ def test_outgoing_trace_headers_append_to_baggage_span_streaming(
     items = capture_items("span")
 
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=500000):
-        if asyncio.iscoroutinefunction(httpx2_client.get):
-            response = asyncio.run(
-                httpx2_client.get(url, headers={"baGGage": "custom=data"})
-            )
-        else:
-            response = httpx2_client.get(url, headers={"baGGage": "custom=data"})
+        with sentry_sdk.traces.start_span(name="test"):
+            if asyncio.iscoroutinefunction(httpx2_client.get):
+                response = asyncio.run(
+                    httpx2_client.get(url, headers={"baGGage": "custom=data"})
+                )
+            else:
+                response = httpx2_client.get(url, headers={"baGGage": "custom=data"})
 
     sentry_sdk.flush()
 
@@ -814,10 +816,11 @@ def test_request_source_disabled_span_streaming(
 
     url = "http://example.com/"
 
-    if asyncio.iscoroutinefunction(httpx2_client.get):
-        asyncio.run(httpx2_client.get(url))
-    else:
-        httpx2_client.get(url)
+    with sentry_sdk.traces.start_span(name="test"):
+        if asyncio.iscoroutinefunction(httpx2_client.get):
+            asyncio.run(httpx2_client.get(url))
+        else:
+            httpx2_client.get(url)
 
     sentry_sdk.flush()
 
@@ -858,10 +861,11 @@ def test_request_source_enabled_span_streaming(
 
     url = "http://example.com/"
 
-    if asyncio.iscoroutinefunction(httpx2_client.get):
-        asyncio.run(httpx2_client.get(url))
-    else:
-        httpx2_client.get(url)
+    with sentry_sdk.traces.start_span(name="test"):
+        if asyncio.iscoroutinefunction(httpx2_client.get):
+            asyncio.run(httpx2_client.get(url))
+        else:
+            httpx2_client.get(url)
 
     sentry_sdk.flush()
 
@@ -894,10 +898,11 @@ def test_request_source_span_streaming(
 
     url = "http://example.com/"
 
-    if asyncio.iscoroutinefunction(httpx2_client.get):
-        asyncio.run(httpx2_client.get(url))
-    else:
-        httpx2_client.get(url)
+    with sentry_sdk.traces.start_span(name="test"):
+        if asyncio.iscoroutinefunction(httpx2_client.get):
+            asyncio.run(httpx2_client.get(url))
+        else:
+            httpx2_client.get(url)
 
     sentry_sdk.flush()
 
@@ -951,14 +956,15 @@ def test_request_source_with_module_in_search_path_span_streaming(
 
     url = "http://example.com/"
 
-    if asyncio.iscoroutinefunction(httpx2_client.get):
-        from httpx2_helpers.helpers import async_get_request_with_client
+    with sentry_sdk.traces.start_span(name="test"):
+        if asyncio.iscoroutinefunction(httpx2_client.get):
+            from httpx2_helpers.helpers import async_get_request_with_client
 
-        asyncio.run(async_get_request_with_client(httpx2_client, url))
-    else:
-        from httpx2_helpers.helpers import get_request_with_client
+            asyncio.run(async_get_request_with_client(httpx2_client, url))
+        else:
+            from httpx2_helpers.helpers import get_request_with_client
 
-        get_request_with_client(httpx2_client, url)
+            get_request_with_client(httpx2_client, url)
 
     sentry_sdk.flush()
 
@@ -1010,10 +1016,11 @@ def test_no_request_source_if_duration_too_short_span_streaming(
 
     url = "http://example.com/"
 
-    if asyncio.iscoroutinefunction(httpx2_client.get):
-        asyncio.run(httpx2_client.get(url))
-    else:
-        httpx2_client.get(url)
+    with sentry_sdk.traces.start_span(name="test"):
+        if asyncio.iscoroutinefunction(httpx2_client.get):
+            asyncio.run(httpx2_client.get(url))
+        else:
+            httpx2_client.get(url)
 
     sentry_sdk.flush()
 
@@ -1047,10 +1054,11 @@ def test_request_source_if_duration_over_threshold_span_streaming(
 
     url = "http://example.com/"
 
-    if asyncio.iscoroutinefunction(httpx2_client.get):
-        asyncio.run(httpx2_client.get(url))
-    else:
-        httpx2_client.get(url)
+    with sentry_sdk.traces.start_span(name="test"):
+        if asyncio.iscoroutinefunction(httpx2_client.get):
+            asyncio.run(httpx2_client.get(url))
+        else:
+            httpx2_client.get(url)
 
     sentry_sdk.flush()
 
@@ -1099,10 +1107,11 @@ def test_span_origin_span_streaming(
 
     url = "http://example.com/"
 
-    if asyncio.iscoroutinefunction(httpx2_client.get):
-        asyncio.run(httpx2_client.get(url))
-    else:
-        httpx2_client.get(url)
+    with sentry_sdk.traces.start_span(name="test"):
+        if asyncio.iscoroutinefunction(httpx2_client.get):
+            asyncio.run(httpx2_client.get(url))
+        else:
+            httpx2_client.get(url)
 
     sentry_sdk.flush()
 
@@ -1131,10 +1140,11 @@ def test_http_url_attributes_span_streaming(
 
     url = "http://example.com/?foo=bar#frag"
 
-    if asyncio.iscoroutinefunction(httpx2_client.get):
-        asyncio.run(httpx2_client.get(url))
-    else:
-        httpx2_client.get(url)
+    with sentry_sdk.traces.start_span(name="test"):
+        if asyncio.iscoroutinefunction(httpx2_client.get):
+            asyncio.run(httpx2_client.get(url))
+        else:
+            httpx2_client.get(url)
 
     sentry_sdk.flush()
 
@@ -1167,10 +1177,11 @@ def test_http_url_attributes_no_query_or_fragment_span_streaming(
 
     url = "http://example.com/"
 
-    if asyncio.iscoroutinefunction(httpx2_client.get):
-        asyncio.run(httpx2_client.get(url))
-    else:
-        httpx2_client.get(url)
+    with sentry_sdk.traces.start_span(name="test"):
+        if asyncio.iscoroutinefunction(httpx2_client.get):
+            asyncio.run(httpx2_client.get(url))
+        else:
+            httpx2_client.get(url)
 
     sentry_sdk.flush()
 
@@ -1202,10 +1213,11 @@ def test_http_url_attributes_pii_disabled_span_streaming(
 
     url = "http://example.com/?foo=bar#frag"
 
-    if asyncio.iscoroutinefunction(httpx2_client.get):
-        asyncio.run(httpx2_client.get(url))
-    else:
-        httpx2_client.get(url)
+    with sentry_sdk.traces.start_span(name="test"):
+        if asyncio.iscoroutinefunction(httpx2_client.get):
+            asyncio.run(httpx2_client.get(url))
+        else:
+            httpx2_client.get(url)
 
     sentry_sdk.flush()
 
