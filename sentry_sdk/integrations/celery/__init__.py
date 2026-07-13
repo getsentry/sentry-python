@@ -422,8 +422,9 @@ def _wrap_task_call(task: "Any", f: "F") -> "F":
             if span_streaming and get_current_span() is None:
                 return f(*args, **kwargs)
 
+            span: "Union[Span, StreamedSpan]"
             if span_streaming:
-                span_ctx = sentry_sdk.traces.start_span(
+                span = sentry_sdk.traces.start_span(
                     name=task.name,
                     attributes={
                         "sentry.op": OP.QUEUE_PROCESS,
@@ -431,13 +432,13 @@ def _wrap_task_call(task: "Any", f: "F") -> "F":
                     },
                 )
             else:
-                span_ctx = sentry_sdk.start_span(
+                span = sentry_sdk.start_span(
                     op=OP.QUEUE_PROCESS,
                     name=task.name,
                     origin=CeleryIntegration.origin,
                 )
 
-            with span_ctx as span:
+            with span:
                 if isinstance(span, StreamedSpan):
                     set_on_span = span.set_attribute
                 else:
