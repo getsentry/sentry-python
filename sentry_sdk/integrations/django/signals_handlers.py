@@ -7,7 +7,6 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.django import DJANGO_VERSION
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
-from sentry_sdk.utils import nullcontext
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -69,17 +68,16 @@ def patch_signals() -> None:
                     sentry_sdk.get_client().options
                 )
                 if span_streaming:
-                    span_ctx = nullcontext()
-                    if sentry_sdk.traces.get_current_span() is not None:
-                        span_ctx = sentry_sdk.traces.start_span(
-                            name=signal_name,
-                            attributes={
-                                "sentry.op": OP.EVENT_DJANGO,
-                                "sentry.origin": DjangoIntegration.origin,
-                                SPANDATA.CODE_FUNCTION_NAME: signal_name,
-                            },
-                        )
-                    with span_ctx:
+                    if sentry_sdk.traces.get_current_span() is None:
+                        return receiver(*args, **kwargs)
+                    with sentry_sdk.traces.start_span(
+                        name=signal_name,
+                        attributes={
+                            "sentry.op": OP.EVENT_DJANGO,
+                            "sentry.origin": DjangoIntegration.origin,
+                            SPANDATA.CODE_FUNCTION_NAME: signal_name,
+                        },
+                    ):
                         return receiver(*args, **kwargs)
                 else:
                     with sentry_sdk.start_span(

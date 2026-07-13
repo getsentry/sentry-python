@@ -5,7 +5,6 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
-from sentry_sdk.utils import nullcontext
 
 try:
     from google.protobuf.message import Message
@@ -53,17 +52,21 @@ class SentryUnaryUnaryClientInterceptor(ClientInterceptor, UnaryUnaryClientInter
 
         span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
-            span_ctx = nullcontext()
-            if sentry_sdk.traces.get_current_span() is not None:
-                span_ctx = sentry_sdk.traces.start_span(
-                    name="unary unary call to %s" % method.decode(),
-                    attributes={
-                        "sentry.op": OP.GRPC_CLIENT,
-                        "sentry.origin": SPAN_ORIGIN,
-                        SPANDATA.RPC_METHOD: method.decode(),
-                    },
+            if sentry_sdk.traces.get_current_span() is None:
+                client_call_details = (
+                    self._update_client_call_details_metadata_from_scope(
+                        client_call_details
+                    )
                 )
-            with span_ctx as span:
+                return await continuation(client_call_details, request)
+            with sentry_sdk.traces.start_span(
+                name="unary unary call to %s" % method.decode(),
+                attributes={
+                    "sentry.op": OP.GRPC_CLIENT,
+                    "sentry.origin": SPAN_ORIGIN,
+                    SPANDATA.RPC_METHOD: method.decode(),
+                },
+            ) as span:
                 client_call_details = (
                     self._update_client_call_details_metadata_from_scope(
                         client_call_details
@@ -71,11 +74,8 @@ class SentryUnaryUnaryClientInterceptor(ClientInterceptor, UnaryUnaryClientInter
                 )
 
                 response = await continuation(client_call_details, request)
-                if span is not None:
-                    status_code = await response.code()
-                    span.set_attribute(
-                        SPANDATA.RPC_RESPONSE_STATUS_CODE, status_code.name
-                    )
+                status_code = await response.code()
+                span.set_attribute(SPANDATA.RPC_RESPONSE_STATUS_CODE, status_code.name)
 
                 return response
         else:
@@ -114,17 +114,21 @@ class SentryUnaryStreamClientInterceptor(
 
         span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
-            span_ctx = nullcontext()
-            if sentry_sdk.traces.get_current_span() is not None:
-                span_ctx = sentry_sdk.traces.start_span(
-                    name="unary stream call to %s" % method.decode(),
-                    attributes={
-                        "sentry.op": OP.GRPC_CLIENT,
-                        "sentry.origin": SPAN_ORIGIN,
-                        SPANDATA.RPC_METHOD: method.decode(),
-                    },
+            if sentry_sdk.traces.get_current_span() is None:
+                client_call_details = (
+                    self._update_client_call_details_metadata_from_scope(
+                        client_call_details
+                    )
                 )
-            with span_ctx as span:
+                return await continuation(client_call_details, request)
+            with sentry_sdk.traces.start_span(
+                name="unary stream call to %s" % method.decode(),
+                attributes={
+                    "sentry.op": OP.GRPC_CLIENT,
+                    "sentry.origin": SPAN_ORIGIN,
+                    SPANDATA.RPC_METHOD: method.decode(),
+                },
+            ) as span:
                 client_call_details = (
                     self._update_client_call_details_metadata_from_scope(
                         client_call_details

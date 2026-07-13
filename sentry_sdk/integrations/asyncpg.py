@@ -16,7 +16,6 @@ from sentry_sdk.tracing_utils import (
 )
 from sentry_sdk.utils import (
     capture_internal_exceptions,
-    nullcontext,
     parse_version,
 )
 
@@ -236,42 +235,39 @@ def _wrap_connect_addr(
                 except IndexError:
                     pass
 
-            span_ctx = nullcontext()
-            if sentry_sdk.traces.get_current_span() is not None:
-                span_ctx = sentry_sdk.traces.start_span(
-                    name="connect", attributes=span_attributes
-                )
-            with span_ctx as span:
+            if sentry_sdk.traces.get_current_span() is None:
+                return await f(*args, **kwargs)
+
+            with sentry_sdk.traces.start_span(
+                name="connect", attributes=span_attributes
+            ):
                 with capture_internal_exceptions():
                     sentry_sdk.add_breadcrumb(
                         message="connect", category="query", data=span_attributes
                     )
-                res = await f(*args, **kwargs)
+                return await f(*args, **kwargs)
 
-        else:
-            with sentry_sdk.start_span(
-                op=OP.DB,
-                name="connect",
-                origin=AsyncPGIntegration.origin,
-            ) as span:
-                span.set_data(SPANDATA.DB_SYSTEM, "postgresql")
-                if addr:
-                    try:
-                        span.set_data(SPANDATA.SERVER_ADDRESS, addr[0])
-                        span.set_data(SPANDATA.SERVER_PORT, addr[1])
-                    except IndexError:
-                        pass
-                span.set_data(SPANDATA.DB_NAME, database)
-                span.set_data(SPANDATA.DB_USER, user)
-                span.set_data(SPANDATA.DB_DRIVER_NAME, "asyncpg")
+        with sentry_sdk.start_span(
+            op=OP.DB,
+            name="connect",
+            origin=AsyncPGIntegration.origin,
+        ) as span:
+            span.set_data(SPANDATA.DB_SYSTEM, "postgresql")
+            if addr:
+                try:
+                    span.set_data(SPANDATA.SERVER_ADDRESS, addr[0])
+                    span.set_data(SPANDATA.SERVER_PORT, addr[1])
+                except IndexError:
+                    pass
+            span.set_data(SPANDATA.DB_NAME, database)
+            span.set_data(SPANDATA.DB_USER, user)
+            span.set_data(SPANDATA.DB_DRIVER_NAME, "asyncpg")
 
-                with capture_internal_exceptions():
-                    sentry_sdk.add_breadcrumb(
-                        message="connect", category="query", data=span._data
-                    )
-                res = await f(*args, **kwargs)
-
-        return res
+            with capture_internal_exceptions():
+                sentry_sdk.add_breadcrumb(
+                    message="connect", category="query", data=span._data
+                )
+            return await f(*args, **kwargs)
 
     return _inner
 

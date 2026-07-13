@@ -11,7 +11,6 @@ from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     event_from_exception,
     logger,
-    nullcontext,
     package_version,
     qualname_from_function,
     reraise,
@@ -157,18 +156,32 @@ def _patch_ray_remote() -> None:
                 )
                 if span_streaming:
                     function_name = qualname_from_function(user_f)
-                    span_ctx = nullcontext()
-                    if sentry_sdk.traces.get_current_span() is not None:
-                        span_ctx = sentry_sdk.traces.start_span(
-                            name="unknown Ray task"
-                            if function_name is None
-                            else function_name,
-                            attributes={
-                                "sentry.op": OP.QUEUE_SUBMIT_RAY,
-                                "sentry.origin": RayIntegration.origin,
-                            },
-                        )
-                    with span_ctx:
+
+                    if sentry_sdk.traces.get_current_span() is None:
+                        tracing = {
+                            k: v
+                            for k, v in sentry_sdk.get_current_scope().iter_trace_propagation_headers()
+                        }
+                        try:
+                            result = old_remote_method(
+                                *args, **kwargs, _sentry_tracing=tracing
+                            )
+                        except Exception:
+                            exc_info = sys.exc_info()
+                            _capture_exception(exc_info)
+                            reraise(*exc_info)
+
+                        return result
+
+                    with sentry_sdk.traces.start_span(
+                        name="unknown Ray task"
+                        if function_name is None
+                        else function_name,
+                        attributes={
+                            "sentry.op": OP.QUEUE_SUBMIT_RAY,
+                            "sentry.origin": RayIntegration.origin,
+                        },
+                    ):
                         tracing = {
                             k: v
                             for k, v in sentry_sdk.get_current_scope().iter_trace_propagation_headers()

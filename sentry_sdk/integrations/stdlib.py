@@ -23,7 +23,6 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     is_sentry_url,
     logger,
-    nullcontext,
     parse_url,
     safe_repr,
 )
@@ -360,18 +359,16 @@ def _install_subprocess() -> None:
     ) -> "Any":
         span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
-            span_ctx = nullcontext()
-            if sentry_sdk.traces.get_current_span() is not None:
-                span_ctx = sentry_sdk.traces.start_span(
-                    name=OP.SUBPROCESS_WAIT,
-                    attributes={
-                        "sentry.op": OP.SUBPROCESS_WAIT,
-                        "sentry.origin": "auto.subprocess.stdlib.subprocess",
-                    },
-                )
-            with span_ctx as span:
-                if span is not None:
-                    span.set_attribute(SPANDATA.PROCESS_PID, self.pid)
+            if sentry_sdk.traces.get_current_span() is None:
+                return old_popen_wait(self, *a, **kw)
+            with sentry_sdk.traces.start_span(
+                name=OP.SUBPROCESS_WAIT,
+                attributes={
+                    "sentry.op": OP.SUBPROCESS_WAIT,
+                    "sentry.origin": "auto.subprocess.stdlib.subprocess",
+                },
+            ) as span:
+                span.set_attribute(SPANDATA.PROCESS_PID, self.pid)
                 return old_popen_wait(self, *a, **kw)
         else:
             with sentry_sdk.start_span(
@@ -391,18 +388,16 @@ def _install_subprocess() -> None:
     ) -> "Any":
         span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
-            span_ctx = nullcontext()
-            if sentry_sdk.traces.get_current_span() is not None:
-                span_ctx = sentry_sdk.traces.start_span(
-                    name=OP.SUBPROCESS_COMMUNICATE,
-                    attributes={
-                        "sentry.op": OP.SUBPROCESS_COMMUNICATE,
-                        "sentry.origin": "auto.subprocess.stdlib.subprocess",
-                    },
-                )
-            with span_ctx as span:
-                if span is not None:
-                    span.set_attribute(SPANDATA.PROCESS_PID, self.pid)
+            if sentry_sdk.traces.get_current_span() is None:
+                return old_popen_communicate(self, *a, **kw)
+            with sentry_sdk.traces.start_span(
+                name=OP.SUBPROCESS_COMMUNICATE,
+                attributes={
+                    "sentry.op": OP.SUBPROCESS_COMMUNICATE,
+                    "sentry.origin": "auto.subprocess.stdlib.subprocess",
+                },
+            ) as span:
+                span.set_attribute(SPANDATA.PROCESS_PID, self.pid)
                 return old_popen_communicate(self, *a, **kw)
         else:
             with sentry_sdk.start_span(

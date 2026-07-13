@@ -24,7 +24,7 @@ from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
     should_truncate_gen_ai_input,
 )
-from sentry_sdk.utils import capture_internal_exceptions, logger, nullcontext
+from sentry_sdk.utils import capture_internal_exceptions, logger
 
 if TYPE_CHECKING:
     from typing import (
@@ -1029,60 +1029,56 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
         run_name, tools = _get_request_data(self, args, kwargs)
 
         if has_span_streaming_enabled(client.options):
-            span_ctx = nullcontext()
-            if sentry_sdk.traces.get_current_span() is not None:
-                span_ctx = sentry_sdk.traces.start_span(
-                    name=f"invoke_agent {run_name}" if run_name else "invoke_agent",
-                    attributes={
-                        "sentry.op": OP.GEN_AI_INVOKE_AGENT,
-                        "sentry.origin": LangchainIntegration.origin,
-                        SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
-                        SPANDATA.GEN_AI_RESPONSE_STREAMING: False,
-                    },
-                )
-            with span_ctx as span:
-                if span is not None:
-                    if run_name:
-                        span.set_attribute(SPANDATA.GEN_AI_FUNCTION_ID, run_name)
+            if sentry_sdk.traces.get_current_span() is None:
+                return f(self, *args, **kwargs)
 
-                    _set_tools_on_span(span, tools)
+            with sentry_sdk.traces.start_span(
+                name=f"invoke_agent {run_name}" if run_name else "invoke_agent",
+                attributes={
+                    "sentry.op": OP.GEN_AI_INVOKE_AGENT,
+                    "sentry.origin": LangchainIntegration.origin,
+                    SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
+                    SPANDATA.GEN_AI_RESPONSE_STREAMING: False,
+                },
+            ) as span:
+                if run_name:
+                    span.set_attribute(SPANDATA.GEN_AI_FUNCTION_ID, run_name)
+
+                _set_tools_on_span(span, tools)
 
                 # Run the agent
                 result = f(self, *args, **kwargs)
 
-                if span is not None:
-                    input = result.get("input")
-                    if (
-                        input is not None
-                        and should_send_default_pii()
-                        and integration.include_prompts
-                    ):
-                        normalized_messages = normalize_message_roles([input])
+                input = result.get("input")
+                if (
+                    input is not None
+                    and should_send_default_pii()
+                    and integration.include_prompts
+                ):
+                    normalized_messages = normalize_message_roles([input])
 
-                        client = sentry_sdk.get_client()
-                        scope = sentry_sdk.get_current_scope()
-                        messages_data = (
-                            truncate_and_annotate_messages(
-                                normalized_messages, span, scope
-                            )
-                            if should_truncate_gen_ai_input(client.options)
-                            else normalized_messages
+                    client = sentry_sdk.get_client()
+                    scope = sentry_sdk.get_current_scope()
+                    messages_data = (
+                        truncate_and_annotate_messages(normalized_messages, span, scope)
+                        if should_truncate_gen_ai_input(client.options)
+                        else normalized_messages
+                    )
+                    if messages_data is not None:
+                        set_data_normalized(
+                            span,
+                            SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                            messages_data,
+                            unpack=False,
                         )
-                        if messages_data is not None:
-                            set_data_normalized(
-                                span,
-                                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                                messages_data,
-                                unpack=False,
-                            )
 
-                    output = result.get("output")
-                    if (
-                        output is not None
-                        and should_send_default_pii()
-                        and integration.include_prompts
-                    ):
-                        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
+                output = result.get("output")
+                if (
+                    output is not None
+                    and should_send_default_pii()
+                    and integration.include_prompts
+                ):
+                    set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
                 return result
         else:
@@ -1309,38 +1305,35 @@ def _wrap_embedding_method(f: "Callable[..., Any]") -> "Callable[..., Any]":
         model_name = getattr(self, "model", None) or getattr(self, "model_name", None)
 
         if has_span_streaming_enabled(client.options):
-            span_ctx = nullcontext()
-            if sentry_sdk.traces.get_current_span() is not None:
-                span_ctx = sentry_sdk.traces.start_span(
-                    name=f"embeddings {model_name}" if model_name else "embeddings",
-                    attributes={
-                        "sentry.op": OP.GEN_AI_EMBEDDINGS,
-                        "sentry.origin": LangchainIntegration.origin,
-                        SPANDATA.GEN_AI_OPERATION_NAME: "embeddings",
-                    },
-                )
-            with span_ctx as span:
-                if span is not None:
-                    if model_name:
-                        span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
+            if sentry_sdk.traces.get_current_span() is None:
+                return f(self, *args, **kwargs)
 
-                    # Capture input if PII is allowed
-                    if (
-                        should_send_default_pii()
-                        and integration.include_prompts
-                        and len(args) > 0
-                    ):
-                        input_data = args[0]
-                        # Normalize to list format
-                        texts = (
-                            input_data if isinstance(input_data, list) else [input_data]
-                        )
-                        set_data_normalized(
-                            span,
-                            SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
-                            texts,
-                            unpack=False,
-                        )
+            with sentry_sdk.traces.start_span(
+                name=f"embeddings {model_name}" if model_name else "embeddings",
+                attributes={
+                    "sentry.op": OP.GEN_AI_EMBEDDINGS,
+                    "sentry.origin": LangchainIntegration.origin,
+                    SPANDATA.GEN_AI_OPERATION_NAME: "embeddings",
+                },
+            ) as span:
+                if model_name:
+                    span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
+
+                # Capture input if PII is allowed
+                if (
+                    should_send_default_pii()
+                    and integration.include_prompts
+                    and len(args) > 0
+                ):
+                    input_data = args[0]
+                    # Normalize to list format
+                    texts = input_data if isinstance(input_data, list) else [input_data]
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+                        texts,
+                        unpack=False,
+                    )
 
                 result = f(self, *args, **kwargs)
                 return result
@@ -1388,38 +1381,35 @@ def _wrap_async_embedding_method(f: "Callable[..., Any]") -> "Callable[..., Any]
         model_name = getattr(self, "model", None) or getattr(self, "model_name", None)
 
         if has_span_streaming_enabled(client.options):
-            span_ctx = nullcontext()
-            if sentry_sdk.traces.get_current_span() is not None:
-                span_ctx = sentry_sdk.traces.start_span(
-                    name=f"embeddings {model_name}" if model_name else "embeddings",
-                    attributes={
-                        "sentry.op": OP.GEN_AI_EMBEDDINGS,
-                        "sentry.origin": LangchainIntegration.origin,
-                        SPANDATA.GEN_AI_OPERATION_NAME: "embeddings",
-                    },
-                )
-            with span_ctx as span:
-                if span is not None:
-                    if model_name:
-                        span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
+            if sentry_sdk.traces.get_current_span() is None:
+                return await f(self, *args, **kwargs)
 
-                    # Capture input if PII is allowed
-                    if (
-                        should_send_default_pii()
-                        and integration.include_prompts
-                        and len(args) > 0
-                    ):
-                        input_data = args[0]
-                        # Normalize to list format
-                        texts = (
-                            input_data if isinstance(input_data, list) else [input_data]
-                        )
-                        set_data_normalized(
-                            span,
-                            SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
-                            texts,
-                            unpack=False,
-                        )
+            with sentry_sdk.traces.start_span(
+                name=f"embeddings {model_name}" if model_name else "embeddings",
+                attributes={
+                    "sentry.op": OP.GEN_AI_EMBEDDINGS,
+                    "sentry.origin": LangchainIntegration.origin,
+                    SPANDATA.GEN_AI_OPERATION_NAME: "embeddings",
+                },
+            ) as span:
+                if model_name:
+                    span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
+
+                # Capture input if PII is allowed
+                if (
+                    should_send_default_pii()
+                    and integration.include_prompts
+                    and len(args) > 0
+                ):
+                    input_data = args[0]
+                    # Normalize to list format
+                    texts = input_data if isinstance(input_data, list) else [input_data]
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+                        texts,
+                        unpack=False,
+                    )
 
                 result = await f(self, *args, **kwargs)
                 return result

@@ -20,7 +20,6 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    nullcontext,
     reraise,
 )
 
@@ -80,19 +79,27 @@ def patch_enqueue() -> None:
             sentry_sdk.get_client().options
         )
 
-        span_ctx = None
+        no_headers_types = (PeriodicTask,) + tuple(
+            t for t in [HueyGroup, HueyChord] if t is not None
+        )
+
+        if is_span_streaming_enabled and sentry_sdk.traces.get_current_span() is None:
+            if not isinstance(item, no_headers_types):
+                item.kwargs["sentry_headers"] = {
+                    BAGGAGE_HEADER_NAME: get_baggage(),
+                    SENTRY_TRACE_HEADER_NAME: get_traceparent(),
+                }
+            return old_enqueue(self, item)
+
         if is_span_streaming_enabled:
-            if sentry_sdk.traces.get_current_span() is not None:
-                span_ctx = sentry_sdk.traces.start_span(
-                    name=span_name,
-                    attributes={
-                        "sentry.op": OP.QUEUE_SUBMIT_HUEY,
-                        "sentry.origin": HueyIntegration.origin,
-                        SPANDATA.MESSAGING_DESTINATION_NAME: self.name,
-                    },
-                )
-            else:
-                span_ctx = nullcontext()
+            span_ctx = sentry_sdk.traces.start_span(
+                name=span_name,
+                attributes={
+                    "sentry.op": OP.QUEUE_SUBMIT_HUEY,
+                    "sentry.origin": HueyIntegration.origin,
+                    SPANDATA.MESSAGING_DESTINATION_NAME: self.name,
+                },
+            )
         else:
             span_ctx = sentry_sdk.start_span(
                 op=OP.QUEUE_SUBMIT_HUEY,
@@ -101,9 +108,6 @@ def patch_enqueue() -> None:
             )
             span_ctx.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, self.name)
 
-        no_headers_types = (PeriodicTask,) + tuple(
-            t for t in [HueyGroup, HueyChord] if t is not None
-        )
         with span_ctx:
             if not isinstance(item, no_headers_types):
                 # Attach trace propagation data to task kwargs. We do

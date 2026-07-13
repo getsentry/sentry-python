@@ -20,7 +20,6 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    nullcontext,
     reraise,
 )
 
@@ -257,16 +256,15 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
         )
 
         if is_span_streaming_enabled:
-            if sentry_sdk.traces.get_current_span() is not None:
-                span_ctx = sentry_sdk.traces.start_span(
-                    name="Cohere Embedding Creation",
-                    attributes={
-                        "sentry.op": consts.OP.COHERE_EMBEDDINGS_CREATE,
-                        "sentry.origin": CohereIntegration.origin,
-                    },
-                )
-            else:
-                span_ctx = nullcontext()
+            if sentry_sdk.traces.get_current_span() is None:
+                return f(*args, **kwargs)
+            span_ctx = sentry_sdk.traces.start_span(
+                name="Cohere Embedding Creation",
+                attributes={
+                    "sentry.op": consts.OP.COHERE_EMBEDDINGS_CREATE,
+                    "sentry.origin": CohereIntegration.origin,
+                },
+            )
         else:
             span_ctx = get_start_span_function()(
                 op=consts.OP.COHERE_EMBEDDINGS_CREATE,
@@ -275,23 +273,22 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
             )
 
         with span_ctx as span:
-            if span is not None:
-                if "texts" in kwargs and (
-                    should_send_default_pii() and integration.include_prompts
+            if "texts" in kwargs and (
+                should_send_default_pii() and integration.include_prompts
+            ):
+                if isinstance(kwargs["texts"], str):
+                    set_data_normalized(span, SPANDATA.AI_TEXTS, [kwargs["texts"]])
+                elif (
+                    isinstance(kwargs["texts"], list)
+                    and len(kwargs["texts"]) > 0
+                    and isinstance(kwargs["texts"][0], str)
                 ):
-                    if isinstance(kwargs["texts"], str):
-                        set_data_normalized(span, SPANDATA.AI_TEXTS, [kwargs["texts"]])
-                    elif (
-                        isinstance(kwargs["texts"], list)
-                        and len(kwargs["texts"]) > 0
-                        and isinstance(kwargs["texts"][0], str)
-                    ):
-                        set_data_normalized(
-                            span, SPANDATA.AI_INPUT_MESSAGES, kwargs["texts"]
-                        )
+                    set_data_normalized(
+                        span, SPANDATA.AI_INPUT_MESSAGES, kwargs["texts"]
+                    )
 
-                if "model" in kwargs:
-                    set_data_normalized(span, SPANDATA.AI_MODEL_ID, kwargs["model"])
+            if "model" in kwargs:
+                set_data_normalized(span, SPANDATA.AI_MODEL_ID, kwargs["model"])
             try:
                 res = f(*args, **kwargs)
             except Exception as e:
@@ -299,7 +296,7 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 with capture_internal_exceptions():
                     _capture_exception(e)
                 reraise(*exc_info)
-            if span is not None and (
+            if (
                 hasattr(res, "meta")
                 and hasattr(res.meta, "billed_units")
                 and hasattr(res.meta.billed_units, "input_tokens")
