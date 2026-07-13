@@ -79,6 +79,9 @@ def patch_enqueue_job() -> None:
             return await old_enqueue_job(self, function, *args, **kwargs)
 
         if has_span_streaming_enabled(client.options):
+            if sentry_sdk.traces.get_current_span() is None:
+                return await old_enqueue_job(self, function, *args, **kwargs)
+
             with sentry_sdk.traces.start_span(
                 name=function,
                 attributes={

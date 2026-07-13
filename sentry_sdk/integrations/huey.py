@@ -79,7 +79,18 @@ def patch_enqueue() -> None:
             sentry_sdk.get_client().options
         )
 
-        span_ctx = None
+        no_headers_types = (PeriodicTask,) + tuple(
+            t for t in [HueyGroup, HueyChord] if t is not None
+        )
+
+        if is_span_streaming_enabled and sentry_sdk.traces.get_current_span() is None:
+            if not isinstance(item, no_headers_types):
+                item.kwargs["sentry_headers"] = {
+                    BAGGAGE_HEADER_NAME: get_baggage(),
+                    SENTRY_TRACE_HEADER_NAME: get_traceparent(),
+                }
+            return old_enqueue(self, item)
+
         if is_span_streaming_enabled:
             span_ctx = sentry_sdk.traces.start_span(
                 name=span_name,
@@ -97,9 +108,6 @@ def patch_enqueue() -> None:
             )
             span_ctx.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, self.name)
 
-        no_headers_types = (PeriodicTask,) + tuple(
-            t for t in [HueyGroup, HueyChord] if t is not None
-        )
         with span_ctx:
             if not isinstance(item, no_headers_types):
                 # Attach trace propagation data to task kwargs. We do
