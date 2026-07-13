@@ -134,6 +134,7 @@ TEST_SUITE_CONFIG = {
             "*": ["pytest-asyncio", "aiohttp"],
         },
         "include": ">=8",
+        "python": ">=3.8",
     },
     "falcon": {
         "package": "falcon",
