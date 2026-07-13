@@ -664,7 +664,7 @@ class PropagationContext:
 
         # Get the sample rate and compute the transformation that will map the random value
         # to the desired range: [0, 1), [0, sample_rate), or [sample_rate, 1).
-        sample_rate = try_convert(float, self.baggage.sentry_items.get("sample_rate"))
+        sample_rate = self._sample_rate()
         lower, upper = _sample_rand_range(self.parent_sampled, sample_rate)
 
         try:
@@ -688,6 +688,13 @@ class PropagationContext:
             return None
 
         return self.baggage.sentry_items.get("sample_rand")
+
+    def _sample_rate(self) -> "Optional[float]":
+        """Convenience method to get the sample_rate value from the baggage."""
+        if self.baggage is None:
+            return None
+
+        return try_convert(float, self.baggage.sentry_items.get("sample_rate"))
 
 
 class Baggage:
@@ -857,7 +864,8 @@ class Baggage:
         options = client.options or {}
 
         sentry_items["trace_id"] = segment.trace_id
-        sentry_items["sample_rand"] = f"{segment._sample_rand:.6f}"  # noqa: E231
+        if segment._sample_rand is not None:
+            sentry_items["sample_rand"] = f"{segment._sample_rand:.6f}"
 
         if options.get("environment"):
             sentry_items["environment"] = options["environment"]
@@ -873,8 +881,8 @@ class Baggage:
         if (
             segment.get_attributes().get("sentry.span.source")
             not in LOW_QUALITY_SEGMENT_SOURCES
-        ) and segment._name:
-            sentry_items["transaction"] = segment._name
+        ) and segment.name:
+            sentry_items["transaction"] = segment.name
 
         if segment._sample_rate is not None:
             sentry_items["sample_rate"] = str(segment._sample_rate)
@@ -1533,22 +1541,22 @@ def _make_sampling_decision(
     name: str,
     attributes: "Optional[Attributes]",
     scope: "sentry_sdk.Scope",
-) -> "tuple[bool, Optional[float], Optional[float], Optional[str]]":
+) -> "tuple[Optional[bool], Optional[float], Optional[float], Optional[str]]":
     """
     Decide whether a span should be sampled.
 
     Returns a tuple with:
-    1. the sampling decision
+    1. the sampling decision (sampled, unsampled, deferred)
     2. the effective sample rate
     3. the sample rand
     4. the reason for not sampling the span, if unsampled
     """
     client = sentry_sdk.get_client()
 
-    if not has_tracing_enabled(client.options):
-        return False, None, None, None
-
     propagation_context = scope.get_active_propagation_context()
+
+    if not has_tracing_enabled(client.options):
+        return propagation_context.parent_sampled, None, None, None
 
     sample_rand = None
     if propagation_context.baggage is not None:
@@ -1575,7 +1583,10 @@ def _make_sampling_decision(
         sample_rate = client.options["traces_sampler"](sampling_context)
     else:
         if propagation_context.parent_sampled is not None:
-            sample_rate = propagation_context.parent_sampled
+            if propagation_context._sample_rate() is not None:
+                sample_rate = propagation_context._sample_rate()
+            else:
+                sample_rate = propagation_context.parent_sampled
         else:
             sample_rate = client.options["traces_sample_rate"]
 
@@ -1585,7 +1596,7 @@ def _make_sampling_decision(
         logger.warning(f"[Tracing] Discarding {name} because of invalid sample rate.")
         return False, None, None, "sample_rate"
 
-    sample_rate = float(sample_rate)
+    sample_rate = float(sample_rate)  # type: ignore[arg-type]
     if not sample_rate:
         if traces_sampler_defined:
             reason = "traces_sampler returned 0 or False"
@@ -1593,7 +1604,7 @@ def _make_sampling_decision(
             reason = "traces_sample_rate is set to 0"
 
         logger.debug(f"[Tracing] Discarding {name} because {reason}")
-        return False, 0.0, None, "sample_rate"
+        return False, 0.0, sample_rand, "sample_rate"
 
     # Adjust sample rate if we're under backpressure
     sample_rate_before_backpressure = sample_rate
