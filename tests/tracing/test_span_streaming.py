@@ -1740,7 +1740,7 @@ def test_default_attributes(sentry_init, capture_envelopes):
                 "trace_lifecycle": "static",
                 "_experiments": {"trace_lifecycle": "stream"},
             },
-            True,
+            False,
         ),
         ({"trace_lifecycle": "static"}, False),
         ({"_experiments": {"trace_lifecycle": "static"}}, False),
