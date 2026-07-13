@@ -164,6 +164,8 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
 
         middleware_name = self.__class__.__name__
         if has_span_streaming_enabled(client.options):
+            if sentry_sdk.traces.get_current_span() is None:
+                return await old_call(self, scope, receive, send)
             with sentry_sdk.traces.start_span(
                 name=middleware_name,
                 attributes={
@@ -178,6 +180,8 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                     *args: "Any", **kwargs: "Any"
                 ) -> "Union[HTTPReceiveMessage, WebSocketReceiveMessage]":
                     if client.get_integration(LitestarIntegration) is None:
+                        return await receive(*args, **kwargs)
+                    if sentry_sdk.traces.get_current_span() is None:
                         return await receive(*args, **kwargs)
                     with sentry_sdk.traces.start_span(
                         name=getattr(receive, "__qualname__", str(receive)),
@@ -196,6 +200,8 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                 # Creating spans for the "send" callback
                 async def _sentry_send(message: "Message") -> None:
                     if client.get_integration(LitestarIntegration) is None:
+                        return await send(message)
+                    if sentry_sdk.traces.get_current_span() is None:
                         return await send(message)
                     with sentry_sdk.traces.start_span(
                         name=getattr(send, "__qualname__", str(send)),

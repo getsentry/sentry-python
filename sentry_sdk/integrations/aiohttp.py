@@ -351,8 +351,12 @@ def create_trace_config() -> "TraceConfig":
             parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
         )
 
-        span: "Union[Span, StreamedSpan]"
+        span: "Union[Span, StreamedSpan, None]"
         if has_span_streaming_enabled(client.options):
+            if sentry_sdk.traces.get_current_span() is None:
+                trace_config_ctx.span = None
+                return
+
             attributes: "Attributes" = {
                 "sentry.op": OP.HTTP_CLIENT,
                 "sentry.origin": AioHttpIntegration.origin,
