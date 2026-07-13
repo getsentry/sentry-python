@@ -1,5 +1,63 @@
 # Changelog
 
+## 2.65.0
+
+### New Features ✨
+
+#### Data Collection
+
+- Move data collection to \_experiments by @ericapisani in [#6790](https://github.com/getsentry/sentry-python/pull/6790)
+- Add queues option to data collection config by @ericapisani in [#6770](https://github.com/getsentry/sentry-python/pull/6770)
+
+#### Huey
+
+- Set `messaging.destination.name` on consumer spans by @alexander-alderman-webb in [#6779](https://github.com/getsentry/sentry-python/pull/6779)
+- Set `messaging.destination.name` on producer spans by @alexander-alderman-webb in [#6778](https://github.com/getsentry/sentry-python/pull/6778)
+
+#### Other
+
+- (arq) Set `messaging.destination.name` on consumer spans by @alexander-alderman-webb in [#6767](https://github.com/getsentry/sentry-python/pull/6767)
+- (dramatiq) Set `messaging.destination.name` on consumer spans by @alexander-alderman-webb in [#6776](https://github.com/getsentry/sentry-python/pull/6776)
+- (rq) Set `messaging.destination.name` on consumer spans by @alexander-alderman-webb in [#6774](https://github.com/getsentry/sentry-python/pull/6774)
+
+### Bug Fixes 🐛
+
+#### Tracing
+
+- Fix unsampled/deferred trace propagation in span streaming by @sentrivana in [#6757](https://github.com/getsentry/sentry-python/pull/6757)
+- Set `sentry.op` to function in new trace decorator by @sentrivana in [#6796](https://github.com/getsentry/sentry-python/pull/6796)
+- Take first sentry-trace header in case multiple are supplied by @sl0thentr0py in [#6722](https://github.com/getsentry/sentry-python/pull/6722)
+
+#### Other
+
+- (django) Avoid `ValueError` in async middleware `process_*` hooks by @r0ro in [#6698](https://github.com/getsentry/sentry-python/pull/6698)
+- (scope) Drop None user attribute values in set_user by @ericapisani in [#6692](https://github.com/getsentry/sentry-python/pull/6692)
+- (starlette) Don't overwrite user set during request in AuthenticationMiddleware by @ericapisani in [#6760](https://github.com/getsentry/sentry-python/pull/6760)
+
+### Internal Changes 🔧
+
+- (data-collection) Simplify database collection config to a plain boolean by @ericapisani in [#6772](https://github.com/getsentry/sentry-python/pull/6772)
+- (mcp) Add package to the typing group by @alexander-alderman-webb in [#6727](https://github.com/getsentry/sentry-python/pull/6727)
+- (starlette) Add package to typing group by @alexander-alderman-webb in [#6728](https://github.com/getsentry/sentry-python/pull/6728)
+- Add required `cache_write_tokens` field by @alexander-alderman-webb in [#6804](https://github.com/getsentry/sentry-python/pull/6804)
+- Add streaming tests to `test_misc` by @sentrivana in [#6787](https://github.com/getsentry/sentry-python/pull/6787)
+- Add streaming tests to `test_sampling` by @sentrivana in [#6784](https://github.com/getsentry/sentry-python/pull/6784)
+- Add streaming propagation tests by @sentrivana in [#6782](https://github.com/getsentry/sentry-python/pull/6782)
+- Add streaming `sample_rand` propagation tests by @sentrivana in [#6780](https://github.com/getsentry/sentry-python/pull/6780)
+- Pin extra test dependencies for generated test suites by @alexander-alderman-webb in [#6696](https://github.com/getsentry/sentry-python/pull/6696)
+- Add `pydantic` to the typing group by @alexander-alderman-webb in [#6730](https://github.com/getsentry/sentry-python/pull/6730)
+- Add `python_multipart` to the typing group by @alexander-alderman-webb in [#6729](https://github.com/getsentry/sentry-python/pull/6729)
+- 🤖 Update test matrix with new releases (07/06) by @github-actions in [#6753](https://github.com/getsentry/sentry-python/pull/6753)
+- Remove dependabot by @alexander-alderman-webb in [#6720](https://github.com/getsentry/sentry-python/pull/6720)
+- Update Renovate config by @alexander-alderman-webb in [#6716](https://github.com/getsentry/sentry-python/pull/6716)
+- Stop inheriting secrets for `changelog-preview` by @alexander-alderman-webb in [#6723](https://github.com/getsentry/sentry-python/pull/6723)
+- Stop inheriting secrets in tests by @alexander-alderman-webb in [#6721](https://github.com/getsentry/sentry-python/pull/6721)
+- Configure Renovate by @renovate in [#6701](https://github.com/getsentry/sentry-python/pull/6701)
+- Move conversation ID tests to their own file by @sentrivana in [#6699](https://github.com/getsentry/sentry-python/pull/6699)
+- Add span origin span streaming tests by @sentrivana in [#6697](https://github.com/getsentry/sentry-python/pull/6697)
+- Replace `requirements-testing.txt` with a `uv` dependency group by @alexander-alderman-webb in [#6693](https://github.com/getsentry/sentry-python/pull/6693)
+- Move streaming decorator tests by @sentrivana in [#6695](https://github.com/getsentry/sentry-python/pull/6695)
+
 ## 2.64.0
 
 The SDK now extracts all `gen_ai` spans out of a transaction and sends them as v2 envelope items by default. This prevents `gen_ai` spans from being dropped when the transaction payload exceeds size limits. Because they are no longer constrained by transaction size limits, AI message data is also no longer truncated. To keep the previous behavior, set `stream_gen_ai_spans=False`.
