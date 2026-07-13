@@ -60,6 +60,9 @@ def _install_httpx2_client() -> None:
             parsed_url = parse_url(str(request.url), sanitize=False)
 
         if is_span_streaming_enabled:
+            if sentry_sdk.traces.get_current_span() is None:
+                return real_send(self, request, **kwargs)
+
             with sentry_sdk.traces.start_span(
                 name="%s %s"
                 % (
@@ -170,6 +173,9 @@ def _install_httpx2_async_client() -> None:
             parsed_url = parse_url(str(request.url), sanitize=False)
 
         if is_span_streaming_enabled:
+            if sentry_sdk.traces.get_current_span() is None:
+                return await real_send(self, request, **kwargs)
+
             with sentry_sdk.traces.start_span(
                 name="%s %s"
                 % (

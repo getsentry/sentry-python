@@ -114,6 +114,9 @@ def _install_httplib() -> None:
         span_streaming = has_span_streaming_enabled(client.options)
         span: "Union[Span, StreamedSpan]"
         if span_streaming:
+            if sentry_sdk.traces.get_current_span() is None:
+                return real_putrequest(self, method, url, *args, **kwargs)
+
             span = sentry_sdk.traces.start_span(
                 name="%s %s"
                 % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
@@ -303,6 +306,9 @@ def _install_subprocess() -> None:
         span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         span: "Union[Span, StreamedSpan]"
         if span_streaming:
+            if sentry_sdk.traces.get_current_span() is None:
+                return old_popen_init(self, *a, **kw)
+
             span = sentry_sdk.traces.start_span(
                 name=description,
                 attributes={
@@ -353,6 +359,8 @@ def _install_subprocess() -> None:
     ) -> "Any":
         span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
+            if sentry_sdk.traces.get_current_span() is None:
+                return old_popen_wait(self, *a, **kw)
             with sentry_sdk.traces.start_span(
                 name=OP.SUBPROCESS_WAIT,
                 attributes={
@@ -380,6 +388,8 @@ def _install_subprocess() -> None:
     ) -> "Any":
         span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
+            if sentry_sdk.traces.get_current_span() is None:
+                return old_popen_communicate(self, *a, **kw)
             with sentry_sdk.traces.start_span(
                 name=OP.SUBPROCESS_COMMUNICATE,
                 attributes={
