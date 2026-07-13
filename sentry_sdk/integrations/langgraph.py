@@ -174,6 +174,9 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
         )
 
         if has_span_streaming_enabled(client.options):
+            if sentry_sdk.traces.get_current_span() is None:
+                return f(self, *args, **kwargs)
+
             with sentry_sdk.traces.start_span(
                 name=span_name,
                 attributes={
@@ -286,6 +289,9 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
         )
 
         if has_span_streaming_enabled(client.options):
+            if sentry_sdk.traces.get_current_span() is None:
+                return await f(self, *args, **kwargs)
+
             with sentry_sdk.traces.start_span(
                 name=span_name,
                 attributes={

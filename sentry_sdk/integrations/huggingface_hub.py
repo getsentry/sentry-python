@@ -93,6 +93,8 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
 
         span: "Union[Span, StreamedSpan]"
         if has_span_streaming_enabled(sentry_sdk.get_client().options):
+            if sentry_sdk.traces.get_current_span() is None:
+                return f(*args, **kwargs)
             span = sentry_sdk.traces.start_span(
                 name=f"{operation_name} {model}",
                 attributes={

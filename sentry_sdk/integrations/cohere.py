@@ -17,7 +17,11 @@ if TYPE_CHECKING:
 import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception, reraise
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    event_from_exception,
+    reraise,
+)
 
 try:
     from cohere import (
@@ -154,6 +158,8 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
         message = kwargs.get("message")
 
         if is_span_streaming_enabled:
+            if sentry_sdk.traces.get_current_span() is None:
+                return f(*args, **kwargs)
             span = sentry_sdk.traces.start_span(
                 name="cohere.client.Chat",
                 attributes={
@@ -250,6 +256,8 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
         )
 
         if is_span_streaming_enabled:
+            if sentry_sdk.traces.get_current_span() is None:
+                return f(*args, **kwargs)
             span_ctx = sentry_sdk.traces.start_span(
                 name="Cohere Embedding Creation",
                 attributes={

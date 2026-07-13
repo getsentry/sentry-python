@@ -76,17 +76,19 @@ def _wrap_generate_content_stream(f: "Callable[..., Any]") -> "Callable[..., Any
         _model, contents, model_name = prepare_generate_content_args(args, kwargs)
 
         if has_span_streaming_enabled(client.options):
-            chat_span = sentry_sdk.traces.start_span(
-                name=f"chat {model_name}",
-                attributes={
-                    "sentry.op": OP.GEN_AI_CHAT,
-                    "sentry.origin": ORIGIN,
-                    SPANDATA.GEN_AI_OPERATION_NAME: "chat",
-                    SPANDATA.GEN_AI_SYSTEM: GEN_AI_SYSTEM,
-                    SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
-                    SPANDATA.GEN_AI_RESPONSE_STREAMING: True,
-                },
-            )
+            chat_span = None
+            if sentry_sdk.traces.get_current_span() is not None:
+                chat_span = sentry_sdk.traces.start_span(
+                    name=f"chat {model_name}",
+                    attributes={
+                        "sentry.op": OP.GEN_AI_CHAT,
+                        "sentry.origin": ORIGIN,
+                        SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+                        SPANDATA.GEN_AI_SYSTEM: GEN_AI_SYSTEM,
+                        SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
+                        SPANDATA.GEN_AI_RESPONSE_STREAMING: True,
+                    },
+                )
         else:
             chat_span = get_start_span_function()(
                 op=OP.GEN_AI_CHAT,
@@ -100,7 +102,10 @@ def _wrap_generate_content_stream(f: "Callable[..., Any]") -> "Callable[..., Any
             chat_span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
             chat_span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
-        set_span_data_for_request(chat_span, integration, model_name, contents, kwargs)
+        if chat_span is not None:
+            set_span_data_for_request(
+                chat_span, integration, model_name, contents, kwargs
+            )
 
         try:
             stream = f(self, *args, **kwargs)
@@ -114,25 +119,28 @@ def _wrap_generate_content_stream(f: "Callable[..., Any]") -> "Callable[..., Any
                         yield chunk
                 except Exception as exc:
                     _capture_exception(exc)
-                    if isinstance(chat_span, StreamedSpan):
-                        chat_span.status = SpanStatus.ERROR
-                    else:
-                        chat_span.set_status(SPANSTATUS.INTERNAL_ERROR)
+                    if chat_span is not None:
+                        if isinstance(chat_span, StreamedSpan):
+                            chat_span.status = SpanStatus.ERROR
+                        else:
+                            chat_span.set_status(SPANSTATUS.INTERNAL_ERROR)
                     raise
                 finally:
-                    # Accumulate all chunks and set final response data on spans
-                    if chunks:
-                        accumulated_response = accumulate_streaming_response(chunks)
-                        set_span_data_for_streaming_response(
-                            chat_span, integration, accumulated_response
-                        )
-                    chat_span.__exit__(None, None, None)
+                    if chat_span is not None:
+                        # Accumulate all chunks and set final response data on spans
+                        if chunks:
+                            accumulated_response = accumulate_streaming_response(chunks)
+                            set_span_data_for_streaming_response(
+                                chat_span, integration, accumulated_response
+                            )
+                        chat_span.__exit__(None, None, None)
 
             return new_iterator()
 
         except Exception as exc:
             _capture_exception(exc)
-            chat_span.__exit__(None, None, None)
+            if chat_span is not None:
+                chat_span.__exit__(None, None, None)
             raise
 
     return new_generate_content_stream
@@ -153,17 +161,19 @@ def _wrap_async_generate_content_stream(
         _model, contents, model_name = prepare_generate_content_args(args, kwargs)
 
         if has_span_streaming_enabled(client.options):
-            chat_span = sentry_sdk.traces.start_span(
-                name=f"chat {model_name}",
-                attributes={
-                    "sentry.op": OP.GEN_AI_CHAT,
-                    "sentry.origin": ORIGIN,
-                    SPANDATA.GEN_AI_OPERATION_NAME: "chat",
-                    SPANDATA.GEN_AI_SYSTEM: GEN_AI_SYSTEM,
-                    SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
-                    SPANDATA.GEN_AI_RESPONSE_STREAMING: True,
-                },
-            )
+            chat_span = None
+            if sentry_sdk.traces.get_current_span() is not None:
+                chat_span = sentry_sdk.traces.start_span(
+                    name=f"chat {model_name}",
+                    attributes={
+                        "sentry.op": OP.GEN_AI_CHAT,
+                        "sentry.origin": ORIGIN,
+                        SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+                        SPANDATA.GEN_AI_SYSTEM: GEN_AI_SYSTEM,
+                        SPANDATA.GEN_AI_REQUEST_MODEL: model_name,
+                        SPANDATA.GEN_AI_RESPONSE_STREAMING: True,
+                    },
+                )
         else:
             chat_span = get_start_span_function()(
                 op=OP.GEN_AI_CHAT,
@@ -177,7 +187,10 @@ def _wrap_async_generate_content_stream(
             chat_span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
             chat_span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
-        set_span_data_for_request(chat_span, integration, model_name, contents, kwargs)
+        if chat_span is not None:
+            set_span_data_for_request(
+                chat_span, integration, model_name, contents, kwargs
+            )
 
         try:
             stream = await f(self, *args, **kwargs)
@@ -191,25 +204,28 @@ def _wrap_async_generate_content_stream(
                         yield chunk
                 except Exception as exc:
                     _capture_exception(exc)
-                    if isinstance(chat_span, StreamedSpan):
-                        chat_span.status = SpanStatus.ERROR
-                    else:
-                        chat_span.set_status(SPANSTATUS.INTERNAL_ERROR)
+                    if chat_span is not None:
+                        if isinstance(chat_span, StreamedSpan):
+                            chat_span.status = SpanStatus.ERROR
+                        else:
+                            chat_span.set_status(SPANSTATUS.INTERNAL_ERROR)
                     raise
                 finally:
-                    # Accumulate all chunks and set final response data on spans
-                    if chunks:
-                        accumulated_response = accumulate_streaming_response(chunks)
-                        set_span_data_for_streaming_response(
-                            chat_span, integration, accumulated_response
-                        )
-                    chat_span.__exit__(None, None, None)
+                    if chat_span is not None:
+                        # Accumulate all chunks and set final response data on spans
+                        if chunks:
+                            accumulated_response = accumulate_streaming_response(chunks)
+                            set_span_data_for_streaming_response(
+                                chat_span, integration, accumulated_response
+                            )
+                        chat_span.__exit__(None, None, None)
 
             return new_async_iterator()
 
         except Exception as exc:
             _capture_exception(exc)
-            chat_span.__exit__(None, None, None)
+            if chat_span is not None:
+                chat_span.__exit__(None, None, None)
             raise
 
     return new_async_generate_content_stream
@@ -226,6 +242,9 @@ def _wrap_generate_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
         model, contents, model_name = prepare_generate_content_args(args, kwargs)
 
         if has_span_streaming_enabled(client.options):
+            if sentry_sdk.traces.get_current_span() is None:
+                return f(self, *args, **kwargs)
+
             with sentry_sdk.traces.start_span(
                 name=f"chat {model_name}",
                 attributes={
@@ -290,6 +309,9 @@ def _wrap_async_generate_content(f: "Callable[..., Any]") -> "Callable[..., Any]
         model, contents, model_name = prepare_generate_content_args(args, kwargs)
 
         if has_span_streaming_enabled(client.options):
+            if sentry_sdk.traces.get_current_span() is None:
+                return await f(self, *args, **kwargs)
+
             with sentry_sdk.traces.start_span(
                 name=f"chat {model_name}",
                 attributes={
@@ -350,6 +372,9 @@ def _wrap_embed_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
         model_name, contents = prepare_embed_content_args(args, kwargs)
 
         if has_span_streaming_enabled(client.options):
+            if sentry_sdk.traces.get_current_span() is None:
+                return f(self, *args, **kwargs)
+
             with sentry_sdk.traces.start_span(
                 name=f"embeddings {model_name}",
                 attributes={
@@ -410,6 +435,9 @@ def _wrap_async_embed_content(f: "Callable[..., Any]") -> "Callable[..., Any]":
         model_name, contents = prepare_embed_content_args(args, kwargs)
 
         if has_span_streaming_enabled(client.options):
+            if sentry_sdk.traces.get_current_span() is None:
+                return await f(self, *args, **kwargs)
+
             with sentry_sdk.traces.start_span(
                 name=f"embeddings {model_name}",
                 attributes={

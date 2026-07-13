@@ -99,6 +99,8 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
 
     # Start a new span/transaction
     if has_span_streaming_enabled(client.options):
+        if sentry_sdk.traces.get_current_span() is None:
+            return
         span = sentry_sdk.traces.start_span(
             name=f"{operation} {model}",
             attributes={

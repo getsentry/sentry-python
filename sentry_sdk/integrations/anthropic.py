@@ -640,6 +640,8 @@ def _sentry_patched_create_sync(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
 
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
     if span_streaming:
+        if sentry_sdk.traces.get_current_span() is None:
+            return f(*args, **kwargs)
         span = sentry_sdk.traces.start_span(
             name=f"chat {model}".strip(),
             attributes={
@@ -738,6 +740,8 @@ async def _sentry_patched_create_async(
 
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
     if span_streaming:
+        if sentry_sdk.traces.get_current_span() is None:
+            return await f(*args, **kwargs)
         span = sentry_sdk.traces.start_span(
             name=f"chat {model}".strip(),
             attributes={
@@ -982,6 +986,8 @@ def _wrap_message_stream_manager_enter(f: "Any") -> "Any":
             return f(self)
 
         if has_span_streaming_enabled(client.options):
+            if sentry_sdk.traces.get_current_span() is None:
+                return f(self)
             span = sentry_sdk.traces.start_span(
                 name="chat" if self._model is None else f"chat {self._model}".strip(),
                 attributes={
@@ -1089,6 +1095,8 @@ def _wrap_async_message_stream_manager_aenter(f: "Any") -> "Any":
             return await f(self)
 
         if has_span_streaming_enabled(client.options):
+            if sentry_sdk.traces.get_current_span() is None:
+                return await f(self)
             span = sentry_sdk.traces.start_span(
                 name="chat" if self._model is None else f"chat {self._model}".strip(),
                 attributes={
