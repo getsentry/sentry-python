@@ -235,16 +235,17 @@ def _wrap_connect_addr(
                 except IndexError:
                     pass
 
+            with capture_internal_exceptions():
+                sentry_sdk.add_breadcrumb(
+                    message="connect", category="query", data=span_attributes
+                )
+
             if sentry_sdk.traces.get_current_span() is None:
                 return await f(*args, **kwargs)
 
             with sentry_sdk.traces.start_span(
                 name="connect", attributes=span_attributes
             ):
-                with capture_internal_exceptions():
-                    sentry_sdk.add_breadcrumb(
-                        message="connect", category="query", data=span_attributes
-                    )
                 return await f(*args, **kwargs)
 
         with sentry_sdk.start_span(
