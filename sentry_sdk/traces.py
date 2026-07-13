@@ -610,10 +610,7 @@ class StreamedSpan:
 
 class NoOpStreamedSpan(StreamedSpan):
     __slots__ = (
-        "_trace_id",
-        "_span_id",
         "_sampled",
-        "_segment",
         "_finished",
         "_unsampled_reason",
     )
