@@ -18,9 +18,12 @@ def agent_workflow_span(
     # Create a transaction or a span if an transaction is already active
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
     if span_streaming:
-        span = sentry_sdk.traces.start_span(
-            name=f"{agent.name} workflow", attributes={"sentry.origin": SPAN_ORIGIN}
-        )
+        span = None
+        if sentry_sdk.traces.get_current_span() is not None:
+            span = sentry_sdk.traces.start_span(
+                name=f"{agent.name} workflow",
+                attributes={"sentry.origin": SPAN_ORIGIN},
+            )
 
         return span
 

@@ -15,6 +15,9 @@ def handoff_span(
 ) -> None:
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
     if span_streaming:
+        if sentry_sdk.traces.get_current_span() is None:
+            return
+
         with sentry_sdk.traces.start_span(
             name=f"handoff from {from_agent.name} to {to_agent_name}",
             attributes={

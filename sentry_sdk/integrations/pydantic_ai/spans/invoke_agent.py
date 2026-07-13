@@ -51,14 +51,16 @@ def invoke_agent_span(
 
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
     if span_streaming:
-        span = sentry_sdk.traces.start_span(
-            name=f"invoke_agent {name}",
-            attributes={
-                "sentry.op": OP.GEN_AI_INVOKE_AGENT,
-                "sentry.origin": SPAN_ORIGIN,
-                SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
-            },
-        )
+        span = None
+        if sentry_sdk.traces.get_current_span() is not None:
+            span = sentry_sdk.traces.start_span(
+                name=f"invoke_agent {name}",
+                attributes={
+                    "sentry.op": OP.GEN_AI_INVOKE_AGENT,
+                    "sentry.origin": SPAN_ORIGIN,
+                    SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
+                },
+            )
     else:
         span = get_start_span_function()(
             op=OP.GEN_AI_INVOKE_AGENT,
@@ -68,85 +70,86 @@ def invoke_agent_span(
 
         span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
 
-    _set_agent_data(span, agent)
-    _set_model_data(span, model, model_settings)
-    _set_available_tools(span, agent)
+    if span is not None:
+        _set_agent_data(span, agent)
+        _set_model_data(span, model, model_settings)
+        _set_available_tools(span, agent)
 
-    # Add user prompt and system prompts if available and prompts are enabled
-    if _should_send_prompts():
-        messages = []
+        # Add user prompt and system prompts if available and prompts are enabled
+        if _should_send_prompts():
+            messages = []
 
-        # Add system prompts (both instructions and system_prompt)
-        system_texts = []
+            # Add system prompts (both instructions and system_prompt)
+            system_texts = []
 
-        if agent:
-            # Check for system_prompt
-            system_prompts = getattr(agent, "_system_prompts", None) or []
-            for prompt in system_prompts:
-                if isinstance(prompt, str):
-                    system_texts.append(prompt)
+            if agent:
+                # Check for system_prompt
+                system_prompts = getattr(agent, "_system_prompts", None) or []
+                for prompt in system_prompts:
+                    if isinstance(prompt, str):
+                        system_texts.append(prompt)
 
-            # Check for instructions (stored in _instructions)
-            instructions = getattr(agent, "_instructions", None)
-            if instructions:
-                if isinstance(instructions, str):
-                    system_texts.append(instructions)
-                elif isinstance(instructions, (list, tuple)):
-                    for instr in instructions:
-                        if isinstance(instr, str):
-                            system_texts.append(instr)
-                        elif callable(instr):
-                            # Skip dynamic/callable instructions
-                            pass
+                # Check for instructions (stored in _instructions)
+                instructions = getattr(agent, "_instructions", None)
+                if instructions:
+                    if isinstance(instructions, str):
+                        system_texts.append(instructions)
+                    elif isinstance(instructions, (list, tuple)):
+                        for instr in instructions:
+                            if isinstance(instr, str):
+                                system_texts.append(instr)
+                            elif callable(instr):
+                                # Skip dynamic/callable instructions
+                                pass
 
-        # Add all system texts as system messages
-        for system_text in system_texts:
-            messages.append(
-                {
-                    "content": [{"text": system_text, "type": "text"}],
-                    "role": "system",
-                }
-            )
-
-        # Add user prompt
-        if user_prompt:
-            if isinstance(user_prompt, str):
+            # Add all system texts as system messages
+            for system_text in system_texts:
                 messages.append(
                     {
-                        "content": [{"text": user_prompt, "type": "text"}],
-                        "role": "user",
+                        "content": [{"text": system_text, "type": "text"}],
+                        "role": "system",
                     }
                 )
-            elif isinstance(user_prompt, list):
-                # Handle list of user content
-                content = []
-                for item in user_prompt:
-                    if isinstance(item, str):
-                        content.append({"text": item, "type": "text"})
-                    elif ImageUrl and isinstance(item, ImageUrl):
-                        content.append(_serialize_image_url_item(item))
-                    elif BinaryContent and isinstance(item, BinaryContent):
-                        content.append(_serialize_binary_content_item(item))
-                if content:
+
+            # Add user prompt
+            if user_prompt:
+                if isinstance(user_prompt, str):
                     messages.append(
                         {
-                            "content": content,
+                            "content": [{"text": user_prompt, "type": "text"}],
                             "role": "user",
                         }
                     )
+                elif isinstance(user_prompt, list):
+                    # Handle list of user content
+                    content = []
+                    for item in user_prompt:
+                        if isinstance(item, str):
+                            content.append({"text": item, "type": "text"})
+                        elif ImageUrl and isinstance(item, ImageUrl):
+                            content.append(_serialize_image_url_item(item))
+                        elif BinaryContent and isinstance(item, BinaryContent):
+                            content.append(_serialize_binary_content_item(item))
+                    if content:
+                        messages.append(
+                            {
+                                "content": content,
+                                "role": "user",
+                            }
+                        )
 
-        if messages:
-            normalized_messages = normalize_message_roles(messages)
-            client = sentry_sdk.get_client()
-            scope = sentry_sdk.get_current_scope()
-            messages_data = (
-                truncate_and_annotate_messages(normalized_messages, span, scope)
-                if should_truncate_gen_ai_input(client.options)
-                else normalized_messages
-            )
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
-            )
+            if messages:
+                normalized_messages = normalize_message_roles(messages)
+                client = sentry_sdk.get_client()
+                scope = sentry_sdk.get_current_scope()
+                messages_data = (
+                    truncate_and_annotate_messages(normalized_messages, span, scope)
+                    if should_truncate_gen_ai_input(client.options)
+                    else normalized_messages
+                )
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
+                )
 
     return span
 

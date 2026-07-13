@@ -30,14 +30,16 @@ def invoke_agent_span(
 ) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
     if span_streaming:
-        span = sentry_sdk.traces.start_span(
-            name=f"invoke_agent {agent.name}",
-            attributes={
-                "sentry.op": OP.GEN_AI_INVOKE_AGENT,
-                "sentry.origin": SPAN_ORIGIN,
-                SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
-            },
-        )
+        span = None
+        if sentry_sdk.traces.get_current_span() is not None:
+            span = sentry_sdk.traces.start_span(
+                name=f"invoke_agent {agent.name}",
+                attributes={
+                    "sentry.op": OP.GEN_AI_INVOKE_AGENT,
+                    "sentry.origin": SPAN_ORIGIN,
+                    SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
+                },
+            )
     else:
         start_span_function = get_start_span_function()
         span = start_span_function(
@@ -49,53 +51,54 @@ def invoke_agent_span(
 
         span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
 
-    if should_send_default_pii():
-        messages = []
-        if agent.instructions:
-            message = (
-                agent.instructions
-                if isinstance(agent.instructions, str)
-                else safe_serialize(agent.instructions)
-            )
-            messages.append(
-                {
-                    "content": [{"text": message, "type": "text"}],
-                    "role": "system",
-                }
-            )
-
-        original_input = kwargs.get("original_input")
-        if original_input is not None:
-            message = (
-                original_input
-                if isinstance(original_input, str)
-                else safe_serialize(original_input)
-            )
-            messages.append(
-                {
-                    "content": [{"text": message, "type": "text"}],
-                    "role": "user",
-                }
-            )
-
-        if len(messages) > 0:
-            normalized_messages = normalize_message_roles(messages)
-            client = sentry_sdk.get_client()
-            scope = sentry_sdk.get_current_scope()
-            messages_data = (
-                truncate_and_annotate_messages(normalized_messages, span, scope)
-                if should_truncate_gen_ai_input(client.options)
-                else normalized_messages
-            )
-            if messages_data is not None:
-                set_data_normalized(
-                    span,
-                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                    messages_data,
-                    unpack=False,
+    if span is not None:
+        if should_send_default_pii():
+            messages = []
+            if agent.instructions:
+                message = (
+                    agent.instructions
+                    if isinstance(agent.instructions, str)
+                    else safe_serialize(agent.instructions)
+                )
+                messages.append(
+                    {
+                        "content": [{"text": message, "type": "text"}],
+                        "role": "system",
+                    }
                 )
 
-    _set_agent_data(span, agent)
+            original_input = kwargs.get("original_input")
+            if original_input is not None:
+                message = (
+                    original_input
+                    if isinstance(original_input, str)
+                    else safe_serialize(original_input)
+                )
+                messages.append(
+                    {
+                        "content": [{"text": message, "type": "text"}],
+                        "role": "user",
+                    }
+                )
+
+            if len(messages) > 0:
+                normalized_messages = normalize_message_roles(messages)
+                client = sentry_sdk.get_client()
+                scope = sentry_sdk.get_current_scope()
+                messages_data = (
+                    truncate_and_annotate_messages(normalized_messages, span, scope)
+                    if should_truncate_gen_ai_input(client.options)
+                    else normalized_messages
+                )
+                if messages_data is not None:
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                        messages_data,
+                        unpack=False,
+                    )
+
+        _set_agent_data(span, agent)
 
     return span
 

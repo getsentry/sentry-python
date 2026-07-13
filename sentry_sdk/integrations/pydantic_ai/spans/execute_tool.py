@@ -31,17 +31,19 @@ def execute_tool_span(
     """
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
     if span_streaming:
-        span = sentry_sdk.traces.start_span(
-            name=f"execute_tool {tool_name}",
-            attributes={
-                "sentry.op": OP.GEN_AI_EXECUTE_TOOL,
-                "sentry.origin": SPAN_ORIGIN,
-                SPANDATA.GEN_AI_OPERATION_NAME: "execute_tool",
-                SPANDATA.GEN_AI_TOOL_NAME: tool_name,
-            },
-        )
+        span = None
+        if sentry_sdk.traces.get_current_span() is not None:
+            span = sentry_sdk.traces.start_span(
+                name=f"execute_tool {tool_name}",
+                attributes={
+                    "sentry.op": OP.GEN_AI_EXECUTE_TOOL,
+                    "sentry.origin": SPAN_ORIGIN,
+                    SPANDATA.GEN_AI_OPERATION_NAME: "execute_tool",
+                    SPANDATA.GEN_AI_TOOL_NAME: tool_name,
+                },
+            )
 
-        set_on_span = span.set_attribute
+        set_on_span = span.set_attribute if span is not None else None
     else:
         span = sentry_sdk.start_span(
             op=OP.GEN_AI_EXECUTE_TOOL,
@@ -54,16 +56,17 @@ def execute_tool_span(
 
         set_on_span = span.set_data
 
-    if tool_definition is not None and hasattr(tool_definition, "description"):
-        set_on_span(
-            SPANDATA.GEN_AI_TOOL_DESCRIPTION,
-            tool_definition.description,
-        )
+    if span is not None:
+        if tool_definition is not None and hasattr(tool_definition, "description"):
+            set_on_span(
+                SPANDATA.GEN_AI_TOOL_DESCRIPTION,
+                tool_definition.description,
+            )
 
-    _set_agent_data(span, agent)
+        _set_agent_data(span, agent)
 
-    if _should_send_prompts() and tool_args is not None:
-        set_on_span(SPANDATA.GEN_AI_TOOL_INPUT, safe_serialize(tool_args))
+        if _should_send_prompts() and tool_args is not None:
+            set_on_span(SPANDATA.GEN_AI_TOOL_INPUT, safe_serialize(tool_args))
 
     return span
 
