@@ -282,15 +282,17 @@ def ai_client_span(
 
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
     if span_streaming:
-        span = sentry_sdk.traces.start_span(
-            name=f"chat {model_name}",
-            attributes={
-                "sentry.op": OP.GEN_AI_CHAT,
-                "sentry.origin": SPAN_ORIGIN,
-                SPANDATA.GEN_AI_OPERATION_NAME: "chat",
-                SPANDATA.GEN_AI_RESPONSE_STREAMING: get_is_streaming(),
-            },
-        )
+        span = None
+        if sentry_sdk.traces.get_current_span() is not None:
+            span = sentry_sdk.traces.start_span(
+                name=f"chat {model_name}",
+                attributes={
+                    "sentry.op": OP.GEN_AI_CHAT,
+                    "sentry.origin": SPAN_ORIGIN,
+                    SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+                    SPANDATA.GEN_AI_RESPONSE_STREAMING: get_is_streaming(),
+                },
+            )
     else:
         span = sentry_sdk.start_span(
             op=OP.GEN_AI_CHAT,
@@ -302,16 +304,17 @@ def ai_client_span(
         # Set streaming flag from contextvar
         span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, get_is_streaming())
 
-    _set_agent_data(span, agent)
-    _set_model_data(span, model, model_settings)
+    if span is not None:
+        _set_agent_data(span, agent)
+        _set_model_data(span, model, model_settings)
 
-    # Add available tools if agent is available
-    agent_obj = agent or get_current_agent()
-    _set_available_tools(span, agent_obj)
+        # Add available tools if agent is available
+        agent_obj = agent or get_current_agent()
+        _set_available_tools(span, agent_obj)
 
-    # Set input messages (full conversation history)
-    if messages:
-        _set_input_messages(span, messages)
+        # Set input messages (full conversation history)
+        if messages:
+            _set_input_messages(span, messages)
 
     return span
 

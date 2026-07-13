@@ -16,6 +16,7 @@ from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
+    nullcontext,
     transaction_from_function,
 )
 
@@ -164,14 +165,20 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
 
         middleware_name = self.__class__.__name__
         if has_span_streaming_enabled(client.options):
-            with sentry_sdk.traces.start_span(
-                name=middleware_name,
-                attributes={
-                    "sentry.op": OP.MIDDLEWARE_LITESTAR,
-                    "sentry.origin": LitestarIntegration.origin,
-                },
-            ) as middleware_span:
-                middleware_span.set_attribute(SPANDATA.MIDDLEWARE_NAME, middleware_name)
+            span_ctx = nullcontext()
+            if sentry_sdk.traces.get_current_span() is not None:
+                span_ctx = sentry_sdk.traces.start_span(
+                    name=middleware_name,
+                    attributes={
+                        "sentry.op": OP.MIDDLEWARE_LITESTAR,
+                        "sentry.origin": LitestarIntegration.origin,
+                    },
+                )
+            with span_ctx as middleware_span:
+                if middleware_span is not None:
+                    middleware_span.set_attribute(
+                        SPANDATA.MIDDLEWARE_NAME, middleware_name
+                    )
 
                 # Creating spans for the "receive" callback
                 async def _sentry_receive(
@@ -179,14 +186,20 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                 ) -> "Union[HTTPReceiveMessage, WebSocketReceiveMessage]":
                     if client.get_integration(LitestarIntegration) is None:
                         return await receive(*args, **kwargs)
-                    with sentry_sdk.traces.start_span(
-                        name=getattr(receive, "__qualname__", str(receive)),
-                        attributes={
-                            "sentry.op": OP.MIDDLEWARE_LITESTAR_RECEIVE,
-                            "sentry.origin": LitestarIntegration.origin,
-                        },
-                    ) as span:
-                        span.set_attribute(SPANDATA.MIDDLEWARE_NAME, middleware_name)
+                    recv_span_ctx = nullcontext()
+                    if sentry_sdk.traces.get_current_span() is not None:
+                        recv_span_ctx = sentry_sdk.traces.start_span(
+                            name=getattr(receive, "__qualname__", str(receive)),
+                            attributes={
+                                "sentry.op": OP.MIDDLEWARE_LITESTAR_RECEIVE,
+                                "sentry.origin": LitestarIntegration.origin,
+                            },
+                        )
+                    with recv_span_ctx as span:
+                        if span is not None:
+                            span.set_attribute(
+                                SPANDATA.MIDDLEWARE_NAME, middleware_name
+                            )
                         return await receive(*args, **kwargs)
 
                 receive_name = getattr(receive, "__name__", str(receive))
@@ -197,14 +210,20 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                 async def _sentry_send(message: "Message") -> None:
                     if client.get_integration(LitestarIntegration) is None:
                         return await send(message)
-                    with sentry_sdk.traces.start_span(
-                        name=getattr(send, "__qualname__", str(send)),
-                        attributes={
-                            "sentry.op": OP.MIDDLEWARE_LITESTAR_SEND,
-                            "sentry.origin": LitestarIntegration.origin,
-                        },
-                    ) as span:
-                        span.set_attribute(SPANDATA.MIDDLEWARE_NAME, middleware_name)
+                    send_span_ctx = nullcontext()
+                    if sentry_sdk.traces.get_current_span() is not None:
+                        send_span_ctx = sentry_sdk.traces.start_span(
+                            name=getattr(send, "__qualname__", str(send)),
+                            attributes={
+                                "sentry.op": OP.MIDDLEWARE_LITESTAR_SEND,
+                                "sentry.origin": LitestarIntegration.origin,
+                            },
+                        )
+                    with send_span_ctx as span:
+                        if span is not None:
+                            span.set_attribute(
+                                SPANDATA.MIDDLEWARE_NAME, middleware_name
+                            )
                         return await send(message)
 
                 send_name = getattr(send, "__name__", str(send))

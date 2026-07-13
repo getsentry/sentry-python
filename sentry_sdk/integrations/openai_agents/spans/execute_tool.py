@@ -20,18 +20,20 @@ def execute_tool_span(
 ) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
     if span_streaming:
-        span = sentry_sdk.traces.start_span(
-            name=f"execute_tool {tool.name}",
-            attributes={
-                "sentry.op": OP.GEN_AI_EXECUTE_TOOL,
-                "sentry.origin": SPAN_ORIGIN,
-                SPANDATA.GEN_AI_OPERATION_NAME: "execute_tool",
-                SPANDATA.GEN_AI_TOOL_NAME: tool.name,
-                SPANDATA.GEN_AI_TOOL_DESCRIPTION: tool.description,
-            },
-        )
+        span = None
+        if sentry_sdk.traces.get_current_span() is not None:
+            span = sentry_sdk.traces.start_span(
+                name=f"execute_tool {tool.name}",
+                attributes={
+                    "sentry.op": OP.GEN_AI_EXECUTE_TOOL,
+                    "sentry.origin": SPAN_ORIGIN,
+                    SPANDATA.GEN_AI_OPERATION_NAME: "execute_tool",
+                    SPANDATA.GEN_AI_TOOL_NAME: tool.name,
+                    SPANDATA.GEN_AI_TOOL_DESCRIPTION: tool.description,
+                },
+            )
 
-        set_on_span = span.set_attribute
+        set_on_span = span.set_attribute if span is not None else None
     else:
         span = sentry_sdk.start_span(
             op=OP.GEN_AI_EXECUTE_TOOL,
@@ -46,7 +48,7 @@ def execute_tool_span(
 
         set_on_span = span.set_data
 
-    if should_send_default_pii():
+    if span is not None and should_send_default_pii():
         input = args[1]
         set_on_span(SPANDATA.GEN_AI_TOOL_INPUT, input)
 

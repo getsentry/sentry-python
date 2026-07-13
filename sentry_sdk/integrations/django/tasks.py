@@ -3,7 +3,7 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
-from sentry_sdk.utils import qualname_from_function
+from sentry_sdk.utils import nullcontext, qualname_from_function
 
 try:
     # django.tasks were added in Django 6.0
@@ -35,13 +35,16 @@ def patch_tasks() -> None:
 
         span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
-            with sentry_sdk.traces.start_span(
-                name=name,
-                attributes={
-                    "sentry.op": OP.QUEUE_SUBMIT_DJANGO,
-                    "sentry.origin": DjangoIntegration.origin,
-                },
-            ):
+            span_ctx = nullcontext()
+            if sentry_sdk.traces.get_current_span() is not None:
+                span_ctx = sentry_sdk.traces.start_span(
+                    name=name,
+                    attributes={
+                        "sentry.op": OP.QUEUE_SUBMIT_DJANGO,
+                        "sentry.origin": DjangoIntegration.origin,
+                    },
+                )
+            with span_ctx:
                 return old_task_enqueue(self, *args, **kwargs)
         else:
             with sentry_sdk.start_span(

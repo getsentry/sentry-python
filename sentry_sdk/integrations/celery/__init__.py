@@ -23,6 +23,7 @@ from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     event_from_exception,
+    nullcontext,
     reraise,
 )
 
@@ -419,58 +420,63 @@ def _wrap_task_call(task: "Any", f: "F") -> "F":
         span_streaming = has_span_streaming_enabled(client.options)
 
         try:
-            span: "Union[Span, StreamedSpan]"
+            span_ctx: "Any"
             if span_streaming:
-                span = sentry_sdk.traces.start_span(
-                    name=task.name,
-                    attributes={
-                        "sentry.op": OP.QUEUE_PROCESS,
-                        "sentry.origin": CeleryIntegration.origin,
-                    },
-                )
+                span_ctx = nullcontext()
+                if get_current_span() is not None:
+                    span_ctx = sentry_sdk.traces.start_span(
+                        name=task.name,
+                        attributes={
+                            "sentry.op": OP.QUEUE_PROCESS,
+                            "sentry.origin": CeleryIntegration.origin,
+                        },
+                    )
             else:
-                span = sentry_sdk.start_span(
+                span_ctx = sentry_sdk.start_span(
                     op=OP.QUEUE_PROCESS,
                     name=task.name,
                     origin=CeleryIntegration.origin,
                 )
 
-            with span:
-                if isinstance(span, StreamedSpan):
-                    set_on_span = span.set_attribute
-                else:
-                    set_on_span = span.set_data
+            with span_ctx as span:
+                if span is not None:
+                    if isinstance(span, StreamedSpan):
+                        set_on_span = span.set_attribute
+                    else:
+                        set_on_span = span.set_data
 
-                _set_messaging_destination_name(task, span)
+                    _set_messaging_destination_name(task, span)
 
-                latency = None
-                with capture_internal_exceptions():
-                    if (
-                        task.request.headers is not None
-                        and "sentry-task-enqueued-time" in task.request.headers
-                    ):
-                        latency = _now_seconds_since_epoch() - task.request.headers.pop(
-                            "sentry-task-enqueued-time"
-                        )
+                    latency = None
+                    with capture_internal_exceptions():
+                        if (
+                            task.request.headers is not None
+                            and "sentry-task-enqueued-time" in task.request.headers
+                        ):
+                            latency = (
+                                _now_seconds_since_epoch()
+                                - task.request.headers.pop("sentry-task-enqueued-time")
+                            )
 
-                if latency is not None:
-                    latency *= 1000  # milliseconds
-                    set_on_span(SPANDATA.MESSAGING_MESSAGE_RECEIVE_LATENCY, latency)
+                    if latency is not None:
+                        latency *= 1000  # milliseconds
+                        set_on_span(SPANDATA.MESSAGING_MESSAGE_RECEIVE_LATENCY, latency)
 
-                with capture_internal_exceptions():
-                    set_on_span(SPANDATA.MESSAGING_MESSAGE_ID, task.request.id)
+                    with capture_internal_exceptions():
+                        set_on_span(SPANDATA.MESSAGING_MESSAGE_ID, task.request.id)
 
-                with capture_internal_exceptions():
-                    set_on_span(
-                        SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT, task.request.retries
-                    )
-
-                with capture_internal_exceptions():
-                    with task.app.connection() as conn:
+                    with capture_internal_exceptions():
                         set_on_span(
-                            SPANDATA.MESSAGING_SYSTEM,
-                            conn.transport.driver_type,
+                            SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT,
+                            task.request.retries,
                         )
+
+                    with capture_internal_exceptions():
+                        with task.app.connection() as conn:
+                            set_on_span(
+                                SPANDATA.MESSAGING_SYSTEM,
+                                conn.transport.driver_type,
+                            )
 
                 return f(*args, **kwargs)
         except Exception:

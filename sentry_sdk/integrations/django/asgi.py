@@ -22,6 +22,7 @@ from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
+    nullcontext,
 )
 
 if TYPE_CHECKING:
@@ -191,13 +192,16 @@ def wrap_async_view(callback: "Any") -> "Any":
             return await callback(request, *args, **kwargs)
 
         if span_streaming:
-            with sentry_sdk.traces.start_span(
-                name=request.resolver_match.view_name,
-                attributes={
-                    "sentry.op": OP.VIEW_RENDER,
-                    "sentry.origin": DjangoIntegration.origin,
-                },
-            ):
+            span_ctx = nullcontext()
+            if sentry_sdk.traces.get_current_span() is not None:
+                span_ctx = sentry_sdk.traces.start_span(
+                    name=request.resolver_match.view_name,
+                    attributes={
+                        "sentry.op": OP.VIEW_RENDER,
+                        "sentry.origin": DjangoIntegration.origin,
+                    },
+                )
+            with span_ctx:
                 return await callback(request, *args, **kwargs)
         else:
             with sentry_sdk.start_span(

@@ -729,6 +729,9 @@ def _new_sync_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
     is_streaming_response = kwargs.get("stream", False) or False
 
     if has_span_streaming_enabled(client.options):
+        if sentry_sdk.traces.get_current_span() is None:
+            return f(*args, **kwargs)
+
         span = sentry_sdk.traces.start_span(
             name=f"chat {model}",
             attributes={
@@ -810,6 +813,9 @@ async def _new_async_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") ->
     is_streaming_response = kwargs.get("stream", False) or False
 
     if has_span_streaming_enabled(client.options):
+        if sentry_sdk.traces.get_current_span() is None:
+            return await f(*args, **kwargs)
+
         span = sentry_sdk.traces.start_span(
             name=f"chat {model}",
             attributes={
@@ -1227,6 +1233,9 @@ def _new_sync_embeddings_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
     model = kwargs.get("model")
 
     if has_span_streaming_enabled(client.options):
+        if sentry_sdk.traces.get_current_span() is None:
+            return f(*args, **kwargs)
+
         with sentry_sdk.traces.start_span(
             name=f"embeddings {model}",
             attributes={
@@ -1285,6 +1294,9 @@ async def _new_async_embeddings_create(
     model = kwargs.get("model")
 
     if has_span_streaming_enabled(client.options):
+        if sentry_sdk.traces.get_current_span() is None:
+            return await f(*args, **kwargs)
+
         with sentry_sdk.traces.start_span(
             name=f"embeddings {model}",
             attributes={
@@ -1368,6 +1380,9 @@ def _new_sync_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any"
     is_streaming_response = kwargs.get("stream", False) or False
 
     if has_span_streaming_enabled(client.options):
+        if sentry_sdk.traces.get_current_span() is None:
+            return f(*args, **kwargs)
+
         span = sentry_sdk.traces.start_span(
             name=f"responses {model}",
             attributes={
@@ -1438,6 +1453,9 @@ async def _new_async_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -
     is_streaming_response = kwargs.get("stream", False) or False
 
     if has_span_streaming_enabled(client.options):
+        if sentry_sdk.traces.get_current_span() is None:
+            return await f(*args, **kwargs)
+
         span = sentry_sdk.traces.start_span(
             name=f"responses {model}",
             attributes={

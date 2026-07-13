@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
+from sentry_sdk.utils import nullcontext
 
 from ..consts import SPAN_ORIGIN
 
@@ -15,18 +16,22 @@ def handoff_span(
 ) -> None:
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
     if span_streaming:
-        with sentry_sdk.traces.start_span(
-            name=f"handoff from {from_agent.name} to {to_agent_name}",
-            attributes={
-                "sentry.op": OP.GEN_AI_HANDOFF,
-                "sentry.origin": SPAN_ORIGIN,
-                SPANDATA.GEN_AI_OPERATION_NAME: "handoff",
-            },
-        ) as span:
-            # Add conversation ID from agent
-            conv_id = getattr(from_agent, "_sentry_conversation_id", None)
-            if conv_id:
-                span.set_attribute(SPANDATA.GEN_AI_CONVERSATION_ID, conv_id)
+        span_ctx = nullcontext()
+        if sentry_sdk.traces.get_current_span() is not None:
+            span_ctx = sentry_sdk.traces.start_span(
+                name=f"handoff from {from_agent.name} to {to_agent_name}",
+                attributes={
+                    "sentry.op": OP.GEN_AI_HANDOFF,
+                    "sentry.origin": SPAN_ORIGIN,
+                    SPANDATA.GEN_AI_OPERATION_NAME: "handoff",
+                },
+            )
+        with span_ctx as span:
+            if span is not None:
+                # Add conversation ID from agent
+                conv_id = getattr(from_agent, "_sentry_conversation_id", None)
+                if conv_id:
+                    span.set_attribute(SPANDATA.GEN_AI_CONVERSATION_ID, conv_id)
     else:
         with sentry_sdk.start_span(
             op=OP.GEN_AI_HANDOFF,

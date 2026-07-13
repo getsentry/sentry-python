@@ -20,6 +20,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    nullcontext,
     reraise,
 )
 
@@ -81,14 +82,17 @@ def patch_enqueue() -> None:
 
         span_ctx = None
         if is_span_streaming_enabled:
-            span_ctx = sentry_sdk.traces.start_span(
-                name=span_name,
-                attributes={
-                    "sentry.op": OP.QUEUE_SUBMIT_HUEY,
-                    "sentry.origin": HueyIntegration.origin,
-                    SPANDATA.MESSAGING_DESTINATION_NAME: self.name,
-                },
-            )
+            if sentry_sdk.traces.get_current_span() is not None:
+                span_ctx = sentry_sdk.traces.start_span(
+                    name=span_name,
+                    attributes={
+                        "sentry.op": OP.QUEUE_SUBMIT_HUEY,
+                        "sentry.origin": HueyIntegration.origin,
+                        SPANDATA.MESSAGING_DESTINATION_NAME: self.name,
+                    },
+                )
+            else:
+                span_ctx = nullcontext()
         else:
             span_ctx = sentry_sdk.start_span(
                 op=OP.QUEUE_SUBMIT_HUEY,

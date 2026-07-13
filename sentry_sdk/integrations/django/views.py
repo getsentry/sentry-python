@@ -5,6 +5,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
+from sentry_sdk.utils import nullcontext
 
 if TYPE_CHECKING:
     from typing import Any
@@ -34,13 +35,16 @@ def patch_views() -> None:
     def sentry_patched_render(self: "SimpleTemplateResponse") -> "Any":
         span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
-            with sentry_sdk.traces.start_span(
-                name="serialize response",
-                attributes={
-                    "sentry.op": OP.VIEW_RESPONSE_RENDER,
-                    "sentry.origin": DjangoIntegration.origin,
-                },
-            ):
+            span_ctx = nullcontext()
+            if sentry_sdk.traces.get_current_span() is not None:
+                span_ctx = sentry_sdk.traces.start_span(
+                    name="serialize response",
+                    attributes={
+                        "sentry.op": OP.VIEW_RESPONSE_RENDER,
+                        "sentry.origin": DjangoIntegration.origin,
+                    },
+                )
+            with span_ctx:
                 return old_render(self)
         else:
             with sentry_sdk.start_span(
@@ -108,13 +112,16 @@ def _wrap_sync_view(callback: "Any") -> "Any":
             return callback(request, *args, **kwargs)
 
         if span_streaming:
-            with sentry_sdk.traces.start_span(
-                name=request.resolver_match.view_name,
-                attributes={
-                    "sentry.op": OP.VIEW_RENDER,
-                    "sentry.origin": DjangoIntegration.origin,
-                },
-            ):
+            span_ctx = nullcontext()
+            if sentry_sdk.traces.get_current_span() is not None:
+                span_ctx = sentry_sdk.traces.start_span(
+                    name=request.resolver_match.view_name,
+                    attributes={
+                        "sentry.op": OP.VIEW_RENDER,
+                        "sentry.origin": DjangoIntegration.origin,
+                    },
+                )
+            with span_ctx:
                 return callback(request, *args, **kwargs)
         else:
             with sentry_sdk.start_span(

@@ -5,6 +5,7 @@ from sentry_sdk._types import MYPY
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
+from sentry_sdk.utils import nullcontext
 
 if MYPY:
     from socket import AddressFamily, SocketKind
@@ -57,16 +58,20 @@ def _patch_create_connection() -> None:
             return real_create_connection(address, timeout, source_address)
 
         if has_span_streaming_enabled(client.options):
-            with sentry_sdk.traces.start_span(
-                name=_get_span_description(address[0], address[1]),
-                attributes={
-                    "sentry.op": OP.SOCKET_CONNECTION,
-                    "sentry.origin": SocketIntegration.origin,
-                },
-            ) as span:
-                if address[0] is not None:
-                    span.set_attribute(SPANDATA.SERVER_ADDRESS, address[0])
-                span.set_attribute(SPANDATA.SERVER_PORT, address[1])
+            span_ctx = nullcontext()
+            if sentry_sdk.traces.get_current_span() is not None:
+                span_ctx = sentry_sdk.traces.start_span(
+                    name=_get_span_description(address[0], address[1]),
+                    attributes={
+                        "sentry.op": OP.SOCKET_CONNECTION,
+                        "sentry.origin": SocketIntegration.origin,
+                    },
+                )
+            with span_ctx as span:
+                if span is not None:
+                    if address[0] is not None:
+                        span.set_attribute(SPANDATA.SERVER_ADDRESS, address[0])
+                    span.set_attribute(SPANDATA.SERVER_PORT, address[1])
 
                 return real_create_connection(
                     address=address, timeout=timeout, source_address=source_address
@@ -105,27 +110,31 @@ def _patch_getaddrinfo() -> None:
             return real_getaddrinfo(host, port, family, type, proto, flags)
 
         if has_span_streaming_enabled(client.options):
-            with sentry_sdk.traces.start_span(
-                name=_get_span_description(host, port),
-                attributes={
-                    "sentry.op": OP.SOCKET_DNS,
-                    "sentry.origin": SocketIntegration.origin,
-                },
-            ) as span:
-                if isinstance(host, str):
-                    span.set_attribute(SPANDATA.SERVER_ADDRESS, host)
-                elif isinstance(host, bytes):
-                    span.set_attribute(
-                        SPANDATA.SERVER_ADDRESS, host.decode(errors="replace")
-                    )
+            span_ctx = nullcontext()
+            if sentry_sdk.traces.get_current_span() is not None:
+                span_ctx = sentry_sdk.traces.start_span(
+                    name=_get_span_description(host, port),
+                    attributes={
+                        "sentry.op": OP.SOCKET_DNS,
+                        "sentry.origin": SocketIntegration.origin,
+                    },
+                )
+            with span_ctx as span:
+                if span is not None:
+                    if isinstance(host, str):
+                        span.set_attribute(SPANDATA.SERVER_ADDRESS, host)
+                    elif isinstance(host, bytes):
+                        span.set_attribute(
+                            SPANDATA.SERVER_ADDRESS, host.decode(errors="replace")
+                        )
 
-                if isinstance(port, int):
-                    span.set_attribute(SPANDATA.SERVER_PORT, port)
-                elif port is not None:
-                    try:
-                        span.set_attribute(SPANDATA.SERVER_PORT, int(port))
-                    except (ValueError, TypeError):
-                        pass
+                    if isinstance(port, int):
+                        span.set_attribute(SPANDATA.SERVER_PORT, port)
+                    elif port is not None:
+                        try:
+                            span.set_attribute(SPANDATA.SERVER_PORT, int(port))
+                        except (ValueError, TypeError):
+                            pass
 
                 return real_getaddrinfo(host, port, family, type, proto, flags)
         else:

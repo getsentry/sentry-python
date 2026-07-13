@@ -14,6 +14,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    nullcontext,
     parse_version,
     reraise,
 )
@@ -79,13 +80,16 @@ def patch_enqueue_job() -> None:
             return await old_enqueue_job(self, function, *args, **kwargs)
 
         if has_span_streaming_enabled(client.options):
-            with sentry_sdk.traces.start_span(
-                name=function,
-                attributes={
-                    "sentry.op": OP.QUEUE_SUBMIT_ARQ,
-                    "sentry.origin": ArqIntegration.origin,
-                },
-            ):
+            span_ctx = nullcontext()
+            if sentry_sdk.traces.get_current_span() is not None:
+                span_ctx = sentry_sdk.traces.start_span(
+                    name=function,
+                    attributes={
+                        "sentry.op": OP.QUEUE_SUBMIT_ARQ,
+                        "sentry.origin": ArqIntegration.origin,
+                    },
+                )
+            with span_ctx:
                 return await old_enqueue_job(self, function, *args, **kwargs)
 
         with sentry_sdk.start_span(

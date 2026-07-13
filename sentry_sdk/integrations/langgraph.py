@@ -19,7 +19,7 @@ from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
     should_truncate_gen_ai_input,
 )
-from sentry_sdk.utils import safe_serialize
+from sentry_sdk.utils import nullcontext, safe_serialize
 
 try:
     from langgraph.errors import GraphBubbleUp
@@ -174,22 +174,26 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
         )
 
         if has_span_streaming_enabled(client.options):
-            with sentry_sdk.traces.start_span(
-                name=span_name,
-                attributes={
-                    "sentry.op": OP.GEN_AI_INVOKE_AGENT,
-                    "sentry.origin": LanggraphIntegration.origin,
-                    SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
-                },
-            ) as span:
-                if graph_name:
+            span_ctx = nullcontext()
+            if sentry_sdk.traces.get_current_span() is not None:
+                span_ctx = sentry_sdk.traces.start_span(
+                    name=span_name,
+                    attributes={
+                        "sentry.op": OP.GEN_AI_INVOKE_AGENT,
+                        "sentry.origin": LanggraphIntegration.origin,
+                        SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
+                    },
+                )
+            with span_ctx as span:
+                if span is not None and graph_name:
                     span.set_attribute(SPANDATA.GEN_AI_PIPELINE_NAME, graph_name)
                     span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, graph_name)
 
                 # Store input messages to later compare with output
                 input_messages = None
                 if (
-                    len(args) > 0
+                    span is not None
+                    and len(args) > 0
                     and should_send_default_pii()
                     and integration.include_prompts
                 ):
@@ -218,7 +222,8 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
                 result = f(self, *args, **kwargs)
 
-                _set_response_attributes(span, input_messages, result, integration)
+                if span is not None:
+                    _set_response_attributes(span, input_messages, result, integration)
 
                 return result
         else:
@@ -286,21 +291,25 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
         )
 
         if has_span_streaming_enabled(client.options):
-            with sentry_sdk.traces.start_span(
-                name=span_name,
-                attributes={
-                    "sentry.op": OP.GEN_AI_INVOKE_AGENT,
-                    "sentry.origin": LanggraphIntegration.origin,
-                    SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
-                },
-            ) as span:
-                if graph_name:
+            span_ctx = nullcontext()
+            if sentry_sdk.traces.get_current_span() is not None:
+                span_ctx = sentry_sdk.traces.start_span(
+                    name=span_name,
+                    attributes={
+                        "sentry.op": OP.GEN_AI_INVOKE_AGENT,
+                        "sentry.origin": LanggraphIntegration.origin,
+                        SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
+                    },
+                )
+            with span_ctx as span:
+                if span is not None and graph_name:
                     span.set_attribute(SPANDATA.GEN_AI_PIPELINE_NAME, graph_name)
                     span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, graph_name)
 
                 input_messages = None
                 if (
-                    len(args) > 0
+                    span is not None
+                    and len(args) > 0
                     and should_send_default_pii()
                     and integration.include_prompts
                 ):
@@ -329,7 +338,8 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
                 result = await f(self, *args, **kwargs)
 
-                _set_response_attributes(span, input_messages, result, integration)
+                if span is not None:
+                    _set_response_attributes(span, input_messages, result, integration)
 
                 return result
 

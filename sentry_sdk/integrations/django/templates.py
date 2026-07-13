@@ -8,7 +8,7 @@ from django.utils.safestring import mark_safe
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
-from sentry_sdk.utils import ensure_integration_enabled
+from sentry_sdk.utils import ensure_integration_enabled, nullcontext
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Iterator, Optional, Tuple
@@ -64,13 +64,16 @@ def patch_templates() -> None:
     def rendered_content(self: "SimpleTemplateResponse") -> str:
         span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
-            with sentry_sdk.traces.start_span(
-                name=_get_template_name_description(self.template_name),
-                attributes={
-                    "sentry.op": OP.TEMPLATE_RENDER,
-                    "sentry.origin": DjangoIntegration.origin,
-                },
-            ) as span:
+            span_ctx = nullcontext()
+            if sentry_sdk.traces.get_current_span() is not None:
+                span_ctx = sentry_sdk.traces.start_span(
+                    name=_get_template_name_description(self.template_name),
+                    attributes={
+                        "sentry.op": OP.TEMPLATE_RENDER,
+                        "sentry.origin": DjangoIntegration.origin,
+                    },
+                )
+            with span_ctx:
                 return real_rendered_content.fget(self)
         else:
             with sentry_sdk.start_span(
@@ -109,13 +112,16 @@ def patch_templates() -> None:
         span_streaming = has_span_streaming_enabled(client.options)
 
         if span_streaming:
-            with sentry_sdk.traces.start_span(
-                name=_get_template_name_description(template_name),
-                attributes={
-                    "sentry.op": OP.TEMPLATE_RENDER,
-                    "sentry.origin": DjangoIntegration.origin,
-                },
-            ) as span:
+            span_ctx = nullcontext()
+            if sentry_sdk.traces.get_current_span() is not None:
+                span_ctx = sentry_sdk.traces.start_span(
+                    name=_get_template_name_description(template_name),
+                    attributes={
+                        "sentry.op": OP.TEMPLATE_RENDER,
+                        "sentry.origin": DjangoIntegration.origin,
+                    },
+                )
+            with span_ctx:
                 return real_render(request, template_name, context, *args, **kwargs)
         else:
             with sentry_sdk.start_span(

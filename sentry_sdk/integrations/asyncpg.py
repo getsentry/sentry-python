@@ -16,6 +16,7 @@ from sentry_sdk.tracing_utils import (
 )
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    nullcontext,
     parse_version,
 )
 
@@ -235,9 +236,12 @@ def _wrap_connect_addr(
                 except IndexError:
                     pass
 
-            with sentry_sdk.traces.start_span(
-                name="connect", attributes=span_attributes
-            ) as span:
+            span_ctx = nullcontext()
+            if sentry_sdk.traces.get_current_span() is not None:
+                span_ctx = sentry_sdk.traces.start_span(
+                    name="connect", attributes=span_attributes
+                )
+            with span_ctx as span:
                 with capture_internal_exceptions():
                     sentry_sdk.add_breadcrumb(
                         message="connect", category="query", data=span_attributes
