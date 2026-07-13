@@ -1659,7 +1659,11 @@ def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
         "ignore_spans"
     )
 
-    ignore_spans = is_ignored_at_top_level or is_ignored_in_experiment_config
+    ignore_spans = (
+        is_ignored_at_top_level
+        if is_ignored_at_top_level is not None
+        else is_ignored_in_experiment_config
+    )
 
     if not ignore_spans:
         return False

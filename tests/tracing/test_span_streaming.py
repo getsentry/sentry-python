@@ -1828,6 +1828,30 @@ def test_ignore_spans_top_level_with_trace_lifecycle_in_experiments(
     assert span["name"] == "not ignored"
 
 
+def test_ignore_spans_empty_top_level_overrides_experiments(sentry_init, capture_items):
+    # An explicit empty top-level ignore_spans should disable ignoring,
+    # taking precedence over any rules set in _experiments.
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        ignore_spans=[],
+        _experiments={"ignore_spans": ["ignored"]},
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="ignored") as span:
+        assert span.sampled is True
+        assert isinstance(span, StreamedSpan)
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    assert len(spans) == 1
+    (span,) = spans
+    assert span["name"] == "ignored"
+
+
 @pytest.mark.parametrize(
     ("options", "streaming_enabled"),
     [
