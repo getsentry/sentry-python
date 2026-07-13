@@ -92,6 +92,7 @@ EXAMPLE_RESPONSE = Response(
         input_tokens=20,
         input_tokens_details=InputTokensDetails(
             cached_tokens=5,
+            cache_write_tokens=0,
         ),
         output_tokens=10,
         output_tokens_details=OutputTokensDetails(
@@ -109,7 +110,10 @@ def mock_usage():
         input_tokens=10,
         output_tokens=20,
         total_tokens=30,
-        input_tokens_details=InputTokensDetails(cached_tokens=0),
+        input_tokens_details=InputTokensDetails(
+            cached_tokens=0,
+            cache_write_tokens=0,
+        ),
         output_tokens_details=OutputTokensDetails(reasoning_tokens=5),
     )
 
@@ -1536,6 +1540,7 @@ async def test_handoff_span(
                 input_tokens=10,
                 input_tokens_details=InputTokensDetails(
                     cached_tokens=0,
+                    cache_write_tokens=0,
                 ),
                 output_tokens=20,
                 output_tokens_details=OutputTokensDetails(
@@ -1575,6 +1580,7 @@ async def test_handoff_span(
                 input_tokens=10,
                 input_tokens_details=InputTokensDetails(
                     cached_tokens=0,
+                    cache_write_tokens=0,
                 ),
                 output_tokens=20,
                 output_tokens_details=OutputTokensDetails(
@@ -1713,6 +1719,7 @@ async def test_max_turns_before_handoff_span(
                 input_tokens=10,
                 input_tokens_details=InputTokensDetails(
                     cached_tokens=0,
+                    cache_write_tokens=0,
                 ),
                 output_tokens=20,
                 output_tokens_details=OutputTokensDetails(
@@ -1752,6 +1759,7 @@ async def test_max_turns_before_handoff_span(
                 input_tokens=10,
                 input_tokens_details=InputTokensDetails(
                     cached_tokens=0,
+                    cache_write_tokens=0,
                 ),
                 output_tokens=20,
                 output_tokens_details=OutputTokensDetails(
@@ -1876,6 +1884,7 @@ async def test_tool_execution_span(
                     input_tokens=10,
                     input_tokens_details=InputTokensDetails(
                         cached_tokens=0,
+                        cache_write_tokens=0,
                     ),
                     output_tokens=5,
                     output_tokens_details=OutputTokensDetails(
@@ -1887,6 +1896,7 @@ async def test_tool_execution_span(
                     input_tokens=15,
                     input_tokens_details=InputTokensDetails(
                         cached_tokens=0,
+                        cache_write_tokens=0,
                     ),
                     output_tokens=10,
                     output_tokens_details=OutputTokensDetails(
@@ -2664,6 +2674,7 @@ async def test_hosted_mcp_tool_propagation_header_streamed(
                                 input_tokens=20,
                                 input_tokens_details=InputTokensDetails(
                                     cached_tokens=5,
+                                    cache_write_tokens=0,
                                 ),
                                 output_tokens=10,
                                 output_tokens_details=OutputTokensDetails(
@@ -3607,6 +3618,7 @@ async def test_tool_execution_error_tracing(
                     input_tokens=10,
                     input_tokens_details=InputTokensDetails(
                         cached_tokens=0,
+                        cache_write_tokens=0,
                     ),
                     output_tokens=5,
                     output_tokens_details=OutputTokensDetails(
@@ -3618,6 +3630,7 @@ async def test_tool_execution_error_tracing(
                     input_tokens=15,
                     input_tokens_details=InputTokensDetails(
                         cached_tokens=0,
+                        cache_write_tokens=0,
                     ),
                     output_tokens=10,
                     output_tokens_details=OutputTokensDetails(
@@ -3778,6 +3791,7 @@ async def test_invoke_agent_span_includes_usage_data(
                 input_tokens=10,
                 input_tokens_details=InputTokensDetails(
                     cached_tokens=0,
+                    cache_write_tokens=0,
                 ),
                 output_tokens=20,
                 output_tokens_details=OutputTokensDetails(
@@ -3921,6 +3935,7 @@ async def test_ai_client_span_includes_response_model(
                 input_tokens=10,
                 input_tokens_details=InputTokensDetails(
                     cached_tokens=0,
+                    cache_write_tokens=0,
                 ),
                 output_tokens=20,
                 output_tokens_details=OutputTokensDetails(
@@ -4052,6 +4067,7 @@ async def test_ai_client_span_response_model_with_chat_completions(
                 input_tokens=15,
                 input_tokens_details=InputTokensDetails(
                     cached_tokens=0,
+                    cache_write_tokens=0,
                 ),
                 output_tokens=25,
                 output_tokens_details=OutputTokensDetails(
@@ -4177,6 +4193,7 @@ async def test_multiple_llm_calls_aggregate_usage(
                 input_tokens=10,
                 input_tokens_details=InputTokensDetails(
                     cached_tokens=0,
+                    cache_write_tokens=0,
                 ),
                 output_tokens=5,
                 output_tokens_details=OutputTokensDetails(
@@ -4216,6 +4233,7 @@ async def test_multiple_llm_calls_aggregate_usage(
                 input_tokens=20,
                 input_tokens_details=InputTokensDetails(
                     cached_tokens=5,
+                    cache_write_tokens=0,
                 ),
                 output_tokens=15,
                 output_tokens_details=OutputTokensDetails(
@@ -4391,6 +4409,7 @@ async def test_invoke_agent_span_includes_response_model(
                 input_tokens=10,
                 input_tokens_details=InputTokensDetails(
                     cached_tokens=0,
+                    cache_write_tokens=0,
                 ),
                 output_tokens=20,
                 output_tokens_details=OutputTokensDetails(
@@ -4539,6 +4558,7 @@ async def test_invoke_agent_span_uses_last_response_model(
                 input_tokens=10,
                 input_tokens_details=InputTokensDetails(
                     cached_tokens=0,
+                    cache_write_tokens=0,
                 ),
                 output_tokens=5,
                 output_tokens_details=OutputTokensDetails(
@@ -4578,6 +4598,7 @@ async def test_invoke_agent_span_uses_last_response_model(
                 input_tokens=20,
                 input_tokens_details=InputTokensDetails(
                     cached_tokens=0,
+                    cache_write_tokens=0,
                 ),
                 output_tokens=15,
                 output_tokens_details=OutputTokensDetails(
@@ -4922,6 +4943,7 @@ async def test_streaming_ttft_on_chat_span(
                                 input_tokens=20,
                                 input_tokens_details=InputTokensDetails(
                                     cached_tokens=5,
+                                    cache_write_tokens=0,
                                 ),
                                 output_tokens=10,
                                 output_tokens_details=OutputTokensDetails(
@@ -5183,6 +5205,7 @@ async def test_conversation_id_on_tool_span(
                 input_tokens=10,
                 input_tokens_details=InputTokensDetails(
                     cached_tokens=0,
+                    cache_write_tokens=0,
                 ),
                 output_tokens=5,
                 output_tokens_details=OutputTokensDetails(
@@ -5222,6 +5245,7 @@ async def test_conversation_id_on_tool_span(
                 input_tokens=20,
                 input_tokens_details=InputTokensDetails(
                     cached_tokens=5,
+                    cache_write_tokens=0,
                 ),
                 output_tokens=10,
                 output_tokens_details=OutputTokensDetails(
@@ -5627,6 +5651,7 @@ async def test_runner_run_streamed_with_starting_agent_kwarg(
                                 input_tokens=10,
                                 input_tokens_details=InputTokensDetails(
                                     cached_tokens=0,
+                                    cache_write_tokens=0,
                                 ),
                                 output_tokens=20,
                                 output_tokens_details=OutputTokensDetails(

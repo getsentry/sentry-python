@@ -768,6 +768,7 @@ def test_tool_execution_span(
                     input_tokens=142,
                     input_tokens_details=InputTokensDetails(
                         cached_tokens=0,
+                        cache_write_tokens=0,
                     ),
                     output_tokens=50,
                     output_tokens_details=OutputTokensDetails(
@@ -779,6 +780,7 @@ def test_tool_execution_span(
                     input_tokens=89,
                     input_tokens_details=InputTokensDetails(
                         cached_tokens=0,
+                        cache_write_tokens=0,
                     ),
                     output_tokens=28,
                     output_tokens_details=OutputTokensDetails(

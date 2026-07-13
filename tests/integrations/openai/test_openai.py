@@ -96,6 +96,7 @@ else:
             input_tokens=20,
             input_tokens_details=InputTokensDetails(
                 cached_tokens=5,
+                cache_write_tokens=0,
             ),
             output_tokens=10,
             output_tokens_details=OutputTokensDetails(
