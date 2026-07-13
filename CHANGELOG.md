@@ -4,11 +4,6 @@
 
 ### New Features ✨
 
-#### Data Collection
-
-- Move data collection to \_experiments by @ericapisani in [#6790](https://github.com/getsentry/sentry-python/pull/6790)
-- Add queues option to data collection config by @ericapisani in [#6770](https://github.com/getsentry/sentry-python/pull/6770)
-
 #### Huey
 
 - Set `messaging.destination.name` on consumer spans by @alexander-alderman-webb in [#6779](https://github.com/getsentry/sentry-python/pull/6779)
@@ -24,8 +19,6 @@
 
 #### Tracing
 
-- Fix unsampled/deferred trace propagation in span streaming by @sentrivana in [#6757](https://github.com/getsentry/sentry-python/pull/6757)
-- Set `sentry.op` to function in new trace decorator by @sentrivana in [#6796](https://github.com/getsentry/sentry-python/pull/6796)
 - Take first sentry-trace header in case multiple are supplied by @sl0thentr0py in [#6722](https://github.com/getsentry/sentry-python/pull/6722)
 
 #### Other
@@ -36,14 +29,9 @@
 
 ### Internal Changes 🔧
 
-- (data-collection) Simplify database collection config to a plain boolean by @ericapisani in [#6772](https://github.com/getsentry/sentry-python/pull/6772)
 - (mcp) Add package to the typing group by @alexander-alderman-webb in [#6727](https://github.com/getsentry/sentry-python/pull/6727)
 - (starlette) Add package to typing group by @alexander-alderman-webb in [#6728](https://github.com/getsentry/sentry-python/pull/6728)
 - Add required `cache_write_tokens` field by @alexander-alderman-webb in [#6804](https://github.com/getsentry/sentry-python/pull/6804)
-- Add streaming tests to `test_misc` by @sentrivana in [#6787](https://github.com/getsentry/sentry-python/pull/6787)
-- Add streaming tests to `test_sampling` by @sentrivana in [#6784](https://github.com/getsentry/sentry-python/pull/6784)
-- Add streaming propagation tests by @sentrivana in [#6782](https://github.com/getsentry/sentry-python/pull/6782)
-- Add streaming `sample_rand` propagation tests by @sentrivana in [#6780](https://github.com/getsentry/sentry-python/pull/6780)
 - Pin extra test dependencies for generated test suites by @alexander-alderman-webb in [#6696](https://github.com/getsentry/sentry-python/pull/6696)
 - Add `pydantic` to the typing group by @alexander-alderman-webb in [#6730](https://github.com/getsentry/sentry-python/pull/6730)
 - Add `python_multipart` to the typing group by @alexander-alderman-webb in [#6729](https://github.com/getsentry/sentry-python/pull/6729)
@@ -54,9 +42,7 @@
 - Stop inheriting secrets in tests by @alexander-alderman-webb in [#6721](https://github.com/getsentry/sentry-python/pull/6721)
 - Configure Renovate by @renovate in [#6701](https://github.com/getsentry/sentry-python/pull/6701)
 - Move conversation ID tests to their own file by @sentrivana in [#6699](https://github.com/getsentry/sentry-python/pull/6699)
-- Add span origin span streaming tests by @sentrivana in [#6697](https://github.com/getsentry/sentry-python/pull/6697)
 - Replace `requirements-testing.txt` with a `uv` dependency group by @alexander-alderman-webb in [#6693](https://github.com/getsentry/sentry-python/pull/6693)
-- Move streaming decorator tests by @sentrivana in [#6695](https://github.com/getsentry/sentry-python/pull/6695)
 
 ## 2.64.0
 
