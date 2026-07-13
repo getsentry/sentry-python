@@ -113,13 +113,12 @@ def has_span_streaming_enabled(options: "Optional[dict[str, Any]]") -> bool:
     if options is None:
         return False
 
-    is_enabled_at_top_level = options.get("trace_lifecycle") == "stream"
     is_enabled_in_experiment_config = (options.get("_experiments") or {}).get(
         "trace_lifecycle"
     ) == "stream"
 
     if options.get("trace_lifecycle") is not None:
-        return is_enabled_at_top_level
+        return options.get("trace_lifecycle") == "stream"
 
     return is_enabled_in_experiment_config
 
