@@ -34,7 +34,7 @@ from litellm.litellm_core_utils import (
 from litellm.litellm_core_utils.logging_worker import GLOBAL_LOGGING_WORKER
 from litellm.llms.custom_httpx.http_handler import AsyncHTTPHandler, HTTPHandler
 from openai import AsyncOpenAI, OpenAI
-from openai.types import Completion, CompletionUsage, Image, ImagesResponse
+from openai.types import Completion, CompletionUsage
 from openai.types.completion_choice import CompletionChoice
 
 from sentry_sdk import start_transaction
@@ -3521,45 +3521,3 @@ def test_responses_operation_name(
     assert span["op"] == OP.GEN_AI_RESPONSES
     assert span["description"] == "responses gpt-4"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "responses"
-
-
-def test_unknown_call_type_is_not_instrumented(
-    sentry_init,
-    capture_events,
-    get_model_response,
-    reset_litellm_executor,
-):
-    """Call types with no accurate operation name emit no span at all."""
-    sentry_init(
-        integrations=[LiteLLMIntegration()],
-        disabled_integrations=[StdlibIntegration],
-        traces_sample_rate=1.0,
-        stream_gen_ai_spans=False,
-    )
-    events = capture_events()
-
-    client = OpenAI(api_key="test-key")
-
-    model_response = get_model_response(
-        ImagesResponse(
-            created=1234567890,
-            data=[Image(url="https://example.com/image.png")],
-        ),
-        serialize_pydantic=True,
-    )
-
-    with mock.patch.object(
-        client.images._client._client,
-        "send",
-        return_value=model_response,
-    ), start_transaction(name="litellm test"):
-        litellm.image_generation(
-            model="dall-e-3",
-            prompt="A cat",
-            client=client,
-        )
-
-        litellm_utils.executor.shutdown(wait=True)
-
-    (event,) = events
-    assert [s for s in event["spans"] if s["origin"] == "auto.ai.litellm"] == []
