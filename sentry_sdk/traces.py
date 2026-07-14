@@ -501,16 +501,16 @@ class StreamedSpan:
         return self._segment._get_baggage().dynamic_sampling_context()
 
     def _to_traceparent(self) -> str:
-        if self.sampled is True:
+        if self._segment.sampled is True:
             sampled = "1"
-        elif self.sampled is False:
+        elif self._segment.sampled is False:
             sampled = "0"
         else:
             sampled = None
 
-        traceparent = "%s-%s" % (self.trace_id, self.span_id)
+        traceparent = f"{self.trace_id}-{self.span_id}"
         if sampled is not None:
-            traceparent += "-%s" % (sampled,)
+            traceparent += f"-{sampled}"
 
         return traceparent
 
@@ -610,15 +610,36 @@ class StreamedSpan:
 
 class NoOpStreamedSpan(StreamedSpan):
     __slots__ = (
+        "_sampled",
         "_finished",
         "_unsampled_reason",
     )
 
     def __init__(
         self,
+        segment: "Optional[StreamedSpan]" = None,
+        trace_id: "Optional[str]" = None,
+        parent_span_id: "Optional[str]" = None,
+        parent_sampled: "Optional[bool]" = None,
+        baggage: "Optional[Baggage]" = None,
+        sampled: "Optional[bool]" = False,
         unsampled_reason: "Optional[str]" = None,
         scope: "Optional[sentry_sdk.Scope]" = None,
+        sample_rand: "Optional[float]" = None,
+        sample_rate: "Optional[float]" = None,
     ) -> None:
+        self._span_id: "Optional[str]" = None
+
+        self._sampled = sampled
+        self._segment = segment or self
+
+        self._trace_id: "Optional[str]" = trace_id
+        self._parent_span_id = parent_span_id
+        self._parent_sampled = parent_sampled
+        self._baggage = baggage
+        self._sample_rand = sample_rand
+        self._sample_rate = sample_rate
+
         self._scope = scope  # type: ignore[assignment]
         self._unsampled_reason = unsampled_reason
 
@@ -693,9 +714,6 @@ class NoOpStreamedSpan(StreamedSpan):
     def remove_attribute(self, key: str) -> None:
         pass
 
-    def _is_segment(self) -> bool:
-        return self._scope is not None
-
     @property
     def status(self) -> "str":
         return SpanStatus.OK.value
@@ -717,16 +735,8 @@ class NoOpStreamedSpan(StreamedSpan):
         return True
 
     @property
-    def span_id(self) -> str:
-        return "0000000000000000"
-
-    @property
-    def trace_id(self) -> str:
-        return "00000000000000000000000000000000"
-
-    @property
     def sampled(self) -> "Optional[bool]":
-        return False
+        return self._sampled
 
     @property
     def start_timestamp(self) -> "Optional[datetime]":
@@ -735,6 +745,14 @@ class NoOpStreamedSpan(StreamedSpan):
     @property
     def end_timestamp(self) -> "Optional[datetime]":
         return None
+
+    def _get_trace_context(self) -> "dict[str, Any]":
+        return {
+            "trace_id": self.trace_id,
+            "span_id": self.span_id,
+            "parent_span_id": self._parent_span_id,
+            "dynamic_sampling_context": self._dynamic_sampling_context(),
+        }
 
 
 if TYPE_CHECKING:
