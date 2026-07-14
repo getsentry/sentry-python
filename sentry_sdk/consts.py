@@ -1272,6 +1272,7 @@ class ClientConstructor:
         server_name: "Optional[str]" = None,
         shutdown_timeout: float = 2,
         integrations: "Sequence[sentry_sdk.integrations.Integration]" = [],  # noqa: B006
+        ignore_spans: "Optional[IgnoreSpansConfig]" = None,
         in_app_include: "List[str]" = [],  # noqa: B006
         in_app_exclude: "List[str]" = [],  # noqa: B006
         default_integrations: bool = True,
@@ -1293,6 +1294,7 @@ class ClientConstructor:
         ca_certs: "Optional[str]" = None,
         propagate_traces: bool = True,
         traces_sample_rate: "Optional[float]" = None,
+        trace_lifecycle: "Optional[Literal['static', 'stream']]" = None,
         traces_sampler: "Optional[TracesSampler]" = None,
         profiles_sample_rate: "Optional[float]" = None,
         profiles_sampler: "Optional[TracesSampler]" = None,
@@ -1756,6 +1758,12 @@ class ClientConstructor:
 
         :param stream_gen_ai_spans: When set, generative AI spans are sent in a new transport format to
             reduce downstream data loss.
+
+        :param trace_lifecycle: Controls how traces are sent. Set to `"stream"` to send spans as they
+            finish, or `"static"` to send a completed trace as a transaction event.
+
+        :param ignore_spans: A sequence of span-matching rules. Matching spans are ignored when
+            `trace_lifecycle="stream"` is enabled.
 
         :param _experiments: Dictionary of experimental, opt-in features that are not yet stable.
 
