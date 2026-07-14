@@ -4,7 +4,7 @@ EXPERIMENTAL. Do not use in production.
 The API in this file is only meant to be used in span streaming mode.
 
 You can enable span streaming mode via
-sentry_sdk.init(_experiments={"trace_lifecycle": "stream"}).
+sentry_sdk.init(trace_lifecycle="stream").
 """
 
 import sys
@@ -854,7 +854,7 @@ def get_current_span(
     Returns the currently active span on the scope if the span is a `StreamedSpan`, otherwise `None`.
 
     This function will only return a non-`None` value when the streaming trace lifecycle is enabled.
-    To enable the lifecycle, pass `_experiments={"trace_lifecycle": "stream"}` to `sentry.init()`.
+    To enable the lifecycle, pass `trace_lifecycle="stream"` to `sentry.init()`.
     """
     scope = scope or sentry_sdk.get_current_scope()
     current_span = scope.streamed_span
