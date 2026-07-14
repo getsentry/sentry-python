@@ -174,11 +174,6 @@ def _wrap_connect(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
         if has_span_streaming_enabled(client.options):
             breadcrumb_data = _get_connect_data(self, use_streaming_keys=True)
 
-            span_attributes: dict[str, Any] = {
-                "sentry.op": OP.DB,
-                "sentry.origin": AioMySQLIntegration.origin,
-            } | breadcrumb_data
-
             with capture_internal_exceptions():
                 sentry_sdk.add_breadcrumb(
                     message="connect", category="query", data=breadcrumb_data
@@ -186,6 +181,11 @@ def _wrap_connect(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
 
             if sentry_sdk.traces.get_current_span() is None:
                 return await f(self)
+
+            span_attributes: dict[str, Any] = {
+                "sentry.op": OP.DB,
+                "sentry.origin": AioMySQLIntegration.origin,
+            } | breadcrumb_data
 
             with sentry_sdk.traces.start_span(
                 name="connect", attributes=span_attributes
