@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.api import continue_trace, get_baggage, get_traceparent
-from sentry_sdk.consts import OP, SPANSTATUS
+from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SegmentSource, SpanStatus, StreamedSpan
@@ -86,6 +86,7 @@ def patch_enqueue() -> None:
                 attributes={
                     "sentry.op": OP.QUEUE_SUBMIT_HUEY,
                     "sentry.origin": HueyIntegration.origin,
+                    SPANDATA.MESSAGING_DESTINATION_NAME: self.name,
                 },
             )
         else:
@@ -94,6 +95,7 @@ def patch_enqueue() -> None:
                 name=span_name,
                 origin=HueyIntegration.origin,
             )
+            span_ctx.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, self.name)
 
         no_headers_types = (PeriodicTask,) + tuple(
             t for t in [HueyGroup, HueyChord] if t is not None
@@ -211,6 +213,7 @@ def patch_execute() -> None:
                         "sentry.op": OP.QUEUE_TASK_HUEY,
                         "sentry.origin": HueyIntegration.origin,
                         "sentry.span.source": SegmentSource.TASK,
+                        SPANDATA.MESSAGING_DESTINATION_NAME: self.name,
                         "messaging.message.id": task.id,
                         "messaging.message.system": "huey",
                         "messaging.message.retry.count": (task.default_retries or 0)
@@ -228,6 +231,7 @@ def patch_execute() -> None:
                 )
                 transaction.set_status(SPANSTATUS.OK)
                 span_ctx = sentry_sdk.start_transaction(transaction)
+                span_ctx.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, self.name)
 
             if not getattr(task, "_sentry_is_patched", False):
                 task.execute = _wrap_task_execute(task.execute)

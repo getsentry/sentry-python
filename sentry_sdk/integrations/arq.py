@@ -119,7 +119,11 @@ def patch_run_job() -> None:
                         SPANDATA.MESSAGING_MESSAGE_ID: job_id,
                     },
                     parent_span=None,
-                ):
+                ) as span:
+                    if self.queue_name is not None:
+                        span.set_attribute(
+                            SPANDATA.MESSAGING_DESTINATION_NAME, self.queue_name
+                        )
                     return await old_run_job(self, job_id, score)
 
             transaction = Transaction(
@@ -130,7 +134,9 @@ def patch_run_job() -> None:
                 origin=ArqIntegration.origin,
             )
 
-            with sentry_sdk.start_transaction(transaction):
+            with sentry_sdk.start_transaction(transaction) as span:
+                if self.queue_name is not None:
+                    span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, self.queue_name)
                 return await old_run_job(self, job_id, score)
 
     Worker.run_job = _sentry_run_job

@@ -9,7 +9,6 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     _filter_headers,
-    nullcontext,
 )
 from sentry_sdk.scope import Scope, should_send_default_pii, use_isolation_scope
 from sentry_sdk.sessions import track_session
@@ -20,6 +19,7 @@ from sentry_sdk.utils import (
     ContextVar,
     capture_internal_exceptions,
     event_from_exception,
+    nullcontext,
     reraise,
 )
 
