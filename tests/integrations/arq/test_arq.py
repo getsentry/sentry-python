@@ -11,6 +11,7 @@ from fakeredis.aioredis import FakeRedis
 
 import sentry_sdk
 from sentry_sdk import get_client, start_transaction
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.arq import ArqIntegration
 
 
@@ -364,6 +365,10 @@ async def test_job_transaction(
 
         division_span = next(span for span in task_spans if span["name"] == "division")
         assert division_span["attributes"]["sentry.span.source"] == "task"
+        assert (
+            division_span["attributes"][SPANDATA.MESSAGING_DESTINATION_NAME]
+            == worker.queue_name
+        )
 
         assert any(span["name"] == "cron:division" for span in task_spans)
     else:
@@ -410,6 +415,10 @@ async def test_job_transaction(
         assert func_event["type"] == "transaction"
         assert func_event["transaction"] == "division"
         assert func_event["transaction_info"] == {"source": "task"}
+        assert (
+            func_event["contexts"]["trace"]["data"][SPANDATA.MESSAGING_DESTINATION_NAME]
+            == worker.queue_name
+        )
 
         assert "arq_task_id" in func_event["tags"]
         assert "arq_task_retry" in func_event["tags"]

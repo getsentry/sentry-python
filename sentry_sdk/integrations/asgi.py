@@ -24,7 +24,6 @@ from sentry_sdk.integrations._asgi_common import (
 )
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
-    nullcontext,
 )
 from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.sessions import track_session
@@ -49,6 +48,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     logger,
+    nullcontext,
     qualname_from_function,
     reraise,
     transaction_from_function,

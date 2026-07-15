@@ -1,5 +1,4 @@
 import json
-from contextlib import contextmanager
 from copy import deepcopy
 
 import sentry_sdk
@@ -19,7 +18,7 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Iterator, Mapping, MutableMapping, Optional, Union
+    from typing import Any, Dict, Mapping, MutableMapping, Optional, Union
 
     from sentry_sdk._types import Event, HttpStatusCodeRange
 
@@ -51,12 +50,6 @@ DEFAULT_HTTP_METHODS_TO_CAPTURE = (
     "PUT",
     "TRACE",
 )
-
-
-# This noop context manager can be replaced with "from contextlib import nullcontext" when we drop Python 3.6 support
-@contextmanager
-def nullcontext() -> "Iterator[None]":
-    yield
 
 
 def request_body_within_bounds(

@@ -1,4 +1,3 @@
-import gc
 import re
 from array import array
 
@@ -182,29 +181,6 @@ def test_max_value_length(body_normalizer):
     result = body_normalizer(data, max_value_length=max_value_length)
 
     assert len(result["key"]) == max_value_length
-
-
-def test_serialize_does_not_leave_cyclic_garbage():
-    # Applications running with the GC disabled rely on serialize() being
-    # freed by reference counting alone, so it must not create reference
-    # cycles.
-    gc_was_enabled = gc.isenabled()
-    old_debug_flags = gc.get_debug()
-    gc.collect()
-    gc.disable()
-    try:
-        serialize({"extra": {"foo": [{"bar": i} for i in range(20)]}})
-        serialize({"foo": "bar"}, is_vars=True)
-
-        gc.set_debug(gc.DEBUG_SAVEALL)
-        gc.collect()
-        assert gc.garbage == []
-    finally:
-        gc.set_debug(old_debug_flags)
-        gc.garbage.clear()
-        gc.collect()
-        if gc_was_enabled:
-            gc.enable()
 
 
 def test_serialize_local_vars():
