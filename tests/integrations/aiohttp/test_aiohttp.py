@@ -1566,13 +1566,18 @@ async def test_outgoing_trace_headers_span_streaming(
     items = capture_items("span")
 
     client = await aiohttp_client(raw_server)
-    await client.get("/")
+    resp = await client.get("/")
 
     sentry_sdk.flush()
 
     # The outgoing http.client span is suppressed because there is no active
     # span when the test client makes the request.
     assert len(items) == 0
+
+    # Even though no span is created, the trace propagation headers must still
+    # be added to the outgoing request so the trace is not broken.
+    assert "sentry-trace" in resp.request_info.headers
+    assert "baggage" in resp.request_info.headers
 
 
 @pytest.mark.asyncio
