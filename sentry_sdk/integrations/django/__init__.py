@@ -724,6 +724,8 @@ def install_sql_hook() -> None:
 
         span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
+            if sentry_sdk.traces.get_current_span() is None:
+                return real_connect(self)
             with sentry_sdk.traces.start_span(
                 name="connect",
                 attributes={
@@ -750,6 +752,8 @@ def install_sql_hook() -> None:
 
         span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
+            if sentry_sdk.traces.get_current_span() is None:
+                return real_commit(self)
             with sentry_sdk.traces.start_span(
                 name=SPANNAME.DB_COMMIT,
                 attributes={
@@ -776,6 +780,8 @@ def install_sql_hook() -> None:
 
         span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
+            if sentry_sdk.traces.get_current_span() is None:
+                return real_rollback(self)
             with sentry_sdk.traces.start_span(
                 name=SPANNAME.DB_ROLLBACK,
                 attributes={

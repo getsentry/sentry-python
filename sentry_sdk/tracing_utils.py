@@ -113,7 +113,14 @@ def has_span_streaming_enabled(options: "Optional[dict[str, Any]]") -> bool:
     if options is None:
         return False
 
-    return (options.get("_experiments") or {}).get("trace_lifecycle") == "stream"
+    is_enabled_in_experiment_config = (options.get("_experiments") or {}).get(
+        "trace_lifecycle"
+    ) == "stream"
+
+    if options.get("trace_lifecycle") is not None:
+        return options.get("trace_lifecycle") == "stream"
+
+    return is_enabled_in_experiment_config
 
 
 def should_truncate_gen_ai_input(options: "Optional[dict[str, Any]]") -> bool:
@@ -1647,7 +1654,16 @@ def _make_sampling_decision(
 def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
     """Determine if a span fits one of the rules in ignore_spans."""
     client = sentry_sdk.get_client()
-    ignore_spans = (client.options.get("_experiments") or {}).get("ignore_spans")
+    is_ignored_at_top_level = client.options.get("ignore_spans", None)
+    is_ignored_in_experiment_config = (client.options.get("_experiments") or {}).get(
+        "ignore_spans"
+    )
+
+    ignore_spans = (
+        is_ignored_at_top_level
+        if is_ignored_at_top_level is not None
+        else is_ignored_in_experiment_config
+    )
 
     if not ignore_spans:
         return False
