@@ -485,7 +485,7 @@ def _normalize_data(data: "Any", unpack: bool = True) -> "Any":
     if isinstance(data, dict):
         return {k: _normalize_data(v, unpack=unpack) for (k, v) in data.items()}
 
-    return data if isinstance(data, (int, float, bool, str)) else str(data)
+    return data if data is None or isinstance(data, (int, float, bool, str)) else str(data)
 
 
 def set_data_normalized(
