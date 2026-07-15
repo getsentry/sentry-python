@@ -382,6 +382,12 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
             stacklevel=2,
         )
 
+    if rv["ignore_spans"] and not has_span_streaming_enabled(rv):
+        warnings.warn(
+            "The `ignore_spans` parameter only works when `trace_lifecycle` is set to `stream`.",
+            stacklevel=2,
+        )
+
     return rv
 
 

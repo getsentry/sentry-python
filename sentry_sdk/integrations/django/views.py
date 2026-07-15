@@ -34,6 +34,8 @@ def patch_views() -> None:
     def sentry_patched_render(self: "SimpleTemplateResponse") -> "Any":
         span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
+            if sentry_sdk.traces.get_current_span() is None:
+                return old_render(self)
             with sentry_sdk.traces.start_span(
                 name="serialize response",
                 attributes={
@@ -108,6 +110,8 @@ def _wrap_sync_view(callback: "Any") -> "Any":
             return callback(request, *args, **kwargs)
 
         if span_streaming:
+            if sentry_sdk.traces.get_current_span() is None:
+                return callback(request, *args, **kwargs)
             with sentry_sdk.traces.start_span(
                 name=request.resolver_match.view_name,
                 attributes={
