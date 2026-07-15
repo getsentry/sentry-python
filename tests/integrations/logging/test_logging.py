@@ -223,9 +223,12 @@ def test_logging_captured_warnings(sentry_init, capture_events, recwarn):
     assert events[1]["logentry"]["message"] == events[1]["logentry"]["formatted"]
     assert events[1]["logentry"]["params"] == []
 
-    # Using recwarn suppresses the "third" warning in the test output
-    assert len(recwarn) == 1
-    assert str(recwarn[0].message) == "third"
+    # "third" is emitted after captureWarnings(False), so it is not captured
+    # by Sentry and instead surfaces as a normal warning. Using recwarn also
+    # suppresses it in the test output. Filter by message rather than asserting
+    # on the total count, since unrelated warnings from other tests can leak in.
+    third_warnings = [w for w in recwarn if str(w.message) == "third"]
+    assert len(third_warnings) == 1
 
 
 def test_ignore_logger(sentry_init, capture_events, request):
