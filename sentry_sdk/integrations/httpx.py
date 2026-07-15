@@ -58,6 +58,7 @@ def _install_httpx_client() -> None:
 
         if is_span_streaming_enabled:
             if sentry_sdk.traces.get_current_span() is None:
+                propagate_trace_headers(client, request)
                 return real_send(self, request, **kwargs)
 
             with sentry_sdk.traces.start_span(
@@ -143,6 +144,7 @@ def _install_httpx_async_client() -> None:
 
         if is_span_streaming_enabled:
             if sentry_sdk.traces.get_current_span() is None:
+                propagate_trace_headers(client, request)
                 return await real_send(self, request, **kwargs)
 
             with sentry_sdk.traces.start_span(
