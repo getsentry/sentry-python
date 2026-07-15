@@ -7,7 +7,7 @@ from huey.exceptions import CancelExecution, RetryTask
 
 import sentry_sdk
 from sentry_sdk import start_transaction
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.huey import HueyIntegration
 from sentry_sdk.traces import SegmentSource, SpanStatus
 from sentry_sdk.utils import parse_version
@@ -97,8 +97,14 @@ def test_task_transaction_or_segment(
         enqueue_span, execute_span = payloads
 
         assert enqueue_span["attributes"]["sentry.op"] == OP.QUEUE_SUBMIT_HUEY
+        assert (
+            enqueue_span["attributes"][SPANDATA.MESSAGING_DESTINATION_NAME] == huey.name
+        )
         assert execute_span["is_segment"]
         assert execute_span["attributes"]["sentry.op"] == OP.QUEUE_TASK_HUEY
+        assert (
+            execute_span["attributes"][SPANDATA.MESSAGING_DESTINATION_NAME] == huey.name
+        )
         assert execute_span["name"] == "division"
         assert execute_span["status"] == (
             SpanStatus.ERROR if task_fails else SpanStatus.OK
@@ -118,6 +124,10 @@ def test_task_transaction_or_segment(
         assert event["type"] == "transaction"
         assert event["transaction"] == "division"
         assert event["transaction_info"] == {"source": "task"}
+        assert (
+            event["contexts"]["trace"]["data"][SPANDATA.MESSAGING_DESTINATION_NAME]
+            == huey.name
+        )
 
         if task_fails:
             assert event["contexts"]["trace"]["status"] == "internal_error"
@@ -308,6 +318,7 @@ def test_huey_enqueue(init_huey, capture_events):
     assert len(event["spans"])
     assert event["spans"][0]["op"] == "queue.submit.huey"
     assert event["spans"][0]["description"] == "different_task_name"
+    assert event["spans"][0]["data"][SPANDATA.MESSAGING_DESTINATION_NAME] == huey.name
 
 
 def test_huey_propagate_trace(init_huey, capture_events):

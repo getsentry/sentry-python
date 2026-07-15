@@ -1027,8 +1027,8 @@ async def test_transaction_http_method_custom(
         sentry_sdk.flush()
         spans = [item.payload for item in items]
 
-        assert spans[10]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "OPTIONS"
-        assert spans[16]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "HEAD"
+        assert spans[5]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "OPTIONS"
+        assert spans[11]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "HEAD"
     else:
         events = capture_events()
 

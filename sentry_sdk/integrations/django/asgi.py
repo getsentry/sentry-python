@@ -191,6 +191,8 @@ def wrap_async_view(callback: "Any") -> "Any":
             return await callback(request, *args, **kwargs)
 
         if span_streaming:
+            if sentry_sdk.traces.get_current_span() is None:
+                return await callback(request, *args, **kwargs)
             with sentry_sdk.traces.start_span(
                 name=request.resolver_match.view_name,
                 attributes={

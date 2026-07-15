@@ -68,6 +68,8 @@ def patch_signals() -> None:
                     sentry_sdk.get_client().options
                 )
                 if span_streaming:
+                    if sentry_sdk.traces.get_current_span() is None:
+                        return receiver(*args, **kwargs)
                     with sentry_sdk.traces.start_span(
                         name=signal_name,
                         attributes={
@@ -75,7 +77,7 @@ def patch_signals() -> None:
                             "sentry.origin": DjangoIntegration.origin,
                             SPANDATA.CODE_FUNCTION_NAME: signal_name,
                         },
-                    ) as span:
+                    ):
                         return receiver(*args, **kwargs)
                 else:
                     with sentry_sdk.start_span(

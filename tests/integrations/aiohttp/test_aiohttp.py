@@ -1162,16 +1162,12 @@ async def test_tracing_span_streaming(
 
     sentry_sdk.flush()
 
-    # The aiohttp_client fixture is itself sentry-instrumented and emits the
-    # first http.client segment; the server-side http.server span is the other
-    # segment. Asserting the exact length confirms no other spans leak in.
-    assert len(items) == 2
+    # The server-side http.server span is the only segment. The aiohttp_client
+    # fixture's outgoing http.client span is suppressed because there is no
+    # active span when the test client makes the request.
+    assert len(items) == 1
 
-    server_span, client_span = [item.payload for item in items]
-
-    assert client_span["is_segment"] is True
-    assert client_span["attributes"]["sentry.op"] == "http.client"
-    assert client_span["name"].startswith("GET http://127.0.0.1:")
+    (server_span,) = [item.payload for item in items]
 
     assert server_span["is_segment"] is True
     assert (
@@ -1242,7 +1238,7 @@ async def test_sensitive_header_scrubbing_span_streaming(
 
     sentry_sdk.flush()
 
-    server_span, _client_segment = [item.payload for item in items]
+    (server_span,) = [item.payload for item in items]
 
     # send_default_pii defaults to False, so _filter_headers substitutes
     # sensitive headers with SENSITIVE_DATA_SUBSTITUTE ("[Filtered]"). The
@@ -1405,7 +1401,7 @@ async def test_sensitive_header_passthrough_with_pii_span_streaming(
 
     sentry_sdk.flush()
 
-    server_span, _client_segment = [item.payload for item in items]
+    (server_span,) = [item.payload for item in items]
 
     if request.node.callspec.id.endswith("data_collection_off_does_not_add_headers"):
         assert "http.request.header.authorization" not in server_span["attributes"]
@@ -1459,7 +1455,7 @@ async def test_sensitive_header_passthrough_with_pii_span_streaming_without_data
 
     sentry_sdk.flush()
 
-    server_span, _client_segment = [item.payload for item in items]
+    (server_span,) = [item.payload for item in items]
 
     # With send_default_pii=True, _filter_headers is a no-op and the original
     # value reaches the span attribute.
@@ -1498,8 +1494,8 @@ async def test_url_query_attribute_span_streaming(
 
     sentry_sdk.flush()
 
-    assert len(items) == 2
-    server_segment, client_segment = [item.payload for item in items]
+    assert len(items) == 1
+    (server_segment,) = [item.payload for item in items]
 
     if send_pii:
         assert server_segment["attributes"]["url.query"] == "foo=bar&baz=qux"
@@ -1555,8 +1551,8 @@ async def test_transaction_style_span_streaming(
 
     sentry_sdk.flush()
 
-    assert len(items) == 2
-    server_segment, client_segment = [item.payload for item in items]
+    assert len(items) == 1
+    (server_segment,) = [item.payload for item in items]
 
     assert server_segment["name"] == expected_name
     assert server_segment["is_segment"]
@@ -1585,21 +1581,14 @@ async def test_server_error_span_streaming(sentry_init, aiohttp_client, capture_
 
     sentry_sdk.flush()
 
-    # 1 error event + 2 spans (server http.server, test client http.client segment)
-    assert len(items) == 3
+    # 1 error event + 1 span (server http.server)
+    assert len(items) == 2
 
     error_event = items[0]
     assert error_event.type == "event"
     assert error_event.payload["exception"]["values"][0]["type"] == "ZeroDivisionError"
 
-    server_span, segment = [item.payload for item in items[1:]]
-
-    assert segment["is_segment"] is True
-    assert segment["attributes"]["sentry.op"] == "http.client"
-    # The test client receives the 500 response that aiohttp's outer error
-    # handler synthesizes from the unhandled exception.
-    assert segment["attributes"]["http.response.status_code"] == 500
-    assert segment["status"] == "error"
+    server_span = items[1].payload
 
     # The integration's generic Exception path reraises without recording
     # http.response.status_code on the server span. StreamedSpan.__exit__
@@ -1633,13 +1622,8 @@ async def test_http_exception_span_streaming(
 
     sentry_sdk.flush()
 
-    assert len(items) == 2
-    server_span, segment = [item.payload for item in items]
-
-    assert segment["is_segment"] is True
-    assert segment["attributes"]["sentry.op"] == "http.client"
-    assert segment["attributes"]["http.response.status_code"] == 403
-    assert segment["status"] == "error"
+    assert len(items) == 1
+    (server_span,) = [item.payload for item in items]
 
     assert server_span["attributes"]["sentry.op"] == "http.server"
     assert server_span["attributes"]["http.response.status_code"] == 403
@@ -1670,13 +1654,8 @@ async def test_http_exception_ok_status_not_overridden_span_streaming(
 
     sentry_sdk.flush()
 
-    assert len(items) == 2
-    server_span, segment = [item.payload for item in items]
-
-    assert segment["is_segment"] is True
-    assert segment["attributes"]["sentry.op"] == "http.client"
-    assert segment["attributes"]["http.response.status_code"] == 302
-    assert segment["status"] == "ok"
+    assert len(items) == 1
+    (server_span,) = [item.payload for item in items]
 
     assert server_span["attributes"]["sentry.op"] == "http.server"
     assert server_span["attributes"]["http.response.status_code"] == 302
@@ -1715,18 +1694,13 @@ async def test_outgoing_client_span_span_streaming(
 
     sentry_sdk.flush()
 
-    # 3 spans, finished inner-first:
+    # 2 spans, finished inner-first:
     #   #0 inner http.client (server -> raw_server)
     #   #1 server http.server
-    #   #2 outer http.client segment (test client -> server)
-    assert len(items) == 3
+    assert len(items) == 2
 
     inner_client_span = items[0].payload
     server_span = items[1].payload
-    segment = items[2].payload
-
-    assert segment["is_segment"] is True
-    assert segment["attributes"]["sentry.op"] == "http.client"
 
     assert server_span["attributes"]["sentry.op"] == "http.server"
 
@@ -1773,21 +1747,14 @@ async def test_outgoing_trace_headers_span_streaming(
 
     sentry_sdk.flush()
 
-    # raw_server bypasses Application._handle, so only the test client's
-    # outgoing http.client segment is emitted.
-    assert len(items) == 1
-    client_span = items[0].payload
+    # The outgoing http.client span is suppressed because there is no active
+    # span when the test client makes the request.
+    assert len(items) == 0
 
-    assert client_span["is_segment"] is True
-    assert client_span["attributes"]["sentry.op"] == "http.client"
-    assert client_span["name"].startswith("GET http://127.0.0.1:")
-    assert resp.request_info.headers[
-        "sentry-trace"
-    ] == "{trace_id}-{span_id}-{sampled}".format(
-        trace_id=client_span["trace_id"],
-        span_id=client_span["span_id"],
-        sampled=1,
-    )
+    # Even though no span is created, the trace propagation headers must still
+    # be added to the outgoing request so the trace is not broken.
+    assert "sentry-trace" in resp.request_info.headers
+    assert "baggage" in resp.request_info.headers
 
 
 @pytest.mark.asyncio
@@ -1817,7 +1784,7 @@ async def test_user_ip_address_on_all_spans(
 
     sentry_sdk.flush()
 
-    child_span, server_span, client_span = [item.payload for item in items]
+    child_span, server_span = [item.payload for item in items]
 
     if send_default_pii:
         assert server_span["attributes"]["user.ip_address"] == "127.0.0.1"
