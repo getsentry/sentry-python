@@ -795,6 +795,89 @@ def test_outgoing_trace_headers_append_to_baggage_span_streaming(
     assert "sentry-sampled=true" in baggage
 
 
+def test_outgoing_trace_headers_span_streaming_no_current_span(
+    sentry_init, httpx2_mock
+):
+    """
+    Even when there is no active span, trace propagation headers should still
+    be attached to outgoing requests when span streaming is enabled.
+
+    This is deliberately different from the legacy (transaction-based) approach,
+    which does not propagate outside of a transaction (see
+    ``test_do_not_propagate_outside_transaction``). The streamed approach
+    propagates from the current scope's propagation context regardless of
+    whether a span is active.
+    """
+    httpx2_mock.add_response()
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_propagation_targets=[MATCH_ALL],
+        integrations=[Httpx2Integration()],
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    url = "http://example.com/"
+
+    httpx2_client = httpx2.Client()
+
+    # No start_span / start_transaction -> get_current_span() is None
+    assert sentry_sdk.traces.get_current_span() is None
+
+    response = httpx2_client.get(url)
+
+    assert response.status_code == 200
+
+    # Trace is still propagated from the scope's propagation context
+    request_headers = httpx2_mock.get_request().headers
+    assert "sentry-trace" in request_headers
+    assert "baggage" in request_headers
+
+    # The propagated headers describe a single, coherent trace: the trace_id in
+    # sentry-trace matches the one carried in baggage.
+    trace_id = request_headers["sentry-trace"].split("-")[0]
+    assert f"sentry-trace_id={trace_id}" in request_headers["baggage"]
+
+
+def test_outgoing_trace_headers_span_streaming_no_current_span_async(
+    sentry_init, httpx2_mock
+):
+    """
+    The async client must match the sync client: trace propagation headers are
+    attached to outgoing requests even when there is no active span and span
+    streaming is enabled.
+    """
+    httpx2_mock.add_response()
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_propagation_targets=[MATCH_ALL],
+        integrations=[Httpx2Integration()],
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    url = "http://example.com/"
+
+    httpx2_client = httpx2.AsyncClient()
+
+    # No start_span / start_transaction -> get_current_span() is None
+    assert sentry_sdk.traces.get_current_span() is None
+
+    response = asyncio.run(httpx2_client.get(url))
+
+    assert response.status_code == 200
+
+    # Trace is still propagated from the scope's propagation context
+    request_headers = httpx2_mock.get_request().headers
+    assert "sentry-trace" in request_headers
+    assert "baggage" in request_headers
+
+    # The propagated headers describe a single, coherent trace: the trace_id in
+    # sentry-trace matches the one carried in baggage.
+    trace_id = request_headers["sentry-trace"].split("-")[0]
+    assert f"sentry-trace_id={trace_id}" in request_headers["baggage"]
+
+
 @pytest.mark.parametrize(
     "httpx2_client",
     (httpx2.Client(), httpx2.AsyncClient()),
