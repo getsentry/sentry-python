@@ -460,6 +460,74 @@ def test_outgoing_trace_headers_head_sdk(
     assert request_headers["baggage"] == expected_outgoing_baggage
 
 
+def test_outgoing_trace_headers_span_streaming_no_current_span(sentry_init):
+    """
+    With span streaming enabled and no active span, trace propagation headers
+    should still be attached to outgoing requests, propagated from the scope's
+    propagation context.
+    """
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    already_patched_getresponse = HTTPSConnection.getresponse
+    request_headers = {}
+
+    class HTTPSConnectionRecordingRequestHeaders(HTTPSConnection):
+        def send(self, *args, **kwargs) -> None:
+            request_str = args[0]
+            for line in request_str.decode("utf-8").split("\r\n")[1:]:
+                if line:
+                    key, val = line.split(": ")
+                    request_headers[key] = val
+
+            server_sock, client_sock = socket.socketpair()
+            server_sock.sendall(b"HTTP/1.1 200 OK\r\n\r\n")
+            server_sock.close()
+            self.sock = client_sock
+
+        def getresponse(self, *args, **kwargs):
+            return already_patched_getresponse(self, *args, **kwargs)
+
+    headers = {
+        "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-1",
+        "baggage": (
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
+            "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
+            "sentry-sample_rate=0.01337,"
+            "sentry-sample_rand=0.000005,"
+            "sentry-sampled=true"
+        ),
+    }
+
+    # Seed the scope's propagation context, but do NOT start a span.
+    sentry_sdk.traces.continue_trace(headers)
+    assert sentry_sdk.traces.get_current_span() is None
+
+    connection = HTTPSConnectionRecordingRequestHeaders("localhost", port=PORT)
+    connection.request("GET", "/top-chasers")
+    connection.getresponse()
+
+    # Trace is still propagated, carrying the trace_id from the propagation
+    # context. The span id segment is generated for the propagation context
+    # (there is no active span), so we assert the stable trace_id prefix.
+    assert request_headers["sentry-trace"].startswith(
+        "771a43a4192642f0b136d5159a501700-"
+    )
+
+    # The outgoing baggage is fully deterministic: it is the frozen incoming
+    # baggage from the propagation context.
+    expected_outgoing_baggage = (
+        "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
+        "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
+        "sentry-sample_rate=0.01337,"
+        "sentry-sample_rand=0.000005,"
+        "sentry-sampled=true"
+    )
+    assert request_headers["baggage"] == expected_outgoing_baggage
+
+
 @pytest.mark.parametrize(
     "trace_propagation_targets,host,path,trace_propagated",
     [
