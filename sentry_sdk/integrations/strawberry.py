@@ -188,6 +188,10 @@ class SentryAsyncExtension(SchemaExtension):
         client = sentry_sdk.get_client()
         is_span_streaming_enabled = has_span_streaming_enabled(client.options)
         if is_span_streaming_enabled:
+            if sentry_sdk.traces.get_current_span() is None:
+                yield
+                return
+
             additional_attributes: "dict[str, Any]" = {}
 
             if should_send_default_pii():
@@ -244,6 +248,10 @@ class SentryAsyncExtension(SchemaExtension):
         is_span_streaming_enabled = has_span_streaming_enabled(client.options)
 
         if is_span_streaming_enabled:
+            if sentry_sdk.traces.get_current_span() is None:
+                yield
+                return
+
             validation_span = sentry_sdk.traces.start_span(
                 name="validation",
                 attributes={
@@ -272,6 +280,10 @@ class SentryAsyncExtension(SchemaExtension):
         is_span_streaming_enabled = has_span_streaming_enabled(client.options)
 
         if is_span_streaming_enabled:
+            if sentry_sdk.traces.get_current_span() is None:
+                yield
+                return
+
             parsing_span = sentry_sdk.traces.start_span(
                 name="parsing",
                 attributes={
@@ -333,6 +345,9 @@ class SentryAsyncExtension(SchemaExtension):
         client = sentry_sdk.get_client()
         is_span_streaming_enabled = has_span_streaming_enabled(client.options)
         if is_span_streaming_enabled:
+            if sentry_sdk.traces.get_current_span() is None:
+                return await self._resolve(_next, root, info, *args, **kwargs)
+
             with sentry_sdk.traces.start_span(
                 name=f"resolving {field_path}",
                 attributes={
@@ -372,6 +387,9 @@ class SentrySyncExtension(SentryAsyncExtension):
         client = sentry_sdk.get_client()
         is_span_streaming_enabled = has_span_streaming_enabled(client.options)
         if is_span_streaming_enabled:
+            if sentry_sdk.traces.get_current_span() is None:
+                return _next(root, info, *args, **kwargs)
+
             with sentry_sdk.traces.start_span(
                 name=f"resolving {field_path}",
                 attributes={

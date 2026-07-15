@@ -1,13 +1,19 @@
 import re
 import sys
 import time
+import warnings
 from unittest import mock
 
 import pytest
 
 import sentry_sdk
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
-from sentry_sdk.traces import NoOpStreamedSpan, SpanStatus, StreamedSpan
+from sentry_sdk.traces import (
+    NoOpStreamedSpan,
+    SpanStatus,
+    StreamedSpan,
+)
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 minimum_python_38 = pytest.mark.skipif(
     sys.version_info < (3, 8), reason="Asyncio tests need Python >= 3.8"
@@ -1170,90 +1176,92 @@ def test_set_span_status_on_ignored_span(sentry_init, capture_items):
     assert len(spans) == 0
 
 
+IGNORE_SPANS_CASES = [
+    # no regexes
+    ([], "/health", {}, False),
+    ([{}], "/health", {}, False),
+    (["/health"], "/health", {}, True),
+    (["/health"], "/health", {"custom": "custom"}, True),
+    ([{"name": "/health"}], "/health", {}, True),
+    ([{"name": "/health"}], "/health", {"custom": "custom"}, True),
+    ([{"attributes": {"custom": "custom"}}], "/health", {"custom": "custom"}, True),
+    ([{"attributes": {"custom": "custom"}}], "/health", {}, False),
+    (
+        [{"name": "/nothealth", "attributes": {"custom": "custom"}}],
+        "/health",
+        {"custom": "custom"},
+        False,
+    ),
+    (
+        [{"name": "/health", "attributes": {"custom": "notcustom"}}],
+        "/health",
+        {"custom": "custom"},
+        False,
+    ),
+    (
+        [{"name": "/health", "attributes": {"custom": "custom"}}],
+        "/health",
+        {"custom": "custom"},
+        True,
+    ),
+    # test cases with regexes
+    ([re.compile("/hea.*")], "/health", {}, True),
+    ([re.compile("/hea.*")], "/health", {"custom": "custom"}, True),
+    ([{"name": re.compile("/hea.*")}], "/health", {}, True),
+    ([{"name": re.compile("/hea.*")}], "/health", {"custom": "custom"}, True),
+    (
+        [{"attributes": {"custom": re.compile("c.*")}}],
+        "/health",
+        {"custom": "custom"},
+        True,
+    ),
+    ([{"attributes": {"custom": re.compile("c.*")}}], "/health", {}, False),
+    (
+        [
+            {
+                "name": re.compile("/nothea.*"),
+                "attributes": {"custom": re.compile("c.*")},
+            }
+        ],
+        "/health",
+        {"custom": "custom"},
+        False,
+    ),
+    (
+        [
+            {
+                "name": re.compile("/hea.*"),
+                "attributes": {"custom": re.compile("notc.*")},
+            }
+        ],
+        "/health",
+        {"custom": "custom"},
+        False,
+    ),
+    (
+        [
+            {
+                "name": re.compile("/hea.*"),
+                "attributes": {"custom": re.compile("c.*")},
+            }
+        ],
+        "/health",
+        {"custom": "custom"},
+        True,
+    ),
+    (
+        [{"attributes": {"listattr": re.compile(r"\[.*\]")}}],
+        "/a",
+        {"listattr": [1, 2, 3]},
+        False,
+    ),
+]
+
+
 @pytest.mark.parametrize(
-    ("ignore_spans", "name", "attributes", "ignored"),
-    [
-        # no regexes
-        ([], "/health", {}, False),
-        ([{}], "/health", {}, False),
-        (["/health"], "/health", {}, True),
-        (["/health"], "/health", {"custom": "custom"}, True),
-        ([{"name": "/health"}], "/health", {}, True),
-        ([{"name": "/health"}], "/health", {"custom": "custom"}, True),
-        ([{"attributes": {"custom": "custom"}}], "/health", {"custom": "custom"}, True),
-        ([{"attributes": {"custom": "custom"}}], "/health", {}, False),
-        (
-            [{"name": "/nothealth", "attributes": {"custom": "custom"}}],
-            "/health",
-            {"custom": "custom"},
-            False,
-        ),
-        (
-            [{"name": "/health", "attributes": {"custom": "notcustom"}}],
-            "/health",
-            {"custom": "custom"},
-            False,
-        ),
-        (
-            [{"name": "/health", "attributes": {"custom": "custom"}}],
-            "/health",
-            {"custom": "custom"},
-            True,
-        ),
-        # test cases with regexes
-        ([re.compile("/hea.*")], "/health", {}, True),
-        ([re.compile("/hea.*")], "/health", {"custom": "custom"}, True),
-        ([{"name": re.compile("/hea.*")}], "/health", {}, True),
-        ([{"name": re.compile("/hea.*")}], "/health", {"custom": "custom"}, True),
-        (
-            [{"attributes": {"custom": re.compile("c.*")}}],
-            "/health",
-            {"custom": "custom"},
-            True,
-        ),
-        ([{"attributes": {"custom": re.compile("c.*")}}], "/health", {}, False),
-        (
-            [
-                {
-                    "name": re.compile("/nothea.*"),
-                    "attributes": {"custom": re.compile("c.*")},
-                }
-            ],
-            "/health",
-            {"custom": "custom"},
-            False,
-        ),
-        (
-            [
-                {
-                    "name": re.compile("/hea.*"),
-                    "attributes": {"custom": re.compile("notc.*")},
-                }
-            ],
-            "/health",
-            {"custom": "custom"},
-            False,
-        ),
-        (
-            [
-                {
-                    "name": re.compile("/hea.*"),
-                    "attributes": {"custom": re.compile("c.*")},
-                }
-            ],
-            "/health",
-            {"custom": "custom"},
-            True,
-        ),
-        (
-            [{"attributes": {"listattr": re.compile(r"\[.*\]")}}],
-            "/a",
-            {"listattr": [1, 2, 3]},
-            False,
-        ),
-    ],
+    ("ignore_spans", "name", "attributes", "ignored"), IGNORE_SPANS_CASES
 )
-def test_ignore_spans(
+def test_ignore_spans_set_in_experiments(
     sentry_init, capture_items, ignore_spans, name, attributes, ignored
 ):
     sentry_init(
@@ -1713,3 +1721,176 @@ def test_default_attributes(sentry_init, capture_envelopes):
             "value": mock.ANY,
         },
     }
+
+
+@pytest.mark.parametrize(
+    ("options", "expected"),
+    [
+        ({"trace_lifecycle": "stream"}, True),
+        ({"_experiments": {"trace_lifecycle": "stream"}}, True),
+        (
+            {
+                "trace_lifecycle": "stream",
+                "_experiments": {"trace_lifecycle": "static"},
+            },
+            True,
+        ),
+        (
+            {
+                "trace_lifecycle": "static",
+                "_experiments": {"trace_lifecycle": "stream"},
+            },
+            False,
+        ),
+        ({"trace_lifecycle": "static"}, False),
+        ({"_experiments": {"trace_lifecycle": "static"}}, False),
+        ({}, False),
+        ({"_experiments": {}}, False),
+        ({"_experiments": None}, False),
+        (None, False),
+    ],
+)
+def test_has_span_streaming_enabled(options, expected):
+    assert has_span_streaming_enabled(options) is expected
+
+
+def test_trace_lifecycle_top_level_enables_streaming(sentry_init, capture_items):
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="segment") as segment:
+        assert isinstance(segment, StreamedSpan)
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    assert len(spans) == 1
+    assert spans[0]["name"] == "segment"
+
+
+@pytest.mark.parametrize(
+    ("ignore_spans", "name", "attributes", "ignored"), IGNORE_SPANS_CASES
+)
+def test_ignore_spans_top_level(
+    sentry_init, capture_items, ignore_spans, name, attributes, ignored
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        ignore_spans=ignore_spans,
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name=name, attributes=attributes) as span:
+        if ignored:
+            assert span.sampled is False
+            assert isinstance(span, NoOpStreamedSpan)
+        else:
+            assert span.sampled is True
+            assert isinstance(span, StreamedSpan)
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    if ignored:
+        assert len(spans) == 0
+    else:
+        assert len(spans) == 1
+        (span,) = spans
+        assert span["name"] == name
+
+
+def test_ignore_spans_top_level_with_trace_lifecycle_in_experiments(
+    sentry_init, capture_items
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        ignore_spans=["ignored"],
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="ignored") as ignored_span:
+        assert ignored_span.sampled is False
+        assert isinstance(ignored_span, NoOpStreamedSpan)
+
+    with sentry_sdk.traces.start_span(name="not ignored") as span:
+        assert span.sampled is True
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    assert len(spans) == 1
+    (span,) = spans
+    assert span["name"] == "not ignored"
+
+
+def test_ignore_spans_empty_top_level_overrides_experiments(sentry_init, capture_items):
+    # An explicit empty top-level ignore_spans should disable ignoring,
+    # taking precedence over any rules set in _experiments.
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        ignore_spans=[],
+        _experiments={"ignore_spans": ["ignored"]},
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="ignored") as span:
+        assert span.sampled is True
+        assert isinstance(span, StreamedSpan)
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    assert len(spans) == 1
+    (span,) = spans
+    assert span["name"] == "ignored"
+
+
+@pytest.mark.parametrize(
+    ("options", "streaming_enabled"),
+    [
+        (
+            {
+                "trace_lifecycle": "stream",
+                "_experiments": {"trace_lifecycle": "static"},
+            },
+            True,
+        ),
+        (
+            {
+                "trace_lifecycle": "static",
+                "_experiments": {"trace_lifecycle": "stream"},
+            },
+            False,
+        ),
+    ],
+)
+def test_top_level_trace_lifecycle_takes_precedence_over_experiments(
+    sentry_init, capture_items, options, streaming_enabled
+):
+    sentry_init(traces_sample_rate=1.0, **options)
+
+    items = capture_items("span")
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        with sentry_sdk.traces.start_span(name="segment") as segment:
+            if streaming_enabled:
+                assert isinstance(segment, StreamedSpan)
+            else:
+                assert isinstance(segment, NoOpStreamedSpan)
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    if streaming_enabled:
+        assert len(spans) == 1
+        assert spans[0]["name"] == "segment"
+    else:
+        assert len(spans) == 0

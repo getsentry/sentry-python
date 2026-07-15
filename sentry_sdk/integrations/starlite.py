@@ -12,6 +12,7 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
     has_data_collection_enabled,
+    nullcontext,
     transaction_from_function,
 )
 
@@ -153,6 +154,8 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
 
         def _start_middleware_span(op: str, name: str) -> "Any":
             if is_span_streaming_enabled:
+                if sentry_sdk.traces.get_current_span() is None:
+                    return nullcontext()
                 return sentry_sdk.traces.start_span(
                     name=name,
                     attributes={
