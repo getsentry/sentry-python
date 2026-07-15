@@ -88,8 +88,8 @@ def _get(dc, path):
                 "user_info": False,
                 "gen_ai.inputs": False,
                 "gen_ai.outputs": False,
-                "cookies.mode": "off",
-                "query_params.mode": "off",
+                "cookies.mode": "denylist",
+                "url_query_params.mode": "denylist",
                 "http_headers.request.mode": "denylist",
                 "http_bodies": _ALL_HTTP_BODY_TYPES,
                 "queues": False,
@@ -104,14 +104,14 @@ def _get(dc, path):
                 "gen_ai.inputs": True,
                 "gen_ai.outputs": True,
                 "cookies.mode": "denylist",
-                "query_params.mode": "denylist",
+                "url_query_params.mode": "denylist",
                 "queues": True,
             },
             id="send_default_pii_true_collects_pii",
         ),
         pytest.param(
             {"send_default_pii": False},
-            {"user_info": False, "cookies.mode": "off", "queues": False},
+            {"user_info": False, "cookies.mode": "denylist", "queues": False},
             id="send_default_pii_false_collects_no_pii",
         ),
         pytest.param(
@@ -121,7 +121,7 @@ def _get(dc, path):
                 "gen_ai.inputs": True,
                 "gen_ai.outputs": True,
                 "cookies.mode": "denylist",
-                "query_params.mode": "denylist",
+                "url_query_params.mode": "denylist",
                 "http_bodies": _ALL_HTTP_BODY_TYPES,
                 "queues": True,
             },
@@ -155,7 +155,7 @@ def _get(dc, path):
                 "_experiments": {
                     "data_collection": {
                         "cookies": {"mode": "off"},
-                        "query_params": {"mode": "allowlist", "terms": ["page"]},
+                        "url_query_params": {"mode": "allowlist", "terms": ["page"]},
                         "http_headers": {"request": {"mode": "off"}},
                         "gen_ai": {"inputs": False, "outputs": True},
                     }
@@ -163,8 +163,8 @@ def _get(dc, path):
             },
             {
                 "cookies.mode": "off",
-                "query_params.mode": "allowlist",
-                "query_params.terms": ["page"],
+                "url_query_params.mode": "allowlist",
+                "url_query_params.terms": ["page"],
                 "http_headers.request.mode": "off",
                 "gen_ai.inputs": False,
                 "gen_ai.outputs": True,
@@ -177,7 +177,7 @@ def _get(dc, path):
                     "data_collection": {
                         "cookies": None,
                         "http_headers": None,
-                        "query_params": None,
+                        "url_query_params": None,
                         "graphql": None,
                         "gen_ai": None,
                     }
@@ -186,7 +186,7 @@ def _get(dc, path):
             {
                 "cookies.mode": "denylist",
                 "http_headers.request.mode": "denylist",
-                "query_params.mode": "denylist",
+                "url_query_params.mode": "denylist",
                 "graphql.document": True,
                 "graphql.variables": True,
                 "gen_ai.inputs": True,

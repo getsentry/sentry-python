@@ -29,8 +29,15 @@ from sentry_sdk import (
     capture_message,
     set_tag,
 )
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
+
+NO_QUERY_STRING = object()
+
+# Query string used across the query-param filtering tests below. ``auth`` is a
+# built-in sensitive term, so it is redacted by the default denylist.
+QUERY_STRING = "toy=tennisball&color=red&auth=secret"
 
 login_manager = LoginManager()
 
@@ -1220,3 +1227,166 @@ def test_transaction_or_segment_http_method_custom(
         (event1, event2) = events
         assert event1["request"]["method"] == "OPTIONS"
         assert event2["request"]["method"] == "HEAD"
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query_string",
+    [
+        pytest.param(
+            {"send_default_pii": True},
+            "toy=tennisball&color=red&auth=secret",
+            id="legacy_send_default_pii_true",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            "toy=tennisball&color=red&auth=secret",
+            id="legacy_send_default_pii_false",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}}},
+            NO_QUERY_STRING,
+            id="data_collection_off",
+        ),
+    ],
+)
+def test_query_string_data_collection(
+    sentry_init,
+    app,
+    capture_events,
+    monkeypatch,
+    init_kwargs,
+    expected_query_string,
+):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()], **init_kwargs)
+    # This test is about query-string filtering, not user data. Disable
+    # flask_login so the module-level login manager (which has no user_loader)
+    # does not raise when send_default_pii is on.
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
+    events = capture_events()
+
+    client = app.test_client()
+    client.get("/message?" + QUERY_STRING)
+
+    (event,) = events
+
+    if expected_query_string is NO_QUERY_STRING:
+        assert "query_string" not in event["request"]
+    else:
+        assert event["request"]["query_string"] == expected_query_string
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query",
+    [
+        pytest.param(
+            {"send_default_pii": True},
+            "toy=tennisball&color=red&auth=secret",
+            id="legacy_send_default_pii_true",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            NO_QUERY_STRING,
+            id="legacy_send_default_pii_false",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}}},
+            NO_QUERY_STRING,
+            id="data_collection_off",
+        ),
+    ],
+)
+def test_span_http_query_data_collection(
+    sentry_init,
+    app,
+    capture_items,
+    monkeypatch,
+    init_kwargs,
+    expected_query,
+):
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream",
+            **init_kwargs.pop("_experiments", {}),
+        },
+        **init_kwargs,
+    )
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
+
+    items = capture_items("span")
+
+    client = app.test_client()
+    client.get("/message?" + QUERY_STRING)
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items if item.type == "span"]
+    (segment,) = spans
+
+    if expected_query is NO_QUERY_STRING:
+        assert SPANDATA.HTTP_QUERY not in segment["attributes"]
+    else:
+        assert segment["attributes"][SPANDATA.HTTP_QUERY] == expected_query
+
+
+def test_query_string_empty_legacy_emits_empty_string(
+    sentry_init, app, capture_events, monkeypatch
+):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()], send_default_pii=True)
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
+    events = capture_events()
+
+    client = app.test_client()
+    client.get("/message")
+
+    (event,) = events
+    assert event["request"]["query_string"] == ""
+
+
+def test_empty_query_string_is_dropped_with_data_collection(
+    sentry_init, app, capture_events
+):
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        _experiments={"data_collection": {}},
+    )
+    events = capture_events()
+
+    client = app.test_client()
+    client.get("/message")
+
+    (event,) = events
+    assert "query_string" not in event["request"]

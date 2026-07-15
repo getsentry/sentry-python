@@ -6,6 +6,7 @@ import sentry_sdk
 from sentry_sdk._werkzeug import _get_headers, get_host
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query_string
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     _filter_headers,
@@ -20,6 +21,7 @@ from sentry_sdk.utils import (
     ContextVar,
     capture_internal_exceptions,
     event_from_exception,
+    has_data_collection_enabled,
     reraise,
 )
 
@@ -355,6 +357,7 @@ def _make_wsgi_event_processor(
     method = environ.get("REQUEST_METHOD")
     env = dict(_get_environ(environ))
     headers = _filter_headers(dict(_get_headers(environ)))
+    client_options = sentry_sdk.get_client().options
 
     def event_processor(event: "Event", hint: "Dict[str, Any]") -> "Event":
         with capture_internal_exceptions():
@@ -367,10 +370,21 @@ def _make_wsgi_event_processor(
                     user_info.setdefault("ip_address", client_ip)
 
             request_info["url"] = request_url
-            request_info["query_string"] = query_string
             request_info["method"] = method
             request_info["env"] = env
             request_info["headers"] = headers
+
+            if has_data_collection_enabled(client_options):
+                if query_string:
+                    filtered_qs = _apply_data_collection_filtering_to_query_string(
+                        query_string=query_string,
+                        behaviour=client_options["data_collection"]["url_query_params"],
+                    )
+                    if filtered_qs:
+                        request_info["query_string"] = filtered_qs
+            else:
+                # This was not originally gated so if data collection is not enabled, leave as-is.
+                request_info["query_string"] = query_string
 
         return event
 
@@ -409,14 +423,25 @@ def _get_request_attributes(
         except ValueError:
             pass
 
+    client_options = sentry_sdk.get_client().options
+
+    query_string = environ.get("QUERY_STRING")
+    if query_string:
+        if has_data_collection_enabled(client_options):
+            filtered_qs = _apply_data_collection_filtering_to_query_string(
+                query_string=query_string,
+                behaviour=client_options["data_collection"]["url_query_params"],
+            )
+
+            if filtered_qs:
+                attributes["http.query"] = filtered_qs
+        elif should_send_default_pii():
+            attributes["http.query"] = query_string
+
     if should_send_default_pii():
         client_ip = get_client_ip(environ)
         if client_ip:
             attributes["client.address"] = client_ip
-
-        query_string = environ.get("QUERY_STRING")
-        if query_string:
-            attributes["http.query"] = query_string
 
         path = environ.get("PATH_INFO", "")
         if path:
