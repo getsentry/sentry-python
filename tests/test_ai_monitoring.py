@@ -245,6 +245,24 @@ class TestTruncateMessagesBySize:
         assert result == []
         assert truncation_index == 0
 
+    def test_normalizes_pydantic_messages(self):
+        class PydanticMessage:
+            def model_dump(self):
+                return {"type": "function_call", "name": "get_weather"}
+
+        messages = [
+            {"role": "user", "content": "What's the weather?"},
+            PydanticMessage(),
+        ]
+
+        result, truncation_index = truncate_messages_by_size(messages)
+
+        assert result == [
+            {"role": "user", "content": "What's the weather?"},
+            {"type": "function_call", "name": "get_weather"},
+        ]
+        assert truncation_index == 0
+
     def test_find_truncation_index(
         self,
     ):
