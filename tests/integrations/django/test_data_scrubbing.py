@@ -261,7 +261,11 @@ QUERY_STRING = "toy=tennisball&color=red&auth=secret"
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}}},
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
             NO_QUERY_STRING,
             id="data_collection_off",
         ),
@@ -319,7 +323,11 @@ def test_query_string_data_collection(
             id="data_collection_allowlist",
         ),
         pytest.param(
-            {"_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}}},
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
             NO_QUERY_STRING,
             id="data_collection_off",
         ),
