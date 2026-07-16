@@ -5,6 +5,7 @@ from inspect import iscoroutinefunction
 import sentry_sdk
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query_string
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import (
     RequestExtractor,
@@ -24,6 +25,8 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    has_data_collection_enabled,
+    parse_url,
     transaction_from_function,
 )
 
@@ -189,6 +192,7 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
 
 def _get_request_attributes(request: "Any") -> "Dict[str, Any]":
     attributes = {}  # type: Dict[str, Any]
+    client_options = sentry_sdk.get_client().options
 
     if request.method:
         attributes[SPANDATA.HTTP_REQUEST_METHOD] = request.method.upper()
@@ -197,7 +201,24 @@ def _get_request_attributes(request: "Any") -> "Dict[str, Any]":
     for header, value in headers.items():
         attributes[f"{SPANDATA.HTTP_REQUEST_HEADER}.{header.lower()}"] = value
 
-    if should_send_default_pii():
+    if has_data_collection_enabled(client_options):
+        attributes["url.path"] = request.path
+
+        filtered_query = None
+        if request.query:
+            filtered_query = _apply_data_collection_filtering_to_query_string(
+                query_string=request.query,
+                behaviour=client_options["data_collection"]["url_query_params"],
+            )
+            if filtered_query:
+                attributes[SPANDATA.URL_QUERY] = filtered_query
+
+        parsed_url = parse_url(request.full_url())
+        attributes[SPANDATA.URL_FULL] = (
+            f"{parsed_url.url}?{filtered_query}" if filtered_query else parsed_url.url
+        )
+
+    elif should_send_default_pii():
         attributes[SPANDATA.URL_FULL] = request.full_url()
         attributes["url.path"] = request.path
 
@@ -273,7 +294,18 @@ def _make_event_processor(
                 request.path,
             )
 
-            request_info["query_string"] = request.query
+            client_options = sentry_sdk.get_client().options
+            if has_data_collection_enabled(client_options):
+                if request.query:
+                    filtered_query = _apply_data_collection_filtering_to_query_string(
+                        query_string=request.query,
+                        behaviour=client_options["data_collection"]["url_query_params"],
+                    )
+                    if filtered_query:
+                        request_info["query_string"] = filtered_query
+            else:
+                request_info["query_string"] = request.query
+
             request_info["method"] = request.method
             request_info["env"] = {"REMOTE_ADDR": request.remote_ip}
             request_info["headers"] = _filter_headers(dict(request.headers))
