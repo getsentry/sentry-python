@@ -1244,7 +1244,7 @@ def test_transaction_or_segment_http_method_custom(
         ),
         pytest.param(
             {"_experiments": {"data_collection": {}}},
-            "toy=tennisball&color=red&auth=%5BFiltered%5D",
+            "toy=tennisball&color=red&auth=[Filtered]",
             id="data_collection_denylist_default",
         ),
         pytest.param(
@@ -1255,7 +1255,7 @@ def test_transaction_or_segment_http_method_custom(
                     }
                 }
             },
-            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            "toy=tennisball&color=[Filtered]&auth=[Filtered]",
             id="data_collection_allowlist",
         ),
         pytest.param(
@@ -1310,7 +1310,7 @@ def test_query_string_data_collection(
         ),
         pytest.param(
             {"_experiments": {"data_collection": {}}},
-            "toy=tennisball&color=red&auth=%5BFiltered%5D",
+            "toy=tennisball&color=red&auth=[Filtered]",
             id="data_collection_denylist_default",
         ),
         pytest.param(
@@ -1321,7 +1321,7 @@ def test_query_string_data_collection(
                     }
                 }
             },
-            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            "toy=tennisball&color=[Filtered]&auth=[Filtered]",
             id="data_collection_allowlist",
         ),
         pytest.param(
