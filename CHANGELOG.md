@@ -2,6 +2,8 @@
 
 ## 2.66.0
 
+New documentation for enabling streamed spans in the SDK can be found [here](https://docs.sentry.io/platforms/python/tracing/streamed-spans).
+
 ### New Features ✨
 
 - (tracing) Promote trace_lifecycle and ignore_spans to top-level options by @ericapisani in [#6821](https://github.com/getsentry/sentry-python/pull/6821)
