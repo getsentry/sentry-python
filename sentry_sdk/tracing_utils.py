@@ -984,6 +984,9 @@ def propagate_trace_headers(
     ``request`` is expected to expose ``url`` and a mutable ``headers`` mapping
     (e.g. an ``httpx``/``httpx2`` ``Request``).
     """
+    if not hasattr(request, "url") or not hasattr(request, "headers"):
+        return
+
     if not should_propagate_trace(client, str(request.url)):
         return
 
