@@ -90,24 +90,23 @@ def _sentry_pyreqwest_span(request: "Request") -> "Generator[Any, None, None]":
 
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
     if span_streaming:
-        span_ctx = nullcontext()
-        if sentry_sdk.traces.get_current_span() is not None:
-            span_ctx = sentry_sdk.traces.start_span(
-                name=f"{request.method} {parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE}",
-                attributes={
-                    "sentry.op": OP.HTTP_CLIENT,
-                    "sentry.origin": PyreqwestIntegration.origin,
-                    SPANDATA.HTTP_REQUEST_METHOD: request.method,
-                },
-            )
-        with span_ctx as span:
-            if span is not None:
-                if parsed_url is not None and should_send_default_pii():
-                    span.set_attribute(SPANDATA.URL_FULL, parsed_url.url)
-                    span.set_attribute(SPANDATA.URL_QUERY, parsed_url.query)
-                    span.set_attribute(SPANDATA.URL_FRAGMENT, parsed_url.fragment)
-
+        if sentry_sdk.traces.get_current_span() is None:
             propagate_trace_headers(client=sentry_sdk.get_client(), request=request)
+            yield None
+            return
+
+        with sentry_sdk.traces.start_span(
+            name=f"{request.method} {parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE}",
+            attributes={
+                "sentry.op": OP.HTTP_CLIENT,
+                "sentry.origin": PyreqwestIntegration.origin,
+                SPANDATA.HTTP_REQUEST_METHOD: request.method,
+            },
+        ) as span:
+            if parsed_url is not None and should_send_default_pii():
+                span.set_attribute(SPANDATA.URL_FULL, parsed_url.url)
+                span.set_attribute(SPANDATA.URL_QUERY, parsed_url.query)
+                span.set_attribute(SPANDATA.URL_FRAGMENT, parsed_url.fragment)
 
             yield span
 
