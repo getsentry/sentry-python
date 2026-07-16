@@ -3,10 +3,10 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 import sentry_sdk
+from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query_string
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import has_data_collection_enabled
-from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query_string
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional, Union
