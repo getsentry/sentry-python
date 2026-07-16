@@ -918,6 +918,216 @@ def test_get_request_attributes_url_with_headers_off(sentry_init):
     assert attributes["url.full"] == "http://example.com/foo?somevalue=123"
 
 
+NO_QUERY_STRING = object()
+QUERY_STRING = "token=abc&theme=dark&lang=en&session=xyz"
+
+
+def _http_scope(query_string=QUERY_STRING):
+    return {
+        "type": "http",
+        "method": "GET",
+        "scheme": "http",
+        "server": ("example.com", 80),
+        "path": "/foo",
+        "query_string": query_string.encode("latin-1"),
+        "headers": [(b"host", b"example.com")],
+    }
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query_string",
+    [
+        pytest.param(
+            {"send_default_pii": True},
+            QUERY_STRING,
+            id="send_default_pii_true",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            QUERY_STRING,
+            id="send_default_pii_false",
+        ),
+        pytest.param(
+            {},
+            QUERY_STRING,
+            id="defaults",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "token=[Filtered]&theme=dark&lang=en&session=[Filtered]",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "denylist", "terms": ["theme"]}
+                    }
+                }
+            },
+            "token=[Filtered]&theme=[Filtered]&lang=en&session=[Filtered]",
+            id="data_collection_denylist_custom_terms",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["theme"]}
+                    }
+                }
+            },
+            "token=[Filtered]&theme=dark&lang=[Filtered]&session=[Filtered]",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["token"]}
+                    }
+                }
+            },
+            "token=[Filtered]&theme=[Filtered]&lang=[Filtered]&session=[Filtered]",
+            id="data_collection_allowlist_sensitive_term",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            NO_QUERY_STRING,
+            id="data_collection_off",
+        ),
+        # data_collection wins over send_default_pii: filtering still applies.
+        pytest.param(
+            {
+                "send_default_pii": True,
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                },
+            },
+            NO_QUERY_STRING,
+            id="data_collection_wins_over_send_default_pii",
+        ),
+    ],
+)
+def test_get_request_data_query_string_data_collection(
+    sentry_init, init_kwargs, expected_query_string
+):
+    sentry_init(**init_kwargs)
+
+    request_data = _get_request_data(_http_scope(), _RootPathInPath.EXCLUDED)
+
+    if expected_query_string is NO_QUERY_STRING:
+        assert "query_string" not in request_data
+    else:
+        assert request_data["query_string"] == expected_query_string
+
+
+def test_get_request_data_query_string_empty_legacy_is_none(sentry_init):
+    # Legacy path: the query string is always set even when empty (``None``).
+    sentry_init(send_default_pii=True)
+
+    request_data = _get_request_data(
+        _http_scope(query_string=""), _RootPathInPath.EXCLUDED
+    )
+
+    assert request_data["query_string"] is None
+
+
+def test_get_request_data_empty_query_string_dropped_with_data_collection(sentry_init):
+    sentry_init(_experiments={"data_collection": {}})
+
+    request_data = _get_request_data(
+        _http_scope(query_string=""), _RootPathInPath.EXCLUDED
+    )
+
+    assert "query_string" not in request_data
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query, expected_url_full",
+    [
+        pytest.param(
+            {"send_default_pii": True},
+            QUERY_STRING,
+            "http://example.com/foo?" + QUERY_STRING,
+            id="send_default_pii_true",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            NO_QUERY_STRING,
+            None,
+            id="send_default_pii_false",
+        ),
+        pytest.param(
+            {},
+            NO_QUERY_STRING,
+            None,
+            id="defaults",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "token=[Filtered]&theme=dark&lang=en&session=[Filtered]",
+            "http://example.com/foo?token=[Filtered]&theme=dark&lang=en&session=[Filtered]",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["theme"]}
+                    }
+                }
+            },
+            "token=[Filtered]&theme=dark&lang=[Filtered]&session=[Filtered]",
+            "http://example.com/foo?token=[Filtered]&theme=dark&lang=[Filtered]&session=[Filtered]",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            NO_QUERY_STRING,
+            "http://example.com/foo",
+            id="data_collection_off",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": True,
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                },
+            },
+            NO_QUERY_STRING,
+            "http://example.com/foo",
+            id="data_collection_wins_over_send_default_pii",
+        ),
+    ],
+)
+def test_get_request_attributes_query_data_collection(
+    sentry_init, init_kwargs, expected_query, expected_url_full
+):
+    sentry_init(**init_kwargs)
+
+    attributes = _get_request_attributes(_http_scope(), _RootPathInPath.EXCLUDED)
+
+    if expected_query is NO_QUERY_STRING:
+        assert "http.query" not in attributes
+    else:
+        assert attributes["http.query"] == expected_query
+
+    if expected_url_full is None:
+        assert "url.full" not in attributes
+        assert "url.path" not in attributes
+    else:
+        assert attributes["url.full"] == expected_url_full
+        assert attributes["url.path"] == "/foo"
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "request_url,transaction_style,expected_transaction_name,expected_transaction_source",

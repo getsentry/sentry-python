@@ -46,6 +46,9 @@ COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
 # as opposed to an empty ``{}`` dict.
 NO_COOKIES = object()
 
+QUERY_STRING = "toy=tennisball&color=red&auth=secret"
+NO_QUERY_STRING = object()
+
 BODY_FORM = """--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="username"\r\n\r\nJane\r\n--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="password"\r\n\r\nhello123\r\n--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="photo"; filename="photo.jpg"\r\nContent-Type: image/jpg\r\nContent-Transfer-Encoding: base64\r\n\r\n{{image_data}}\r\n--fd721ef49ea403a6--\r\n""".replace(
     "{{image_data}}", str(base64.b64encode(open(PICTURE, "rb").read()))
 )
@@ -669,6 +672,133 @@ async def test_cookie_data_collection(
     else:
         assert event["request"]["cookies"] == expected_cookies
         assert transaction_event["request"]["cookies"] == expected_cookies
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query_string",
+    [
+        pytest.param(
+            {"send_default_pii": True},
+            QUERY_STRING,
+            id="legacy_send_default_pii_true",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "toy=tennisball&color=red&auth=[Filtered]",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "toy=tennisball&color=[Filtered]&auth=[Filtered]",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            NO_QUERY_STRING,
+            id="data_collection_off",
+        ),
+    ],
+)
+def test_query_string_data_collection(
+    sentry_init, capture_events, init_kwargs, expected_query_string
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarletteIntegration()],
+        **init_kwargs,
+    )
+
+    starlette_app = starlette_app_factory()
+    events = capture_events()
+
+    client = TestClient(starlette_app)
+    client.get("/message?" + QUERY_STRING)
+
+    (event, transaction_event) = events
+
+    if expected_query_string is NO_QUERY_STRING:
+        assert "query_string" not in event["request"]
+        assert "query_string" not in transaction_event["request"]
+    else:
+        assert event["request"]["query_string"] == expected_query_string
+        assert transaction_event["request"]["query_string"] == expected_query_string
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query, expected_url_full",
+    [
+        pytest.param(
+            {"send_default_pii": True},
+            QUERY_STRING,
+            "http://testserver/message?" + QUERY_STRING,
+            id="legacy_send_default_pii_true",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "toy=tennisball&color=red&auth=[Filtered]",
+            "http://testserver/message?toy=tennisball&color=red&auth=[Filtered]",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            NO_QUERY_STRING,
+            "http://testserver/message",
+            id="data_collection_off",
+        ),
+    ],
+)
+def test_span_http_query_data_collection(
+    sentry_init, capture_items, init_kwargs, expected_query, expected_url_full
+):
+    sentry_init(
+        auto_enabling_integrations=False,
+        integrations=[StarletteIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream",
+            **init_kwargs.pop("_experiments", {}),
+        },
+        **init_kwargs,
+    )
+
+    starlette_app = starlette_app_factory()
+    items = capture_items("span")
+
+    client = TestClient(starlette_app)
+    client.get("/message?" + QUERY_STRING)
+
+    sentry_sdk.flush()
+
+    segments = [
+        item.payload
+        for item in items
+        if item.payload.get("is_segment")
+        and item.payload["attributes"].get("sentry.op") == "http.server"
+    ]
+    (segment,) = segments
+    attributes = segment["attributes"]
+
+    if expected_query is NO_QUERY_STRING:
+        assert SPANDATA.HTTP_QUERY not in attributes
+    else:
+        assert attributes[SPANDATA.HTTP_QUERY] == expected_query
+
+    assert attributes["url.full"] == expected_url_full
+    assert attributes["url.path"] == "/message"
 
 
 @pytest.mark.parametrize(
