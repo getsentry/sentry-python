@@ -108,6 +108,8 @@ def _sentry_pyreqwest_span(request: "Request") -> "Generator[Any, None, None]":
                 span.set_attribute(SPANDATA.URL_QUERY, parsed_url.query)
                 span.set_attribute(SPANDATA.URL_FRAGMENT, parsed_url.fragment)
 
+            propagate_trace_headers(client=sentry_sdk.get_client(), request=request)
+
             yield span
 
             if span is not None:
