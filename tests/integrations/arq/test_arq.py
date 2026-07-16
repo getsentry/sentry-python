@@ -248,19 +248,19 @@ async def test_job_retry(
         # The retry re-enqueue happens without an active span, so no producer
         # (queue.submit.arq) span is created for it; only the consumer segment
         # is emitted. The consumer segment is preceded by the redis spans for
-        # the re-enqueue, so it lands at index 3.
-        assert spans[3]["attributes"]["sentry.op"] == "queue.task.arq"
-        assert spans[3]["status"] == "ok"
-        assert spans[3]["name"] == "retry_job"
+        # the re-enqueue, so it lands at index 2.
+        assert spans[2]["attributes"]["sentry.op"] == "queue.task.arq"
+        assert spans[2]["status"] == "ok"
+        assert spans[2]["name"] == "retry_job"
 
         await worker.run_job(job.job_id, timestamp_ms())
 
         sentry_sdk.flush()
         spans = [item.payload for item in items]
 
-        assert spans[6]["attributes"]["sentry.op"] == "queue.task.arq"
-        assert spans[6]["status"] == "ok"
-        assert spans[6]["name"] == "retry_job"
+        assert spans[5]["attributes"]["sentry.op"] == "queue.task.arq"
+        assert spans[5]["status"] == "ok"
+        assert spans[5]["name"] == "retry_job"
     else:
         events = capture_events()
 
@@ -589,7 +589,7 @@ async def test_span_origin_consumer(
     pool, worker = init_fixture_method(span_streaming, [job])
 
     if span_streaming:
-        job = await pool.enqueue_job("retry_job")
+        job = await pool.enqueue_job("job")
 
         items = capture_items("span")
 
@@ -600,13 +600,13 @@ async def test_span_origin_consumer(
 
         # No producer (queue.submit.arq) span is created for the re-enqueue
         # triggered by the retry, since it happens without an active span, so
-        # the consumer segment lands at index 3.
-        assert spans[3]["attributes"]["sentry.op"] == "queue.task.arq"
-        assert spans[3]["attributes"]["sentry.origin"] == "auto.queue.arq"
-        assert spans[2]["attributes"]["sentry.origin"] == "auto.db.redis"
+        # the consumer segment lands at index 2.
+        assert spans[2]["attributes"]["sentry.op"] == "queue.task.arq"
+        assert spans[2]["attributes"]["sentry.origin"] == "auto.queue.arq"
         assert spans[1]["attributes"]["sentry.origin"] == "auto.db.redis"
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.db.redis"
     else:
-        job = await pool.enqueue_job("retry_job")
+        job = await pool.enqueue_job("job")
 
         events = capture_events()
 
