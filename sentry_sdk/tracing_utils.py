@@ -985,12 +985,9 @@ def propagate_trace_headers(
     (e.g. an ``httpx``/``httpx2`` ``Request``).
     """
     if not hasattr(request, "url") or not hasattr(request, "headers"):
-<<<<<<< HEAD
         logger.warning(
             "Unable to propagate trace headers in request - missing url or headers attributes"
         )
-=======
->>>>>>> 4afedf112f0ab2e8879a4bb09642329e48ee2f9c
         return
 
     if not should_propagate_trace(client, str(request.url)):
