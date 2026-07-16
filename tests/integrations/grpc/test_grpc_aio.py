@@ -100,7 +100,7 @@ async def test_noop_for_unimplemented_method(
 
         sentry_sdk.flush()
         spans = [item.payload for item in items]
-        assert len(spans) == 1  # Only client span present.
+        assert len(spans) == 0  # No client span created without an active span.
     else:
         events = capture_events()
 

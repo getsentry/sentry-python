@@ -67,6 +67,8 @@ def _sentry_request_created(
     is_span_streaming_enabled = has_span_streaming_enabled(client.options)
     span: "Union[Span, StreamedSpan]"
     if is_span_streaming_enabled:
+        if sentry_sdk.traces.get_current_span() is None:
+            return
         span = sentry_sdk.traces.start_span(
             name=description,
             attributes={

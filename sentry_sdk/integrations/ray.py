@@ -156,6 +156,23 @@ def _patch_ray_remote() -> None:
                 )
                 if span_streaming:
                     function_name = qualname_from_function(user_f)
+
+                    if sentry_sdk.traces.get_current_span() is None:
+                        tracing = {
+                            k: v
+                            for k, v in sentry_sdk.get_current_scope().iter_trace_propagation_headers()
+                        }
+                        try:
+                            result = old_remote_method(
+                                *args, **kwargs, _sentry_tracing=tracing
+                            )
+                        except Exception:
+                            exc_info = sys.exc_info()
+                            _capture_exception(exc_info)
+                            reraise(*exc_info)
+
+                        return result
+
                     with sentry_sdk.traces.start_span(
                         name="unknown Ray task"
                         if function_name is None

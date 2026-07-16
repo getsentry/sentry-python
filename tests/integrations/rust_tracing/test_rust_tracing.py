@@ -309,10 +309,10 @@ def test_on_new_span_without_transaction(sentry_init, span_streaming):
     if span_streaming:
         assert sentry_sdk.traces.get_current_span() is None
 
+        # In streaming mode we do not create an orphan root segment when there
+        # is no active span
         rust_tracing.new_span(RustTracingLevel.Info, 3)
-        current_span = sentry_sdk.traces.get_current_span()
-        assert current_span is not None
-        assert current_span._segment is current_span
+        assert sentry_sdk.traces.get_current_span() is None
     else:
         assert sentry_sdk.get_current_span() is None
 

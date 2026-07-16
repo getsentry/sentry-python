@@ -419,6 +419,9 @@ def _wrap_task_call(task: "Any", f: "F") -> "F":
         span_streaming = has_span_streaming_enabled(client.options)
 
         try:
+            if span_streaming and get_current_span() is None:
+                return f(*args, **kwargs)
+
             span: "Union[Span, StreamedSpan]"
             if span_streaming:
                 span = sentry_sdk.traces.start_span(
@@ -462,7 +465,8 @@ def _wrap_task_call(task: "Any", f: "F") -> "F":
 
                 with capture_internal_exceptions():
                     set_on_span(
-                        SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT, task.request.retries
+                        SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT,
+                        task.request.retries,
                     )
 
                 with capture_internal_exceptions():

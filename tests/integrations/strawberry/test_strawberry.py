@@ -331,14 +331,8 @@ def test_capture_transaction_on_error(
 
         assert len(error_events) == 1
 
-        if async_execution:
-            # When FastAPI is run, there's an extra span from the httpx client
-            # so we need to account for that
-            assert len(spans) == 6
-            parse_span, validate_span, resolve_span, query_span, segment, _ = spans
-        else:
-            assert len(spans) == 5
-            parse_span, validate_span, resolve_span, query_span, segment = spans
+        assert len(spans) == 5
+        parse_span, validate_span, resolve_span, query_span, segment = spans
 
         assert segment["is_segment"] is True
         assert segment["name"] == "ErrorQuery"
@@ -473,12 +467,8 @@ def test_capture_transaction_on_success(
         sentry_sdk.flush()
         spans = [i.payload for i in items]
 
-        if async_execution:
-            assert len(spans) == 6
-            parse_span, validate_span, resolve_span, query_span, segment, _ = spans
-        else:
-            assert len(spans) == 5
-            parse_span, validate_span, resolve_span, query_span, segment = spans
+        assert len(spans) == 5
+        parse_span, validate_span, resolve_span, query_span, segment = spans
 
         assert segment["is_segment"] is True
         assert segment["name"] == "GreetingQuery"
@@ -613,12 +603,8 @@ def test_transaction_no_operation_name(
         sentry_sdk.flush()
         spans = [i.payload for i in items]
 
-        if async_execution:
-            assert len(spans) == 6
-            parse_span, validate_span, resolve_span, query_span, segment, _ = spans
-        else:
-            assert len(spans) == 5
-            parse_span, validate_span, resolve_span, query_span, segment = spans
+        assert len(spans) == 5
+        parse_span, validate_span, resolve_span, query_span, segment = spans
 
         assert segment["is_segment"] is True
         if async_execution:
@@ -758,12 +744,8 @@ def test_transaction_mutation(
         sentry_sdk.flush()
         spans = [i.payload for i in items]
 
-        if async_execution:
-            assert len(spans) == 6
-            parse_span, validate_span, resolve_span, mutation_span, segment, _ = spans
-        else:
-            assert len(spans) == 5
-            parse_span, validate_span, resolve_span, mutation_span, segment = spans
+        assert len(spans) == 5
+        parse_span, validate_span, resolve_span, mutation_span, segment = spans
 
         assert segment["is_segment"] is True
         assert segment["name"] == "Change"
@@ -924,12 +906,8 @@ def test_span_origin(
         sentry_sdk.flush()
         spans = [i.payload for i in items]
 
-        if async_execution:
-            assert len(spans) == 6
-            parse_span, validate_span, resolve_span, mutation_span, segment, _ = spans
-        else:
-            assert len(spans) == 5
-            parse_span, validate_span, resolve_span, mutation_span, segment = spans
+        assert len(spans) == 5
+        parse_span, validate_span, resolve_span, mutation_span, segment = spans
 
         assert segment["is_segment"] is True
         if is_flask:
@@ -995,12 +973,8 @@ def test_span_origin2(
         sentry_sdk.flush()
         spans = [i.payload for i in items]
 
-        if async_execution:
-            assert len(spans) == 6
-            parse_span, validate_span, resolve_span, query_span, segment, _ = spans
-        else:
-            assert len(spans) == 5
-            parse_span, validate_span, resolve_span, query_span, segment = spans
+        assert len(spans) == 5
+        parse_span, validate_span, resolve_span, query_span, segment = spans
 
         assert segment["is_segment"] is True
         if is_flask:
@@ -1066,14 +1040,8 @@ def test_span_origin3(
         sentry_sdk.flush()
         spans = [i.payload for i in items]
 
-        if async_execution:
-            assert len(spans) == 6
-            parse_span, validate_span, resolve_span, subscription_span, segment, _ = (
-                spans
-            )
-        else:
-            assert len(spans) == 5
-            parse_span, validate_span, resolve_span, subscription_span, segment = spans
+        assert len(spans) == 5
+        parse_span, validate_span, resolve_span, subscription_span, segment = spans
 
         assert segment["is_segment"] is True
         if is_flask:
