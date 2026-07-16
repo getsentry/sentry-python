@@ -263,7 +263,7 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
     ),
     pytest.param(
         {"_experiments": {"data_collection": {}}},
-        "toy=tennisball&color=red&auth={}".format(SENSITIVE_DATA_SUBSTITUTE),
+        "toy=tennisball&color=red&auth=[Filtered]",
         id="data_collection_denylist_default",
     ),
     pytest.param(
@@ -274,7 +274,7 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
                 }
             }
         },
-        "toy={0}&color=red&auth={0}".format(SENSITIVE_DATA_SUBSTITUTE),
+        "toy=[Filtered]&color=red&auth=[Filtered]",
         id="data_collection_denylist_custom_terms",
     ),
     pytest.param(
@@ -285,7 +285,7 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
                 }
             }
         },
-        "toy=tennisball&color={0}&auth={0}".format(SENSITIVE_DATA_SUBSTITUTE),
+        "toy=tennisball&color=[Filtered]&auth=[Filtered]",
         id="data_collection_allowlist",
     ),
     pytest.param(
@@ -296,7 +296,7 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
                 }
             }
         },
-        "toy={0}&color={0}&auth={0}".format(SENSITIVE_DATA_SUBSTITUTE),
+        "toy=[Filtered]&color=[Filtered]&auth=[Filtered]",
         id="data_collection_allowlist_sensitive_term",
     ),
     pytest.param(
