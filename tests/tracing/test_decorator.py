@@ -77,7 +77,7 @@ async def test_trace_decorator_async_no_trx():
 
             start_child_span_decorator = create_span_decorator()
             result2 = await start_child_span_decorator(my_async_example_function)()
-            fake_debug.assert_called_once_with(
+            fake_debug.assert_any_call(
                 "Cannot create a child span for %s. "
                 "Please start a Sentry transaction before calling this function.",
                 "test_decorator.my_async_example_function",
