@@ -19,7 +19,6 @@ from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     logger,
-    nullcontext,
     parse_url,
 )
 
