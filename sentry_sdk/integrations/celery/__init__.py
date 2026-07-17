@@ -361,7 +361,7 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
                         parent_span=None,  # make this a segment
                         attributes={
                             "sentry.origin": CeleryIntegration.origin,
-                            "sentry.span.source": TransactionSource.TASK.value,
+                            "sentry.segment.name.source": TransactionSource.TASK.value,
                             "sentry.op": OP.QUEUE_TASK_CELERY,
                         },
                     )

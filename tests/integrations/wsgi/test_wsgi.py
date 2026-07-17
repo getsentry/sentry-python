@@ -248,7 +248,7 @@ def test_transaction_no_error(
         assert span["is_segment"] is True
         assert span["name"] == "generic WSGI request"
         assert span["attributes"]["sentry.op"] == "http.server"
-        assert span["attributes"]["sentry.span.source"] == "route"
+        assert span["attributes"]["sentry.segment.name.source"] == "route"
         assert span["attributes"]["http.request.method"] == "GET"
         assert span["attributes"]["http.response.status_code"] == 200
         assert span["status"] == "ok"

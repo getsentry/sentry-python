@@ -9,7 +9,7 @@ import sentry_sdk
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.huey import HueyIntegration
-from sentry_sdk.traces import SegmentSource, SpanStatus
+from sentry_sdk.traces import SegmentNameSource, SpanStatus
 from sentry_sdk.utils import parse_version
 
 HUEY_VERSION = parse_version(HUEY_VERSION)
@@ -446,7 +446,8 @@ def test_huey_enqueue_group(
         assert task1_execute_span["attributes"]["sentry.op"] == "queue.task.huey"
         assert task1_execute_span["attributes"]["sentry.origin"] == "auto.queue.huey"
         assert (
-            task1_execute_span["attributes"]["sentry.span.source"] == SegmentSource.TASK
+            task1_execute_span["attributes"]["sentry.segment.name.source"]
+            == SegmentNameSource.TASK
         )
         assert task1_execute_span["attributes"]["messaging.message.id"] is not None
         assert task1_execute_span["attributes"]["messaging.message.retry.count"] == 0
@@ -458,7 +459,8 @@ def test_huey_enqueue_group(
         assert task2_execute_span["attributes"]["sentry.op"] == "queue.task.huey"
         assert task2_execute_span["attributes"]["sentry.origin"] == "auto.queue.huey"
         assert (
-            task2_execute_span["attributes"]["sentry.span.source"] == SegmentSource.TASK
+            task2_execute_span["attributes"]["sentry.segment.name.source"]
+            == SegmentNameSource.TASK
         )
 
     else:
@@ -569,7 +571,8 @@ def test_huey_enqueue_chord(
         assert task1_execute_span["attributes"]["sentry.op"] == "queue.task.huey"
         assert task1_execute_span["attributes"]["sentry.origin"] == "auto.queue.huey"
         assert (
-            task1_execute_span["attributes"]["sentry.span.source"] == SegmentSource.TASK
+            task1_execute_span["attributes"]["sentry.segment.name.source"]
+            == SegmentNameSource.TASK
         )
         # chord callback (task2) is enqueued during task1's execution
         assert task2_enqueue_span["name"] == "task2"
@@ -586,7 +589,8 @@ def test_huey_enqueue_chord(
         assert task2_execute_span["attributes"]["sentry.op"] == "queue.task.huey"
         assert task2_execute_span["attributes"]["sentry.origin"] == "auto.queue.huey"
         assert (
-            task2_execute_span["attributes"]["sentry.span.source"] == SegmentSource.TASK
+            task2_execute_span["attributes"]["sentry.segment.name.source"]
+            == SegmentNameSource.TASK
         )
     else:
         events = capture_events()

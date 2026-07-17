@@ -659,7 +659,7 @@ def test_span_streaming_transaction_style(
     assert segment["is_segment"] is True
 
     assert segment["name"].endswith(expected_name)
-    assert segment["attributes"]["sentry.span.source"] == expected_source
+    assert segment["attributes"]["sentry.segment.name.source"] == expected_source
 
 
 def test_span_streaming_with_error(sentry_init, capture_items):

@@ -139,7 +139,7 @@ def test_transaction_style(
         spans = [item.payload for item in items if item.type == "span"]
         spans = [span for span in spans if span["name"] == expected_transaction]
         assert len(spans) == 1
-        assert spans[0]["attributes"]["sentry.span.source"] == expected_source
+        assert spans[0]["attributes"]["sentry.segment.name.source"] == expected_source
     else:
         events = capture_events()
 

@@ -171,7 +171,7 @@ def test_task_transaction(
         assert segment["name"] == "dummy_actor"
         assert segment["is_segment"] is True
         assert segment["attributes"]["sentry.op"] == "queue.task.dramatiq"
-        assert segment["attributes"]["sentry.span.source"] == "task"
+        assert segment["attributes"]["sentry.segment.name.source"] == "task"
         assert (
             segment["attributes"][SPANDATA.MESSAGING_DESTINATION_NAME]
             == dummy_actor.queue_name
