@@ -148,8 +148,12 @@ def _get_request_data(
         )
 
     client = asgi_scope.get("client")
-    if client and should_send_default_pii():
-        request_data["env"] = {"REMOTE_ADDR": _get_ip(asgi_scope)}
+    if client:
+        if has_data_collection_enabled(client_options):
+            if client_options["data_collection"]["user_info"]:
+                request_data["env"] = {"REMOTE_ADDR": _get_ip(asgi_scope)}
+        elif should_send_default_pii():
+            request_data["env"] = {"REMOTE_ADDR": _get_ip(asgi_scope)}
 
     return request_data
 
@@ -226,9 +230,14 @@ def _get_request_attributes(
                 else url_without_query_string
             )
 
-    client = asgi_scope.get("client")
-    if client and should_send_default_pii():
-        ip = _get_ip(asgi_scope)
-        attributes["client.address"] = ip
+    asgi_scope_client = asgi_scope.get("client")
+    if asgi_scope_client:
+        if has_data_collection_enabled(client_options):
+            if client_options["data_collection"]["user_info"]:
+                ip = _get_ip(asgi_scope)
+                attributes["client.address"] = ip
+        elif should_send_default_pii():
+            ip = _get_ip(asgi_scope)
+            attributes["client.address"] = ip
 
     return attributes
