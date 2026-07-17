@@ -205,7 +205,7 @@ async def test_capture_transaction(
         assert span["is_segment"] is True
         assert span["name"] == "/some_url"
 
-        assert span["attributes"]["sentry.span.source"] == "url"
+        assert span["attributes"]["sentry.segment.name.source"] == "url"
         assert span["attributes"]["sentry.op"] == "http.server"
 
         assert span["attributes"]["network.protocol.name"] == "http"
@@ -561,7 +561,7 @@ async def test_websocket(
         assert span.type == "span"
         span = span.payload
         assert span["name"] == request_url
-        assert span["attributes"]["sentry.span.source"] == "url"
+        assert span["attributes"]["sentry.segment.name.source"] == "url"
 
     else:
         msg_event, error_event, transaction_event = events
@@ -678,7 +678,7 @@ async def test_transaction_style(
         span = items[0].payload
 
         assert span["name"] == expected_transaction
-        assert span["attributes"]["sentry.span.source"] == expected_source
+        assert span["attributes"]["sentry.segment.name.source"] == expected_source
 
     else:
         (transaction_event,) = events
@@ -891,7 +891,10 @@ async def test_transaction_name(
         span = items[0].payload
 
         assert span["name"] == expected_transaction_name
-        assert span["attributes"]["sentry.span.source"] == expected_transaction_source
+        assert (
+            span["attributes"]["sentry.segment.name.source"]
+            == expected_transaction_source
+        )
 
     else:
         (transaction_envelope,) = envelopes
@@ -944,7 +947,9 @@ async def test_transaction_name_in_traces_sampler(
         if span_streaming:
             assert sampling_context["span_context"]["name"] == expected_transaction_name
             assert (
-                sampling_context["span_context"]["attributes"]["sentry.span.source"]
+                sampling_context["span_context"]["attributes"][
+                    "sentry.segment.name.source"
+                ]
                 == expected_transaction_source
             )
         else:
@@ -1006,7 +1011,7 @@ async def test_custom_transaction_name(
 
         assert span["is_segment"] is True
         assert span["name"] == "foobar"
-        assert span["attributes"]["sentry.span.source"] == "custom"
+        assert span["attributes"]["sentry.segment.name.source"] == "custom"
 
     else:
         (transaction_event,) = events

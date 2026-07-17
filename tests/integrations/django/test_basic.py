@@ -1277,7 +1277,7 @@ def test_transaction_style(
         spans = [item.payload for item in items if item.type == "span"]
 
         assert spans[2]["is_segment"] is True
-        assert spans[2]["attributes"]["sentry.span.source"] == expected_source
+        assert spans[2]["attributes"]["sentry.segment.name.source"] == expected_source
 
         (event,) = (item.payload for item in items if item.type == "event")
     else:

@@ -1177,7 +1177,7 @@ async def test_tracing_span_streaming(
     assert server_span["attributes"]["sentry.op"] == "http.server"
     assert server_span["attributes"]["sentry.origin"] == "auto.http.aiohttp"
     assert server_span["attributes"]["http.response.status_code"] == 200
-    assert server_span["attributes"]["sentry.span.source"] == "component"
+    assert server_span["attributes"]["sentry.segment.name.source"] == "component"
     assert server_span["status"] == "ok"
     # No query string on the request, so the attribute should be omitted.
     assert "url.query" not in server_span["attributes"]
@@ -1379,7 +1379,7 @@ async def test_transaction_style_span_streaming(
 
     assert server_segment["name"] == expected_name
     assert server_segment["is_segment"]
-    assert server_segment["attributes"]["sentry.span.source"] == expected_source
+    assert server_segment["attributes"]["sentry.segment.name.source"] == expected_source
 
 
 @pytest.mark.asyncio
@@ -1608,6 +1608,9 @@ async def test_user_ip_address_on_all_spans(
     sentry_sdk.flush()
 
     child_span, server_span = [item.payload for item in items]
+
+    assert server_span["attributes"]["sentry.segment.name.source"] == "component"
+    assert "sentry.segment.name.source" not in child_span["attributes"]
 
     if send_default_pii:
         assert server_span["attributes"]["user.ip_address"] == "127.0.0.1"

@@ -16,7 +16,7 @@ from sentry_sdk.integrations.celery.beat import (
 from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import Scope, should_send_default_pii
-from sentry_sdk.traces import StreamedSpan, get_current_span
+from sentry_sdk.traces import SegmentNameSource, StreamedSpan, get_current_span
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, Span, TransactionSource
 from sentry_sdk.tracing_utils import Baggage, has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -361,7 +361,7 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
                         parent_span=None,  # make this a segment
                         attributes={
                             "sentry.origin": CeleryIntegration.origin,
-                            "sentry.span.source": TransactionSource.TASK.value,
+                            "sentry.segment.name.source": SegmentNameSource.TASK.value,
                             "sentry.op": OP.QUEUE_TASK_CELERY,
                         },
                     )

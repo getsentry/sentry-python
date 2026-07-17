@@ -128,7 +128,7 @@ def test_transaction_or_segment_style(
         assert len(spans) == 1
         (segment,) = spans
         assert segment["name"] == expected_transaction
-        assert segment["attributes"]["sentry.span.source"] == expected_source
+        assert segment["attributes"]["sentry.segment.name.source"] == expected_source
     else:
         (_, event) = events
         assert event["transaction"] == expected_transaction

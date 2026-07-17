@@ -725,7 +725,8 @@ def test_transaction_name(
         segment = segments[0]
         assert segment["name"] == expected_transaction_name
         assert (
-            segment["attributes"]["sentry.span.source"] == expected_transaction_source
+            segment["attributes"]["sentry.segment.name.source"]
+            == expected_transaction_source
         )
     else:
         (_, transaction_envelope) = envelopes
@@ -780,7 +781,7 @@ def test_transaction_name_with_prefix(
         assert len(segments) == 1
         segment = segments[0]
         assert segment["name"] == "/api/users/{user_id}"
-        assert segment["attributes"]["sentry.span.source"] == "route"
+        assert segment["attributes"]["sentry.segment.name.source"] == "route"
     else:
         (transaction_envelope,) = envelopes
         transaction_event = transaction_envelope.get_transaction_event()

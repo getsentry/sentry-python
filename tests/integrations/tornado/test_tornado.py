@@ -184,7 +184,7 @@ def test_transactions(
             else "tests.integrations.tornado.test_tornado.CrashingHandler.post"
         )
         assert server_segment["name"] == expected_handler
-        assert server_segment["attributes"]["sentry.span.source"] == "component"
+        assert server_segment["attributes"]["sentry.segment.name.source"] == "component"
         assert server_segment["attributes"]["http.request.method"] == "POST"
         assert server_segment["attributes"]["http.request.body.data"] == "heyoo"
         assert server_segment["attributes"]["http.response.status_code"] == code
