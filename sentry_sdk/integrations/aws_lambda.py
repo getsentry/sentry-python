@@ -427,9 +427,7 @@ def _make_request_event_processor(
                 if query_string:
                     filtered_qs = _apply_key_value_collection_filtering(
                         items=query_string,
-                        behaviour=client_options["data_collection"][
-                            "url_query_params"
-                        ],
+                        behaviour=client_options["data_collection"]["url_query_params"],
                     )
                     if filtered_qs:
                         request["query_string"] = filtered_qs
