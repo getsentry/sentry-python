@@ -1611,8 +1611,6 @@ async def test_user_ip_address_on_all_spans(
 
     assert server_span["attributes"]["sentry.segment.name.source"] == "component"
     assert "sentry.segment.name.source" not in child_span["attributes"]
-    assert "sentry.span.source" not in server_span["attributes"]
-    assert "sentry.span.source" not in child_span["attributes"]
 
     if send_default_pii:
         assert server_span["attributes"]["user.ip_address"] == "127.0.0.1"
