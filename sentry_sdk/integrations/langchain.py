@@ -3,12 +3,14 @@ import json
 import sys
 import warnings
 from collections import OrderedDict
+from dataclasses import dataclass
 from functools import wraps
 from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.ai.utils import (
     GEN_AI_ALLOWED_MESSAGE_ROLES,
+    _set_span_data_attribute,
     get_start_span_function,
     normalize_message_roles,
     set_data_normalized,
@@ -728,47 +730,116 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         self._handle_error(run_id, error)
 
 
+@dataclass
+class _TokenUsage:
+    """
+    Normalized token usage, matching UsageMetadata from Langchain
+    """
+
+    input_tokens: "Optional[int|float]" = None
+    input_tokens_audio: "Optional[int|float]" = None
+    input_tokens_cache_read: "Optional[int|float]" = None
+    input_tokens_cache_creation: "Optional[int|float]" = None
+    output_tokens: "Optional[int|float]" = None
+    output_tokens_audio: "Optional[int|float]" = None
+    output_tokens_reasoning: "Optional[int|float]" = None
+    total_tokens: "Optional[int|float]" = None
+
+
 def _extract_tokens(
     token_usage: "Any",
-) -> "tuple[Optional[int], Optional[int], Optional[int]]":
+) -> _TokenUsage:
+    usage = _TokenUsage()
     if not token_usage:
-        return None, None, None
+        return usage
 
-    input_tokens = _get_value(token_usage, "prompt_tokens") or _get_value(
+    usage.input_tokens = _get_value(token_usage, "prompt_tokens") or _get_value(
         token_usage, "input_tokens"
     )
-    output_tokens = _get_value(token_usage, "completion_tokens") or _get_value(
+    usage.output_tokens = _get_value(token_usage, "completion_tokens") or _get_value(
         token_usage, "output_tokens"
     )
-    total_tokens = _get_value(token_usage, "total_tokens")
+    usage.total_tokens = _get_value(token_usage, "total_tokens")
 
-    return input_tokens, output_tokens, total_tokens
+    input_token_details = _get_value(token_usage, "input_token_details")
+    if input_token_details is not None:
+        usage.input_tokens_audio = _get_value(input_token_details, "audio")
+        usage.input_tokens_cache_read = _get_value(input_token_details, "cache_read")
+        usage.input_tokens_cache_creation = _get_value(
+            input_token_details, "cache_creation"
+        )
+
+    output_token_details = _get_value(token_usage, "output_token_details")
+    if output_token_details is not None:
+        usage.output_tokens_audio = _get_value(output_token_details, "audio")
+        usage.output_tokens_reasoning = _get_value(output_token_details, "reasoning")
+    return usage
 
 
 def _extract_tokens_from_generations(
     generations: "Any",
-) -> "tuple[Optional[int], Optional[int], Optional[int]]":
+) -> _TokenUsage:
     """Extract token usage from response.generations structure."""
-    if not generations:
-        return None, None, None
+    total = _TokenUsage()
 
-    total_input = 0
-    total_output = 0
-    total_total = 0
+    if not generations:
+        return total
+
+    def _is_number(value: "Any") -> bool:
+        return isinstance(value, (int, float))
+
+    def _add(left: "Any", right: "Any") -> "Union[int, float]":
+        left = left if _is_number(left) else 0
+        right = right if _is_number(right) else 0
+        return left + right
+
+    def _none_or_zero(value: "Optional[int|float]") -> bool:
+        return value is None or value <= 0
 
     for gen_list in generations:
         for gen in gen_list:
             token_usage = _get_token_usage(gen)
-            input_tokens, output_tokens, total_tokens = _extract_tokens(token_usage)
-            total_input += input_tokens if input_tokens is not None else 0
-            total_output += output_tokens if output_tokens is not None else 0
-            total_total += total_tokens if total_tokens is not None else 0
+            tokens = _extract_tokens(token_usage)
+            total.input_tokens = _add(total.input_tokens, tokens.input_tokens)
+            total.output_tokens = _add(total.output_tokens, tokens.output_tokens)
+            total.total_tokens = _add(total.total_tokens, tokens.total_tokens)
 
-    return (
-        total_input if total_input > 0 else None,
-        total_output if total_output > 0 else None,
-        total_total if total_total > 0 else None,
-    )
+            # We don't want to default zero here as it oculd be a valid value that is given by the
+            # provider and can be a common value for caches
+            if _is_number(tokens.input_tokens_cache_read):
+                total.input_tokens_cache_read = _add(
+                    total.input_tokens_cache_read, tokens.input_tokens_cache_read
+                )
+
+            if _is_number(tokens.input_tokens_cache_creation):
+                total.input_tokens_cache_creation = _add(
+                    total.input_tokens_cache_creation,
+                    tokens.input_tokens_cache_creation,
+                )
+
+            if _is_number(tokens.input_tokens_audio):
+                total.input_tokens_audio = _add(
+                    total.input_tokens_audio, tokens.input_tokens_audio
+                )
+
+            if _is_number(tokens.output_tokens_audio):
+                total.output_tokens_audio = _add(
+                    total.output_tokens_audio, tokens.output_tokens_audio
+                )
+
+            if _is_number(tokens.output_tokens_reasoning):
+                total.output_tokens_reasoning = _add(
+                    total.output_tokens_reasoning, tokens.output_tokens_reasoning
+                )
+
+        if _none_or_zero(total.input_tokens):
+            total.input_tokens = None
+        if _none_or_zero(total.output_tokens):
+            total.output_tokens = None
+        if _none_or_zero(total.total_tokens):
+            total.total_tokens = None
+        # we keep cached/reasoning token counts as is
+    return total
 
 
 def _get_token_usage(obj: "Any") -> "Optional[Dict[str, Any]]":
@@ -800,26 +871,50 @@ def _get_token_usage(obj: "Any") -> "Optional[Dict[str, Any]]":
 
 
 def _record_token_usage(span: "Union[Span, StreamedSpan]", response: "Any") -> None:
-    token_usage = _get_token_usage(response)
-    if token_usage:
-        input_tokens, output_tokens, total_tokens = _extract_tokens(token_usage)
-    else:
-        input_tokens, output_tokens, total_tokens = _extract_tokens_from_generations(
-            response.generations
+    # Prefer usage_metadata: UsageMetadata from "generations" as it's Langchain's provider-agnostic
+    # shape. Legacy usages rely on response.llm_output["token_usage"]
+    tokens = _extract_tokens_from_generations(response.generations)
+    if (
+        tokens.input_tokens is None
+        and tokens.output_tokens is None
+        and tokens.total_tokens is None
+    ):
+        token_usage = _get_token_usage(response)
+        if token_usage:
+            tokens = _extract_tokens(token_usage)
+
+    if tokens.input_tokens is not None:
+        _set_span_data_attribute(
+            span, SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, tokens.input_tokens
+        )
+    if tokens.output_tokens is not None:
+        _set_span_data_attribute(
+            span, SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, tokens.output_tokens
+        )
+    if tokens.total_tokens is not None:
+        _set_span_data_attribute(
+            span, SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, tokens.total_tokens
         )
 
-    set_on_span = (
-        span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
-    )
-
-    if input_tokens is not None:
-        set_on_span(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
-
-    if output_tokens is not None:
-        set_on_span(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
-
-    if total_tokens is not None:
-        set_on_span(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)
+    # TODO: add input/output audio tokens when Sentry supports them
+    if tokens.input_tokens_cache_read is not None:
+        _set_span_data_attribute(
+            span,
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED,
+            tokens.input_tokens_cache_read,
+        )
+    if tokens.input_tokens_cache_creation is not None:
+        _set_span_data_attribute(
+            span,
+            SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE,
+            tokens.input_tokens_cache_creation,
+        )
+    if tokens.output_tokens_reasoning is not None:
+        _set_span_data_attribute(
+            span,
+            SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING,
+            tokens.output_tokens_reasoning,
+        )
 
 
 def _get_request_data(
