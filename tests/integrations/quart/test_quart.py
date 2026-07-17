@@ -1131,3 +1131,155 @@ async def test_span_streaming_sensitive_header_passthrough_with_pii_and_no_data_
         segment["attributes"]["http.request.header.authorization"]
         == "Bearer secret-token"
     )
+
+
+NO_QUERY_STRING = object()
+_QUERY_PARAM_DATA_COLLECTION_CASES = [
+    pytest.param(
+        {"send_default_pii": True},
+        "toy=tennisball&color=red&auth=secret",
+        id="send_default_pii_true",
+    ),
+    pytest.param(
+        {"send_default_pii": False},
+        NO_QUERY_STRING,
+        id="send_default_pii_false",
+    ),
+    pytest.param(
+        {},
+        NO_QUERY_STRING,
+        id="defaults",
+    ),
+    pytest.param(
+        {"_experiments": {"data_collection": {}}},
+        "toy=tennisball&color=red&auth=[Filtered]",
+        id="data_collection_denylist_default",
+    ),
+    pytest.param(
+        {
+            "_experiments": {
+                "data_collection": {
+                    "url_query_params": {"mode": "denylist", "terms": ["toy"]}
+                }
+            }
+        },
+        "toy=[Filtered]&color=red&auth=[Filtered]",
+        id="data_collection_denylist_custom_terms",
+    ),
+    pytest.param(
+        {
+            "_experiments": {
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                }
+            }
+        },
+        "toy=tennisball&color=[Filtered]&auth=[Filtered]",
+        id="data_collection_allowlist",
+    ),
+    pytest.param(
+        {
+            "_experiments": {
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
+                }
+            }
+        },
+        "toy=[Filtered]&color=[Filtered]&auth=[Filtered]",
+        id="data_collection_allowlist_sensitive_term",
+    ),
+    pytest.param(
+        {"_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}}},
+        NO_QUERY_STRING,
+        id="data_collection_off",
+    ),
+    pytest.param(
+        {
+            "send_default_pii": True,
+            "_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}},
+        },
+        NO_QUERY_STRING,
+        id="data_collection_wins_over_send_default_pii",
+    ),
+]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query", _QUERY_PARAM_DATA_COLLECTION_CASES
+)
+async def test_span_streaming_url_query_data_collection(
+    sentry_init, capture_items, init_kwargs, expected_query
+):
+    init_kwargs = dict(init_kwargs)
+    experiments = {"trace_lifecycle": "stream"}
+    experiments.update(init_kwargs.pop("_experiments", {}))
+    sentry_init(
+        integrations=[quart_sentry.QuartIntegration()],
+        traces_sample_rate=1.0,
+        _experiments=experiments,
+        **init_kwargs,
+    )
+    items = capture_items("span")
+
+    app = quart_app_factory()
+    client = app.test_client()
+    response = await client.get("/message?toy=tennisball&color=red&auth=secret")
+    assert response.status_code == 200
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
+
+    segment = spans[0]
+
+    data_collection_enabled = "data_collection" in experiments
+    url_attrs_expected = data_collection_enabled or init_kwargs.get(
+        "send_default_pii", False
+    )
+
+    if expected_query is NO_QUERY_STRING:
+        assert "url.query" not in segment["attributes"]
+        if url_attrs_expected:
+            # When the filtered query string is empty, url.full carries the
+            # base URL only (no query).
+            assert segment["attributes"]["url.full"] == "http://localhost/message"
+        else:
+            assert "url.full" not in segment["attributes"]
+    else:
+        assert segment["attributes"]["url.query"] == expected_query
+        assert segment["attributes"]["url.full"] == (
+            f"http://localhost/message?{expected_query}"
+        )
+
+
+@pytest.mark.asyncio
+async def test_span_streaming_url_query_multi_and_blank_values(
+    sentry_init, capture_items
+):
+    sentry_init(
+        integrations=[quart_sentry.QuartIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream", "data_collection": {}},
+    )
+    items = capture_items("span")
+
+    app = quart_app_factory()
+    client = app.test_client()
+    response = await client.get("/message?foo=1&foo=2&empty=")
+    assert response.status_code == 200
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
+
+    segment = spans[0]
+    query = segment["attributes"]["url.query"]
+    # Repeated keys are preserved and blank values are kept.
+    assert "foo=1" in query
+    assert "foo=2" in query
+    assert "empty=" in query
+    # url.full carries the same filtered query string.
+    assert segment["attributes"]["url.full"] == f"http://localhost/message?{query}"
