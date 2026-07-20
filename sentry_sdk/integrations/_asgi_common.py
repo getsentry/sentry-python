@@ -115,6 +115,7 @@ def _get_request_data(
     """
     request_data: "Dict[str, Any]" = {}
     ty = asgi_scope["type"]
+    client_options = sentry_sdk.get_client().options
     if ty in ("http", "websocket"):
         request_data["method"] = asgi_scope.get("method")
 
@@ -125,7 +126,6 @@ def _get_request_data(
             use_annotated_value=False,
         )
 
-        client_options = sentry_sdk.get_client().options
         if has_data_collection_enabled(client_options):
             qs = _get_query(asgi_scope)
             if qs:

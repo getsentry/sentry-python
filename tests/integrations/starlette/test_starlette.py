@@ -801,6 +801,105 @@ def test_span_http_query_data_collection(
     assert attributes["url.path"] == "/message"
 
 
+# TestClient provides ("testclient", 50000) as the scope's client.
+TESTCLIENT_IP = "testclient"
+NO_USER_INFO = object()
+
+USER_INFO_CASES = [
+    pytest.param(
+        {"send_default_pii": True},
+        TESTCLIENT_IP,
+        id="legacy_send_default_pii_true",
+    ),
+    pytest.param(
+        {"send_default_pii": False},
+        NO_USER_INFO,
+        id="legacy_send_default_pii_false",
+    ),
+    pytest.param(
+        {"_experiments": {"data_collection": {}}},
+        TESTCLIENT_IP,
+        id="data_collection_default_user_info_true",
+    ),
+    pytest.param(
+        {"_experiments": {"data_collection": {"user_info": True}}},
+        TESTCLIENT_IP,
+        id="data_collection_user_info_true",
+    ),
+    pytest.param(
+        {"_experiments": {"data_collection": {"user_info": False}}},
+        NO_USER_INFO,
+        id="data_collection_user_info_false",
+    ),
+    pytest.param(
+        {
+            "send_default_pii": True,
+            "_experiments": {"data_collection": {"user_info": False}},
+        },
+        NO_USER_INFO,
+        id="data_collection_wins_over_send_default_pii",
+    ),
+]
+
+
+@pytest.mark.parametrize("init_kwargs, expected_ip", USER_INFO_CASES)
+def test_user_info_data_collection(
+    sentry_init, capture_events, init_kwargs, expected_ip
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarletteIntegration()],
+        **init_kwargs,
+    )
+
+    starlette_app = starlette_app_factory()
+    events = capture_events()
+
+    client = TestClient(starlette_app)
+    client.get("/message")
+
+    (event, transaction_event) = events
+
+    if expected_ip is NO_USER_INFO:
+        assert "env" not in event["request"]
+        assert "env" not in transaction_event["request"]
+    else:
+        assert event["request"]["env"] == {"REMOTE_ADDR": expected_ip}
+        assert transaction_event["request"]["env"] == {"REMOTE_ADDR": expected_ip}
+
+
+@pytest.mark.parametrize("init_kwargs, expected_ip", USER_INFO_CASES)
+def test_user_info_data_collection_with_streamed_spans(
+    sentry_init, capture_items, init_kwargs, expected_ip
+):
+    sentry_init(
+        auto_enabling_integrations=False,
+        integrations=[StarletteIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        _experiments={
+            **init_kwargs.pop("_experiments", {}),
+        },
+        **init_kwargs,
+    )
+
+    starlette_app = starlette_app_factory()
+    items = capture_items("span")
+
+    client = TestClient(starlette_app)
+    client.get("/message")
+
+    sentry_sdk.flush()
+
+    assert len(items) == 1
+    attributes = items[0].payload["attributes"]
+
+    if expected_ip is NO_USER_INFO:
+        assert SPANDATA.CLIENT_ADDRESS not in attributes
+    else:
+        assert attributes[SPANDATA.CLIENT_ADDRESS] == expected_ip
+
+
 @pytest.mark.parametrize(
     "url,transaction_style,expected_transaction,expected_source",
     [
