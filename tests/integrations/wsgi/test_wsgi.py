@@ -488,37 +488,23 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
 
     client.get("/dogs/are/great/")
 
-    if span_streaming:
-        traces_sampler.assert_any_call(
-            DictionaryContaining(
-                {
-                    "span_context": DictionaryContaining(
-                        {
-                            "name": "generic WSGI request",
-                        },
-                    ),
-                    "wsgi_environ": DictionaryContaining(
-                        {
-                            "PATH_INFO": "/dogs/are/great/",
-                            "REQUEST_METHOD": "GET",
-                        },
-                    ),
-                }
-            )
+    traces_sampler.assert_any_call(
+        DictionaryContaining(
+            {
+                "transaction_context": DictionaryContaining(
+                    {
+                        "name": "generic WSGI request",
+                    },
+                ),
+                "wsgi_environ": DictionaryContaining(
+                    {
+                        "PATH_INFO": "/dogs/are/great/",
+                        "REQUEST_METHOD": "GET",
+                    },
+                ),
+            }
         )
-    else:
-        traces_sampler.assert_any_call(
-            DictionaryContaining(
-                {
-                    "wsgi_environ": DictionaryContaining(
-                        {
-                            "PATH_INFO": "/dogs/are/great/",
-                            "REQUEST_METHOD": "GET",
-                        },
-                    ),
-                }
-            )
-        )
+    )
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])

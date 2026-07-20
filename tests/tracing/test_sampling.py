@@ -446,7 +446,7 @@ def test_custom_sampling_context(sentry_init):
 
 def test_custom_sampling_context_update_to_context_value_persists(sentry_init):
     def traces_sampler(sampling_context):
-        if sampling_context["span_context"]["attributes"]["first"] is True:
+        if sampling_context["transaction_context"]["data"]["first"] is True:
             assert sampling_context["custom_value"] == 1
         else:
             assert sampling_context["custom_value"] == 2
