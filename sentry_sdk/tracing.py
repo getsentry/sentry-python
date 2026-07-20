@@ -386,6 +386,9 @@ class Span:
         )
 
     def __enter__(self) -> "Span":
+        if has_span_streaming_enabled(sentry_sdk.get_client().options):
+            return self
+
         scope = self.scope or sentry_sdk.get_current_scope()
         old_span = scope.span
         scope.span = self
@@ -395,6 +398,9 @@ class Span:
     def __exit__(
         self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
     ) -> None:
+        if has_span_streaming_enabled(sentry_sdk.get_client().options):
+            return None
+
         if value is not None and should_be_treated_as_error(ty, value):
             self.set_status(SPANSTATUS.INTERNAL_ERROR)
 
@@ -1270,14 +1276,6 @@ class NoOpSpan(Span):
     def __repr__(self) -> str:
         return "<%s>" % self.__class__.__name__
 
-    def __enter__(self) -> "Span":
-        return self
-
-    def __exit__(
-        self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
-    ) -> None:
-        return None
-
     @property
     def containing_transaction(self) -> "Optional[Transaction]":
         return None
@@ -1478,6 +1476,7 @@ from sentry_sdk.tracing_utils import (
     EnvironHeaders,
     _generate_sample_rand,
     extract_sentrytrace_data,
+    has_span_streaming_enabled,
     has_tracing_enabled,
     maybe_create_breadcrumbs_from_span,
 )
