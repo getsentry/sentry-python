@@ -85,7 +85,7 @@ def test_grpc_server_starts_transaction(
         spans = [item["payload"] for item in items if item["type"] == "span"]
         span = spans[0]
 
-        assert spans[1]["attributes"]["sentry.span.source"] == "custom"
+        assert spans[1]["attributes"]["sentry.segment.name.source"] == "custom"
         assert spans[1]["attributes"]["sentry.op"] == OP.GRPC_SERVER
         assert span["attributes"]["sentry.op"] == "test"
     else:
@@ -148,7 +148,7 @@ def test_grpc_server_other_interceptors(
         spans = [item["payload"] for item in items if item["type"] == "span"]
         span = spans[0]
 
-        assert spans[1]["attributes"]["sentry.span.source"] == "custom"
+        assert spans[1]["attributes"]["sentry.segment.name.source"] == "custom"
         assert spans[1]["attributes"]["sentry.op"] == OP.GRPC_SERVER
         assert span["attributes"]["sentry.op"] == "test"
     else:
@@ -223,7 +223,7 @@ def test_grpc_server_continues_transaction(
         spans = [item["payload"] for item in items if item["type"] == "span"]
         span = spans[0]
 
-        assert spans[1]["attributes"]["sentry.span.source"] == "custom"
+        assert spans[1]["attributes"]["sentry.segment.name.source"] == "custom"
         assert spans[1]["attributes"]["sentry.op"] == OP.GRPC_SERVER
         assert spans[1]["trace_id"] == segment_span.trace_id
         assert span["attributes"]["sentry.op"] == "test"

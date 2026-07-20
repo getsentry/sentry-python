@@ -886,7 +886,7 @@ class Baggage:
                 sentry_items["org_id"] = client.parsed_dsn.org_id
 
         if (
-            segment.get_attributes().get("sentry.span.source")
+            segment.get_attributes().get("sentry.segment.name.source")
             not in LOW_QUALITY_SEGMENT_SOURCES
         ) and segment.name:
             sentry_items["transaction"] = segment.name

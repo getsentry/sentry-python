@@ -368,7 +368,7 @@ async def test_job_transaction(
         ]
 
         division_span = next(span for span in task_spans if span["name"] == "division")
-        assert division_span["attributes"]["sentry.span.source"] == "task"
+        assert division_span["attributes"]["sentry.segment.name.source"] == "task"
         assert (
             division_span["attributes"][SPANDATA.MESSAGING_DESTINATION_NAME]
             == worker.queue_name

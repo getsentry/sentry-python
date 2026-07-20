@@ -7,7 +7,7 @@ from sentry_sdk.api import continue_trace, get_baggage, get_traceparent
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import SegmentSource, SpanStatus, StreamedSpan
+from sentry_sdk.traces import SegmentNameSource, SpanStatus, StreamedSpan
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
@@ -220,7 +220,7 @@ def patch_execute() -> None:
                     attributes={
                         "sentry.op": OP.QUEUE_TASK_HUEY,
                         "sentry.origin": HueyIntegration.origin,
-                        "sentry.span.source": SegmentSource.TASK,
+                        "sentry.segment.name.source": SegmentNameSource.TASK,
                         SPANDATA.MESSAGING_DESTINATION_NAME: self.name,
                         "messaging.message.id": task.id,
                         "messaging.message.system": "huey",

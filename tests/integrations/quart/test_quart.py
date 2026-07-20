@@ -751,7 +751,7 @@ async def test_span_streaming_transaction_style(
     segment = spans[0]
     assert segment["is_segment"] is True
     assert segment["name"] == expected_name
-    assert segment["attributes"]["sentry.span.source"] == expected_source
+    assert segment["attributes"]["sentry.segment.name.source"] == expected_source
 
 
 @pytest.mark.asyncio

@@ -5,7 +5,7 @@ import sys
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.traces import SegmentSource
+from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -104,7 +104,7 @@ def _patch_ray_remote() -> None:
                         attributes={
                             "sentry.op": OP.QUEUE_TASK_RAY,
                             "sentry.origin": RayIntegration.origin,
-                            "sentry.span.source": SegmentSource.TASK,
+                            "sentry.segment.name.source": SegmentNameSource.TASK,
                         },
                         parent_span=None,
                     ):
