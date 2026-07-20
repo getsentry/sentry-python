@@ -78,7 +78,7 @@ def test_basic_span_streaming(sentry_init, capture_items, sample_rate):
         span1, span2, parent_span = [item.payload for item in items]
 
         assert parent_span["name"] == "hi"
-        assert parent_span["attributes"]["sentry.span.source"] == "custom"
+        assert parent_span["attributes"]["sentry.segment.name.source"] == "custom"
 
         assert span1["status"] == "error"
         assert span1["name"] == "foo"
@@ -191,19 +191,20 @@ def test_continue_trace(sentry_init, capture_envelopes, parent_sampled, sample_r
 @pytest.mark.parametrize("parent_sampled", [True, False, None])
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])
 def test_continue_trace_span_streaming(
-    sentry_init, capture_envelopes, parent_sampled, sample_rate
+    sentry_init, capture_items, parent_sampled, sample_rate
 ):
     """
     Ensure data is actually passed along via headers, and that they are read
     correctly.
     """
     sentry_init(
-        traces_sample_rate=sample_rate, _experiments={"trace_lifecycle": "stream"}
+        traces_sample_rate=sample_rate,
+        _experiments={"trace_lifecycle": "stream"},
     )
-    envelopes = capture_envelopes()
+    items = capture_items()
 
     # make a parent segment (normally this would be in a different service)
-    with sentry_sdk.traces.start_span(name="hi"):
+    with sentry_sdk.traces.start_span(name="hi", parent_span=None):
         with sentry_sdk.traces.start_span(name="hey") as old_span:
             headers = dict(
                 sentry_sdk.get_current_scope().iter_trace_propagation_headers(old_span)
@@ -245,25 +246,20 @@ def test_continue_trace_span_streaming(
 
     if parent_sampled is False or (sample_rate == 0 and parent_sampled is None):
         # in this case the child transaction won't be captured
-        trace1, message = envelopes
-        message_payload = message.get_event()
-        trace1_payload = trace1.items[0].payload.json
+        trace1, message = [item.payload for item in items]
 
-        assert trace1_payload["transaction"] == "hi"
+        assert trace1["transaction"] == "hi"
     else:
-        trace1, message, trace2 = envelopes
-        trace1_payload = trace1.items[0].payload.json
-        message_payload = message.get_event()
-        trace2_payload = trace2.items[0].payload.json
+        trace1, message, trace2 = [item.payload for item in items]
 
-        assert trace1_payload["attributes"]["sentry.segment.name"] == "hi"
-        assert trace2_payload["attributes"]["sentry.segment.name"] == "ho"
+        assert trace1["attributes"]["sentry.segment.name"] == "hi"
+        assert trace2["attributes"]["sentry.segment.name"] == "ho"
 
         assert (
-            trace1_payload["trace_id"]
-            == trace2_payload["trace_id"]
+            trace1["trace_id"]
+            == trace2["trace_id"]
             == child_segment.trace_id
-            == message_payload["contexts"]["trace"]["trace_id"]
+            == message["contexts"]["trace"]["trace_id"]
         )
 
         assert trace2.headers["trace"] == baggage.dynamic_sampling_context()
@@ -275,7 +271,7 @@ def test_continue_trace_span_streaming(
             "sample_rate": str(sample_rate),
         }
 
-    assert message_payload["message"] == "hello"
+    assert message["message"] == "hello"
 
 
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])
