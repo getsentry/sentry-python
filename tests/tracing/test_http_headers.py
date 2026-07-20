@@ -51,7 +51,10 @@ def test_to_traceparent_span_streaming(sentry_init, traces_sample_rate):
         else:
             assert parts[0] == span.trace_id  # trace_id
             assert parts[1] == span.span_id  # parent_span_id
-            assert parts[2] == "1" if traces_sample_rate == 1.0 else "0"  # sampled
+            if traces_sample_rate == 1.0:
+                assert parts[2] == "1"
+            else:
+                assert parts[2] == "0"
 
 
 @pytest.mark.parametrize("sampling_decision", [True, False])
