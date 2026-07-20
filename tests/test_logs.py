@@ -163,6 +163,32 @@ def test_logs_before_send_log_experimental_option_still_works(
 
 
 @minimum_python_37
+@pytest.mark.tests_internal_exceptions
+def test_logs_before_send_log_raises_does_not_crash_application(
+    sentry_init, capture_items
+):
+    def _before_log(record, hint):
+        raise ValueError("before_send_log error")
+
+    sentry_init(
+        enable_logs=True,
+        before_send_log=_before_log,
+    )
+    items = capture_items("log")
+
+    sentry_sdk.logger.error("This is an error log...")
+
+    get_client().flush()
+    logs = [item.payload for item in items]
+
+    # The exception in before_send_log is swallowed and the original,
+    # unmodified log is sent.
+    assert len(logs) == 1
+    assert logs[0]["body"] == "This is an error log..."
+    assert logs[0]["attributes"]["sentry.severity_text"] == "error"
+
+
+@minimum_python_37
 def test_logs_attributes(sentry_init, capture_items):
     """
     Passing arbitrary attributes to log messages.

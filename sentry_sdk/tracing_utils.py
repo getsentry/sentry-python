@@ -1575,7 +1575,10 @@ def add_sentry_baggage_to_headers(
         stripped_existing_baggage + separator + sentry_baggage
     )
 
-def _get_fallback_sample_rate(client: "BaseClient", propagation_context: "PropagationContext") -> "Union[float, bool]":
+
+def _get_fallback_sample_rate(
+    client: "BaseClient", propagation_context: "PropagationContext"
+) -> "Union[float, bool]":
     if propagation_context.parent_sampled is not None:
         propagation_context_sample_rate = propagation_context._sample_rate()
 
@@ -1585,6 +1588,7 @@ def _get_fallback_sample_rate(client: "BaseClient", propagation_context: "Propag
             return propagation_context.parent_sampled
     else:
         return client.options["traces_sample_rate"]
+
 
 def _make_sampling_decision(
     name: str,
@@ -1644,10 +1648,17 @@ def _make_sampling_decision(
         try:
             sample_rate = client.options["traces_sampler"](sampling_context)
         except Exception:
-            logger.warning("[Tracing] traces_sampler raised; falling back to parent sample rate or traces_sample_rate", exc_info=True)
-            sample_rate = _get_fallback_sample_rate(client=client, propagation_context=propagation_context)
+            logger.warning(
+                "[Tracing] traces_sampler raised; falling back to parent sample rate or traces_sample_rate",
+                exc_info=True,
+            )
+            sample_rate = _get_fallback_sample_rate(
+                client=client, propagation_context=propagation_context
+            )
     else:
-        sample_rate = _get_fallback_sample_rate(client=client, propagation_context=propagation_context)
+        sample_rate = _get_fallback_sample_rate(
+            client=client, propagation_context=propagation_context
+        )
 
     # Validate whether the sample_rate we got is actually valid. Since
     # traces_sampler is user-provided, it could return anything.
@@ -1655,7 +1666,7 @@ def _make_sampling_decision(
         logger.warning(f"[Tracing] Discarding {name} because of invalid sample rate.")
         return False, None, None, "sample_rate"
 
-    sample_rate = float(sample_rate)  # type: ignore[arg-type]
+    sample_rate = float(sample_rate)
     if not sample_rate:
         if traces_sampler_defined:
             reason = "traces_sampler returned 0 or False"
