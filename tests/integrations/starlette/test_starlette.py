@@ -872,15 +872,16 @@ def test_user_info_data_collection(
 def test_user_info_data_collection_with_streamed_spans(
     sentry_init, capture_items, init_kwargs, expected_ip
 ):
+    kwargs = dict(init_kwargs)
     sentry_init(
         auto_enabling_integrations=False,
         integrations=[StarletteIntegration()],
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
         _experiments={
-            **init_kwargs.pop("_experiments", {}),
+            **kwargs.pop("_experiments", {}),
         },
-        **init_kwargs,
+        **kwargs,
     )
 
     starlette_app = starlette_app_factory()

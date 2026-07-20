@@ -168,6 +168,7 @@ def _get_request_attributes(
     attributes: "dict[str, Any]" = {}
 
     ty = asgi_scope["type"]
+    client_options = sentry_sdk.get_client().options
     if ty in ("http", "websocket"):
         if asgi_scope.get("method"):
             attributes["http.request.method"] = asgi_scope["method"].upper()
@@ -178,7 +179,6 @@ def _get_request_attributes(
         for header, value in filtered_headers.items():
             attributes[f"http.request.header.{header.lower()}"] = value
 
-        client_options = sentry_sdk.get_client().options
         if has_data_collection_enabled(client_options):
             filtered_query_string = None
             query = _get_query(asgi_scope)
