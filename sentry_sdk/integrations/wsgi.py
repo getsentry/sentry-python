@@ -9,17 +9,17 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     _filter_headers,
-    nullcontext,
 )
 from sentry_sdk.scope import Scope, should_send_default_pii, use_isolation_scope
 from sentry_sdk.sessions import track_session
-from sentry_sdk.traces import SegmentSource, StreamedSpan
+from sentry_sdk.traces import SegmentNameSource, StreamedSpan
 from sentry_sdk.tracing import Span, TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     ContextVar,
     capture_internal_exceptions,
     event_from_exception,
+    nullcontext,
     reraise,
 )
 
@@ -144,7 +144,7 @@ class SentryWsgiMiddleware:
                             span_ctx = sentry_sdk.traces.start_span(
                                 name=_DEFAULT_TRANSACTION_NAME,
                                 attributes={
-                                    "sentry.span.source": SegmentSource.ROUTE,
+                                    "sentry.segment.name.source": SegmentNameSource.ROUTE,
                                     "sentry.origin": self.span_origin,
                                     "sentry.op": OP.HTTP_SERVER,
                                 },

@@ -45,6 +45,7 @@ if TYPE_CHECKING:
     from sentry_sdk._types import (
         BreadcrumbProcessor,
         ContinuousProfilerMode,
+        DataCollectionUserOptions,
         Event,
         EventProcessor,
         Hint,
@@ -86,6 +87,7 @@ if TYPE_CHECKING:
                 Callable[[SpanJSON, Hint], Optional[SpanJSON]]
             ],
             "suppress_asgi_chained_exceptions": Optional[bool],
+            "data_collection": Optional[DataCollectionUserOptions],
         },
         total=False,
     )
@@ -1270,6 +1272,7 @@ class ClientConstructor:
         server_name: "Optional[str]" = None,
         shutdown_timeout: float = 2,
         integrations: "Sequence[sentry_sdk.integrations.Integration]" = [],  # noqa: B006
+        ignore_spans: "Optional[IgnoreSpansConfig]" = None,
         in_app_include: "List[str]" = [],  # noqa: B006
         in_app_exclude: "List[str]" = [],  # noqa: B006
         default_integrations: bool = True,
@@ -1291,6 +1294,7 @@ class ClientConstructor:
         ca_certs: "Optional[str]" = None,
         propagate_traces: bool = True,
         traces_sample_rate: "Optional[float]" = None,
+        trace_lifecycle: "Optional[Literal['static', 'stream']]" = None,
         traces_sampler: "Optional[TracesSampler]" = None,
         profiles_sample_rate: "Optional[float]" = None,
         profiles_sampler: "Optional[TracesSampler]" = None,
@@ -1755,7 +1759,31 @@ class ClientConstructor:
         :param stream_gen_ai_spans: When set, generative AI spans are sent in a new transport format to
             reduce downstream data loss.
 
-        :param _experiments:
+        :param trace_lifecycle: Controls how traces are sent. Set to `"stream"` to send spans as they
+            finish, or `"static"` to send a completed trace as a transaction event.
+
+        :param ignore_spans: A sequence of span-matching rules. Matching spans are ignored when
+            `trace_lifecycle="stream"` is enabled.
+
+        :param _experiments: Dictionary of experimental, opt-in features that are not yet stable.
+
+            ``data_collection`` (EXPERIMENTAL): structured configuration controlling what data integrations
+            collect automatically, superseding `send_default_pii`. Passing a dict under
+            `_experiments={"data_collection": {...}}` opts into the feature; omitted fields use their
+            defaults (most categories are collected, with the sensitive denylist scrubbing values).
+            When it is not set, the SDK derives behaviour from `send_default_pii` so that upgrading
+            changes nothing. Restrict collection per category (user identity, cookies, HTTP
+            headers/bodies, query params, generative AI inputs/outputs, stack frame variables, source
+            context). If `send_default_pii` is also set, `data_collection` takes precedence.
+
+            Example::
+
+                sentry_sdk.init(
+                    dsn="...",
+                    _experiments={"data_collection": {"user_info": False, "http_bodies": []}},
+                )
+
+            See https://docs.sentry.io/platforms/python/configuration/options/#data_collection for more details.
         """
         pass
 
@@ -1779,4 +1807,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.64.0"
+VERSION = "2.66.0"

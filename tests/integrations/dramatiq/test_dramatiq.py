@@ -7,7 +7,7 @@ from dramatiq.middleware import Middleware, SkipMessage
 
 import sentry_sdk
 from sentry_sdk import start_transaction
-from sentry_sdk.consts import SPANSTATUS
+from sentry_sdk.consts import SPANDATA, SPANSTATUS
 from sentry_sdk.integrations.dramatiq import DramatiqIntegration
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.tracing import Transaction, TransactionSource
@@ -171,7 +171,11 @@ def test_task_transaction(
         assert segment["name"] == "dummy_actor"
         assert segment["is_segment"] is True
         assert segment["attributes"]["sentry.op"] == "queue.task.dramatiq"
-        assert segment["attributes"]["sentry.span.source"] == "task"
+        assert segment["attributes"]["sentry.segment.name.source"] == "task"
+        assert (
+            segment["attributes"][SPANDATA.MESSAGING_DESTINATION_NAME]
+            == dummy_actor.queue_name
+        )
         assert segment["status"] == ("error" if task_fails else "ok")
     else:
         if task_fails:
@@ -184,6 +188,10 @@ def test_task_transaction(
         assert event["type"] == "transaction"
         assert event["transaction"] == "dummy_actor"
         assert event["transaction_info"] == {"source": TransactionSource.TASK}
+        assert (
+            event["contexts"]["trace"]["data"][SPANDATA.MESSAGING_DESTINATION_NAME]
+            == dummy_actor.queue_name
+        )
         assert event["contexts"]["trace"]["status"] == expected_span_status
 
 

@@ -466,7 +466,7 @@ def test_transactions(
         if segment is not None:
             assert segment["name"] == test_config.expected_transaction_name
             assert (
-                segment["attributes"]["sentry.span.source"]
+                segment["attributes"]["sentry.segment.name.source"]
                 == test_config.expected_source
             )
 

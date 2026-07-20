@@ -1,5 +1,73 @@
 # Changelog
 
+## 2.66.0
+
+### New Features ✨
+
+- (tracing) Promote trace_lifecycle and ignore_spans to top-level options by @ericapisani in [#6821](https://github.com/getsentry/sentry-python/pull/6821)
+
+### Bug Fixes 🐛
+
+#### Tracing
+
+- Skip child span creation in streaming path when no current span (HTTP clients) by @sentrivana in [#6811](https://github.com/getsentry/sentry-python/pull/6811)
+- Skip child span creation in streaming path when no current span (task queues) by @sentrivana in [#6814](https://github.com/getsentry/sentry-python/pull/6814)
+- Skip child span creation in streaming path when no current span (misc) by @sentrivana in [#6815](https://github.com/getsentry/sentry-python/pull/6815)
+- Skip child span creation in streaming path when no current span (databases) by @sentrivana in [#6808](https://github.com/getsentry/sentry-python/pull/6808)
+- Skip child span creation in streaming path when no current span (web frameworks) by @sentrivana in [#6810](https://github.com/getsentry/sentry-python/pull/6810)
+- Skip child span creation in streaming path when no current span (django) by @sentrivana in [#6809](https://github.com/getsentry/sentry-python/pull/6809)
+
+### Internal Changes 🔧
+
+- (logging) Fix flaky test_logging_captured_warnings by @ericapisani in [#6824](https://github.com/getsentry/sentry-python/pull/6824)
+- Remove flaky no cyclic garbage test by @alexander-alderman-webb in [#6817](https://github.com/getsentry/sentry-python/pull/6817)
+- Remove Claude permission settings by @cleptric in [#6806](https://github.com/getsentry/sentry-python/pull/6806)
+- Move `nullcontext` to `sentry_sdk.utils` by @sentrivana in [#6805](https://github.com/getsentry/sentry-python/pull/6805)
+
+## 2.65.0
+
+### New Features ✨
+
+#### Huey
+
+- Set `messaging.destination.name` on consumer spans by @alexander-alderman-webb in [#6779](https://github.com/getsentry/sentry-python/pull/6779)
+- Set `messaging.destination.name` on producer spans by @alexander-alderman-webb in [#6778](https://github.com/getsentry/sentry-python/pull/6778)
+
+#### Other
+
+- (arq) Set `messaging.destination.name` on consumer spans by @alexander-alderman-webb in [#6767](https://github.com/getsentry/sentry-python/pull/6767)
+- (dramatiq) Set `messaging.destination.name` on consumer spans by @alexander-alderman-webb in [#6776](https://github.com/getsentry/sentry-python/pull/6776)
+- (rq) Set `messaging.destination.name` on consumer spans by @alexander-alderman-webb in [#6774](https://github.com/getsentry/sentry-python/pull/6774)
+
+### Bug Fixes 🐛
+
+#### Tracing
+
+- Take first sentry-trace header in case multiple are supplied by @sl0thentr0py in [#6722](https://github.com/getsentry/sentry-python/pull/6722)
+
+#### Other
+
+- (django) Avoid `ValueError` in async middleware `process_*` hooks by @r0ro in [#6698](https://github.com/getsentry/sentry-python/pull/6698)
+- (scope) Drop None user attribute values in set_user by @ericapisani in [#6692](https://github.com/getsentry/sentry-python/pull/6692)
+- (starlette) Don't overwrite user set during request in AuthenticationMiddleware by @ericapisani in [#6760](https://github.com/getsentry/sentry-python/pull/6760)
+
+### Internal Changes 🔧
+
+- (mcp) Add package to the typing group by @alexander-alderman-webb in [#6727](https://github.com/getsentry/sentry-python/pull/6727)
+- (starlette) Add package to typing group by @alexander-alderman-webb in [#6728](https://github.com/getsentry/sentry-python/pull/6728)
+- Add required `cache_write_tokens` field by @alexander-alderman-webb in [#6804](https://github.com/getsentry/sentry-python/pull/6804)
+- Pin extra test dependencies for generated test suites by @alexander-alderman-webb in [#6696](https://github.com/getsentry/sentry-python/pull/6696)
+- Add `pydantic` to the typing group by @alexander-alderman-webb in [#6730](https://github.com/getsentry/sentry-python/pull/6730)
+- Add `python_multipart` to the typing group by @alexander-alderman-webb in [#6729](https://github.com/getsentry/sentry-python/pull/6729)
+- 🤖 Update test matrix with new releases (07/06) by @github-actions in [#6753](https://github.com/getsentry/sentry-python/pull/6753)
+- Remove dependabot by @alexander-alderman-webb in [#6720](https://github.com/getsentry/sentry-python/pull/6720)
+- Update Renovate config by @alexander-alderman-webb in [#6716](https://github.com/getsentry/sentry-python/pull/6716)
+- Stop inheriting secrets for `changelog-preview` by @alexander-alderman-webb in [#6723](https://github.com/getsentry/sentry-python/pull/6723)
+- Stop inheriting secrets in tests by @alexander-alderman-webb in [#6721](https://github.com/getsentry/sentry-python/pull/6721)
+- Configure Renovate by @renovate in [#6701](https://github.com/getsentry/sentry-python/pull/6701)
+- Move conversation ID tests to their own file by @sentrivana in [#6699](https://github.com/getsentry/sentry-python/pull/6699)
+- Replace `requirements-testing.txt` with a `uv` dependency group by @alexander-alderman-webb in [#6693](https://github.com/getsentry/sentry-python/pull/6693)
+
 ## 2.64.0
 
 The SDK now extracts all `gen_ai` spans out of a transaction and sends them as v2 envelope items by default. This prevents `gen_ai` spans from being dropped when the transaction payload exceeds size limits. Because they are no longer constrained by transaction size limits, AI message data is also no longer truncated. To keep the previous behavior, set `stream_gen_ai_spans=False`.

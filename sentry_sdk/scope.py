@@ -597,7 +597,7 @@ class Scope:
 
         span_streaming = has_span_streaming_enabled(client.options)
         # If we have an active span, return traceparent from there
-        if span_streaming and type(self.streamed_span) is StreamedSpan:
+        if span_streaming and self.streamed_span is not None:
             return self.streamed_span._to_traceparent()
         elif not span_streaming and self.span is not None:
             return self.span._to_traceparent()
@@ -617,7 +617,7 @@ class Scope:
 
         span_streaming = has_span_streaming_enabled(client.options)
         # If we have an active span, return baggage from there
-        if span_streaming and type(self.streamed_span) is StreamedSpan:
+        if span_streaming and self.streamed_span is not None:
             return self.streamed_span._to_baggage()
         elif not span_streaming and self.span is not None:
             return self.span._to_baggage()
@@ -632,7 +632,7 @@ class Scope:
         if (
             has_tracing_enabled(self.get_client().options)
             and self._span is not None
-            and not isinstance(self._span, (NoOpStreamedSpan, NoOpSpan))
+            and not isinstance(self._span, NoOpSpan)
         ):
             return self._span._get_trace_context()
 
@@ -703,7 +703,7 @@ class Scope:
         if (
             has_tracing_enabled(client.options)
             and span is not None
-            and not isinstance(span, (NoOpStreamedSpan, NoOpSpan))
+            and not isinstance(span, NoOpSpan)
         ):
             for header in span._iter_headers():
                 yield header
@@ -867,7 +867,7 @@ class Scope:
                 self._span._segment.name = name
                 if source:
                     self._span._segment.set_attribute(
-                        "sentry.span.source", getattr(source, "value", source)
+                        "sentry.segment.name.source", getattr(source, "value", source)
                     )
 
             elif self._span.containing_transaction:
@@ -926,9 +926,9 @@ class Scope:
         # is used for populating events and linking them to segments
         if type(span) is StreamedSpan and span._is_segment():
             self._transaction = span.name
-            if span._attributes.get("sentry.span.source"):
+            if span._attributes.get("sentry.segment.name.source"):
                 self._transaction_info["source"] = str(
-                    span._attributes["sentry.span.source"]
+                    span._attributes["sentry.segment.name.source"]
                 )
 
     @property
@@ -1295,13 +1295,18 @@ class Scope:
             parent_span = self.streamed_span
 
         # If no eligible parent_span was provided and there is no currently
-        # active span, this is a segment
+        # active span, this is a new segment
         if parent_span is None:
             propagation_context = self.get_active_propagation_context()
 
             if is_ignored_span(name, attributes):
                 return NoOpStreamedSpan(
                     scope=self,
+                    segment=None,
+                    trace_id=propagation_context.trace_id,
+                    parent_span_id=propagation_context.parent_span_id,
+                    parent_sampled=propagation_context.parent_sampled,
+                    baggage=propagation_context.baggage,
                     unsampled_reason="ignored",
                 )
 
@@ -1314,10 +1319,18 @@ class Scope:
             if sample_rate is not None:
                 self._update_sample_rate(sample_rate)
 
-            if sampled is False:
+            if sampled is False or sampled is None:
                 return NoOpStreamedSpan(
                     scope=self,
+                    segment=None,
+                    trace_id=propagation_context.trace_id,
+                    parent_span_id=propagation_context.parent_span_id,
+                    parent_sampled=propagation_context.parent_sampled,
+                    baggage=propagation_context.baggage,
+                    sampled=sampled,
                     unsampled_reason=outcome,
+                    sample_rand=sample_rand,
+                    sample_rate=sample_rate,
                 )
 
             return StreamedSpan(
@@ -1338,11 +1351,21 @@ class Scope:
         with new_scope():
             if is_ignored_span(name, attributes):
                 return NoOpStreamedSpan(
+                    segment=parent_span._segment,
+                    trace_id=parent_span.trace_id,
+                    parent_span_id=parent_span.span_id,
+                    parent_sampled=parent_span.sampled,
                     unsampled_reason="ignored",
                 )
 
             if isinstance(parent_span, NoOpStreamedSpan):
-                return NoOpStreamedSpan(unsampled_reason=parent_span._unsampled_reason)
+                return NoOpStreamedSpan(
+                    segment=parent_span._segment,
+                    trace_id=parent_span.trace_id,
+                    parent_span_id=parent_span.span_id,
+                    parent_sampled=parent_span.sampled,
+                    unsampled_reason=parent_span._unsampled_reason,
+                )
 
             return StreamedSpan(
                 name=name,
@@ -1361,7 +1384,7 @@ class Scope:
         propagation_context = self.get_active_propagation_context()
         baggage = propagation_context.baggage
 
-        if baggage is not None:
+        if baggage is not None and baggage.sentry_items.get("sample_rate"):
             baggage.sentry_items["sample_rate"] = str(sample_rate)
 
     def continue_trace(

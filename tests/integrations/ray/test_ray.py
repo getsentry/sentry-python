@@ -11,7 +11,7 @@ import sentry_sdk
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations.ray import RayIntegration
 from sentry_sdk.integrations.stdlib import StdlibIntegration
-from sentry_sdk.traces import SegmentSource
+from sentry_sdk.traces import SegmentNameSource
 from tests.conftest import TestTransport
 
 
@@ -240,8 +240,8 @@ def test_tracing_in_ray_tasks(task_options, task, span_streaming):
             == f"tests.integrations.ray.test_ray.{task.__name__}"
         )
         assert (
-            worker_spans[1]["attributes"]["sentry.span.source"]["value"]
-            == SegmentSource.TASK
+            worker_spans[1]["attributes"]["sentry.segment.name.source"]["value"]
+            == SegmentNameSource.TASK
         )
 
         span = client_spans[0]

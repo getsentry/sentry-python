@@ -100,7 +100,7 @@ async def test_noop_for_unimplemented_method(
 
         sentry_sdk.flush()
         spans = [item.payload for item in items]
-        assert len(spans) == 1  # Only client span present.
+        assert len(spans) == 0  # No client span created without an active span.
     else:
         events = capture_events()
 
@@ -140,7 +140,7 @@ async def test_grpc_server_starts_transaction(
         spans = [item.payload for item in items]
         span = spans[0]
 
-        assert spans[1]["attributes"]["sentry.span.source"] == "custom"
+        assert spans[1]["attributes"]["sentry.segment.name.source"] == "custom"
         assert spans[1]["attributes"]["sentry.op"] == OP.GRPC_SERVER
         assert span["attributes"]["sentry.op"] == "test"
     else:
@@ -200,7 +200,7 @@ async def test_grpc_server_continues_transaction(
         spans = [item.payload for item in items]
         span = spans[0]
 
-        assert spans[1]["attributes"]["sentry.span.source"] == "custom"
+        assert spans[1]["attributes"]["sentry.segment.name.source"] == "custom"
         assert spans[1]["attributes"]["sentry.op"] == OP.GRPC_SERVER
         assert spans[1]["trace_id"] == segment_span.trace_id
         assert span["attributes"]["sentry.op"] == "test"

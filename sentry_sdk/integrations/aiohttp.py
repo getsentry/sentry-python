@@ -23,7 +23,7 @@ from sentry_sdk.traces import (
 )
 from sentry_sdk.traces import (
     NoOpStreamedSpan,
-    SegmentSource,
+    SegmentNameSource,
     SpanStatus,
     StreamedSpan,
 )
@@ -185,7 +185,7 @@ class AioHttpIntegration(Integration):
                             attributes={
                                 "sentry.op": OP.HTTP_SERVER,
                                 "sentry.origin": AioHttpIntegration.origin,
-                                "sentry.span.source": SegmentSource.ROUTE.value,
+                                "sentry.segment.name.source": SegmentNameSource.ROUTE.value,
                                 "http.request.method": request.method,
                                 **url_attributes,
                                 **client_address_attributes,
@@ -302,7 +302,7 @@ class AioHttpIntegration(Integration):
                 ):
                     current_span._segment.name = name
                     current_span._segment.set_attribute(
-                        "sentry.span.source",
+                        "sentry.segment.name.source",
                         SEGMENT_SOURCE_FOR_STYLE[integration.transaction_style].value,
                     )
                 else:
@@ -351,23 +351,28 @@ def create_trace_config() -> "TraceConfig":
             parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
         )
 
-        span: "Union[Span, StreamedSpan]"
+        span: "Union[Span, StreamedSpan, None]"
         if has_span_streaming_enabled(client.options):
-            attributes: "Attributes" = {
-                "sentry.op": OP.HTTP_CLIENT,
-                "sentry.origin": AioHttpIntegration.origin,
-                "http.request.method": method,
-            }
-            if parsed_url is not None and should_send_default_pii():
-                attributes["url.full"] = parsed_url.url
-                attributes["url.path"] = params.url.path
+            if sentry_sdk.traces.get_current_span() is None:
+                span = None
+            else:
+                attributes: "Attributes" = {
+                    "sentry.op": OP.HTTP_CLIENT,
+                    "sentry.origin": AioHttpIntegration.origin,
+                    "http.request.method": method,
+                }
+                if parsed_url is not None and should_send_default_pii():
+                    attributes["url.full"] = parsed_url.url
+                    attributes["url.path"] = params.url.path
 
-                if parsed_url.query:
-                    attributes["url.query"] = parsed_url.query
-                if parsed_url.fragment:
-                    attributes["url.fragment"] = parsed_url.fragment
+                    if parsed_url.query:
+                        attributes["url.query"] = parsed_url.query
+                    if parsed_url.fragment:
+                        attributes["url.fragment"] = parsed_url.fragment
 
-            span = sentry_sdk.traces.start_span(name=span_name, attributes=attributes)
+                span = sentry_sdk.traces.start_span(
+                    name=span_name, attributes=attributes
+                )
         else:
             legacy_span = sentry_sdk.start_span(
                 op=OP.HTTP_CLIENT,

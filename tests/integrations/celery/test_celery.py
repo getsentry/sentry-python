@@ -274,7 +274,7 @@ def test_transaction_events(
 
         assert execution_span["name"] == "dummy_task"
         assert execution_span["is_segment"] is True
-        assert execution_span["attributes"]["sentry.span.source"] == "task"
+        assert execution_span["attributes"]["sentry.segment.name.source"] == "task"
         assert execution_span["trace_id"] == span.trace_id
         if task_fails:
             assert execution_span["status"] == "error"

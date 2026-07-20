@@ -43,6 +43,8 @@ def patch_redis_pipeline(
 
         span: "Union[Span, StreamedSpan]"
         if span_streaming:
+            if sentry_sdk.traces.get_current_span() is None:
+                return old_execute(self, *args, **kwargs)
             span = sentry_sdk.traces.start_span(
                 name="redis.pipeline.execute",
                 attributes={
@@ -101,6 +103,9 @@ def patch_redis_client(
             return old_execute_command(self, name, *args, **kwargs)
 
         span_streaming = has_span_streaming_enabled(client.options)
+
+        if span_streaming and sentry_sdk.traces.get_current_span() is None:
+            return old_execute_command(self, name, *args, **kwargs)
 
         cache_properties = _compile_cache_span_properties(
             name,

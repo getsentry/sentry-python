@@ -187,7 +187,7 @@ def test_transaction_name_and_source(
 
         spans = [span for span in spans if expected_tx_name in span["name"]]
         assert len(spans) == 1
-        assert spans[0]["attributes"]["sentry.span.source"] == "component"
+        assert spans[0]["attributes"]["sentry.segment.name.source"] == "component"
     else:
         events = capture_events()
 
