@@ -1200,16 +1200,22 @@ class Transaction(Span):
         # we would have bailed already if neither `traces_sampler` nor
         # `traces_sample_rate` were defined, so one of these should work; prefer
         # the hook if so
-        sample_rate = (
-            client.options["traces_sampler"](sampling_context)
-            if callable(client.options.get("traces_sampler"))
-            # default inheritance behavior
-            else (
+        if callable(client.options.get("traces_sampler")):
+            try:
+                sample_rate = client.options["traces_sampler"](sampling_context)
+            except Exception:
+                logger.warning("[Tracing] traces_sampler raised; falling back to parent sample rate or traces_sample_rate", exc_info=True)
+                sample_rate = (
+                    sampling_context["parent_sampled"]
+                    if sampling_context["parent_sampled"] is not None
+                    else client.options["traces_sample_rate"]
+                )
+        else:
+            sample_rate = (
                 sampling_context["parent_sampled"]
                 if sampling_context["parent_sampled"] is not None
                 else client.options["traces_sample_rate"]
             )
-        )
 
         # Since this is coming from the user (or from a function provided by the
         # user), who knows what we might get. (The only valid values are

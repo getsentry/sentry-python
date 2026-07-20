@@ -42,6 +42,7 @@ if TYPE_CHECKING:
     from typing import Any, Dict, Generator, Iterator, Optional, Tuple, Union
 
     from sentry_sdk._types import Attributes
+    from sentry_sdk.client import BaseClient
 
 
 SENTRY_TRACE_REGEX = re.compile(
@@ -1574,6 +1575,16 @@ def add_sentry_baggage_to_headers(
         stripped_existing_baggage + separator + sentry_baggage
     )
 
+def _get_fallback_sample_rate(client: "BaseClient", propagation_context: "PropagationContext") -> "Union[float, bool]":
+    if propagation_context.parent_sampled is not None:
+        propagation_context_sample_rate = propagation_context._sample_rate()
+
+        if propagation_context_sample_rate is not None:
+            return propagation_context_sample_rate
+        else:
+            return propagation_context.parent_sampled
+    else:
+        return client.options["traces_sample_rate"]
 
 def _make_sampling_decision(
     name: str,
@@ -1630,15 +1641,13 @@ def _make_sampling_decision(
         if propagation_context.custom_sampling_context:
             sampling_context.update(propagation_context.custom_sampling_context)
 
-        sample_rate = client.options["traces_sampler"](sampling_context)
+        try:
+            sample_rate = client.options["traces_sampler"](sampling_context)
+        except Exception:
+            logger.warning("[Tracing] traces_sampler raised; falling back to parent sample rate or traces_sample_rate", exc_info=True)
+            sample_rate = _get_fallback_sample_rate(client=client, propagation_context=propagation_context)
     else:
-        if propagation_context.parent_sampled is not None:
-            if propagation_context._sample_rate() is not None:
-                sample_rate = propagation_context._sample_rate()
-            else:
-                sample_rate = propagation_context.parent_sampled
-        else:
-            sample_rate = client.options["traces_sample_rate"]
+        sample_rate = _get_fallback_sample_rate(client=client, propagation_context=propagation_context)
 
     # Validate whether the sample_rate we got is actually valid. Since
     # traces_sampler is user-provided, it could return anything.
