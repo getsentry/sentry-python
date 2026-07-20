@@ -1605,14 +1605,26 @@ def _make_sampling_decision(
     # If there's a traces_sampler, use that; otherwise use traces_sample_rate
     traces_sampler_defined = callable(client.options.get("traces_sampler"))
     if traces_sampler_defined:
+        if attributes is not None:
+            attributes = dict(attributes)
+        else:
+            attributes = {}
+
         sampling_context = {
-            "span_context": {
-                "name": name,
+            "transaction_context": {
                 "trace_id": propagation_context.trace_id,
+                "span_id": None,
                 "parent_span_id": propagation_context.parent_span_id,
-                "parent_sampled": propagation_context.parent_sampled,
-                "attributes": dict(attributes) if attributes else {},
+                "op": attributes.get("sentry.op"),
+                "name": name,
+                "description": name,
+                "start_timestamp": None,
+                "timestamp": None,
+                "source": attributes.get("sentry.segment.name.source"),
+                "sampled": None,
+                "data": attributes,
             },
+            "parent_sampled": propagation_context.parent_sampled,
         }
 
         if propagation_context.custom_sampling_context:
