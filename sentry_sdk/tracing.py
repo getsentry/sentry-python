@@ -1270,6 +1270,14 @@ class NoOpSpan(Span):
     def __repr__(self) -> str:
         return "<%s>" % self.__class__.__name__
 
+    def __enter__(self) -> "Span":
+        return self
+
+    def __exit__(
+        self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
+    ) -> None:
+        return None
+
     @property
     def containing_transaction(self) -> "Optional[Transaction]":
         return None
