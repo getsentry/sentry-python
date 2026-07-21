@@ -35,7 +35,7 @@ async def grpc_server_and_channel(sentry_init):
         sentry_init(
             traces_sample_rate=1.0,
             integrations=[GRPCIntegration()],
-            _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+            trace_lifecycle="stream" if span_streaming else "static",
         )
 
         # Create server
@@ -76,7 +76,7 @@ async def test_noop_for_unimplemented_method(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[GRPCIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     # Create empty server with no services

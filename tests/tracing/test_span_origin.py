@@ -39,7 +39,7 @@ def test_span_origin_custom(sentry_init, capture_events):
 
 
 def test_span_origin_manual_span_streaming(sentry_init, capture_items):
-    sentry_init(_experiments={"trace_lifecycle": "stream"}, traces_sample_rate=1.0)
+    sentry_init(trace_lifecycle="stream", traces_sample_rate=1.0)
     items = capture_items("span")
 
     with sentry_sdk.traces.start_span(name="hi"):
@@ -54,7 +54,7 @@ def test_span_origin_manual_span_streaming(sentry_init, capture_items):
 
 
 def test_span_origin_custom_span_streaming(sentry_init, capture_items):
-    sentry_init(_experiments={"trace_lifecycle": "stream"}, traces_sample_rate=1.0)
+    sentry_init(trace_lifecycle="stream", traces_sample_rate=1.0)
     items = capture_items("span")
 
     with sentry_sdk.traces.start_span(

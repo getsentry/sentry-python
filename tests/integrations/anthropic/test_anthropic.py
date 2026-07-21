@@ -108,7 +108,7 @@ def test_nonstreaming_create_message(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = Anthropic(api_key="z")
@@ -257,7 +257,7 @@ async def test_nonstreaming_create_message_async(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncAnthropic(api_key="z")
@@ -442,7 +442,7 @@ def test_streaming_create_message(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -621,7 +621,7 @@ def test_streaming_create_message_close(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -777,7 +777,7 @@ def test_streaming_create_message_api_error(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -946,7 +946,7 @@ def test_stream_messages(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -1124,7 +1124,7 @@ def test_stream_messages_close(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -1288,7 +1288,7 @@ def test_stream_messages_api_error(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -1463,7 +1463,7 @@ async def test_streaming_create_message_async(
         default_integrations=False,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -1646,7 +1646,7 @@ async def test_streaming_create_message_async_close(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -1804,7 +1804,7 @@ async def test_streaming_create_message_async_api_error(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -1978,7 +1978,7 @@ async def test_stream_message_async(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -2157,7 +2157,7 @@ async def test_stream_messages_async_api_error(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -2322,7 +2322,7 @@ async def test_stream_messages_async_close(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -2538,7 +2538,7 @@ def test_streaming_create_message_with_input_json_delta(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -2744,7 +2744,7 @@ def test_stream_messages_with_input_json_delta(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -2956,7 +2956,7 @@ async def test_streaming_create_message_with_input_json_delta_async(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -3170,7 +3170,7 @@ async def test_stream_message_with_input_json_delta_async(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -3291,7 +3291,7 @@ def test_exception_message_create(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = Anthropic(api_key="z")
@@ -3354,7 +3354,7 @@ def test_span_status_error(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming or stream_gen_ai_spans:
         items = capture_items("event", "span")
@@ -3420,7 +3420,7 @@ async def test_span_status_error_async(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming or stream_gen_ai_spans:
         items = capture_items("event", "span")
@@ -3486,7 +3486,7 @@ async def test_exception_message_create_async(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncAnthropic(api_key="z")
@@ -3549,7 +3549,7 @@ def test_span_origin(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = Anthropic(api_key="z")
@@ -3603,7 +3603,7 @@ async def test_span_origin_async(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncAnthropic(api_key="z")
@@ -3746,7 +3746,7 @@ def test_anthropic_message_role_mapping(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = Anthropic(api_key="z")
@@ -3942,7 +3942,7 @@ def test_nonstreaming_create_message_with_system_prompt(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = Anthropic(api_key="z")
@@ -4103,7 +4103,7 @@ async def test_nonstreaming_create_message_with_system_prompt_async(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncAnthropic(api_key="z")
@@ -4304,7 +4304,7 @@ def test_streaming_create_message_with_system_prompt(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -4505,7 +4505,7 @@ def test_stream_messages_with_system_prompt(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -4699,7 +4699,7 @@ async def test_stream_message_with_system_prompt_async(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -4898,7 +4898,7 @@ async def test_streaming_create_message_with_system_prompt_async(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -5046,7 +5046,7 @@ def test_system_prompt_with_complex_structure(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = Anthropic(api_key="z")
@@ -5400,7 +5400,7 @@ def test_message_with_url_image(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = Anthropic(api_key="z")
@@ -5471,7 +5471,7 @@ def test_message_with_file_image(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = Anthropic(api_key="z")
@@ -5589,7 +5589,7 @@ def test_message_with_url_pdf(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = Anthropic(api_key="z")
@@ -5660,7 +5660,7 @@ def test_message_with_file_document(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = Anthropic(api_key="z")
@@ -5892,7 +5892,7 @@ def test_binary_content_not_stored_when_pii_disabled(
         traces_sample_rate=1.0,
         send_default_pii=False,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = Anthropic(api_key="z")
@@ -5956,7 +5956,7 @@ def test_binary_content_not_stored_when_prompts_disabled(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = Anthropic(api_key="z")
@@ -6019,7 +6019,7 @@ def test_cache_tokens_nonstreaming(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = Anthropic(api_key="z")
@@ -6101,7 +6101,7 @@ def test_input_tokens_include_cache_write_nonstreaming(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = Anthropic(api_key="z")
@@ -6187,7 +6187,7 @@ def test_input_tokens_include_cache_read_nonstreaming(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = Anthropic(api_key="z")
@@ -6297,7 +6297,7 @@ def test_input_tokens_include_cache_read_streaming(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming or stream_gen_ai_spans:
@@ -6400,7 +6400,7 @@ def test_stream_messages_input_tokens_include_cache_read_streaming(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming or stream_gen_ai_spans:
@@ -6471,7 +6471,7 @@ def test_input_tokens_unchanged_without_caching(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = Anthropic(api_key="z")
@@ -6567,7 +6567,7 @@ def test_cache_tokens_streaming(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming or stream_gen_ai_spans:
@@ -6665,7 +6665,7 @@ def test_stream_messages_cache_tokens(
         integrations=[AnthropicIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming or stream_gen_ai_spans:
