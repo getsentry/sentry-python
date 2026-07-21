@@ -110,7 +110,7 @@ def test_transaction_or_segment_style(
             flask_sentry.FlaskIntegration(transaction_style=transaction_style)
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -238,7 +238,7 @@ def test_flask_login_configured(
             integrations=[flask_sentry.FlaskIntegration()],
             send_default_pii=send_default_pii,
             traces_sample_rate=1.0,
-            _experiments={"trace_lifecycle": "stream"},
+            trace_lifecycle="stream",
         )
     else:
         sentry_init(send_default_pii=send_default_pii, **integration_enabled_params)
@@ -817,7 +817,7 @@ def test_tracing_success(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[flask_sentry.FlaskIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     @app.before_request
@@ -878,7 +878,7 @@ def test_tracing_error(sentry_init, capture_events, capture_items, app, span_str
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[flask_sentry.FlaskIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -1103,7 +1103,7 @@ def test_span_origin(sentry_init, app, capture_events, capture_items, span_strea
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -1139,7 +1139,7 @@ def test_transaction_or_segment_http_method_default(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[flask_sentry.FlaskIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -1190,7 +1190,7 @@ def test_transaction_or_segment_http_method_custom(
                 )  # capitalization does not matter
             )  # case does not matter
         ],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:

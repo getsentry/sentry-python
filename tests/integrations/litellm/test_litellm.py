@@ -164,7 +164,7 @@ def test_nonstreaming_chat_completion(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -321,7 +321,7 @@ async def test_async_nonstreaming_chat_completion(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -481,7 +481,7 @@ def test_streaming_chat_completion(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -597,7 +597,7 @@ async def test_async_streaming_chat_completion(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -710,7 +710,7 @@ def test_embeddings_create(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="test-key")
@@ -831,7 +831,7 @@ async def test_async_embeddings_create(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="test-key")
@@ -948,7 +948,7 @@ def test_embeddings_create_with_list_input(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="test-key")
@@ -1062,7 +1062,7 @@ async def test_async_embeddings_create_with_list_input(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="test-key")
@@ -1176,7 +1176,7 @@ def test_embeddings_no_pii(
         traces_sample_rate=1.0,
         send_default_pii=False,  # PII disabled
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="test-key")
@@ -1276,7 +1276,7 @@ async def test_async_embeddings_no_pii(
         traces_sample_rate=1.0,
         send_default_pii=False,  # PII disabled
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="test-key")
@@ -1374,7 +1374,7 @@ def test_exception_handling(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1440,7 +1440,7 @@ async def test_async_exception_handling(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1507,7 +1507,7 @@ def test_span_origin(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1614,7 +1614,7 @@ def test_multiple_providers(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1862,7 +1862,7 @@ async def test_async_multiple_providers(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -2046,7 +2046,7 @@ def test_additional_parameters(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -2160,7 +2160,7 @@ async def test_async_additional_parameters(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -2275,7 +2275,7 @@ def test_no_integration(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -2365,7 +2365,7 @@ async def test_async_no_integration(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -2455,7 +2455,7 @@ def test_response_without_usage(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -2614,7 +2614,7 @@ def test_binary_content_encoding_image_url(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -2739,7 +2739,7 @@ async def test_async_binary_content_encoding_image_url(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -2866,7 +2866,7 @@ def test_binary_content_encoding_mixed_content(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -2980,7 +2980,7 @@ async def test_async_binary_content_encoding_mixed_content(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -3096,7 +3096,7 @@ def test_binary_content_encoding_uri_type(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [
@@ -3214,7 +3214,7 @@ async def test_async_binary_content_encoding_uri_type(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     messages = [

@@ -508,7 +508,7 @@ def test_active_thread_id_span_streaming(sentry_init, capture_items, endpoint):
         auto_enabling_integrations=False,  # Ensure httpx is not auto-enabled; its legacy start_span interferes with streaming mode
         integrations=[StarletteIntegration(), FastApiIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     app = fastapi_app_factory()
 

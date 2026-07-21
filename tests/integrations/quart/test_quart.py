@@ -644,7 +644,7 @@ async def test_active_thread_id_span_streaming(
         sentry_init(
             traces_sample_rate=1.0,
             profiles_sample_rate=1.0,
-            _experiments={"trace_lifecycle": "stream"},
+            trace_lifecycle="stream",
         )
         app = quart_app_factory()
 
@@ -687,7 +687,7 @@ async def test_span_streaming_basic(sentry_init, capture_items):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -734,7 +734,7 @@ async def test_span_streaming_transaction_style(
             quart_sentry.QuartIntegration(transaction_style=transaction_style)
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -759,7 +759,7 @@ async def test_span_streaming_with_error(sentry_init, capture_items):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("event", "span")
 
@@ -803,7 +803,7 @@ async def test_span_streaming_request_attributes_no_pii(sentry_init, capture_ite
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=False,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -834,7 +834,7 @@ async def test_span_streaming_request_attributes_with_pii(sentry_init, capture_i
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -867,7 +867,7 @@ async def test_span_streaming_sensitive_header_scrubbing(sentry_init, capture_it
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=False,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -910,7 +910,7 @@ async def test_span_streaming_quart_auth_user_id(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -946,7 +946,7 @@ async def test_span_streaming_sensitive_header_passthrough_with_pii(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
