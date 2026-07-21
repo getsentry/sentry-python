@@ -1987,7 +1987,78 @@ async def test_async_multiple_providers(
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        with mock.patch.object(
+            openai_client.completions._client._client,
+            "send",
+            return_value=openai_model_response,
+        ), sentry_sdk.traces.start_span(name="test gpt-3.5-turbo"):
+            await litellm.acompletion(
+                model="gpt-3.5-turbo",
+                messages=messages,
+                client=openai_client,
+            )
+
+            await GLOBAL_LOGGING_WORKER.flush()
+            await asyncio.sleep(0.5)
+
+        _reset_litellm_executor()
+
+        anthropic_client = AsyncHTTPHandler()
+        anthropic_model_response = get_model_response(
+            nonstreaming_anthropic_model_response,
+            serialize_pydantic=True,
+            request_headers={"X-Stainless-Raw-Response": "True"},
+        )
+
+        with mock.patch.object(
+            anthropic_client,
+            "post",
+            return_value=anthropic_model_response,
+        ), sentry_sdk.traces.start_span(name="test claude-3-opus-20240229"):
+            await litellm.acompletion(
+                model="claude-3-opus-20240229",
+                messages=messages,
+                client=anthropic_client,
+                api_key="test-key",
+            )
+
+            await GLOBAL_LOGGING_WORKER.flush()
+            await asyncio.sleep(0.5)
+
+        _reset_litellm_executor()
+
+        gemini_client = AsyncHTTPHandler()
+        gemini_model_response = get_model_response(
+            nonstreaming_google_genai_model_response,
+            serialize_pydantic=True,
+        )
+
+        with mock.patch.object(
+            gemini_client,
+            "post",
+            return_value=gemini_model_response,
+        ), sentry_sdk.traces.start_span(name="test gemini/gemini-pro"):
+            await litellm.acompletion(
+                model="gemini/gemini-pro",
+                messages=messages,
+                client=gemini_client,
+                api_key="test-key",
+            )
+
+            await GLOBAL_LOGGING_WORKER.flush()
+            await asyncio.sleep(0.5)
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        for span in spans:
+            if span["is_segment"] is True:
+                continue
+            # The provider should be detected by litellm.get_llm_provider
+            assert SPANDATA.GEN_AI_SYSTEM in span["attributes"]
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with mock.patch.object(
