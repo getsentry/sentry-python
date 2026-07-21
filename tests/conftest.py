@@ -287,9 +287,12 @@ def uninstall_integration():
 
 @pytest.fixture
 def sentry_init(request):
+    clients = []
+
     def inner(*a, **kw):
         kw.setdefault("transport", TestTransport())
         client = sentry_sdk.Client(*a, **kw)
+        clients.append(client)
         sentry_sdk.get_global_scope().set_client(client)
 
     if request.node.get_closest_marker("forked"):
@@ -303,6 +306,8 @@ def sentry_init(request):
             sentry_sdk.get_current_scope().set_client(None)
             yield inner
         finally:
+            for client in clients:
+                client.close()
             sentry_sdk.get_global_scope().set_client(old_client)
 
 
@@ -449,8 +454,16 @@ def capture_events_forksafe(monkeypatch, capture_events, request):
                 events_w.write(b"\n")
             return old_capture_envelope(envelope)
 
+        real_flush = test_client.flush
+
         def flush(timeout=None, callback=None):
             events_w.write(b"flush\n")
+
+        def cleanup():
+            test_client.flush = real_flush
+            test_client.transport.capture_envelope = old_capture_envelope
+
+        request.addfinalizer(cleanup)
 
         monkeypatch.setattr(test_client.transport, "capture_envelope", append)
         monkeypatch.setattr(test_client, "flush", flush)
@@ -497,6 +510,12 @@ def capture_items_forksafe(monkeypatch, capture_items, request):
             real_flush(timeout=timeout, callback=callback)
             items_w.write(json.dumps(telemetry).encode("utf-8") + b"\n")
             items_w.write(b"flush\n")
+
+        def cleanup():
+            test_client.flush = real_flush
+            test_client.transport.capture_envelope = old_capture_envelope
+
+        request.addfinalizer(cleanup)
 
         monkeypatch.setattr(test_client.transport, "capture_envelope", append)
         monkeypatch.setattr(test_client, "flush", flush)
