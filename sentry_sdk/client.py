@@ -1264,6 +1264,11 @@ class _Client(BaseClient):
                     return
 
             elif ty == "span" and isinstance(telemetry, StreamedSpan):
+                # Reset the span to its original value before we attempted
+                # to call the `before_send_span` callback
+                if exception_raised_in_before_send_func:
+                    serialized = telemetry._to_json()
+
                 # Spans can't be dropped in before_send_span by design. They can
                 # be altered though (e.g. to sanitize). Only allow changes to
                 # name and attributes.
