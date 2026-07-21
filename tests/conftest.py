@@ -287,9 +287,12 @@ def uninstall_integration():
 
 @pytest.fixture
 def sentry_init(request):
+    clients = []
+
     def inner(*a, **kw):
         kw.setdefault("transport", TestTransport())
         client = sentry_sdk.Client(*a, **kw)
+        clients.append(client)
         sentry_sdk.get_global_scope().set_client(client)
 
     if request.node.get_closest_marker("forked"):
@@ -303,9 +306,8 @@ def sentry_init(request):
             sentry_sdk.get_current_scope().set_client(None)
             yield inner
         finally:
-            current = sentry_sdk.get_global_scope().client
-            if current is not None:
-                current.close()
+            for client in reversed(clients):
+                client.close()
             sentry_sdk.get_global_scope().set_client(old_client)
 
 
