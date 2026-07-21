@@ -1668,7 +1668,7 @@ def _make_sampling_decision(
     sample_rate = float(sample_rate)
     if not sample_rate:
         if traces_sampler_defined:
-            reason = "traces_sampler returned 0 or False"
+            reason = "traces_sampler returned 0 or False, or is using a fallback sample rate that is 0 or False"
         else:
             reason = "traces_sample_rate is set to 0"
 
