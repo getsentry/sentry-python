@@ -1030,7 +1030,7 @@ async def test_span_streaming_sensitive_header_without_data_collection(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=False,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -1109,7 +1109,7 @@ async def test_span_streaming_sensitive_header_passthrough_with_pii_and_no_data_
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 

@@ -1439,7 +1439,7 @@ async def test_sensitive_header_passthrough_with_pii_span_streaming_without_data
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     async def hello(request):
