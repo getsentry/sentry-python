@@ -1244,8 +1244,16 @@ class _Client(BaseClient):
             serialized = telemetry._to_json()  # type: ignore[union-attr]
 
         if before_send is not None:
+            exception_raised_in_before_send_func = False
             with capture_internal_exceptions():
-                serialized = before_send(serialized, {})  # type: ignore[arg-type]
+                try:
+                    serialized = before_send(serialized, {})  # type: ignore[arg-type]
+                except Exception:
+                    exception_raised_in_before_send_func = True
+                    raise
+
+            if exception_raised_in_before_send_func:
+                return
 
             if ty in ("log", "metric"):
                 # Logs and metrics can be dropped in their respective

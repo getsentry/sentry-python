@@ -1576,7 +1576,7 @@ def add_sentry_baggage_to_headers(
     )
 
 
-def _get_fallback_sample_rate(
+def _get_effective_sample_rate(
     client: "BaseClient", propagation_context: "PropagationContext"
 ) -> "Union[float, bool]":
     if propagation_context.parent_sampled is not None:
@@ -1652,11 +1652,11 @@ def _make_sampling_decision(
                 "[Tracing] traces_sampler raised; falling back to parent sample rate or traces_sample_rate",
                 exc_info=True,
             )
-            sample_rate = _get_fallback_sample_rate(
+            sample_rate = _get_effective_sample_rate(
                 client=client, propagation_context=propagation_context
             )
     else:
-        sample_rate = _get_fallback_sample_rate(
+        sample_rate = _get_effective_sample_rate(
             client=client, propagation_context=propagation_context
         )
 

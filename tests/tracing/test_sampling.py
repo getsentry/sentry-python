@@ -195,9 +195,7 @@ def test_tolerates_traces_sampler_returning_a_boolean_span_streaming(
 ):
     sentry_init(
         traces_sampler=mock.Mock(return_value=traces_sampler_return_value),
-        _experiments={
-            "trace_lifecycle": "stream",
-        },
+        trace_lifecycle="stream",
     )
 
     with sentry_sdk.traces.start_span(name="dogpark") as span:
@@ -253,9 +251,7 @@ def test_traces_sampler_raising_falls_back_to_traces_sample_rate_span_streaming(
     sentry_init(
         traces_sampler=mock.Mock(side_effect=ValueError("boom")),
         traces_sample_rate=traces_sample_rate,
-        _experiments={
-            "trace_lifecycle": "stream",
-        },
+        trace_lifecycle="stream",
     )
 
     sentry_sdk.traces.continue_trace(
@@ -269,29 +265,52 @@ def test_traces_sampler_raising_falls_back_to_traces_sample_rate_span_streaming(
         assert span.sampled is expected_decision
 
 
-def test_traces_sampler_raising_falls_back_to_propagated_sample_rate_span_streaming(
+@pytest.mark.parametrize(
+    "traces_sample_rate,expected_decision",
+    [(0.0, False), (0.25, False), (0.75, True), (1.00, True)],
+)
+def test_traces_sampler_raising_no_incoming_trace_falls_back_to_traces_sample_rate_span_streaming(
     sentry_init,
+    traces_sample_rate,
+    expected_decision,
+    monkeypatch,
 ):
-    # parent said "don't sample", but its propagated sample rate of 0.75
-    # combined with sample_rand 0.5 should win over both the flag and
-    # traces_sample_rate=0.0
     sentry_init(
         traces_sampler=mock.Mock(side_effect=ValueError("boom")),
-        traces_sample_rate=0.0,
-        _experiments={
-            "trace_lifecycle": "stream",
-        },
+        traces_sample_rate=traces_sample_rate,
+        trace_lifecycle="stream",
     )
 
-    sentry_sdk.traces.continue_trace(
-        {
-            "sentry-trace": "0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-0",
-            "baggage": "sentry-sample_rate=0.75,sentry-sample_rand=0.500000",
-        }
+    # no continue_trace, so no propagated sample_rand; make it deterministic
+    monkeypatch.setattr(
+        "sentry_sdk.tracing_utils._generate_sample_rand", lambda *a, **kw: 0.5
     )
 
     with sentry_sdk.traces.start_span(name="dogpark") as span:
-        assert span.sampled is True
+        assert span.sampled is expected_decision
+
+
+def test_traces_sampler_raising_no_incoming_trace_and_no_traces_sample_rate(
+    sentry_init,
+):
+    sentry_init(
+        traces_sampler=mock.Mock(side_effect=ValueError("boom")),
+    )
+
+    transaction = start_transaction(name="dogpark")
+    assert transaction.sampled is False
+
+
+def test_traces_sampler_raising_no_incoming_trace_and_no_traces_sample_rate_span_streaming(
+    sentry_init,
+):
+    sentry_init(
+        traces_sampler=mock.Mock(side_effect=ValueError("boom")),
+        trace_lifecycle="stream",
+    )
+
+    with sentry_sdk.traces.start_span(name="dogpark") as span:
+        assert span.sampled is False
 
 
 @pytest.mark.parametrize("sampling_decision", [True, False])

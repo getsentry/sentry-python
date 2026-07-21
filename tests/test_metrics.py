@@ -263,11 +263,10 @@ def test_metrics_before_send_raises_does_not_crash_application(
 
     get_client().flush()
 
-    # The exception in before_send_metric is swallowed and the original,
-    # unmodified metric is sent.
+    # The exception in before_send_metric is swallowed and the metric is
+    # dropped.
     metrics = [item.payload for item in items]
-    assert len(metrics) == 1
-    assert metrics[0]["name"] == "test.keep"
+    assert not metrics
 
 
 def test_transport_format(sentry_init, capture_envelopes):

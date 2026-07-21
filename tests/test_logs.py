@@ -181,11 +181,8 @@ def test_logs_before_send_log_raises_does_not_crash_application(
     get_client().flush()
     logs = [item.payload for item in items]
 
-    # The exception in before_send_log is swallowed and the original,
-    # unmodified log is sent.
-    assert len(logs) == 1
-    assert logs[0]["body"] == "This is an error log..."
-    assert logs[0]["attributes"]["sentry.severity_text"] == "error"
+    # The exception in before_send_log is swallowed and the log is dropped.
+    assert not logs
 
 
 @minimum_python_37
