@@ -457,6 +457,11 @@ def capture_events_forksafe(monkeypatch, capture_events, request):
         def flush(timeout=None, callback=None):
             events_w.write(b"flush\n")
 
+        def cleanup():
+            test_client.transport.capture_envelope = old_capture_envelope
+
+        request.addfinalizer(cleanup)
+
         monkeypatch.setattr(test_client.transport, "capture_envelope", append)
         monkeypatch.setattr(test_client, "flush", flush)
 
