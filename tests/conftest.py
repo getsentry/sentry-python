@@ -306,7 +306,7 @@ def sentry_init(request):
             sentry_sdk.get_current_scope().set_client(None)
             yield inner
         finally:
-            for client in reversed(clients):
+            for client in clients:
                 client.close()
             sentry_sdk.get_global_scope().set_client(old_client)
 
