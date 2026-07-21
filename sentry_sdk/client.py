@@ -1244,15 +1244,31 @@ class _Client(BaseClient):
             serialized = telemetry._to_json()  # type: ignore[union-attr]
 
         if before_send is not None:
-            serialized = before_send(serialized, {})  # type: ignore[arg-type]
+            exception_raised_in_before_send_func = False
+            with capture_internal_exceptions():
+                try:
+                    serialized = before_send(serialized, {})  # type: ignore[arg-type]
+                except Exception:
+                    exception_raised_in_before_send_func = True
+                    raise
 
             if ty in ("log", "metric"):
+                # We are ok with dropping metrics and logs when an exception is raised
+                # because we allow users to drop them in their respect before_send_*
+                # functions.
+                if exception_raised_in_before_send_func:
+                    return
                 # Logs and metrics can be dropped in their respective
                 # before_send, so if we get None, don't queue them for sending.
                 if serialized is None:
                     return
 
             elif ty == "span" and isinstance(telemetry, StreamedSpan):
+                # Reset the span to its original value before we attempted
+                # to call the `before_send_span` callback
+                if exception_raised_in_before_send_func:
+                    serialized = telemetry._to_json()
+
                 # Spans can't be dropped in before_send_span by design. They can
                 # be altered though (e.g. to sanitize). Only allow changes to
                 # name and attributes.

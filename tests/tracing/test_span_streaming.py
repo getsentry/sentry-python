@@ -359,6 +359,41 @@ def test_before_send_span_doesnt_receive_ignored_spans(sentry_init, capture_item
     assert not before_send_span_called
 
 
+@pytest.mark.tests_internal_exceptions
+def test_before_send_span_raises_does_not_crash_application(sentry_init, capture_items):
+    def before_send_span(span, hint):
+        # Mutate the span before raising to ensure the partial mutation
+        # is discarded when the exception is raised.
+        span["name"] = "Mutated span name"
+        span["attributes"]["mutated"] = True
+        raise ValueError("before_send_span error")
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={
+            "before_send_span": before_send_span,
+            "trace_lifecycle": "stream",
+        },
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="span", attributes={"original": "value"}):
+        ...
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    # The exception in before_send_span is swallowed and the original,
+    # unmodified span is sent.
+    assert len(spans) == 1
+    (span,) = spans
+
+    assert span["name"] == "span"
+    assert span["attributes"]["original"] == "value"
+    assert "mutated" not in span["attributes"]
+
+
 def test_span_attributes(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
