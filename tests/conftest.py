@@ -503,6 +503,12 @@ def capture_items_forksafe(monkeypatch, capture_items, request):
             items_w.write(json.dumps(telemetry).encode("utf-8") + b"\n")
             items_w.write(b"flush\n")
 
+        def cleanup():
+            test_client.flush = real_flush
+            test_client.transport.capture_envelope = old_capture_envelope
+
+        request.addfinalizer(cleanup)
+
         monkeypatch.setattr(test_client.transport, "capture_envelope", append)
         monkeypatch.setattr(test_client, "flush", flush)
 
