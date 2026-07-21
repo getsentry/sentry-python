@@ -278,8 +278,6 @@ class Span:
         "_flags_capacity",
     )
 
-    _context_manager_state: "Optional[Tuple[sentry_sdk.Scope, Optional[Span]]]"
-
     def __init__(
         self,
         trace_id: "Optional[str]" = None,
