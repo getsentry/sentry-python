@@ -398,7 +398,59 @@ async def test_async_nonstreaming_chat_completion(
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        with mock.patch.object(
+            client.completions._client._client,
+            "send",
+            return_value=model_response,
+        ), sentry_sdk.traces.start_span(name="litellm test"):
+            await litellm.acompletion(
+                model="gpt-3.5-turbo",
+                messages=messages,
+                client=client,
+            )
+
+            await GLOBAL_LOGGING_WORKER.flush()
+            await asyncio.sleep(0.5)
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[2]["name"] == "litellm test"
+        chat_spans = list(
+            x
+            for x in spans
+            if x["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+            and x["attributes"].get("sentry.origin") == "auto.ai.litellm"
+        )
+        assert len(chat_spans) == 1
+        span = chat_spans[0]
+
+        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        assert span["name"] == "chat gpt-3.5-turbo"
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+
+        if send_default_pii and include_prompts:
+            assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {"role": "user", "content": "Hello!"},
+            ]
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT in span["attributes"]
+        else:
+            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with mock.patch.object(
