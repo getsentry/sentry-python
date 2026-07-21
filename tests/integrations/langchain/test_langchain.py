@@ -255,7 +255,7 @@ def test_langchain_text_completion(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     model_response = get_model_response(
@@ -377,7 +377,7 @@ def test_langchain_chat_with_run_name(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     request_headers = {}
@@ -470,7 +470,7 @@ def test_langchain_tool_call_with_run_name(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming or stream_gen_ai_spans:
         items = capture_items("span")
@@ -575,7 +575,7 @@ def test_langchain_create_agent(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     model_response = get_model_response(
@@ -753,7 +753,7 @@ def test_tool_execution_span(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     responses = responses_tool_call_model_responses(
@@ -1045,7 +1045,7 @@ def test_langchain_openai_tools_agent_no_prompts(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -1350,7 +1350,7 @@ def test_langchain_openai_tools_agent(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -1609,7 +1609,7 @@ def test_langchain_openai_tools_agent_with_config(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -1732,7 +1732,7 @@ def test_langchain_openai_tools_agent_stream_no_prompts(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -2041,7 +2041,7 @@ def test_langchain_openai_tools_agent_stream(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -2312,7 +2312,7 @@ def test_langchain_openai_tools_agent_stream_with_config(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -2435,7 +2435,7 @@ def test_langchain_error(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -2504,7 +2504,7 @@ def test_span_status_error(
         integrations=[LangchainIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming or stream_gen_ai_spans:
         items = capture_items("event", "transaction", "span")
@@ -2835,7 +2835,7 @@ def test_langchain_message_role_mapping(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     prompt = ChatPromptTemplate.from_messages(
@@ -3122,7 +3122,7 @@ def test_langchain_embeddings_sync(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming or stream_gen_ai_spans:
         items = capture_items("span")
@@ -3272,7 +3272,7 @@ def test_langchain_embeddings_embed_query(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming or stream_gen_ai_spans:
         items = capture_items("span")
@@ -3413,7 +3413,7 @@ async def test_langchain_embeddings_async(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     async def mock_aembed_documents(self, texts):
@@ -3566,7 +3566,7 @@ async def test_langchain_embeddings_aembed_query(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     async def mock_aembed_query(self, text):
@@ -3685,7 +3685,7 @@ def test_langchain_embeddings_no_model_name(
         integrations=[LangchainIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming or stream_gen_ai_spans:
         items = capture_items("span")
@@ -3788,7 +3788,7 @@ def test_langchain_embeddings_integration_disabled(
     sentry_init(
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     # Initialize without LangchainIntegration
@@ -3864,7 +3864,7 @@ def test_langchain_embeddings_multiple_providers(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming or stream_gen_ai_spans:
         items = capture_items("span")
@@ -4021,7 +4021,7 @@ def test_langchain_embeddings_multiple_calls(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming or stream_gen_ai_spans:
         items = capture_items("span")
@@ -4149,7 +4149,7 @@ def test_langchain_embeddings_span_hierarchy(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -4307,7 +4307,7 @@ def test_langchain_embeddings_with_list_and_string_inputs(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming or stream_gen_ai_spans:
         items = capture_items("span")
@@ -4433,7 +4433,7 @@ def test_langchain_response_model_extraction(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
@@ -4792,7 +4792,7 @@ def test_langchain_ai_system_detection(
         integrations=[LangchainIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)

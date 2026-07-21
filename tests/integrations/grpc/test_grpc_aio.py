@@ -35,7 +35,7 @@ async def grpc_server_and_channel(sentry_init):
         sentry_init(
             traces_sample_rate=1.0,
             integrations=[GRPCIntegration()],
-            _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+            trace_lifecycle="stream" if span_streaming else "static",
         )
 
         # Create server
@@ -76,7 +76,7 @@ async def test_noop_for_unimplemented_method(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[GRPCIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     # Create empty server with no services
@@ -140,7 +140,7 @@ async def test_grpc_server_starts_transaction(
         spans = [item.payload for item in items]
         span = spans[0]
 
-        assert spans[1]["attributes"]["sentry.span.source"] == "custom"
+        assert spans[1]["attributes"]["sentry.segment.name.source"] == "custom"
         assert spans[1]["attributes"]["sentry.op"] == OP.GRPC_SERVER
         assert span["attributes"]["sentry.op"] == "test"
     else:
@@ -200,7 +200,7 @@ async def test_grpc_server_continues_transaction(
         spans = [item.payload for item in items]
         span = spans[0]
 
-        assert spans[1]["attributes"]["sentry.span.source"] == "custom"
+        assert spans[1]["attributes"]["sentry.segment.name.source"] == "custom"
         assert spans[1]["attributes"]["sentry.op"] == OP.GRPC_SERVER
         assert spans[1]["trace_id"] == segment_span.trace_id
         assert span["attributes"]["sentry.op"] == "test"

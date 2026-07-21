@@ -26,7 +26,7 @@ def test_sampling_decided_only_for_transactions(sentry_init, capture_events):
 def test_sampling_decided_only_for_segments(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=0.5,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     with sentry_sdk.traces.start_span(name="hi") as segment:
@@ -67,7 +67,7 @@ def test_no_double_sampling_span_streaming(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         sample_rate=0.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items()
 
@@ -308,7 +308,7 @@ def test_ignores_inherited_sample_decision_when_traces_sampler_defined_span_stre
     traces_sampler = mock.Mock(return_value=not bool(int(parent_sampling_decision)))
     sentry_init(
         traces_sampler=traces_sampler,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     sentry_sdk.traces.continue_trace(
@@ -356,7 +356,7 @@ def test_inherits_parent_sampling_decision_when_traces_sampler_undefined_span_st
 ):
     sentry_init(
         traces_sample_rate=0.5,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     sentry_sdk.traces.continue_trace(
@@ -430,7 +430,7 @@ def test_custom_sampling_context(sentry_init):
 
     sentry_init(
         traces_sampler=traces_sampler,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     sentry_sdk.get_current_scope().set_custom_sampling_context(
@@ -446,7 +446,7 @@ def test_custom_sampling_context(sentry_init):
 
 def test_custom_sampling_context_update_to_context_value_persists(sentry_init):
     def traces_sampler(sampling_context):
-        if sampling_context["span_context"]["attributes"]["first"] is True:
+        if sampling_context["transaction_context"]["data"]["first"] is True:
             assert sampling_context["custom_value"] == 1
         else:
             assert sampling_context["custom_value"] == 2
@@ -454,7 +454,7 @@ def test_custom_sampling_context_update_to_context_value_persists(sentry_init):
 
     sentry_init(
         traces_sampler=traces_sampler,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     sentry_sdk.traces.new_trace()
@@ -532,7 +532,7 @@ def test_warns_and_sets_sampled_to_false_on_invalid_traces_sampler_return_value_
 ):
     sentry_init(
         traces_sampler=mock.Mock(return_value=traces_sampler_return_value),
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     with mock.patch.object(logger, "warning", mock.Mock()):
@@ -606,7 +606,7 @@ def test_unsampled_spans_produce_client_report_if_traces_sample_rate_defined(
 ):
     sentry_init(
         traces_sample_rate=0.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -635,7 +635,7 @@ def test_unsampled_spans_produce_client_report_if_traces_sampler_defined(
 ):
     sentry_init(
         traces_sampler=lambda _: 0.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -664,7 +664,7 @@ def test_no_client_reports_if_tracing_is_off(
 ):
     sentry_init(
         traces_sample_rate=None,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")

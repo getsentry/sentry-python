@@ -886,7 +886,7 @@ class Baggage:
                 sentry_items["org_id"] = client.parsed_dsn.org_id
 
         if (
-            segment.get_attributes().get("sentry.span.source")
+            segment.get_attributes().get("sentry.segment.name.source")
             not in LOW_QUALITY_SEGMENT_SOURCES
         ) and segment.name:
             sentry_items["transaction"] = segment.name
@@ -971,6 +971,37 @@ def should_propagate_trace(client: "sentry_sdk.client.BaseClient", url: str) -> 
         return False
 
     return match_regex_list(url, trace_propagation_targets, substring_matching=True)
+
+
+def propagate_trace_headers(
+    client: "sentry_sdk.client.BaseClient", request: "Any"
+) -> None:
+    """
+    Attach Sentry trace propagation headers (``sentry-trace``/``baggage``) from the
+    current scope's propagation context to an outgoing request, if the request's
+    URL matches the configured ``trace_propagation_targets``.
+
+    ``request`` is expected to expose ``url`` and a mutable ``headers`` mapping
+    (e.g. an ``httpx``/``httpx2`` ``Request``).
+    """
+    if not hasattr(request, "url") or not hasattr(request, "headers"):
+        logger.warning(
+            "Unable to propagate trace headers in request - missing url or headers attributes"
+        )
+        return
+
+    if not should_propagate_trace(client, str(request.url)):
+        return
+
+    for key, value in sentry_sdk.get_current_scope().iter_trace_propagation_headers():
+        logger.debug(
+            f"[Tracing] Adding `{key}` header {value} to outgoing request to {request.url}."
+        )
+
+        if key == BAGGAGE_HEADER_NAME:
+            add_sentry_baggage_to_headers(request.headers, value)
+        else:
+            request.headers[key] = value
 
 
 def normalize_incoming_data(incoming_data: "Dict[str, Any]") -> "Dict[str, Any]":
@@ -1574,14 +1605,26 @@ def _make_sampling_decision(
     # If there's a traces_sampler, use that; otherwise use traces_sample_rate
     traces_sampler_defined = callable(client.options.get("traces_sampler"))
     if traces_sampler_defined:
+        if attributes is not None:
+            attributes = dict(attributes)
+        else:
+            attributes = {}
+
         sampling_context = {
-            "span_context": {
-                "name": name,
+            "transaction_context": {
                 "trace_id": propagation_context.trace_id,
+                "span_id": None,
                 "parent_span_id": propagation_context.parent_span_id,
-                "parent_sampled": propagation_context.parent_sampled,
-                "attributes": dict(attributes) if attributes else {},
+                "op": attributes.get("sentry.op"),
+                "name": name,
+                "description": name,
+                "start_timestamp": None,
+                "timestamp": None,
+                "source": attributes.get("sentry.segment.name.source"),
+                "sampled": None,
+                "data": attributes,
             },
+            "parent_sampled": propagation_context.parent_sampled,
         }
 
         if propagation_context.custom_sampling_context:

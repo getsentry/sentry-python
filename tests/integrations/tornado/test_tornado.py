@@ -133,7 +133,7 @@ def test_transactions(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -184,7 +184,7 @@ def test_transactions(
             else "tests.integrations.tornado.test_tornado.CrashingHandler.post"
         )
         assert server_segment["name"] == expected_handler
-        assert server_segment["attributes"]["sentry.span.source"] == "component"
+        assert server_segment["attributes"]["sentry.segment.name.source"] == "component"
         assert server_segment["attributes"]["http.request.method"] == "POST"
         assert server_segment["attributes"]["http.request.body.data"] == "heyoo"
         assert server_segment["attributes"]["http.response.status_code"] == code
@@ -525,7 +525,7 @@ def test_span_origin(
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -557,7 +557,7 @@ def test_user_ip_address_on_all_spans(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")

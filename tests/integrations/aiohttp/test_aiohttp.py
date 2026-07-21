@@ -1145,7 +1145,7 @@ async def test_tracing_span_streaming(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_pii,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1177,7 +1177,7 @@ async def test_tracing_span_streaming(
     assert server_span["attributes"]["sentry.op"] == "http.server"
     assert server_span["attributes"]["sentry.origin"] == "auto.http.aiohttp"
     assert server_span["attributes"]["http.response.status_code"] == 200
-    assert server_span["attributes"]["sentry.span.source"] == "component"
+    assert server_span["attributes"]["sentry.segment.name.source"] == "component"
     assert server_span["status"] == "ok"
     # No query string on the request, so the attribute should be omitted.
     assert "url.query" not in server_span["attributes"]
@@ -1215,7 +1215,7 @@ async def test_sensitive_header_scrubbing_span_streaming(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1262,7 +1262,7 @@ async def test_sensitive_header_passthrough_with_pii_span_streaming(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1300,7 +1300,7 @@ async def test_url_query_attribute_span_streaming(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_pii,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1357,7 +1357,7 @@ async def test_transaction_style_span_streaming(
     sentry_init(
         integrations=[AioHttpIntegration(transaction_style=transaction_style)],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1379,7 +1379,7 @@ async def test_transaction_style_span_streaming(
 
     assert server_segment["name"] == expected_name
     assert server_segment["is_segment"]
-    assert server_segment["attributes"]["sentry.span.source"] == expected_source
+    assert server_segment["attributes"]["sentry.segment.name.source"] == expected_source
 
 
 @pytest.mark.asyncio
@@ -1387,7 +1387,7 @@ async def test_server_error_span_streaming(sentry_init, aiohttp_client, capture_
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1428,7 +1428,7 @@ async def test_http_exception_span_streaming(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1460,7 +1460,7 @@ async def test_http_exception_ok_status_not_overridden_span_streaming(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1494,7 +1494,7 @@ async def test_outgoing_client_span_span_streaming(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_pii,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     async def handler(request):
@@ -1555,7 +1555,7 @@ async def test_outgoing_trace_headers_span_streaming(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     async def handler(request):
@@ -1589,7 +1589,7 @@ async def test_user_ip_address_on_all_spans(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1608,6 +1608,9 @@ async def test_user_ip_address_on_all_spans(
     sentry_sdk.flush()
 
     child_span, server_span = [item.payload for item in items]
+
+    assert server_span["attributes"]["sentry.segment.name.source"] == "component"
+    assert "sentry.segment.name.source" not in child_span["attributes"]
 
     if send_default_pii:
         assert server_span["attributes"]["user.ip_address"] == "127.0.0.1"

@@ -31,7 +31,7 @@ from sentry_sdk.traces import (
     SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE,
 )
 from sentry_sdk.traces import (
-    SegmentSource,
+    SegmentNameSource,
     StreamedSpan,
 )
 from sentry_sdk.tracing import (
@@ -246,7 +246,7 @@ class SentryAsgiMiddleware:
                     if span_streaming:
                         segment: "Optional[StreamedSpan]" = None
                         attributes: "Attributes" = {
-                            "sentry.span.source": getattr(
+                            "sentry.segment.name.source": getattr(
                                 transaction_source, "value", transaction_source
                             ),
                             "sentry.origin": self.span_origin,
@@ -384,11 +384,13 @@ class SentryAsgiMiddleware:
                                 already_set = (
                                     span is not None
                                     and span.name != _DEFAULT_TRANSACTION_NAME
-                                    and span.get_attributes().get("sentry.span.source")
+                                    and span.get_attributes().get(
+                                        "sentry.segment.name.source"
+                                    )
                                     in [
-                                        SegmentSource.COMPONENT.value,
-                                        SegmentSource.ROUTE.value,
-                                        SegmentSource.CUSTOM.value,
+                                        SegmentNameSource.COMPONENT.value,
+                                        SegmentNameSource.ROUTE.value,
+                                        SegmentNameSource.CUSTOM.value,
                                     ]
                                 )
                                 with capture_internal_exceptions():
@@ -399,7 +401,9 @@ class SentryAsgiMiddleware:
                                             )
                                         )
                                         span.name = name
-                                        span.set_attribute("sentry.span.source", source)
+                                        span.set_attribute(
+                                            "sentry.segment.name.source", source
+                                        )
         finally:
             _asgi_middleware_applied.set(False)
 
@@ -514,7 +518,7 @@ class SentryAsgiMiddleware:
                         asgi_scope=asgi_scope, root_path_in_path=self.root_path_in_path
                     ),
                 )
-                source = SegmentSource.URL.value
+                source = SegmentNameSource.URL.value
 
         elif segment_style == "url":
             # FastAPI includes the route object in the scope to let Sentry extract the
@@ -533,11 +537,11 @@ class SentryAsgiMiddleware:
                         asgi_scope=asgi_scope, root_path_in_path=self.root_path_in_path
                     ),
                 )
-                source = SegmentSource.URL.value
+                source = SegmentNameSource.URL.value
 
         if name is None:
             name = _DEFAULT_TRANSACTION_NAME
-            source = SegmentSource.ROUTE.value
+            source = SegmentNameSource.ROUTE.value
             return name, source
 
         return name, source
