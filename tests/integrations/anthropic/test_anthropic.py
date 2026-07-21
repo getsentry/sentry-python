@@ -170,8 +170,8 @@ def test_nonstreaming_create_message(
                 span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi, I'm Claude."
             )
         else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in spans[1]["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in spans[1]["attributes"]
+            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
