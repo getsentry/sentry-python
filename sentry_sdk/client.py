@@ -63,6 +63,7 @@ from sentry_sdk.utils import (
     get_sdk_name,
     get_type_name,
     handle_in_app,
+    has_data_collection_enabled,
     has_logs_enabled,
     has_metrics_enabled,
     logger,
@@ -351,11 +352,18 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
 
     rv["data_collection"] = _resolve_data_collection(rv)
 
-    if rv["event_scrubber"] is None:
+    # Do not add the event scrubber if data collection is enabled as it can remove data that's
+    # collected under data collection config
+    if not has_data_collection_enabled(rv) and rv["event_scrubber"] is None:
         rv["event_scrubber"] = EventScrubber(
             send_default_pii=False
             if rv["send_default_pii"] is None
             else rv["send_default_pii"]
+        )
+    elif rv["event_scrubber"]:
+        warnings.warn(
+            "Event scrubbers are not enabled when data collection configuration is provided.",
+            stacklevel=2,
         )
 
     if rv["socket_options"] and not isinstance(rv["socket_options"], list):

@@ -396,3 +396,112 @@ def test_empty_query_string_is_dropped_with_data_collection(
 
     (event,) = events
     assert "query_string" not in event["request"]
+
+
+USER_INFO_INIT_KWARGS = [
+    pytest.param({"send_default_pii": True}, True, id="legacy_send_default_pii_true"),
+    pytest.param(
+        {"send_default_pii": False}, False, id="legacy_send_default_pii_false"
+    ),
+    pytest.param(
+        {"_experiments": {"data_collection": {"user_info": True}}},
+        True,
+        id="data_collection_user_info_true",
+    ),
+    pytest.param(
+        {"_experiments": {"data_collection": {"user_info": False}}},
+        False,
+        id="data_collection_user_info_false",
+    ),
+    pytest.param(
+        {
+            "send_default_pii": True,
+            "_experiments": {"data_collection": {"user_info": False}},
+        },
+        False,
+        id="data_collection_wins_over_send_default_pii_true",
+    ),
+    pytest.param(
+        {
+            "send_default_pii": False,
+            "_experiments": {"data_collection": {"user_info": True}},
+        },
+        True,
+        id="data_collection_wins_over_send_default_pii_false",
+    ),
+]
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator()
+@pytest.mark.parametrize("init_kwargs, expect_ip", USER_INFO_INIT_KWARGS)
+def test_user_info_span_attributes_data_collection(
+    sentry_init, client, capture_items, init_kwargs, expect_ip
+):
+    init_kwargs = dict(init_kwargs)  # shallow copy so we can mutate
+    experiments = init_kwargs.pop("_experiments", {})
+
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        _experiments=experiments,
+        **init_kwargs,
+    )
+
+    items = capture_items("span")
+
+    unpack_werkzeug_response(
+        client.get(reverse("message"), environ_base={"REMOTE_ADDR": "127.0.0.1"})
+    )
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    root_span = spans[-1]
+
+    if expect_ip:
+        assert root_span["attributes"][SPANDATA.USER_IP_ADDRESS] == "127.0.0.1"
+        assert root_span["attributes"]["client.address"] == "127.0.0.1"
+    else:
+        assert SPANDATA.USER_IP_ADDRESS not in root_span["attributes"]
+        assert "client.address" not in root_span["attributes"]
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator()
+@pytest.mark.parametrize("init_kwargs, expect_ip", USER_INFO_INIT_KWARGS)
+def test_user_info_error_event_data_collection(
+    sentry_init, client, capture_events, init_kwargs, expect_ip
+):
+    sentry_init(integrations=[DjangoIntegration()], **init_kwargs)
+    events = capture_events()
+
+    client.get(reverse("view_exc"), environ_base={"REMOTE_ADDR": "127.0.0.1"})
+
+    (event,) = events
+
+    if expect_ip:
+        assert event["user"]["ip_address"] == "127.0.0.1"
+        assert event["request"]["env"]["REMOTE_ADDR"] == "127.0.0.1"
+    else:
+        assert "ip_address" not in event.get("user", {})
+        assert "REMOTE_ADDR" not in event["request"]["env"]
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator()
+def test_error_event_no_user_ip_address_without_remote_addr(
+    sentry_init, client, capture_events
+):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        _experiments={"data_collection": {"user_info": True}},
+    )
+    events = capture_events()
+
+    client.get(reverse("view_exc"))
+
+    (event,) = events
+
+    assert "ip_address" not in event.get("user", {})

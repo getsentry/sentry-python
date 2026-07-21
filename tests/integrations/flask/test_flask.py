@@ -1398,3 +1398,128 @@ def test_empty_query_string_is_dropped_with_data_collection(
 
     (event,) = events
     assert "query_string" not in event["request"]
+
+
+# Parametrization shared by the user_info tests below. ``expect_ip`` is
+# whether the client IP may be collected under the given init kwargs.
+USER_INFO_INIT_KWARGS = [
+    pytest.param({"send_default_pii": True}, True, id="legacy_send_default_pii_true"),
+    pytest.param(
+        {"send_default_pii": False}, False, id="legacy_send_default_pii_false"
+    ),
+    pytest.param(
+        {"_experiments": {"data_collection": {"user_info": True}}},
+        True,
+        id="data_collection_user_info_true",
+    ),
+    pytest.param(
+        {"_experiments": {"data_collection": {"user_info": False}}},
+        False,
+        id="data_collection_user_info_false",
+    ),
+    # ``data_collection`` is the single source of truth: it must win over
+    # ``send_default_pii`` when both are configured.
+    pytest.param(
+        {
+            "send_default_pii": True,
+            "_experiments": {"data_collection": {"user_info": False}},
+        },
+        False,
+        id="data_collection_wins_over_send_default_pii_true",
+    ),
+    pytest.param(
+        {
+            "send_default_pii": False,
+            "_experiments": {"data_collection": {"user_info": True}},
+        },
+        True,
+        id="data_collection_wins_over_send_default_pii_false",
+    ),
+]
+
+
+@pytest.mark.parametrize("init_kwargs, expect_ip", USER_INFO_INIT_KWARGS)
+def test_user_info_span_attributes_data_collection(
+    sentry_init, app, capture_items, monkeypatch, init_kwargs, expect_ip
+):
+    init_kwargs = dict(init_kwargs)  # shallow copy so we can mutate
+    experiments = init_kwargs.pop("_experiments", {})
+
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        _experiments=experiments,
+        **init_kwargs,
+    )
+    # This test is about user IP collection, not flask_login. Disable
+    # flask_login so the module-level login manager does not interfere.
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
+
+    items = capture_items("span")
+
+    client = app.test_client()
+    client.get("/message", environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items if item.type == "span"]
+    (segment,) = spans
+
+    if expect_ip:
+        assert segment["attributes"][SPANDATA.USER_IP_ADDRESS] == "127.0.0.1"
+        assert segment["attributes"]["client.address"] == "127.0.0.1"
+    else:
+        assert SPANDATA.USER_IP_ADDRESS not in segment["attributes"]
+        assert "client.address" not in segment["attributes"]
+
+
+@pytest.mark.parametrize("init_kwargs, expect_ip", USER_INFO_INIT_KWARGS)
+def test_user_info_error_event_data_collection(
+    sentry_init, app, capture_events, monkeypatch, init_kwargs, expect_ip
+):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()], **init_kwargs)
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
+
+    @app.route("/crash")
+    def crash():
+        1 / 0
+
+    events = capture_events()
+
+    client = app.test_client()
+    with pytest.raises(ZeroDivisionError):
+        client.get("/crash", environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+
+    (event,) = events
+
+    if expect_ip:
+        assert event["user"]["ip_address"] == "127.0.0.1"
+        assert event["request"]["env"]["REMOTE_ADDR"] == "127.0.0.1"
+    else:
+        assert "ip_address" not in event.get("user", {})
+        assert "REMOTE_ADDR" not in event["request"]["env"]
+
+
+def test_error_event_no_user_ip_address_without_remote_addr(
+    sentry_init, app, capture_events, monkeypatch
+):
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        _experiments={"data_collection": {"user_info": True}},
+    )
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
+
+    @app.route("/crash")
+    def crash():
+        1 / 0
+
+    events = capture_events()
+
+    client = app.test_client()
+    with pytest.raises(ZeroDivisionError):
+        client.get("/crash", environ_overrides={"REMOTE_ADDR": ""})
+
+    (event,) = events
+
+    assert "ip_address" not in event.get("user", {})

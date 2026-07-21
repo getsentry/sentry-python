@@ -1316,3 +1316,119 @@ def test_user_ip_address_on_all_spans(sentry_init, capture_items, send_default_p
     else:
         assert "user.ip_address" not in server_span["attributes"]
         assert "user.ip_address" not in child_span["attributes"]
+
+
+# Parametrization shared by the user_info tests below. ``expect_ip`` is
+# whether the client IP may be collected under the given init kwargs.
+USER_INFO_INIT_KWARGS = [
+    pytest.param({"send_default_pii": True}, True, id="legacy_send_default_pii_true"),
+    pytest.param(
+        {"send_default_pii": False}, False, id="legacy_send_default_pii_false"
+    ),
+    pytest.param(
+        {"_experiments": {"data_collection": {"user_info": True}}},
+        True,
+        id="data_collection_user_info_true",
+    ),
+    pytest.param(
+        {"_experiments": {"data_collection": {"user_info": False}}},
+        False,
+        id="data_collection_user_info_false",
+    ),
+    # ``data_collection`` is the single source of truth: it must win over
+    # ``send_default_pii`` when both are configured.
+    pytest.param(
+        {
+            "send_default_pii": True,
+            "_experiments": {"data_collection": {"user_info": False}},
+        },
+        False,
+        id="data_collection_wins_over_send_default_pii_true",
+    ),
+    pytest.param(
+        {
+            "send_default_pii": False,
+            "_experiments": {"data_collection": {"user_info": True}},
+        },
+        True,
+        id="data_collection_wins_over_send_default_pii_false",
+    ),
+]
+
+
+@pytest.mark.parametrize("init_kwargs, expect_ip", USER_INFO_INIT_KWARGS)
+def test_user_info_span_attributes_data_collection(
+    sentry_init, capture_items, init_kwargs, expect_ip
+):
+    def dogpark(environ, start_response):
+        with sentry_sdk.traces.start_span(name="child-span"):
+            pass
+        start_response("200 OK", [])
+        return ["Go get the ball! Good dog!"]
+
+    init_kwargs = dict(init_kwargs)  # shallow copy so we can mutate
+    experiments = init_kwargs.pop("_experiments", {})
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        _experiments=experiments,
+        **init_kwargs,
+    )
+    app = SentryWsgiMiddleware(dogpark)
+    client = Client(app)
+
+    items = capture_items("span")
+
+    client.get("/dogs/are/great/", environ_base={"REMOTE_ADDR": "127.0.0.1"})
+
+    sentry_sdk.flush()
+
+    child_span, server_span = [item.payload for item in items]
+
+    if expect_ip:
+        assert server_span["attributes"]["user.ip_address"] == "127.0.0.1"
+        assert child_span["attributes"]["user.ip_address"] == "127.0.0.1"
+        assert server_span["attributes"]["client.address"] == "127.0.0.1"
+    else:
+        assert "user.ip_address" not in server_span["attributes"]
+        assert "user.ip_address" not in child_span["attributes"]
+        assert "client.address" not in server_span["attributes"]
+
+
+@pytest.mark.parametrize("init_kwargs, expect_ip", USER_INFO_INIT_KWARGS)
+def test_user_info_error_event_data_collection(
+    sentry_init, crashing_app, capture_events, init_kwargs, expect_ip
+):
+    sentry_init(**init_kwargs)
+    app = SentryWsgiMiddleware(crashing_app)
+    client = Client(app)
+    events = capture_events()
+
+    with pytest.raises(ZeroDivisionError):
+        client.get("/", environ_base={"REMOTE_ADDR": "127.0.0.1"})
+
+    (event,) = events
+
+    if expect_ip:
+        assert event["user"]["ip_address"] == "127.0.0.1"
+        assert event["request"]["env"]["REMOTE_ADDR"] == "127.0.0.1"
+    else:
+        assert "ip_address" not in event.get("user", {})
+        assert "REMOTE_ADDR" not in event["request"]["env"]
+
+
+def test_error_event_no_user_ip_address_without_remote_addr(
+    sentry_init, crashing_app, capture_events
+):
+    sentry_init(_experiments={"data_collection": {"user_info": True}})
+    app = SentryWsgiMiddleware(crashing_app)
+    client = Client(app)
+    events = capture_events()
+
+    with pytest.raises(ZeroDivisionError):
+        client.get("/")
+
+    (event,) = events
+
+    assert "ip_address" not in event.get("user", {})
