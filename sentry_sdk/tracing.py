@@ -2,7 +2,7 @@ import uuid
 import warnings
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER, SPANDATA, SPANSTATUS, SPANTEMPLATE
@@ -412,7 +412,10 @@ class Span:
             self.set_status(SPANSTATUS.INTERNAL_ERROR)
 
         with capture_internal_exceptions():
-            scope, old_span = self._context_manager_state
+            scope, old_span = cast(
+                "Tuple[sentry_sdk.Scope, Optional[Span]]",
+                self._context_manager_state,
+            )
             del self._context_manager_state
             self.finish(scope)
             scope.span = old_span
