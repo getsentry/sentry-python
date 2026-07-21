@@ -303,6 +303,9 @@ def sentry_init(request):
             sentry_sdk.get_current_scope().set_client(None)
             yield inner
         finally:
+            current = sentry_sdk.get_global_scope().client
+            if current is not None:
+                current.close()
             sentry_sdk.get_global_scope().set_client(old_client)
 
 
