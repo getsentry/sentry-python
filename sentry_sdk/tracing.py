@@ -398,8 +398,8 @@ class Span:
     def __exit__(
         self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
     ) -> None:
-        if has_span_streaming_enabled(sentry_sdk.get_client().options):
-            return None
+        if not hasattr(self, "_context_manager_state"):
+            return
 
         if value is not None and should_be_treated_as_error(ty, value):
             self.set_status(SPANSTATUS.INTERNAL_ERROR)
