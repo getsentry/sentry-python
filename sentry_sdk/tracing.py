@@ -222,6 +222,9 @@ class _SpanRecorder:
             self.spans.append(span)
 
 
+_NOOP_CONTEXT = object()
+
+
 class Span:
     """A span holds timing information of a block of code.
     Spans can have multiple child spans thus forming a span tree.
@@ -387,6 +390,7 @@ class Span:
 
     def __enter__(self) -> "Span":
         if has_span_streaming_enabled(sentry_sdk.get_client().options):
+            self._context_manager_state = _NOOP_CONTEXT
             return self
 
         scope = self.scope or sentry_sdk.get_current_scope()
@@ -398,7 +402,9 @@ class Span:
     def __exit__(
         self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
     ) -> None:
-        if not hasattr(self, "_context_manager_state"):
+        state = getattr(self, "_context_manager_state", None)
+        if state is _NOOP_CONTEXT:
+            del self._context_manager_state
             return
 
         if value is not None and should_be_treated_as_error(ty, value):
