@@ -1523,3 +1523,105 @@ def test_error_event_no_user_ip_address_without_remote_addr(
     (event,) = events
 
     assert "ip_address" not in event.get("user", {})
+
+
+@pytest.mark.parametrize("init_kwargs, expect_user", USER_INFO_INIT_KWARGS)
+def test_flask_login_user_identity_error_event_data_collection(
+    sentry_init, app, capture_events, init_kwargs, expect_user
+):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()], **init_kwargs)
+
+    class User:
+        is_authenticated = is_active = True
+        is_anonymous = False
+        email = "user@example.com"
+        username = "testuser"
+
+        def get_id(self):
+            return "42"
+
+    @login_manager.user_loader
+    def load_user(user_id):
+        return User()
+
+    @app.route("/login")
+    def login():
+        login_user(User())
+        return "ok"
+
+    @app.route("/crash")
+    def crash():
+        1 / 0
+
+    events = capture_events()
+
+    client = app.test_client()
+    assert client.get("/login").status_code == 200
+    with pytest.raises(ZeroDivisionError):
+        client.get("/crash")
+
+    (event,) = events
+
+    if expect_user:
+        assert event["user"]["id"] == "42"
+        assert event["user"]["email"] == "user@example.com"
+        assert event["user"]["username"] == "testuser"
+    else:
+        user = event.get("user", {})
+        assert "id" not in user
+        assert "email" not in user
+        assert "username" not in user
+
+
+@pytest.mark.parametrize("init_kwargs, expect_user", USER_INFO_INIT_KWARGS)
+def test_flask_login_user_identity_span_attributes_data_collection(
+    sentry_init, app, capture_items, init_kwargs, expect_user
+):
+    init_kwargs = dict(init_kwargs)
+    experiments = init_kwargs.pop("_experiments", {})
+
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        _experiments=experiments,
+        **init_kwargs,
+    )
+
+    class User:
+        is_authenticated = is_active = True
+        is_anonymous = False
+        email = "user@example.com"
+        username = "testuser"
+
+        def get_id(self):
+            return "42"
+
+    @login_manager.user_loader
+    def load_user(user_id):
+        return User()
+
+    @app.route("/login")
+    def login():
+        login_user(User())
+        return "ok"
+
+    items = capture_items("span")
+
+    client = app.test_client()
+    assert client.get("/login").status_code == 200
+    assert client.get("/message").status_code == 200
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items if item.type == "span"]
+    segment = next(s for s in spans if s["name"] == "hi")
+
+    if expect_user:
+        assert segment["attributes"]["user.id"] == "42"
+        assert segment["attributes"]["user.email"] == "user@example.com"
+        assert segment["attributes"]["user.name"] == "testuser"
+    else:
+        assert "user.id" not in segment.get("attributes", {})
+        assert "user.email" not in segment.get("attributes", {})
+        assert "user.name" not in segment.get("attributes", {})
