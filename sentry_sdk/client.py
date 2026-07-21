@@ -362,9 +362,10 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
         )
     elif has_data_collection_enabled(rv) and rv["event_scrubber"]:
         warnings.warn(
-            "Event scrubbers are not enabled when data collection configuration is provided.",
+            "Event scrubbers are not enabled when data collection configuration is provided. Ignoring event_scrubber...",
             stacklevel=2,
         )
+        rv["event_scrubber"] = None
 
     if rv["socket_options"] and not isinstance(rv["socket_options"], list):
         logger.warning(
