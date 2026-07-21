@@ -835,17 +835,7 @@ def test_log_batcher_lock_reset_in_child_after_fork(sentry_init):
     original_lock = batcher._lock
     original_lock.acquire()
 
-    batcher._buffer.append(
-        {
-            "severity_text": "info",
-            "severity_number": 9,
-            "body": "fork-reset sentinel",
-            "attributes": {},
-            "time_unix_nano": 0,
-            "trace_id": None,
-            "span_id": None,
-        }
-    )
+    batcher._buffer.append(object())
     batcher._active.flag = True
     batcher._flush_event.set()
     batcher._running = False
