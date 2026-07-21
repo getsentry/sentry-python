@@ -454,10 +454,13 @@ def capture_events_forksafe(monkeypatch, capture_events, request):
                 events_w.write(b"\n")
             return old_capture_envelope(envelope)
 
+        real_flush = test_client.flush
+
         def flush(timeout=None, callback=None):
             events_w.write(b"flush\n")
 
         def cleanup():
+            test_client.flush = real_flush
             test_client.transport.capture_envelope = old_capture_envelope
 
         request.addfinalizer(cleanup)
