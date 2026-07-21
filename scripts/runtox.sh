@@ -28,10 +28,8 @@ if [ -n "$TOX_UV_PYTHON_PREFERENCE" ]; then
     TOX_ENV=(env "UV_PYTHON_PREFERENCE=$TOX_UV_PYTHON_PREFERENCE")
 fi
 
-# Django ASGI tests deadlock under tox's parallel env scheduler when multiple
-# Django envs share the same Postgres service container. Run those serially.
-if [[ "$searchstring" == *-django* ]]; then
-    exec uv run "${TOX_ENV[@]}" tox -e "$ENV" -- "${@:2}"
-else
-    exec uv run "${TOX_ENV[@]}" tox -p auto -o -e "$ENV" -- "${@:2}"
-fi
+# Django envs used to run serially: with per-fork database creation the
+# parallel scheduler deadlocked the shared Postgres service container. Each
+# env now builds one reusable database (tox.ini setenv + the django_db_setup
+# override in tests/integrations/django/conftest.py), so parallel is safe.
+exec uv run "${TOX_ENV[@]}" tox -p auto -o -e "$ENV" -- "${@:2}"
