@@ -1244,7 +1244,7 @@ class Transaction(Span):
                 "[Tracing] Discarding {transaction_description} because {reason}".format(
                     transaction_description=transaction_description,
                     reason=(
-                        "traces_sampler returned 0 or False"
+                        "traces_sampler returned 0 or False, or is using a fallback sample rate that is 0 or False"
                         if callable(client.options.get("traces_sampler"))
                         else "traces_sample_rate is set to 0"
                     ),
