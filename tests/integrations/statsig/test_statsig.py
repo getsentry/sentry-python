@@ -198,7 +198,7 @@ def test_statsig_span_integration(
         sentry_init(
             traces_sample_rate=1.0,
             integrations=[StatsigIntegration()],
-            _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+            trace_lifecycle="stream" if span_streaming else "static",
         )
         user = StatsigUser(user_id="user-id")
 

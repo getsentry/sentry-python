@@ -1136,7 +1136,7 @@ def test_active_thread_id_span_streaming(sentry_init, capture_items, endpoint):
         auto_enabling_integrations=False,  # avoid legacy spans from auto-enabled integrations leaking into streaming mode
         integrations=[StarletteIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     app = starlette_app_factory()
 

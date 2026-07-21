@@ -1031,23 +1031,13 @@ async def test_transaction_name_in_traces_sampler(
     """
 
     def dummy_traces_sampler(sampling_context):
-        if span_streaming:
-            assert sampling_context["span_context"]["name"] == expected_transaction_name
-            assert (
-                sampling_context["span_context"]["attributes"][
-                    "sentry.segment.name.source"
-                ]
-                == expected_transaction_source
-            )
-        else:
-            assert (
-                sampling_context["transaction_context"]["name"]
-                == expected_transaction_name
-            )
-            assert (
-                sampling_context["transaction_context"]["source"]
-                == expected_transaction_source
-            )
+        assert (
+            sampling_context["transaction_context"]["name"] == expected_transaction_name
+        )
+        assert (
+            sampling_context["transaction_context"]["source"]
+            == expected_transaction_source
+        )
 
     sentry_init(
         traces_sampler=dummy_traces_sampler,
@@ -1139,7 +1129,7 @@ async def test_user_ip_address_on_all_spans(
     sentry_init(
         send_default_pii=send_default_pii,
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     sentry_app = SentryAsgiMiddleware(app)
 

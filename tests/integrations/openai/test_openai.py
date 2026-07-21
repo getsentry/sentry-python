@@ -133,7 +133,7 @@ def test_nonstreaming_chat_completion_no_prompts(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -334,7 +334,7 @@ def test_nonstreaming_chat_completion(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -472,7 +472,7 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -668,7 +668,7 @@ async def test_nonstreaming_chat_completion_async(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -815,7 +815,7 @@ def test_streaming_chat_completion_no_prompts(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -997,7 +997,7 @@ def test_streaming_chat_completion_with_usage_in_stream(
         traces_sample_rate=1.0,
         send_default_pii=False,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -1111,7 +1111,7 @@ def test_streaming_chat_completion_empty_content_preserves_token_usage(
         traces_sample_rate=1.0,
         send_default_pii=False,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -1208,7 +1208,7 @@ async def test_streaming_chat_completion_empty_content_preserves_token_usage_asy
         traces_sample_rate=1.0,
         send_default_pii=False,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -1307,7 +1307,7 @@ async def test_streaming_chat_completion_async_with_usage_in_stream(
         traces_sample_rate=1.0,
         send_default_pii=False,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -1512,7 +1512,7 @@ def test_streaming_chat_completion(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -1724,7 +1724,7 @@ async def test_streaming_chat_completion_async_no_prompts(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2003,7 +2003,7 @@ async def test_streaming_chat_completion_async(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2201,7 +2201,7 @@ def test_bad_chat_completion(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -2271,7 +2271,7 @@ def test_span_status_error(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming or stream_gen_ai_spans:
@@ -2329,7 +2329,7 @@ async def test_bad_chat_completion_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2400,7 +2400,7 @@ def test_embeddings_create_no_pii(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -2549,7 +2549,7 @@ def test_embeddings_create(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -2644,7 +2644,7 @@ async def test_embeddings_create_async_no_pii(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2794,7 +2794,7 @@ async def test_embeddings_create_async(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2884,7 +2884,7 @@ def test_embeddings_create_raises_error(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -2947,7 +2947,7 @@ async def test_embeddings_create_raises_error_async(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -3008,7 +3008,7 @@ def test_span_origin_nonstreaming_chat(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -3070,7 +3070,7 @@ async def test_span_origin_nonstreaming_chat_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -3130,7 +3130,7 @@ def test_span_origin_streaming_chat(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -3221,7 +3221,7 @@ async def test_span_origin_streaming_chat_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -3318,7 +3318,7 @@ def test_span_origin_embeddings(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -3374,7 +3374,7 @@ async def test_span_origin_embeddings_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -3796,7 +3796,7 @@ def test_ai_client_span_responses_api_no_pii(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -4092,7 +4092,7 @@ def test_ai_client_span_responses_api(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -4264,7 +4264,7 @@ def test_responses_api_conversation_id(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -4322,7 +4322,7 @@ def test_error_in_responses_api(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -4566,7 +4566,7 @@ async def test_ai_client_span_responses_async_api(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -4879,7 +4879,7 @@ async def test_ai_client_span_streaming_responses_async_api(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -5026,7 +5026,7 @@ async def test_error_in_responses_async_api(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -5208,7 +5208,7 @@ def test_streaming_responses_api(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -5338,7 +5338,7 @@ async def test_streaming_responses_api_async(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -5460,7 +5460,7 @@ def test_empty_tools_in_chat_completion(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -5543,7 +5543,7 @@ def test_openai_message_role_mapping(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -5679,7 +5679,7 @@ def test_streaming_chat_completion_ttft(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -5792,7 +5792,7 @@ async def test_streaming_chat_completion_ttft_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -5906,7 +5906,7 @@ def test_streaming_responses_api_ttft(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -5990,7 +5990,7 @@ async def test_streaming_responses_api_ttft_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
