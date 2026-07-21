@@ -982,8 +982,8 @@ async def test_span_streaming_sensitive_header_scrubbing(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=options["send_default_pii"],
+        trace_lifecycle="stream",
         _experiments={
-            "trace_lifecycle": "stream",
             "data_collection": options["data_collection"],
         },
     )
@@ -1007,7 +1007,7 @@ async def test_span_streaming_sensitive_header_scrubbing(
     assert len(spans) == 1
 
     segment = spans[0]
-    if request.node.callspec.id == "data_collection_off_does_not_add_headers":
+    if expected is None:
         assert "http.request.header.authorization" not in segment["attributes"]
         assert "http.request.header.cookie" not in segment["attributes"]
     else:
