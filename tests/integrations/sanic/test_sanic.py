@@ -435,7 +435,7 @@ def test_transactions(
         integrations=[SanicIntegration(*test_config.integration_args)],
         traces_sample_rate=1.0,
         send_default_pii=send_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -530,7 +530,7 @@ def test_span_origin(sentry_init, app, capture_events, capture_items, span_strea
     sentry_init(
         integrations=[SanicIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -576,7 +576,7 @@ def test_user_ip_address_on_all_spans(
         default_integrations=False,
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")

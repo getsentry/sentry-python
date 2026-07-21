@@ -1042,7 +1042,7 @@ async def test_user_ip_address_on_all_spans(
     sentry_init(
         send_default_pii=send_default_pii,
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     sentry_app = SentryAsgiMiddleware(app)
 

@@ -13,7 +13,7 @@ def test_envelope_by_trace_id(sentry_init, capture_envelopes, monkeypatch):
     """Envelopes only contain spans of one trace ID."""
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     envelopes = capture_envelopes()
@@ -60,7 +60,7 @@ def test_max_envelope_size(sentry_init, capture_envelopes, monkeypatch):
 
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     envelopes = capture_envelopes()
@@ -101,7 +101,7 @@ def test_drop_after_max_reached(
 
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     envelopes = capture_envelopes()
@@ -134,7 +134,7 @@ def test_drop_isolated_per_bucket(
 
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     envelopes = capture_envelopes()
@@ -180,7 +180,7 @@ def test_length_based_flushing(sentry_init, capture_items, monkeypatch):
 
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -203,7 +203,7 @@ def test_weight_based_flushing(sentry_init, capture_envelopes, monkeypatch):
 
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     envelopes = capture_envelopes()
@@ -228,7 +228,7 @@ def test_weight_based_flushing_by_attribute_size(
 
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     envelopes = capture_envelopes()
@@ -263,7 +263,7 @@ def test_bucket_recreated_after_flush(sentry_init, capture_envelopes, monkeypatc
 
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     envelopes = capture_envelopes()
@@ -312,7 +312,7 @@ def test_quiet_buckets_flush_eventually(sentry_init, capture_envelopes, monkeypa
 
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     envelopes = capture_envelopes()
@@ -337,7 +337,7 @@ def test_quiet_buckets_flushed_with_busy_neighbors(
 
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     envelopes = capture_envelopes()
@@ -385,7 +385,7 @@ def test_transport_format(sentry_init, capture_envelopes):
         server_name="test-server",
         release="1.0.0",
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     envelopes = capture_envelopes()
@@ -451,7 +451,7 @@ def test_span_batcher_lock_reset_in_child_after_fork(sentry_init):
     """
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     batcher = sentry_sdk.get_client().span_batcher
     assert batcher is not None

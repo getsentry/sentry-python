@@ -598,7 +598,7 @@ def test_span_streaming_no_error(run_cloud_function):
         + FUNCTIONS_PRELUDE
         + dedent(
             """
-        init_sdk(traces_sample_rate=1.0, _experiments={"trace_lifecycle": "stream"})
+        init_sdk(traces_sample_rate=1.0, trace_lifecycle="stream")
         gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
         """
         )
@@ -632,7 +632,7 @@ def test_span_streaming_error(run_cloud_function):
         + FUNCTIONS_PRELUDE
         + dedent(
             """
-        init_sdk(traces_sample_rate=1.0, _experiments={"trace_lifecycle": "stream"})
+        init_sdk(traces_sample_rate=1.0, trace_lifecycle="stream")
         gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
         """
         )
@@ -684,7 +684,7 @@ def test_span_streaming_existing_trace_context(run_cloud_function):
         + FUNCTIONS_PRELUDE
         + dedent(
             """
-        init_sdk(traces_sample_rate=1.0, _experiments={"trace_lifecycle": "stream"})
+        init_sdk(traces_sample_rate=1.0, trace_lifecycle="stream")
         gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
         """
         )
@@ -729,7 +729,7 @@ def test_span_streaming_request_attributes(run_cloud_function):
         + FUNCTIONS_PRELUDE
         + dedent(
             """
-        init_sdk(traces_sample_rate=1.0, send_default_pii=True, _experiments={"trace_lifecycle": "stream"})
+        init_sdk(traces_sample_rate=1.0, send_default_pii=True, trace_lifecycle="stream")
         gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
         """
         )
@@ -770,7 +770,7 @@ def test_span_streaming_no_query_string_without_pii(run_cloud_function):
         + FUNCTIONS_PRELUDE
         + dedent(
             """
-        init_sdk(traces_sample_rate=1.0, send_default_pii=False, _experiments={"trace_lifecycle": "stream"})
+        init_sdk(traces_sample_rate=1.0, send_default_pii=False, trace_lifecycle="stream")
         gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
         """
         )
