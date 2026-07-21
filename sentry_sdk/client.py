@@ -1252,10 +1252,12 @@ class _Client(BaseClient):
                     exception_raised_in_before_send_func = True
                     raise
 
-            if exception_raised_in_before_send_func:
-                return
-
             if ty in ("log", "metric"):
+                # We are ok with dropping metrics and logs when an exception is raised
+                # because we allow users to drop them in their respect before_send_*
+                # functions.
+                if exception_raised_in_before_send_func:
+                    return
                 # Logs and metrics can be dropped in their respective
                 # before_send, so if we get None, don't queue them for sending.
                 if serialized is None:

@@ -380,8 +380,12 @@ def test_before_send_span_raises_does_not_crash_application(sentry_init, capture
     sentry_sdk.get_client().flush()
     spans = [item.payload for item in items]
 
-    # The exception in before_send_span is swallowed and the span is dropped.
-    assert not spans
+    # The exception in before_send_span is swallowed and the original,
+    # unmodified span is sent.
+    assert len(spans) == 1
+    (span,) = spans
+
+    assert span["name"] == "span"
 
 
 def test_span_attributes(sentry_init, capture_items):
