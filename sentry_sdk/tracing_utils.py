@@ -42,7 +42,6 @@ if TYPE_CHECKING:
     from typing import Any, Dict, Generator, Iterator, Optional, Tuple, Union
 
     from sentry_sdk._types import Attributes
-    from sentry_sdk.client import BaseClient
 
 
 SENTRY_TRACE_REGEX = re.compile(
@@ -1577,7 +1576,7 @@ def add_sentry_baggage_to_headers(
 
 
 def _get_effective_sample_rate(
-    client: "BaseClient", propagation_context: "PropagationContext"
+    client: "Any", propagation_context: "PropagationContext"
 ) -> "Union[float, bool]":
     if propagation_context.parent_sampled is not None:
         propagation_context_sample_rate = propagation_context._sample_rate()
