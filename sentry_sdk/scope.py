@@ -1141,9 +1141,16 @@ class Scope:
             constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
             available arguments.
         """
-        kwargs.setdefault("scope", self)
-
         client = self.get_client()
+        if has_span_streaming_enabled(client.options):
+            warnings.warn(
+                "Scope.start_transaction is not available in streaming mode.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return NoOpSpan()
+
+        kwargs.setdefault("scope", self)
 
         configuration_instrumenter = client.options["instrumenter"]
 

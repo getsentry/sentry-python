@@ -3026,7 +3026,19 @@ def test_span_origin_nonstreaming_chat(
         )
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        with sentry_sdk.traces.start_span(name="openai tx"):
+            client.chat.completions.create(
+                model="some-model", messages=[{"role": "system", "content": "hello"}]
+            )
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[1]["attributes"]["sentry.origin"] == "manual"
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="openai tx"):
@@ -3088,7 +3100,19 @@ async def test_span_origin_nonstreaming_chat_async(
         )
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        with sentry_sdk.traces.start_span(name="openai tx"):
+            await client.chat.completions.create(
+                model="some-model", messages=[{"role": "system", "content": "hello"}]
+            )
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[1]["attributes"]["sentry.origin"] == "manual"
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="openai tx"):
@@ -3171,7 +3195,22 @@ def test_span_origin_streaming_chat(
         ),
     ]
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        client.chat.completions._post = mock.Mock(return_value=returned_stream)
+        with sentry_sdk.traces.start_span(name="openai tx"):
+            response_stream = client.chat.completions.create(
+                model="some-model", messages=[{"role": "system", "content": "hello"}]
+            )
+
+            "".join(map(lambda x: x.choices[0].delta.content, response_stream))
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[1]["attributes"]["sentry.origin"] == "manual"
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         client.chat.completions._post = mock.Mock(return_value=returned_stream)
@@ -3268,7 +3307,23 @@ async def test_span_origin_streaming_chat_async(
 
     client.chat.completions._post = AsyncMock(return_value=returned_stream)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        with sentry_sdk.traces.start_span(name="openai tx"):
+            response_stream = await client.chat.completions.create(
+                model="some-model", messages=[{"role": "system", "content": "hello"}]
+            )
+            async for _ in response_stream:
+                pass
+
+            # "".join(map(lambda x: x.choices[0].delta.content, response_stream))
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[1]["attributes"]["sentry.origin"] == "manual"
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="openai tx"):
@@ -3335,7 +3390,17 @@ def test_span_origin_embeddings(
 
     client.embeddings._post = mock.Mock(return_value=returned_embedding)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        with sentry_sdk.traces.start_span(name="openai tx"):
+            client.embeddings.create(input="hello", model="text-embedding-3-large")
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[1]["attributes"]["sentry.origin"] == "manual"
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="openai tx"):
@@ -3391,7 +3456,19 @@ async def test_span_origin_embeddings_async(
 
     client.embeddings._post = AsyncMock(return_value=returned_embedding)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        with sentry_sdk.traces.start_span(name="openai tx"):
+            await client.embeddings.create(
+                input="hello", model="text-embedding-3-large"
+            )
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[1]["attributes"]["sentry.origin"] == "manual"
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="openai tx"):
