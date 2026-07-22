@@ -180,7 +180,7 @@ def test_finds_transaction_on_scope(sentry_init):
 def test_finds_segment_on_scope(sentry_init):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     with sentry_sdk.traces.start_span(name="dogpark"):
@@ -250,7 +250,7 @@ def test_finds_non_orphan_span_on_scope(sentry_init):
 def test_finds_non_orphan_span_on_scope_span_streaming(sentry_init):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     segment = sentry_sdk.traces.start_span(name="dogpark")
@@ -342,7 +342,7 @@ def test_circular_references_span_streaming(monkeypatch, sentry_init, request):
 
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     # Make sure that we're starting with a clean slate before we start creating

@@ -726,7 +726,7 @@ def test_outgoing_trace_headers_span_streaming(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[Httpx2Integration()],
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     url = "http://example.com/"
@@ -768,7 +768,7 @@ def test_outgoing_trace_headers_append_to_baggage_span_streaming(
         traces_sample_rate=1.0,
         integrations=[Httpx2Integration()],
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     url = "http://example.com/"
@@ -814,7 +814,7 @@ def test_outgoing_trace_headers_span_streaming_no_current_span(
         traces_sample_rate=1.0,
         trace_propagation_targets=[MATCH_ALL],
         integrations=[Httpx2Integration()],
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     url = "http://example.com/"
@@ -853,7 +853,7 @@ def test_outgoing_trace_headers_span_streaming_no_current_span_async(
         traces_sample_rate=1.0,
         trace_propagation_targets=[MATCH_ALL],
         integrations=[Httpx2Integration()],
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     url = "http://example.com/"
@@ -892,7 +892,7 @@ def test_request_source_disabled_span_streaming(
         traces_sample_rate=1.0,
         enable_http_request_source=False,
         http_request_source_threshold_ms=0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -933,7 +933,7 @@ def test_request_source_enabled_span_streaming(
         "integrations": [Httpx2Integration()],
         "traces_sample_rate": 1.0,
         "http_request_source_threshold_ms": 0,
-        "_experiments": {"trace_lifecycle": "stream"},
+        "trace_lifecycle": "stream",
     }
     if enable_http_request_source is not None:
         sentry_options["enable_http_request_source"] = enable_http_request_source
@@ -974,7 +974,7 @@ def test_request_source_span_streaming(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1032,7 +1032,7 @@ def test_request_source_with_module_in_search_path_span_streaming(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1092,7 +1092,7 @@ def test_no_request_source_if_duration_too_short_span_streaming(
         enable_http_request_source=True,
         # Threshold so high no real request will ever exceed it
         http_request_source_threshold_ms=9999999,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1130,7 +1130,7 @@ def test_request_source_if_duration_over_threshold_span_streaming(
         enable_http_request_source=True,
         # Threshold of 0 means any non-zero duration qualifies
         http_request_source_threshold_ms=0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1183,7 +1183,7 @@ def test_span_origin_span_streaming(
     sentry_init(
         integrations=[Httpx2Integration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1216,7 +1216,7 @@ def test_http_url_attributes_span_streaming(
         integrations=[Httpx2Integration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1253,7 +1253,7 @@ def test_http_url_attributes_no_query_or_fragment_span_streaming(
         integrations=[Httpx2Integration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1289,7 +1289,7 @@ def test_http_url_attributes_pii_disabled_span_streaming(
     sentry_init(
         integrations=[Httpx2Integration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")

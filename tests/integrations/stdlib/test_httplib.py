@@ -192,7 +192,7 @@ def test_empty_realurl(
 
     sentry_init(
         dsn="",
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     HTTPConnection("localhost", port=PORT).putrequest("POST", None)
 
@@ -255,7 +255,7 @@ def test_outgoing_trace_headers(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     already_patched_getresponse = HTTPSConnection.getresponse
@@ -370,7 +370,7 @@ def test_outgoing_trace_headers_head_sdk(
     sentry_init(
         traces_sample_rate=0.5,
         release="foo",
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     already_patched_getresponse = HTTPSConnection.getresponse
@@ -468,7 +468,7 @@ def test_outgoing_trace_headers_span_streaming_no_current_span(sentry_init):
     """
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     already_patched_getresponse = HTTPSConnection.getresponse
@@ -599,7 +599,7 @@ def test_option_trace_propagation_targets(
     sentry_init(
         trace_propagation_targets=trace_propagation_targets,
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     already_patched_getresponse = HTTPSConnection.getresponse
@@ -677,7 +677,7 @@ def test_request_source_disabled(
 
     sentry_init(
         **sentry_options,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -731,7 +731,7 @@ def test_request_source_enabled(
     sentry_options = {
         "traces_sample_rate": 1.0,
         "http_request_source_threshold_ms": 0,
-        "_experiments": {"trace_lifecycle": "stream" if span_streaming else "static"},
+        "trace_lifecycle": "stream" if span_streaming else "static",
     }
 
     if enable_http_request_source is not None:
@@ -793,7 +793,7 @@ def test_request_source(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -878,7 +878,7 @@ def test_request_source_with_module_in_search_path(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -952,7 +952,7 @@ def test_no_request_source_if_duration_too_short(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=100,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     add_http_request_source = sentry_sdk.tracing_utils.add_http_request_source
@@ -1026,7 +1026,7 @@ def test_request_source_if_duration_over_threshold(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=100,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     add_http_request_source = sentry_sdk.tracing_utils.add_http_request_source
@@ -1136,7 +1136,7 @@ def test_span_origin(
     sentry_init(
         traces_sample_rate=1.0,
         debug=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -1181,7 +1181,7 @@ def test_http_timeout(
 
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -1236,7 +1236,7 @@ def test_proxy_http_tunnel(
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -1301,7 +1301,7 @@ def test_chunked_response_span_covers_body_read(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     min_expected_duration = CHUNK_DELAY * NUM_CHUNKS

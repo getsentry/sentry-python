@@ -1575,6 +1575,20 @@ def add_sentry_baggage_to_headers(
     )
 
 
+def _get_effective_sample_rate(
+    client: "Any", propagation_context: "PropagationContext"
+) -> "Union[float, bool]":
+    if propagation_context.parent_sampled is not None:
+        propagation_context_sample_rate = propagation_context._sample_rate()
+
+        if propagation_context_sample_rate is not None:
+            return propagation_context_sample_rate
+        else:
+            return propagation_context.parent_sampled
+    else:
+        return client.options["traces_sample_rate"]
+
+
 def _make_sampling_decision(
     name: str,
     attributes: "Optional[Attributes]",
@@ -1605,28 +1619,45 @@ def _make_sampling_decision(
     # If there's a traces_sampler, use that; otherwise use traces_sample_rate
     traces_sampler_defined = callable(client.options.get("traces_sampler"))
     if traces_sampler_defined:
+        if attributes is not None:
+            attributes = dict(attributes)
+        else:
+            attributes = {}
+
         sampling_context = {
-            "span_context": {
-                "name": name,
+            "transaction_context": {
                 "trace_id": propagation_context.trace_id,
+                "span_id": None,
                 "parent_span_id": propagation_context.parent_span_id,
-                "parent_sampled": propagation_context.parent_sampled,
-                "attributes": dict(attributes) if attributes else {},
+                "op": attributes.get("sentry.op"),
+                "name": name,
+                "description": name,
+                "start_timestamp": None,
+                "timestamp": None,
+                "source": attributes.get("sentry.segment.name.source"),
+                "sampled": None,
+                "data": attributes,
             },
+            "parent_sampled": propagation_context.parent_sampled,
         }
 
         if propagation_context.custom_sampling_context:
             sampling_context.update(propagation_context.custom_sampling_context)
 
-        sample_rate = client.options["traces_sampler"](sampling_context)
+        try:
+            sample_rate = client.options["traces_sampler"](sampling_context)
+        except Exception:
+            logger.warning(
+                "[Tracing] traces_sampler raised; falling back to parent sample rate or traces_sample_rate",
+                exc_info=True,
+            )
+            sample_rate = _get_effective_sample_rate(
+                client=client, propagation_context=propagation_context
+            )
     else:
-        if propagation_context.parent_sampled is not None:
-            if propagation_context._sample_rate() is not None:
-                sample_rate = propagation_context._sample_rate()
-            else:
-                sample_rate = propagation_context.parent_sampled
-        else:
-            sample_rate = client.options["traces_sample_rate"]
+        sample_rate = _get_effective_sample_rate(
+            client=client, propagation_context=propagation_context
+        )
 
     # Validate whether the sample_rate we got is actually valid. Since
     # traces_sampler is user-provided, it could return anything.
@@ -1634,10 +1665,10 @@ def _make_sampling_decision(
         logger.warning(f"[Tracing] Discarding {name} because of invalid sample rate.")
         return False, None, None, "sample_rate"
 
-    sample_rate = float(sample_rate)  # type: ignore[arg-type]
+    sample_rate = float(sample_rate)
     if not sample_rate:
         if traces_sampler_defined:
-            reason = "traces_sampler returned 0 or False"
+            reason = "traces_sampler returned 0 or False, or is using a fallback sample rate that is 0 or False"
         else:
             reason = "traces_sample_rate is set to 0"
 

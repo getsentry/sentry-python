@@ -308,7 +308,7 @@ def test_capture_transaction_on_error(
         ]
         + framework_integrations,
         traces_sample_rate=1,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -447,7 +447,7 @@ def test_capture_transaction_on_success(
         + framework_integrations,
         traces_sample_rate=1,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -583,7 +583,7 @@ def test_transaction_no_operation_name(
         + framework_integrations,
         traces_sample_rate=1,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -724,7 +724,7 @@ def test_transaction_mutation(
         + framework_integrations,
         traces_sample_rate=1,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -884,7 +884,7 @@ def test_span_origin(
         ]
         + framework_integrations,
         traces_sample_rate=1,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -951,7 +951,7 @@ def test_span_origin2(
         ]
         + framework_integrations,
         traces_sample_rate=1,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -1018,7 +1018,7 @@ def test_span_origin3(
         ]
         + framework_integrations,
         traces_sample_rate=1,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:

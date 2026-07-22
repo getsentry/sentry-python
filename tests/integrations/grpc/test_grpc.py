@@ -64,7 +64,7 @@ def test_grpc_server_starts_transaction(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[GRPCIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     server, channel = _set_up()
@@ -119,7 +119,7 @@ def test_grpc_server_other_interceptors(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[GRPCIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mock_intercept = lambda continuation, handler_call_details: continuation(
@@ -183,7 +183,7 @@ def test_grpc_server_continues_transaction(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[GRPCIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     server, channel = _set_up()
@@ -277,7 +277,7 @@ def test_grpc_client_starts_span(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[GRPCIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     server, channel = _set_up()
@@ -361,7 +361,7 @@ def test_grpc_client_unary_stream_starts_span(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[GRPCIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     server, channel = _set_up()
@@ -452,7 +452,7 @@ def test_grpc_client_other_interceptor(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[GRPCIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     server, channel = _set_up()
@@ -541,7 +541,7 @@ def test_prevent_dual_client_interceptor(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[GRPCIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     server, channel = _set_up()
@@ -615,7 +615,7 @@ def test_grpc_client_and_servers_interceptors_integration(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[GRPCIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     server, channel = _set_up()
@@ -700,7 +700,7 @@ def test_span_origin(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[GRPCIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     server, channel = _set_up()

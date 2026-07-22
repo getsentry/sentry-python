@@ -28,7 +28,7 @@ def init_huey(sentry_init):
             integrations=[HueyIntegration()],
             traces_sample_rate=1.0,
             send_default_pii=True,
-            _experiments={"trace_lifecycle": "stream"} if has_span_streaming else {},
+            trace_lifecycle="stream" if has_span_streaming else "static",
         )
 
         return MemoryHuey(name="sentry_sdk")
