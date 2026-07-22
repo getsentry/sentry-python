@@ -686,9 +686,6 @@ def test_litestar_scope_user_on_exception_event(
 
 COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
 
-# Sentinel meaning "the request payload should have no ``cookies`` key at all",
-# as opposed to an empty ``{}`` dict.
-
 
 @pytest.mark.parametrize(
     "init_kwargs, expected_cookies",

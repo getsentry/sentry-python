@@ -1094,10 +1094,6 @@ def test_request_headers_legacy_pii_passes_headers_through(
     assert headers["X-Custom-Header"] == "passthrough"
 
 
-# Sentinel: the query string (event) / ``http.query`` attribute (span) is absent.
-NO_QUERY_STRING = object()
-
-
 @pytest.mark.parametrize(
     "init_kwargs, expected_query_string",
     [
@@ -1155,7 +1151,7 @@ NO_QUERY_STRING = object()
                     "data_collection": {"url_query_params": {"mode": "off"}}
                 }
             },
-            NO_QUERY_STRING,
+            None,
             id="data_collection_off",
         ),
     ],
@@ -1173,7 +1169,7 @@ def test_query_string_data_collection(
 
     (event,) = events
 
-    if expected_query_string is NO_QUERY_STRING:
+    if expected_query_string is None:
         assert "query_string" not in event["request"]
     else:
         assert event["request"]["query_string"] == expected_query_string
@@ -1191,12 +1187,12 @@ def test_query_string_data_collection(
         ),
         pytest.param(
             {"send_default_pii": False},
-            NO_QUERY_STRING,
+            None,
             id="send_default_pii_false",
         ),
         pytest.param(
             {},
-            NO_QUERY_STRING,
+            None,
             id="defaults",
         ),
         # data_collection configured: attribute is routed through filtering.
@@ -1235,7 +1231,7 @@ def test_query_string_data_collection(
                     "data_collection": {"url_query_params": {"mode": "off"}}
                 }
             },
-            NO_QUERY_STRING,
+            None,
             id="data_collection_off",
         ),
     ],
@@ -1266,7 +1262,7 @@ def test_span_http_query_data_collection(
 
     (span,) = [item.payload for item in items]
 
-    if expected_query is NO_QUERY_STRING:
+    if expected_query is None:
         assert "http.query" not in span["attributes"]
     else:
         assert span["attributes"]["http.query"] == expected_query

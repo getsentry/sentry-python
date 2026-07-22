@@ -119,9 +119,6 @@ def test_basic(tornado_testcase, sentry_init, capture_events):
 # logic, not the always-on scrubber.
 COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
 
-# Sentinel meaning "the request payload should have no ``cookies`` key at all",
-# as opposed to an empty ``{}`` dict.
-
 
 @pytest.mark.parametrize(
     "init_kwargs, expected_cookies",

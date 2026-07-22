@@ -14,9 +14,6 @@ except ImportError:
     from django.core.urlresolvers import reverse
 
 
-NO_COOKIES = object()
-
-
 @pytest.fixture
 def client():
     return Client(application)
