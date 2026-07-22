@@ -211,7 +211,7 @@ async def test_capture_transaction(
         assert span["is_segment"] is True
         assert span["name"] == "/some_url"
 
-        assert span["attributes"]["sentry.span.source"] == "url"
+        assert span["attributes"]["sentry.segment.name.source"] == "url"
         assert span["attributes"]["sentry.op"] == "http.server"
 
         assert span["attributes"]["network.protocol.name"] == "http"
@@ -567,7 +567,7 @@ async def test_websocket(
         assert span.type == "span"
         span = span.payload
         assert span["name"] == request_url
-        assert span["attributes"]["sentry.span.source"] == "url"
+        assert span["attributes"]["sentry.segment.name.source"] == "url"
 
     else:
         msg_event, error_event, transaction_event = events
@@ -684,7 +684,7 @@ async def test_transaction_style(
         span = items[0].payload
 
         assert span["name"] == expected_transaction
-        assert span["attributes"]["sentry.span.source"] == expected_source
+        assert span["attributes"]["sentry.segment.name.source"] == expected_source
 
     else:
         (transaction_event,) = events
@@ -918,7 +918,6 @@ def test_get_request_attributes_url_with_headers_off(sentry_init):
     assert attributes["url.full"] == "http://example.com/foo?somevalue=123"
 
 
-NO_QUERY_STRING = object()
 QUERY_STRING = "token=abc&theme=dark&lang=en&session=xyz"
 
 
@@ -954,7 +953,7 @@ def _http_scope(query_string=QUERY_STRING):
         ),
         pytest.param(
             {"_experiments": {"data_collection": {}}},
-            "token=[Filtered]&theme=dark&lang=en&session=[Filtered]",
+            "token=%5BFiltered%5D&theme=dark&lang=en&session=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
@@ -965,7 +964,7 @@ def _http_scope(query_string=QUERY_STRING):
                     }
                 }
             },
-            "token=[Filtered]&theme=[Filtered]&lang=en&session=[Filtered]",
+            "token=%5BFiltered%5D&theme=%5BFiltered%5D&lang=en&session=%5BFiltered%5D",
             id="data_collection_denylist_custom_terms",
         ),
         pytest.param(
@@ -976,7 +975,7 @@ def _http_scope(query_string=QUERY_STRING):
                     }
                 }
             },
-            "token=[Filtered]&theme=dark&lang=[Filtered]&session=[Filtered]",
+            "token=%5BFiltered%5D&theme=dark&lang=%5BFiltered%5D&session=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
@@ -987,7 +986,7 @@ def _http_scope(query_string=QUERY_STRING):
                     }
                 }
             },
-            "token=[Filtered]&theme=[Filtered]&lang=[Filtered]&session=[Filtered]",
+            "token=%5BFiltered%5D&theme=%5BFiltered%5D&lang=%5BFiltered%5D&session=%5BFiltered%5D",
             id="data_collection_allowlist_sensitive_term",
         ),
         pytest.param(
@@ -996,7 +995,7 @@ def _http_scope(query_string=QUERY_STRING):
                     "data_collection": {"url_query_params": {"mode": "off"}}
                 }
             },
-            NO_QUERY_STRING,
+            None,
             id="data_collection_off",
         ),
         # data_collection wins over send_default_pii: filtering still applies.
@@ -1007,7 +1006,7 @@ def _http_scope(query_string=QUERY_STRING):
                     "data_collection": {"url_query_params": {"mode": "off"}}
                 },
             },
-            NO_QUERY_STRING,
+            None,
             id="data_collection_wins_over_send_default_pii",
         ),
     ],
@@ -1019,7 +1018,7 @@ def test_get_request_data_query_string_data_collection(
 
     request_data = _get_request_data(_http_scope(), _RootPathInPath.EXCLUDED)
 
-    if expected_query_string is NO_QUERY_STRING:
+    if expected_query_string is None:
         assert "query_string" not in request_data
     else:
         assert request_data["query_string"] == expected_query_string
@@ -1057,20 +1056,20 @@ def test_get_request_data_empty_query_string_dropped_with_data_collection(sentry
         ),
         pytest.param(
             {"send_default_pii": False},
-            NO_QUERY_STRING,
+            None,
             None,
             id="send_default_pii_false",
         ),
         pytest.param(
             {},
-            NO_QUERY_STRING,
+            None,
             None,
             id="defaults",
         ),
         pytest.param(
             {"_experiments": {"data_collection": {}}},
-            "token=[Filtered]&theme=dark&lang=en&session=[Filtered]",
-            "http://example.com/foo?token=[Filtered]&theme=dark&lang=en&session=[Filtered]",
+            "token=%5BFiltered%5D&theme=dark&lang=en&session=%5BFiltered%5D",
+            "http://example.com/foo?token=%5BFiltered%5D&theme=dark&lang=en&session=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
@@ -1081,8 +1080,8 @@ def test_get_request_data_empty_query_string_dropped_with_data_collection(sentry
                     }
                 }
             },
-            "token=[Filtered]&theme=dark&lang=[Filtered]&session=[Filtered]",
-            "http://example.com/foo?token=[Filtered]&theme=dark&lang=[Filtered]&session=[Filtered]",
+            "token=%5BFiltered%5D&theme=dark&lang=%5BFiltered%5D&session=%5BFiltered%5D",
+            "http://example.com/foo?token=%5BFiltered%5D&theme=dark&lang=%5BFiltered%5D&session=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
@@ -1091,7 +1090,7 @@ def test_get_request_data_empty_query_string_dropped_with_data_collection(sentry
                     "data_collection": {"url_query_params": {"mode": "off"}}
                 }
             },
-            NO_QUERY_STRING,
+            None,
             "http://example.com/foo",
             id="data_collection_off",
         ),
@@ -1102,7 +1101,7 @@ def test_get_request_data_empty_query_string_dropped_with_data_collection(sentry
                     "data_collection": {"url_query_params": {"mode": "off"}}
                 },
             },
-            NO_QUERY_STRING,
+            None,
             "http://example.com/foo",
             id="data_collection_wins_over_send_default_pii",
         ),
@@ -1115,7 +1114,7 @@ def test_get_request_attributes_query_data_collection(
 
     attributes = _get_request_attributes(_http_scope(), _RootPathInPath.EXCLUDED)
 
-    if expected_query is NO_QUERY_STRING:
+    if expected_query is None:
         assert "http.query" not in attributes
     else:
         assert attributes["http.query"] == expected_query
@@ -1188,7 +1187,10 @@ async def test_transaction_name(
         span = items[0].payload
 
         assert span["name"] == expected_transaction_name
-        assert span["attributes"]["sentry.span.source"] == expected_transaction_source
+        assert (
+            span["attributes"]["sentry.segment.name.source"]
+            == expected_transaction_source
+        )
 
     else:
         (transaction_envelope,) = envelopes
@@ -1238,21 +1240,13 @@ async def test_transaction_name_in_traces_sampler(
     """
 
     def dummy_traces_sampler(sampling_context):
-        if span_streaming:
-            assert sampling_context["span_context"]["name"] == expected_transaction_name
-            assert (
-                sampling_context["span_context"]["attributes"]["sentry.span.source"]
-                == expected_transaction_source
-            )
-        else:
-            assert (
-                sampling_context["transaction_context"]["name"]
-                == expected_transaction_name
-            )
-            assert (
-                sampling_context["transaction_context"]["source"]
-                == expected_transaction_source
-            )
+        assert (
+            sampling_context["transaction_context"]["name"] == expected_transaction_name
+        )
+        assert (
+            sampling_context["transaction_context"]["source"]
+            == expected_transaction_source
+        )
 
     sentry_init(
         traces_sampler=dummy_traces_sampler,
@@ -1303,7 +1297,7 @@ async def test_custom_transaction_name(
 
         assert span["is_segment"] is True
         assert span["name"] == "foobar"
-        assert span["attributes"]["sentry.span.source"] == "custom"
+        assert span["attributes"]["sentry.segment.name.source"] == "custom"
 
     else:
         (transaction_event,) = events
@@ -1344,7 +1338,7 @@ async def test_user_ip_address_on_all_spans(
     sentry_init(
         send_default_pii=send_default_pii,
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     sentry_app = SentryAsgiMiddleware(app)
 

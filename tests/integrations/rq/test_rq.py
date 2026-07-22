@@ -59,7 +59,7 @@ def test_basic(
     sentry_init(
         integrations=[RqIntegration()],
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     queue = rq.Queue(connection=FakeStrictRedis())
@@ -114,7 +114,7 @@ def test_transport_shutdown(
 ):
     sentry_init(
         integrations=[RqIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     queue = rq.Queue(connection=FakeStrictRedis())
@@ -159,7 +159,7 @@ def test_transaction_with_error(
         integrations=[RqIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     queue = rq.Queue(connection=FakeStrictRedis())
@@ -250,7 +250,7 @@ def test_error_has_trace_context_if_tracing_disabled(
 ):
     sentry_init(
         integrations=[RqIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     queue = rq.Queue(connection=FakeStrictRedis())
@@ -284,7 +284,7 @@ def test_tracing_enabled(
     sentry_init(
         integrations=[RqIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     queue = rq.Queue(connection=FakeStrictRedis())
@@ -347,7 +347,7 @@ def test_tracing_disabled(
 ):
     sentry_init(
         integrations=[RqIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     queue = rq.Queue(connection=FakeStrictRedis())
@@ -394,7 +394,7 @@ def test_transaction_no_error(
         integrations=[RqIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     queue = rq.Queue(connection=FakeStrictRedis())
@@ -457,7 +457,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
     sentry_init(
         integrations=[RqIntegration()],
         traces_sampler=traces_sampler,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     queue = rq.Queue(connection=FakeStrictRedis())
@@ -496,7 +496,7 @@ def test_job_with_retries(
 ):
     sentry_init(
         integrations=[RqIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     queue = rq.Queue(connection=FakeStrictRedis())
@@ -527,7 +527,7 @@ def test_span_origin(
     sentry_init(
         integrations=[RqIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     queue = rq.Queue(connection=FakeStrictRedis())

@@ -5,7 +5,7 @@ from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import SegmentSource
+from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.tracing import Transaction, TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -79,6 +79,9 @@ def patch_enqueue_job() -> None:
             return await old_enqueue_job(self, function, *args, **kwargs)
 
         if has_span_streaming_enabled(client.options):
+            if sentry_sdk.traces.get_current_span() is None:
+                return await old_enqueue_job(self, function, *args, **kwargs)
+
             with sentry_sdk.traces.start_span(
                 name=function,
                 attributes={
@@ -115,7 +118,7 @@ def patch_run_job() -> None:
                     attributes={
                         "sentry.op": OP.QUEUE_TASK_ARQ,
                         "sentry.origin": ArqIntegration.origin,
-                        "sentry.span.source": SegmentSource.TASK,
+                        "sentry.segment.name.source": SegmentNameSource.TASK,
                         SPANDATA.MESSAGING_MESSAGE_ID: job_id,
                     },
                     parent_span=None,

@@ -155,13 +155,14 @@ def patch_asyncio() -> None:
                 with sentry_sdk.isolation_scope():
                     if task_spans:
                         if is_span_streaming_enabled:
-                            span_ctx = sentry_sdk.traces.start_span(
-                                name=get_name(coro),
-                                attributes={
-                                    "sentry.op": OP.FUNCTION,
-                                    "sentry.origin": AsyncioIntegration.origin,
-                                },
-                            )
+                            if sentry_sdk.traces.get_current_span() is not None:
+                                span_ctx = sentry_sdk.traces.start_span(
+                                    name=get_name(coro),
+                                    attributes={
+                                        "sentry.op": OP.FUNCTION,
+                                        "sentry.origin": AsyncioIntegration.origin,
+                                    },
+                                )
                         else:
                             span_ctx = sentry_sdk.start_span(
                                 op=OP.FUNCTION,

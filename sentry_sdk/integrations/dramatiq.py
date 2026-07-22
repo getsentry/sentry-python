@@ -6,7 +6,7 @@ from sentry_sdk.api import continue_trace, get_baggage, get_traceparent
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import request_body_within_bounds
-from sentry_sdk.traces import SegmentSource
+from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
@@ -139,7 +139,7 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
                 attributes={
                     "sentry.op": OP.QUEUE_TASK_DRAMATIQ,
                     "sentry.origin": DramatiqIntegration.origin,
-                    "sentry.span.source": SegmentSource.TASK.value,
+                    "sentry.segment.name.source": SegmentNameSource.TASK.value,
                     SPANDATA.MESSAGING_DESTINATION_NAME: message.queue_name,
                 },
                 parent_span=None,
