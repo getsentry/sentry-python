@@ -136,7 +136,14 @@ class SentryWsgiMiddleware:
                             )
                             Scope.set_custom_sampling_context({"wsgi_environ": environ})
 
-                            if should_send_default_pii():
+                            if has_data_collection_enabled(client.options):
+                                if client.options["data_collection"]["user_info"]:
+                                    client_ip = get_client_ip(environ)
+                                    if client_ip:
+                                        scope.set_attribute(
+                                            SPANDATA.USER_IP_ADDRESS, client_ip
+                                        )
+                            elif should_send_default_pii():
                                 client_ip = get_client_ip(environ)
                                 if client_ip:
                                     scope.set_attribute(
@@ -243,9 +250,14 @@ def _get_environ(environ: "Dict[str, str]") -> "Iterator[Tuple[str, str]]":
     capture (server name, port and remote addr if pii is enabled).
     """
     keys = ["SERVER_NAME", "SERVER_PORT"]
-    if should_send_default_pii():
-        # make debugging of proxy setup easier. Proxy headers are
-        # in headers.
+    client_options = sentry_sdk.get_client().options
+
+    # make debugging of proxy setup easier. Proxy headers are
+    # in headers.
+    if has_data_collection_enabled(client_options):
+        if client_options["data_collection"]["user_info"]:
+            keys += ["REMOTE_ADDR"]
+    elif should_send_default_pii():
         keys += ["REMOTE_ADDR"]
 
     for key in keys:
@@ -364,7 +376,12 @@ def _make_wsgi_event_processor(
             # if the code below fails halfway through we at least have some data
             request_info = event.setdefault("request", {})
 
-            if should_send_default_pii():
+            if has_data_collection_enabled(client_options):
+                if client_options["data_collection"]["user_info"]:
+                    user_info = event.setdefault("user", {})
+                    if client_ip:
+                        user_info.setdefault("ip_address", client_ip)
+            elif should_send_default_pii():
                 user_info = event.setdefault("user", {})
                 if client_ip:
                     user_info.setdefault("ip_address", client_ip)
@@ -441,6 +458,11 @@ def _get_request_attributes(
             attributes["url.path"] = path
 
         attributes["url.full"] = get_request_url(environ, use_x_forwarded_for)
+
+        if client_options["data_collection"]["user_info"]:
+            client_ip = get_client_ip(environ)
+            if client_ip:
+                attributes["client.address"] = client_ip
 
     elif should_send_default_pii():
         client_ip = get_client_ip(environ)
