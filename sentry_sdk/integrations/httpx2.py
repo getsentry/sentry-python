@@ -77,7 +77,13 @@ def _install_httpx2_client() -> None:
                 attributes: "Attributes" = {}
 
                 if parsed_url is not None and should_send_default_pii():
-                    attributes["url.full"] = parsed_url.url
+                    url_full = parsed_url.url
+                    if parsed_url.query:
+                        url_full += "?" + parsed_url.query
+                    if parsed_url.fragment:
+                        url_full += "#" + parsed_url.fragment
+
+                    attributes["url.full"] = url_full
                     if parsed_url.query:
                         attributes["url.query"] = parsed_url.query
                     if parsed_url.fragment:
@@ -164,7 +170,13 @@ def _install_httpx2_async_client() -> None:
                 attributes: "Attributes" = {}
 
                 if parsed_url is not None and should_send_default_pii():
-                    attributes["url.full"] = parsed_url.url
+                    url_full = parsed_url.url
+                    if parsed_url.query:
+                        url_full += "?" + parsed_url.query
+                    if parsed_url.fragment:
+                        url_full += "#" + parsed_url.fragment
+
+                    attributes["url.full"] = url_full
                     if parsed_url.query:
                         attributes["url.query"] = parsed_url.query
                     if parsed_url.fragment:

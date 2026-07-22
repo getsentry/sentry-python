@@ -254,7 +254,10 @@ def test_transaction_no_error(
         assert span["status"] == "ok"
 
         if send_pii:
-            assert span["attributes"]["url.full"] == "http://localhost/dogs/are/great"
+            assert (
+                span["attributes"]["url.full"]
+                == "http://localhost/dogs/are/great?toy=tennisball"
+            )
             assert span["attributes"]["url.path"] == "/dogs/are/great"
             assert span["attributes"]["http.query"] == "toy=tennisball"
         else:

@@ -1234,7 +1234,7 @@ def test_http_url_attributes_span_streaming(
     http_span = _get_http_client_span(items)
 
     assert http_span["attributes"]["http.request.method"] == "GET"
-    assert http_span["attributes"]["url.full"] == "http://example.com/"
+    assert http_span["attributes"]["url.full"] == "http://example.com/?foo=bar#frag"
     assert http_span["attributes"]["url.query"] == "foo=bar"
     assert http_span["attributes"]["url.fragment"] == "frag"
     assert http_span["attributes"]["http.response.status_code"] == 200

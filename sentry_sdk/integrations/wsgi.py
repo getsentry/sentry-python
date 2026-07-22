@@ -422,6 +422,9 @@ def _get_request_attributes(
         if path:
             attributes["url.path"] = path
 
-        attributes["url.full"] = get_request_url(environ, use_x_forwarded_for)
+        url_full = get_request_url(environ, use_x_forwarded_for)
+        if query_string:
+            url_full += "?" + query_string
+        attributes["url.full"] = url_full
 
     return attributes

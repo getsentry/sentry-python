@@ -161,11 +161,15 @@ class AioHttpIntegration(Integration):
 
                         url_attributes = {}
                         if should_send_default_pii():
-                            url_attributes["url.full"] = "%s://%s%s" % (
+                            url_full = "%s://%s%s" % (
                                 request.scheme,
                                 request.host,
                                 request.path,
                             )
+                            if request.query_string:
+                                url_full += "?" + request.query_string
+
+                            url_attributes["url.full"] = url_full
                             url_attributes["url.path"] = request.path
 
                             if request.query_string:
@@ -362,7 +366,13 @@ def create_trace_config() -> "TraceConfig":
                     "http.request.method": method,
                 }
                 if parsed_url is not None and should_send_default_pii():
-                    attributes["url.full"] = parsed_url.url
+                    url_full = parsed_url.url
+                    if parsed_url.query:
+                        url_full += "?" + parsed_url.query
+                    if parsed_url.fragment:
+                        url_full += "#" + parsed_url.fragment
+
+                    attributes["url.full"] = url_full
                     attributes["url.path"] = params.url.path
 
                     if parsed_url.query:
