@@ -12,9 +12,6 @@ except ImportError:
     from django.core.urlresolvers import reverse
 
 
-NO_COOKIES = object()
-
-
 @pytest.fixture
 def client():
     return Client(application)
@@ -112,7 +109,7 @@ def test_scrub_django_custom_session_cookies_filtered(
         pytest.param(
             {"sessionid": "123", "csrftoken": "456", "foo": "bar"},
             {"cookies": {"mode": "off"}},
-            NO_COOKIES,
+            None,
             id="off",
         ),
         pytest.param(
@@ -187,7 +184,7 @@ def test_data_collection_cookies(
     client.get(reverse("view_exc"))
 
     (event,) = (item.payload for item in items if item.type == "event")
-    if expected_cookies is NO_COOKIES:
+    if expected_cookies is None:
         assert "cookies" not in event["request"]
     else:
         assert event["request"]["cookies"] == expected_cookies
