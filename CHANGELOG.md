@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.66.1
+
+### New Features ✨
+
+- (tracing) Send `sentry.segment.name.source` instead of `sentry.span.source` attribute by @Lms24 in [#6835](https://github.com/getsentry/sentry-python/pull/6835)
+
+### Bug Fixes 🐛
+
+#### Tracing
+
+- Stop setting `NoOpSpan` on scope in the streaming trace lifecycle by @alexander-alderman-webb in [#6844](https://github.com/getsentry/sentry-python/pull/6844)
+- Handle exceptions raised within traces_sampler and other callbacks by @ericapisani in [#6853](https://github.com/getsentry/sentry-python/pull/6853)
+
+### Internal Changes 🔧
+
+- Use top-level `trace_lifecycle` and `ignore_spans` options in tests by @sentrivana in [#6855](https://github.com/getsentry/sentry-python/pull/6855)
+- Use old sampling context format in span streaming by @sentrivana in [#6848](https://github.com/getsentry/sentry-python/pull/6848)
+- Add streaming tests to `test_http_headers` by @sentrivana in [#6785](https://github.com/getsentry/sentry-python/pull/6785)
+- Fix flaky decorator test by @sl0thentr0py in [#6830](https://github.com/getsentry/sentry-python/pull/6830)
+
+### Other
+
+- remove span streaming docs in changelog by @ericapisani in [#6831](https://github.com/getsentry/sentry-python/pull/6831)
+
 ## 2.66.0
 
 ### New Features ✨
