@@ -179,7 +179,7 @@ def _make_span_streaming_app(sentry_init):
     sentry_init(
         integrations=[ChaliceIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     app = Chalice(app_name="sentry_chalice")
 
