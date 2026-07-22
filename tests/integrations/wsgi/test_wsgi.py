@@ -248,7 +248,7 @@ def test_transaction_no_error(
         assert span["is_segment"] is True
         assert span["name"] == "generic WSGI request"
         assert span["attributes"]["sentry.op"] == "http.server"
-        assert span["attributes"]["sentry.span.source"] == "route"
+        assert span["attributes"]["sentry.segment.name.source"] == "route"
         assert span["attributes"]["http.request.method"] == "GET"
         assert span["attributes"]["http.response.status_code"] == 200
         assert span["status"] == "ok"
@@ -488,37 +488,23 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
 
     client.get("/dogs/are/great/")
 
-    if span_streaming:
-        traces_sampler.assert_any_call(
-            DictionaryContaining(
-                {
-                    "span_context": DictionaryContaining(
-                        {
-                            "name": "generic WSGI request",
-                        },
-                    ),
-                    "wsgi_environ": DictionaryContaining(
-                        {
-                            "PATH_INFO": "/dogs/are/great/",
-                            "REQUEST_METHOD": "GET",
-                        },
-                    ),
-                }
-            )
+    traces_sampler.assert_any_call(
+        DictionaryContaining(
+            {
+                "transaction_context": DictionaryContaining(
+                    {
+                        "name": "generic WSGI request",
+                    },
+                ),
+                "wsgi_environ": DictionaryContaining(
+                    {
+                        "PATH_INFO": "/dogs/are/great/",
+                        "REQUEST_METHOD": "GET",
+                    },
+                ),
+            }
         )
-    else:
-        traces_sampler.assert_any_call(
-            DictionaryContaining(
-                {
-                    "wsgi_environ": DictionaryContaining(
-                        {
-                            "PATH_INFO": "/dogs/are/great/",
-                            "REQUEST_METHOD": "GET",
-                        },
-                    ),
-                }
-            )
-        )
+    )
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -1119,7 +1105,7 @@ def test_user_ip_address_on_all_spans(sentry_init, capture_items, send_default_p
     sentry_init(
         send_default_pii=send_default_pii,
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)

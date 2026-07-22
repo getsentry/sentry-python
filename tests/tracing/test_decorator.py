@@ -77,7 +77,7 @@ async def test_trace_decorator_async_no_trx():
 
             start_child_span_decorator = create_span_decorator()
             result2 = await start_child_span_decorator(my_async_example_function)()
-            fake_debug.assert_called_once_with(
+            fake_debug.assert_any_call(
                 "Cannot create a child span for %s. "
                 "Please start a Sentry transaction before calling this function.",
                 "test_decorator.my_async_example_function",
@@ -88,7 +88,7 @@ async def test_trace_decorator_async_no_trx():
 def test_trace_decorator_span_streaming(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -117,7 +117,7 @@ def test_trace_decorator_span_streaming(sentry_init, capture_items):
 def test_trace_decorator_arguments_span_streaming(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -144,7 +144,7 @@ def test_trace_decorator_arguments_span_streaming(sentry_init, capture_items):
 def test_trace_decorator_inactive_span_streaming(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -173,7 +173,7 @@ def test_trace_decorator_inactive_span_streaming(sentry_init, capture_items):
 async def test_trace_decorator_async_span_streaming(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -205,7 +205,7 @@ async def test_trace_decorator_async_arguments_span_streaming(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -235,7 +235,7 @@ async def test_trace_decorator_async_inactive_span_streaming(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")

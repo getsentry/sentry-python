@@ -104,7 +104,7 @@ def test_catch_exceptions(
 ):
     sentry_init(
         integrations=[LitestarIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     litestar_app = litestar_app_factory()
     client = TestClient(litestar_app)
@@ -188,7 +188,7 @@ def test_transaction_name_and_source(
 
         spans = [span for span in spans if expected_tx_name in span["name"]]
         assert len(spans) == 1
-        assert spans[0]["attributes"]["sentry.span.source"] == "component"
+        assert spans[0]["attributes"]["sentry.segment.name.source"] == "component"
     else:
         events = capture_events()
 
@@ -212,7 +212,7 @@ def test_middleware_spans(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     logging_config = LoggingMiddlewareConfig()
@@ -294,7 +294,7 @@ def test_middleware_callback_spans(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     litestar_app = litestar_app_factory(middleware=[SampleMiddleware])
@@ -412,7 +412,7 @@ def test_middleware_receive_send(sentry_init, capture_items, span_streaming):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     litestar_app = litestar_app_factory(middleware=[SampleReceiveSendMiddleware])
 
@@ -451,7 +451,7 @@ def test_middleware_partial_receive_send(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     litestar_app = litestar_app_factory(middleware=[SamplePartialReceiveSendMiddleware])
@@ -570,7 +570,7 @@ def test_span_origin(
     sentry_init(
         integrations=[LitestarIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     logging_config = LoggingMiddlewareConfig()
@@ -643,7 +643,7 @@ def test_litestar_scope_user_on_exception_event(
     sentry_init(
         integrations=[LitestarIntegration()],
         send_default_pii=is_send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     litestar_app = litestar_app_factory(middleware=[TestUserMiddleware])
@@ -834,7 +834,7 @@ def test_configurable_status_codes_handler(
     )
     sentry_init(
         integrations=[LitestarIntegration(**integration_kwargs)],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     @get("/error")
@@ -877,7 +877,7 @@ def test_configurable_status_codes_middleware(
 
     sentry_init(
         integrations=[LitestarIntegration(**integration_kwargs)],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     def create_raising_middleware(app):
@@ -915,7 +915,7 @@ def test_catch_non_http_exceptions_in_middleware(
 ):
     sentry_init(
         integrations=[LitestarIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     def create_raising_middleware(app):
