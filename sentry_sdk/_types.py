@@ -183,7 +183,7 @@ if TYPE_CHECKING:
         cookies: "KeyValueCollectionBehaviour"
         http_headers: "HttpHeadersCollectionUserOptions"
         http_bodies: "List[str]"
-        query_params: "KeyValueCollectionBehaviour"
+        url_query_params: "KeyValueCollectionBehaviour"
         graphql: "GraphQLCollectionUserOptions"
         gen_ai: "GenAICollectionUserOptions"
         database_query_data: bool
@@ -197,7 +197,7 @@ if TYPE_CHECKING:
         cookies: "KeyValueCollectionBehaviour"
         http_headers: "HttpHeadersCollectionBehaviour"
         http_bodies: "List[str]"
-        query_params: "KeyValueCollectionBehaviour"
+        url_query_params: "KeyValueCollectionBehaviour"
         graphql: "GraphQLCollectionBehaviour"
         gen_ai: "GenAICollectionBehaviour"
         database_query_data: bool

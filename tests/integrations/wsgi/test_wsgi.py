@@ -1094,6 +1094,184 @@ def test_request_headers_legacy_pii_passes_headers_through(
     assert headers["X-Custom-Header"] == "passthrough"
 
 
+# Sentinel: the query string (event) / ``http.query`` attribute (span) is absent.
+NO_QUERY_STRING = object()
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query_string",
+    [
+        # No data_collection: the legacy path always sets the query string
+        # unchanged, regardless of send_default_pii.
+        pytest.param(
+            {"send_default_pii": True},
+            "toy=tennisball&color=red&auth=secret",
+            id="send_default_pii_true",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            "toy=tennisball&color=red&auth=secret",
+            id="send_default_pii_false",
+        ),
+        pytest.param(
+            {},
+            "toy=tennisball&color=red&auth=secret",
+            id="defaults",
+        ),
+        # data_collection configured: query string is routed through filtering.
+        # Spec defaults -> denylist: only the sensitive ``auth`` is redacted.
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "denylist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
+            id="data_collection_denylist_custom_terms",
+        ),
+        # allowlist with only ``toy`` allowed: ``color`` is redacted even though
+        # it is not sensitive, proving the redaction comes from the allowlist.
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            NO_QUERY_STRING,
+            id="data_collection_off",
+        ),
+    ],
+)
+def test_query_string_data_collection(
+    sentry_init, crashing_app, capture_events, init_kwargs, expected_query_string
+):
+    sentry_init(**init_kwargs)
+    app = SentryWsgiMiddleware(crashing_app)
+    client = Client(app)
+    events = capture_events()
+
+    with pytest.raises(ZeroDivisionError):
+        client.get("/?toy=tennisball&color=red&auth=secret")
+
+    (event,) = events
+
+    if expected_query_string is NO_QUERY_STRING:
+        assert "query_string" not in event["request"]
+    else:
+        assert event["request"]["query_string"] == expected_query_string
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query",
+    [
+        # No data_collection: the ``http.query`` attribute follows the legacy
+        # send_default_pii gate.
+        pytest.param(
+            {"send_default_pii": True},
+            "toy=tennisball&color=red&auth=secret",
+            id="send_default_pii_true",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            NO_QUERY_STRING,
+            id="send_default_pii_false",
+        ),
+        pytest.param(
+            {},
+            NO_QUERY_STRING,
+            id="defaults",
+        ),
+        # data_collection configured: attribute is routed through filtering.
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "denylist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
+            id="data_collection_denylist_custom_terms",
+        ),
+        # allowlist with only ``toy`` allowed: ``color`` is redacted even though
+        # it is not sensitive, proving the redaction comes from the allowlist.
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            NO_QUERY_STRING,
+            id="data_collection_off",
+        ),
+    ],
+)
+def test_span_http_query_data_collection(
+    sentry_init, capture_items, init_kwargs, expected_query
+):
+    def dogpark(environ, start_response):
+        start_response("200 OK", [])
+        return ["Go get the ball! Good dog!"]
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream",
+            **init_kwargs.pop("_experiments", {}),
+        },
+        **init_kwargs,
+    )
+    app = SentryWsgiMiddleware(dogpark)
+    client = Client(app)
+
+    items = capture_items("span")
+
+    client.get("/dogs/are/great?toy=tennisball&color=red&auth=secret")
+
+    sentry_sdk.flush()
+
+    (span,) = [item.payload for item in items]
+
+    if expected_query is NO_QUERY_STRING:
+        assert "http.query" not in span["attributes"]
+    else:
+        assert span["attributes"]["http.query"] == expected_query
+
+
 @pytest.mark.parametrize("send_default_pii", [True, False])
 def test_user_ip_address_on_all_spans(sentry_init, capture_items, send_default_pii):
     def dogpark(environ, start_response):
