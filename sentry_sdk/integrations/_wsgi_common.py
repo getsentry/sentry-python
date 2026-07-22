@@ -89,7 +89,14 @@ class RequestExtractor:
         content_length = self.content_length()
         request_info = event.get("request", {})
 
-        if should_send_default_pii():
+        if has_data_collection_enabled(client.options):
+            cookies = _apply_key_value_collection_filtering(
+                items=dict(self.cookies()),
+                behaviour=client.options["data_collection"]["cookies"],
+            )
+            if cookies:
+                request_info["cookies"] = cookies
+        elif should_send_default_pii():
             request_info["cookies"] = dict(self.cookies())
 
         if not request_body_within_bounds(client, content_length):
