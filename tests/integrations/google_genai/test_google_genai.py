@@ -147,7 +147,77 @@ def test_nonstreaming_generate_content(
     # Mock the HTTP response at the _api_client.request() level
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        with mock.patch.object(
+            mock_genai_client._api_client,
+            "request",
+            return_value=mock_http_response,
+        ), sentry_sdk.traces.start_span(name="google_genai"):
+            config = create_test_config(temperature=0.7, max_output_tokens=100)
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash",
+                contents=[
+                    "Message demonstrating the absence of truncation.",
+                    "Tell me a joke",
+                ],
+                config=config,
+            )
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert len(spans) == 2
+        assert spans[1]["name"] == "google_genai"
+        chat_span = next(item.payload for item in items if item.type == "span")
+
+        # Check chat span
+        assert chat_span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        assert chat_span["name"] == "chat gemini-1.5-flash"
+        assert chat_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+        assert chat_span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "gcp.gemini"
+        assert (
+            chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
+        )
+
+        if send_default_pii and include_prompts:
+            assert json.loads(
+                chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+            ) == [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Message demonstrating the absence of truncation.",
+                        },
+                        {
+                            "type": "text",
+                            "text": "Tell me a joke",
+                        },
+                    ],
+                }
+            ]
+
+            # Response text is stored as a JSON array
+            response_text = chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+            # Parse the JSON array
+            response_texts = json.loads(response_text)
+            assert response_texts == ["Hello! How can I help you today?"]
+        else:
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_span["attributes"]
+
+        # Check token usage
+        assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+        # Output tokens now include reasoning tokens: candidates_token_count (20) + thoughts_token_count (3) = 23
+        assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 23
+        assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+        assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 5
+        assert (
+            chat_span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 3
+        )
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with mock.patch.object(
@@ -867,7 +937,26 @@ def test_span_origin(
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("span", "transaction")
+
+        with mock.patch.object(
+            mock_genai_client._api_client, "request", return_value=mock_http_response
+        ), sentry_sdk.traces.start_span(name="google_genai"):
+            config = create_test_config()
+            mock_genai_client.models.generate_content(
+                model="gemini-1.5-flash", contents="Test origin", config=config
+            )
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        for span in spans:
+            if span["is_segment"] is True:
+                assert span["attributes"]["sentry.origin"] == "manual"
+                continue
+
+            assert span["attributes"]["sentry.origin"] == "auto.ai.google_genai"
+    elif stream_gen_ai_spans:
         items = capture_items("span", "transaction")
 
         with mock.patch.object(
@@ -1596,7 +1685,56 @@ def test_embed_content(
     # Mock the HTTP response at the _api_client.request() level
     mock_http_response = create_mock_http_response(EXAMPLE_EMBED_RESPONSE_JSON)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        with mock.patch.object(
+            mock_genai_client._api_client,
+            "request",
+            return_value=mock_http_response,
+        ), sentry_sdk.traces.start_span(name="google_genai_embeddings"):
+            mock_genai_client.models.embed_content(
+                model="text-embedding-004",
+                contents=[
+                    "What is your name?",
+                    "What is your favorite color?",
+                ],
+            )
+
+        # Should have 1 span for embeddings
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert len(spans) == 2
+        assert spans[1]["name"] == "google_genai_embeddings"
+        (embed_span, _) = spans
+
+        # Check embeddings span
+        assert embed_span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
+        assert embed_span["name"] == "embeddings text-embedding-004"
+        assert embed_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
+        assert embed_span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "gcp.gemini"
+        assert (
+            embed_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
+            == "text-embedding-004"
+        )
+
+        # Check input texts if PII is allowed
+        if send_default_pii and include_prompts:
+            input_texts = json.loads(
+                embed_span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+            )
+            assert input_texts == [
+                "What is your name?",
+                "What is your favorite color?",
+            ]
+        else:
+            assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in embed_span["attributes"]
+
+        # Check usage data (sum of token counts from statistics: 10 + 15 = 25)
+        # Note: Only available in newer versions with ContentEmbeddingStatistics
+        if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
+            assert embed_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 25
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with mock.patch.object(
@@ -1931,7 +2069,25 @@ def test_embed_content_span_origin(
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_EMBED_RESPONSE_JSON)
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+        with mock.patch.object(
+            mock_genai_client._api_client, "request", return_value=mock_http_response
+        ), sentry_sdk.traces.start_span(name="google_genai_embeddings"):
+            mock_genai_client.models.embed_content(
+                model="text-embedding-004",
+                contents=["Test origin"],
+            )
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        for span in spans:
+            if span["is_segment"] is True:
+                assert span["attributes"]["sentry.origin"] == "manual"
+                continue
+
+            assert span["attributes"]["sentry.origin"] == "auto.ai.google_genai"
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
         with mock.patch.object(
             mock_genai_client._api_client, "request", return_value=mock_http_response
@@ -1999,7 +2155,56 @@ async def test_async_embed_content(
     # Mock the async HTTP response
     mock_http_response = create_mock_http_response(EXAMPLE_EMBED_RESPONSE_JSON)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        with mock.patch.object(
+            mock_genai_client._api_client,
+            "async_request",
+            return_value=mock_http_response,
+        ), sentry_sdk.traces.start_span(name="google_genai_embeddings_async"):
+            await mock_genai_client.aio.models.embed_content(
+                model="text-embedding-004",
+                contents=[
+                    "What is your name?",
+                    "What is your favorite color?",
+                ],
+            )
+
+        # Should have 1 span for embeddings
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert len(spans) == 2
+        assert spans[1]["name"] == "google_genai_embeddings_async"
+        (embed_span, _) = spans
+
+        # Check embeddings span
+        assert embed_span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
+        assert embed_span["name"] == "embeddings text-embedding-004"
+        assert embed_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
+        assert embed_span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "gcp.gemini"
+        assert (
+            embed_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
+            == "text-embedding-004"
+        )
+
+        # Check input texts if PII is allowed
+        if send_default_pii and include_prompts:
+            input_texts = json.loads(
+                embed_span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
+            )
+            assert input_texts == [
+                "What is your name?",
+                "What is your favorite color?",
+            ]
+        else:
+            assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in embed_span["attributes"]
+
+        # Check usage data (sum of token counts from statistics: 10 + 15 = 25)
+        # Note: Only available in newer versions with ContentEmbeddingStatistics
+        if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
+            assert embed_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 25
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with mock.patch.object(
@@ -2348,7 +2553,29 @@ async def test_async_embed_content_span_origin(
 
     mock_http_response = create_mock_http_response(EXAMPLE_EMBED_RESPONSE_JSON)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        with mock.patch.object(
+            mock_genai_client._api_client,
+            "async_request",
+            return_value=mock_http_response,
+        ), sentry_sdk.traces.start_span(name="google_genai_embeddings_async"):
+            await mock_genai_client.aio.models.embed_content(
+                model="text-embedding-004",
+                contents=["Test origin"],
+            )
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        for span in spans:
+            if span["is_segment"] is True:
+                assert span["attributes"]["sentry.origin"] == "manual"
+                continue
+
+            assert span["attributes"]["sentry.origin"] == "auto.ai.google_genai"
+
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with mock.patch.object(
