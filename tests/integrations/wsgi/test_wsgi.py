@@ -248,7 +248,7 @@ def test_transaction_no_error(
         assert span["is_segment"] is True
         assert span["name"] == "generic WSGI request"
         assert span["attributes"]["sentry.op"] == "http.server"
-        assert span["attributes"]["sentry.span.source"] == "route"
+        assert span["attributes"]["sentry.segment.name.source"] == "route"
         assert span["attributes"]["http.request.method"] == "GET"
         assert span["attributes"]["http.response.status_code"] == 200
         assert span["status"] == "ok"
@@ -488,37 +488,23 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
 
     client.get("/dogs/are/great/")
 
-    if span_streaming:
-        traces_sampler.assert_any_call(
-            DictionaryContaining(
-                {
-                    "span_context": DictionaryContaining(
-                        {
-                            "name": "generic WSGI request",
-                        },
-                    ),
-                    "wsgi_environ": DictionaryContaining(
-                        {
-                            "PATH_INFO": "/dogs/are/great/",
-                            "REQUEST_METHOD": "GET",
-                        },
-                    ),
-                }
-            )
+    traces_sampler.assert_any_call(
+        DictionaryContaining(
+            {
+                "transaction_context": DictionaryContaining(
+                    {
+                        "name": "generic WSGI request",
+                    },
+                ),
+                "wsgi_environ": DictionaryContaining(
+                    {
+                        "PATH_INFO": "/dogs/are/great/",
+                        "REQUEST_METHOD": "GET",
+                    },
+                ),
+            }
         )
-    else:
-        traces_sampler.assert_any_call(
-            DictionaryContaining(
-                {
-                    "wsgi_environ": DictionaryContaining(
-                        {
-                            "PATH_INFO": "/dogs/are/great/",
-                            "REQUEST_METHOD": "GET",
-                        },
-                    ),
-                }
-            )
-        )
+    )
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -1108,10 +1094,6 @@ def test_request_headers_legacy_pii_passes_headers_through(
     assert headers["X-Custom-Header"] == "passthrough"
 
 
-# Sentinel: the query string (event) / ``http.query`` attribute (span) is absent.
-NO_QUERY_STRING = object()
-
-
 @pytest.mark.parametrize(
     "init_kwargs, expected_query_string",
     [
@@ -1136,7 +1118,7 @@ NO_QUERY_STRING = object()
         # Spec defaults -> denylist: only the sensitive ``auth`` is redacted.
         pytest.param(
             {"_experiments": {"data_collection": {}}},
-            "toy=tennisball&color=red&auth=[Filtered]",
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
@@ -1147,7 +1129,7 @@ NO_QUERY_STRING = object()
                     }
                 }
             },
-            "toy=[Filtered]&color=red&auth=[Filtered]",
+            "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_custom_terms",
         ),
         # allowlist with only ``toy`` allowed: ``color`` is redacted even though
@@ -1160,7 +1142,7 @@ NO_QUERY_STRING = object()
                     }
                 }
             },
-            "toy=tennisball&color=[Filtered]&auth=[Filtered]",
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
@@ -1169,7 +1151,7 @@ NO_QUERY_STRING = object()
                     "data_collection": {"url_query_params": {"mode": "off"}}
                 }
             },
-            NO_QUERY_STRING,
+            None,
             id="data_collection_off",
         ),
     ],
@@ -1187,7 +1169,7 @@ def test_query_string_data_collection(
 
     (event,) = events
 
-    if expected_query_string is NO_QUERY_STRING:
+    if expected_query_string is None:
         assert "query_string" not in event["request"]
     else:
         assert event["request"]["query_string"] == expected_query_string
@@ -1205,18 +1187,18 @@ def test_query_string_data_collection(
         ),
         pytest.param(
             {"send_default_pii": False},
-            NO_QUERY_STRING,
+            None,
             id="send_default_pii_false",
         ),
         pytest.param(
             {},
-            NO_QUERY_STRING,
+            None,
             id="defaults",
         ),
         # data_collection configured: attribute is routed through filtering.
         pytest.param(
             {"_experiments": {"data_collection": {}}},
-            "toy=tennisball&color=red&auth=[Filtered]",
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
@@ -1227,7 +1209,7 @@ def test_query_string_data_collection(
                     }
                 }
             },
-            "toy=[Filtered]&color=red&auth=[Filtered]",
+            "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_custom_terms",
         ),
         # allowlist with only ``toy`` allowed: ``color`` is redacted even though
@@ -1240,7 +1222,7 @@ def test_query_string_data_collection(
                     }
                 }
             },
-            "toy=tennisball&color=[Filtered]&auth=[Filtered]",
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
@@ -1249,7 +1231,7 @@ def test_query_string_data_collection(
                     "data_collection": {"url_query_params": {"mode": "off"}}
                 }
             },
-            NO_QUERY_STRING,
+            None,
             id="data_collection_off",
         ),
     ],
@@ -1280,7 +1262,7 @@ def test_span_http_query_data_collection(
 
     (span,) = [item.payload for item in items]
 
-    if expected_query is NO_QUERY_STRING:
+    if expected_query is None:
         assert "http.query" not in span["attributes"]
     else:
         assert span["attributes"]["http.query"] == expected_query
@@ -1297,7 +1279,7 @@ def test_user_ip_address_on_all_spans(sentry_init, capture_items, send_default_p
     sentry_init(
         send_default_pii=send_default_pii,
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
