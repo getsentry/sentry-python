@@ -2,7 +2,7 @@ import uuid
 import warnings
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER, SPANDATA, SPANSTATUS, SPANTEMPLATE
@@ -386,6 +386,10 @@ class Span:
         )
 
     def __enter__(self) -> "Span":
+        if has_span_streaming_enabled(sentry_sdk.get_client().options):
+            self._context_manager_state = None  # early return sentinel
+            return self
+
         scope = self.scope or sentry_sdk.get_current_scope()
         old_span = scope.span
         scope.span = self
@@ -395,11 +399,21 @@ class Span:
     def __exit__(
         self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
     ) -> None:
+        if (
+            hasattr(self, "_context_manager_state")
+            and self._context_manager_state is None
+        ):
+            del self._context_manager_state
+            return
+
         if value is not None and should_be_treated_as_error(ty, value):
             self.set_status(SPANSTATUS.INTERNAL_ERROR)
 
         with capture_internal_exceptions():
-            scope, old_span = self._context_manager_state
+            scope, old_span = cast(
+                "Tuple[sentry_sdk.Scope, Optional[Span]]",
+                self._context_manager_state,
+            )
             del self._context_manager_state
             self.finish(scope)
             scope.span = old_span
@@ -1479,6 +1493,7 @@ from sentry_sdk.tracing_utils import (
     EnvironHeaders,
     _generate_sample_rand,
     extract_sentrytrace_data,
+    has_span_streaming_enabled,
     has_tracing_enabled,
     maybe_create_breadcrumbs_from_span,
 )
