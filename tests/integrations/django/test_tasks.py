@@ -63,7 +63,7 @@ def test_task_span_is_created(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -140,7 +140,7 @@ def test_task_enqueue_with_kwargs(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -198,7 +198,7 @@ def test_task_error_reporting(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -265,7 +265,7 @@ def test_multiple_task_enqueues_create_multiple_spans(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")

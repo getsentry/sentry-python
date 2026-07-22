@@ -24,7 +24,7 @@ Resolution precedence (see :func:`_resolve_data_collection`):
 
 import warnings
 from typing import TYPE_CHECKING, List, Mapping, Optional, Union, cast
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlencode
 
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 
@@ -109,12 +109,7 @@ def _apply_data_collection_filtering_to_query_string(
     )
 
     if filtered_qs:
-        parts = []
-        for key, value in filtered_qs.items():
-            values = value if isinstance(value, list) else [value]
-            for item in values:
-                parts.append(f"{key}={item}")
-        return "&".join(parts)
+        return urlencode(filtered_qs, doseq=True)
 
     return None
 

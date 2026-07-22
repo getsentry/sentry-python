@@ -644,7 +644,7 @@ async def test_active_thread_id_span_streaming(
         sentry_init(
             traces_sample_rate=1.0,
             profiles_sample_rate=1.0,
-            _experiments={"trace_lifecycle": "stream"},
+            trace_lifecycle="stream",
         )
         app = quart_app_factory()
 
@@ -687,7 +687,7 @@ async def test_span_streaming_basic(sentry_init, capture_items):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -734,7 +734,7 @@ async def test_span_streaming_transaction_style(
             quart_sentry.QuartIntegration(transaction_style=transaction_style)
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -751,7 +751,7 @@ async def test_span_streaming_transaction_style(
     segment = spans[0]
     assert segment["is_segment"] is True
     assert segment["name"] == expected_name
-    assert segment["attributes"]["sentry.span.source"] == expected_source
+    assert segment["attributes"]["sentry.segment.name.source"] == expected_source
 
 
 @pytest.mark.asyncio
@@ -759,7 +759,7 @@ async def test_span_streaming_with_error(sentry_init, capture_items):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("event", "span")
 
@@ -803,7 +803,7 @@ async def test_span_streaming_request_attributes_no_pii(sentry_init, capture_ite
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=False,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -834,7 +834,7 @@ async def test_span_streaming_request_attributes_with_pii(sentry_init, capture_i
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -982,8 +982,8 @@ async def test_span_streaming_sensitive_header_scrubbing(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=options["send_default_pii"],
+        trace_lifecycle="stream",
         _experiments={
-            "trace_lifecycle": "stream",
             "data_collection": options["data_collection"],
         },
     )
@@ -1007,7 +1007,7 @@ async def test_span_streaming_sensitive_header_scrubbing(
     assert len(spans) == 1
 
     segment = spans[0]
-    if request.node.callspec.id == "data_collection_off_does_not_add_headers":
+    if expected is None:
         assert "http.request.header.authorization" not in segment["attributes"]
         assert "http.request.header.cookie" not in segment["attributes"]
     else:
@@ -1030,7 +1030,7 @@ async def test_span_streaming_sensitive_header_without_data_collection(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=False,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -1073,7 +1073,7 @@ async def test_span_streaming_quart_auth_user_id(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -1109,7 +1109,7 @@ async def test_span_streaming_sensitive_header_passthrough_with_pii_and_no_data_
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
