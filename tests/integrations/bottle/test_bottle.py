@@ -474,7 +474,7 @@ def test_span_origin(
     sentry_init(
         integrations=[BottleIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -577,7 +577,7 @@ def test_span_streaming_basic(sentry_init, capture_items):
     sentry_init(
         integrations=[BottleIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -628,7 +628,7 @@ def test_span_streaming_transaction_style(
     sentry_init(
         integrations=[BottleIntegration(transaction_style=transaction_style)],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -659,14 +659,14 @@ def test_span_streaming_transaction_style(
     assert segment["is_segment"] is True
 
     assert segment["name"].endswith(expected_name)
-    assert segment["attributes"]["sentry.span.source"] == expected_source
+    assert segment["attributes"]["sentry.segment.name.source"] == expected_source
 
 
 def test_span_streaming_with_error(sentry_init, capture_items):
     sentry_init(
         integrations=[BottleIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("event", "span")
 
@@ -727,7 +727,7 @@ def test_span_streaming_http_error_status(
     sentry_init(
         integrations=[BottleIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -775,7 +775,7 @@ def test_span_streaming_failed_request_status_codes(
     sentry_init(
         integrations=[BottleIntegration(**integration_kwargs)],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("event", "span")
 

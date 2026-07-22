@@ -15,7 +15,7 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import SegmentSource, StreamedSpan
+from sentry_sdk.traces import SegmentNameSource, StreamedSpan
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -141,7 +141,7 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
                 attributes={
                     "sentry.op": OP.HTTP_SERVER,
                     "sentry.origin": TornadoIntegration.origin,
-                    "sentry.span.source": SegmentSource.ROUTE,
+                    "sentry.segment.name.source": SegmentNameSource.ROUTE,
                 },
                 parent_span=None,
             )
@@ -180,8 +180,8 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
                             if span_name:
                                 span.name = span_name
                                 span.set_attribute(
-                                    "sentry.span.source",
-                                    SegmentSource.COMPONENT,
+                                    "sentry.segment.name.source",
+                                    SegmentNameSource.COMPONENT,
                                 )
 
                     with capture_internal_exceptions():

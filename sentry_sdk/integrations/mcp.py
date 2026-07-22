@@ -567,15 +567,18 @@ async def _handler_wrapper(
     # Start span and execute
     with isolation_scope_context:
         with current_scope_context:
-            span_mgr: "Union[Span, StreamedSpan]"
+            span_mgr: "Union[Span, StreamedSpan, ContextManager[None]]"
             if span_streaming:
-                span_mgr = sentry_sdk.traces.start_span(
-                    name=span_name,
-                    attributes={
-                        "sentry.op": OP.MCP_SERVER,
-                        "sentry.origin": MCPIntegration.origin,
-                    },
-                )
+                if sentry_sdk.traces.get_current_span() is not None:
+                    span_mgr = sentry_sdk.traces.start_span(
+                        name=span_name,
+                        attributes={
+                            "sentry.op": OP.MCP_SERVER,
+                            "sentry.origin": MCPIntegration.origin,
+                        },
+                    )
+                else:
+                    span_mgr = nullcontext()
             else:
                 span_mgr = get_start_span_function()(
                     op=OP.MCP_SERVER,
@@ -584,40 +587,41 @@ async def _handler_wrapper(
                 )
 
             with span_mgr as span:
-                # Set input span data
-                _set_span_input_data(
-                    span,
-                    handler_name,
-                    span_data_key,
-                    mcp_method_name,
-                    arguments,
-                    request_id,
-                    session_id,
-                    mcp_transport,
-                )
+                if span is not None:
+                    # Set input span data
+                    _set_span_input_data(
+                        span,
+                        handler_name,
+                        span_data_key,
+                        mcp_method_name,
+                        arguments,
+                        request_id,
+                        session_id,
+                        mcp_transport,
+                    )
 
-                # For resources, extract and set protocol
-                if handler_type == "resource":
-                    uri = None
-                    if params is not None:
-                        uri = getattr(params, "uri", None)
+                    # For resources, extract and set protocol
+                    if handler_type == "resource":
+                        uri = None
+                        if params is not None:
+                            uri = getattr(params, "uri", None)
 
-                    # v1 scenario
-                    if ServerRequestContext is None:
-                        if original_args:
-                            uri = original_args[0]
-                        else:
-                            uri = original_kwargs.get("uri")
+                        # v1 scenario
+                        if ServerRequestContext is None:
+                            if original_args:
+                                uri = original_args[0]
+                            else:
+                                uri = original_kwargs.get("uri")
 
-                    protocol = None
-                    if uri is not None and hasattr(uri, "scheme"):
-                        protocol = uri.scheme
-                    elif handler_name and "://" in handler_name:
-                        protocol = handler_name.split("://")[0]
-                    if protocol:
-                        _set_span_data_attribute(
-                            span, SPANDATA.MCP_RESOURCE_PROTOCOL, protocol
-                        )
+                        protocol = None
+                        if uri is not None and hasattr(uri, "scheme"):
+                            protocol = uri.scheme
+                        elif handler_name and "://" in handler_name:
+                            protocol = handler_name.split("://")[0]
+                        if protocol:
+                            _set_span_data_attribute(
+                                span, SPANDATA.MCP_RESOURCE_PROTOCOL, protocol
+                            )
 
                 try:
                     # Execute the async handler
@@ -630,14 +634,15 @@ async def _handler_wrapper(
 
                 except Exception as e:
                     # Set error flag for tools
-                    if handler_type == "tool":
+                    if span is not None and handler_type == "tool":
                         _set_span_data_attribute(
                             span, SPANDATA.MCP_TOOL_RESULT_IS_ERROR, True
                         )
                     sentry_sdk.capture_exception(e)
                     raise
 
-                _set_span_output_data(span, result, result_data_key, handler_type)
+                if span is not None:
+                    _set_span_output_data(span, result, result_data_key, handler_type)
 
     return result
 
