@@ -267,7 +267,7 @@ def test_graphql_streamed_span_holds_query_information(
         traces_sample_rate=1.0,
         default_integrations=False,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -361,7 +361,7 @@ def test_breadcrumbs_hold_query_information_on_error_with_span_streaming(
             GrapheneIntegration(),
         ],
         default_integrations=False,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span", "event")
 

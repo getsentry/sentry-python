@@ -57,7 +57,7 @@ async def test_async_redis_pipeline(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     connection = FakeRedis()
@@ -127,7 +127,7 @@ async def test_async_span_origin(
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     connection = FakeRedis()

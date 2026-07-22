@@ -7,7 +7,7 @@ from sentry_sdk.api import continue_trace, get_baggage, get_traceparent
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import SegmentSource, SpanStatus, StreamedSpan
+from sentry_sdk.traces import SegmentNameSource, SpanStatus, StreamedSpan
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
@@ -79,7 +79,18 @@ def patch_enqueue() -> None:
             sentry_sdk.get_client().options
         )
 
-        span_ctx = None
+        no_headers_types = (PeriodicTask,) + tuple(
+            t for t in [HueyGroup, HueyChord] if t is not None
+        )
+
+        if is_span_streaming_enabled and sentry_sdk.traces.get_current_span() is None:
+            if not isinstance(item, no_headers_types):
+                item.kwargs["sentry_headers"] = {
+                    BAGGAGE_HEADER_NAME: get_baggage(),
+                    SENTRY_TRACE_HEADER_NAME: get_traceparent(),
+                }
+            return old_enqueue(self, item)
+
         if is_span_streaming_enabled:
             span_ctx = sentry_sdk.traces.start_span(
                 name=span_name,
@@ -97,9 +108,6 @@ def patch_enqueue() -> None:
             )
             span_ctx.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, self.name)
 
-        no_headers_types = (PeriodicTask,) + tuple(
-            t for t in [HueyGroup, HueyChord] if t is not None
-        )
         with span_ctx:
             if not isinstance(item, no_headers_types):
                 # Attach trace propagation data to task kwargs. We do
@@ -212,7 +220,7 @@ def patch_execute() -> None:
                     attributes={
                         "sentry.op": OP.QUEUE_TASK_HUEY,
                         "sentry.origin": HueyIntegration.origin,
-                        "sentry.span.source": SegmentSource.TASK,
+                        "sentry.segment.name.source": SegmentNameSource.TASK,
                         SPANDATA.MESSAGING_DESTINATION_NAME: self.name,
                         "messaging.message.id": task.id,
                         "messaging.message.system": "huey",

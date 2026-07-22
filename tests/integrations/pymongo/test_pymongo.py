@@ -116,7 +116,7 @@ def test_segment_span_streaming(sentry_init, capture_items, mongo_server, with_p
         integrations=[PyMongoIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=with_pii,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -222,7 +222,7 @@ def test_breadcrumbs_span_streaming(sentry_init, capture_items, mongo_server, wi
         integrations=[PyMongoIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=with_pii,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("event")
 
@@ -577,7 +577,7 @@ def test_span_origin_span_streaming(sentry_init, capture_items, mongo_server):
     sentry_init(
         integrations=[PyMongoIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -600,7 +600,7 @@ def test_span_streaming_status_on_success(sentry_init, capture_items, mongo_serv
     sentry_init(
         integrations=[PyMongoIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -621,7 +621,7 @@ def test_span_streaming_status_on_failure(sentry_init, capture_items, mongo_serv
     sentry_init(
         integrations=[PyMongoIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 

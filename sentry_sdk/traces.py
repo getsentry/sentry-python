@@ -65,9 +65,9 @@ class SpanStatus(str, Enum):
 _VALID_SPAN_STATUSES = frozenset(e.value for e in SpanStatus)
 
 
-# Segment source, see
-# https://getsentry.github.io/sentry-conventions/generated/attributes/sentry.html#sentryspansource
-class SegmentSource(str, Enum):
+# The source of a segment name, see
+# https://getsentry.github.io/sentry-conventions/attributes/sentry/#sentry-segment-name-source
+class SegmentNameSource(str, Enum):
     COMPONENT = "component"
     CUSTOM = "custom"
     ROUTE = "route"
@@ -81,20 +81,20 @@ class SegmentSource(str, Enum):
 
 # These are typically high cardinality and the server hates them
 LOW_QUALITY_SEGMENT_SOURCES = [
-    SegmentSource.URL,
+    SegmentNameSource.URL,
 ]
 
 
 SOURCE_FOR_STYLE = {
-    "endpoint": SegmentSource.COMPONENT,
-    "function_name": SegmentSource.COMPONENT,
-    "handler_name": SegmentSource.COMPONENT,
-    "method_and_path_pattern": SegmentSource.ROUTE,
-    "path": SegmentSource.URL,
-    "route_name": SegmentSource.COMPONENT,
-    "route_pattern": SegmentSource.ROUTE,
-    "uri_template": SegmentSource.ROUTE,
-    "url": SegmentSource.ROUTE,
+    "endpoint": SegmentNameSource.COMPONENT,
+    "function_name": SegmentNameSource.COMPONENT,
+    "handler_name": SegmentNameSource.COMPONENT,
+    "method_and_path_pattern": SegmentNameSource.ROUTE,
+    "path": SegmentNameSource.URL,
+    "route_name": SegmentNameSource.COMPONENT,
+    "route_pattern": SegmentNameSource.ROUTE,
+    "uri_template": SegmentNameSource.ROUTE,
+    "url": SegmentNameSource.ROUTE,
 }
 
 

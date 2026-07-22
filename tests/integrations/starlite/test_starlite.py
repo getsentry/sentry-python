@@ -161,7 +161,7 @@ def test_transaction_name_and_source(
         spans = [item.payload for item in items]
         spans = [span for span in spans if expected_tx_name in span["name"]]
         assert len(spans) == 1
-        assert spans[0]["attributes"]["sentry.span.source"] == "component"
+        assert spans[0]["attributes"]["sentry.segment.name.source"] == "component"
     else:
         events = capture_events()
 
@@ -579,10 +579,6 @@ def test_starlite_scope_user_on_exception_event(
 
 COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
 
-# Sentinel meaning "the request payload should have no ``cookies`` key at all",
-# as opposed to an empty ``{}`` dict.
-NO_COOKIES = object()
-
 
 @pytest.mark.parametrize(
     "init_kwargs, expected_cookies",
@@ -599,17 +595,17 @@ NO_COOKIES = object()
         ),
         pytest.param(
             {"send_default_pii": False},
-            NO_COOKIES,
+            None,
             id="send_default_pii_false",
         ),
         pytest.param(
             {},
-            NO_COOKIES,
+            None,
             id="defaults",
         ),
         pytest.param(
             {"_experiments": {"data_collection": {"cookies": {"mode": "off"}}}},
-            NO_COOKIES,
+            None,
             id="data_collection_off",
         ),
         pytest.param(
@@ -702,7 +698,7 @@ def test_cookie_data_collection(
 
     (event, transaction_event) = events
 
-    if expected_cookies is NO_COOKIES:
+    if expected_cookies is None:
         assert "cookies" not in event["request"]
         assert "cookies" not in transaction_event["request"]
     else:

@@ -19,7 +19,7 @@ from sentry_sdk.integrations.cloud_resource_context import (
     CLOUD_PROVIDER,
 )
 from sentry_sdk.scope import Scope, should_send_default_pii
-from sentry_sdk.traces import SegmentSource
+from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -197,7 +197,7 @@ def _wrap_handler(handler: "F") -> "F":
                     attributes={
                         "sentry.op": OP.FUNCTION_AWS,
                         "sentry.origin": AwsLambdaIntegration.origin,
-                        "sentry.span.source": SegmentSource.COMPONENT,
+                        "sentry.segment.name.source": SegmentNameSource.COMPONENT,
                         "cloud.region": aws_region,
                         "cloud.resource_id": aws_context.invoked_function_arn,
                         "cloud.platform": CLOUD_PLATFORM.AWS_LAMBDA,

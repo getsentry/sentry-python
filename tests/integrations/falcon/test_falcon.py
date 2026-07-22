@@ -74,7 +74,7 @@ def test_has_context(
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = make_client()
@@ -122,7 +122,7 @@ def test_transaction_style(
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = make_client()
@@ -139,7 +139,7 @@ def test_transaction_style(
         spans = [item.payload for item in items if item.type == "span"]
         spans = [span for span in spans if span["name"] == expected_transaction]
         assert len(spans) == 1
-        assert spans[0]["attributes"]["sentry.span.source"] == expected_source
+        assert spans[0]["attributes"]["sentry.segment.name.source"] == expected_source
     else:
         events = capture_events()
 
@@ -165,7 +165,7 @@ def test_unhandled_errors(
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     class Resource:
@@ -216,7 +216,7 @@ def test_raised_5xx_errors(
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     class Resource:
@@ -261,7 +261,7 @@ def test_raised_4xx_errors(
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     class Resource:
@@ -298,7 +298,7 @@ def test_http_status(
     """
     sentry_init(
         integrations=[FalconIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     class Resource:
@@ -337,7 +337,7 @@ def test_falcon_large_json_request(
         integrations=[FalconIntegration()],
         max_request_body_size="always",
         max_value_length=max_value_length,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     data = {"foo": {"bar": "a" * (1034)}}
@@ -390,7 +390,7 @@ def test_falcon_empty_json_request(
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     class Resource:
@@ -430,7 +430,7 @@ def test_falcon_raw_data_request(
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     class Resource:
@@ -470,7 +470,7 @@ def test_logging(
 ):
     sentry_init(
         integrations=[FalconIntegration(), LoggingIntegration(event_level="ERROR")],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     logger = logging.getLogger()
@@ -533,7 +533,7 @@ def test_error_in_errorhandler(
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     app = falcon.API()
@@ -579,7 +579,7 @@ def test_bad_request_not_captured(
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     app = falcon.API()
@@ -611,7 +611,7 @@ def test_does_not_leak_scope(
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     app = falcon.API()
@@ -661,7 +661,7 @@ def test_falcon_not_breaking_asgi(sentry_init, span_streaming):
     """
     sentry_init(
         integrations=[FalconIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     asgi_app = falcon.asgi.App()
@@ -690,7 +690,7 @@ def test_falcon_custom_error_handler(
     """
     sentry_init(
         integrations=[FalconIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     app = make_app()
@@ -717,7 +717,7 @@ def test_span_origin(
     sentry_init(
         integrations=[FalconIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = make_client()
@@ -770,7 +770,7 @@ def test_falcon_request_media(sentry_init, span_streaming):
 
     sentry_init(
         integrations=[FalconIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     try:

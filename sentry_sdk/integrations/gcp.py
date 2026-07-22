@@ -13,7 +13,7 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.cloud_resource_context import CLOUD_PROVIDER
 from sentry_sdk.scope import Scope, should_send_default_pii
-from sentry_sdk.traces import SegmentSource
+from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -150,7 +150,7 @@ def _wrap_func(func: "F") -> "F":
                     attributes={
                         "sentry.op": OP.FUNCTION_GCP,
                         "sentry.origin": GcpIntegration.origin,
-                        "sentry.span.source": SegmentSource.COMPONENT,
+                        "sentry.segment.name.source": SegmentNameSource.COMPONENT,
                         "cloud.provider": CLOUD_PROVIDER.GCP,
                         "faas.name": function_name,
                         **header_attributes,

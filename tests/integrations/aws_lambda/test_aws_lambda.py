@@ -914,7 +914,7 @@ def test_span_streaming_no_error(lambda_client, test_environment):
 
     assert _get_span_attr(attrs, "sentry.op") == "function.aws"
     assert _get_span_attr(attrs, "sentry.origin") == "auto.function.aws_lambda"
-    assert _get_span_attr(attrs, "sentry.span.source") == "component"
+    assert _get_span_attr(attrs, "sentry.segment.name.source") == "component"
     assert _get_span_attr(attrs, "cloud.provider") == "aws"
     assert _get_span_attr(attrs, "cloud.platform") == "aws_lambda"
     assert (
@@ -964,7 +964,7 @@ def test_span_streaming_error(lambda_client, test_environment):
 
     assert _get_span_attr(attrs, "sentry.op") == "function.aws"
     assert _get_span_attr(attrs, "sentry.origin") == "auto.function.aws_lambda"
-    assert _get_span_attr(attrs, "sentry.span.source") == "component"
+    assert _get_span_attr(attrs, "sentry.segment.name.source") == "component"
     assert _get_span_attr(attrs, "cloud.provider") == "aws"
     assert _get_span_attr(attrs, "cloud.platform") == "aws_lambda"
     assert (
@@ -1017,7 +1017,7 @@ def test_span_streaming_trace_continuation(lambda_client, test_environment):
     attrs = segment_span["attributes"]
     assert _get_span_attr(attrs, "sentry.op") == "function.aws"
     assert _get_span_attr(attrs, "sentry.origin") == "auto.function.aws_lambda"
-    assert _get_span_attr(attrs, "sentry.span.source") == "component"
+    assert _get_span_attr(attrs, "sentry.segment.name.source") == "component"
     assert _get_span_attr(attrs, "cloud.provider") == "aws"
     assert _get_span_attr(attrs, "cloud.platform") == "aws_lambda"
     assert _get_span_attr(attrs, "cloud.region") == "us-east-1"
