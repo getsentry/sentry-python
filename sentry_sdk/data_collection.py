@@ -23,7 +23,9 @@ Resolution precedence (see :func:`_resolve_data_collection`):
 """
 
 import warnings
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, List, Mapping, Optional, cast
+
+from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Literal
@@ -75,6 +77,62 @@ _SENSITIVE_DENYLIST = [
     "sid",
     "identity",
 ]
+
+
+def _is_sensitive_key(key: str, extra_terms: "Optional[List[str]]" = None) -> bool:
+    """
+    Return whether ``key`` matches the sensitive denylist using a partial,
+    case-insensitive substring match.
+
+    :param extra_terms: additional deny terms (e.g. user-provided) to consider
+        alongside the built-in `_SENSITIVE_DENYLIST`.
+    """
+    lowered = key.lower()
+    for term in _SENSITIVE_DENYLIST:
+        if term in lowered:
+            return True
+    if extra_terms:
+        for term in extra_terms:
+            if term and term.lower() in lowered:
+                return True
+    return False
+
+
+def _apply_key_value_collection_filtering(
+    items: "Mapping[str, Any]",
+    behaviour: "KeyValueCollectionBehaviour",
+    substitute: "Any" = SENSITIVE_DATA_SUBSTITUTE,
+) -> "Dict[str, Any]":
+
+    if behaviour["mode"] == "off":
+        return {}
+
+    result: "Dict[str, Any]" = {}
+
+    if behaviour["mode"] == "allowlist":
+        for key, value in items.items():
+            is_allowed = False
+            if isinstance(key, str):
+                lowered = key.lower()
+                is_allowed = any(
+                    term and term.lower() in lowered
+                    for term in behaviour.get("terms", [])
+                )
+            if is_allowed and not _is_sensitive_key(key):
+                result[key] = value
+            else:
+                result[key] = substitute
+        return result
+
+    # denylist behaviour
+    for key, value in items.items():
+        if isinstance(key, str) and _is_sensitive_key(
+            key=key, extra_terms=behaviour.get("terms", [])
+        ):
+            result[key] = substitute
+        else:
+            result[key] = value
+    return result
 
 
 def _map_from_send_default_pii(

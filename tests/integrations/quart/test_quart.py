@@ -13,8 +13,8 @@ from sentry_sdk import (
     capture_message,
     set_tag,
 )
+from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.integrations.logging import LoggingIntegration
-from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 
 
 def quart_app_factory():
@@ -861,8 +861,171 @@ async def test_span_streaming_request_attributes_with_pii(sentry_init, capture_i
     assert "user.ip_address" in segment["attributes"]
 
 
+@pytest.mark.parametrize(
+    "options,expected",
+    [
+        pytest.param(
+            {
+                "send_default_pii": True,
+                "data_collection": None,
+            },
+            {
+                "authorization": "[Filtered]",
+                "custom": "passthrough",
+                "cookie": "[Filtered]",
+            },
+            id="enabled_send_default_pii_redacts_auth_header_due_to_data_collection_default_settings",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": False,
+                "data_collection": None,
+            },
+            {
+                "authorization": "[Filtered]",
+                "custom": "passthrough",
+                "cookie": "[Filtered]",
+            },
+            id="disabled_send_default_pii_redacts_auth_header_due_to_data_collection_default_settings",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": False,
+                "data_collection": {"http_headers": {"request": {"mode": "off"}}},
+            },
+            None,
+            id="data_collection_off_does_not_add_headers",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": False,
+                "data_collection": {"http_headers": {"request": {"mode": "allowlist"}}},
+            },
+            {
+                "authorization": "[Filtered]",
+                "custom": "[Filtered]",
+                "cookie": "[Filtered]",
+            },
+            id="data_collection_allow_list_redacts_terms_that_do_not_appear",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": False,
+                "data_collection": {
+                    "http_headers": {
+                        "request": {"mode": "allowlist", "terms": ["Authorization"]}
+                    }
+                },
+            },
+            {
+                "authorization": "[Filtered]",
+                "custom": "[Filtered]",
+                "cookie": "[Filtered]",
+            },
+            id="data_collection_allow_list_redacts_sensitive_terms_even_when_provided_by_user",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": False,
+                "data_collection": {
+                    "http_headers": {
+                        "request": {"mode": "allowlist", "terms": ["custom"]}
+                    }
+                },
+            },
+            {
+                "authorization": "[Filtered]",
+                "custom": "passthrough",
+                "cookie": "[Filtered]",
+            },
+            id="data_collection_allow_list_does_not_redact_provided_term",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": False,
+                "data_collection": {
+                    "http_headers": {
+                        "request": {"mode": "denylist", "terms": ["custom"]}
+                    }
+                },
+            },
+            {
+                "authorization": "[Filtered]",
+                "custom": "[Filtered]",
+                "cookie": "[Filtered]",
+            },
+            id="data_collection_deny_list_redacts_sensitive_terms_when_provided_by_user",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": False,
+                "data_collection": {
+                    "http_headers": {
+                        "request": {"mode": "allowlist", "terms": ["cookie"]}
+                    }
+                },
+            },
+            {
+                "authorization": "[Filtered]",
+                "custom": "[Filtered]",
+                "cookie": "[Filtered]",
+            },
+            id="data_collection_cookie_is_always_redacted_even_when_allow_listed",
+        ),
+    ],
+)
 @pytest.mark.asyncio
-async def test_span_streaming_sensitive_header_scrubbing(sentry_init, capture_items):
+async def test_span_streaming_sensitive_header_scrubbing(
+    sentry_init, capture_items, options, expected, request
+):
+    sentry_init(
+        integrations=[quart_sentry.QuartIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=options["send_default_pii"],
+        trace_lifecycle="stream",
+        _experiments={
+            "data_collection": options["data_collection"],
+        },
+    )
+    items = capture_items("span")
+
+    app = quart_app_factory()
+    client = app.test_client()
+    response = await client.get(
+        "/message",
+        headers={
+            "Authorization": "Bearer secret-token",
+            "X-Custom-Header": "passthrough",
+            "Cookie": "sessionid=secret",
+        },
+    )
+    assert response.status_code == 200
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
+
+    segment = spans[0]
+    if expected is None:
+        assert "http.request.header.authorization" not in segment["attributes"]
+        assert "http.request.header.cookie" not in segment["attributes"]
+    else:
+        assert (
+            segment["attributes"]["http.request.header.authorization"]
+            == expected["authorization"]
+        )
+        assert (
+            segment["attributes"]["http.request.header.x-custom-header"]
+            == expected["custom"]
+        )
+        assert segment["attributes"]["http.request.header.cookie"] == expected["cookie"]
+
+
+@pytest.mark.asyncio
+async def test_span_streaming_sensitive_header_without_data_collection(
+    sentry_init, capture_items
+):
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
@@ -939,7 +1102,7 @@ async def test_span_streaming_quart_auth_user_id(
 
 
 @pytest.mark.asyncio
-async def test_span_streaming_sensitive_header_passthrough_with_pii(
+async def test_span_streaming_sensitive_header_passthrough_with_pii_and_no_data_collection(
     sentry_init, capture_items
 ):
     sentry_init(

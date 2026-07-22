@@ -3,8 +3,9 @@ from copy import deepcopy
 
 import sentry_sdk
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
+from sentry_sdk.data_collection import _apply_key_value_collection_filtering
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import AnnotatedValue, logger
+from sentry_sdk.utils import AnnotatedValue, has_data_collection_enabled, logger
 
 try:
     from django.http.request import RawPostDataException
@@ -206,19 +207,39 @@ def _filter_headers(
     headers: "Mapping[str, str]",
     use_annotated_value: bool = True,
 ) -> "Mapping[str, Union[AnnotatedValue, str]]":
-    if should_send_default_pii():
-        return headers
+    client_options = sentry_sdk.get_client().options
 
-    substitute: "Union[AnnotatedValue, str]" = (
-        SENSITIVE_DATA_SUBSTITUTE
-        if not use_annotated_value
-        else AnnotatedValue.removed_because_over_size_limit()
-    )
+    if has_data_collection_enabled(client_options):
+        data_collection_configuration = client_options["data_collection"]
 
-    return {
-        k: (v if k.upper().replace("-", "_") not in SENSITIVE_HEADERS else substitute)
-        for k, v in headers.items()
-    }
+        filtered = _apply_key_value_collection_filtering(
+            items=headers,
+            behaviour=data_collection_configuration["http_headers"]["request"],
+        )
+
+        for key in filtered:
+            if isinstance(key, str) and key.lower() in ("cookie", "set-cookie"):
+                filtered[key] = SENSITIVE_DATA_SUBSTITUTE
+
+        return filtered
+    else:
+        if should_send_default_pii():
+            return headers
+
+        substitute: "Union[AnnotatedValue, str]" = (
+            SENSITIVE_DATA_SUBSTITUTE
+            if not use_annotated_value
+            else AnnotatedValue.removed_because_over_size_limit()
+        )
+
+        return {
+            k: (
+                v
+                if k.upper().replace("-", "_") not in SENSITIVE_HEADERS
+                else substitute
+            )
+            for k, v in headers.items()
+        }
 
 
 def _in_http_status_code_range(
