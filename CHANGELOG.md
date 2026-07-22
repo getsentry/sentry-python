@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.66.1
+
+### Bug Fixes 🐛
+
+#### Tracing
+
+- Handle exceptions raised within traces_sampler and other callbacks by @ericapisani in [#6853](https://github.com/getsentry/sentry-python/pull/6853)
+
+### Internal Changes 🔧
+
+- Fix flaky decorator test by @sl0thentr0py in [#6830](https://github.com/getsentry/sentry-python/pull/6830)
+
 ## 2.66.0
 
 ### New Features ✨
