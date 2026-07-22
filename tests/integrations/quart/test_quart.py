@@ -1132,6 +1132,7 @@ async def test_span_streaming_sensitive_header_passthrough_with_pii_and_no_data_
         == "Bearer secret-token"
     )
 
+
 _QUERY_PARAM_DATA_COLLECTION_CASES = [
     pytest.param(
         {"send_default_pii": True},

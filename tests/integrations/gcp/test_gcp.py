@@ -788,10 +788,6 @@ def test_span_streaming_no_query_string_without_pii(run_cloud_function):
     assert attrs["faas.entry_point"] == "cloud_function"
 
 
-# Sentinel: the query string (event) / ``url.query`` attribute (span) is absent.
-NO_QUERY_STRING = "__NO_QUERY_STRING__"
-
-
 # Each case is (send_default_pii, data_collection, expected_event, expected_span).
 # ``send_default_pii`` / ``data_collection`` of None means the option is omitted.
 # The two paths only diverge for the legacy (no ``data_collection``) rows: the
@@ -809,14 +805,14 @@ _QUERY_STRING_DATA_COLLECTION_CASES = [
         False,
         None,
         "toy=tennisball&color=red&auth=secret",
-        NO_QUERY_STRING,
+        None,
         id="send_default_pii_false",
     ),
     pytest.param(
         None,
         None,
         "toy=tennisball&color=red&auth=secret",
-        NO_QUERY_STRING,
+        None,
         id="defaults",
     ),
     # data_collection configured: query string is routed through filtering.
@@ -824,15 +820,15 @@ _QUERY_STRING_DATA_COLLECTION_CASES = [
     pytest.param(
         None,
         {},
-        "toy=tennisball&color=red&auth=[Filtered]",
-        "toy=tennisball&color=red&auth=[Filtered]",
+        "toy=tennisball&color=red&auth=%5BFiltered%5D",
+        "toy=tennisball&color=red&auth=%5BFiltered%5D",
         id="data_collection_denylist_default",
     ),
     pytest.param(
         None,
         {"url_query_params": {"mode": "denylist", "terms": ["toy"]}},
-        "toy=[Filtered]&color=red&auth=[Filtered]",
-        "toy=[Filtered]&color=red&auth=[Filtered]",
+        "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
+        "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
         id="data_collection_denylist_custom_terms",
     ),
     # allowlist with only ``toy`` allowed: ``color`` is redacted even though it
@@ -840,15 +836,15 @@ _QUERY_STRING_DATA_COLLECTION_CASES = [
     pytest.param(
         None,
         {"url_query_params": {"mode": "allowlist", "terms": ["toy"]}},
-        "toy=tennisball&color=[Filtered]&auth=[Filtered]",
-        "toy=tennisball&color=[Filtered]&auth=[Filtered]",
+        "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+        "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
         id="data_collection_allowlist",
     ),
     pytest.param(
         None,
         {"url_query_params": {"mode": "off"}},
-        NO_QUERY_STRING,
-        NO_QUERY_STRING,
+        None,
+        None,
         id="data_collection_off",
     ),
 ]
@@ -906,7 +902,7 @@ def test_query_string_data_collection_event_processor(
     )
 
     request = envelope_items[0]["request"]
-    if expected_event == NO_QUERY_STRING:
+    if expected_event is None:
         assert "query_string" not in request
     else:
         assert request["query_string"] == expected_event
@@ -953,7 +949,7 @@ def test_query_string_data_collection_span_streaming(
 
     assert len(span_items) == 1
     attrs = span_items[0]["attributes"]
-    if expected_span == NO_QUERY_STRING:
+    if expected_span is None:
         assert "url.query" not in attrs
     else:
         assert attrs["url.query"] == expected_span
