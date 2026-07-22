@@ -42,12 +42,9 @@ BODY_JSON = {"some": "json", "for": "testing", "nested": {"numbers": 123}}
 
 COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
 
-# Sentinel meaning "the request payload should have no ``cookies`` key at all",
-# as opposed to an empty ``{}`` dict.
-NO_COOKIES = object()
-
+# Query string used across the query-param filtering tests below. ``auth`` is a
+# built-in sensitive term, so it is redacted by the default denylist.
 QUERY_STRING = "toy=tennisball&color=red&auth=secret"
-NO_QUERY_STRING = object()
 
 BODY_FORM = """--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="username"\r\n\r\nJane\r\n--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="password"\r\n\r\nhello123\r\n--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="photo"; filename="photo.jpg"\r\nContent-Type: image/jpg\r\nContent-Transfer-Encoding: base64\r\n\r\n{{image_data}}\r\n--fd721ef49ea403a6--\r\n""".replace(
     "{{image_data}}", str(base64.b64encode(open(PICTURE, "rb").read()))
@@ -563,17 +560,17 @@ async def test_request_info_no_pii(sentry_init, capture_events):
         ),
         pytest.param(
             {"send_default_pii": False},
-            NO_COOKIES,
+            None,
             id="send_default_pii_false",
         ),
         pytest.param(
             {},
-            NO_COOKIES,
+            None,
             id="defaults",
         ),
         pytest.param(
             {"_experiments": {"data_collection": {"cookies": {"mode": "off"}}}},
-            NO_COOKIES,
+            None,
             id="data_collection_off",
         ),
         pytest.param(
@@ -666,7 +663,7 @@ async def test_cookie_data_collection(
 
     (event, transaction_event) = events
 
-    if expected_cookies is NO_COOKIES:
+    if expected_cookies is None:
         assert "cookies" not in event["request"]
         assert "cookies" not in transaction_event["request"]
     else:
@@ -684,7 +681,7 @@ async def test_cookie_data_collection(
         ),
         pytest.param(
             {"_experiments": {"data_collection": {}}},
-            "toy=tennisball&color=red&auth=[Filtered]",
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
@@ -695,7 +692,7 @@ async def test_cookie_data_collection(
                     }
                 }
             },
-            "toy=tennisball&color=[Filtered]&auth=[Filtered]",
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
@@ -704,7 +701,7 @@ async def test_cookie_data_collection(
                     "data_collection": {"url_query_params": {"mode": "off"}}
                 }
             },
-            NO_QUERY_STRING,
+            None,
             id="data_collection_off",
         ),
     ],
@@ -726,7 +723,7 @@ def test_query_string_data_collection(
 
     (event, transaction_event) = events
 
-    if expected_query_string is NO_QUERY_STRING:
+    if expected_query_string is None:
         assert "query_string" not in event["request"]
         assert "query_string" not in transaction_event["request"]
     else:
@@ -745,8 +742,8 @@ def test_query_string_data_collection(
         ),
         pytest.param(
             {"_experiments": {"data_collection": {}}},
-            "toy=tennisball&color=red&auth=[Filtered]",
-            "http://testserver/message?toy=tennisball&color=red&auth=[Filtered]",
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
+            "http://testserver/message?toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
@@ -755,7 +752,7 @@ def test_query_string_data_collection(
                     "data_collection": {"url_query_params": {"mode": "off"}}
                 }
             },
-            NO_QUERY_STRING,
+            None,
             "http://testserver/message",
             id="data_collection_off",
         ),
@@ -792,7 +789,7 @@ def test_span_http_query_data_collection(
     (segment,) = segments
     attributes = segment["attributes"]
 
-    if expected_query is NO_QUERY_STRING:
+    if expected_query is None:
         assert SPANDATA.HTTP_QUERY not in attributes
     else:
         assert attributes[SPANDATA.HTTP_QUERY] == expected_query
@@ -1400,7 +1397,7 @@ def test_active_thread_id_span_streaming(sentry_init, capture_items, endpoint):
         auto_enabling_integrations=False,  # avoid legacy spans from auto-enabled integrations leaking into streaming mode
         integrations=[StarletteIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     app = starlette_app_factory()
 

@@ -79,7 +79,7 @@ def test_that_a_single_error_is_captured(broker, worker, capture_events, fail_fa
         (
             {
                 "traces_sample_rate": 1.0,
-                "_experiments": {"trace_lifecycle": "stream"},
+                "trace_lifecycle": "stream",
             },
             SPANSTATUS.INTERNAL_ERROR,
             False,
@@ -88,7 +88,7 @@ def test_that_a_single_error_is_captured(broker, worker, capture_events, fail_fa
         (
             {
                 "traces_sample_rate": 1.0,
-                "_experiments": {"trace_lifecycle": "stream"},
+                "trace_lifecycle": "stream",
             },
             SPANSTATUS.OK,
             False,
@@ -97,7 +97,7 @@ def test_that_a_single_error_is_captured(broker, worker, capture_events, fail_fa
         (
             {
                 "traces_sample_rate": 1.0,
-                "_experiments": {"trace_lifecycle": "stream"},
+                "trace_lifecycle": "stream",
             },
             SPANSTATUS.INTERNAL_ERROR,
             True,
@@ -106,7 +106,7 @@ def test_that_a_single_error_is_captured(broker, worker, capture_events, fail_fa
         (
             {
                 "traces_sample_rate": 1.0,
-                "_experiments": {"trace_lifecycle": "stream"},
+                "trace_lifecycle": "stream",
             },
             SPANSTATUS.OK,
             True,
@@ -171,7 +171,7 @@ def test_task_transaction(
         assert segment["name"] == "dummy_actor"
         assert segment["is_segment"] is True
         assert segment["attributes"]["sentry.op"] == "queue.task.dramatiq"
-        assert segment["attributes"]["sentry.span.source"] == "task"
+        assert segment["attributes"]["sentry.segment.name.source"] == "task"
         assert (
             segment["attributes"][SPANDATA.MESSAGING_DESTINATION_NAME]
             == dummy_actor.queue_name
@@ -202,7 +202,7 @@ def test_task_transaction(
         (
             {
                 "traces_sample_rate": 1.0,
-                "_experiments": {"trace_lifecycle": "stream"},
+                "trace_lifecycle": "stream",
             },
             True,
         ),
@@ -519,7 +519,7 @@ def test_that_retry_exceptions_are_not_captured(
         (
             {
                 "traces_sample_rate": 1.0,
-                "_experiments": {"trace_lifecycle": "stream"},
+                "trace_lifecycle": "stream",
             },
             True,
         ),

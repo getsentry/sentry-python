@@ -247,6 +247,28 @@ def test_metrics_experimental_before_send(sentry_init, capture_items):
     assert before_metric_called
 
 
+@pytest.mark.tests_internal_exceptions
+def test_metrics_before_send_raises_does_not_crash_application(
+    sentry_init, capture_items
+):
+    def _before_metric(record, hint):
+        raise ValueError("before_send_metric error")
+
+    sentry_init(
+        before_send_metric=_before_metric,
+    )
+    items = capture_items("trace_metric")
+
+    sentry_sdk.metrics.count("test.keep", 1)
+
+    get_client().flush()
+
+    # The exception in before_send_metric is swallowed and the metric is
+    # dropped.
+    metrics = [item.payload for item in items]
+    assert not metrics
+
+
 def test_transport_format(sentry_init, capture_envelopes):
     sentry_init(server_name="test-server", release="1.0.0")
 

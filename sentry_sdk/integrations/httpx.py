@@ -4,18 +4,15 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
 from sentry_sdk.tracing_utils import (
     add_http_request_source,
-    add_sentry_baggage_to_headers,
     has_span_streaming_enabled,
-    should_propagate_trace,
+    propagate_trace_headers,
 )
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     ensure_integration_enabled,
-    logger,
     parse_url,
 )
 
@@ -60,6 +57,10 @@ def _install_httpx_client() -> None:
             parsed_url = parse_url(str(request.url), sanitize=False)
 
         if is_span_streaming_enabled:
+            if sentry_sdk.traces.get_current_span() is None:
+                propagate_trace_headers(client, request)
+                return real_send(self, request, **kwargs)
+
             with sentry_sdk.traces.start_span(
                 name="%s %s"
                 % (
@@ -81,21 +82,7 @@ def _install_httpx_client() -> None:
                     if parsed_url.fragment:
                         attributes["url.fragment"] = parsed_url.fragment
 
-                if should_propagate_trace(client, str(request.url)):
-                    for (
-                        key,
-                        value,
-                    ) in (
-                        sentry_sdk.get_current_scope().iter_trace_propagation_headers()
-                    ):
-                        logger.debug(
-                            f"[Tracing] Adding `{key}` header {value} to outgoing request to {request.url}."
-                        )
-
-                        if key == BAGGAGE_HEADER_NAME:
-                            add_sentry_baggage_to_headers(request.headers, value)
-                        else:
-                            request.headers[key] = value
+                propagate_trace_headers(client, request)
 
                 try:
                     rv = real_send(self, request, **kwargs)
@@ -125,21 +112,7 @@ def _install_httpx_client() -> None:
                     span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
                     span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
 
-                if should_propagate_trace(client, str(request.url)):
-                    for (
-                        key,
-                        value,
-                    ) in (
-                        sentry_sdk.get_current_scope().iter_trace_propagation_headers()
-                    ):
-                        logger.debug(
-                            f"[Tracing] Adding `{key}` header {value} to outgoing request to {request.url}."
-                        )
-
-                        if key == BAGGAGE_HEADER_NAME:
-                            add_sentry_baggage_to_headers(request.headers, value)
-                        else:
-                            request.headers[key] = value
+                propagate_trace_headers(client, request)
 
                 rv = real_send(self, request, **kwargs)
 
@@ -170,6 +143,10 @@ def _install_httpx_async_client() -> None:
             parsed_url = parse_url(str(request.url), sanitize=False)
 
         if is_span_streaming_enabled:
+            if sentry_sdk.traces.get_current_span() is None:
+                propagate_trace_headers(client, request)
+                return await real_send(self, request, **kwargs)
+
             with sentry_sdk.traces.start_span(
                 name="%s %s"
                 % (
@@ -191,21 +168,7 @@ def _install_httpx_async_client() -> None:
                     if parsed_url.fragment:
                         attributes["url.fragment"] = parsed_url.fragment
 
-                if should_propagate_trace(client, str(request.url)):
-                    for (
-                        key,
-                        value,
-                    ) in (
-                        sentry_sdk.get_current_scope().iter_trace_propagation_headers()
-                    ):
-                        logger.debug(
-                            f"[Tracing] Adding `{key}` header {value} to outgoing request to {request.url}."
-                        )
-
-                        if key == BAGGAGE_HEADER_NAME:
-                            add_sentry_baggage_to_headers(request.headers, value)
-                        else:
-                            request.headers[key] = value
+                propagate_trace_headers(client, request)
 
                 try:
                     rv = await real_send(self, request, **kwargs)
@@ -235,20 +198,7 @@ def _install_httpx_async_client() -> None:
                     span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
                     span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
 
-                if should_propagate_trace(client, str(request.url)):
-                    for (
-                        key,
-                        value,
-                    ) in (
-                        sentry_sdk.get_current_scope().iter_trace_propagation_headers()
-                    ):
-                        logger.debug(
-                            f"[Tracing] Adding `{key}` header {value} to outgoing request to {request.url}."
-                        )
-                        if key == BAGGAGE_HEADER_NAME:
-                            add_sentry_baggage_to_headers(request.headers, value)
-                        else:
-                            request.headers[key] = value
+                propagate_trace_headers(client, request)
 
                 rv = await real_send(self, request, **kwargs)
 

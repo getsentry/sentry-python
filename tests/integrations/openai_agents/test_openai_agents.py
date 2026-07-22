@@ -206,7 +206,7 @@ async def test_agent_invocation_span_no_pii(
                 traces_sample_rate=1.0,
                 send_default_pii=False,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={"trace_lifecycle": "stream"},
+                trace_lifecycle="stream",
             )
 
             items = capture_items("span")
@@ -606,7 +606,7 @@ async def test_agent_invocation_span(
                 traces_sample_rate=1.0,
                 send_default_pii=True,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={"trace_lifecycle": "stream"},
+                trace_lifecycle="stream",
             )
 
             items = capture_items("span")
@@ -924,7 +924,7 @@ def test_agent_invocation_span_sync_no_pii(
                 traces_sample_rate=1.0,
                 send_default_pii=False,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={"trace_lifecycle": "stream"},
+                trace_lifecycle="stream",
             )
 
             items = capture_items("span")
@@ -1316,7 +1316,7 @@ def test_agent_invocation_span_sync(
                 traces_sample_rate=1.0,
                 send_default_pii=True,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={"trace_lifecycle": "stream"},
+                trace_lifecycle="stream",
             )
 
             items = capture_items("span")
@@ -1928,7 +1928,7 @@ async def test_tool_execution_span(
                 traces_sample_rate=1.0,
                 send_default_pii=True,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={"trace_lifecycle": "stream"},
+                trace_lifecycle="stream",
             )
 
             items = capture_items("span")
@@ -2888,7 +2888,7 @@ async def test_model_behavior_error(
                 traces_sample_rate=1.0,
                 send_default_pii=True,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={"trace_lifecycle": "stream"},
+                trace_lifecycle="stream",
             )
 
             items = capture_items("span")
@@ -3055,7 +3055,7 @@ async def test_error_handling(
                 disabled_integrations=[StdlibIntegration],
                 traces_sample_rate=1.0,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={"trace_lifecycle": "stream"},
+                trace_lifecycle="stream",
             )
 
             items = capture_items("event", "span")
@@ -3331,7 +3331,7 @@ async def test_span_status_error(
                 disabled_integrations=[StdlibIntegration],
                 traces_sample_rate=1.0,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={"trace_lifecycle": "stream"},
+                trace_lifecycle="stream",
             )
 
             items = capture_items("event", "span")
@@ -3446,7 +3446,7 @@ async def test_multiple_agents_asyncio(
                 disabled_integrations=[StdlibIntegration],
                 traces_sample_rate=1.0,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={"trace_lifecycle": "stream"},
+                trace_lifecycle="stream",
             )
 
             items = capture_items("span")
@@ -4257,7 +4257,7 @@ async def test_multiple_llm_calls_aggregate_usage(
                 traces_sample_rate=1.0,
                 send_default_pii=True,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={"trace_lifecycle": "stream"},
+                trace_lifecycle="stream",
             )
 
             items = capture_items("span")
@@ -4622,7 +4622,7 @@ async def test_invoke_agent_span_uses_last_response_model(
                 traces_sample_rate=1.0,
                 send_default_pii=True,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={"trace_lifecycle": "stream"},
+                trace_lifecycle="stream",
             )
 
             items = capture_items("span")
@@ -5027,7 +5027,7 @@ async def test_conversation_id_on_all_spans(
                 disabled_integrations=[StdlibIntegration],
                 traces_sample_rate=1.0,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={"trace_lifecycle": "stream"},
+                trace_lifecycle="stream",
             )
 
             items = capture_items("span")
@@ -5268,7 +5268,7 @@ async def test_conversation_id_on_tool_span(
                 disabled_integrations=[StdlibIntegration],
                 traces_sample_rate=1.0,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={"trace_lifecycle": "stream"},
+                trace_lifecycle="stream",
             )
 
             items = capture_items("span")
@@ -5426,7 +5426,7 @@ async def test_no_conversation_id_when_not_provided(
                 disabled_integrations=[StdlibIntegration],
                 traces_sample_rate=1.0,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={"trace_lifecycle": "stream"},
+                trace_lifecycle="stream",
             )
 
             items = capture_items("span")

@@ -12,7 +12,7 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import SegmentSource, StreamedSpan
+from sentry_sdk.traces import SegmentNameSource, StreamedSpan
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -202,7 +202,7 @@ async def _context_enter(request: "Request") -> None:
             attributes={
                 "sentry.op": OP.HTTP_SERVER,
                 "sentry.origin": SanicIntegration.origin,
-                "sentry.span.source": SegmentSource.URL.value,
+                "sentry.segment.name.source": SegmentNameSource.URL.value,
             },
             parent_span=None,
         )
