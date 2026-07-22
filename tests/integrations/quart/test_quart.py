@@ -1132,8 +1132,6 @@ async def test_span_streaming_sensitive_header_passthrough_with_pii_and_no_data_
         == "Bearer secret-token"
     )
 
-
-NO_QUERY_STRING = object()
 _QUERY_PARAM_DATA_COLLECTION_CASES = [
     pytest.param(
         {"send_default_pii": True},
@@ -1142,17 +1140,17 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
     ),
     pytest.param(
         {"send_default_pii": False},
-        NO_QUERY_STRING,
+        None,
         id="send_default_pii_false",
     ),
     pytest.param(
         {},
-        NO_QUERY_STRING,
+        None,
         id="defaults",
     ),
     pytest.param(
         {"_experiments": {"data_collection": {}}},
-        "toy=tennisball&color=red&auth=[Filtered]",
+        "toy=tennisball&color=red&auth=%5BFiltered%5D",
         id="data_collection_denylist_default",
     ),
     pytest.param(
@@ -1163,7 +1161,7 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
                 }
             }
         },
-        "toy=[Filtered]&color=red&auth=[Filtered]",
+        "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
         id="data_collection_denylist_custom_terms",
     ),
     pytest.param(
@@ -1174,7 +1172,7 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
                 }
             }
         },
-        "toy=tennisball&color=[Filtered]&auth=[Filtered]",
+        "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
         id="data_collection_allowlist",
     ),
     pytest.param(
@@ -1185,12 +1183,12 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
                 }
             }
         },
-        "toy=[Filtered]&color=[Filtered]&auth=[Filtered]",
+        "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
         id="data_collection_allowlist_sensitive_term",
     ),
     pytest.param(
         {"_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}}},
-        NO_QUERY_STRING,
+        None,
         id="data_collection_off",
     ),
     pytest.param(
@@ -1198,7 +1196,7 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
             "send_default_pii": True,
             "_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}},
         },
-        NO_QUERY_STRING,
+        None,
         id="data_collection_wins_over_send_default_pii",
     ),
 ]
@@ -1239,7 +1237,7 @@ async def test_span_streaming_url_query_data_collection(
         "send_default_pii", False
     )
 
-    if expected_query is NO_QUERY_STRING:
+    if expected_query is None:
         assert "url.query" not in segment["attributes"]
         if url_attrs_expected:
             # When the filtered query string is empty, url.full carries the
