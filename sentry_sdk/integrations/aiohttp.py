@@ -26,7 +26,7 @@ from sentry_sdk.traces import (
 )
 from sentry_sdk.traces import (
     NoOpStreamedSpan,
-    SegmentSource,
+    SegmentNameSource,
     SpanStatus,
     StreamedSpan,
 )
@@ -209,7 +209,7 @@ class AioHttpIntegration(Integration):
                             attributes={
                                 "sentry.op": OP.HTTP_SERVER,
                                 "sentry.origin": AioHttpIntegration.origin,
-                                "sentry.span.source": SegmentSource.ROUTE.value,
+                                "sentry.segment.name.source": SegmentNameSource.ROUTE.value,
                                 "http.request.method": request.method,
                                 **url_attributes,
                                 **client_address_attributes,
@@ -326,7 +326,7 @@ class AioHttpIntegration(Integration):
                 ):
                     current_span._segment.name = name
                     current_span._segment.set_attribute(
-                        "sentry.span.source",
+                        "sentry.segment.name.source",
                         SEGMENT_SOURCE_FOR_STYLE[integration.transaction_style].value,
                     )
                 else:

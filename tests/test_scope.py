@@ -87,7 +87,7 @@ def test_set_user_none_values_are_dropped_when_copying_to_attributes(
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
