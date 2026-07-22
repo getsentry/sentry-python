@@ -115,6 +115,7 @@ def _get_request_data(
     """
     request_data: "Dict[str, Any]" = {}
     ty = asgi_scope["type"]
+    client_options = sentry_sdk.get_client().options
     if ty in ("http", "websocket"):
         request_data["method"] = asgi_scope.get("method")
 
@@ -125,7 +126,6 @@ def _get_request_data(
             use_annotated_value=False,
         )
 
-        client_options = sentry_sdk.get_client().options
         if has_data_collection_enabled(client_options):
             qs = _get_query(asgi_scope)
             if qs:
@@ -148,8 +148,12 @@ def _get_request_data(
         )
 
     client = asgi_scope.get("client")
-    if client and should_send_default_pii():
-        request_data["env"] = {"REMOTE_ADDR": _get_ip(asgi_scope)}
+    if client:
+        if has_data_collection_enabled(client_options):
+            if client_options["data_collection"]["user_info"]:
+                request_data["env"] = {"REMOTE_ADDR": _get_ip(asgi_scope)}
+        elif should_send_default_pii():
+            request_data["env"] = {"REMOTE_ADDR": _get_ip(asgi_scope)}
 
     return request_data
 
@@ -164,6 +168,7 @@ def _get_request_attributes(
     attributes: "dict[str, Any]" = {}
 
     ty = asgi_scope["type"]
+    client_options = sentry_sdk.get_client().options
     if ty in ("http", "websocket"):
         if asgi_scope.get("method"):
             attributes["http.request.method"] = asgi_scope["method"].upper()
@@ -174,7 +179,6 @@ def _get_request_attributes(
         for header, value in filtered_headers.items():
             attributes[f"http.request.header.{header.lower()}"] = value
 
-        client_options = sentry_sdk.get_client().options
         if has_data_collection_enabled(client_options):
             filtered_query_string = None
             query = _get_query(asgi_scope)
@@ -226,9 +230,14 @@ def _get_request_attributes(
                 else url_without_query_string
             )
 
-    client = asgi_scope.get("client")
-    if client and should_send_default_pii():
-        ip = _get_ip(asgi_scope)
-        attributes["client.address"] = ip
+    asgi_scope_client = asgi_scope.get("client")
+    if asgi_scope_client:
+        if has_data_collection_enabled(client_options):
+            if client_options["data_collection"]["user_info"]:
+                ip = _get_ip(asgi_scope)
+                attributes["client.address"] = ip
+        elif should_send_default_pii():
+            ip = _get_ip(asgi_scope)
+            attributes["client.address"] = ip
 
     return attributes
