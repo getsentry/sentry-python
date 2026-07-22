@@ -600,8 +600,6 @@ def test_user_ip_address_on_all_spans(
         assert "user.ip_address" not in child_span["attributes"]
 
 
-NO_QUERY_STRING = object()
-
 _QUERY_PARAM_DATA_COLLECTION_CASES = [
     pytest.param(
         {"send_default_pii": True},
@@ -610,17 +608,17 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
     ),
     pytest.param(
         {"send_default_pii": False},
-        NO_QUERY_STRING,
+        None,
         id="send_default_pii_false",
     ),
     pytest.param(
         {},
-        NO_QUERY_STRING,
+        None,
         id="defaults",
     ),
     pytest.param(
         {"_experiments": {"data_collection": {}}},
-        "toy=tennisball&color=red&auth=[Filtered]",
+        "toy=tennisball&color=red&auth=%5BFiltered%5D",
         id="data_collection_denylist_default",
     ),
     pytest.param(
@@ -631,7 +629,7 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
                 }
             }
         },
-        "toy=[Filtered]&color=red&auth=[Filtered]",
+        "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
         id="data_collection_denylist_custom_terms",
     ),
     pytest.param(
@@ -642,7 +640,7 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
                 }
             }
         },
-        "toy=tennisball&color=[Filtered]&auth=[Filtered]",
+        "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
         id="data_collection_allowlist",
     ),
     pytest.param(
@@ -653,12 +651,12 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
                 }
             }
         },
-        "toy=[Filtered]&color=[Filtered]&auth=[Filtered]",
+        "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
         id="data_collection_allowlist_sensitive_term",
     ),
     pytest.param(
         {"_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}}},
-        NO_QUERY_STRING,
+        None,
         id="data_collection_off",
     ),
     pytest.param(
@@ -666,7 +664,7 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
             "send_default_pii": True,
             "_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}},
         },
-        NO_QUERY_STRING,
+        None,
         id="data_collection_wins_over_send_default_pii",
     ),
 ]
@@ -712,7 +710,7 @@ def test_url_query_data_collection_span_streaming(
         "send_default_pii", False
     )
 
-    if expected_query is NO_QUERY_STRING:
+    if expected_query is None:
         assert "http.query" not in server_span["attributes"]
         if url_attrs_expected:
             assert server_span["attributes"]["url.full"].endswith("/message")
@@ -751,7 +749,7 @@ def test_url_query_data_collection_event_processor(
         assert (
             event["request"]["query_string"] == "toy=tennisball&color=red&auth=secret"
         )
-    elif expected_query is NO_QUERY_STRING:
+    elif expected_query is None:
         assert "query_string" not in event["request"]
     else:
         assert event["request"]["query_string"] == expected_query
