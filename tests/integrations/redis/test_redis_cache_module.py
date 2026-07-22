@@ -20,7 +20,7 @@ def test_no_cache_basic(sentry_init, capture_events, capture_items, span_streami
             RedisIntegration(),
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     connection = FakeStrictRedis()
@@ -55,7 +55,7 @@ def test_cache_basic(sentry_init, capture_events, capture_items, span_streaming)
             ),
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     connection = FakeStrictRedis()
@@ -156,7 +156,7 @@ def test_cache_keys(sentry_init, capture_events, capture_items, span_streaming):
             ),
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     connection = FakeStrictRedis()
@@ -233,7 +233,7 @@ def test_cache_data(sentry_init, capture_events, capture_items, span_streaming):
             ),
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     # Use a unique host per parametrized run so fakeredis (which shares state
@@ -386,7 +386,7 @@ def test_cache_prefixes(sentry_init, capture_events, capture_items, span_streami
             ),
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     connection = FakeStrictRedis()

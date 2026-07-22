@@ -8,7 +8,7 @@ from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import SegmentSource
+from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.tracing import Span, TransactionSource
 from sentry_sdk.tracing_utils import StreamedSpan, has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -231,7 +231,9 @@ class SentryAsyncExtension(SchemaExtension):
         if type(graphql_span) is StreamedSpan:
             if self.execution_context.operation_name:
                 segment = graphql_span._segment
-                segment.set_attribute("sentry.span.source", SegmentSource.COMPONENT)
+                segment.set_attribute(
+                    "sentry.segment.name.source", SegmentNameSource.COMPONENT
+                )
                 segment.set_attribute("sentry.op", op)
                 segment.name = self.execution_context.operation_name
         elif isinstance(graphql_span, Span):

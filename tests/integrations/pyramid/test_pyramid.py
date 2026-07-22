@@ -152,7 +152,7 @@ def test_transaction_style(
     sentry_init(
         integrations=[PyramidIntegration(transaction_style=transaction_style)],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -169,7 +169,7 @@ def test_transaction_style(
         assert len(spans) == 1
         (segment,) = spans
         assert segment["name"] == expected_transaction
-        assert segment["attributes"]["sentry.span.source"] == expected_source
+        assert segment["attributes"]["sentry.segment.name.source"] == expected_source
     else:
         (_, transaction_event) = events
         assert transaction_event["transaction"] == expected_transaction
@@ -481,7 +481,7 @@ def test_tracing_error(
     sentry_init(
         integrations=[PyramidIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -537,7 +537,7 @@ def test_span_origin(
     sentry_init(
         integrations=[PyramidIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -571,7 +571,7 @@ def test_span_sets_user_id_on_segment(
         integrations=[PyramidIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     class AuthenticationPolicy:
