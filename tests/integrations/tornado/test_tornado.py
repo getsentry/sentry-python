@@ -121,7 +121,6 @@ COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
 
 # Sentinel meaning "the request payload should have no ``cookies`` key at all",
 # as opposed to an empty ``{}`` dict.
-NO_COOKIES = object()
 
 
 @pytest.mark.parametrize(
@@ -139,17 +138,17 @@ NO_COOKIES = object()
         ),
         pytest.param(
             {"send_default_pii": False},
-            NO_COOKIES,
+            None,
             id="send_default_pii_false",
         ),
         pytest.param(
             {},
-            NO_COOKIES,
+            None,
             id="defaults",
         ),
         pytest.param(
             {"_experiments": {"data_collection": {"cookies": {"mode": "off"}}}},
-            NO_COOKIES,
+            None,
             id="data_collection_off",
         ),
         pytest.param(
@@ -236,7 +235,7 @@ def test_cookie_data_collection(
     assert response.code == 500
 
     (event,) = events
-    if expected_cookies is NO_COOKIES:
+    if expected_cookies is None:
         assert "cookies" not in event["request"]
     else:
         assert event["request"]["cookies"] == expected_cookies
@@ -265,7 +264,7 @@ def test_transactions(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -316,7 +315,7 @@ def test_transactions(
             else "tests.integrations.tornado.test_tornado.CrashingHandler.post"
         )
         assert server_segment["name"] == expected_handler
-        assert server_segment["attributes"]["sentry.span.source"] == "component"
+        assert server_segment["attributes"]["sentry.segment.name.source"] == "component"
         assert server_segment["attributes"]["http.request.method"] == "POST"
         assert server_segment["attributes"]["http.request.body.data"] == "heyoo"
         assert server_segment["attributes"]["http.response.status_code"] == code
@@ -657,7 +656,7 @@ def test_span_origin(
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -689,7 +688,7 @@ def test_user_ip_address_on_all_spans(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")

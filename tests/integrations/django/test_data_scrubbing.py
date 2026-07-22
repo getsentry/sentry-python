@@ -37,7 +37,7 @@ def test_scrub_django_session_cookies_removed(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=False,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     items = capture_items("event")
     werkzeug_set_cookie(client, "localhost", "sessionid", "123")
@@ -61,7 +61,7 @@ def test_scrub_django_session_cookies_filtered(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     items = capture_items("event")
     werkzeug_set_cookie(client, "localhost", "sessionid", "123")
@@ -93,7 +93,7 @@ def test_scrub_django_custom_session_cookies_filtered(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     items = capture_items("event")
     werkzeug_set_cookie(client, "localhost", "my_sess", "123")
@@ -117,7 +117,7 @@ def test_scrub_django_custom_session_cookies_filtered(
         pytest.param(
             {"sessionid": "123", "csrftoken": "456", "foo": "bar"},
             {"cookies": {"mode": "off"}},
-            NO_COOKIES,
+            None,
             id="off",
         ),
         pytest.param(
@@ -192,7 +192,7 @@ def test_data_collection_cookies(
     client.get(reverse("view_exc"))
 
     (event,) = (item.payload for item in items if item.type == "event")
-    if expected_cookies is NO_COOKIES:
+    if expected_cookies is None:
         assert "cookies" not in event["request"]
     else:
         assert event["request"]["cookies"] == expected_cookies

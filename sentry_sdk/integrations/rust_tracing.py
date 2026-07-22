@@ -208,6 +208,9 @@ class RustTracingLayer:
 
         span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
+            if sentry_sdk.traces.get_current_span() is None:
+                return None
+
             sentry_span = sentry_sdk.traces.start_span(
                 name=sentry_span_name,
                 attributes={
