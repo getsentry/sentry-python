@@ -953,7 +953,7 @@ def _http_scope(query_string=QUERY_STRING):
         ),
         pytest.param(
             {"_experiments": {"data_collection": {}}},
-            "token=[Filtered]&theme=dark&lang=en&session=[Filtered]",
+            "token=%5BFiltered%5D&theme=dark&lang=en&session=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
@@ -964,7 +964,7 @@ def _http_scope(query_string=QUERY_STRING):
                     }
                 }
             },
-            "token=[Filtered]&theme=[Filtered]&lang=en&session=[Filtered]",
+            "token=%5BFiltered%5D&theme=%5BFiltered%5D&lang=en&session=%5BFiltered%5D",
             id="data_collection_denylist_custom_terms",
         ),
         pytest.param(
@@ -975,7 +975,7 @@ def _http_scope(query_string=QUERY_STRING):
                     }
                 }
             },
-            "token=[Filtered]&theme=dark&lang=[Filtered]&session=[Filtered]",
+            "token=%5BFiltered%5D&theme=dark&lang=%5BFiltered%5D&session=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
@@ -986,7 +986,7 @@ def _http_scope(query_string=QUERY_STRING):
                     }
                 }
             },
-            "token=[Filtered]&theme=[Filtered]&lang=[Filtered]&session=[Filtered]",
+            "token=%5BFiltered%5D&theme=%5BFiltered%5D&lang=%5BFiltered%5D&session=%5BFiltered%5D",
             id="data_collection_allowlist_sensitive_term",
         ),
         pytest.param(
@@ -1068,8 +1068,8 @@ def test_get_request_data_empty_query_string_dropped_with_data_collection(sentry
         ),
         pytest.param(
             {"_experiments": {"data_collection": {}}},
-            "token=[Filtered]&theme=dark&lang=en&session=[Filtered]",
-            "http://example.com/foo?token=[Filtered]&theme=dark&lang=en&session=[Filtered]",
+            "token=%5BFiltered%5D&theme=dark&lang=en&session=%5BFiltered%5D",
+            "http://example.com/foo?token=%5BFiltered%5D&theme=dark&lang=en&session=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
@@ -1080,8 +1080,8 @@ def test_get_request_data_empty_query_string_dropped_with_data_collection(sentry
                     }
                 }
             },
-            "token=[Filtered]&theme=dark&lang=[Filtered]&session=[Filtered]",
-            "http://example.com/foo?token=[Filtered]&theme=dark&lang=[Filtered]&session=[Filtered]",
+            "token=%5BFiltered%5D&theme=dark&lang=%5BFiltered%5D&session=%5BFiltered%5D",
+            "http://example.com/foo?token=%5BFiltered%5D&theme=dark&lang=%5BFiltered%5D&session=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
