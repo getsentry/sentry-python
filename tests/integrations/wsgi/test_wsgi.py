@@ -1122,7 +1122,7 @@ NO_QUERY_STRING = object()
         # Spec defaults -> denylist: only the sensitive ``auth`` is redacted.
         pytest.param(
             {"_experiments": {"data_collection": {}}},
-            "toy=tennisball&color=red&auth=[Filtered]",
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
@@ -1133,7 +1133,7 @@ NO_QUERY_STRING = object()
                     }
                 }
             },
-            "toy=[Filtered]&color=red&auth=[Filtered]",
+            "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_custom_terms",
         ),
         # allowlist with only ``toy`` allowed: ``color`` is redacted even though
@@ -1146,7 +1146,7 @@ NO_QUERY_STRING = object()
                     }
                 }
             },
-            "toy=tennisball&color=[Filtered]&auth=[Filtered]",
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
@@ -1202,7 +1202,7 @@ def test_query_string_data_collection(
         # data_collection configured: attribute is routed through filtering.
         pytest.param(
             {"_experiments": {"data_collection": {}}},
-            "toy=tennisball&color=red&auth=[Filtered]",
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
@@ -1213,7 +1213,7 @@ def test_query_string_data_collection(
                     }
                 }
             },
-            "toy=[Filtered]&color=red&auth=[Filtered]",
+            "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_custom_terms",
         ),
         # allowlist with only ``toy`` allowed: ``color`` is redacted even though
@@ -1226,7 +1226,7 @@ def test_query_string_data_collection(
                     }
                 }
             },
-            "toy=tennisball&color=[Filtered]&auth=[Filtered]",
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(

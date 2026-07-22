@@ -33,8 +33,6 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 
-NO_QUERY_STRING = object()
-
 # Query string used across the query-param filtering tests below. ``auth`` is a
 # built-in sensitive term, so it is redacted by the default denylist.
 QUERY_STRING = "toy=tennisball&color=red&auth=secret"
@@ -1244,7 +1242,7 @@ def test_transaction_or_segment_http_method_custom(
         ),
         pytest.param(
             {"_experiments": {"data_collection": {}}},
-            "toy=tennisball&color=red&auth=[Filtered]",
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
@@ -1255,7 +1253,7 @@ def test_transaction_or_segment_http_method_custom(
                     }
                 }
             },
-            "toy=tennisball&color=[Filtered]&auth=[Filtered]",
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
@@ -1264,7 +1262,7 @@ def test_transaction_or_segment_http_method_custom(
                     "data_collection": {"url_query_params": {"mode": "off"}}
                 }
             },
-            NO_QUERY_STRING,
+            None,
             id="data_collection_off",
         ),
     ],
@@ -1289,7 +1287,7 @@ def test_query_string_data_collection(
 
     (event,) = events
 
-    if expected_query_string is NO_QUERY_STRING:
+    if expected_query_string is None:
         assert "query_string" not in event["request"]
     else:
         assert event["request"]["query_string"] == expected_query_string
@@ -1305,12 +1303,12 @@ def test_query_string_data_collection(
         ),
         pytest.param(
             {"send_default_pii": False},
-            NO_QUERY_STRING,
+            None,
             id="legacy_send_default_pii_false",
         ),
         pytest.param(
             {"_experiments": {"data_collection": {}}},
-            "toy=tennisball&color=red&auth=[Filtered]",
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
@@ -1321,7 +1319,7 @@ def test_query_string_data_collection(
                     }
                 }
             },
-            "toy=tennisball&color=[Filtered]&auth=[Filtered]",
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
@@ -1330,7 +1328,7 @@ def test_query_string_data_collection(
                     "data_collection": {"url_query_params": {"mode": "off"}}
                 }
             },
-            NO_QUERY_STRING,
+            None,
             id="data_collection_off",
         ),
     ],
@@ -1364,7 +1362,7 @@ def test_span_http_query_data_collection(
     spans = [item.payload for item in items if item.type == "span"]
     (segment,) = spans
 
-    if expected_query is NO_QUERY_STRING:
+    if expected_query is None:
         assert SPANDATA.HTTP_QUERY not in segment["attributes"]
     else:
         assert segment["attributes"][SPANDATA.HTTP_QUERY] == expected_query

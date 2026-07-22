@@ -16,9 +16,6 @@ except ImportError:
 
 NO_COOKIES = object()
 
-# Sentinel: the query string (event) / ``http.query`` attribute (span) is absent.
-NO_QUERY_STRING = object()
-
 
 @pytest.fixture
 def client():
@@ -246,7 +243,7 @@ QUERY_STRING = "toy=tennisball&color=red&auth=secret"
         ),
         pytest.param(
             {"_experiments": {"data_collection": {}}},
-            "toy=tennisball&color=red&auth=[Filtered]",
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
@@ -257,7 +254,7 @@ QUERY_STRING = "toy=tennisball&color=red&auth=secret"
                     }
                 }
             },
-            "toy=tennisball&color=[Filtered]&auth=[Filtered]",
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
@@ -266,7 +263,7 @@ QUERY_STRING = "toy=tennisball&color=red&auth=secret"
                     "data_collection": {"url_query_params": {"mode": "off"}}
                 }
             },
-            NO_QUERY_STRING,
+            None,
             id="data_collection_off",
         ),
     ],
@@ -285,7 +282,7 @@ def test_query_string_data_collection(
 
     (event,) = events
 
-    if expected_query_string is NO_QUERY_STRING:
+    if expected_query_string is None:
         assert "query_string" not in event["request"]
     else:
         assert event["request"]["query_string"] == expected_query_string
@@ -303,12 +300,12 @@ def test_query_string_data_collection(
         ),
         pytest.param(
             {"send_default_pii": False},
-            NO_QUERY_STRING,
+            None,
             id="legacy_send_default_pii_false",
         ),
         pytest.param(
             {"_experiments": {"data_collection": {}}},
-            "toy=tennisball&color=red&auth=[Filtered]",
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
             id="data_collection_denylist_default",
         ),
         pytest.param(
@@ -319,7 +316,7 @@ def test_query_string_data_collection(
                     }
                 }
             },
-            "toy=tennisball&color=[Filtered]&auth=[Filtered]",
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
             id="data_collection_allowlist",
         ),
         pytest.param(
@@ -328,7 +325,7 @@ def test_query_string_data_collection(
                     "data_collection": {"url_query_params": {"mode": "off"}}
                 }
             },
-            NO_QUERY_STRING,
+            None,
             id="data_collection_off",
         ),
     ],
@@ -359,7 +356,7 @@ def test_span_http_query_data_collection(
     spans = [item.payload for item in items]
     (root_span,) = (span for span in spans if span["name"] == "/message")
 
-    if expected_query is NO_QUERY_STRING:
+    if expected_query is None:
         assert SPANDATA.HTTP_QUERY not in root_span["attributes"]
     else:
         assert root_span["attributes"][SPANDATA.HTTP_QUERY] == expected_query
