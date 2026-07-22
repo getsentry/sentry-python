@@ -626,6 +626,142 @@ def test_request_data_with_data_collection_off(lambda_client, test_environment):
     }
 
 
+def test_url_query_params_with_data_collection_denylist(
+    lambda_client, test_environment
+):
+    payload = b"""
+        {
+          "resource": "/asd",
+          "path": "/asd",
+          "httpMethod": "GET",
+          "headers": {
+            "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
+            "X-Forwarded-Proto": "https"
+          },
+          "queryStringParameters": {
+            "page": "2",
+            "tracking": "campaign",
+            "token": "secret-token"
+          },
+          "pathParameters": null,
+          "stageVariables": null,
+          "requestContext": {
+            "identity": {
+              "sourceIp": "213.47.147.207",
+              "userArn": "42"
+            }
+          },
+          "body": null,
+          "isBase64Encoded": false
+        }
+    """
+
+    lambda_client.invoke(
+        FunctionName="BasicOkDataCollectionUrlQueryDenylist",
+        Payload=payload,
+    )
+    envelopes = test_environment["server"].envelopes
+
+    (transaction_event,) = envelopes
+
+    assert transaction_event["request"]["query_string"] == {
+        # Not denied by any term -> pass through.
+        "page": "2",
+        # Denied by custom terms.
+        "tracking": "[Filtered]",
+        # Denied by the built-in sensitive denylist.
+        "token": "[Filtered]",
+    }
+
+
+def test_url_query_params_with_data_collection_allowlist(
+    lambda_client, test_environment
+):
+    payload = b"""
+        {
+          "resource": "/asd",
+          "path": "/asd",
+          "httpMethod": "GET",
+          "headers": {
+            "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
+            "X-Forwarded-Proto": "https"
+          },
+          "queryStringParameters": {
+            "page": "2",
+            "tracking": "campaign",
+            "token": "secret-token"
+          },
+          "pathParameters": null,
+          "stageVariables": null,
+          "requestContext": {
+            "identity": {
+              "sourceIp": "213.47.147.207",
+              "userArn": "42"
+            }
+          },
+          "body": null,
+          "isBase64Encoded": false
+        }
+    """
+
+    lambda_client.invoke(
+        FunctionName="BasicOkDataCollectionUrlQueryAllowlist",
+        Payload=payload,
+    )
+    envelopes = test_environment["server"].envelopes
+
+    (transaction_event,) = envelopes
+
+    assert transaction_event["request"]["query_string"] == {
+        # Allowlisted, non-sensitive -> pass through.
+        "page": "2",
+        # Not allowlisted -> substituted.
+        "tracking": "[Filtered]",
+        # Allowlisted but sensitive -> still filtered; an allowlist entry
+        # cannot override the built-in sensitive denylist.
+        "token": "[Filtered]",
+    }
+
+
+def test_url_query_params_with_data_collection_off(lambda_client, test_environment):
+    payload = b"""
+        {
+          "resource": "/asd",
+          "path": "/asd",
+          "httpMethod": "GET",
+          "headers": {
+            "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
+            "X-Forwarded-Proto": "https"
+          },
+          "queryStringParameters": {
+            "page": "2",
+            "tracking": "campaign"
+          },
+          "pathParameters": null,
+          "stageVariables": null,
+          "requestContext": {
+            "identity": {
+              "sourceIp": "213.47.147.207",
+              "userArn": "42"
+            }
+          },
+          "body": null,
+          "isBase64Encoded": false
+        }
+    """
+
+    lambda_client.invoke(
+        FunctionName="BasicOkDataCollectionUrlQueryOff",
+        Payload=payload,
+    )
+    envelopes = test_environment["server"].envelopes
+
+    (transaction_event,) = envelopes
+
+    # With url_query_params collection turned off, no query string is collected.
+    assert "query_string" not in transaction_event["request"]
+
+
 def test_trace_continuation(lambda_client, test_environment):
     trace_id = "471a43a4192642f0b136d5159a501701"
     parent_span_id = "6e8f22c393e68f19"
@@ -931,6 +1067,38 @@ def test_span_streaming_request_attributes(lambda_client, test_environment):
         "aws/lambda/BasicOkSpanStreamingPii"
     ]
     assert _get_span_attr(attrs, "aws.log.stream.names") == ["$LATEST"]
+
+
+def test_span_streaming_url_query_params_with_data_collection(
+    lambda_client, test_environment
+):
+    payload = {
+        "httpMethod": "GET",
+        "queryStringParameters": {
+            "page": "2",
+            "tracking": "campaign",
+            "token": "secret-token",
+        },
+        "path": "/test",
+    }
+
+    lambda_client.invoke(
+        FunctionName="BasicOkSpanStreamingDataCollection",
+        Payload=json.dumps(payload),
+    )
+    span_items = test_environment["server"].span_items
+
+    segment_spans = [s for s in span_items if s["is_segment"]]
+    assert len(segment_spans) == 1
+    segment_span = segment_spans[0]
+    attrs = segment_span["attributes"]
+
+    # "page" passes through; "tracking" is denied by a custom term and "token"
+    # by the built-in sensitive denylist.
+    assert (
+        _get_span_attr(attrs, "url.query")
+        == "page=2&tracking=%5BFiltered%5D&token=%5BFiltered%5D"
+    )
 
 
 @pytest.mark.parametrize(
