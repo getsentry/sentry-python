@@ -52,6 +52,6 @@ def test_integration_disabled_with_span_streaming(sentry_init, reset_integration
     ):
         sentry_init(
             integrations=[OpenTelemetryIntegration()],
-            _experiments={"trace_lifecycle": "stream"},
+            trace_lifecycle="stream",
         )
         mocked_setup_sentry_tracing.assert_not_called()

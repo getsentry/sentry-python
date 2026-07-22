@@ -1145,7 +1145,7 @@ async def test_tracing_span_streaming(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_pii,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1177,7 +1177,7 @@ async def test_tracing_span_streaming(
     assert server_span["attributes"]["sentry.op"] == "http.server"
     assert server_span["attributes"]["sentry.origin"] == "auto.http.aiohttp"
     assert server_span["attributes"]["http.response.status_code"] == 200
-    assert server_span["attributes"]["sentry.span.source"] == "component"
+    assert server_span["attributes"]["sentry.segment.name.source"] == "component"
     assert server_span["status"] == "ok"
     # No query string on the request, so the attribute should be omitted.
     assert "url.query" not in server_span["attributes"]
@@ -1215,7 +1215,7 @@ async def test_sensitive_header_scrubbing_span_streaming(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1375,8 +1375,8 @@ async def test_sensitive_header_passthrough_with_pii_span_streaming(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=options["send_default_pii"],
+        trace_lifecycle="stream",
         _experiments={
-            "trace_lifecycle": "stream",
             "data_collection": options["data_collection"],
         },
     )
@@ -1403,7 +1403,7 @@ async def test_sensitive_header_passthrough_with_pii_span_streaming(
 
     (server_span,) = [item.payload for item in items]
 
-    if request.node.callspec.id.endswith("data_collection_off_does_not_add_headers"):
+    if expected is None:
         assert "http.request.header.authorization" not in server_span["attributes"]
         assert "http.request.header.cookie" not in server_span["attributes"]
     else:
@@ -1439,7 +1439,7 @@ async def test_sensitive_header_passthrough_with_pii_span_streaming_without_data
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1477,7 +1477,7 @@ async def test_url_query_attribute_span_streaming(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_pii,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1534,7 +1534,7 @@ async def test_transaction_style_span_streaming(
     sentry_init(
         integrations=[AioHttpIntegration(transaction_style=transaction_style)],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1556,7 +1556,7 @@ async def test_transaction_style_span_streaming(
 
     assert server_segment["name"] == expected_name
     assert server_segment["is_segment"]
-    assert server_segment["attributes"]["sentry.span.source"] == expected_source
+    assert server_segment["attributes"]["sentry.segment.name.source"] == expected_source
 
 
 @pytest.mark.asyncio
@@ -1564,7 +1564,7 @@ async def test_server_error_span_streaming(sentry_init, aiohttp_client, capture_
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1605,7 +1605,7 @@ async def test_http_exception_span_streaming(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1637,7 +1637,7 @@ async def test_http_exception_ok_status_not_overridden_span_streaming(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1671,7 +1671,7 @@ async def test_outgoing_client_span_span_streaming(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_pii,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     async def handler(request):
@@ -1732,7 +1732,7 @@ async def test_outgoing_trace_headers_span_streaming(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     async def handler(request):
@@ -1766,7 +1766,7 @@ async def test_user_ip_address_on_all_spans(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     async def hello(request):
@@ -1786,6 +1786,9 @@ async def test_user_ip_address_on_all_spans(
 
     child_span, server_span = [item.payload for item in items]
 
+    assert server_span["attributes"]["sentry.segment.name.source"] == "component"
+    assert "sentry.segment.name.source" not in child_span["attributes"]
+
     if send_default_pii:
         assert server_span["attributes"]["user.ip_address"] == "127.0.0.1"
         assert child_span["attributes"]["user.ip_address"] == "127.0.0.1"
@@ -1794,7 +1797,6 @@ async def test_user_ip_address_on_all_spans(
         assert "user.ip_address" not in child_span["attributes"]
 
 
-NO_QUERY_STRING = object()
 _QUERY_PARAM_DATA_COLLECTION_CASES = [
     pytest.param(
         {"send_default_pii": True},
@@ -1803,17 +1805,17 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
     ),
     pytest.param(
         {"send_default_pii": False},
-        NO_QUERY_STRING,
+        None,
         id="send_default_pii_false",
     ),
     pytest.param(
         {},
-        NO_QUERY_STRING,
+        None,
         id="defaults",
     ),
     pytest.param(
         {"_experiments": {"data_collection": {}}},
-        "toy=tennisball&color=red&auth=[Filtered]",
+        "toy=tennisball&color=red&auth=%5BFiltered%5D",
         id="data_collection_denylist_default",
     ),
     pytest.param(
@@ -1824,7 +1826,7 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
                 }
             }
         },
-        "toy=[Filtered]&color=red&auth=[Filtered]",
+        "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
         id="data_collection_denylist_custom_terms",
     ),
     pytest.param(
@@ -1835,7 +1837,7 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
                 }
             }
         },
-        "toy=tennisball&color=[Filtered]&auth=[Filtered]",
+        "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
         id="data_collection_allowlist",
     ),
     pytest.param(
@@ -1846,12 +1848,12 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
                 }
             }
         },
-        "toy=[Filtered]&color=[Filtered]&auth=[Filtered]",
+        "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
         id="data_collection_allowlist_sensitive_term",
     ),
     pytest.param(
         {"_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}}},
-        NO_QUERY_STRING,
+        None,
         id="data_collection_off",
     ),
     pytest.param(
@@ -1859,7 +1861,7 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
             "send_default_pii": True,
             "_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}},
         },
-        NO_QUERY_STRING,
+        None,
         id="data_collection_wins_over_send_default_pii",
     ),
 ]
@@ -1899,7 +1901,7 @@ async def test_server_url_query_data_collection_span_streaming(
 
     (server_span,) = [item.payload for item in items]
 
-    if expected_query is NO_QUERY_STRING:
+    if expected_query is None:
         assert "url.query" not in server_span["attributes"]
     else:
         assert server_span["attributes"]["url.query"] == expected_query
@@ -1950,7 +1952,7 @@ async def test_client_url_query_data_collection_span_streaming(
 
     inner_client_span = items[0].payload
 
-    if expected_query is NO_QUERY_STRING:
+    if expected_query is None:
         assert "url.query" not in inner_client_span["attributes"]
     else:
         assert inner_client_span["attributes"]["url.query"] == expected_query

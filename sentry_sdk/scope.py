@@ -867,7 +867,7 @@ class Scope:
                 self._span._segment.name = name
                 if source:
                     self._span._segment.set_attribute(
-                        "sentry.span.source", getattr(source, "value", source)
+                        "sentry.segment.name.source", getattr(source, "value", source)
                     )
 
             elif self._span.containing_transaction:
@@ -926,9 +926,9 @@ class Scope:
         # is used for populating events and linking them to segments
         if type(span) is StreamedSpan and span._is_segment():
             self._transaction = span.name
-            if span._attributes.get("sentry.span.source"):
+            if span._attributes.get("sentry.segment.name.source"):
                 self._transaction_info["source"] = str(
-                    span._attributes["sentry.span.source"]
+                    span._attributes["sentry.segment.name.source"]
                 )
 
     @property
@@ -1141,9 +1141,16 @@ class Scope:
             constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
             available arguments.
         """
-        kwargs.setdefault("scope", self)
-
         client = self.get_client()
+        if has_span_streaming_enabled(client.options):
+            warnings.warn(
+                "Scope.start_transaction is not available in streaming mode.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return NoOpSpan()
+
+        kwargs.setdefault("scope", self)
 
         configuration_instrumenter = client.options["instrumenter"]
 

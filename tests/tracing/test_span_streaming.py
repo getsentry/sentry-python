@@ -23,7 +23,7 @@ minimum_python_38 = pytest.mark.skipif(
 def test_start_span(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -63,7 +63,7 @@ def test_start_span(sentry_init, capture_items):
 def test_start_span_no_context_manager(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -104,12 +104,14 @@ def test_span_sampled_when_created(sentry_init, capture_items):
     # at start_span() time
 
     def traces_sampler(sampling_context):
-        assert "delayed_attribute" not in sampling_context["span_context"]["attributes"]
+        assert (
+            "delayed_attribute" not in sampling_context["transaction_context"]["data"]
+        )
         return 1.0
 
     sentry_init(
         traces_sampler=traces_sampler,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -131,7 +133,7 @@ def test_span_sampled_when_created(sentry_init, capture_items):
 def test_start_span_attributes(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -153,16 +155,17 @@ def test_start_span_attributes(sentry_init, capture_items):
 
 def test_start_span_attributes_in_traces_sampler(sentry_init, capture_items):
     def traces_sampler(sampling_context):
-        assert "attributes" in sampling_context["span_context"]
-        assert "my_attribute" in sampling_context["span_context"]["attributes"]
+        assert "data" in sampling_context["transaction_context"]
+        assert "my_attribute" in sampling_context["transaction_context"]["data"]
         assert (
-            sampling_context["span_context"]["attributes"]["my_attribute"] == "my_value"
+            sampling_context["transaction_context"]["data"]["my_attribute"]
+            == "my_value"
         )
         return 1.0
 
     sentry_init(
         traces_sampler=traces_sampler,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -188,22 +191,22 @@ def test_sampling_context(sentry_init, capture_items):
     def traces_sampler(sampling_context):
         nonlocal received_trace_id
 
-        assert "trace_id" in sampling_context["span_context"]
-        received_trace_id = sampling_context["span_context"]["trace_id"]
+        assert "trace_id" in sampling_context["transaction_context"]
+        received_trace_id = sampling_context["transaction_context"]["trace_id"]
 
-        assert "parent_span_id" in sampling_context["span_context"]
-        assert sampling_context["span_context"]["parent_span_id"] is None
+        assert "parent_span_id" in sampling_context["transaction_context"]
+        assert sampling_context["transaction_context"]["parent_span_id"] is None
 
-        assert "parent_sampled" in sampling_context["span_context"]
-        assert sampling_context["span_context"]["parent_sampled"] is None
+        assert "parent_sampled" in sampling_context
+        assert sampling_context["parent_sampled"] is None
 
-        assert "attributes" in sampling_context["span_context"]
+        assert "data" in sampling_context["transaction_context"]
 
         return 1.0
 
     sentry_init(
         traces_sampler=traces_sampler,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -356,10 +359,45 @@ def test_before_send_span_doesnt_receive_ignored_spans(sentry_init, capture_item
     assert not before_send_span_called
 
 
+@pytest.mark.tests_internal_exceptions
+def test_before_send_span_raises_does_not_crash_application(sentry_init, capture_items):
+    def before_send_span(span, hint):
+        # Mutate the span before raising to ensure the partial mutation
+        # is discarded when the exception is raised.
+        span["name"] = "Mutated span name"
+        span["attributes"]["mutated"] = True
+        raise ValueError("before_send_span error")
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={
+            "before_send_span": before_send_span,
+            "trace_lifecycle": "stream",
+        },
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="span", attributes={"original": "value"}):
+        ...
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    # The exception in before_send_span is swallowed and the original,
+    # unmodified span is sent.
+    assert len(spans) == 1
+    (span,) = spans
+
+    assert span["name"] == "span"
+    assert span["attributes"]["original"] == "value"
+    assert "mutated" not in span["attributes"]
+
+
 def test_span_attributes(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -393,7 +431,7 @@ def test_span_attributes(sentry_init, capture_items):
 def test_span_attributes_serialize_early(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -428,17 +466,17 @@ def test_span_attributes_serialize_early(sentry_init, capture_items):
 
 def test_traces_sampler_drops_span(sentry_init, capture_items):
     def traces_sampler(sampling_context):
-        assert "attributes" in sampling_context["span_context"]
-        assert "drop" in sampling_context["span_context"]["attributes"]
+        assert "data" in sampling_context["transaction_context"]
+        assert "drop" in sampling_context["transaction_context"]["data"]
 
-        if sampling_context["span_context"]["attributes"]["drop"] is True:
+        if sampling_context["transaction_context"]["data"]["drop"] is True:
             return 0.0
 
         return 1.0
 
     sentry_init(
         traces_sampler=traces_sampler,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -465,12 +503,12 @@ def test_traces_sampler_called_once_per_segment(sentry_init):
     def traces_sampler(sampling_context):
         nonlocal traces_sampler_called, span_name_in_traces_sampler
         traces_sampler_called += 1
-        span_name_in_traces_sampler = sampling_context["span_context"]["name"]
+        span_name_in_traces_sampler = sampling_context["transaction_context"]["name"]
         return 1.0
 
     sentry_init(
         traces_sampler=traces_sampler,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     with sentry_sdk.traces.start_span(name="segment") as segment:
@@ -487,7 +525,7 @@ def test_traces_sampler_called_once_per_segment(sentry_init):
 def test_start_inactive_span(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -524,7 +562,7 @@ def test_start_inactive_span(sentry_init, capture_items):
 def test_start_span_override_parent(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -563,7 +601,7 @@ def test_start_span_override_parent(sentry_init, capture_items):
 def test_sibling_segments(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -596,7 +634,7 @@ def test_sibling_segments(sentry_init, capture_items):
 def test_sibling_segments_new_trace(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -632,7 +670,7 @@ def test_continue_trace_sampled(sentry_init, capture_items):
     sentry_init(
         # parent sampling decision takes precedence over traces_sample_rate
         traces_sample_rate=0.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -672,7 +710,7 @@ def test_continue_trace_unsampled(sentry_init, capture_items):
     sentry_init(
         # parent sampling decision takes precedence over traces_sample_rate
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -724,7 +762,7 @@ def test_backpressure_outcome(
     sentry_init(
         traces_sample_rate=0.5,
         enable_backpressure_handling=True,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -770,7 +808,7 @@ def test_continue_trace_no_sample_rand(sentry_init, capture_items):
     sentry_init(
         # parent sampling decision takes precedence over traces_sample_rate
         traces_sample_rate=0.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -825,7 +863,7 @@ def test_outgoing_traceparent_and_baggage_head_sdk(sentry_init, traces_sample_ra
 
     sentry_init(
         traces_sample_rate=traces_sample_rate,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     sentry_sdk.traces.new_trace()
@@ -892,7 +930,7 @@ def test_outgoing_traceparent_and_baggage_incoming_trace(
     # test_outgoing_traceparent_and_baggage_incoming_trace_deferred
     sentry_init(
         traces_sample_rate=traces_sample_rate,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     trace_id = "0af7651916cd43dd8448eb211c80319c"
@@ -973,7 +1011,7 @@ def test_outgoing_traceparent_and_baggage_incoming_trace_deferred(
     """The SDK handles a deferred incoming sampling decision correctly."""
     sentry_init(
         traces_sample_rate=traces_sample_rate,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     if traces_sample_rate == 0.0:
@@ -1117,7 +1155,7 @@ def test_outgoing_traceparent_and_baggage_ignored_child_span(sentry_init):
 def test_set_span_status(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1141,7 +1179,7 @@ def test_set_span_status(sentry_init, capture_items):
 def test_set_span_status_on_error(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -1162,7 +1200,8 @@ def test_set_span_status_on_error(sentry_init, capture_items):
 def test_set_span_status_on_ignored_span(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream", "ignore_spans": ["ignored"]},
+        trace_lifecycle="stream",
+        ignore_spans=["ignored"],
     )
 
     items = capture_items("span")
@@ -1547,7 +1586,8 @@ def test_ignored_spans_produce_client_report(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream", "ignore_spans": ["ignored"]},
+        trace_lifecycle="stream",
+        ignore_spans=["ignored"],
     )
 
     items = capture_items("span")
@@ -1676,7 +1716,7 @@ def test_default_attributes(sentry_init, capture_envelopes):
         release="1.0.0",
         dist="1.0",
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     envelopes = capture_envelopes()

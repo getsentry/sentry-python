@@ -1,5 +1,41 @@
 # Changelog
 
+## 2.66.1
+
+### Bug Fixes 🐛
+
+#### Tracing
+
+- Handle exceptions raised within traces_sampler and other callbacks by @ericapisani in [#6853](https://github.com/getsentry/sentry-python/pull/6853)
+
+### Internal Changes 🔧
+
+- Fix flaky decorator test by @sl0thentr0py in [#6830](https://github.com/getsentry/sentry-python/pull/6830)
+
+## 2.66.0
+
+### New Features ✨
+
+- (tracing) Promote trace_lifecycle and ignore_spans to top-level options by @ericapisani in [#6821](https://github.com/getsentry/sentry-python/pull/6821)
+
+### Bug Fixes 🐛
+
+#### Tracing
+
+- Skip child span creation in streaming path when no current span (HTTP clients) by @sentrivana in [#6811](https://github.com/getsentry/sentry-python/pull/6811)
+- Skip child span creation in streaming path when no current span (task queues) by @sentrivana in [#6814](https://github.com/getsentry/sentry-python/pull/6814)
+- Skip child span creation in streaming path when no current span (misc) by @sentrivana in [#6815](https://github.com/getsentry/sentry-python/pull/6815)
+- Skip child span creation in streaming path when no current span (databases) by @sentrivana in [#6808](https://github.com/getsentry/sentry-python/pull/6808)
+- Skip child span creation in streaming path when no current span (web frameworks) by @sentrivana in [#6810](https://github.com/getsentry/sentry-python/pull/6810)
+- Skip child span creation in streaming path when no current span (django) by @sentrivana in [#6809](https://github.com/getsentry/sentry-python/pull/6809)
+
+### Internal Changes 🔧
+
+- (logging) Fix flaky test_logging_captured_warnings by @ericapisani in [#6824](https://github.com/getsentry/sentry-python/pull/6824)
+- Remove flaky no cyclic garbage test by @alexander-alderman-webb in [#6817](https://github.com/getsentry/sentry-python/pull/6817)
+- Remove Claude permission settings by @cleptric in [#6806](https://github.com/getsentry/sentry-python/pull/6806)
+- Move `nullcontext` to `sentry_sdk.utils` by @sentrivana in [#6805](https://github.com/getsentry/sentry-python/pull/6805)
+
 ## 2.65.0
 
 ### New Features ✨
