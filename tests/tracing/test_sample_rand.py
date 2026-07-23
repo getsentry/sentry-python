@@ -100,7 +100,7 @@ def test_segment_uses_incoming_sample_rand_span_streaming(
         traces_sample_rate=sample_rate,
         trace_lifecycle="stream",
     )
-    items = capture_items()
+    items = capture_items("span")
 
     sentry_sdk.traces.continue_trace(
         {
