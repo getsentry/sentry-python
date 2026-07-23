@@ -464,6 +464,66 @@ def test_request_data_with_send_default_pii_true(lambda_client, test_environment
         "data": None,
     }
 
+    # Legacy send_default_pii=True attaches the user identity.
+    assert transaction_event["user"] == {
+        "id": "42",
+        "ip_address": "213.47.147.207",
+    }
+
+
+USER_INFO_PAYLOAD = b"""
+    {
+      "resource": "/asd",
+      "path": "/asd",
+      "httpMethod": "GET",
+      "headers": {
+        "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
+        "User-Agent": "custom",
+        "X-Forwarded-Proto": "https"
+      },
+      "queryStringParameters": {
+        "bonkers": "true"
+      },
+      "pathParameters": null,
+      "stageVariables": null,
+      "requestContext": {
+        "identity": {
+          "sourceIp": "213.47.147.207",
+          "userArn": "42"
+        }
+      },
+      "body": null,
+      "isBase64Encoded": false
+    }
+"""
+
+
+def test_user_info_with_data_collection_user_info_on(lambda_client, test_environment):
+    lambda_client.invoke(
+        FunctionName="BasicOkDataCollectionUserInfoOn",
+        Payload=USER_INFO_PAYLOAD,
+    )
+    envelopes = test_environment["server"].envelopes
+
+    (transaction_event,) = envelopes
+
+    assert transaction_event["user"] == {
+        "id": "42",
+        "ip_address": "213.47.147.207",
+    }
+
+
+def test_user_info_with_data_collection_user_info_off(lambda_client, test_environment):
+    lambda_client.invoke(
+        FunctionName="BasicOkDataCollectionUserInfoOff",
+        Payload=USER_INFO_PAYLOAD,
+    )
+    envelopes = test_environment["server"].envelopes
+
+    (transaction_event,) = envelopes
+
+    assert "user" not in transaction_event
+
 
 def test_request_data_with_data_collection_allowlist(lambda_client, test_environment):
     payload = b"""
