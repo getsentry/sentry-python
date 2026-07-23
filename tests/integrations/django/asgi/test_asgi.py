@@ -1102,6 +1102,7 @@ async def test_async_middleware_process_exception_is_awaited(
     assert response["body"] == b"handled by async process_exception"
 
 
+@pytest.mark.forked
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.asyncio
 @pytest.mark.skipif(
