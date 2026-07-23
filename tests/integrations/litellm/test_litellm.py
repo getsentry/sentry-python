@@ -34,7 +34,8 @@ from litellm.litellm_core_utils import (
 from litellm.litellm_core_utils.logging_worker import GLOBAL_LOGGING_WORKER
 from litellm.llms.custom_httpx.http_handler import AsyncHTTPHandler, HTTPHandler
 from openai import AsyncOpenAI, OpenAI
-from openai.types import CompletionUsage
+from openai.types import Completion, CompletionUsage
+from openai.types.completion_choice import CompletionChoice
 
 from sentry_sdk import start_transaction
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
@@ -2651,6 +2652,7 @@ def test_response_without_usage(
             kwargs = {
                 "model": "gpt-3.5-turbo",
                 "messages": messages,
+                "call_type": "completion",
             }
 
             _input_callback(kwargs)
@@ -2674,6 +2676,7 @@ def test_response_without_usage(
             kwargs = {
                 "model": "gpt-3.5-turbo",
                 "messages": messages,
+                "call_type": "completion",
             }
 
             _input_callback(kwargs)
@@ -2733,6 +2736,7 @@ def test_litellm_message_truncation(sentry_init, capture_events):
         kwargs = {
             "model": "gpt-3.5-turbo",
             "messages": messages,
+            "call_type": "completion",
         }
 
         _input_callback(kwargs)
@@ -3589,3 +3593,105 @@ def test_convert_message_parts_image_url_missing_url():
     converted = _convert_message_parts(messages)
     # Should return item unchanged
     assert converted[0]["content"][0]["type"] == "image_url"
+
+
+def test_text_completion_operation_name(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    reset_litellm_executor,
+):
+    """text_completion calls get the text_completion op, not the chat fallback."""
+    sentry_init(
+        integrations=[LiteLLMIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=False,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="test-key")
+
+    model_response = get_model_response(
+        Completion(
+            id="cmpl-test",
+            choices=[
+                CompletionChoice(finish_reason="stop", index=0, text="Test response")
+            ],
+            created=1234567890,
+            model="gpt-3.5-turbo-instruct",
+            object="text_completion",
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
+        ),
+        serialize_pydantic=True,
+        request_headers={"X-Stainless-Raw-Response": "true"},
+    )
+
+    with mock.patch.object(
+        client.completions._client._client,
+        "send",
+        return_value=model_response,
+    ), start_transaction(name="litellm test"):
+        litellm.text_completion(
+            model="gpt-3.5-turbo-instruct",
+            prompt="Hello!",
+            client=client,
+        )
+
+        litellm_utils.executor.shutdown(wait=True)
+
+    (event,) = events
+    (span,) = [s for s in event["spans"] if s["origin"] == "auto.ai.litellm"]
+
+    assert span["op"] == OP.GEN_AI_TEXT_COMPLETION
+    assert span["description"] == "text_completion gpt-3.5-turbo-instruct"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "text_completion"
+
+
+def test_responses_operation_name(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    nonstreaming_responses_model_response,
+    reset_litellm_executor,
+):
+    """Responses API calls get the responses op, not the chat fallback."""
+    sentry_init(
+        integrations=[LiteLLMIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=False,
+    )
+    events = capture_events()
+
+    client = HTTPHandler()
+
+    model_response = get_model_response(
+        nonstreaming_responses_model_response,
+        serialize_pydantic=True,
+    )
+
+    with mock.patch.object(
+        client,
+        "post",
+        return_value=model_response,
+    ), start_transaction(name="litellm test"):
+        litellm.responses(
+            model="gpt-4",
+            input="Hello!",
+            client=client,
+            api_key="test-key",
+        )
+
+        litellm_utils.executor.shutdown(wait=True)
+
+    (event,) = events
+    (span,) = [s for s in event["spans"] if s["origin"] == "auto.ai.litellm"]
+
+    assert span["op"] == OP.GEN_AI_RESPONSES
+    assert span["description"] == "responses gpt-4"
+    assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "responses"
