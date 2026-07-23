@@ -556,6 +556,9 @@ def test_include_source_context_when_serializing_frame(include_source_context):
         ["some-string", ["some.*"], True],
         ["some-string", ["Some"], False],  # we do case sensitive matching
         ["some-string", [".*string$"], True],
+        ["some-string", [""], False],  # empty pattern should not match
+        ["some-string", ["", "some-string"], True],  # empty pattern skipped, second matches
+        ["some-string", ["", ""], False],  # all empty patterns, no match
     ],
 )
 def test_match_regex_list(item, regex_list, expected_result):
