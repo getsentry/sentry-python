@@ -235,9 +235,25 @@ async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
                     else parsed_url.url,
                 )
 
-                # TODO: Add the user properties that are seen in the branch below here once
-                # code is added to respect the `user_info` settings within the data collection
-                # configuration
+                if client_options["data_collection"]["user_info"]:
+                    user_properties = {}
+
+                    if len(request_websocket.access_route) >= 1:
+                        segment.set_attribute(
+                            "client.address", request_websocket.access_route[0]
+                        )
+                        user_properties["ip_address"] = request_websocket.access_route[
+                            0
+                        ]
+
+                    current_user_id = _get_current_user_id_from_quart()
+                    if current_user_id:
+                        user_properties["id"] = current_user_id
+
+                    if user_properties:
+                        existing_user_properties = scope._user or {}
+                        scope.set_user({**existing_user_properties, **user_properties})
+
             elif should_send_default_pii():
                 segment.set_attribute("url.full", request_websocket.url)
                 segment.set_attribute(
@@ -284,7 +300,18 @@ def _make_request_event_processor(
             request_info["method"] = request.method
             request_info["headers"] = _filter_headers(dict(request.headers))
 
-            if should_send_default_pii():
+            client_options = sentry_sdk.get_client().options
+            if has_data_collection_enabled(client_options):
+                if client_options["data_collection"]["user_info"]:
+                    if len(request.access_route) >= 1:
+                        request_info["env"] = {"REMOTE_ADDR": request.access_route[0]}
+
+                    current_user_id = _get_current_user_id_from_quart()
+                    if current_user_id:
+                        user_info = event.setdefault("user", {})
+                        user_info["id"] = current_user_id
+
+            elif should_send_default_pii():
                 if len(request.access_route) >= 1:
                     request_info["env"] = {"REMOTE_ADDR": request.access_route[0]}
 
