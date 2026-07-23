@@ -739,7 +739,10 @@ def test_langchain_create_agent(
         assert chat_spans[0]["attributes"]["gen_ai.agent.name"] == "word_length_agent"
 
         assert chat_spans[0]["attributes"]["gen_ai.usage.input_tokens"] == 10
+        assert chat_spans[0]["attributes"]["gen_ai.usage.input_tokens.cached"] == 4
+        assert chat_spans[0]["attributes"]["gen_ai.usage.input_tokens.cache_write"] == 6
         assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens"] == 20
+        assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens.reasoning"] == 5
         assert chat_spans[0]["attributes"]["gen_ai.usage.total_tokens"] == 30
 
         if send_default_pii and include_prompts:
@@ -803,7 +806,10 @@ def test_langchain_create_agent(
         assert chat_spans[0]["data"]["gen_ai.agent.name"] == "word_length_agent"
 
         assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 10
+        assert chat_spans[0]["data"]["gen_ai.usage.input_tokens.cached"] == 4
+        assert chat_spans[0]["data"]["gen_ai.usage.input_tokens.cache_write"] == 6
         assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 20
+        assert chat_spans[0]["data"]["gen_ai.usage.output_tokens.reasoning"] == 5
         assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 30
 
         if send_default_pii and include_prompts:
@@ -873,24 +879,24 @@ def test_tool_execution_span(
                 ResponseUsage(
                     input_tokens=142,
                     input_tokens_details=InputTokensDetails(
-                        cached_tokens=0,
-                        cache_write_tokens=0,
+                        cached_tokens=69,
+                        cache_write_tokens=31,
                     ),
                     output_tokens=50,
                     output_tokens_details=OutputTokensDetails(
-                        reasoning_tokens=0,
+                        reasoning_tokens=10,
                     ),
                     total_tokens=192,
                 ),
                 ResponseUsage(
                     input_tokens=89,
                     input_tokens_details=InputTokensDetails(
-                        cached_tokens=0,
-                        cache_write_tokens=0,
+                        cached_tokens=69,
+                        cache_write_tokens=10,
                     ),
                     output_tokens=28,
                     output_tokens_details=OutputTokensDetails(
-                        reasoning_tokens=0,
+                        reasoning_tokens=11,
                     ),
                     total_tokens=117,
                 ),
@@ -1068,12 +1074,22 @@ def test_tool_execution_span(
         assert tool_exec_span["attributes"]["gen_ai.agent.name"] == "word_length_agent"
 
         assert chat_spans[0]["attributes"]["gen_ai.usage.input_tokens"] == 142
+        assert chat_spans[0]["attributes"]["gen_ai.usage.input_tokens.cached"] == 69
+        assert (
+            chat_spans[0]["attributes"]["gen_ai.usage.input_tokens.cache_write"] == 31
+        )
         assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens"] == 50
+        assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens.reasoning"] == 10
         assert chat_spans[0]["attributes"]["gen_ai.usage.total_tokens"] == 192
         assert chat_spans[0]["attributes"]["gen_ai.system"] == "openai-chat"
 
         assert chat_spans[1]["attributes"]["gen_ai.usage.input_tokens"] == 89
+        assert chat_spans[1]["attributes"]["gen_ai.usage.input_tokens.cached"] == 69
+        assert (
+            chat_spans[1]["attributes"]["gen_ai.usage.input_tokens.cache_write"] == 10
+        )
         assert chat_spans[1]["attributes"]["gen_ai.usage.output_tokens"] == 28
+        assert chat_spans[1]["attributes"]["gen_ai.usage.output_tokens.reasoning"] == 11
         assert chat_spans[1]["attributes"]["gen_ai.usage.total_tokens"] == 117
         assert chat_spans[1]["attributes"]["gen_ai.system"] == "openai-chat"
 
@@ -1171,12 +1187,18 @@ def test_tool_execution_span(
         assert tool_exec_span["data"]["gen_ai.agent.name"] == "word_length_agent"
 
         assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 142
+        assert chat_spans[0]["data"]["gen_ai.usage.input_tokens.cached"] == 69
+        assert chat_spans[0]["data"]["gen_ai.usage.input_tokens.cache_write"] == 31
         assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 50
+        assert chat_spans[0]["data"]["gen_ai.usage.output_tokens.reasoning"] == 10
         assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 192
         assert chat_spans[0]["data"]["gen_ai.system"] == "openai-chat"
 
         assert chat_spans[1]["data"]["gen_ai.usage.input_tokens"] == 89
+        assert chat_spans[1]["data"]["gen_ai.usage.input_tokens.cached"] == 69
+        assert chat_spans[1]["data"]["gen_ai.usage.input_tokens.cache_write"] == 10
         assert chat_spans[1]["data"]["gen_ai.usage.output_tokens"] == 28
+        assert chat_spans[1]["data"]["gen_ai.usage.output_tokens.reasoning"] == 11
         assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
         assert chat_spans[1]["data"]["gen_ai.system"] == "openai-chat"
 
