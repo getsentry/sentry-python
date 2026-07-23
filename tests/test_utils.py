@@ -551,6 +551,7 @@ def test_include_source_context_when_serializing_frame(include_source_context):
         ["some-string", [], False],
         ["some-string", None, False],
         ["some-string", ["some-string"], True],
+        ["some-string", [""], False],
         ["some-string", ["some"], False],
         ["some-string", ["some$"], False],  # same as above
         ["some-string", ["some.*"], True],
