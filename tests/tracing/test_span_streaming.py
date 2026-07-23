@@ -1814,6 +1814,7 @@ def test_default_attributes(sentry_init, capture_envelopes):
         "sentry.origin": {"value": "manual", "type": "string"},
         "sentry.sdk.integrations": {"value": mock.ANY, "type": "array"},
         "sentry.trace_lifecycle": {"value": "stream", "type": "string"},
+        "sentry.segment.name.source": {"value": "custom", "type": "string"},
         "process.runtime.name": {
             "type": "string",
             "value": mock.ANY,
