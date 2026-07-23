@@ -290,6 +290,7 @@ def _make_event_processor(
             event["transaction"] = transaction_from_function(method) or ""
             event["transaction_info"] = {"source": TransactionSource.COMPONENT}
 
+        client_options = sentry_sdk.get_client().options
         with capture_internal_exceptions():
             extractor = TornadoRequestExtractor(request)
             extractor.extract_into_event(event)
@@ -302,7 +303,6 @@ def _make_event_processor(
                 request.path,
             )
 
-            client_options = sentry_sdk.get_client().options
             if has_data_collection_enabled(client_options):
                 if request.query:
                     filtered_query = _apply_data_collection_filtering_to_query_string(
