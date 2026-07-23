@@ -1,4 +1,5 @@
 import functools
+import sys
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -10,7 +11,10 @@ if TYPE_CHECKING:
     from typing import Any
 
 
-from asyncio import iscoroutinefunction
+if sys.version_info >= (3, 14):
+    from inspect import iscoroutinefunction
+else:
+    from asyncio import iscoroutinefunction
 
 
 try:
