@@ -60,7 +60,7 @@ def test_conversation_id_propagates_to_span_with_gen_ai_op(
             with start_span(op="gen_ai.invoke_agent"):
                 pass
 
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         span_data = spans[0]["attributes"]
     else:
         events = capture_events()

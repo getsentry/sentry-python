@@ -69,7 +69,7 @@ def test_view_exceptions(
         (error,) = exceptions
         assert isinstance(error, ZeroDivisionError)
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
         client.get(reverse("view_exc"))
@@ -111,7 +111,7 @@ def test_ensures_x_forwarded_header_is_honored_in_sdk_when_enabled_in_django(
         (error,) = exceptions
         assert isinstance(error, ZeroDivisionError)
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
         client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"})
@@ -149,7 +149,7 @@ def test_ensures_x_forwarded_header_is_not_honored_when_unenabled_in_django(
 
         (error,) = exceptions
         assert isinstance(error, ZeroDivisionError)
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
         client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"})
@@ -191,7 +191,7 @@ def test_request_captured(
 
         assert content == b"ok"
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
 
         assert event["transaction"] == "/message"
         assert event["request"] == {
@@ -242,7 +242,7 @@ def test_transaction_with_class_view(
         )
         assert status.lower() == "200 ok"
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
         content, status, headers = unpack_werkzeug_response(
@@ -341,7 +341,7 @@ def test_has_trace_if_performance_disabled(
         (
             msg_event,
             error_event,
-        ) = (item.payload for item in items if item.type == "event")
+        ) = (item.payload for item in items)
     else:
         events = capture_events()
         client.head(reverse("view_exc_with_msg"))
@@ -457,7 +457,7 @@ def test_trace_from_headers_if_performance_disabled(
         (
             msg_event,
             error_event,
-        ) = (item.payload for item in items if item.type == "event")
+        ) = (item.payload for item in items)
     else:
         events = capture_events()
         client.head(
@@ -506,7 +506,7 @@ def test_user_captured(
         )
         assert content == b"ok"
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
         content, status, headers = unpack_werkzeug_response(
@@ -587,7 +587,7 @@ def test_queryset_repr(
         except Exception:
             capture_exception()
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
 
@@ -630,7 +630,7 @@ def test_context_nested_queryset_repr(
         except Exception:
             capture_exception()
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
 
@@ -665,7 +665,7 @@ def test_custom_error_handler_request_context(
         content, status, headers = unpack_werkzeug_response(client.post("/404"))
         assert status.lower() == "404 not found"
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
         content, status, headers = unpack_werkzeug_response(client.post("/404"))
@@ -735,7 +735,7 @@ def test_sql_queries(
 
         capture_message("HI")
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
 
@@ -792,7 +792,7 @@ def test_sql_dict_query_params(
 
         capture_message("HI")
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
         sentry_sdk.get_isolation_scope().clear_breadcrumbs()
@@ -905,7 +905,7 @@ def test_sql_psycopg2_string_composition(
 
         capture_message("HI")
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
 
@@ -969,7 +969,7 @@ def test_sql_psycopg2_placeholders(
 
         capture_message("HI")
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
         sentry_sdk.get_isolation_scope().clear_breadcrumbs()
@@ -1117,7 +1117,7 @@ def test_django_connect_breadcrumbs(
 
         # trigger recording of event.
         capture_message("HI")
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
 
@@ -1313,7 +1313,7 @@ def test_request_body(
         assert status.lower() == "200 ok"
         assert content == b"heyooo"
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
 
         assert event["message"] == "hi"
         assert event["request"]["data"] == ""
@@ -1333,7 +1333,7 @@ def test_request_body(
         assert status.lower() == "200 ok"
         assert content == b'{"hey": 42}'
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
         content, status, headers = unpack_werkzeug_response(
@@ -1395,7 +1395,7 @@ def test_read_request(
 
         assert status.lower() == "500 internal server error"
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
 
@@ -1443,7 +1443,7 @@ def test_request_body_already_read(
                 content_type="application/json",
             )
 
-            (event,) = (item.payload for item in items if item.type == "event")
+            (event,) = (item.payload for item in items)
 
     else:
         events = capture_events()
@@ -1525,7 +1525,7 @@ def test_template_exception(
         )
         assert status.lower() == "500 internal server error"
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
 
@@ -1617,7 +1617,7 @@ def test_rest_framework_basic(
         (error,) = exceptions
         assert isinstance(error, ZeroDivisionError)
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         exceptions = capture_exceptions()
         events = capture_events()

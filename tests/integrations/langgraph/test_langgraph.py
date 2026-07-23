@@ -2005,7 +2005,7 @@ def test_langgraph_message_role_mapping(
             wrapped_invoke(pregel, state_data)
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
 
         # Verify that the span was created correctly
         assert span["attributes"]["sentry.op"] == "gen_ai.invoke_agent"

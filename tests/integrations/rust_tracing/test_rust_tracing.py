@@ -353,7 +353,7 @@ def test_on_event_exception(
 
             rust_tracing.close_span(3)
 
-        (exc,) = (item.payload for item in items if item.type == "event")
+        (exc,) = (item.payload for item in items)
     else:
         events = capture_events()
         sentry_sdk.get_isolation_scope().clear_breadcrumbs()
@@ -414,7 +414,7 @@ def test_on_event_breadcrumb(
             rust_tracing.close_span(3)
             capture_message("test message")
 
-        (message,) = (item.payload for item in items if item.type == "event")
+        (message,) = (item.payload for item in items)
     else:
         events = capture_events()
         sentry_sdk.get_isolation_scope().clear_breadcrumbs()
@@ -468,7 +468,7 @@ def test_on_event_event(
 
             rust_tracing.close_span(3)
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
         sentry_sdk.get_isolation_scope().clear_breadcrumbs()
