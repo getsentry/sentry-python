@@ -136,6 +136,16 @@ def mylogin(request):
 
 
 @csrf_exempt
+def mylogin_with_exception(request):
+    user, _ = User.objects.get_or_create(
+        username="john", defaults={"email": "lennon@thebeatles.com"}
+    )
+    user.backend = "django.contrib.auth.backends.ModelBackend"
+    login(request, user)
+    1 / 0
+
+
+@csrf_exempt
 def handler500(request):
     return HttpResponseServerError("Sentry error.")
 

@@ -30,6 +30,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    has_data_collection_enabled,
     logger,
     transaction_from_function,
     walk_exception_chain,
@@ -457,6 +458,39 @@ def _attempt_resolve_again(
     _set_transaction_name_and_source(scope, transaction_style, request)
 
 
+def _get_user_from_request_and_set_on_scope(request: "WSGIRequest") -> None:
+    user = getattr(request, "user", None)
+
+    # Evaluating a SimpleLazyObject in an async view can raise django.core.exceptions.SynchronousOnlyOperation.
+    # Exit early if the user has not been materialized yet.
+    is_lazy = isinstance(user, SimpleLazyObject)
+    if is_lazy and hasattr(request, "_cached_user"):
+        user = request._cached_user
+    elif is_lazy:
+        return
+
+    if user is None or not is_authenticated(user):
+        return
+
+    user_info = {}
+    try:
+        user_info["id"] = str(user.pk)
+    except Exception:
+        pass
+
+    try:
+        user_info["email"] = user.email
+    except Exception:
+        pass
+
+    try:
+        user_info["username"] = user.get_username()
+    except Exception:
+        pass
+
+    sentry_sdk.set_user(user_info)
+
+
 def _after_get_response(request: "WSGIRequest") -> None:
     client = sentry_sdk.get_client()
     integration = client.get_integration(DjangoIntegration)
@@ -468,37 +502,12 @@ def _after_get_response(request: "WSGIRequest") -> None:
         _attempt_resolve_again(request, scope, integration.transaction_style)
 
     span_streaming = has_span_streaming_enabled(client.options)
-    if span_streaming and should_send_default_pii():
-        user = getattr(request, "user", None)
-
-        # Evaluating a SimpleLazyObject in an async view can raise django.core.exceptions.SynchronousOnlyOperation.
-        # Exit early if the user has not been materialized yet.
-        is_lazy = isinstance(user, SimpleLazyObject)
-        if is_lazy and hasattr(request, "_cached_user"):
-            user = request._cached_user
-        elif is_lazy:
-            return
-
-        if user is None or not is_authenticated(user):
-            return
-
-        user_info = {}
-        try:
-            user_info["id"] = str(user.pk)
-        except Exception:
-            pass
-
-        try:
-            user_info["email"] = user.email
-        except Exception:
-            pass
-
-        try:
-            user_info["username"] = user.get_username()
-        except Exception:
-            pass
-
-        sentry_sdk.set_user(user_info)
+    if span_streaming:
+        if has_data_collection_enabled(client.options):
+            if client.options["data_collection"]["user_info"]:
+                _get_user_from_request_and_set_on_scope(request)
+        elif should_send_default_pii():
+            _get_user_from_request_and_set_on_scope(request)
 
 
 def _patch_get_response() -> None:
@@ -544,7 +553,12 @@ def _make_wsgi_request_event_processor(
         with capture_internal_exceptions():
             DjangoRequestExtractor(request).extract_into_event(event)
 
-        if should_send_default_pii():
+        client_options = sentry_sdk.get_client().options
+        if has_data_collection_enabled(client_options):
+            if client_options["data_collection"]["user_info"]:
+                with capture_internal_exceptions():
+                    _set_user_info(request, event)
+        elif should_send_default_pii():
             with capture_internal_exceptions():
                 _set_user_info(request, event)
 
