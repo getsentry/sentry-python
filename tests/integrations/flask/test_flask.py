@@ -32,6 +32,7 @@ from sentry_sdk import (
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
+from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
 
 # Query string used across the query-param filtering tests below. ``auth`` is a
 # built-in sensitive term, so it is redacted by the default denylist.
@@ -1398,45 +1399,7 @@ def test_empty_query_string_is_dropped_with_data_collection(
     assert "query_string" not in event["request"]
 
 
-# Parametrization shared by the user_info tests below. ``expect_ip`` is
-# whether the client IP may be collected under the given init kwargs.
-USER_INFO_INIT_KWARGS = [
-    pytest.param({"send_default_pii": True}, True, id="legacy_send_default_pii_true"),
-    pytest.param(
-        {"send_default_pii": False}, False, id="legacy_send_default_pii_false"
-    ),
-    pytest.param(
-        {"_experiments": {"data_collection": {"user_info": True}}},
-        True,
-        id="data_collection_user_info_true",
-    ),
-    pytest.param(
-        {"_experiments": {"data_collection": {"user_info": False}}},
-        False,
-        id="data_collection_user_info_false",
-    ),
-    # ``data_collection`` is the single source of truth: it must win over
-    # ``send_default_pii`` when both are configured.
-    pytest.param(
-        {
-            "send_default_pii": True,
-            "_experiments": {"data_collection": {"user_info": False}},
-        },
-        False,
-        id="data_collection_wins_over_send_default_pii_true",
-    ),
-    pytest.param(
-        {
-            "send_default_pii": False,
-            "_experiments": {"data_collection": {"user_info": True}},
-        },
-        True,
-        id="data_collection_wins_over_send_default_pii_false",
-    ),
-]
-
-
-@pytest.mark.parametrize("init_kwargs, expect_ip", USER_INFO_INIT_KWARGS)
+@pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_info_span_attributes_data_collection(
     sentry_init, app, capture_items, monkeypatch, init_kwargs, expect_ip
 ):
@@ -1472,7 +1435,7 @@ def test_user_info_span_attributes_data_collection(
         assert "client.address" not in segment["attributes"]
 
 
-@pytest.mark.parametrize("init_kwargs, expect_ip", USER_INFO_INIT_KWARGS)
+@pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_info_error_event_data_collection(
     sentry_init, app, capture_events, monkeypatch, init_kwargs, expect_ip
 ):
@@ -1523,7 +1486,7 @@ def test_error_event_no_user_ip_address_without_remote_addr(
     assert "ip_address" not in event.get("user", {})
 
 
-@pytest.mark.parametrize("init_kwargs, expect_user", USER_INFO_INIT_KWARGS)
+@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
 def test_flask_login_user_identity_error_event_data_collection(
     sentry_init, app, capture_events, init_kwargs, expect_user
 ):
@@ -1571,7 +1534,7 @@ def test_flask_login_user_identity_error_event_data_collection(
         assert "username" not in user
 
 
-@pytest.mark.parametrize("init_kwargs, expect_user", USER_INFO_INIT_KWARGS)
+@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
 def test_flask_login_user_identity_span_attributes_data_collection(
     sentry_init, app, capture_items, init_kwargs, expect_user
 ):

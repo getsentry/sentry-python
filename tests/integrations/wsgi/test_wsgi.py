@@ -11,6 +11,7 @@ from sentry_sdk.integrations.wsgi import (
     _ScopedResponse,
     get_request_url,
 )
+from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
 
 
 @pytest.fixture
@@ -1303,45 +1304,7 @@ def test_user_ip_address_on_all_spans(sentry_init, capture_items, send_default_p
         assert "user.ip_address" not in child_span["attributes"]
 
 
-# Parametrization shared by the user_info tests below. ``expect_ip`` is
-# whether the client IP may be collected under the given init kwargs.
-USER_INFO_INIT_KWARGS = [
-    pytest.param({"send_default_pii": True}, True, id="legacy_send_default_pii_true"),
-    pytest.param(
-        {"send_default_pii": False}, False, id="legacy_send_default_pii_false"
-    ),
-    pytest.param(
-        {"_experiments": {"data_collection": {"user_info": True}}},
-        True,
-        id="data_collection_user_info_true",
-    ),
-    pytest.param(
-        {"_experiments": {"data_collection": {"user_info": False}}},
-        False,
-        id="data_collection_user_info_false",
-    ),
-    # ``data_collection`` is the single source of truth: it must win over
-    # ``send_default_pii`` when both are configured.
-    pytest.param(
-        {
-            "send_default_pii": True,
-            "_experiments": {"data_collection": {"user_info": False}},
-        },
-        False,
-        id="data_collection_wins_over_send_default_pii_true",
-    ),
-    pytest.param(
-        {
-            "send_default_pii": False,
-            "_experiments": {"data_collection": {"user_info": True}},
-        },
-        True,
-        id="data_collection_wins_over_send_default_pii_false",
-    ),
-]
-
-
-@pytest.mark.parametrize("init_kwargs, expect_ip", USER_INFO_INIT_KWARGS)
+@pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_info_span_attributes_data_collection(
     sentry_init, capture_items, init_kwargs, expect_ip
 ):
@@ -1381,7 +1344,7 @@ def test_user_info_span_attributes_data_collection(
         assert "client.address" not in server_span["attributes"]
 
 
-@pytest.mark.parametrize("init_kwargs, expect_ip", USER_INFO_INIT_KWARGS)
+@pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_info_error_event_data_collection(
     sentry_init, crashing_app, capture_events, init_kwargs, expect_ip
 ):
