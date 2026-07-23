@@ -444,6 +444,7 @@ def _get_request_attributes(
 
     if has_data_collection_enabled(client_options):
         query_string = environ.get("QUERY_STRING")
+        filtered_qs = None
         if query_string:
             filtered_qs = _apply_data_collection_filtering_to_query_string(
                 query_string=query_string,
@@ -458,6 +459,8 @@ def _get_request_attributes(
             attributes["url.path"] = path
 
         attributes["url.full"] = get_request_url(environ, use_x_forwarded_for)
+        if filtered_qs is not None:
+            attributes["url.full"] += f"?{filtered_qs}"
 
         if client_options["data_collection"]["user_info"]:
             client_ip = get_client_ip(environ)
