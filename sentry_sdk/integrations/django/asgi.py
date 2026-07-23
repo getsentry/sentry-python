@@ -1,9 +1,8 @@
 """
 Instrumentation for Django 3.0
 
-Since this file contains `async def` it is conditionally imported in
-`sentry_sdk.integrations.django` (depending on the existence of
-`django.core.handlers.asgi`.
+Since this file imports `django.core.handlers.asgi` (Django >= 3)
+it is conditionally imported in `sentry_sdk.integrations.django`.
 """
 
 import asyncio
