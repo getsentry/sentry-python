@@ -187,19 +187,17 @@ class AioHttpIntegration(Integration):
                                     url_attributes["url.full"] += "?" + filtered_query_string
 
                         elif should_send_default_pii():
-                            url_attributes["url.full"] = "%s://%s%s" % (
+                            url_full = "%s://%s%s" % (
                                 request.scheme,
                                 request.host,
                                 request.path,
                             )
                             if request.query_string:
                                 url_full += "?" + request.query_string
+                                url_attributes["url.query"] = request.query_string
 
                             url_attributes["url.full"] = url_full
                             url_attributes["url.path"] = request.path
-
-                            if request.query_string:
-                                url_attributes["url.query"] = request.query_string
 
                         client_address_attributes = {}
                         if should_send_default_pii() and request.remote:
@@ -391,25 +389,10 @@ def create_trace_config() -> "TraceConfig":
                     "sentry.origin": AioHttpIntegration.origin,
                     "http.request.method": method,
                 }
-<<<<<<< HEAD
-                if parsed_url is not None and should_send_default_pii():
-                    url_full = parsed_url.url
-                    if parsed_url.query:
-                        url_full += "?" + parsed_url.query
-                    if parsed_url.fragment:
-                        url_full += "#" + parsed_url.fragment
-
-                    attributes["url.full"] = url_full
-                    attributes["url.path"] = params.url.path
-=======
                 if parsed_url is not None:
                     if has_data_collection_enabled(client.options):
-                        attributes["url.full"] = parsed_url.url
+                        url_full = parsed_url.url
                         attributes["url.path"] = params.url.path
->>>>>>> master
-
-                        if parsed_url.fragment:
-                            attributes["url.fragment"] = parsed_url.fragment
 
                         if parsed_url.query:
                             filtered_query = (
@@ -422,14 +405,25 @@ def create_trace_config() -> "TraceConfig":
                             )
                             if filtered_query:
                                 attributes["url.query"] = filtered_query
+                                url_full += "?" + filtered_query
+
+                        if parsed_url.fragment:
+                            attributes["url.fragment"] = parsed_url.fragment
+                            url_full += "#" + parsed_url.fragment
+
+                        attributes["url.full"] = url_full
                     elif should_send_default_pii():
-                        attributes["url.full"] = parsed_url.url
+                        url_full = parsed_url.url
                         attributes["url.path"] = params.url.path
 
                         if parsed_url.query:
+                            url_full += "?" + parsed_url.query
                             attributes["url.query"] = parsed_url.query
                         if parsed_url.fragment:
+                            url_full += "#" + parsed_url.fragment
                             attributes["url.fragment"] = parsed_url.fragment
+
+                        attributes["url.full"] = url_full
 
                 span = sentry_sdk.traces.start_span(
                     name=span_name, attributes=attributes
