@@ -203,18 +203,19 @@ def test_continue_trace_span_streaming(
     )
     items = capture_items()
 
-    # Simulate incoming headers from another service.
-    # We construct the sentry-trace header manually because StreamedSpan.sampled
-    # is always True (and NoOpStreamedSpan.sampled is always False), so we can't
-    # vary parent_sampled by generating headers from a real span.
+    # Simulate incoming headers from another service
     trace_id = "771a43a4192642f0b136d5159a501700"
     parent_span_id = "1234567890abcdef"
 
-    sampled_flag = ""
     if parent_sampled is True:
         sampled_flag = "-1"
+        parent_sample_rate = "0.5"
     elif parent_sampled is False:
         sampled_flag = "-0"
+        parent_sample_rate = "0.001"
+    elif parent_sampled is None:
+        sampled_flag = ""
+        parent_sample_rate = "0.001"
 
     headers = {
         "sentry-trace": f"{trace_id}-{parent_span_id}{sampled_flag}",
@@ -222,16 +223,16 @@ def test_continue_trace_span_streaming(
             "other-vendor-value-1=foo;bar;baz,"
             f"sentry-trace_id={trace_id},"
             "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
-            "sentry-sample_rate=0.01337,"
+            f"sentry-sample_rate={parent_sample_rate},"
             "sentry-user_id=Amelie,"
             "sentry-sample_rand=0.250000,"
             "other-vendor-value-2=foo;bar;"
         ),
     }
 
-    # child segment, to prove that we can read 'sentry-trace' header data correctly
     sentry_sdk.traces.continue_trace(headers)
 
+    # child segment, to prove that we can read 'sentry-trace' header data correctly
     with sentry_sdk.traces.start_span(name="WRONG") as child_segment:
         assert child_segment is not None
         assert child_segment._parent_sampled == parent_sampled
@@ -243,14 +244,10 @@ def test_continue_trace_span_streaming(
         assert baggage
         assert not baggage.mutable
 
-        # When parent_sampled is None, the SDK falls back to the client's
-        # traces_sample_rate and _update_sample_rate mutates the baggage's
-        # sample_rate. When parent_sampled is set, the baggage sample_rate
-        # from the incoming header (0.01337) is used as-is.
         if parent_sampled is not None:
-            expected_sample_rate = "0.01337"
+            expected_sample_rate = str(float(parent_sampled))
         else:
-            expected_sample_rate = str(sample_rate)
+            expected_sample_rate = parent_sample_rate
 
         assert baggage.sentry_items == {
             "public_key": "49d0f7386ad645858ae85020e393bef3",
@@ -267,11 +264,9 @@ def test_continue_trace_span_streaming(
 
     sentry_sdk.flush()
 
-    # In streaming mode, sampling uses sample_rate and sample_rand, not
-    # parent_sampled directly. With baggage sample_rate=0.01337 and
-    # sample_rand=0.250000, the child is only sampled when parent_sampled
-    # is None (falls back to client's traces_sample_rate) and that rate > 0.
-    child_sampled = parent_sampled is None and sample_rate > 0
+    child_sampled = parent_sampled is True or (
+        parent_sampled is None and sample_rate > 0
+    )
 
     if not child_sampled:
         # the child segment won't be captured
