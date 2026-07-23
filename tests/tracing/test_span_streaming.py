@@ -1016,20 +1016,15 @@ def test_outgoing_traceparent_and_baggage_inconsistent_incoming_trace(
     trace_id = "0af7651916cd43dd8448eb211c80319c"
     parent_span_id = "b7ad6b7169203331"
 
-    incoming_baggage = {
-        "sentry-trace_id": trace_id,
-    }
-
     # Baggage says sampled, sentry-trace says unsampled. sentry-trace takes
     # precedence
     incoming_sentry_trace = f"{trace_id}-{parent_span_id}-0"
-    incoming_baggage.update(
-        {
-            "sentry-sample_rate": "0.75",
-            "sentry-sample_rand": "0.500000",
-            "sentry-sampled": "true",
-        }
-    )
+    incoming_baggage = {
+        "sentry-trace_id": trace_id,
+        "sentry-sample_rate": "0.75",
+        "sentry-sample_rand": "0.500000",
+        "sentry-sampled": "true",
+    }
 
     sentry_sdk.traces.continue_trace(
         {

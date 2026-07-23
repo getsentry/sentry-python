@@ -1246,7 +1246,7 @@ def test_http_url_attributes_span_streaming(
     assert http_span["attributes"]["http.response.status_code"] == 200
 
     if send_default_pii:
-        assert http_span["attributes"]["url.full"] == "http://example.com/"
+        assert http_span["attributes"]["url.full"] == "http://example.com/?foo=bar#frag"
         assert http_span["attributes"]["url.query"] == "foo=bar"
         assert http_span["attributes"]["url.fragment"] == "frag"
     else:
