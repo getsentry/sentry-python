@@ -6,7 +6,10 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import DjangoIntegration
 from tests.conftest import unpack_werkzeug_response, werkzeug_set_cookie
 from tests.integrations.django.myapp.wsgi import application
-from tests.integrations.django.utils import pytest_mark_django_db_decorator
+from tests.integrations.django.utils import (
+    USER_INFO_INIT_KWARGS,
+    pytest_mark_django_db_decorator,
+)
 
 try:
     from django.urls import reverse
@@ -392,40 +395,6 @@ def test_empty_query_string_is_dropped_with_data_collection(
     assert "query_string" not in event["request"]
 
 
-USER_INFO_INIT_KWARGS = [
-    pytest.param({"send_default_pii": True}, True, id="legacy_send_default_pii_true"),
-    pytest.param(
-        {"send_default_pii": False}, False, id="legacy_send_default_pii_false"
-    ),
-    pytest.param(
-        {"_experiments": {"data_collection": {"user_info": True}}},
-        True,
-        id="data_collection_user_info_true",
-    ),
-    pytest.param(
-        {"_experiments": {"data_collection": {"user_info": False}}},
-        False,
-        id="data_collection_user_info_false",
-    ),
-    pytest.param(
-        {
-            "send_default_pii": True,
-            "_experiments": {"data_collection": {"user_info": False}},
-        },
-        False,
-        id="data_collection_wins_over_send_default_pii_true",
-    ),
-    pytest.param(
-        {
-            "send_default_pii": False,
-            "_experiments": {"data_collection": {"user_info": True}},
-        },
-        True,
-        id="data_collection_wins_over_send_default_pii_false",
-    ),
-]
-
-
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.parametrize("init_kwargs, expect_ip", USER_INFO_INIT_KWARGS)
@@ -464,6 +433,42 @@ def test_user_info_span_attributes_data_collection(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
+@pytest.mark.parametrize("init_kwargs, expect_user", USER_INFO_INIT_KWARGS)
+def test_user_identity_span_attributes_data_collection(
+    sentry_init, client, capture_items, init_kwargs, expect_user
+):
+    init_kwargs = dict(init_kwargs)  # shallow copy so we can mutate
+    experiments = init_kwargs.pop("_experiments", {})
+
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        _experiments=experiments,
+        **init_kwargs,
+    )
+
+    unpack_werkzeug_response(client.get(reverse("mylogin")))
+
+    items = capture_items("span")
+    unpack_werkzeug_response(client.get(reverse("template_test")))
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    (span,) = (s for s in spans if s["name"] == "/template-test")
+
+    if expect_user:
+        assert span["attributes"][SPANDATA.USER_ID] == "1"
+        assert span["attributes"][SPANDATA.USER_EMAIL] == "lennon@thebeatles.com"
+        assert span["attributes"][SPANDATA.USER_NAME] == "john"
+    else:
+        assert SPANDATA.USER_ID not in span["attributes"]
+        assert SPANDATA.USER_EMAIL not in span["attributes"]
+        assert SPANDATA.USER_NAME not in span["attributes"]
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator()
 @pytest.mark.parametrize("init_kwargs, expect_ip", USER_INFO_INIT_KWARGS)
 def test_user_info_error_event_data_collection(
     sentry_init, client, capture_events, init_kwargs, expect_ip
@@ -481,6 +486,30 @@ def test_user_info_error_event_data_collection(
     else:
         assert "ip_address" not in event.get("user", {})
         assert "REMOTE_ADDR" not in event["request"]["env"]
+
+
+@pytest.mark.forked
+@pytest_mark_django_db_decorator()
+@pytest.mark.parametrize("init_kwargs, expect_user", USER_INFO_INIT_KWARGS)
+def test_user_identity_error_event_data_collection(
+    sentry_init, client, capture_events, init_kwargs, expect_user
+):
+    sentry_init(integrations=[DjangoIntegration()], **init_kwargs)
+    events = capture_events()
+
+    client.get(reverse("mylogin"))
+    client.get(reverse("view_exc"))
+
+    event = events[-1]
+
+    if expect_user:
+        assert event["user"]["id"] == "1"
+        assert event["user"]["email"] == "lennon@thebeatles.com"
+        assert event["user"]["username"] == "john"
+    else:
+        assert "id" not in event.get("user", {})
+        assert "email" not in event.get("user", {})
+        assert "username" not in event.get("user", {})
 
 
 @pytest.mark.forked

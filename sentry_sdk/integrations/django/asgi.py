@@ -22,6 +22,7 @@ from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
+    has_data_collection_enabled,
 )
 
 if TYPE_CHECKING:
@@ -70,7 +71,12 @@ def _make_asgi_request_event_processor(request: "ASGIRequest") -> "EventProcesso
         with capture_internal_exceptions():
             DjangoRequestExtractor(request).extract_into_event(event)
 
-        if should_send_default_pii():
+        client_options = sentry_sdk.get_client().options
+        if has_data_collection_enabled(client_options):
+            if client_options["data_collection"]["user_info"]:
+                with capture_internal_exceptions():
+                    _set_user_info(request, event)
+        elif should_send_default_pii():
             with capture_internal_exceptions():
                 _set_user_info(request, event)
 
