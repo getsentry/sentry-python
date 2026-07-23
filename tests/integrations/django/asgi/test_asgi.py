@@ -642,9 +642,7 @@ async def test_trace_from_headers_if_performance_disabled(
 
         assert response["status"] == 500
 
-        (msg_event, error_event) = (
-            item.payload for item in items
-        )
+        (msg_event, error_event) = (item.payload for item in items)
     else:
         events = capture_events()
 

@@ -1534,9 +1534,7 @@ def test_tool_calls_extraction(
             )
 
         sentry_sdk.flush()
-        chat_span = next(
-            item.payload for item in items
-        )  # The chat span
+        chat_span = next(item.payload for item in items)  # The chat span
 
         # Check that tool calls are extracted and stored
         assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in chat_span["attributes"]
