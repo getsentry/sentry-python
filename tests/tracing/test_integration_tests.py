@@ -247,7 +247,10 @@ def test_continue_trace_span_streaming(
         if parent_sampled is not None:
             expected_sample_rate = str(float(parent_sampled))
         else:
-            expected_sample_rate = parent_sample_rate
+            if sample_rate is None:
+                expected_sample_rate = parent_sample_rate
+            else:
+                expected_sample_rate = str(sample_rate)
 
         assert baggage.sentry_items == {
             "public_key": "49d0f7386ad645858ae85020e393bef3",
@@ -291,12 +294,20 @@ def test_continue_trace_span_streaming(
             == message_payload["contexts"]["trace"]["trace_id"]
         )
 
+        if parent_sampled is not None:
+            expected_sample_rate = str(float(parent_sampled))
+        else:
+            if sample_rate is None:
+                expected_sample_rate = parent_sample_rate
+            else:
+                expected_sample_rate = str(sample_rate)
+
         assert baggage.dynamic_sampling_context() == {
             "public_key": "49d0f7386ad645858ae85020e393bef3",
             "trace_id": trace_id,
             "user_id": "Amelie",
             "sample_rand": "0.250000",
-            "sample_rate": str(sample_rate),
+            "sample_rate": expected_sample_rate,
         }
 
         assert message_payload["message"] == "hello"
