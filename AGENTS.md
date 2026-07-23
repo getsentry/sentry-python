@@ -26,14 +26,6 @@ Use **ruff** for linting and formatting:
 - `uv run ruff check --fix tests sentry_sdk`
 - `uv run ruff format tests sentry_sdk`
 
-## Commit Attribution
-
-AI commits MUST include:
-```
-Co-Authored-By: <agent model name> <noreply@anthropic.com>
-```
-Example: `Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>`
-
 ## Auto-Generated Files
 
 Do NOT edit these directly — modify source scripts instead:
