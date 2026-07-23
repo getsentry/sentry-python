@@ -410,7 +410,6 @@ def test_dynamic_sampling_head_sdk_creates_dsc_span_streaming(
 
     sentry_sdk.flush()
 
-    # flush triggers the batcher which populates _baggage via _get_baggage()
     baggage = segment._baggage
     trace_id = segment.trace_id
 
