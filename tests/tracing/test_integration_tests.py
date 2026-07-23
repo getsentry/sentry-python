@@ -775,29 +775,24 @@ def test_continue_trace_strict_trace_continuation(
     headers = {
         "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-1",
         "baggage": (
-            "other-vendor-value-1=foo;bar;baz, sentry-trace_id=771a43a4192642f0b136d5159a501700, "
-            f"{baggage_org_id}, "
-            "sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337, "
-            "sentry-user_id=Am%C3%A9lie, other-vendor-value-2=foo;bar;"
+            "other-vendor-value-1=foo;bar;baz,"
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
+            f"{baggage_org_id},"
+            "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
+            "sentry-sample_rate=0.01337,"
+            "sentry-user_id=Am%C3%A9lie,"
+            "other-vendor-value-2=foo;bar;"
         ),
     }
 
     transaction = continue_trace(headers, name="strict trace")
 
     if should_continue_trace:
-        assert (
-            transaction.trace_id
-            == "771a43a4192642f0b136d5159a501700"
-            == "771a43a4192642f0b136d5159a501700"
-        )
+        assert transaction.trace_id == "771a43a4192642f0b136d5159a501700"
         assert transaction.parent_span_id == "1234567890abcdef"
         assert transaction.parent_sampled
     else:
-        assert (
-            transaction.trace_id
-            != "771a43a4192642f0b136d5159a501700"
-            == "771a43a4192642f0b136d5159a501700"
-        )
+        assert transaction.trace_id != "771a43a4192642f0b136d5159a501700"
         assert transaction.parent_span_id != "1234567890abcdef"
         assert transaction.parent_sampled is None
 
@@ -854,11 +849,7 @@ def test_continue_trace_strict_trace_continuation_span_streaming(
             assert segment._parent_sampled is True
 
         else:
-            assert (
-                segment.trace_id
-                != "771a43a4192642f0b136d5159a501700"
-                == "771a43a4192642f0b136d5159a501700"
-            )
+            assert segment.trace_id != "771a43a4192642f0b136d5159a501700"
             assert segment._parent_span_id != "1234567890abcdef"
             assert segment._parent_sampled is None
 
