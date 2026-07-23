@@ -199,7 +199,7 @@ def test_continue_trace_span_streaming(
     """
     sentry_init(
         traces_sample_rate=sample_rate,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items()
 
@@ -388,7 +388,7 @@ def test_dynamic_sampling_head_sdk_creates_dsc_span_streaming(
     sentry_init(
         traces_sample_rate=sample_rate,
         release="foo",
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     envelopes = capture_envelopes()
 
@@ -479,7 +479,7 @@ def test_memory_usage(sentry_init, capture_events, args, expected_refcount):
     [{"traces_sample_rate": 1.0}, {"traces_sample_rate": 0.0}],
 )
 def test_memory_usage_span_streaming(sentry_init, capture_events, args):
-    sentry_init(**args, _experiments={"trace_lifecycle": "stream"})
+    sentry_init(**args, trace_lifecycle="stream")
 
     references = weakref.WeakSet()
 
@@ -524,7 +524,7 @@ def test_segments_do_not_go_through_before_send(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         before_send=before_send,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items()
 
@@ -570,7 +570,7 @@ def test_start_span_after_finish_span_streaming(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1,
         transport=CustomTransport(),
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items()
 
@@ -610,7 +610,7 @@ def test_trace_propagation_meta_head_sdk_span_streaming(sentry_init):
     sentry_init(
         traces_sample_rate=1.0,
         release="foo",
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     sentry_sdk.traces.new_trace()
@@ -672,7 +672,7 @@ def test_non_error_exceptions(
 def test_non_error_exceptions_span_streaming(
     sentry_init, capture_items, exception_cls, exception_value
 ):
-    sentry_init(traces_sample_rate=1.0, _experiments={"trace_lifecycle": "stream"})
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
     items = capture_items()
 
     with sentry_sdk.traces.start_span(name="hi") as segment:
@@ -720,7 +720,7 @@ def test_good_sysexit_doesnt_fail_transaction(
 def test_good_sysexit_doesnt_fail_segment_span_streaming(
     sentry_init, capture_items, exception_value
 ):
-    sentry_init(traces_sample_rate=1.0, _experiments={"trace_lifecycle": "stream"})
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
     items = capture_items()
 
     with sentry_sdk.traces.start_span(name="hi"):
@@ -822,7 +822,7 @@ def test_continue_trace_strict_trace_continuation_span_streaming(
         strict_trace_continuation=strict_trace_continuation,
         traces_sample_rate=1.0,
         transport=TestTransportWithOptions,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     headers = {
@@ -874,7 +874,7 @@ def test_continue_trace_forces_new_traces_when_no_propagation_span_streaming(
 ):
     """This is to make sure we don't have a long running trace because of TWP logic for the no propagation case."""
 
-    sentry_init(traces_sample_rate=1.0, _experiments={"trace_lifecycle": "stream"})
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
 
     sentry_sdk.traces.continue_trace({})
     with sentry_sdk.traces.start_span(name="segment1") as segment1:
@@ -892,7 +892,7 @@ def test_continue_trace_forces_new_traces_when_no_propagation_with_new_trace_spa
 ):
     """This is to make sure we don't have a long running trace because of TWP logic for the no propagation case."""
 
-    sentry_init(traces_sample_rate=1.0, _experiments={"trace_lifecycle": "stream"})
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
 
     sentry_sdk.traces.new_trace()
     with sentry_sdk.traces.start_span(name="segment1") as segment1:
