@@ -184,7 +184,9 @@ class AioHttpIntegration(Integration):
                                 )
                                 if filtered_query_string:
                                     url_attributes["url.query"] = filtered_query_string
-                                    url_attributes["url.full"] += "?" + filtered_query_string
+                                    url_attributes["url.full"] += (
+                                        "?" + filtered_query_string
+                                    )
 
                         elif should_send_default_pii():
                             url_full = "%s://%s%s" % (
