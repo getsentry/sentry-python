@@ -136,9 +136,13 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
             if self.request.remote_ip:
                 if has_data_collection_enabled(client.options):
                     if client.options["data_collection"]["user_info"]:
-                        scope.set_attribute(SPANDATA.USER_IP_ADDRESS, self.request.remote_ip)
+                        scope.set_attribute(
+                            SPANDATA.USER_IP_ADDRESS, self.request.remote_ip
+                        )
                 elif should_send_default_pii():
-                    scope.set_attribute(SPANDATA.USER_IP_ADDRESS, self.request.remote_ip)
+                    scope.set_attribute(
+                        SPANDATA.USER_IP_ADDRESS, self.request.remote_ip
+                    )
 
             span_ctx = sentry_sdk.traces.start_span(
                 name=_DEFAULT_ROOT_SPAN_NAME,
