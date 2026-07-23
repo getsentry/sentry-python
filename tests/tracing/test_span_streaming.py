@@ -988,10 +988,67 @@ def test_outgoing_traceparent_and_baggage_incoming_trace(
                 traceparent == f"{trace_id}-{span_id}-{'1' if parent_sampled else '0'}"
             )
 
-        # As we've received incoming baggage, we mustn't modify it ourselves and
-        # have to propagate it as-is
         baggage = sentry_sdk.get_baggage()
         baggage_items = dict(tuple(item.split("=")) for item in baggage.split(","))
+
+        # As we've received incoming baggage, we shouldn't modify it ourselves
+        # and should propagate it as-is. However, in the case where our
+        # effective sample rate overrides the parent sample rate, we update the
+        # sample rate in the baggage as a consequence of updating the sample rate
+        # in the DSC.
+        if traces_sample_rate is not None:
+            incoming_baggage["sentry-sample_rate"] = str(float(parent_sampled))
+
+        assert baggage_items == incoming_baggage
+
+
+def test_outgoing_traceparent_and_baggage_inconsistent_incoming_trace(
+    sentry_init,
+):
+    # We correctly propagate even if we get a sample_rate/sample_rand/sampled
+    # baggage combination from upstream that doesn't align with the parent
+    # sampling decision
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    trace_id = "0af7651916cd43dd8448eb211c80319c"
+    parent_span_id = "b7ad6b7169203331"
+
+    # Baggage says sampled, sentry-trace says unsampled. sentry-trace takes
+    # precedence
+    incoming_sentry_trace = f"{trace_id}-{parent_span_id}-0"
+    incoming_baggage = {
+        "sentry-trace_id": trace_id,
+        "sentry-sample_rate": "0.75",
+        "sentry-sample_rand": "0.500000",
+        "sentry-sampled": "true",
+    }
+
+    sentry_sdk.traces.continue_trace(
+        {
+            "sentry-trace": incoming_sentry_trace,
+            "baggage": ",".join(
+                sorted([f"{k}={v}" for k, v in incoming_baggage.items()])
+            ),
+        }
+    )
+
+    with sentry_sdk.traces.start_span(name="span") as span:
+        assert span.sampled is False
+
+        traceparent = sentry_sdk.get_traceparent()
+
+        span_id = span.span_id
+        assert traceparent == f"{trace_id}-{span_id}-0"
+
+        # We shouldn't be updating incoming baggage, but in the case where our
+        # effective sample rate overrides the parent sample rate, we do this as
+        # a consequence of updating the sample rate in the DSC.
+        baggage = sentry_sdk.get_baggage()
+        baggage_items = dict(tuple(item.split("=")) for item in baggage.split(","))
+        incoming_baggage["sentry-sample_rate"] = "0.0"
         assert baggage_items == incoming_baggage
 
 
