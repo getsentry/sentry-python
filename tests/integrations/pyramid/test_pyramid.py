@@ -15,6 +15,7 @@ from sentry_sdk.integrations.pyramid import PyramidIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from sentry_sdk.traces import SpanStatus
 from tests.conftest import unpack_werkzeug_response
+from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
 
 try:
     from importlib.metadata import version
@@ -559,19 +560,20 @@ def test_span_origin(
         assert event["contexts"]["trace"]["origin"] == "auto.http.pyramid"
 
 
-@pytest.mark.parametrize("send_default_pii", [True, False])
+@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
 def test_span_sets_user_id_on_segment(
     sentry_init,
     pyramid_config,
     capture_items,
     get_client,
-    send_default_pii,
+    init_kwargs,
+    expect_user,
 ):
     sentry_init(
         integrations=[PyramidIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
         trace_lifecycle="stream",
+        **init_kwargs,
     )
 
     class AuthenticationPolicy:
@@ -592,7 +594,43 @@ def test_span_sets_user_id_on_segment(
     assert len(spans) == 1
     (segment,) = spans
 
-    if send_default_pii:
+    if expect_user:
         assert segment["attributes"]["user.id"] == "123-abc"
     else:
         assert "user.id" not in segment["attributes"]
+
+
+@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
+def test_user_id_error_event_data_collection(
+    sentry_init,
+    pyramid_config,
+    capture_events,
+    route,
+    get_client,
+    init_kwargs,
+    expect_user,
+):
+    sentry_init(integrations=[PyramidIntegration()], **init_kwargs)
+    events = capture_events()
+
+    class AuthenticationPolicy:
+        def authenticated_userid(self, request):
+            return "123-abc"
+
+    pyramid_config.set_authorization_policy(ACLAuthorizationPolicy())
+    pyramid_config.set_authentication_policy(AuthenticationPolicy())
+
+    @route("/crash")
+    def crash(request):
+        1 / 0
+
+    client = get_client()
+    with pytest.raises(ZeroDivisionError):
+        client.get("/crash")
+
+    (event,) = events
+
+    if expect_user:
+        assert event["user"]["id"] == "123-abc"
+    else:
+        assert "id" not in event.get("user", {})
