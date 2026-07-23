@@ -391,7 +391,9 @@ class StreamedSpan:
         if conversation_id:
             has_ai_operation_name = SPANDATA.GEN_AI_OPERATION_NAME in self._attributes
             op = self._attributes.get("sentry.op")
-            has_gen_ai_op = op and (op.startswith("ai.") or op.startswith("gen_ai."))
+            has_gen_ai_op = isinstance(op, str) and (
+                op.startswith("ai.") or op.startswith("gen_ai.")
+            )
             if has_ai_operation_name or has_gen_ai_op:
                 self.set_attribute("gen_ai.conversation.id", conversation_id)
 
