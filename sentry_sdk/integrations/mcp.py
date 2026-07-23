@@ -20,13 +20,13 @@ from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import nullcontext, package_version, safe_serialize
 
-MCP_PACKAGE_VERSION = package_version("mcp")
-
 try:
     from mcp.server.lowlevel import Server
     from mcp.server.streamable_http import (
         StreamableHTTPServerTransport,
     )
+
+    MCP_PACKAGE_VERSION = package_version("mcp")
 
     if MCP_PACKAGE_VERSION and MCP_PACKAGE_VERSION < (2, 0, 0):
         from mcp.server.lowlevel.server import (  # type: ignore[attr-defined]
