@@ -1717,10 +1717,8 @@ async def test_outgoing_client_span_span_streaming(
 
         url_full = inner_client_span["attributes"]["url.full"]
 
-        # parse_url() splits the URL — url.full is the base URL only, with the
-        # query string captured separately on url.query.
         assert url_full.startswith("http://127.0.0.1:")
-        assert url_full.endswith("/")
+        assert "?foo=bar" in url_full
 
         assert inner_client_span["attributes"]["url.path"] == "/"
 
