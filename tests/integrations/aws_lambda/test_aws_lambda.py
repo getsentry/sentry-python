@@ -354,7 +354,7 @@ def test_non_dict_event(
         assert transaction_event["tags"]["batch_request"] is True
 
 
-def test_request_data(lambda_client, test_environment):
+def test_request_data_with_send_default_pii_false(lambda_client, test_environment):
     payload = b"""
         {
           "resource": "/asd",
@@ -363,7 +363,9 @@ def test_request_data(lambda_client, test_environment):
           "headers": {
             "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
             "User-Agent": "custom",
-            "X-Forwarded-Proto": "https"
+            "X-Forwarded-Proto": "https",
+            "Authorization": "Bearer secret-token",
+            "Cookie": "sessionid=secret"
           },
           "queryStringParameters": {
             "bonkers": "true"
@@ -393,12 +395,371 @@ def test_request_data(lambda_client, test_environment):
         "headers": {
             "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
             "User-Agent": "custom",
+            # X-Forwarded-Proto is not sensitive and passes through.
             "X-Forwarded-Proto": "https",
+            # With send_default_pii=False, _filter_headers substitutes the
+            # SENSITIVE_HEADERS (Authorization, Cookie); the EventScrubber
+            # also scrubs them. Both end up as "[Filtered]".
+            "Authorization": "[Filtered]",
+            "Cookie": "[Filtered]",
         },
         "method": "GET",
         "query_string": {"bonkers": "true"},
         "url": "https://iwsz2c7uwi.execute-api.us-east-1.amazonaws.com/asd",
     }
+
+
+def test_request_data_with_send_default_pii_true(lambda_client, test_environment):
+    payload = b"""
+        {
+          "resource": "/asd",
+          "path": "/asd",
+          "httpMethod": "GET",
+          "headers": {
+            "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
+            "User-Agent": "custom",
+            "X-Forwarded-Proto": "https",
+            "Authorization": "Bearer secret-token",
+            "Cookie": "sessionid=secret"
+          },
+          "queryStringParameters": {
+            "bonkers": "true"
+          },
+          "pathParameters": null,
+          "stageVariables": null,
+          "requestContext": {
+            "identity": {
+              "sourceIp": "213.47.147.207",
+              "userArn": "42"
+            }
+          },
+          "body": null,
+          "isBase64Encoded": false
+        }
+    """
+
+    lambda_client.invoke(
+        FunctionName="BasicOkSendDefaultPii",
+        Payload=payload,
+    )
+    envelopes = test_environment["server"].envelopes
+
+    (transaction_event,) = envelopes
+
+    assert transaction_event["request"] == {
+        "headers": {
+            "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
+            "User-Agent": "custom",
+            "X-Forwarded-Proto": "https",
+            # With send_default_pii=True (and no data_collection config),
+            # _filter_headers passes headers through untouched. Authorization
+            # and Cookie are still scrubbed to "[Filtered]" by the always-on
+            # EventScrubber (DEFAULT_DENYLIST), independent of PII settings.
+            "Authorization": "[Filtered]",
+            "Cookie": "[Filtered]",
+        },
+        "method": "GET",
+        "query_string": {"bonkers": "true"},
+        "url": "https://iwsz2c7uwi.execute-api.us-east-1.amazonaws.com/asd",
+        "data": None,
+    }
+
+
+def test_request_data_with_data_collection_allowlist(lambda_client, test_environment):
+    payload = b"""
+        {
+          "resource": "/asd",
+          "path": "/asd",
+          "httpMethod": "GET",
+          "headers": {
+            "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
+            "User-Agent": "custom",
+            "X-Forwarded-Proto": "https",
+            "Authorization": "Bearer secret-token",
+            "Cookie": "sessionid=secret",
+            "X-Allow-Me": "yes"
+          },
+          "queryStringParameters": {
+            "bonkers": "true"
+          },
+          "pathParameters": null,
+          "stageVariables": null,
+          "requestContext": {
+            "identity": {
+              "sourceIp": "213.47.147.207",
+              "userArn": "42"
+            }
+          },
+          "body": null,
+          "isBase64Encoded": false
+        }
+    """
+
+    lambda_client.invoke(
+        FunctionName="BasicOkDataCollectionAllowlist",
+        Payload=payload,
+    )
+    envelopes = test_environment["server"].envelopes
+
+    (transaction_event,) = envelopes
+
+    assert transaction_event["request"] == {
+        "headers": {
+            # Allowlisted, non-sensitive headers pass through.
+            "User-Agent": "custom",
+            "X-Allow-Me": "yes",
+            # Not allowlisted -> substituted.
+            "Host": "[Filtered]",
+            "X-Forwarded-Proto": "[Filtered]",
+            # Allowlisted but sensitive -> still filtered; an allowlist entry
+            # cannot override the built-in sensitive denylist.
+            "Authorization": "[Filtered]",
+            # Not allowlisted, and cookies are always substituted.
+            "Cookie": "[Filtered]",
+        },
+        "method": "GET",
+        "query_string": {"bonkers": "true"},
+        "url": "https://iwsz2c7uwi.execute-api.us-east-1.amazonaws.com/asd",
+    }
+
+
+def test_request_data_with_data_collection_denylist(lambda_client, test_environment):
+    payload = b"""
+        {
+          "resource": "/asd",
+          "path": "/asd",
+          "httpMethod": "GET",
+          "headers": {
+            "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
+            "User-Agent": "custom",
+            "X-Forwarded-Proto": "https",
+            "Authorization": "Bearer secret-token",
+            "Cookie": "sessionid=secret",
+            "X-Custom": "keep-me"
+          },
+          "queryStringParameters": {
+            "bonkers": "true"
+          },
+          "pathParameters": null,
+          "stageVariables": null,
+          "requestContext": {
+            "identity": {
+              "sourceIp": "213.47.147.207",
+              "userArn": "42"
+            }
+          },
+          "body": null,
+          "isBase64Encoded": false
+        }
+    """
+
+    lambda_client.invoke(
+        FunctionName="BasicOkDataCollectionDenylist",
+        Payload=payload,
+    )
+    envelopes = test_environment["server"].envelopes
+
+    (transaction_event,) = envelopes
+
+    assert transaction_event["request"] == {
+        "headers": {
+            # Not denied by any term -> pass through.
+            "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
+            "X-Custom": "keep-me",
+            # Denied by custom terms.
+            "User-Agent": "[Filtered]",
+            "X-Forwarded-Proto": "[Filtered]",
+            # Denied by the built-in sensitive denylist.
+            "Authorization": "[Filtered]",
+            # Cookies are always substituted.
+            "Cookie": "[Filtered]",
+        },
+        "method": "GET",
+        "query_string": {"bonkers": "true"},
+        "url": "https://iwsz2c7uwi.execute-api.us-east-1.amazonaws.com/asd",
+    }
+
+
+def test_request_data_with_data_collection_off(lambda_client, test_environment):
+    payload = b"""
+        {
+          "resource": "/asd",
+          "path": "/asd",
+          "httpMethod": "GET",
+          "headers": {
+            "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
+            "User-Agent": "custom",
+            "X-Forwarded-Proto": "https",
+            "Authorization": "Bearer secret-token",
+            "Cookie": "sessionid=secret"
+          },
+          "queryStringParameters": {
+            "bonkers": "true"
+          },
+          "pathParameters": null,
+          "stageVariables": null,
+          "requestContext": {
+            "identity": {
+              "sourceIp": "213.47.147.207",
+              "userArn": "42"
+            }
+          },
+          "body": null,
+          "isBase64Encoded": false
+        }
+    """
+
+    lambda_client.invoke(
+        FunctionName="BasicOkDataCollectionOff",
+        Payload=payload,
+    )
+    envelopes = test_environment["server"].envelopes
+
+    (transaction_event,) = envelopes
+
+    assert transaction_event["request"] == {
+        # With request headers collection turned off, no headers are collected.
+        "headers": {},
+        "method": "GET",
+        "query_string": {"bonkers": "true"},
+        "url": "https://iwsz2c7uwi.execute-api.us-east-1.amazonaws.com/asd",
+    }
+
+
+def test_url_query_params_with_data_collection_denylist(
+    lambda_client, test_environment
+):
+    payload = b"""
+        {
+          "resource": "/asd",
+          "path": "/asd",
+          "httpMethod": "GET",
+          "headers": {
+            "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
+            "X-Forwarded-Proto": "https"
+          },
+          "queryStringParameters": {
+            "page": "2",
+            "tracking": "campaign",
+            "token": "secret-token"
+          },
+          "pathParameters": null,
+          "stageVariables": null,
+          "requestContext": {
+            "identity": {
+              "sourceIp": "213.47.147.207",
+              "userArn": "42"
+            }
+          },
+          "body": null,
+          "isBase64Encoded": false
+        }
+    """
+
+    lambda_client.invoke(
+        FunctionName="BasicOkDataCollectionUrlQueryDenylist",
+        Payload=payload,
+    )
+    envelopes = test_environment["server"].envelopes
+
+    (transaction_event,) = envelopes
+
+    assert transaction_event["request"]["query_string"] == {
+        # Not denied by any term -> pass through.
+        "page": "2",
+        # Denied by custom terms.
+        "tracking": "[Filtered]",
+        # Denied by the built-in sensitive denylist.
+        "token": "[Filtered]",
+    }
+
+
+def test_url_query_params_with_data_collection_allowlist(
+    lambda_client, test_environment
+):
+    payload = b"""
+        {
+          "resource": "/asd",
+          "path": "/asd",
+          "httpMethod": "GET",
+          "headers": {
+            "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
+            "X-Forwarded-Proto": "https"
+          },
+          "queryStringParameters": {
+            "page": "2",
+            "tracking": "campaign",
+            "token": "secret-token"
+          },
+          "pathParameters": null,
+          "stageVariables": null,
+          "requestContext": {
+            "identity": {
+              "sourceIp": "213.47.147.207",
+              "userArn": "42"
+            }
+          },
+          "body": null,
+          "isBase64Encoded": false
+        }
+    """
+
+    lambda_client.invoke(
+        FunctionName="BasicOkDataCollectionUrlQueryAllowlist",
+        Payload=payload,
+    )
+    envelopes = test_environment["server"].envelopes
+
+    (transaction_event,) = envelopes
+
+    assert transaction_event["request"]["query_string"] == {
+        # Allowlisted, non-sensitive -> pass through.
+        "page": "2",
+        # Not allowlisted -> substituted.
+        "tracking": "[Filtered]",
+        # Allowlisted but sensitive -> still filtered; an allowlist entry
+        # cannot override the built-in sensitive denylist.
+        "token": "[Filtered]",
+    }
+
+
+def test_url_query_params_with_data_collection_off(lambda_client, test_environment):
+    payload = b"""
+        {
+          "resource": "/asd",
+          "path": "/asd",
+          "httpMethod": "GET",
+          "headers": {
+            "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
+            "X-Forwarded-Proto": "https"
+          },
+          "queryStringParameters": {
+            "page": "2",
+            "tracking": "campaign"
+          },
+          "pathParameters": null,
+          "stageVariables": null,
+          "requestContext": {
+            "identity": {
+              "sourceIp": "213.47.147.207",
+              "userArn": "42"
+            }
+          },
+          "body": null,
+          "isBase64Encoded": false
+        }
+    """
+
+    lambda_client.invoke(
+        FunctionName="BasicOkDataCollectionUrlQueryOff",
+        Payload=payload,
+    )
+    envelopes = test_environment["server"].envelopes
+
+    (transaction_event,) = envelopes
+
+    # With url_query_params collection turned off, no query string is collected.
+    assert "query_string" not in transaction_event["request"]
 
 
 def test_trace_continuation(lambda_client, test_environment):
@@ -706,6 +1067,38 @@ def test_span_streaming_request_attributes(lambda_client, test_environment):
         "aws/lambda/BasicOkSpanStreamingPii"
     ]
     assert _get_span_attr(attrs, "aws.log.stream.names") == ["$LATEST"]
+
+
+def test_span_streaming_url_query_params_with_data_collection(
+    lambda_client, test_environment
+):
+    payload = {
+        "httpMethod": "GET",
+        "queryStringParameters": {
+            "page": "2",
+            "tracking": "campaign",
+            "token": "secret-token",
+        },
+        "path": "/test",
+    }
+
+    lambda_client.invoke(
+        FunctionName="BasicOkSpanStreamingDataCollection",
+        Payload=json.dumps(payload),
+    )
+    span_items = test_environment["server"].span_items
+
+    segment_spans = [s for s in span_items if s["is_segment"]]
+    assert len(segment_spans) == 1
+    segment_span = segment_spans[0]
+    attrs = segment_span["attributes"]
+
+    # "page" passes through; "tracking" is denied by a custom term and "token"
+    # by the built-in sensitive denylist.
+    assert (
+        _get_span_attr(attrs, "url.query")
+        == "page=2&tracking=%5BFiltered%5D&token=%5BFiltered%5D"
+    )
 
 
 @pytest.mark.parametrize(

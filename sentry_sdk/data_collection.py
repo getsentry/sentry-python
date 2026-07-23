@@ -7,7 +7,7 @@ Implements the ``data_collection`` client option described in the Sentry SDK
 
 ``data_collection`` supersedes the single ``send_default_pii`` boolean with a
 structured configuration that lets users enable or restrict automatically
-collected data by category (user identity, cookies, HTTP headers, query params,
+collected data by category (user identity, cookies, HTTP headers, URL query params,
 HTTP bodies, generative AI inputs/outputs, stack frame variables, source
 context).
 
@@ -23,10 +23,13 @@ Resolution precedence (see :func:`_resolve_data_collection`):
 """
 
 import warnings
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, List, Mapping, Optional, Union, cast
+from urllib.parse import parse_qs, urlencode
+
+from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Literal
+    from typing import Any, Dict
 
     from sentry_sdk._types import (
         DataCollection,
@@ -48,7 +51,7 @@ _ALL_HTTP_BODY_TYPES = [
 # Default number of source lines captured above and below a stack frame.
 _DEFAULT_FRAME_CONTEXT_LINES = 5
 
-# Collection modes for key-value data (cookies, headers, query params).
+# Collection modes for key-value data (cookies, headers, URL query params).
 # snake_case (Python-only deviation from the spec's camelCase); never
 # serialized to Sentry.
 _VALID_KEY_VALUE_COLLECTION_BEHAVIOUR_MODES = ("off", "denylist", "allowlist")
@@ -77,6 +80,77 @@ _SENSITIVE_DENYLIST = [
 ]
 
 
+def _is_sensitive_key(key: str, extra_terms: "Optional[List[str]]" = None) -> bool:
+    """
+    Return whether ``key`` matches the sensitive denylist using a partial,
+    case-insensitive substring match.
+
+    :param extra_terms: additional deny terms (e.g. user-provided) to consider
+        alongside the built-in `_SENSITIVE_DENYLIST`.
+    """
+    lowered = key.lower()
+    for term in _SENSITIVE_DENYLIST:
+        if term in lowered:
+            return True
+    if extra_terms:
+        for term in extra_terms:
+            if term and term.lower() in lowered:
+                return True
+    return False
+
+
+def _apply_data_collection_filtering_to_query_string(
+    query_string: str,
+    behaviour: "KeyValueCollectionBehaviour",
+) -> "Union[str, None]":
+    parsed_qs = parse_qs(query_string, keep_blank_values=True)
+    filtered_qs = _apply_key_value_collection_filtering(
+        items=parsed_qs, behaviour=behaviour
+    )
+
+    if filtered_qs:
+        return urlencode(filtered_qs, doseq=True)
+
+    return None
+
+
+def _apply_key_value_collection_filtering(
+    items: "Mapping[str, Any]",
+    behaviour: "KeyValueCollectionBehaviour",
+    substitute: "Any" = SENSITIVE_DATA_SUBSTITUTE,
+) -> "Dict[str, Any]":
+
+    if behaviour["mode"] == "off":
+        return {}
+
+    result: "Dict[str, Any]" = {}
+
+    if behaviour["mode"] == "allowlist":
+        for key, value in items.items():
+            is_allowed = False
+            if isinstance(key, str):
+                lowered = key.lower()
+                is_allowed = any(
+                    term and term.lower() in lowered
+                    for term in behaviour.get("terms", [])
+                )
+            if is_allowed and not _is_sensitive_key(key):
+                result[key] = value
+            else:
+                result[key] = substitute
+        return result
+
+    # denylist behaviour
+    for key, value in items.items():
+        if isinstance(key, str) and _is_sensitive_key(
+            key=key, extra_terms=behaviour.get("terms", [])
+        ):
+            result[key] = substitute
+        else:
+            result[key] = value
+    return result
+
+
 def _map_from_send_default_pii(
     *,
     send_default_pii: bool,
@@ -88,13 +162,12 @@ def _map_from_send_default_pii(
     ``send_default_pii`` collects today. Used when ``data_collection`` is not
     provided explicitly.
     """
-    kv_mode: "Literal['denylist', 'off']" = "denylist" if send_default_pii else "off"
     terms = [] if send_default_pii else ["forwarded", "-ip", "remote-", "via", "-user"]
 
     return {
         "provided_by_user": False,
         "user_info": send_default_pii,
-        "cookies": {"mode": kv_mode, "terms": terms},
+        "cookies": {"mode": "denylist", "terms": terms},
         # Headers are collected in both PII modes today (sensitive ones filtered
         # when PII is off), so this never maps to "off".
         "http_headers": {
@@ -103,7 +176,7 @@ def _map_from_send_default_pii(
         # Bodies are collected regardless of PII today, bounded by
         # ``max_request_body_size``.
         "http_bodies": list(_ALL_HTTP_BODY_TYPES),
-        "query_params": {"mode": kv_mode, "terms": terms},
+        "url_query_params": {"mode": "denylist", "terms": terms},
         "graphql": {"document": send_default_pii, "variables": send_default_pii},
         "gen_ai": {"inputs": send_default_pii, "outputs": send_default_pii},
         "database_query_data": send_default_pii,
@@ -153,7 +226,7 @@ def _resolve_explicit(
         "cookies": _kvcb_from_value(d.get("cookies") or {}),
         "http_headers": _http_headers_from_value(d.get("http_headers") or {}),
         "http_bodies": http_bodies,
-        "query_params": _kvcb_from_value(d.get("query_params") or {}),
+        "url_query_params": _kvcb_from_value(d.get("url_query_params") or {}),
         "graphql": _graphql_from_value(d.get("graphql") or {}),
         "gen_ai": _gen_ai_from_value(d.get("gen_ai") or {}),
         "database_query_data": d.get("database_query_data", True),
