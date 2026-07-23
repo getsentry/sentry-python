@@ -1446,11 +1446,41 @@ async def test_custom_transaction_name(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("send_default_pii", [True, False])
+@pytest.mark.parametrize(
+    "init_kwargs, expect_ip",
+    [
+        pytest.param({"send_default_pii": True}, True, id="legacy_pii_true"),
+        pytest.param({"send_default_pii": False}, False, id="legacy_pii_false"),
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            True,
+            id="dc_default_user_info",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"user_info": True}}},
+            True,
+            id="dc_user_info_true",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"user_info": False}}},
+            False,
+            id="dc_user_info_false",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": True,
+                "_experiments": {"data_collection": {"user_info": False}},
+            },
+            False,
+            id="dc_wins_over_pii",
+        ),
+    ],
+)
 async def test_user_ip_address_on_all_spans(
     sentry_init,
     capture_items,
-    send_default_pii,
+    init_kwargs,
+    expect_ip,
 ):
     async def app(scope, receive, send):
         if scope["type"] == "lifespan":
@@ -1474,11 +1504,9 @@ async def test_user_ip_address_on_all_spans(
         )
         await send({"type": "http.response.body", "body": b"Hello, world!"})
 
-    sentry_init(
-        send_default_pii=send_default_pii,
-        traces_sample_rate=1.0,
-        trace_lifecycle="stream",
-    )
+    kwargs = {k: v for k, v in init_kwargs.items() if k != "_experiments"}
+    experiments = {"trace_lifecycle": "stream", **init_kwargs.get("_experiments", {})}
+    sentry_init(traces_sample_rate=1.0, _experiments=experiments, **kwargs)
     sentry_app = SentryAsgiMiddleware(app)
 
     async def wrapped_app(scope, receive, send):
@@ -1493,7 +1521,7 @@ async def test_user_ip_address_on_all_spans(
 
     child_span, server_span = [item.payload for item in items]
 
-    if send_default_pii:
+    if expect_ip:
         assert server_span["attributes"]["user.ip_address"] == "127.0.0.1"
         assert child_span["attributes"]["user.ip_address"] == "127.0.0.1"
     else:
