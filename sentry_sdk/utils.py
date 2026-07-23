@@ -2080,6 +2080,13 @@ def has_logs_enabled(options: "Optional[dict[str, Any]]") -> bool:
     )
 
 
+def has_data_collection_enabled(options: "Optional[dict[str, Any]]") -> bool:
+    if options is None:
+        return False
+
+    return "data_collection" in options.get("_experiments", {})
+
+
 def get_before_send_log(
     options: "Optional[dict[str, Any]]",
 ) -> "Optional[Callable[[Log, Hint], Optional[Log]]]":
@@ -2169,3 +2176,9 @@ def serialize_attribute(val: "AttributeValue") -> "SerializedAttributeValue":
     # Coerce to string if we don't know what to do with the value. This should
     # never happen as we pre-format early in format_attribute, but let's be safe.
     return {"value": safe_repr(val), "type": "string"}
+
+
+# This noop context manager can be replaced with "from contextlib import nullcontext" when we drop Python 3.6 support
+@contextmanager
+def nullcontext() -> "Iterator[None]":
+    yield

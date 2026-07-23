@@ -15,6 +15,7 @@ from litestar.testing import TestClient
 
 import sentry_sdk
 from sentry_sdk import capture_message
+from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.integrations.litestar import LitestarIntegration
 from tests.conftest import ApproxDict
 from tests.integrations.conftest import parametrize_test_configurable_status_codes
@@ -103,7 +104,7 @@ def test_catch_exceptions(
 ):
     sentry_init(
         integrations=[LitestarIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     litestar_app = litestar_app_factory()
     client = TestClient(litestar_app)
@@ -187,7 +188,7 @@ def test_transaction_name_and_source(
 
         spans = [span for span in spans if expected_tx_name in span["name"]]
         assert len(spans) == 1
-        assert spans[0]["attributes"]["sentry.span.source"] == "component"
+        assert spans[0]["attributes"]["sentry.segment.name.source"] == "component"
     else:
         events = capture_events()
 
@@ -211,7 +212,7 @@ def test_middleware_spans(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     logging_config = LoggingMiddlewareConfig()
@@ -293,7 +294,7 @@ def test_middleware_callback_spans(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     litestar_app = litestar_app_factory(middleware=[SampleMiddleware])
@@ -411,7 +412,7 @@ def test_middleware_receive_send(sentry_init, capture_items, span_streaming):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     litestar_app = litestar_app_factory(middleware=[SampleReceiveSendMiddleware])
 
@@ -450,7 +451,7 @@ def test_middleware_partial_receive_send(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     litestar_app = litestar_app_factory(middleware=[SamplePartialReceiveSendMiddleware])
@@ -569,7 +570,7 @@ def test_span_origin(
     sentry_init(
         integrations=[LitestarIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     logging_config = LoggingMiddlewareConfig()
@@ -642,7 +643,7 @@ def test_litestar_scope_user_on_exception_event(
     sentry_init(
         integrations=[LitestarIntegration()],
         send_default_pii=is_send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     litestar_app = litestar_app_factory(middleware=[TestUserMiddleware])
@@ -683,6 +684,135 @@ def test_litestar_scope_user_on_exception_event(
         assert "user" not in event
 
 
+COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_cookies",
+    [
+        pytest.param(
+            {"send_default_pii": True},
+            {
+                "jwt": "tokenval",
+                "theme": "dark",
+                "lang": "en",
+                "identity": "alice",
+            },
+            id="send_default_pii_true",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            None,
+            id="send_default_pii_false",
+        ),
+        pytest.param(
+            {},
+            None,
+            id="defaults",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"cookies": {"mode": "off"}}}},
+            None,
+            id="data_collection_off",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"cookies": {"mode": "denylist"}}}},
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": "dark",
+                "lang": "en",
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "cookies": {"mode": "denylist", "terms": ["theme"]}
+                    }
+                }
+            },
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": SENSITIVE_DATA_SUBSTITUTE,
+                "lang": "en",
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_denylist_custom_terms",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "cookies": {"mode": "allowlist", "terms": ["theme"]}
+                    }
+                }
+            },
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": "dark",
+                "lang": SENSITIVE_DATA_SUBSTITUTE,
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "cookies": {"mode": "allowlist", "terms": ["identity"]}
+                    }
+                }
+            },
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": SENSITIVE_DATA_SUBSTITUTE,
+                "lang": SENSITIVE_DATA_SUBSTITUTE,
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_allowlist_sensitive_term",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": False,
+                "_experiments": {"data_collection": {"cookies": {"mode": "denylist"}}},
+            },
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": "dark",
+                "lang": "en",
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_wins_over_send_default_pii",
+        ),
+    ],
+)
+def test_cookie_data_collection(
+    sentry_init, capture_events, init_kwargs, expected_cookies
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[LitestarIntegration()],
+        **init_kwargs,
+    )
+
+    litestar_app = litestar_app_factory()
+    events = capture_events()
+
+    client = TestClient(litestar_app)
+    client.get("/message", headers={"cookie": COOKIE_HEADER})
+
+    (event, transaction_event) = events
+
+    if expected_cookies is None:
+        assert "cookies" not in event["request"]
+        assert "cookies" not in transaction_event["request"]
+    else:
+        assert event["request"]["cookies"] == expected_cookies
+        assert transaction_event["request"]["cookies"] == expected_cookies
+
+
 @parametrize_test_configurable_status_codes
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_configurable_status_codes_handler(
@@ -701,7 +831,7 @@ def test_configurable_status_codes_handler(
     )
     sentry_init(
         integrations=[LitestarIntegration(**integration_kwargs)],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     @get("/error")
@@ -744,7 +874,7 @@ def test_configurable_status_codes_middleware(
 
     sentry_init(
         integrations=[LitestarIntegration(**integration_kwargs)],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     def create_raising_middleware(app):
@@ -782,7 +912,7 @@ def test_catch_non_http_exceptions_in_middleware(
 ):
     sentry_init(
         integrations=[LitestarIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     def create_raising_middleware(app):

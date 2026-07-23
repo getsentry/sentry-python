@@ -293,7 +293,7 @@ async def test_fastmcp_tool_sync(
         integrations=[MCPIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp = FastMCP("Test Server")
@@ -405,7 +405,7 @@ async def test_fastmcp_tool_async(
         integrations=[MCPIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp = FastMCP("Test Server")
@@ -526,7 +526,7 @@ async def test_fastmcp_tool_with_error(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp = FastMCP("Test Server")
@@ -622,7 +622,7 @@ async def test_fastmcp_multiple_tools(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp = FastMCP("Test Server")
@@ -761,7 +761,7 @@ async def test_fastmcp_tool_with_complex_return(
         integrations=[MCPIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp = FastMCP("Test Server")
@@ -866,7 +866,7 @@ async def test_fastmcp_prompt_sync(
         integrations=[MCPIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp = FastMCP("Test Server")
@@ -1058,7 +1058,7 @@ async def test_fastmcp_resource_sync(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp = FastMCP("Test Server")
@@ -1167,7 +1167,7 @@ async def test_fastmcp_resource_async(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp = FastMCP("Test Server")
@@ -1284,7 +1284,7 @@ async def test_fastmcp_span_origin(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp = FastMCP("Test Server")
@@ -1361,7 +1361,7 @@ async def test_fastmcp_sse_transport(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp = FastMCP("Test Server")
@@ -1486,7 +1486,7 @@ def test_fastmcp_http_transport(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp = FastMCP("Test Server")
@@ -1581,7 +1581,7 @@ async def test_fastmcp_stdio_transport(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp = FastMCP("Test Server")
@@ -1818,7 +1818,7 @@ async def test_fastmcp_mixed_sync_async_tools(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp = FastMCP("Test Server")

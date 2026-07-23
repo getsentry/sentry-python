@@ -25,6 +25,7 @@ from starlette.testclient import TestClient
 
 import sentry_sdk
 from sentry_sdk import capture_message, get_baggage, get_traceparent
+from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.starlette import (
@@ -38,6 +39,12 @@ STARLETTE_VERSION = parse_version(starlette.__version__)
 PICTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "photo.jpg")
 
 BODY_JSON = {"some": "json", "for": "testing", "nested": {"numbers": 123}}
+
+COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
+
+# Query string used across the query-param filtering tests below. ``auth`` is a
+# built-in sensitive term, so it is redacted by the default denylist.
+QUERY_STRING = "toy=tennisball&color=red&auth=secret"
 
 BODY_FORM = """--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="username"\r\n\r\nJane\r\n--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="password"\r\n\r\nhello123\r\n--fd721ef49ea403a6\r\nContent-Disposition: form-data; name="photo"; filename="photo.jpg"\r\nContent-Type: image/jpg\r\nContent-Transfer-Encoding: base64\r\n\r\n{{image_data}}\r\n--fd721ef49ea403a6--\r\n""".replace(
     "{{image_data}}", str(base64.b64encode(open(PICTURE, "rb").read()))
@@ -535,6 +542,360 @@ async def test_request_info_no_pii(sentry_init, capture_events):
 
     assert "cookies" not in transaction_event["request"]
     assert transaction_event["request"]["data"] == BODY_JSON
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "init_kwargs, expected_cookies",
+    [
+        pytest.param(
+            {"send_default_pii": True},
+            {
+                "jwt": "tokenval",
+                "theme": "dark",
+                "lang": "en",
+                "identity": "alice",
+            },
+            id="send_default_pii_true",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            None,
+            id="send_default_pii_false",
+        ),
+        pytest.param(
+            {},
+            None,
+            id="defaults",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"cookies": {"mode": "off"}}}},
+            None,
+            id="data_collection_off",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"cookies": {"mode": "denylist"}}}},
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": "dark",
+                "lang": "en",
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "cookies": {"mode": "denylist", "terms": ["theme"]}
+                    }
+                }
+            },
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": SENSITIVE_DATA_SUBSTITUTE,
+                "lang": "en",
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_denylist_custom_terms",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "cookies": {"mode": "allowlist", "terms": ["theme"]}
+                    }
+                }
+            },
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": "dark",
+                "lang": SENSITIVE_DATA_SUBSTITUTE,
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "cookies": {"mode": "allowlist", "terms": ["identity"]}
+                    }
+                }
+            },
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": SENSITIVE_DATA_SUBSTITUTE,
+                "lang": SENSITIVE_DATA_SUBSTITUTE,
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_allowlist_sensitive_term",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": False,
+                "_experiments": {"data_collection": {"cookies": {"mode": "denylist"}}},
+            },
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": "dark",
+                "lang": "en",
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_wins_over_send_default_pii",
+        ),
+    ],
+)
+async def test_cookie_data_collection(
+    sentry_init, capture_events, init_kwargs, expected_cookies
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarletteIntegration()],
+        **init_kwargs,
+    )
+
+    starlette_app = starlette_app_factory()
+    events = capture_events()
+
+    client = TestClient(starlette_app)
+    client.get("/message", headers={"cookie": COOKIE_HEADER})
+
+    (event, transaction_event) = events
+
+    if expected_cookies is None:
+        assert "cookies" not in event["request"]
+        assert "cookies" not in transaction_event["request"]
+    else:
+        assert event["request"]["cookies"] == expected_cookies
+        assert transaction_event["request"]["cookies"] == expected_cookies
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query_string",
+    [
+        pytest.param(
+            {"send_default_pii": True},
+            QUERY_STRING,
+            id="legacy_send_default_pii_true",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            None,
+            id="data_collection_off",
+        ),
+    ],
+)
+def test_query_string_data_collection(
+    sentry_init, capture_events, init_kwargs, expected_query_string
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarletteIntegration()],
+        **init_kwargs,
+    )
+
+    starlette_app = starlette_app_factory()
+    events = capture_events()
+
+    client = TestClient(starlette_app)
+    client.get("/message?" + QUERY_STRING)
+
+    (event, transaction_event) = events
+
+    if expected_query_string is None:
+        assert "query_string" not in event["request"]
+        assert "query_string" not in transaction_event["request"]
+    else:
+        assert event["request"]["query_string"] == expected_query_string
+        assert transaction_event["request"]["query_string"] == expected_query_string
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query, expected_url_full",
+    [
+        pytest.param(
+            {"send_default_pii": True},
+            QUERY_STRING,
+            "http://testserver/message?" + QUERY_STRING,
+            id="legacy_send_default_pii_true",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
+            "http://testserver/message?toy=tennisball&color=red&auth=%5BFiltered%5D",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            None,
+            "http://testserver/message",
+            id="data_collection_off",
+        ),
+    ],
+)
+def test_span_http_query_data_collection(
+    sentry_init, capture_items, init_kwargs, expected_query, expected_url_full
+):
+    sentry_init(
+        auto_enabling_integrations=False,
+        integrations=[StarletteIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream",
+            **init_kwargs.pop("_experiments", {}),
+        },
+        **init_kwargs,
+    )
+
+    starlette_app = starlette_app_factory()
+    items = capture_items("span")
+
+    client = TestClient(starlette_app)
+    client.get("/message?" + QUERY_STRING)
+
+    sentry_sdk.flush()
+
+    segments = [
+        item.payload
+        for item in items
+        if item.payload.get("is_segment")
+        and item.payload["attributes"].get("sentry.op") == "http.server"
+    ]
+    (segment,) = segments
+    attributes = segment["attributes"]
+
+    if expected_query is None:
+        assert SPANDATA.HTTP_QUERY not in attributes
+    else:
+        assert attributes[SPANDATA.HTTP_QUERY] == expected_query
+
+    assert attributes["url.full"] == expected_url_full
+    assert attributes["url.path"] == "/message"
+
+
+# TestClient provides ("testclient", 50000) as the scope's client.
+TESTCLIENT_IP = "testclient"
+NO_USER_INFO = object()
+
+USER_INFO_CASES = [
+    pytest.param(
+        {"send_default_pii": True},
+        TESTCLIENT_IP,
+        id="legacy_send_default_pii_true",
+    ),
+    pytest.param(
+        {"send_default_pii": False},
+        NO_USER_INFO,
+        id="legacy_send_default_pii_false",
+    ),
+    pytest.param(
+        {"_experiments": {"data_collection": {}}},
+        TESTCLIENT_IP,
+        id="data_collection_default_user_info_true",
+    ),
+    pytest.param(
+        {"_experiments": {"data_collection": {"user_info": True}}},
+        TESTCLIENT_IP,
+        id="data_collection_user_info_true",
+    ),
+    pytest.param(
+        {"_experiments": {"data_collection": {"user_info": False}}},
+        NO_USER_INFO,
+        id="data_collection_user_info_false",
+    ),
+    pytest.param(
+        {
+            "send_default_pii": True,
+            "_experiments": {"data_collection": {"user_info": False}},
+        },
+        NO_USER_INFO,
+        id="data_collection_wins_over_send_default_pii",
+    ),
+]
+
+
+@pytest.mark.parametrize("init_kwargs, expected_ip", USER_INFO_CASES)
+def test_user_info_data_collection(
+    sentry_init, capture_events, init_kwargs, expected_ip
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarletteIntegration()],
+        **init_kwargs,
+    )
+
+    starlette_app = starlette_app_factory()
+    events = capture_events()
+
+    client = TestClient(starlette_app)
+    client.get("/message")
+
+    (event, transaction_event) = events
+
+    if expected_ip is NO_USER_INFO:
+        assert "env" not in event["request"]
+        assert "env" not in transaction_event["request"]
+    else:
+        assert event["request"]["env"] == {"REMOTE_ADDR": expected_ip}
+        assert transaction_event["request"]["env"] == {"REMOTE_ADDR": expected_ip}
+
+
+@pytest.mark.parametrize("init_kwargs, expected_ip", USER_INFO_CASES)
+def test_user_info_data_collection_with_streamed_spans(
+    sentry_init, capture_items, init_kwargs, expected_ip
+):
+    kwargs = dict(init_kwargs)
+    sentry_init(
+        auto_enabling_integrations=False,
+        integrations=[StarletteIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        _experiments={
+            **kwargs.pop("_experiments", {}),
+        },
+        **kwargs,
+    )
+
+    starlette_app = starlette_app_factory()
+    items = capture_items("span")
+
+    client = TestClient(starlette_app)
+    client.get("/message")
+
+    sentry_sdk.flush()
+
+    assert len(items) == 1
+    attributes = items[0].payload["attributes"]
+
+    if expected_ip is NO_USER_INFO:
+        assert SPANDATA.CLIENT_ADDRESS not in attributes
+    else:
+        assert attributes[SPANDATA.CLIENT_ADDRESS] == expected_ip
 
 
 @pytest.mark.parametrize(
@@ -1136,7 +1497,7 @@ def test_active_thread_id_span_streaming(sentry_init, capture_items, endpoint):
         auto_enabling_integrations=False,  # avoid legacy spans from auto-enabled integrations leaking into streaming mode
         integrations=[StarletteIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     app = starlette_app_factory()
 

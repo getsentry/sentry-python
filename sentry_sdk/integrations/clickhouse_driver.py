@@ -85,14 +85,16 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
         params = args[3] if len(args) > 3 else kwargs.get("params")
 
         if has_span_streaming_enabled(client.options):
-            span = sentry_sdk.traces.start_span(
-                name=query,  # type: ignore
-                attributes={
-                    "sentry.op": OP.DB,
-                    "sentry.origin": ClickhouseDriverIntegration.origin,
-                    SPANDATA.DB_QUERY_TEXT: str(query),
-                },
-            )
+            span = None
+            if sentry_sdk.traces.get_current_span() is not None:
+                span = sentry_sdk.traces.start_span(
+                    name=query,  # type: ignore
+                    attributes={
+                        "sentry.op": OP.DB,
+                        "sentry.origin": ClickhouseDriverIntegration.origin,
+                        SPANDATA.DB_QUERY_TEXT: str(query),
+                    },
+                )
         else:
             span = sentry_sdk.start_span(
                 op=OP.DB,
@@ -110,7 +112,8 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
 
         connection._sentry_span = span  # type: ignore[attr-defined]
 
-        _set_db_data(span, connection)
+        if span is not None:
+            _set_db_data(span, connection)
 
         # run the original code
         ret = f(*args, **kwargs)

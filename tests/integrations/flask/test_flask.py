@@ -29,8 +29,13 @@ from sentry_sdk import (
     capture_message,
     set_tag,
 )
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
+
+# Query string used across the query-param filtering tests below. ``auth`` is a
+# built-in sensitive term, so it is redacted by the default denylist.
+QUERY_STRING = "toy=tennisball&color=red&auth=secret"
 
 login_manager = LoginManager()
 
@@ -110,7 +115,7 @@ def test_transaction_or_segment_style(
             flask_sentry.FlaskIntegration(transaction_style=transaction_style)
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -128,7 +133,7 @@ def test_transaction_or_segment_style(
         assert len(spans) == 1
         (segment,) = spans
         assert segment["name"] == expected_transaction
-        assert segment["attributes"]["sentry.span.source"] == expected_source
+        assert segment["attributes"]["sentry.segment.name.source"] == expected_source
     else:
         (_, event) = events
         assert event["transaction"] == expected_transaction
@@ -238,7 +243,7 @@ def test_flask_login_configured(
             integrations=[flask_sentry.FlaskIntegration()],
             send_default_pii=send_default_pii,
             traces_sample_rate=1.0,
-            _experiments={"trace_lifecycle": "stream"},
+            trace_lifecycle="stream",
         )
     else:
         sentry_init(send_default_pii=send_default_pii, **integration_enabled_params)
@@ -817,7 +822,7 @@ def test_tracing_success(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[flask_sentry.FlaskIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     @app.before_request
@@ -878,7 +883,7 @@ def test_tracing_error(sentry_init, capture_events, capture_items, app, span_str
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[flask_sentry.FlaskIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -1103,7 +1108,7 @@ def test_span_origin(sentry_init, app, capture_events, capture_items, span_strea
     sentry_init(
         integrations=[flask_sentry.FlaskIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -1139,7 +1144,7 @@ def test_transaction_or_segment_http_method_default(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[flask_sentry.FlaskIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -1190,7 +1195,7 @@ def test_transaction_or_segment_http_method_custom(
                 )  # capitalization does not matter
             )  # case does not matter
         ],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -1220,3 +1225,401 @@ def test_transaction_or_segment_http_method_custom(
         (event1, event2) = events
         assert event1["request"]["method"] == "OPTIONS"
         assert event2["request"]["method"] == "HEAD"
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query_string",
+    [
+        pytest.param(
+            {"send_default_pii": True},
+            "toy=tennisball&color=red&auth=secret",
+            id="legacy_send_default_pii_true",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            "toy=tennisball&color=red&auth=secret",
+            id="legacy_send_default_pii_false",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            None,
+            id="data_collection_off",
+        ),
+    ],
+)
+def test_query_string_data_collection(
+    sentry_init,
+    app,
+    capture_events,
+    monkeypatch,
+    init_kwargs,
+    expected_query_string,
+):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()], **init_kwargs)
+    # This test is about query-string filtering, not user data. Disable
+    # flask_login so the module-level login manager (which has no user_loader)
+    # does not raise when send_default_pii is on.
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
+    events = capture_events()
+
+    client = app.test_client()
+    client.get("/message?" + QUERY_STRING)
+
+    (event,) = events
+
+    if expected_query_string is None:
+        assert "query_string" not in event["request"]
+    else:
+        assert event["request"]["query_string"] == expected_query_string
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query",
+    [
+        pytest.param(
+            {"send_default_pii": True},
+            "toy=tennisball&color=red&auth=secret",
+            id="legacy_send_default_pii_true",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            None,
+            id="legacy_send_default_pii_false",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            None,
+            id="data_collection_off",
+        ),
+    ],
+)
+def test_span_http_query_data_collection(
+    sentry_init,
+    app,
+    capture_items,
+    monkeypatch,
+    init_kwargs,
+    expected_query,
+):
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={
+            "trace_lifecycle": "stream",
+            **init_kwargs.pop("_experiments", {}),
+        },
+        **init_kwargs,
+    )
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
+
+    items = capture_items("span")
+
+    client = app.test_client()
+    client.get("/message?" + QUERY_STRING)
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items if item.type == "span"]
+    (segment,) = spans
+
+    if expected_query is None:
+        assert SPANDATA.HTTP_QUERY not in segment["attributes"]
+    else:
+        assert segment["attributes"][SPANDATA.HTTP_QUERY] == expected_query
+
+
+def test_query_string_empty_legacy_emits_empty_string(
+    sentry_init, app, capture_events, monkeypatch
+):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()], send_default_pii=True)
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
+    events = capture_events()
+
+    client = app.test_client()
+    client.get("/message")
+
+    (event,) = events
+    assert event["request"]["query_string"] == ""
+
+
+def test_empty_query_string_is_dropped_with_data_collection(
+    sentry_init, app, capture_events
+):
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        _experiments={"data_collection": {}},
+    )
+    events = capture_events()
+
+    client = app.test_client()
+    client.get("/message")
+
+    (event,) = events
+    assert "query_string" not in event["request"]
+
+
+# Parametrization shared by the user_info tests below. ``expect_ip`` is
+# whether the client IP may be collected under the given init kwargs.
+USER_INFO_INIT_KWARGS = [
+    pytest.param({"send_default_pii": True}, True, id="legacy_send_default_pii_true"),
+    pytest.param(
+        {"send_default_pii": False}, False, id="legacy_send_default_pii_false"
+    ),
+    pytest.param(
+        {"_experiments": {"data_collection": {"user_info": True}}},
+        True,
+        id="data_collection_user_info_true",
+    ),
+    pytest.param(
+        {"_experiments": {"data_collection": {"user_info": False}}},
+        False,
+        id="data_collection_user_info_false",
+    ),
+    # ``data_collection`` is the single source of truth: it must win over
+    # ``send_default_pii`` when both are configured.
+    pytest.param(
+        {
+            "send_default_pii": True,
+            "_experiments": {"data_collection": {"user_info": False}},
+        },
+        False,
+        id="data_collection_wins_over_send_default_pii_true",
+    ),
+    pytest.param(
+        {
+            "send_default_pii": False,
+            "_experiments": {"data_collection": {"user_info": True}},
+        },
+        True,
+        id="data_collection_wins_over_send_default_pii_false",
+    ),
+]
+
+
+@pytest.mark.parametrize("init_kwargs, expect_ip", USER_INFO_INIT_KWARGS)
+def test_user_info_span_attributes_data_collection(
+    sentry_init, app, capture_items, monkeypatch, init_kwargs, expect_ip
+):
+    init_kwargs = dict(init_kwargs)  # shallow copy so we can mutate
+    experiments = init_kwargs.pop("_experiments", {})
+
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        _experiments=experiments,
+        **init_kwargs,
+    )
+    # This test is about user IP collection, not flask_login. Disable
+    # flask_login so the module-level login manager does not interfere.
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
+
+    items = capture_items("span")
+
+    client = app.test_client()
+    client.get("/message", environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items if item.type == "span"]
+    (segment,) = spans
+
+    if expect_ip:
+        assert segment["attributes"][SPANDATA.USER_IP_ADDRESS] == "127.0.0.1"
+        assert segment["attributes"]["client.address"] == "127.0.0.1"
+    else:
+        assert SPANDATA.USER_IP_ADDRESS not in segment["attributes"]
+        assert "client.address" not in segment["attributes"]
+
+
+@pytest.mark.parametrize("init_kwargs, expect_ip", USER_INFO_INIT_KWARGS)
+def test_user_info_error_event_data_collection(
+    sentry_init, app, capture_events, monkeypatch, init_kwargs, expect_ip
+):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()], **init_kwargs)
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
+
+    @app.route("/crash")
+    def crash():
+        1 / 0
+
+    events = capture_events()
+
+    client = app.test_client()
+    with pytest.raises(ZeroDivisionError):
+        client.get("/crash", environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+
+    (event,) = events
+
+    if expect_ip:
+        assert event["user"]["ip_address"] == "127.0.0.1"
+        assert event["request"]["env"]["REMOTE_ADDR"] == "127.0.0.1"
+    else:
+        assert "ip_address" not in event.get("user", {})
+        assert "REMOTE_ADDR" not in event["request"]["env"]
+
+
+def test_error_event_no_user_ip_address_without_remote_addr(
+    sentry_init, app, capture_events, monkeypatch
+):
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        _experiments={"data_collection": {"user_info": True}},
+    )
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
+
+    @app.route("/crash")
+    def crash():
+        1 / 0
+
+    events = capture_events()
+
+    client = app.test_client()
+    with pytest.raises(ZeroDivisionError):
+        client.get("/crash", environ_overrides={"REMOTE_ADDR": ""})
+
+    (event,) = events
+
+    assert "ip_address" not in event.get("user", {})
+
+
+@pytest.mark.parametrize("init_kwargs, expect_user", USER_INFO_INIT_KWARGS)
+def test_flask_login_user_identity_error_event_data_collection(
+    sentry_init, app, capture_events, init_kwargs, expect_user
+):
+    sentry_init(integrations=[flask_sentry.FlaskIntegration()], **init_kwargs)
+
+    class User:
+        is_authenticated = is_active = True
+        is_anonymous = False
+        email = "user@example.com"
+        username = "testuser"
+
+        def get_id(self):
+            return "42"
+
+    @login_manager.user_loader
+    def load_user(user_id):
+        return User()
+
+    @app.route("/login")
+    def login():
+        login_user(User())
+        return "ok"
+
+    @app.route("/crash")
+    def crash():
+        1 / 0
+
+    events = capture_events()
+
+    client = app.test_client()
+    assert client.get("/login").status_code == 200
+    with pytest.raises(ZeroDivisionError):
+        client.get("/crash")
+
+    (event,) = events
+
+    if expect_user:
+        assert event["user"]["id"] == "42"
+        assert event["user"]["email"] == "user@example.com"
+        assert event["user"]["username"] == "testuser"
+    else:
+        user = event.get("user", {})
+        assert "id" not in user
+        assert "email" not in user
+        assert "username" not in user
+
+
+@pytest.mark.parametrize("init_kwargs, expect_user", USER_INFO_INIT_KWARGS)
+def test_flask_login_user_identity_span_attributes_data_collection(
+    sentry_init, app, capture_items, init_kwargs, expect_user
+):
+    init_kwargs = dict(init_kwargs)
+    experiments = init_kwargs.pop("_experiments", {})
+
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        _experiments=experiments,
+        **init_kwargs,
+    )
+
+    class User:
+        is_authenticated = is_active = True
+        is_anonymous = False
+        email = "user@example.com"
+        username = "testuser"
+
+        def get_id(self):
+            return "42"
+
+    @login_manager.user_loader
+    def load_user(user_id):
+        return User()
+
+    @app.route("/login")
+    def login():
+        login_user(User())
+        return "ok"
+
+    items = capture_items("span")
+
+    client = app.test_client()
+    assert client.get("/login").status_code == 200
+    assert client.get("/message").status_code == 200
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items if item.type == "span"]
+    segment = next(s for s in spans if s["name"] == "hi")
+
+    if expect_user:
+        assert segment["attributes"]["user.id"] == "42"
+        assert segment["attributes"]["user.email"] == "user@example.com"
+        assert segment["attributes"]["user.name"] == "testuser"
+    else:
+        assert "user.id" not in segment.get("attributes", {})
+        assert "user.email" not in segment.get("attributes", {})
+        assert "user.name" not in segment.get("attributes", {})

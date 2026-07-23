@@ -6,6 +6,7 @@ from tornado.web import Application, HTTPError, RequestHandler
 
 import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
+from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.integrations.tornado import TornadoIntegration
 
 
@@ -110,6 +111,383 @@ def test_basic(tornado_testcase, sentry_init, capture_events):
     assert not sentry_sdk.get_isolation_scope()._tags
 
 
+# Sent by every data-collection cookie test below. Mixes benign cookies
+# (``theme``, ``lang``) with ones whose names match the data-collection
+# sensitive denylist (``jwt``, ``identity``). Those two names are deliberately
+# NOT in the ``EventScrubber`` denylist (which matches keys exactly), so any
+# filtering we observe on them comes from the extractor's data-collection
+# logic, not the always-on scrubber.
+COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_cookies",
+    [
+        pytest.param(
+            {"send_default_pii": True},
+            {
+                "jwt": "tokenval",
+                "theme": "dark",
+                "lang": "en",
+                "identity": "alice",
+            },
+            id="send_default_pii_true",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            None,
+            id="send_default_pii_false",
+        ),
+        pytest.param(
+            {},
+            None,
+            id="defaults",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"cookies": {"mode": "off"}}}},
+            None,
+            id="data_collection_off",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"cookies": {"mode": "denylist"}}}},
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": "dark",
+                "lang": "en",
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "cookies": {"mode": "denylist", "terms": ["theme"]}
+                    }
+                }
+            },
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": SENSITIVE_DATA_SUBSTITUTE,
+                "lang": "en",
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_denylist_custom_terms",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "cookies": {"mode": "allowlist", "terms": ["theme"]}
+                    }
+                }
+            },
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": "dark",
+                "lang": SENSITIVE_DATA_SUBSTITUTE,
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "cookies": {"mode": "allowlist", "terms": ["identity"]}
+                    }
+                }
+            },
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": SENSITIVE_DATA_SUBSTITUTE,
+                "lang": SENSITIVE_DATA_SUBSTITUTE,
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_allowlist_sensitive_term",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": False,
+                "_experiments": {"data_collection": {"cookies": {"mode": "denylist"}}},
+            },
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": "dark",
+                "lang": "en",
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_wins_over_send_default_pii",
+        ),
+    ],
+)
+def test_cookie_data_collection(
+    tornado_testcase, sentry_init, capture_events, init_kwargs, expected_cookies
+):
+    sentry_init(integrations=[TornadoIntegration()], **init_kwargs)
+    events = capture_events()
+    client = tornado_testcase(Application([(r"/hi", CrashingHandler)]))
+
+    response = client.fetch("/hi", headers={"Cookie": COOKIE_HEADER})
+    assert response.code == 500
+
+    (event,) = events
+    if expected_cookies is None:
+        assert "cookies" not in event["request"]
+    else:
+        assert event["request"]["cookies"] == expected_cookies
+
+
+class QueryHandler(RequestHandler):
+    async def get(self):
+        self.write("ok")
+
+
+_QUERY_PARAM_DATA_COLLECTION_CASES = [
+    pytest.param(
+        {"send_default_pii": True},
+        "toy=tennisball&color=red&auth=secret",
+        id="send_default_pii_true",
+    ),
+    pytest.param(
+        {"send_default_pii": False},
+        None,
+        id="send_default_pii_false",
+    ),
+    pytest.param(
+        {},
+        None,
+        id="defaults",
+    ),
+    pytest.param(
+        {"_experiments": {"data_collection": {}}},
+        "toy=tennisball&color=red&auth=%5BFiltered%5D",
+        id="data_collection_denylist_default",
+    ),
+    pytest.param(
+        {
+            "_experiments": {
+                "data_collection": {
+                    "url_query_params": {"mode": "denylist", "terms": ["toy"]}
+                }
+            }
+        },
+        "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
+        id="data_collection_denylist_custom_terms",
+    ),
+    pytest.param(
+        {
+            "_experiments": {
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                }
+            }
+        },
+        "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+        id="data_collection_allowlist",
+    ),
+    pytest.param(
+        {
+            "_experiments": {
+                "data_collection": {
+                    "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
+                }
+            }
+        },
+        "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+        id="data_collection_allowlist_sensitive_term",
+    ),
+    pytest.param(
+        {"_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}}},
+        None,
+        id="data_collection_off",
+    ),
+    pytest.param(
+        {
+            "send_default_pii": True,
+            "_experiments": {"data_collection": {"url_query_params": {"mode": "off"}}},
+        },
+        None,
+        id="data_collection_wins_over_send_default_pii",
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query", _QUERY_PARAM_DATA_COLLECTION_CASES
+)
+def test_url_query_data_collection_span_streaming(
+    tornado_testcase, sentry_init, capture_items, init_kwargs, expected_query
+):
+    init_kwargs = dict(init_kwargs)
+    sentry_init(
+        integrations=[TornadoIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+
+    items = capture_items("span")
+
+    client = tornado_testcase(Application([(r"/hi", QueryHandler)]))
+    response = client.fetch("/hi?toy=tennisball&color=red&auth=secret")
+    assert response.code == 200
+
+    sentry_sdk.flush()
+
+    (server_span,) = [item.payload for item in items]
+
+    data_collection_enabled = "data_collection" in init_kwargs.get("_experiments", {})
+    url_attrs_expected = data_collection_enabled or init_kwargs.get(
+        "send_default_pii", False
+    )
+
+    if expected_query is None:
+        assert "url.query" not in server_span["attributes"]
+        if url_attrs_expected:
+            assert server_span["attributes"]["url.full"].endswith("/hi")
+            assert server_span["attributes"]["url.path"] == "/hi"
+        else:
+            assert "url.full" not in server_span["attributes"]
+            assert "url.path" not in server_span["attributes"]
+    else:
+        assert server_span["attributes"]["url.query"] == expected_query
+        assert server_span["attributes"]["url.full"].endswith(f"/hi?{expected_query}")
+        assert server_span["attributes"]["url.full"].startswith("http://")
+        assert server_span["attributes"]["url.path"] == "/hi"
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query", _QUERY_PARAM_DATA_COLLECTION_CASES
+)
+def test_url_query_data_collection_event_processor(
+    tornado_testcase, sentry_init, capture_events, init_kwargs, expected_query
+):
+    sentry_init(
+        integrations=[TornadoIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="static",
+        **init_kwargs,
+    )
+
+    events = capture_events()
+
+    client = tornado_testcase(Application([(r"/hi", QueryHandler)]))
+    response = client.fetch("/hi?toy=tennisball&color=red&auth=secret")
+    assert response.code == 200
+
+    sentry_sdk.flush()
+
+    (event,) = events
+
+    assert event["request"]["url"].endswith("/hi")
+    assert event["request"]["method"] == "GET"
+    if "data_collection" not in init_kwargs.get("_experiments", {}):
+        assert (
+            event["request"]["query_string"] == "toy=tennisball&color=red&auth=secret"
+        )
+    elif expected_query is None:
+        assert "query_string" not in event["request"]
+    else:
+        assert event["request"]["query_string"] == expected_query
+
+
+def test_url_query_data_collection_no_query_string(
+    tornado_testcase, sentry_init, capture_items
+):
+    sentry_init(
+        integrations=[TornadoIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        _experiments={"data_collection": {}},
+    )
+
+    items = capture_items("span")
+
+    client = tornado_testcase(Application([(r"/hi", QueryHandler)]))
+    response = client.fetch("/hi")
+    assert response.code == 200
+
+    sentry_sdk.flush()
+
+    (server_span,) = [item.payload for item in items]
+
+    assert "url.query" not in server_span["attributes"]
+    assert server_span["attributes"]["url.full"].endswith("/hi")
+    assert server_span["attributes"]["url.path"] == "/hi"
+
+
+def test_url_query_data_collection_repeated_and_blank_params(
+    tornado_testcase, sentry_init, capture_items
+):
+    sentry_init(
+        integrations=[TornadoIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        _experiments={"data_collection": {}},
+    )
+
+    items = capture_items("span")
+
+    client = tornado_testcase(Application([(r"/hi", QueryHandler)]))
+    response = client.fetch("/hi?a=1&a=2&b=")
+    assert response.code == 200
+
+    sentry_sdk.flush()
+
+    (server_span,) = [item.payload for item in items]
+
+    assert server_span["attributes"]["url.query"] == "a=1&a=2&b="
+
+
+def test_url_query_data_collection__event_processor_no_query_string(
+    tornado_testcase, sentry_init, capture_events
+):
+    sentry_init(
+        integrations=[TornadoIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="static",
+        _experiments={"data_collection": {}},
+    )
+
+    events = capture_events()
+
+    client = tornado_testcase(Application([(r"/hi", QueryHandler)]))
+    response = client.fetch("/hi")
+    assert response.code == 200
+
+    sentry_sdk.flush()
+
+    (event,) = events
+
+    assert "query_string" not in event["request"]
+    assert event["request"]["url"].endswith("/hi")
+    assert event["request"]["method"] == "GET"
+
+
+def test_url_query_data_collection_event_processor_repeated_and_blank_params(
+    tornado_testcase, sentry_init, capture_events
+):
+    sentry_init(
+        integrations=[TornadoIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="static",
+        _experiments={"data_collection": {}},
+    )
+
+    events = capture_events()
+
+    client = tornado_testcase(Application([(r"/hi", QueryHandler)]))
+    response = client.fetch("/hi?a=1&a=2&b=")
+    assert response.code == 200
+
+    sentry_sdk.flush()
+
+    (event,) = events
+
+    assert event["request"]["query_string"] == "a=1&a=2&b="
+
+
 @pytest.mark.parametrize("send_pii", [True, False])
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize(
@@ -133,7 +511,7 @@ def test_transactions(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -184,7 +562,7 @@ def test_transactions(
             else "tests.integrations.tornado.test_tornado.CrashingHandler.post"
         )
         assert server_segment["name"] == expected_handler
-        assert server_segment["attributes"]["sentry.span.source"] == "component"
+        assert server_segment["attributes"]["sentry.segment.name.source"] == "component"
         assert server_segment["attributes"]["http.request.method"] == "POST"
         assert server_segment["attributes"]["http.request.body.data"] == "heyoo"
         assert server_segment["attributes"]["http.response.status_code"] == code
@@ -525,7 +903,7 @@ def test_span_origin(
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -557,7 +935,7 @@ def test_user_ip_address_on_all_spans(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")

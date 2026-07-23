@@ -3,6 +3,7 @@ from copy import deepcopy
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.data_collection import _apply_key_value_collection_filtering
 from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     DidNotEnable,
@@ -16,6 +17,7 @@ from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
+    has_data_collection_enabled,
     transaction_from_function,
 )
 
@@ -164,6 +166,8 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
 
         middleware_name = self.__class__.__name__
         if has_span_streaming_enabled(client.options):
+            if sentry_sdk.traces.get_current_span() is None:
+                return await old_call(self, scope, receive, send)
             with sentry_sdk.traces.start_span(
                 name=middleware_name,
                 attributes={
@@ -178,6 +182,8 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                     *args: "Any", **kwargs: "Any"
                 ) -> "Union[HTTPReceiveMessage, WebSocketReceiveMessage]":
                     if client.get_integration(LitestarIntegration) is None:
+                        return await receive(*args, **kwargs)
+                    if sentry_sdk.traces.get_current_span() is None:
                         return await receive(*args, **kwargs)
                     with sentry_sdk.traces.start_span(
                         name=getattr(receive, "__qualname__", str(receive)),
@@ -196,6 +202,8 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                 # Creating spans for the "send" callback
                 async def _sentry_send(message: "Message") -> None:
                     if client.get_integration(LitestarIntegration) is None:
+                        return await send(message)
+                    if sentry_sdk.traces.get_current_span() is None:
                         return await send(message)
                     with sentry_sdk.traces.start_span(
                         name=getattr(send, "__qualname__", str(send)),
@@ -273,7 +281,8 @@ def patch_http_route_handle() -> None:
     async def handle_wrapper(
         self: "HTTPRoute", scope: "HTTPScope", receive: "Receive", send: "Send"
     ) -> None:
-        if sentry_sdk.get_client().get_integration(LitestarIntegration) is None:
+        client = sentry_sdk.get_client()
+        if client.get_integration(LitestarIntegration) is None:
             return await old_handle(self, scope, receive, send)
 
         sentry_scope = sentry_sdk.get_isolation_scope()
@@ -312,7 +321,14 @@ def patch_http_route_handle() -> None:
         def event_processor(event: "Event", _: "Hint") -> "Event":
             request_info = event.get("request", {})
             request_info["content_length"] = len(scope.get("_body", b""))
-            if should_send_default_pii():
+            if has_data_collection_enabled(client.options):
+                cookies = _apply_key_value_collection_filtering(
+                    items=extracted_request_data["cookies"],
+                    behaviour=client.options["data_collection"]["cookies"],
+                )
+                if cookies:
+                    request_info["cookies"] = cookies
+            elif should_send_default_pii():
                 request_info["cookies"] = extracted_request_data["cookies"]
             if request_data is not None:
                 request_info["data"] = request_data

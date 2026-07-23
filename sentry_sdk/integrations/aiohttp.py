@@ -5,6 +5,9 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
+from sentry_sdk.data_collection import (
+    _apply_data_collection_filtering_to_query_string,
+)
 from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     DidNotEnable,
@@ -23,7 +26,7 @@ from sentry_sdk.traces import (
 )
 from sentry_sdk.traces import (
     NoOpStreamedSpan,
-    SegmentSource,
+    SegmentNameSource,
     SpanStatus,
     StreamedSpan,
 )
@@ -46,6 +49,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    has_data_collection_enabled,
     logger,
     parse_url,
     parse_version,
@@ -150,7 +154,8 @@ class AioHttpIntegration(Integration):
 
                         header_attributes: "dict[str, Any]" = {}
                         for header, header_value in _filter_headers(
-                            headers, use_annotated_value=False
+                            headers,
+                            use_annotated_value=False,
                         ).items():
                             header_attributes[
                                 f"http.request.header.{header.lower()}"
@@ -160,7 +165,7 @@ class AioHttpIntegration(Integration):
                             )
 
                         url_attributes = {}
-                        if should_send_default_pii():
+                        if has_data_collection_enabled(client.options):
                             url_attributes["url.full"] = "%s://%s%s" % (
                                 request.scheme,
                                 request.host,
@@ -169,7 +174,32 @@ class AioHttpIntegration(Integration):
                             url_attributes["url.path"] = request.path
 
                             if request.query_string:
+                                filtered_query_string = (
+                                    _apply_data_collection_filtering_to_query_string(
+                                        query_string=request.query_string,
+                                        behaviour=client.options["data_collection"][
+                                            "url_query_params"
+                                        ],
+                                    )
+                                )
+                                if filtered_query_string:
+                                    url_attributes["url.query"] = filtered_query_string
+                                    url_attributes["url.full"] += (
+                                        "?" + filtered_query_string
+                                    )
+
+                        elif should_send_default_pii():
+                            url_full = "%s://%s%s" % (
+                                request.scheme,
+                                request.host,
+                                request.path,
+                            )
+                            if request.query_string:
+                                url_full += "?" + request.query_string
                                 url_attributes["url.query"] = request.query_string
+
+                            url_attributes["url.full"] = url_full
+                            url_attributes["url.path"] = request.path
 
                         client_address_attributes = {}
                         if should_send_default_pii() and request.remote:
@@ -185,7 +215,7 @@ class AioHttpIntegration(Integration):
                             attributes={
                                 "sentry.op": OP.HTTP_SERVER,
                                 "sentry.origin": AioHttpIntegration.origin,
-                                "sentry.span.source": SegmentSource.ROUTE.value,
+                                "sentry.segment.name.source": SegmentNameSource.ROUTE.value,
                                 "http.request.method": request.method,
                                 **url_attributes,
                                 **client_address_attributes,
@@ -302,7 +332,7 @@ class AioHttpIntegration(Integration):
                 ):
                     current_span._segment.name = name
                     current_span._segment.set_attribute(
-                        "sentry.span.source",
+                        "sentry.segment.name.source",
                         SEGMENT_SOURCE_FOR_STYLE[integration.transaction_style].value,
                     )
                 else:
@@ -351,23 +381,55 @@ def create_trace_config() -> "TraceConfig":
             parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
         )
 
-        span: "Union[Span, StreamedSpan]"
+        span: "Union[Span, StreamedSpan, None]"
         if has_span_streaming_enabled(client.options):
-            attributes: "Attributes" = {
-                "sentry.op": OP.HTTP_CLIENT,
-                "sentry.origin": AioHttpIntegration.origin,
-                "http.request.method": method,
-            }
-            if parsed_url is not None and should_send_default_pii():
-                attributes["url.full"] = parsed_url.url
-                attributes["url.path"] = params.url.path
+            if sentry_sdk.traces.get_current_span() is None:
+                span = None
+            else:
+                attributes: "Attributes" = {
+                    "sentry.op": OP.HTTP_CLIENT,
+                    "sentry.origin": AioHttpIntegration.origin,
+                    "http.request.method": method,
+                }
+                if parsed_url is not None:
+                    if has_data_collection_enabled(client.options):
+                        url_full = parsed_url.url
+                        attributes["url.path"] = params.url.path
 
-                if parsed_url.query:
-                    attributes["url.query"] = parsed_url.query
-                if parsed_url.fragment:
-                    attributes["url.fragment"] = parsed_url.fragment
+                        if parsed_url.query:
+                            filtered_query = (
+                                _apply_data_collection_filtering_to_query_string(
+                                    query_string=parsed_url.query,
+                                    behaviour=client.options["data_collection"][
+                                        "url_query_params"
+                                    ],
+                                )
+                            )
+                            if filtered_query:
+                                attributes["url.query"] = filtered_query
+                                url_full += "?" + filtered_query
 
-            span = sentry_sdk.traces.start_span(name=span_name, attributes=attributes)
+                        if parsed_url.fragment:
+                            attributes["url.fragment"] = parsed_url.fragment
+                            url_full += "#" + parsed_url.fragment
+
+                        attributes["url.full"] = url_full
+                    elif should_send_default_pii():
+                        url_full = parsed_url.url
+                        attributes["url.path"] = params.url.path
+
+                        if parsed_url.query:
+                            url_full += "?" + parsed_url.query
+                            attributes["url.query"] = parsed_url.query
+                        if parsed_url.fragment:
+                            url_full += "#" + parsed_url.fragment
+                            attributes["url.fragment"] = parsed_url.fragment
+
+                        attributes["url.full"] = url_full
+
+                span = sentry_sdk.traces.start_span(
+                    name=span_name, attributes=attributes
+                )
         else:
             legacy_span = sentry_sdk.start_span(
                 op=OP.HTTP_CLIENT,

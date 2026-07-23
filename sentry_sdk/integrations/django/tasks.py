@@ -35,6 +35,8 @@ def patch_tasks() -> None:
 
         span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
+            if sentry_sdk.traces.get_current_span() is None:
+                return old_task_enqueue(self, *args, **kwargs)
             with sentry_sdk.traces.start_span(
                 name=name,
                 attributes={

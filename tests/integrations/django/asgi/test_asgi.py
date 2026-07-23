@@ -55,7 +55,7 @@ async def test_basic(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     import channels  # type: ignore[import-not-found]
@@ -162,7 +162,7 @@ async def test_async_views(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     comm = HttpCommunicator(application, "GET", "/async_message")
@@ -217,7 +217,7 @@ async def test_active_thread_id(
         integrations=[DjangoIntegration(middleware_spans=middleware_spans)],
         traces_sample_rate=1.0,
         profiles_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     comm = HttpCommunicator(application, "GET", endpoint)
@@ -453,7 +453,7 @@ async def test_has_trace_if_performance_enabled(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     comm = HttpCommunicator(asgi_application, "GET", "/view-exc-with-msg")
@@ -509,7 +509,7 @@ async def test_has_trace_if_performance_disabled(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     comm = HttpCommunicator(asgi_application, "GET", "/view-exc-with-msg")
@@ -560,7 +560,7 @@ async def test_trace_from_headers_if_performance_enabled(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     trace_id = "582b43a4192642f0b136d5159a501701"
@@ -621,7 +621,7 @@ async def test_trace_from_headers_if_performance_disabled(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     trace_id = "582b43a4192642f0b136d5159a501701"
@@ -779,7 +779,7 @@ async def test_asgi_request_body(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     comm = HttpCommunicator(
@@ -900,7 +900,7 @@ async def test_async_view(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     comm = HttpCommunicator(application, "GET", "/simple_async_view")
@@ -943,7 +943,7 @@ async def test_transaction_http_method_default(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -1007,7 +1007,7 @@ async def test_transaction_http_method_custom(
             )
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -1027,8 +1027,8 @@ async def test_transaction_http_method_custom(
         sentry_sdk.flush()
         spans = [item.payload for item in items]
 
-        assert spans[10]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "OPTIONS"
-        assert spans[16]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "HEAD"
+        assert spans[5]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "OPTIONS"
+        assert spans[11]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "HEAD"
     else:
         events = capture_events()
 

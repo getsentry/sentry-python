@@ -6,20 +6,22 @@ import sentry_sdk
 from sentry_sdk._werkzeug import _get_headers, get_host
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query_string
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     _filter_headers,
-    nullcontext,
 )
 from sentry_sdk.scope import Scope, should_send_default_pii, use_isolation_scope
 from sentry_sdk.sessions import track_session
-from sentry_sdk.traces import SegmentSource, StreamedSpan
+from sentry_sdk.traces import SegmentNameSource, StreamedSpan
 from sentry_sdk.tracing import Span, TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     ContextVar,
     capture_internal_exceptions,
     event_from_exception,
+    has_data_collection_enabled,
+    nullcontext,
     reraise,
 )
 
@@ -134,7 +136,14 @@ class SentryWsgiMiddleware:
                             )
                             Scope.set_custom_sampling_context({"wsgi_environ": environ})
 
-                            if should_send_default_pii():
+                            if has_data_collection_enabled(client.options):
+                                if client.options["data_collection"]["user_info"]:
+                                    client_ip = get_client_ip(environ)
+                                    if client_ip:
+                                        scope.set_attribute(
+                                            SPANDATA.USER_IP_ADDRESS, client_ip
+                                        )
+                            elif should_send_default_pii():
                                 client_ip = get_client_ip(environ)
                                 if client_ip:
                                     scope.set_attribute(
@@ -144,7 +153,7 @@ class SentryWsgiMiddleware:
                             span_ctx = sentry_sdk.traces.start_span(
                                 name=_DEFAULT_TRANSACTION_NAME,
                                 attributes={
-                                    "sentry.span.source": SegmentSource.ROUTE,
+                                    "sentry.segment.name.source": SegmentNameSource.ROUTE,
                                     "sentry.origin": self.span_origin,
                                     "sentry.op": OP.HTTP_SERVER,
                                 },
@@ -241,9 +250,14 @@ def _get_environ(environ: "Dict[str, str]") -> "Iterator[Tuple[str, str]]":
     capture (server name, port and remote addr if pii is enabled).
     """
     keys = ["SERVER_NAME", "SERVER_PORT"]
-    if should_send_default_pii():
-        # make debugging of proxy setup easier. Proxy headers are
-        # in headers.
+    client_options = sentry_sdk.get_client().options
+
+    # make debugging of proxy setup easier. Proxy headers are
+    # in headers.
+    if has_data_collection_enabled(client_options):
+        if client_options["data_collection"]["user_info"]:
+            keys += ["REMOTE_ADDR"]
+    elif should_send_default_pii():
         keys += ["REMOTE_ADDR"]
 
     for key in keys:
@@ -355,22 +369,39 @@ def _make_wsgi_event_processor(
     method = environ.get("REQUEST_METHOD")
     env = dict(_get_environ(environ))
     headers = _filter_headers(dict(_get_headers(environ)))
+    client_options = sentry_sdk.get_client().options
 
     def event_processor(event: "Event", hint: "Dict[str, Any]") -> "Event":
         with capture_internal_exceptions():
             # if the code below fails halfway through we at least have some data
             request_info = event.setdefault("request", {})
 
-            if should_send_default_pii():
+            if has_data_collection_enabled(client_options):
+                if client_options["data_collection"]["user_info"]:
+                    user_info = event.setdefault("user", {})
+                    if client_ip:
+                        user_info.setdefault("ip_address", client_ip)
+            elif should_send_default_pii():
                 user_info = event.setdefault("user", {})
                 if client_ip:
                     user_info.setdefault("ip_address", client_ip)
 
             request_info["url"] = request_url
-            request_info["query_string"] = query_string
             request_info["method"] = method
             request_info["env"] = env
             request_info["headers"] = headers
+
+            if has_data_collection_enabled(client_options):
+                if query_string:
+                    filtered_qs = _apply_data_collection_filtering_to_query_string(
+                        query_string=query_string,
+                        behaviour=client_options["data_collection"]["url_query_params"],
+                    )
+                    if filtered_qs:
+                        request_info["query_string"] = filtered_qs
+            else:
+                # This was not originally gated so if data collection is not enabled, leave as-is.
+                request_info["query_string"] = query_string
 
         return event
 
@@ -409,7 +440,34 @@ def _get_request_attributes(
         except ValueError:
             pass
 
-    if should_send_default_pii():
+    client_options = sentry_sdk.get_client().options
+
+    if has_data_collection_enabled(client_options):
+        query_string = environ.get("QUERY_STRING")
+        filtered_qs = None
+        if query_string:
+            filtered_qs = _apply_data_collection_filtering_to_query_string(
+                query_string=query_string,
+                behaviour=client_options["data_collection"]["url_query_params"],
+            )
+
+            if filtered_qs:
+                attributes["http.query"] = filtered_qs
+
+        path = environ.get("PATH_INFO", "")
+        if path:
+            attributes["url.path"] = path
+
+        attributes["url.full"] = get_request_url(environ, use_x_forwarded_for)
+        if filtered_qs is not None:
+            attributes["url.full"] += f"?{filtered_qs}"
+
+        if client_options["data_collection"]["user_info"]:
+            client_ip = get_client_ip(environ)
+            if client_ip:
+                attributes["client.address"] = client_ip
+
+    elif should_send_default_pii():
         client_ip = get_client_ip(environ)
         if client_ip:
             attributes["client.address"] = client_ip
@@ -422,6 +480,9 @@ def _get_request_attributes(
         if path:
             attributes["url.path"] = path
 
-        attributes["url.full"] = get_request_url(environ, use_x_forwarded_for)
+        url_full = get_request_url(environ, use_x_forwarded_for)
+        if query_string:
+            url_full += "?" + query_string
+        attributes["url.full"] = url_full
 
     return attributes

@@ -192,7 +192,7 @@ def test_empty_realurl(
 
     sentry_init(
         dsn="",
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     HTTPConnection("localhost", port=PORT).putrequest("POST", None)
 
@@ -255,7 +255,7 @@ def test_outgoing_trace_headers(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     already_patched_getresponse = HTTPSConnection.getresponse
@@ -282,9 +282,14 @@ def test_outgoing_trace_headers(
     headers = {
         "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-1",
         "baggage": (
-            "other-vendor-value-1=foo;bar;baz, sentry-trace_id=771a43a4192642f0b136d5159a501700, "
-            "sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337, "
-            "sentry-user_id=Am%C3%A9lie, sentry-sample_rand=0.132521102938283, other-vendor-value-2=foo;bar;"
+            "other-vendor-value-1=foo;bar;baz,"
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
+            "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
+            "sentry-sample_rate=0.01337,"
+            "sentry-user_id=Am%C3%A9lie,"
+            "sentry-sample_rand=0.000005,"
+            "sentry-sampled=true,"
+            "other-vendor-value-2=foo;bar;"
         ),
     }
 
@@ -309,6 +314,15 @@ def test_outgoing_trace_headers(
             parent_span_id=request_span["span_id"],
             sampled=1,
         )
+
+        expected_outgoing_baggage = (
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
+            "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
+            "sentry-sample_rate=0.01337,"
+            "sentry-user_id=Am%C3%A9lie,"
+            "sentry-sample_rand=0.000005,"
+            "sentry-sampled=true"
+        )
     else:
         events = capture_events()
         transaction = continue_trace(headers)
@@ -331,16 +345,18 @@ def test_outgoing_trace_headers(
             sampled=1,
         )
 
+        # Note: the sample rate here is actually wrong. It's fixed in the
+        # streaming path
+        expected_outgoing_baggage = (
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
+            "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
+            "sentry-sample_rate=1.0,"
+            "sentry-user_id=Am%C3%A9lie,"
+            "sentry-sample_rand=0.000005,"
+            "sentry-sampled=true"
+        )
+
     assert request_headers["sentry-trace"] == expected_sentry_trace
-
-    expected_outgoing_baggage = (
-        "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
-        "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
-        "sentry-sample_rate=1.0,"
-        "sentry-user_id=Am%C3%A9lie,"
-        "sentry-sample_rand=0.132521102938283"
-    )
-
     assert request_headers["baggage"] == expected_outgoing_baggage
 
 
@@ -354,7 +370,7 @@ def test_outgoing_trace_headers_head_sdk(
     sentry_init(
         traces_sample_rate=0.5,
         release="foo",
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     already_patched_getresponse = HTTPSConnection.getresponse
@@ -444,6 +460,74 @@ def test_outgoing_trace_headers_head_sdk(
     assert request_headers["baggage"] == expected_outgoing_baggage
 
 
+def test_outgoing_trace_headers_span_streaming_no_current_span(sentry_init):
+    """
+    With span streaming enabled and no active span, trace propagation headers
+    should still be attached to outgoing requests, propagated from the scope's
+    propagation context.
+    """
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    already_patched_getresponse = HTTPSConnection.getresponse
+    request_headers = {}
+
+    class HTTPSConnectionRecordingRequestHeaders(HTTPSConnection):
+        def send(self, *args, **kwargs) -> None:
+            request_str = args[0]
+            for line in request_str.decode("utf-8").split("\r\n")[1:]:
+                if line:
+                    key, val = line.split(": ")
+                    request_headers[key] = val
+
+            server_sock, client_sock = socket.socketpair()
+            server_sock.sendall(b"HTTP/1.1 200 OK\r\n\r\n")
+            server_sock.close()
+            self.sock = client_sock
+
+        def getresponse(self, *args, **kwargs):
+            return already_patched_getresponse(self, *args, **kwargs)
+
+    headers = {
+        "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-1",
+        "baggage": (
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
+            "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
+            "sentry-sample_rate=0.01337,"
+            "sentry-sample_rand=0.000005,"
+            "sentry-sampled=true"
+        ),
+    }
+
+    # Seed the scope's propagation context, but do NOT start a span.
+    sentry_sdk.traces.continue_trace(headers)
+    assert sentry_sdk.traces.get_current_span() is None
+
+    connection = HTTPSConnectionRecordingRequestHeaders("localhost", port=PORT)
+    connection.request("GET", "/top-chasers")
+    connection.getresponse()
+
+    # Trace is still propagated, carrying the trace_id from the propagation
+    # context. The span id segment is generated for the propagation context
+    # (there is no active span), so we assert the stable trace_id prefix.
+    assert request_headers["sentry-trace"].startswith(
+        "771a43a4192642f0b136d5159a501700-"
+    )
+
+    # The outgoing baggage is fully deterministic: it is the frozen incoming
+    # baggage from the propagation context.
+    expected_outgoing_baggage = (
+        "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
+        "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
+        "sentry-sample_rate=0.01337,"
+        "sentry-sample_rand=0.000005,"
+        "sentry-sampled=true"
+    )
+    assert request_headers["baggage"] == expected_outgoing_baggage
+
+
 @pytest.mark.parametrize(
     "trace_propagation_targets,host,path,trace_propagated",
     [
@@ -515,7 +599,7 @@ def test_option_trace_propagation_targets(
     sentry_init(
         trace_propagation_targets=trace_propagation_targets,
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     already_patched_getresponse = HTTPSConnection.getresponse
@@ -593,7 +677,7 @@ def test_request_source_disabled(
 
     sentry_init(
         **sentry_options,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -647,7 +731,7 @@ def test_request_source_enabled(
     sentry_options = {
         "traces_sample_rate": 1.0,
         "http_request_source_threshold_ms": 0,
-        "_experiments": {"trace_lifecycle": "stream" if span_streaming else "static"},
+        "trace_lifecycle": "stream" if span_streaming else "static",
     }
 
     if enable_http_request_source is not None:
@@ -709,7 +793,7 @@ def test_request_source(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -794,7 +878,7 @@ def test_request_source_with_module_in_search_path(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -868,7 +952,7 @@ def test_no_request_source_if_duration_too_short(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=100,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     add_http_request_source = sentry_sdk.tracing_utils.add_http_request_source
@@ -942,7 +1026,7 @@ def test_request_source_if_duration_over_threshold(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=100,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     add_http_request_source = sentry_sdk.tracing_utils.add_http_request_source
@@ -1052,7 +1136,7 @@ def test_span_origin(
     sentry_init(
         traces_sample_rate=1.0,
         debug=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -1097,7 +1181,7 @@ def test_http_timeout(
 
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -1152,7 +1236,7 @@ def test_proxy_http_tunnel(
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -1217,7 +1301,7 @@ def test_chunked_response_span_covers_body_read(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     min_expected_duration = CHUNK_DELAY * NUM_CHUNKS

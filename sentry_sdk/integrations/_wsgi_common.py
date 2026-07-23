@@ -1,11 +1,11 @@
 import json
-from contextlib import contextmanager
 from copy import deepcopy
 
 import sentry_sdk
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
+from sentry_sdk.data_collection import _apply_key_value_collection_filtering
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import AnnotatedValue, logger
+from sentry_sdk.utils import AnnotatedValue, has_data_collection_enabled, logger
 
 try:
     from django.http.request import RawPostDataException
@@ -18,7 +18,7 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Iterator, Mapping, MutableMapping, Optional, Union
+    from typing import Any, Dict, Mapping, MutableMapping, Optional, Union
 
     from sentry_sdk._types import Event, HttpStatusCodeRange
 
@@ -50,12 +50,6 @@ DEFAULT_HTTP_METHODS_TO_CAPTURE = (
     "PUT",
     "TRACE",
 )
-
-
-# This noop context manager can be replaced with "from contextlib import nullcontext" when we drop Python 3.6 support
-@contextmanager
-def nullcontext() -> "Iterator[None]":
-    yield
 
 
 def request_body_within_bounds(
@@ -95,7 +89,14 @@ class RequestExtractor:
         content_length = self.content_length()
         request_info = event.get("request", {})
 
-        if should_send_default_pii():
+        if has_data_collection_enabled(client.options):
+            cookies = _apply_key_value_collection_filtering(
+                items=dict(self.cookies()),
+                behaviour=client.options["data_collection"]["cookies"],
+            )
+            if cookies:
+                request_info["cookies"] = cookies
+        elif should_send_default_pii():
             request_info["cookies"] = dict(self.cookies())
 
         if not request_body_within_bounds(client, content_length):
@@ -213,19 +214,39 @@ def _filter_headers(
     headers: "Mapping[str, str]",
     use_annotated_value: bool = True,
 ) -> "Mapping[str, Union[AnnotatedValue, str]]":
-    if should_send_default_pii():
-        return headers
+    client_options = sentry_sdk.get_client().options
 
-    substitute: "Union[AnnotatedValue, str]" = (
-        SENSITIVE_DATA_SUBSTITUTE
-        if not use_annotated_value
-        else AnnotatedValue.removed_because_over_size_limit()
-    )
+    if has_data_collection_enabled(client_options):
+        data_collection_configuration = client_options["data_collection"]
 
-    return {
-        k: (v if k.upper().replace("-", "_") not in SENSITIVE_HEADERS else substitute)
-        for k, v in headers.items()
-    }
+        filtered = _apply_key_value_collection_filtering(
+            items=headers,
+            behaviour=data_collection_configuration["http_headers"]["request"],
+        )
+
+        for key in filtered:
+            if isinstance(key, str) and key.lower() in ("cookie", "set-cookie"):
+                filtered[key] = SENSITIVE_DATA_SUBSTITUTE
+
+        return filtered
+    else:
+        if should_send_default_pii():
+            return headers
+
+        substitute: "Union[AnnotatedValue, str]" = (
+            SENSITIVE_DATA_SUBSTITUTE
+            if not use_annotated_value
+            else AnnotatedValue.removed_because_over_size_limit()
+        )
+
+        return {
+            k: (
+                v
+                if k.upper().replace("-", "_") not in SENSITIVE_HEADERS
+                else substitute
+            )
+            for k, v in headers.items()
+        }
 
 
 def _in_http_status_code_range(

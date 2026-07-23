@@ -23,6 +23,10 @@ from sentry_sdk.consts import (
     VERSION,
     ClientConstructor,
 )
+from sentry_sdk.data_collection import (
+    _map_from_send_default_pii,
+    _resolve_data_collection,
+)
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
 from sentry_sdk.integrations.dedupe import DedupeIntegration
@@ -59,6 +63,7 @@ from sentry_sdk.utils import (
     get_sdk_name,
     get_type_name,
     handle_in_app,
+    has_data_collection_enabled,
     has_logs_enabled,
     has_metrics_enabled,
     logger,
@@ -345,12 +350,22 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
     if rv["enable_tracing"] is True and rv["traces_sample_rate"] is None:
         rv["traces_sample_rate"] = 1.0
 
-    if rv["event_scrubber"] is None:
+    rv["data_collection"] = _resolve_data_collection(rv)
+
+    # Do not add the event scrubber if data collection is enabled as it can remove data that's
+    # collected under data collection config
+    if not has_data_collection_enabled(rv) and rv["event_scrubber"] is None:
         rv["event_scrubber"] = EventScrubber(
-            send_default_pii=(
-                False if rv["send_default_pii"] is None else rv["send_default_pii"]
-            )
+            send_default_pii=False
+            if rv["send_default_pii"] is None
+            else rv["send_default_pii"]
         )
+    elif has_data_collection_enabled(rv) and rv["event_scrubber"]:
+        warnings.warn(
+            "Event scrubbers are not enabled when data collection configuration is provided. Ignoring event_scrubber...",
+            stacklevel=2,
+        )
+        rv["event_scrubber"] = None
 
     if rv["socket_options"] and not isinstance(rv["socket_options"], list):
         logger.warning(
@@ -373,6 +388,12 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
     if rv["trace_ignore_status_codes"] and has_span_streaming_enabled(rv):
         warnings.warn(
             "The `trace_ignore_status_codes` parameter is ignored in span streaming mode.",
+            stacklevel=2,
+        )
+
+    if rv["ignore_spans"] and not has_span_streaming_enabled(rv):
+        warnings.warn(
+            "The `ignore_spans` parameter only works when `trace_lifecycle` is set to `stream`.",
             stacklevel=2,
         )
 
@@ -614,6 +635,19 @@ class _Client(BaseClient):
                 self.options["error_sampler"] = sample_all
                 self.options["traces_sampler"] = sample_all
                 self.options["profiles_sampler"] = sample_all
+                # data_collection was resolved in _get_options() before this
+                # spotlight override flipped send_default_pii on. Re-derive it so
+                # data_collection agrees with should_send_default_pii() in
+                # DSN-less spotlight mode (only when the user did not set
+                # data_collection explicitly).
+                if not self.options["data_collection"]["provided_by_user"]:
+                    self.options["data_collection"] = _map_from_send_default_pii(
+                        send_default_pii=True,
+                        include_local_variables=self.options["include_local_variables"]
+                        is not False,
+                        include_source_context=self.options["include_source_context"]
+                        is not False,
+                    )
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
@@ -1219,15 +1253,31 @@ class _Client(BaseClient):
             serialized = telemetry._to_json()  # type: ignore[union-attr]
 
         if before_send is not None:
-            serialized = before_send(serialized, {})  # type: ignore[arg-type]
+            exception_raised_in_before_send_func = False
+            with capture_internal_exceptions():
+                try:
+                    serialized = before_send(serialized, {})  # type: ignore[arg-type]
+                except Exception:
+                    exception_raised_in_before_send_func = True
+                    raise
 
             if ty in ("log", "metric"):
+                # We are ok with dropping metrics and logs when an exception is raised
+                # because we allow users to drop them in their respect before_send_*
+                # functions.
+                if exception_raised_in_before_send_func:
+                    return
                 # Logs and metrics can be dropped in their respective
                 # before_send, so if we get None, don't queue them for sending.
                 if serialized is None:
                     return
 
             elif ty == "span" and isinstance(telemetry, StreamedSpan):
+                # Reset the span to its original value before we attempted
+                # to call the `before_send_span` callback
+                if exception_raised_in_before_send_func:
+                    serialized = telemetry._to_json()
+
                 # Spans can't be dropped in before_send_span by design. They can
                 # be altered though (e.g. to sanitize). Only allow changes to
                 # name and attributes.

@@ -52,6 +52,13 @@ class SentryUnaryUnaryClientInterceptor(ClientInterceptor, UnaryUnaryClientInter
 
         span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
+            if sentry_sdk.traces.get_current_span() is None:
+                client_call_details = (
+                    self._update_client_call_details_metadata_from_scope(
+                        client_call_details
+                    )
+                )
+                return await continuation(client_call_details, request)
             with sentry_sdk.traces.start_span(
                 name="unary unary call to %s" % method.decode(),
                 attributes={
@@ -107,6 +114,13 @@ class SentryUnaryStreamClientInterceptor(
 
         span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
+            if sentry_sdk.traces.get_current_span() is None:
+                client_call_details = (
+                    self._update_client_call_details_metadata_from_scope(
+                        client_call_details
+                    )
+                )
+                return await continuation(client_call_details, request)
             with sentry_sdk.traces.start_span(
                 name="unary stream call to %s" % method.decode(),
                 attributes={
