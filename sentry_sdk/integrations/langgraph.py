@@ -432,6 +432,8 @@ def _set_usage_data(span: "sentry_sdk.tracing.Span", messages: "Any") -> None:
     input_tokens = 0
     output_tokens = 0
     total_tokens = 0
+    cached_tokens = 0
+    reasoning_tokens = 0
 
     for message in messages:
         response_metadata = message.get("response_metadata")
@@ -445,6 +447,12 @@ def _set_usage_data(span: "sentry_sdk.tracing.Span", messages: "Any") -> None:
         input_tokens += int(token_usage.get("prompt_tokens", 0))
         output_tokens += int(token_usage.get("completion_tokens", 0))
         total_tokens += int(token_usage.get("total_tokens", 0))
+
+        input_details = token_usage.get("prompt_tokens_details") or {}
+        cached_tokens += int(input_details.get("cached_tokens") or 0)
+
+        output_details = token_usage.get("completion_tokens_details") or {}
+        reasoning_tokens += int(output_details.get("reasoning_tokens") or 0)
 
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
@@ -461,6 +469,12 @@ def _set_usage_data(span: "sentry_sdk.tracing.Span", messages: "Any") -> None:
             SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS,
             total_tokens,
         )
+
+    if cached_tokens > 0:
+        set_on_span(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED, cached_tokens)
+
+    if reasoning_tokens > 0:
+        set_on_span(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING, reasoning_tokens)
 
 
 def _set_response_model_name(span: "sentry_sdk.tracing.Span", messages: "Any") -> None:

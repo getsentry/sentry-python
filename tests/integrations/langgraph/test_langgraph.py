@@ -2132,3 +2132,40 @@ def test_graph_bubble_up_ignored(sentry_init, capture_items):
         model.invoke([HumanMessage(content="hi")])
 
     assert len(events) == 0
+
+
+def test_set_usage_data_includes_cached_and_reasoning_tokens():
+    from unittest.mock import MagicMock
+
+    from sentry_sdk.consts import SPANDATA
+    from sentry_sdk.integrations.langgraph import _set_usage_data
+
+    span = MagicMock(spec=["set_data"])
+    messages = [
+        {
+            "response_metadata": {
+                "token_usage": {
+                    "prompt_tokens": 100,
+                    "completion_tokens": 50,
+                    "total_tokens": 150,
+                    "prompt_tokens_details": {"cached_tokens": 40},
+                    "completion_tokens_details": {"reasoning_tokens": 10},
+                }
+            }
+        },
+        {
+            "response_metadata": {
+                "token_usage": {
+                    "prompt_tokens": 10,
+                    "completion_tokens": 5,
+                    "total_tokens": 15,
+                }
+            }
+        },
+    ]
+
+    _set_usage_data(span, messages)
+
+    span.set_data.assert_any_call(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, 110)
+    span.set_data.assert_any_call(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED, 40)
+    span.set_data.assert_any_call(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING, 10)

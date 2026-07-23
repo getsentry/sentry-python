@@ -5787,3 +5787,58 @@ class TestTransformLangchainMessageContent:
             "mime_type": "image/jpeg",
             "content": "/9j/4AAQ...",
         }
+
+
+def test_extract_tokens_includes_cached_and_reasoning_details():
+    from sentry_sdk.integrations.langchain import _extract_tokens
+
+    # LangChain usage_metadata shape
+    usage = {
+        "input_tokens": 100,
+        "output_tokens": 50,
+        "total_tokens": 150,
+        "input_token_details": {"cache_read": 40},
+        "output_token_details": {"reasoning": 10},
+    }
+    assert _extract_tokens(usage) == (100, 50, 150, 40, 10)
+
+    # OpenAI-style details shape
+    usage = {
+        "prompt_tokens": 100,
+        "completion_tokens": 50,
+        "total_tokens": 150,
+        "prompt_tokens_details": {"cached_tokens": 30},
+        "completion_tokens_details": {"reasoning_tokens": 5},
+    }
+    assert _extract_tokens(usage) == (100, 50, 150, 30, 5)
+
+    # No details present
+    usage = {"input_tokens": 1, "output_tokens": 2, "total_tokens": 3}
+    assert _extract_tokens(usage) == (1, 2, 3, None, None)
+
+
+def test_record_token_usage_sets_cached_and_reasoning_span_data():
+    from unittest.mock import MagicMock
+
+    from sentry_sdk.consts import SPANDATA
+    from sentry_sdk.integrations.langchain import _record_token_usage
+
+    span = MagicMock(spec=["set_data"])
+    response = MagicMock()
+    response.llm_output = None
+    response.generations = []
+    response.usage = None
+    response.token_usage = None
+    response.message = None
+    response.usage_metadata = {
+        "input_tokens": 100,
+        "output_tokens": 50,
+        "total_tokens": 150,
+        "input_token_details": {"cache_read": 40},
+        "output_token_details": {"reasoning": 10},
+    }
+
+    _record_token_usage(span, response)
+
+    span.set_data.assert_any_call(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED, 40)
+    span.set_data.assert_any_call(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING, 10)
