@@ -6,10 +6,8 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.django import DjangoIntegration
 from tests.conftest import unpack_werkzeug_response, werkzeug_set_cookie
 from tests.integrations.django.myapp.wsgi import application
-from tests.integrations.django.utils import (
-    USER_INFO_INIT_KWARGS,
-    pytest_mark_django_db_decorator,
-)
+from tests.integrations.django.utils import pytest_mark_django_db_decorator
+from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
 
 try:
     from django.urls import reverse
@@ -397,7 +395,7 @@ def test_empty_query_string_is_dropped_with_data_collection(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.parametrize("init_kwargs, expect_ip", USER_INFO_INIT_KWARGS)
+@pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_info_span_attributes_data_collection(
     sentry_init, client, capture_items, init_kwargs, expect_ip
 ):
@@ -433,7 +431,7 @@ def test_user_info_span_attributes_data_collection(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.parametrize("init_kwargs, expect_user", USER_INFO_INIT_KWARGS)
+@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_identity_span_attributes_data_collection(
     sentry_init, client, capture_items, init_kwargs, expect_user
 ):
@@ -469,7 +467,7 @@ def test_user_identity_span_attributes_data_collection(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.parametrize("init_kwargs, expect_ip", USER_INFO_INIT_KWARGS)
+@pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_info_error_event_data_collection(
     sentry_init, client, capture_events, init_kwargs, expect_ip
 ):
@@ -490,7 +488,7 @@ def test_user_info_error_event_data_collection(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.parametrize("init_kwargs, expect_user", USER_INFO_INIT_KWARGS)
+@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_identity_error_event_data_collection(
     sentry_init, client, capture_events, init_kwargs, expect_user
 ):

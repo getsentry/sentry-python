@@ -196,8 +196,12 @@ async def _context_enter(request: "Request") -> None:
         sentry_sdk.traces.continue_trace(dict(request.headers))
         scope.set_custom_sampling_context({"sanic_request": request})
 
-        if should_send_default_pii() and request.remote_addr:
-            scope.set_attribute(SPANDATA.USER_IP_ADDRESS, request.remote_addr)
+        if request.remote_addr:
+            if has_data_collection_enabled(client.options):
+                if client.options["data_collection"]["user_info"]:
+                    scope.set_attribute(SPANDATA.USER_IP_ADDRESS, request.remote_addr)
+            elif should_send_default_pii():
+                scope.set_attribute(SPANDATA.USER_IP_ADDRESS, request.remote_addr)
 
         span = sentry_sdk.traces.start_span(
             # Unless the request results in a 404 error, the name and source
@@ -401,6 +405,10 @@ def _get_request_attributes(request: "Request") -> "Dict[str, Any]":
             query=filtered_query or ""
         ).geturl()
 
+        if request.remote_addr:
+            if client_options["data_collection"]["user_info"]:
+                attributes[SPANDATA.CLIENT_ADDRESS] = request.remote_addr
+
     elif should_send_default_pii():
         attributes[SPANDATA.URL_FULL] = request.url
         attributes["url.path"] = urlparts.path
@@ -408,11 +416,11 @@ def _get_request_attributes(request: "Request") -> "Dict[str, Any]":
         if urlparts.query:
             attributes[SPANDATA.HTTP_QUERY] = urlparts.query
 
+        if request.remote_addr:
+            attributes[SPANDATA.CLIENT_ADDRESS] = request.remote_addr
+
     if urlparts.scheme:
         attributes[SPANDATA.NETWORK_PROTOCOL_NAME] = urlparts.scheme
-
-    if should_send_default_pii() and request.remote_addr:
-        attributes[SPANDATA.CLIENT_ADDRESS] = request.remote_addr
 
     return attributes
 
