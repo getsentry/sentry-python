@@ -8,6 +8,7 @@ import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.integrations.tornado import TornadoIntegration
+from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
 
 
 @pytest.fixture
@@ -701,6 +702,32 @@ def test_user_auth(tornado_testcase, sentry_init, capture_events):
     assert "user" not in event
 
 
+@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
+def test_user_auth_data_collection(
+    tornado_testcase, sentry_init, capture_events, init_kwargs, expect_user
+):
+    sentry_init(integrations=[TornadoIntegration()], **init_kwargs)
+    events = capture_events()
+
+    class UserHandler(RequestHandler):
+        def get(self):
+            1 / 0
+
+        def get_current_user(self):
+            return 42
+
+    client = tornado_testcase(Application([(r"/auth", UserHandler)]))
+
+    response = client.fetch("/auth")
+    assert response.code == 500
+
+    (event,) = events
+    if expect_user:
+        assert event["user"] == {"is_authenticated": True}
+    else:
+        assert "is_authenticated" not in event.get("user", {})
+
+
 def test_formdata(tornado_testcase, sentry_init, capture_events):
     sentry_init(integrations=[TornadoIntegration()], send_default_pii=True)
     events = capture_events()
@@ -927,15 +954,15 @@ def test_span_origin(
         assert event["contexts"]["trace"]["origin"] == "auto.http.tornado"
 
 
-@pytest.mark.parametrize("send_default_pii", [True, False])
+@pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_ip_address_on_all_spans(
-    tornado_testcase, sentry_init, capture_items, send_default_pii
+    tornado_testcase, sentry_init, capture_items, init_kwargs, expect_ip
 ):
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
         trace_lifecycle="stream",
+        **init_kwargs,
     )
 
     items = capture_items("span")
@@ -947,9 +974,39 @@ def test_user_ip_address_on_all_spans(
 
     child_span, server_span = [item.payload for item in items]
 
-    if send_default_pii:
+    if expect_ip:
         assert server_span["attributes"]["user.ip_address"] == "127.0.0.1"
         assert child_span["attributes"]["user.ip_address"] == "127.0.0.1"
     else:
         assert "user.ip_address" not in server_span["attributes"]
         assert "user.ip_address" not in child_span["attributes"]
+
+
+@pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
+def test_client_address_span_attribute_data_collection(
+    tornado_testcase, sentry_init, capture_items, init_kwargs, expect_ip
+):
+    sentry_init(
+        integrations=[TornadoIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+
+    items = capture_items("span")
+
+    client = tornado_testcase(Application([(r"/hi", ChildSpanHandler)]))
+    client.fetch("/hi")
+
+    sentry_sdk.flush()
+
+    (server_span,) = [
+        item.payload
+        for item in items
+        if item.payload["attributes"].get("sentry.origin") == "auto.http.tornado"
+    ]
+
+    if expect_ip:
+        assert server_span["attributes"]["client.address"] == "127.0.0.1"
+    else:
+        assert "client.address" not in server_span["attributes"]
