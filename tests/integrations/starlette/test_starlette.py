@@ -984,10 +984,40 @@ def test_catch_exceptions(
     assert event["exception"]["values"][0]["mechanism"]["type"] == "starlette"
 
 
-def test_user_information_error(sentry_init, capture_events):
+USER_AUTH_CASES = [
+    pytest.param({"send_default_pii": True}, True, id="legacy_pii_true"),
+    pytest.param({"send_default_pii": False}, False, id="legacy_pii_false"),
+    pytest.param(
+        {"_experiments": {"data_collection": {}}},
+        True,
+        id="dc_default_user_info",
+    ),
+    pytest.param(
+        {"_experiments": {"data_collection": {"user_info": True}}},
+        True,
+        id="dc_user_info_true",
+    ),
+    pytest.param(
+        {"_experiments": {"data_collection": {"user_info": False}}},
+        False,
+        id="dc_user_info_false",
+    ),
+    pytest.param(
+        {
+            "send_default_pii": True,
+            "_experiments": {"data_collection": {"user_info": False}},
+        },
+        False,
+        id="dc_wins_over_pii",
+    ),
+]
+
+
+@pytest.mark.parametrize("init_kwargs, expect_user", USER_AUTH_CASES)
+def test_user_information_error(sentry_init, capture_events, init_kwargs, expect_user):
     sentry_init(
-        send_default_pii=True,
         integrations=[StarletteIntegration()],
+        **init_kwargs,
     )
     starlette_app = starlette_app_factory(
         middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
@@ -1001,37 +1031,23 @@ def test_user_information_error(sentry_init, capture_events):
         pass
 
     (event,) = events
-    user = event.get("user", None)
-    assert user
-    assert "username" in user
-    assert user["username"] == "Gabriela"
+    if expect_user:
+        user = event.get("user", None)
+        assert user
+        assert "username" in user
+        assert user["username"] == "Gabriela"
+    else:
+        assert "user" not in event
 
 
-def test_user_information_error_no_pii(sentry_init, capture_events):
-    sentry_init(
-        send_default_pii=False,
-        integrations=[StarletteIntegration()],
-    )
-    starlette_app = starlette_app_factory(
-        middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
-    )
-    events = capture_events()
-
-    client = TestClient(starlette_app, raise_server_exceptions=False)
-    try:
-        client.get("/custom_error", auth=("Gabriela", "hello123"))
-    except Exception:
-        pass
-
-    (event,) = events
-    assert "user" not in event
-
-
-def test_user_information_transaction(sentry_init, capture_events):
+@pytest.mark.parametrize("init_kwargs, expect_user", USER_AUTH_CASES)
+def test_user_information_transaction(
+    sentry_init, capture_events, init_kwargs, expect_user
+):
     sentry_init(
         traces_sample_rate=1.0,
-        send_default_pii=True,
         integrations=[StarletteIntegration()],
+        **init_kwargs,
     )
     starlette_app = starlette_app_factory(
         middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
@@ -1042,28 +1058,13 @@ def test_user_information_transaction(sentry_init, capture_events):
     client.get("/message", auth=("Gabriela", "hello123"))
 
     (_, transaction_event) = events
-    user = transaction_event.get("user", None)
-    assert user
-    assert "username" in user
-    assert user["username"] == "Gabriela"
-
-
-def test_user_information_transaction_no_pii(sentry_init, capture_events):
-    sentry_init(
-        traces_sample_rate=1.0,
-        send_default_pii=False,
-        integrations=[StarletteIntegration()],
-    )
-    starlette_app = starlette_app_factory(
-        middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
-    )
-    events = capture_events()
-
-    client = TestClient(starlette_app, raise_server_exceptions=False)
-    client.get("/message", auth=("Gabriela", "hello123"))
-
-    (_, transaction_event) = events
-    assert "user" not in transaction_event
+    if expect_user:
+        user = transaction_event.get("user", None)
+        assert user
+        assert "username" in user
+        assert user["username"] == "Gabriela"
+    else:
+        assert "user" not in transaction_event
 
 
 def test_user_information_does_not_clobber_app_set_user(sentry_init, capture_events):

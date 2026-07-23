@@ -47,6 +47,7 @@ from sentry_sdk.utils import (
     _get_installed_modules,
     capture_internal_exceptions,
     event_from_exception,
+    has_data_collection_enabled,
     logger,
     nullcontext,
     qualname_from_function,
@@ -253,10 +254,17 @@ class SentryAsgiMiddleware:
                             "network.protocol.name": ty,
                         }
 
-                        if scope.get("client") and should_send_default_pii():
-                            sentry_scope.set_attribute(
-                                SPANDATA.USER_IP_ADDRESS, _get_ip(scope)
-                            )
+                        if scope.get("client"):
+                            client_options = sentry_sdk.get_client().options
+                            if has_data_collection_enabled(client_options):
+                                if client_options["data_collection"]["user_info"]:
+                                    sentry_scope.set_attribute(
+                                        SPANDATA.USER_IP_ADDRESS, _get_ip(scope)
+                                    )
+                            elif should_send_default_pii():
+                                sentry_scope.set_attribute(
+                                    SPANDATA.USER_IP_ADDRESS, _get_ip(scope)
+                                )
 
                         if ty in ("http", "websocket"):
                             if (

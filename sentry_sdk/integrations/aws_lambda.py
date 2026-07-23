@@ -437,7 +437,23 @@ def _make_request_event_processor(
         if "headers" in aws_event:
             request["headers"] = _filter_headers(aws_event["headers"])
 
-        if should_send_default_pii():
+        client_options = sentry_sdk.get_client().options
+        if has_data_collection_enabled(client_options):
+            if client_options["data_collection"]["user_info"]:
+                user_info = sentry_event.setdefault("user", {})
+
+                identity = aws_event.get("identity")
+                if identity is None:
+                    identity = {}
+
+                id = identity.get("userArn")
+                if id is not None:
+                    user_info.setdefault("id", id)
+
+                ip = identity.get("sourceIp")
+                if ip is not None:
+                    user_info.setdefault("ip_address", ip)
+        elif should_send_default_pii():
             user_info = sentry_event.setdefault("user", {})
 
             identity = aws_event.get("identity")

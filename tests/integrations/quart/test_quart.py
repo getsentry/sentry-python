@@ -1101,6 +1101,145 @@ async def test_span_streaming_quart_auth_user_id(
         assert "user.id" not in segment.get("attributes", {})
 
 
+QUART_USER_INFO_CASES = [
+    pytest.param(
+        {"_experiments": {"data_collection": {}}},
+        True,
+        id="dc_default_user_info",
+    ),
+    pytest.param(
+        {"_experiments": {"data_collection": {"user_info": True}}},
+        True,
+        id="dc_user_info_true",
+    ),
+    pytest.param(
+        {"_experiments": {"data_collection": {"user_info": False}}},
+        False,
+        id="dc_user_info_false",
+    ),
+    pytest.param(
+        {
+            "send_default_pii": True,
+            "_experiments": {"data_collection": {"user_info": False}},
+        },
+        False,
+        id="dc_wins_over_pii",
+    ),
+]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("init_kwargs, expect_user_info", QUART_USER_INFO_CASES)
+async def test_quart_auth_user_info_data_collection(
+    sentry_init,
+    capture_events,
+    init_kwargs,
+    expect_user_info,
+):
+    from quart_auth import AuthUser, login_user
+
+    sentry_init(integrations=[quart_sentry.QuartIntegration()], **init_kwargs)
+    app = quart_app_factory()
+
+    @app.route("/login")
+    async def login():
+        login_user(AuthUser("42"))
+        return "ok"
+
+    events = capture_events()
+
+    client = app.test_client()
+    assert (await client.get("/login")).status_code == 200
+    assert not events
+
+    assert (await client.get("/message")).status_code == 200
+
+    (event,) = events
+    if expect_user_info:
+        assert event["user"]["id"] == "42"
+        assert "REMOTE_ADDR" in event["request"]["env"]
+    else:
+        assert event.get("user", {}).get("id") is None
+        assert "env" not in event["request"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("init_kwargs, expect_user_info", QUART_USER_INFO_CASES)
+async def test_span_streaming_quart_auth_user_id_data_collection(
+    sentry_init,
+    capture_items,
+    init_kwargs,
+    expect_user_info,
+):
+    from quart_auth import AuthUser, login_user
+
+    kwargs = {k: v for k, v in init_kwargs.items() if k != "_experiments"}
+    sentry_init(
+        integrations=[quart_sentry.QuartIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        _experiments=init_kwargs.get("_experiments", {}),
+        **kwargs,
+    )
+    items = capture_items("span")
+
+    app = quart_app_factory()
+
+    @app.route("/login")
+    async def login():
+        login_user(AuthUser("42"))
+        return "ok"
+
+    client = app.test_client()
+    assert (await client.get("/login")).status_code == 200
+    assert (await client.get("/message")).status_code == 200
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 2
+
+    segment = spans[1]
+    if expect_user_info:
+        assert segment["attributes"]["user.id"] == "42"
+    else:
+        assert "user.id" not in segment.get("attributes", {})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("init_kwargs, expect_user_info", QUART_USER_INFO_CASES)
+async def test_span_streaming_request_attributes_data_collection(
+    sentry_init, capture_items, init_kwargs, expect_user_info
+):
+    kwargs = {k: v for k, v in init_kwargs.items() if k != "_experiments"}
+    sentry_init(
+        integrations=[quart_sentry.QuartIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        _experiments=init_kwargs.get("_experiments", {}),
+        **kwargs,
+    )
+    items = capture_items("span")
+
+    app = quart_app_factory()
+    client = app.test_client()
+    response = await client.get("/message")
+    assert response.status_code == 200
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
+
+    segment = spans[0]
+    if expect_user_info:
+        assert "client.address" in segment["attributes"]
+        assert "user.ip_address" in segment["attributes"]
+    else:
+        assert "client.address" not in segment["attributes"]
+        assert "user.ip_address" not in segment["attributes"]
+
+
 @pytest.mark.asyncio
 async def test_span_streaming_sensitive_header_passthrough_with_pii_and_no_data_collection(
     sentry_init, capture_items
