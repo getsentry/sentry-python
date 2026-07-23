@@ -357,8 +357,14 @@ def retrieve_user_from_scope(scope: "LitestarScope") -> "Optional[dict[str, Any]
 @ensure_integration_enabled(LitestarIntegration)
 def exception_handler(exc: Exception, scope: "LitestarScope") -> None:
     user_info: "Optional[dict[str, Any]]" = None
-    if should_send_default_pii():
+    client_options = sentry_sdk.get_client().options
+
+    if has_data_collection_enabled(client_options):
+        if client_options["data_collection"]["user_info"]:
+            user_info = retrieve_user_from_scope(scope)
+    elif should_send_default_pii():
         user_info = retrieve_user_from_scope(scope)
+
     if user_info and isinstance(user_info, dict):
         sentry_scope = sentry_sdk.get_isolation_scope()
         sentry_scope.set_user(user_info)

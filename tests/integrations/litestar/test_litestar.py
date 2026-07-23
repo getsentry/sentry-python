@@ -19,6 +19,7 @@ from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.integrations.litestar import LitestarIntegration
 from tests.conftest import ApproxDict
 from tests.integrations.conftest import parametrize_test_configurable_status_codes
+from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
 
 
 def litestar_app_factory(middleware=None, debug=True, exception_handlers=None):
@@ -611,24 +612,15 @@ def test_span_origin(
             assert span["origin"] == "auto.http.litestar"
 
 
-@pytest.mark.parametrize(
-    "is_send_default_pii",
-    [
-        True,
-        False,
-    ],
-    ids=[
-        "send_default_pii=True",
-        "send_default_pii=False",
-    ],
-)
+@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_litestar_scope_user_on_exception_event(
     sentry_init,
     capture_exceptions,
     capture_events,
     capture_items,
-    is_send_default_pii,
+    init_kwargs,
+    expect_user,
     span_streaming,
 ):
     class TestUserMiddleware(AbstractMiddleware):
@@ -642,8 +634,8 @@ def test_litestar_scope_user_on_exception_event(
 
     sentry_init(
         integrations=[LitestarIntegration()],
-        send_default_pii=is_send_default_pii,
         trace_lifecycle="stream" if span_streaming else "static",
+        **init_kwargs,
     )
 
     litestar_app = litestar_app_factory(middleware=[TestUserMiddleware])
@@ -673,7 +665,7 @@ def test_litestar_scope_user_on_exception_event(
         assert len(events) == 1
         (event,) = events
 
-    if is_send_default_pii:
+    if expect_user:
         assert "user" in event
         assert event["user"] == {
             "email": "lennon@thebeatles.com",

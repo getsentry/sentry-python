@@ -13,6 +13,7 @@ import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.integrations.starlite import StarliteIntegration
+from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
 
 
 def starlite_app_factory(middleware=None, debug=True, exception_handlers=None):
@@ -525,19 +526,9 @@ def test_span_origin(sentry_init, capture_events, capture_items, span_streaming)
             assert span["origin"] == "auto.http.starlite"
 
 
-@pytest.mark.parametrize(
-    "is_send_default_pii",
-    [
-        True,
-        False,
-    ],
-    ids=[
-        "send_default_pii=True",
-        "send_default_pii=False",
-    ],
-)
+@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
 def test_starlite_scope_user_on_exception_event(
-    sentry_init, capture_exceptions, capture_events, is_send_default_pii
+    sentry_init, capture_exceptions, capture_events, init_kwargs, expect_user
 ):
     class TestUserMiddleware(AbstractMiddleware):
         async def __call__(self, scope, receive, send):
@@ -548,9 +539,7 @@ def test_starlite_scope_user_on_exception_event(
             }
             await self.app(scope, receive, send)
 
-    sentry_init(
-        integrations=[StarliteIntegration()], send_default_pii=is_send_default_pii
-    )
+    sentry_init(integrations=[StarliteIntegration()], **init_kwargs)
     starlite_app = starlite_app_factory(middleware=[TestUserMiddleware])
     exceptions = capture_exceptions()
     events = capture_events()
@@ -566,7 +555,7 @@ def test_starlite_scope_user_on_exception_event(
     assert len(events) == 1
     (event,) = events
 
-    if is_send_default_pii:
+    if expect_user:
         assert "user" in event
         assert event["user"] == {
             "email": "lennon@thebeatles.com",
