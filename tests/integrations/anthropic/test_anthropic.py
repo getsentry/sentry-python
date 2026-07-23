@@ -4219,7 +4219,7 @@ def test_exception_message_create(
                 max_tokens=1024,
             )
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
         assert event["level"] == "error"
     elif stream_gen_ai_spans:
         items = capture_items("event", "transaction")
@@ -4469,7 +4469,7 @@ async def test_exception_message_create_async(
                 max_tokens=1024,
             )
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
         assert event["level"] == "error"
     elif stream_gen_ai_spans:
         items = capture_items("event", "transaction")
@@ -4772,7 +4772,7 @@ def test_anthropic_message_role_mapping(
             )
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
 
         # Verify that the span was created correctly
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
@@ -7467,7 +7467,7 @@ def test_cache_tokens_nonstreaming(
             )
 
         sentry_sdk.flush()
-        (span,) = (item.payload for item in items if item.type == "span")
+        (span,) = (item.payload for item in items)
         # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 50
@@ -7550,7 +7550,7 @@ def test_input_tokens_include_cache_write_nonstreaming(
             )
 
         sentry_sdk.flush()
-        (span,) = (item.payload for item in items if item.type == "span")
+        (span,) = (item.payload for item in items)
 
         # input_tokens should be total: 19 (non-cached) + 2846 (cache_write) = 2865
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
@@ -7736,7 +7736,7 @@ def test_input_tokens_include_cache_read_streaming(
                 pass
 
         sentry_sdk.flush()
-        (span,) = (item.payload for item in items if item.type == "span")
+        (span,) = (item.payload for item in items)
 
         # input_tokens should be total: 19 + 2846 = test_stream_messages_input_tokens_include_cache_read_streaming
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
@@ -7839,7 +7839,7 @@ def test_stream_messages_input_tokens_include_cache_read_streaming(
                 pass
 
         sentry_sdk.flush()
-        (span,) = (item.payload for item in items if item.type == "span")
+        (span,) = (item.payload for item in items)
 
         # input_tokens should be total: 19 + 2846 = 2865
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 2865
@@ -7922,7 +7922,7 @@ def test_input_tokens_unchanged_without_caching(
             )
 
         sentry_sdk.flush()
-        (span,) = (item.payload for item in items if item.type == "span")
+        (span,) = (item.payload for item in items)
 
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 20
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 32  # 20 + 12
@@ -8009,7 +8009,7 @@ def test_cache_tokens_streaming(
                 pass
 
         sentry_sdk.flush()
-        (span,) = (item.payload for item in items if item.type == "span")
+        (span,) = (item.payload for item in items)
         # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
@@ -8107,7 +8107,7 @@ def test_stream_messages_cache_tokens(
                 pass
 
         sentry_sdk.flush()
-        (span,) = (item.payload for item in items if item.type == "span")
+        (span,) = (item.payload for item in items)
         # input_tokens normalized: 100 + 80 (cache_read) + 20 (cache_write) = 200
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 200
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10

@@ -409,7 +409,7 @@ def test_generate_content_with_system_instruction(
             )
 
         sentry_sdk.flush()
-        invoke_span = next(item.payload for item in items if item.type == "span")
+        invoke_span = next(item.payload for item in items)
 
         if expected_texts is None:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in invoke_span["attributes"]
@@ -528,7 +528,7 @@ def test_generate_content_with_tools(
             )
 
         sentry_sdk.flush()
-        invoke_span = next(item.payload for item in items if item.type == "span")
+        invoke_span = next(item.payload for item in items)
 
         # Check that tools are recorded (data is serialized as a string)
         tools_data_str = invoke_span["attributes"][
@@ -616,7 +616,7 @@ def test_tool_execution(
         spans = [item.payload for item in items]
         assert len(spans) == 1
         sentry_sdk.flush()
-        tool_span = next(item.payload for item in items if item.type == "span")
+        tool_span = next(item.payload for item in items)
 
         assert tool_span["attributes"]["sentry.op"] == OP.GEN_AI_EXECUTE_TOOL
         assert tool_span["name"] == "execute_tool get_weather"
@@ -678,7 +678,7 @@ def test_error_handling(
                 config=create_test_config(),
             )
 
-        (error_event,) = (item.payload for item in items if item.type == "event")
+        (error_event,) = (item.payload for item in items)
     else:
         events = capture_events()
 
@@ -816,7 +816,7 @@ def test_streaming_generate_content(
         spans = [item.payload for item in items]
         assert len(spans) == 1
         sentry_sdk.flush()
-        chat_span = next(item.payload for item in items if item.type == "span")
+        chat_span = next(item.payload for item in items)
 
         assert json.loads(
             chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
@@ -1037,7 +1037,7 @@ def test_response_without_usage_metadata(
             )
 
         sentry_sdk.flush()
-        chat_span = next(item.payload for item in items if item.type == "span")
+        chat_span = next(item.payload for item in items)
 
         # Usage data should not be present
         assert SPANDATA.GEN_AI_USAGE_INPUT_TOKENS not in chat_span["attributes"]
@@ -1121,7 +1121,7 @@ def test_multiple_candidates(
             )
 
         sentry_sdk.flush()
-        chat_span = next(item.payload for item in items if item.type == "span")
+        chat_span = next(item.payload for item in items)
 
         # Should capture all responses
         # Response text is stored as a JSON string when there are multiple responses
@@ -1212,7 +1212,7 @@ def test_all_configuration_parameters(
             )
 
         sentry_sdk.flush()
-        invoke_span = next(item.payload for item in items if item.type == "span")
+        invoke_span = next(item.payload for item in items)
 
         # Check all parameters are recorded
         assert invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.8
@@ -1363,7 +1363,7 @@ def test_response_with_different_id_fields(
             )
 
         sentry_sdk.flush()
-        chat_span = next(item.payload for item in items if item.type == "span")
+        chat_span = next(item.payload for item in items)
 
         assert chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_ID] == "resp-456"
         assert (
@@ -1442,7 +1442,7 @@ def test_contents_as_none(
             )
 
         sentry_sdk.flush()
-        invoke_span = next(item.payload for item in items if item.type == "span")
+        invoke_span = next(item.payload for item in items)
 
         # Should handle None contents gracefully
         messages = invoke_span["attributes"].get(SPANDATA.GEN_AI_REQUEST_MESSAGES, [])
@@ -1535,7 +1535,7 @@ def test_tool_calls_extraction(
 
         sentry_sdk.flush()
         chat_span = next(
-            item.payload for item in items if item.type == "span"
+            item.payload for item in items
         )  # The chat span
 
         # Check that tool calls are extracted and stored
@@ -1954,7 +1954,7 @@ def test_embed_content_error_handling(
                 contents=["This will fail"],
             )
 
-        (error_event,) = (item.payload for item in items if item.type == "event")
+        (error_event,) = (item.payload for item in items)
     else:
         events = capture_events()
 
@@ -2431,7 +2431,7 @@ async def test_async_embed_content_error_handling(
                 contents=["This will fail"],
             )
 
-        (error_event,) = (item.payload for item in items if item.type == "event")
+        (error_event,) = (item.payload for item in items)
     else:
         events = capture_events()
 
@@ -2653,7 +2653,7 @@ def test_generate_content_with_content_object(
             )
 
         sentry_sdk.flush()
-        invoke_span = next(item.payload for item in items if item.type == "span")
+        invoke_span = next(item.payload for item in items)
 
         messages = json.loads(
             invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
@@ -2715,7 +2715,7 @@ def test_generate_content_with_dict_format(
             )
 
         sentry_sdk.flush()
-        invoke_span = next(item.payload for item in items if item.type == "span")
+        invoke_span = next(item.payload for item in items)
 
         messages = json.loads(
             invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
@@ -2786,7 +2786,7 @@ def test_generate_content_with_file_data(
             )
 
         sentry_sdk.flush()
-        invoke_span = next(item.payload for item in items if item.type == "span")
+        invoke_span = next(item.payload for item in items)
 
         messages = json.loads(
             invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
@@ -2862,7 +2862,7 @@ def test_generate_content_with_inline_data(
             )
 
         sentry_sdk.flush()
-        invoke_span = next(item.payload for item in items if item.type == "span")
+        invoke_span = next(item.payload for item in items)
 
         messages = json.loads(
             invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
@@ -3028,7 +3028,7 @@ def test_generate_content_with_part_object_directly(
             )
 
         sentry_sdk.flush()
-        invoke_span = next(item.payload for item in items if item.type == "span")
+        invoke_span = next(item.payload for item in items)
 
         messages = json.loads(
             invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
@@ -3138,7 +3138,7 @@ def test_generate_content_with_dict_inline_data(
             )
 
         sentry_sdk.flush()
-        invoke_span = next(item.payload for item in items if item.type == "span")
+        invoke_span = next(item.payload for item in items)
 
         messages = json.loads(
             invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
@@ -3206,7 +3206,7 @@ def test_generate_content_without_parts_property_inline_data(
             )
 
         sentry_sdk.flush()
-        invoke_span = next(item.payload for item in items if item.type == "span")
+        invoke_span = next(item.payload for item in items)
 
         messages = json.loads(
             invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
@@ -3281,7 +3281,7 @@ def test_generate_content_without_parts_property_inline_data_and_binary_data_wit
             )
 
         sentry_sdk.flush()
-        invoke_span = next(item.payload for item in items if item.type == "span")
+        invoke_span = next(item.payload for item in items)
 
         messages = json.loads(
             invoke_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]

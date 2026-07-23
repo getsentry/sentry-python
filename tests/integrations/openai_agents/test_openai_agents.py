@@ -853,7 +853,7 @@ async def test_client_span_custom_model(
             assert result.final_output == "Hello, how can I help you?"
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         ai_client_span = next(
             span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
         )

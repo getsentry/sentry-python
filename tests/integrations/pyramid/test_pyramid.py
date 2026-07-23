@@ -587,7 +587,7 @@ def test_span_sets_user_id_on_segment(
     client.get("/message")
 
     sentry_sdk.flush()
-    spans = [i.payload for i in items if i.type == "span"]
+    spans = [i.payload for i in items]
 
     assert len(spans) == 1
     (segment,) = spans

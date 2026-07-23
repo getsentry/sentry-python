@@ -174,7 +174,7 @@ def test_nonstreaming_chat_completion_no_prompts(
 
         assert response == "the model response"
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
@@ -372,7 +372,7 @@ def test_nonstreaming_chat_completion(
 
         assert response == "the model response"
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
@@ -510,7 +510,7 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
 
         assert response == "the model response"
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
@@ -703,7 +703,7 @@ async def test_nonstreaming_chat_completion_async(
 
         assert response == "the model response"
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
@@ -893,7 +893,7 @@ def test_streaming_chat_completion_no_prompts(
 
         assert response_string == "hello world"
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
@@ -1058,7 +1058,7 @@ def test_streaming_chat_completion_with_usage_in_stream(
                 pass
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
         assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
         assert span["attributes"]["gen_ai.usage.output_tokens"] == 10
@@ -1153,7 +1153,7 @@ def test_streaming_chat_completion_empty_content_preserves_token_usage(
                 pass
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
         assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
         assert "gen_ai.usage.output_tokens" not in span["attributes"]
@@ -1252,7 +1252,7 @@ async def test_streaming_chat_completion_empty_content_preserves_token_usage_asy
                 pass
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
         assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
         assert "gen_ai.usage.output_tokens" not in span["attributes"]
@@ -1370,7 +1370,7 @@ async def test_streaming_chat_completion_async_with_usage_in_stream(
                 pass
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
         assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
         assert span["attributes"]["gen_ai.usage.output_tokens"] == 10
@@ -1586,7 +1586,7 @@ def test_streaming_chat_completion(
             )
         assert response_string == "hello world"
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
@@ -1805,7 +1805,7 @@ async def test_streaming_chat_completion_async_no_prompts(
 
         assert response_string == "hello world"
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
@@ -2082,7 +2082,7 @@ async def test_streaming_chat_completion_async(
 
         assert response_string == "hello world"
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
@@ -2428,7 +2428,7 @@ def test_embeddings_create_no_pii(
         assert len(response.data[0].embedding) == 3
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.embeddings"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert (
@@ -2577,7 +2577,7 @@ def test_embeddings_create(
         assert len(response.data[0].embedding) == 3
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.embeddings"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert (
@@ -2672,7 +2672,7 @@ async def test_embeddings_create_async_no_pii(
         assert len(response.data[0].embedding) == 3
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.embeddings"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert (
@@ -2822,7 +2822,7 @@ async def test_embeddings_create_async(
         assert len(response.data[0].embedding) == 3
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.embeddings"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert (
@@ -4358,7 +4358,7 @@ def test_responses_api_conversation_id(
             )
 
         sentry_sdk.flush()
-        (span,) = (item.payload for item in items if item.type == "span")
+        (span,) = (item.payload for item in items)
 
         if expected_id is None:
             assert "gen_ai.conversation.id" not in span["attributes"]
@@ -5320,7 +5320,7 @@ def test_streaming_responses_api(
         assert response_string == "hello world"
 
         sentry_sdk.flush()
-        (span,) = (item.payload for item in items if item.type == "span")
+        (span,) = (item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.responses"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
@@ -5448,7 +5448,7 @@ async def test_streaming_responses_api_async(
         assert response_string == "hello world"
 
         sentry_sdk.flush()
-        (span,) = (item.payload for item in items if item.type == "span")
+        (span,) = (item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.responses"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
@@ -5566,7 +5566,7 @@ def test_empty_tools_in_chat_completion(
             )
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
 
         assert "gen_ai.request.available_tools" not in span["attributes"]
     else:
@@ -5648,7 +5648,7 @@ def test_openai_message_role_mapping(
 
         # Verify that the span was created correctly
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
 
@@ -5812,7 +5812,7 @@ def test_streaming_chat_completion_ttft(
                 pass
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
 
         # Verify TTFT is captured
@@ -5927,7 +5927,7 @@ async def test_streaming_chat_completion_ttft_async(
                 pass
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
 
         # Verify TTFT is captured
@@ -6009,7 +6009,7 @@ def test_streaming_responses_api_ttft(
                 pass
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.responses"
 
         # Verify TTFT is captured
@@ -6093,7 +6093,7 @@ async def test_streaming_responses_api_ttft_async(
                 pass
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.responses"
 
         # Verify TTFT is captured

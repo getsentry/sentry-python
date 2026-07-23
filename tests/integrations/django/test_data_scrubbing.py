@@ -39,7 +39,7 @@ def test_scrub_django_session_cookies_removed(
     werkzeug_set_cookie(client, "localhost", "foo", "bar")
     client.get(reverse("view_exc"))
 
-    (event,) = (item.payload for item in items if item.type == "event")
+    (event,) = (item.payload for item in items)
     assert "cookies" not in event["request"]
 
 
@@ -63,7 +63,7 @@ def test_scrub_django_session_cookies_filtered(
     werkzeug_set_cookie(client, "localhost", "foo", "bar")
     client.get(reverse("view_exc"))
 
-    (event,) = (item.payload for item in items if item.type == "event")
+    (event,) = (item.payload for item in items)
     assert event["request"]["cookies"] == {
         "sessionid": "[Filtered]",
         "csrftoken": "[Filtered]",
@@ -95,7 +95,7 @@ def test_scrub_django_custom_session_cookies_filtered(
     werkzeug_set_cookie(client, "localhost", "foo", "bar")
     client.get(reverse("view_exc"))
 
-    (event,) = (item.payload for item in items if item.type == "event")
+    (event,) = (item.payload for item in items)
     assert event["request"]["cookies"] == {
         "my_sess": "[Filtered]",
         "csrf_secret": "[Filtered]",
@@ -185,7 +185,7 @@ def test_data_collection_cookies(
         werkzeug_set_cookie(client, "localhost", name, value)
     client.get(reverse("view_exc"))
 
-    (event,) = (item.payload for item in items if item.type == "event")
+    (event,) = (item.payload for item in items)
     if expected_cookies is None:
         assert "cookies" not in event["request"]
     else:
@@ -210,7 +210,7 @@ def test_data_collection_cookies_precedence_over_send_default_pii(
     werkzeug_set_cookie(client, "localhost", "foo", "bar")
     client.get(reverse("view_exc"))
 
-    (event,) = (item.payload for item in items if item.type == "event")
+    (event,) = (item.payload for item in items)
     assert event["request"]["cookies"] == {
         "sessionid": "[Filtered]",
         "csrftoken": "[Filtered]",

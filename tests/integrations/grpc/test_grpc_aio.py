@@ -262,7 +262,7 @@ async def test_grpc_server_exception(
         except Exception:
             pass
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
 
