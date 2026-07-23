@@ -87,8 +87,8 @@ def test_basic_span_streaming(sentry_init, capture_items, sample_rate):
 
         assert span2["status"] == "ok"
         assert span2["name"] == "bar"
-        assert span1["attributes"]["sentry.segment.id"] == parent_span["span_id"]
-        assert span1["attributes"]["sentry.segment.name"] == "hi"
+        assert span2["attributes"]["sentry.segment.id"] == parent_span["span_id"]
+        assert span2["attributes"]["sentry.segment.name"] == "hi"
     else:
         assert not items
 
@@ -203,75 +203,108 @@ def test_continue_trace_span_streaming(
     )
     items = capture_items()
 
-    # make a parent segment (normally this would be in a different service)
-    with sentry_sdk.traces.start_span(name="hi", parent_span=None):
-        with sentry_sdk.traces.start_span(name="hey") as old_span:
-            headers = dict(
-                sentry_sdk.get_current_scope().iter_trace_propagation_headers(old_span)
-            )
-            headers["baggage"] = (
-                "other-vendor-value-1=foo;bar;baz,"
-                "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
-                "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
-                "sentry-sample_rate=0.01337,"
-                "sentry-user_id=Amelie,"
-                "sentry-sample_rand=0.250000,"
-                "other-vendor-value-2=foo;bar;"
-            )
+    # Simulate incoming headers from another service.
+    # We construct the sentry-trace header manually because StreamedSpan.sampled
+    # is always True (and NoOpStreamedSpan.sampled is always False), so we can't
+    # vary parent_sampled by generating headers from a real span.
+    trace_id = "771a43a4192642f0b136d5159a501700"
+    parent_span_id = "1234567890abcdef"
+
+    sampled_flag = ""
+    if parent_sampled is True:
+        sampled_flag = "-1"
+    elif parent_sampled is False:
+        sampled_flag = "-0"
+
+    headers = {
+        "sentry-trace": f"{trace_id}-{parent_span_id}{sampled_flag}",
+        "baggage": (
+            "other-vendor-value-1=foo;bar;baz,"
+            f"sentry-trace_id={trace_id},"
+            "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
+            "sentry-sample_rate=0.01337,"
+            "sentry-user_id=Amelie,"
+            "sentry-sample_rand=0.250000,"
+            "other-vendor-value-2=foo;bar;"
+        ),
+    }
 
     # child segment, to prove that we can read 'sentry-trace' header data correctly
     sentry_sdk.traces.continue_trace(headers)
-    child_segment = sentry_sdk.traces.start_span(name="WRONG")
-    assert child_segment is not None
-    assert child_segment._parent_sampled == parent_sampled
-    assert child_segment.trace_id == old_span.trace_id
-    assert child_segment._parent_span_id == old_span.span_id
-    assert child_segment.span_id != old_span.span_id
 
-    baggage = child_segment._baggage
-    assert baggage
-    assert not baggage.mutable
-    assert baggage.sentry_items == {
-        "public_key": "49d0f7386ad645858ae85020e393bef3",
-        "trace_id": "771a43a4192642f0b136d5159a501700",
-        "user_id": "Amelie",
-        "sample_rand": "0.250000",
-        "sample_rate": "0.01337",
-    }
+    with sentry_sdk.traces.start_span(name="WRONG") as child_segment:
+        assert child_segment is not None
+        assert child_segment._parent_sampled == parent_sampled
+        assert child_segment.trace_id == trace_id
+        assert child_segment._parent_span_id == parent_span_id
+        assert child_segment.span_id != parent_span_id
 
-    # change the transaction name from "WRONG" to make sure the change
-    # is reflected in the final data
-    sentry_sdk.get_current_scope().transaction = "ho"
-    capture_message("hello")
+        baggage = child_segment._baggage
+        assert baggage
+        assert not baggage.mutable
 
-    if parent_sampled is False or (sample_rate == 0 and parent_sampled is None):
-        # in this case the child transaction won't be captured
-        trace1, message = [item.payload for item in items]
+        # When parent_sampled is None, the SDK falls back to the client's
+        # traces_sample_rate and _update_sample_rate mutates the baggage's
+        # sample_rate. When parent_sampled is set, the baggage sample_rate
+        # from the incoming header (0.01337) is used as-is.
+        if parent_sampled is not None:
+            expected_sample_rate = "0.01337"
+        else:
+            expected_sample_rate = str(sample_rate)
 
-        assert trace1["transaction"] == "hi"
+        assert baggage.sentry_items == {
+            "public_key": "49d0f7386ad645858ae85020e393bef3",
+            "trace_id": trace_id,
+            "user_id": "Amelie",
+            "sample_rand": "0.250000",
+            "sample_rate": expected_sample_rate,
+        }
+
+        # change the segment name from "WRONG" to make sure the change
+        # is reflected in the final data
+        child_segment.name = "ho"
+        capture_message("hello")
+
+    sentry_sdk.flush()
+
+    # In streaming mode, sampling uses sample_rate and sample_rand, not
+    # parent_sampled directly. With baggage sample_rate=0.01337 and
+    # sample_rand=0.250000, the child is only sampled when parent_sampled
+    # is None (falls back to client's traces_sample_rate) and that rate > 0.
+    child_sampled = parent_sampled is None and sample_rate > 0
+
+    if not child_sampled:
+        # the child segment won't be captured
+        messages = [item for item in items if item.type != "span"]
+        assert len(messages) == 1
+        assert messages[0].payload["message"] == "hello"
     else:
-        trace1, message, trace2 = [item.payload for item in items]
+        spans = [item for item in items if item.type == "span"]
+        messages = [item for item in items if item.type != "span"]
 
-        assert trace1["attributes"]["sentry.segment.name"] == "hi"
-        assert trace2["attributes"]["sentry.segment.name"] == "ho"
+        assert len(spans) == 1
+        assert len(messages) == 1
+
+        child_span_payload = spans[0].payload
+        message_payload = messages[0].payload
+
+        assert child_span_payload["attributes"]["sentry.segment.name"] == "ho"
 
         assert (
-            trace1["trace_id"]
-            == trace2["trace_id"]
+            child_span_payload["trace_id"]
             == child_segment.trace_id
-            == message["contexts"]["trace"]["trace_id"]
+            == message_payload["contexts"]["trace"]["trace_id"]
         )
 
-        assert trace2.headers["trace"] == baggage.dynamic_sampling_context()
-        assert trace2.headers["trace"] == {
+        assert baggage.dynamic_sampling_context() == {
             "public_key": "49d0f7386ad645858ae85020e393bef3",
-            "trace_id": "771a43a4192642f0b136d5159a501700",
+            "trace_id": trace_id,
             "user_id": "Amelie",
             "sample_rand": "0.250000",
             "sample_rate": str(sample_rate),
         }
 
-    assert message["message"] == "hello"
+        assert message_payload["message"] == "hello"
 
 
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])
@@ -359,18 +392,19 @@ def test_dynamic_sampling_head_sdk_creates_dsc_span_streaming(
     )
     envelopes = capture_envelopes()
 
-    # make sure transaction is sampled for both cases
+    # make sure segment is sampled for both cases
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=250000):
         sentry_sdk.traces.new_trace()
-        segment = sentry_sdk.traces.start_span(name="Head SDK segment")
+        with sentry_sdk.traces.start_span(name="Head SDK segment") as segment:
+            baggage = segment._baggage
+            assert baggage is None
 
-    baggage = segment._baggage
-    assert baggage is None
+            with sentry_sdk.traces.start_span(name="foo"):
+                pass
 
-    with start_span(name="foo"):
-        pass
+    sentry_sdk.flush()
 
-    # finish will create a new baggage entry
+    # flush triggers the batcher which populates _baggage via _get_baggage()
     baggage = segment._baggage
     trace_id = segment.trace_id
 
@@ -383,7 +417,7 @@ def test_dynamic_sampling_head_sdk_creates_dsc_span_streaming(
         "sample_rate": str(sample_rate),
         "sampled": "true" if segment.sampled else "false",
         "sample_rand": "0.250000",
-        "transaction": "Head SDK tx",
+        "transaction": "Head SDK segment",
         "trace_id": trace_id,
     }
 
@@ -392,7 +426,7 @@ def test_dynamic_sampling_head_sdk_creates_dsc_span_streaming(
         "sentry-sample_rand=0.250000,"
         "sentry-environment=production,"
         "sentry-release=foo,"
-        f"sentry-transaction=Head%%20SDK%%20tx,"
+        "sentry-transaction=Head%20SDK%20segment,"
         f"sentry-sample_rate={sample_rate},"
         f"sentry-sampled={'true' if segment.sampled else 'false'}"
     )
