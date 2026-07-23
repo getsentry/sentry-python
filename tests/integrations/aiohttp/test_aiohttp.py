@@ -26,6 +26,7 @@ from sentry_sdk.integrations.aiohttp import (
 )
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 from tests.conftest import ApproxDict
+from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
 
 
 @pytest.mark.asyncio
@@ -1209,6 +1210,43 @@ async def test_tracing_span_streaming(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
+async def test_user_address_with_data_collection_and_span_streaming(
+    sentry_init, aiohttp_client, capture_items, init_kwargs, expect_ip
+):
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+
+    async def hello(request):
+        return web.Response(text="hello")
+
+    app = web.Application()
+    app.router.add_get("/", hello)
+
+    items = capture_items("span")
+
+    client = await aiohttp_client(app)
+    resp = await client.get("/")
+    assert resp.status == 200
+
+    sentry_sdk.flush()
+
+    (server_span,) = [item.payload for item in items]
+    assert server_span["attributes"]["sentry.origin"] == "auto.http.aiohttp"
+
+    if expect_ip:
+        assert server_span["attributes"]["client.address"] == "127.0.0.1"
+        assert server_span["attributes"]["user.ip_address"] == "127.0.0.1"
+    else:
+        assert "client.address" not in server_span["attributes"]
+        assert "user.ip_address" not in server_span["attributes"]
+
+
+@pytest.mark.asyncio
 async def test_sensitive_header_scrubbing_span_streaming(
     sentry_init, aiohttp_client, capture_items
 ):
@@ -1419,16 +1457,6 @@ async def test_sensitive_header_passthrough_with_pii_span_streaming(
             server_span["attributes"]["http.request.header.cookie"]
             == expected["cookie"]
         )
-
-    # client.address and user.ip_address is captured under send_default_pii=True.
-    # TODO: This block will eventually need to be removed from this test into a separate
-    # test once data collection gating is introduced on these values
-    if options["send_default_pii"]:
-        assert server_span["attributes"]["client.address"] == "127.0.0.1"
-        assert server_span["attributes"]["user.ip_address"] == "127.0.0.1"
-    else:
-        assert "user.ip_address" not in server_span["attributes"]
-        assert "client.address" not in server_span["attributes"]
 
 
 @pytest.mark.asyncio

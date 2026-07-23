@@ -165,6 +165,8 @@ class AioHttpIntegration(Integration):
                             )
 
                         url_attributes = {}
+                        client_address_attributes = {}
+
                         if has_data_collection_enabled(client.options):
                             url_attributes["url.full"] = "%s://%s%s" % (
                                 request.scheme,
@@ -188,6 +190,15 @@ class AioHttpIntegration(Integration):
                                         "?" + filtered_query_string
                                     )
 
+                            if request.remote:
+                                if client.options["data_collection"]["user_info"]:
+                                    client_address_attributes["client.address"] = (
+                                        request.remote
+                                    )
+                                    scope.set_attribute(
+                                        SPANDATA.USER_IP_ADDRESS, request.remote
+                                    )
+
                         elif should_send_default_pii():
                             url_full = "%s://%s%s" % (
                                 request.scheme,
@@ -201,12 +212,13 @@ class AioHttpIntegration(Integration):
                             url_attributes["url.full"] = url_full
                             url_attributes["url.path"] = request.path
 
-                        client_address_attributes = {}
-                        if should_send_default_pii() and request.remote:
-                            client_address_attributes["client.address"] = request.remote
-                            scope.set_attribute(
-                                SPANDATA.USER_IP_ADDRESS, request.remote
-                            )
+                            if request.remote:
+                                client_address_attributes["client.address"] = (
+                                    request.remote
+                                )
+                                scope.set_attribute(
+                                    SPANDATA.USER_IP_ADDRESS, request.remote
+                                )
 
                         span_ctx = sentry_sdk.traces.start_span(
                             # If this name makes it to the UI, AIOHTTP's URL
