@@ -44,7 +44,7 @@ def test_deterministic_sampled_span_streaming(
     """
     sentry_init(
         traces_sample_rate=sample_rate,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -56,6 +56,8 @@ def test_deterministic_sampled_span_streaming(
             assert (
                 span._get_baggage().sentry_items["sample_rand"] == f"{sample_rand:.6f}"  # noqa: E231
             )
+
+    sentry_sdk.flush()
 
     # Span captured if sample_rand < sample_rate, indicating that
     # sample_rand is used to make the sampling decision.
@@ -88,7 +90,7 @@ def test_transaction_uses_incoming_sample_rand(
 
 @pytest.mark.parametrize("sample_rand", (0.0, 0.25, 0.5, 0.75))
 @pytest.mark.parametrize("sample_rate", (0.0, 0.25, 0.5, 0.75, 1.0))
-def test_transaction_uses_incoming_sample_rand_span_streaming(
+def test_segment_uses_incoming_sample_rand_span_streaming(
     sentry_init, capture_items, sample_rate, sample_rand
 ):
     """
@@ -96,18 +98,23 @@ def test_transaction_uses_incoming_sample_rand_span_streaming(
     """
     sentry_init(
         traces_sample_rate=sample_rate,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items()
 
     sentry_sdk.traces.continue_trace(
-        {"baggage": f"sentry-sample_rand={sample_rand:.6f}"}
+        {
+            "sentry-trace": "0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331",
+            "baggage": f"sentry-sample_rand={sample_rand:.6f}",
+        }
     )
 
     with sentry_sdk.traces.start_span(name="span") as span:
         assert (
             span._get_baggage().sentry_items["sample_rand"] == f"{sample_rand:.6f}"  # noqa: E231
         )
+
+    sentry_sdk.flush()
 
     # Span captured if sample_rand < sample_rate, indicating that
     # sample_rand is used to make the sampling decision.
