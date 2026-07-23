@@ -886,8 +886,6 @@ def test_continue_trace_forces_new_traces_when_no_propagation_span_streaming(
 def test_continue_trace_forces_new_traces_when_no_propagation_with_new_trace_span_streaming(
     sentry_init,
 ):
-    """This is to make sure we don't have a long running trace because of TWP logic for the no propagation case."""
-
     sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
 
     sentry_sdk.traces.new_trace()
