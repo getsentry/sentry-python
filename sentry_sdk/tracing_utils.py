@@ -1575,20 +1575,6 @@ def add_sentry_baggage_to_headers(
     )
 
 
-def _get_effective_sample_rate(
-    client: "Any", propagation_context: "PropagationContext"
-) -> "Union[float, bool]":
-    if propagation_context.parent_sampled is not None:
-        propagation_context_sample_rate = propagation_context._sample_rate()
-
-        if propagation_context_sample_rate is not None:
-            return propagation_context_sample_rate
-        else:
-            return propagation_context.parent_sampled
-    else:
-        return client.options["traces_sample_rate"]
-
-
 def _make_sampling_decision(
     name: str,
     attributes: "Optional[Attributes]",
@@ -1651,13 +1637,15 @@ def _make_sampling_decision(
                 "[Tracing] traces_sampler raised; falling back to parent sample rate or traces_sample_rate",
                 exc_info=True,
             )
-            sample_rate = _get_effective_sample_rate(
-                client=client, propagation_context=propagation_context
-            )
+            if propagation_context.parent_sampled is not None:
+                sample_rate = propagation_context.parent_sampled
+            else:
+                sample_rate = client.options["traces_sample_rate"]
     else:
-        sample_rate = _get_effective_sample_rate(
-            client=client, propagation_context=propagation_context
-        )
+        if propagation_context.parent_sampled is not None:
+            sample_rate = propagation_context.parent_sampled
+        else:
+            sample_rate = client.options["traces_sample_rate"]
 
     # Validate whether the sample_rate we got is actually valid. Since
     # traces_sampler is user-provided, it could return anything.
