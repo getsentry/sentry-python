@@ -133,8 +133,16 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
             sentry_sdk.traces.continue_trace(dict(headers))
             scope.set_custom_sampling_context({"tornado_request": self.request})
 
-            if should_send_default_pii() and self.request.remote_ip:
-                scope.set_attribute(SPANDATA.USER_IP_ADDRESS, self.request.remote_ip)
+            if self.request.remote_ip:
+                if has_data_collection_enabled(client.options):
+                    if client.options["data_collection"]["user_info"]:
+                        scope.set_attribute(
+                            SPANDATA.USER_IP_ADDRESS, self.request.remote_ip
+                        )
+                elif should_send_default_pii():
+                    scope.set_attribute(
+                        SPANDATA.USER_IP_ADDRESS, self.request.remote_ip
+                    )
 
             span_ctx = sentry_sdk.traces.start_span(
                 name=_DEFAULT_ROOT_SPAN_NAME,
@@ -218,6 +226,10 @@ def _get_request_attributes(request: "Any") -> "Dict[str, Any]":
             f"{parsed_url.url}?{filtered_query}" if filtered_query else parsed_url.url
         )
 
+        if request.remote_ip:
+            if client_options["data_collection"]["user_info"]:
+                attributes[SPANDATA.CLIENT_ADDRESS] = request.remote_ip
+
     elif should_send_default_pii():
         attributes[SPANDATA.URL_FULL] = request.full_url()
         attributes["url.path"] = request.path
@@ -225,11 +237,11 @@ def _get_request_attributes(request: "Any") -> "Dict[str, Any]":
         if request.query:
             attributes[SPANDATA.URL_QUERY] = request.query
 
+        if request.remote_ip:
+            attributes[SPANDATA.CLIENT_ADDRESS] = request.remote_ip
+
     if request.protocol:
         attributes[SPANDATA.NETWORK_PROTOCOL_NAME] = request.protocol
-
-    if should_send_default_pii() and request.remote_ip:
-        attributes[SPANDATA.CLIENT_ADDRESS] = request.remote_ip
 
     with capture_internal_exceptions():
         raw_data = _get_tornado_request_data(request)
@@ -282,6 +294,7 @@ def _make_event_processor(
             event["transaction"] = transaction_from_function(method) or ""
             event["transaction_info"] = {"source": TransactionSource.COMPONENT}
 
+        client_options = sentry_sdk.get_client().options
         with capture_internal_exceptions():
             extractor = TornadoRequestExtractor(request)
             extractor.extract_into_event(event)
@@ -294,7 +307,6 @@ def _make_event_processor(
                 request.path,
             )
 
-            client_options = sentry_sdk.get_client().options
             if has_data_collection_enabled(client_options):
                 if request.query:
                     filtered_query = _apply_data_collection_filtering_to_query_string(
@@ -310,7 +322,16 @@ def _make_event_processor(
             request_info["env"] = {"REMOTE_ADDR": request.remote_ip}
             request_info["headers"] = _filter_headers(dict(request.headers))
 
-        if should_send_default_pii():
+        if has_data_collection_enabled(client_options):
+            if client_options["data_collection"]["user_info"]:
+                try:
+                    current_user = handler.current_user
+                except Exception:
+                    current_user = None
+
+                if current_user:
+                    event.setdefault("user", {}).setdefault("is_authenticated", True)
+        elif should_send_default_pii():
             try:
                 current_user = handler.current_user
             except Exception:
