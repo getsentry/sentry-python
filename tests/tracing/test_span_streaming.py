@@ -741,6 +741,37 @@ def test_continue_trace_unsampled(sentry_init, capture_items):
     assert len(spans) == 0
 
 
+def test_continue_trace_unsampled_respects_parent_decision(sentry_init, capture_items):
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={"trace_lifecycle": "stream"},
+    )
+
+    items = capture_items("span")
+
+    trace_id = "0af7651916cd43dd8448eb211c80319c"
+    parent_span_id = "b7ad6b7169203331"
+    sample_rand = "0.100000"
+    sampled = "0"
+
+    sentry_sdk.traces.continue_trace(
+        {
+            "sentry-trace": f"{trace_id}-{parent_span_id}-{sampled}",
+            "baggage": f"sentry-trace_id={trace_id},sentry-sample_rate=0.5,sentry-sample_rand={sample_rand}",
+        }
+    )
+
+    with sentry_sdk.traces.start_span(name="segment") as span:
+        ...
+
+    assert span.sampled is False
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    assert len(spans) == 0
+
+
 @pytest.mark.parametrize(
     ("sample_rand", "expected_sampled", "expected_outcome"),
     [

@@ -1579,12 +1579,15 @@ def _get_effective_sample_rate(
     client: "Any", propagation_context: "PropagationContext"
 ) -> "Union[float, bool]":
     if propagation_context.parent_sampled is not None:
-        propagation_context_sample_rate = propagation_context._sample_rate()
+        if propagation_context.parent_sampled:
+            propagation_context_sample_rate = propagation_context._sample_rate()
 
-        if propagation_context_sample_rate is not None:
-            return propagation_context_sample_rate
+            if propagation_context_sample_rate is not None:
+                return propagation_context_sample_rate
+            else:
+                return propagation_context.parent_sampled
         else:
-            return propagation_context.parent_sampled
+            return False
     else:
         return client.options["traces_sample_rate"]
 
