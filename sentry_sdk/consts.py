@@ -1758,7 +1758,7 @@ class ClientConstructor:
             trace propagation and for features like `strict_trace_continuation`.
 
         :param before_send_span: An optional function to modify spans before they're sent to Sentry.
-            Any modifications to the span in this function will be retained. Unlike ``before_send_log``
+            Modifications to the span's attributes and name will be retained. Unlike ``before_send_log``
             and ``before_send_metric``, spans cannot be dropped by returning None. Only works when
             ``trace_lifecycle="stream"`` is enabled.
 
