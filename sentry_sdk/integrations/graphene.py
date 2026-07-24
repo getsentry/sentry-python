@@ -9,6 +9,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    has_data_collection_enabled,
     package_version,
 )
 
@@ -109,12 +110,18 @@ def _patch_graphql() -> None:
 
 
 def _event_processor(event: "Event", hint: "Dict[str, Any]") -> "Event":
-    if should_send_default_pii():
+    client_options = sentry_sdk.get_client().options
+
+    if has_data_collection_enabled(client_options):
+        if client_options["data_collection"]["graphql"]["document"]:
+            request_info = event.setdefault("request", {})
+            request_info["api_target"] = "graphql"
+    elif should_send_default_pii():
         request_info = event.setdefault("request", {})
         request_info["api_target"] = "graphql"
-
-    elif event.get("request", {}).get("data"):
-        del event["request"]["data"]
+    else:
+        if event.get("request", {}).get("data"):
+            del event["request"]["data"]
 
     return event
 
@@ -144,9 +151,8 @@ def graphql_span(
         },
     )
 
-    is_span_streaming_enabled = has_span_streaming_enabled(
-        sentry_sdk.get_client().options
-    )
+    client_options = sentry_sdk.get_client().options
+    is_span_streaming_enabled = has_span_streaming_enabled(client_options)
 
     if is_span_streaming_enabled:
         if sentry_sdk.traces.get_current_span() is None:
@@ -154,7 +160,10 @@ def graphql_span(
             return
 
         additional_attributes = {}
-        if should_send_default_pii():
+        if has_data_collection_enabled(client_options):
+            if client_options["data_collection"]["graphql"]["document"]:
+                additional_attributes["graphql.document"] = source
+        elif should_send_default_pii():
             additional_attributes["graphql.document"] = source
 
         _graphql_span = sentry_sdk.traces.start_span(
@@ -169,8 +178,12 @@ def graphql_span(
     else:
         _graphql_span = sentry_sdk.start_span(op=op, name=operation_name)
 
-        if should_send_default_pii():
+        if has_data_collection_enabled(client_options):
+            if client_options["data_collection"]["graphql"]["document"]:
+                _graphql_span.set_data("graphql.document", source)
+        elif should_send_default_pii():
             _graphql_span.set_data("graphql.document", source)
+
         _graphql_span.set_data("graphql.operation.name", operation_name)
         _graphql_span.set_data("graphql.operation.type", operation_type)
 
