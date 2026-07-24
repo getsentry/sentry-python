@@ -499,6 +499,10 @@ def _set_completions_api_input_data(
     if top_p is not None and _is_given(top_p):
         set_on_span(SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
 
+    reasoning_level = kwargs.get("reasoning_effort")
+    if reasoning_level is not None and _is_given(reasoning_level):
+        set_on_span(SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL, reasoning_level)
+
     if (
         not should_send_default_pii()
         or not integration.include_prompts

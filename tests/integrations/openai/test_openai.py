@@ -5666,6 +5666,96 @@ def test_empty_tools_in_chat_completion(
         assert "gen_ai.request.available_tools" not in span["data"]
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+# Feature added in https://github.com/openai/openai-python/pull/1952
+@pytest.mark.skipif(
+    OPENAI_VERSION < (1, 58, 0),
+    reason="OpenAI versions <1.58.0 do not support the reasoning_effort parameter.",
+)
+@pytest.mark.parametrize(
+    "reasoning_effort,expected_level",
+    [
+        pytest.param(omit, None, id="omit"),
+        pytest.param(None, None, id="none"),
+        pytest.param("high", "high", id="high"),
+        pytest.param("minimal", "minimal", id="minimal"),
+    ],
+)
+def test_chat_completion_reasoning_level(
+    sentry_init,
+    capture_events,
+    capture_items,
+    reasoning_effort,
+    expected_level,
+    nonstreaming_chat_completions_model_response,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
+        )
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "system", "content": "hello"}],
+                reasoning_effort=reasoning_effort,
+            )
+
+        sentry_sdk.flush()
+        span = next(item.payload for item in items if item.type == "span")
+
+        if expected_level is None:
+            assert SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL not in span["attributes"]
+        else:
+            assert (
+                span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL]
+                == expected_level
+            )
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "system", "content": "hello"}],
+                reasoning_effort=reasoning_effort,
+            )
+
+        (event,) = events
+        span = event["spans"][0]
+
+        if expected_level is None:
+            assert SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL not in span["data"]
+        else:
+            assert (
+                span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == expected_level
+            )
+
+
 # Test messages with mixed roles including "ai" that should be mapped to "assistant"
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
