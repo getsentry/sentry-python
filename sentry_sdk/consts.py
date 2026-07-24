@@ -695,6 +695,12 @@ class SPANDATA:
     Example: 0.1
     """
 
+    GEN_AI_REQUEST_REASONING_LEVEL = "gen_ai.request.reasoning_level"
+    """
+    The reasoning or thinking effort level requested for a GenAI model.
+    Example: "high"
+    """
+
     GEN_AI_REQUEST_SEED = "gen_ai.request.seed"
     """
     The seed, ideally models given the same seed and same other parameters will produce the exact same output.

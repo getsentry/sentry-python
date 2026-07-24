@@ -39,8 +39,10 @@ try:
         InputTokensDetails,
         OutputTokensDetails,
     )
+    from openai.types.shared.reasoning import Reasoning
 except ImportError:
     SKIP_RESPONSES_TESTS = True
+    Reasoning = None
 
 from unittest import mock  # python 3.3 and above
 
@@ -4381,6 +4383,85 @@ def test_responses_api_conversation_id(
             assert "gen_ai.conversation.id" not in span["data"]
         else:
             assert span["data"]["gen_ai.conversation.id"] == expected_id
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "reasoning, expected_level",
+    [
+        pytest.param(omit, None, id="omit"),
+        pytest.param(None, None, id="none"),
+        pytest.param({"summary": "auto"}, None, id="dict_without_effort"),
+        pytest.param({"effort": "high"}, "high", id="dict"),
+        pytest.param(
+            Reasoning(effort="low") if Reasoning is not None else None,
+            "low" if Reasoning is not None else None,
+            id="object",
+        ),
+    ],
+)
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_responses_api_reasoning_level(
+    sentry_init,
+    capture_events,
+    capture_items,
+    reasoning,
+    expected_level,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = OpenAI(api_key="z")
+    client.responses._post = mock.Mock(return_value=EXAMPLE_RESPONSE)
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            client.responses.create(
+                model="gpt-4o",
+                input="hello",
+                reasoning=reasoning,
+            )
+
+        sentry_sdk.flush()
+        span = next(item.payload for item in items if item.type == "span")
+
+        if expected_level is None:
+            assert SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL not in span["attributes"]
+        else:
+            assert (
+                span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL]
+                == expected_level
+            )
+
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            client.responses.create(
+                model="gpt-4o",
+                input="hello",
+                reasoning=reasoning,
+            )
+
+        (transaction,) = events
+        span = transaction["spans"][0]
+
+        if expected_level is None:
+            assert SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL not in span["data"]
+        else:
+            assert (
+                span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == expected_level
+            )
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
