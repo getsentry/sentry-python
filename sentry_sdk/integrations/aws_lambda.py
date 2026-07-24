@@ -442,7 +442,7 @@ def _make_request_event_processor(
             if client_options["data_collection"]["user_info"]:
                 user_info = sentry_event.setdefault("user", {})
 
-                identity = aws_event.get("identity")
+                identity = aws_event.get("requestContext", {}).get("identity")
                 if identity is None:
                     identity = {}
 
@@ -456,7 +456,7 @@ def _make_request_event_processor(
         elif should_send_default_pii():
             user_info = sentry_event.setdefault("user", {})
 
-            identity = aws_event.get("identity")
+            identity = aws_event.get("requestContext", {}).get("identity")
             if identity is None:
                 identity = {}
 
