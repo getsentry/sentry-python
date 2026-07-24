@@ -386,6 +386,17 @@ class StreamedSpan:
         self.set_attribute("sentry.segment.id", self._segment.span_id)
         self.set_attribute("sentry.segment.name", self._segment.name)
 
+        # Set conversation ID if one is set and this is a correct kind of span
+        conversation_id = self._scope.get_conversation_id()
+        if conversation_id:
+            has_ai_operation_name = SPANDATA.GEN_AI_OPERATION_NAME in self._attributes
+            op = self._attributes.get("sentry.op")
+            has_gen_ai_op = isinstance(op, str) and (
+                op.startswith("ai.") or op.startswith("gen_ai.")
+            )
+            if has_ai_operation_name or has_gen_ai_op:
+                self.set_attribute("gen_ai.conversation.id", conversation_id)
+
         # Set the end timestamp
         if end_timestamp is not None:
             if isinstance(end_timestamp, (float, int)):
@@ -581,6 +592,10 @@ class StreamedSpan:
         self.set_attribute(
             SPANDATA.SENTRY_SDK_INTEGRATIONS, sorted(client.integrations.keys())
         )
+        if not self.get_attributes().get("sentry.segment.name.source"):
+            self.set_attribute(
+                "sentry.segment.name.source", SegmentNameSource.CUSTOM.value
+            )
 
         if client.options.get("dist") and SPANDATA.SENTRY_DIST not in self._attributes:
             self.set_attribute(
