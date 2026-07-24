@@ -427,9 +427,11 @@ def test_request_data_with_send_default_pii_true(lambda_client, test_environment
           },
           "pathParameters": null,
           "stageVariables": null,
-          "identity": {
-            "sourceIp": "213.47.147.207",
-            "userArn": "42"
+          "requestContext": {
+            "identity": {
+                "sourceIp": "213.47.147.207",
+                "userArn": "42"
+            },
           },
           "body": null,
           "isBase64Encoded": false
@@ -484,9 +486,11 @@ USER_INFO_PAYLOAD = b"""
       },
       "pathParameters": null,
       "stageVariables": null,
-      "identity": {
-        "sourceIp": "213.47.147.207",
-        "userArn": "42"
+      "requestContext": {
+        "identity": {
+            "sourceIp": "213.47.147.207",
+            "userArn": "42",
+        },
       },
       "body": null,
       "isBase64Encoded": false
