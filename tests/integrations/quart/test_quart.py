@@ -1351,11 +1351,12 @@ async def test_span_streaming_url_query_data_collection(
     sentry_init, capture_items, init_kwargs, expected_query
 ):
     kwargs = dict(init_kwargs)
+    experiments = kwargs.pop("_experiments", {})
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
-        _experiments=kwargs.pop("_experiments", {}),
+        _experiments=experiments,
         **kwargs,
     )
     items = capture_items("span")
