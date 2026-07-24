@@ -391,9 +391,9 @@ def test_before_send_span_set_in_experiments(sentry_init, capture_items):
 
     sentry_init(
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         _experiments={
             "before_send_span": before_send_span,
-            "trace_lifecycle": "stream",
         },
     )
 
