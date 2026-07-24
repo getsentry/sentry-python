@@ -431,7 +431,7 @@ def test_request_data_with_send_default_pii_true(lambda_client, test_environment
             "identity": {
                 "sourceIp": "213.47.147.207",
                 "userArn": "42"
-            },
+            }
           },
           "body": null,
           "isBase64Encoded": false
@@ -489,8 +489,8 @@ USER_INFO_PAYLOAD = b"""
       "requestContext": {
         "identity": {
             "sourceIp": "213.47.147.207",
-            "userArn": "42",
-        },
+            "userArn": "42"
+        }
       },
       "body": null,
       "isBase64Encoded": false
