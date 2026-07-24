@@ -1505,7 +1505,7 @@ async def test_user_ip_address_on_all_spans(
         await send({"type": "http.response.body", "body": b"Hello, world!"})
 
     kwargs = dict(init_kwargs)
-    experiments = init_kwargs.pop("_experiments")
+    experiments = kwargs.pop("_experiments")
     sentry_init(
         trace_lifecycle="stream",
         traces_sample_rate=1.0,
