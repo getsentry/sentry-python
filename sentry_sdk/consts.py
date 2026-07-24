@@ -1336,6 +1336,7 @@ class ClientConstructor:
         trace_ignore_status_codes: "AbstractSet[int]" = frozenset(),
         enable_metrics: bool = True,
         before_send_metric: "Optional[Callable[[Metric, Hint], Optional[Metric]]]" = None,
+        before_send_span: "Optional[Callable[[SpanJSON, Hint], Optional[SpanJSON]]]" = None,
         org_id: "Optional[str]" = None,
         strict_trace_continuation: bool = False,
         stream_gen_ai_spans: bool = True,
@@ -1755,6 +1756,11 @@ class ClientConstructor:
         :param org_id: An optional organization ID. The SDK will try to extract if from the DSN in most cases
             but you can provide it explicitly for self-hosted and Relay setups. This value is used for
             trace propagation and for features like `strict_trace_continuation`.
+
+        :param before_send_span: An optional function to modify spans before they're sent to Sentry.
+            Any modifications to the span in this function will be retained. Unlike ``before_send_log``
+            and ``before_send_metric``, spans cannot be dropped by returning None. Only works when
+            ``trace_lifecycle="stream"`` is enabled.
 
         :param stream_gen_ai_spans: When set, generative AI spans are sent in a new transport format to
             reduce downstream data loss.
