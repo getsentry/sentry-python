@@ -1504,9 +1504,14 @@ async def test_user_ip_address_on_all_spans(
         )
         await send({"type": "http.response.body", "body": b"Hello, world!"})
 
-    kwargs = {k: v for k, v in init_kwargs.items() if k != "_experiments"}
-    experiments = {"trace_lifecycle": "stream", **init_kwargs.get("_experiments", {})}
-    sentry_init(traces_sample_rate=1.0, _experiments=experiments, **kwargs)
+    kwargs = dict(init_kwargs)
+    experiments = init_kwargs.pop("_experiments")
+    sentry_init(
+        trace_lifecycle="stream",
+        traces_sample_rate=1.0,
+        _experiments=experiments,
+        **kwargs,
+    )
     sentry_app = SentryAsgiMiddleware(app)
 
     async def wrapped_app(scope, receive, send):

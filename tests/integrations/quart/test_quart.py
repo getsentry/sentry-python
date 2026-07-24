@@ -1138,7 +1138,8 @@ async def test_quart_auth_user_info_data_collection(
 ):
     from quart_auth import AuthUser, login_user
 
-    sentry_init(integrations=[quart_sentry.QuartIntegration()], **init_kwargs)
+    kwargs = dict(init_kwargs)
+    sentry_init(integrations=[quart_sentry.QuartIntegration()], **kwargs)
     app = quart_app_factory()
 
     @app.route("/login")
@@ -1173,12 +1174,12 @@ async def test_span_streaming_quart_auth_user_id_data_collection(
 ):
     from quart_auth import AuthUser, login_user
 
-    kwargs = {k: v for k, v in init_kwargs.items() if k != "_experiments"}
+    kwargs = dict(init_kwargs)
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
-        _experiments=init_kwargs.get("_experiments", {}),
+        _experiments=kwargs.pop("_experiments", {}),
         **kwargs,
     )
     items = capture_items("span")
@@ -1211,12 +1212,12 @@ async def test_span_streaming_quart_auth_user_id_data_collection(
 async def test_span_streaming_request_attributes_data_collection(
     sentry_init, capture_items, init_kwargs, expect_user_info
 ):
-    kwargs = {k: v for k, v in init_kwargs.items() if k != "_experiments"}
+    kwargs = dict(init_kwargs)
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
-        _experiments=init_kwargs.get("_experiments", {}),
+        _experiments=kwargs.pop("_experiments", {}),
         **kwargs,
     )
     items = capture_items("span")
@@ -1349,14 +1350,13 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
 async def test_span_streaming_url_query_data_collection(
     sentry_init, capture_items, init_kwargs, expected_query
 ):
-    init_kwargs = dict(init_kwargs)
-    experiments = {"trace_lifecycle": "stream"}
-    experiments.update(init_kwargs.pop("_experiments", {}))
+    kwargs = dict(init_kwargs)
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        _experiments=experiments,
-        **init_kwargs,
+        trace_lifecycle="stream",
+        _experiments=kwargs.pop("_experiments", {}),
+        **kwargs,
     )
     items = capture_items("span")
 
@@ -1399,7 +1399,8 @@ async def test_span_streaming_url_query_multi_and_blank_values(
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream", "data_collection": {}},
+        trace_lifecycle="stream",
+        _experiments={"data_collection": {}},
     )
     items = capture_items("span")
 
