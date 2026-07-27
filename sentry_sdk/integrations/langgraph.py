@@ -12,7 +12,7 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 
 # This is fine because langgraph depends on langchain-base, and LangchainIntegration only imports from langchain-base.
-from sentry_sdk.integrations.langchain import LangchainIntegration
+from sentry_sdk.integrations.langchain import LangchainIntegration, _extract_tokens
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
@@ -444,15 +444,16 @@ def _set_usage_data(span: "sentry_sdk.tracing.Span", messages: "Any") -> None:
         if not token_usage:
             continue
 
-        input_tokens += int(token_usage.get("prompt_tokens", 0))
-        output_tokens += int(token_usage.get("completion_tokens", 0))
-        total_tokens += int(token_usage.get("total_tokens", 0))
-
-        input_details = token_usage.get("prompt_tokens_details") or {}
-        cached_tokens += int(input_details.get("cached_tokens") or 0)
-
-        output_details = token_usage.get("completion_tokens_details") or {}
-        reasoning_tokens += int(output_details.get("reasoning_tokens") or 0)
+        # Single extraction path shared with the Langchain integration, so both
+        # integrations understand the same provider token-usage shapes.
+        message_input, message_output, message_total, message_cached, message_reasoning = (
+            _extract_tokens(token_usage)
+        )
+        input_tokens += int(message_input or 0)
+        output_tokens += int(message_output or 0)
+        total_tokens += int(message_total or 0)
+        cached_tokens += int(message_cached or 0)
+        reasoning_tokens += int(message_reasoning or 0)
 
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data

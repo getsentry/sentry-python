@@ -2169,3 +2169,33 @@ def test_set_usage_data_includes_cached_and_reasoning_tokens():
     span.set_data.assert_any_call(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, 110)
     span.set_data.assert_any_call(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED, 40)
     span.set_data.assert_any_call(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING, 10)
+
+
+def test_set_usage_data_reads_langchain_detail_shapes():
+    from unittest.mock import MagicMock
+
+    from sentry_sdk.consts import SPANDATA
+    from sentry_sdk.integrations.langgraph import _set_usage_data
+
+    # LangChain-style usage_metadata detail keys (not OpenAI-style) must also be
+    # understood, via the extraction shared with the Langchain integration.
+    span = MagicMock(spec=["set_data"])
+    messages = [
+        {
+            "response_metadata": {
+                "token_usage": {
+                    "input_tokens": 80,
+                    "output_tokens": 20,
+                    "total_tokens": 100,
+                    "input_token_details": {"cache_read": 30},
+                    "output_token_details": {"reasoning": 5},
+                }
+            }
+        },
+    ]
+
+    _set_usage_data(span, messages)
+
+    span.set_data.assert_any_call(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS, 80)
+    span.set_data.assert_any_call(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED, 30)
+    span.set_data.assert_any_call(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING, 5)

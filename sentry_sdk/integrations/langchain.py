@@ -728,39 +728,50 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
         self._handle_error(run_id, error)
 
 
+# LangChain's usage_metadata is a leaky abstraction: the token-detail dicts pass
+# provider-formatted keys through unchanged. Instead of sniffing ad-hoc keys at
+# each call site, the known spellings per field are listed once here, in
+# precedence order (LangChain's own normalized names first, then provider ones).
+# Adding support for another provider's spelling means extending one tuple.
+_INPUT_TOKEN_KEYS = ("prompt_tokens", "input_tokens")
+_OUTPUT_TOKEN_KEYS = ("completion_tokens", "output_tokens")
+_INPUT_DETAILS_KEYS = ("input_token_details", "prompt_tokens_details")
+_OUTPUT_DETAILS_KEYS = ("output_token_details", "completion_tokens_details")
+_CACHED_TOKEN_KEYS = ("cache_read", "cached_tokens")
+_REASONING_TOKEN_KEYS = ("reasoning", "reasoning_tokens")
+
+
+def _first_value(obj: "Any", keys: "tuple[str, ...]") -> "Optional[Any]":
+    """Return the first non-None value among `keys`.
+
+    Deliberately not an `or`-chain: a legitimate count of 0 must be kept
+    rather than falling through to the next provider's key.
+    """
+    if obj is None:
+        return None
+    for key in keys:
+        value = _get_value(obj, key)
+        if value is not None:
+            return value
+    return None
+
+
 def _extract_tokens(
     token_usage: "Any",
 ) -> "tuple[Optional[int], Optional[int], Optional[int], Optional[int], Optional[int]]":
     if not token_usage:
         return None, None, None, None, None
 
-    input_tokens = _get_value(token_usage, "prompt_tokens") or _get_value(
-        token_usage, "input_tokens"
-    )
-    output_tokens = _get_value(token_usage, "completion_tokens") or _get_value(
-        token_usage, "output_tokens"
-    )
+    input_tokens = _first_value(token_usage, _INPUT_TOKEN_KEYS)
+    output_tokens = _first_value(token_usage, _OUTPUT_TOKEN_KEYS)
     total_tokens = _get_value(token_usage, "total_tokens")
 
-    # LangChain's usage_metadata nests these under input/output_token_details;
-    # OpenAI-style dicts use prompt/completion_tokens_details.
-    input_details = _get_value(token_usage, "input_token_details") or _get_value(
-        token_usage, "prompt_tokens_details"
+    cached_tokens = _first_value(
+        _first_value(token_usage, _INPUT_DETAILS_KEYS), _CACHED_TOKEN_KEYS
     )
-    cached_tokens = None
-    if input_details is not None:
-        cached_tokens = _get_value(input_details, "cache_read") or _get_value(
-            input_details, "cached_tokens"
-        )
-
-    output_details = _get_value(token_usage, "output_token_details") or _get_value(
-        token_usage, "completion_tokens_details"
+    reasoning_tokens = _first_value(
+        _first_value(token_usage, _OUTPUT_DETAILS_KEYS), _REASONING_TOKEN_KEYS
     )
-    reasoning_tokens = None
-    if output_details is not None:
-        reasoning_tokens = _get_value(output_details, "reasoning") or _get_value(
-            output_details, "reasoning_tokens"
-        )
 
     return input_tokens, output_tokens, total_tokens, cached_tokens, reasoning_tokens
 

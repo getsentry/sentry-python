@@ -5032,3 +5032,17 @@ def test_record_token_usage_sets_cached_and_reasoning_span_data():
 
     span.set_data.assert_any_call(SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED, 40)
     span.set_data.assert_any_call(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING, 10)
+
+
+def test_extract_tokens_preserves_zero_counts():
+    from sentry_sdk.integrations.langchain import _extract_tokens
+
+    # A legitimate 0 must not fall through to the other provider's key.
+    usage = {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0,
+        "input_token_details": {"cache_read": 0, "cached_tokens": 7},
+        "output_token_details": {"reasoning": 0, "reasoning_tokens": 9},
+    }
+    assert _extract_tokens(usage) == (0, 0, 0, 0, 0)
