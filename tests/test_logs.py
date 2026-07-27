@@ -365,7 +365,7 @@ def test_logs_tied_to_spans_span_streaming(sentry_init, capture_items):
     sentry_init(enable_logs=True, traces_sample_rate=1.0, trace_lifecycle="stream")
     items = capture_items("log")
 
-    with sentry_sdk.traces.start_span(name="test-transaction"):
+    with sentry_sdk.traces.start_span(name="test-segment"):
         with sentry_sdk.traces.start_span(name="test-span") as span:
             sentry_sdk.logger.warning("This is a log tied to a span")
 
