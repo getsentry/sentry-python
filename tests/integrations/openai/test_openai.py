@@ -167,6 +167,7 @@ def test_nonstreaming_chat_completion_no_prompts(
                     frequency_penalty=0.2,
                     temperature=0.7,
                     top_p=0.9,
+                    reasoning_effort="high",
                 )
                 .choices[0]
                 .message.content
@@ -185,6 +186,7 @@ def test_nonstreaming_chat_completion_no_prompts(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
@@ -209,6 +211,7 @@ def test_nonstreaming_chat_completion_no_prompts(
                     frequency_penalty=0.2,
                     temperature=0.7,
                     top_p=0.9,
+                    reasoning_effort="high",
                 )
                 .choices[0]
                 .message.content
@@ -228,6 +231,7 @@ def test_nonstreaming_chat_completion_no_prompts(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -365,6 +369,7 @@ def test_nonstreaming_chat_completion(
                     frequency_penalty=0.2,
                     temperature=0.7,
                     top_p=0.9,
+                    reasoning_effort="high",
                 )
                 .choices[0]
                 .message.content
@@ -383,6 +388,7 @@ def test_nonstreaming_chat_completion(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert (
             json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
@@ -412,6 +418,7 @@ def test_nonstreaming_chat_completion(
                     frequency_penalty=0.2,
                     temperature=0.7,
                     top_p=0.9,
+                    reasoning_effort="high",
                 )
                 .choices[0]
                 .message.content
@@ -431,6 +438,7 @@ def test_nonstreaming_chat_completion(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert (
             json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
@@ -505,6 +513,7 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
                 frequency_penalty=0.2,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning_effort="high",
             )
             response = response.choices[0].message.content
 
@@ -521,6 +530,7 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
@@ -544,6 +554,7 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
                 frequency_penalty=0.2,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning_effort="high",
             )
             response = response.choices[0].message.content
 
@@ -561,6 +572,7 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
@@ -698,6 +710,7 @@ async def test_nonstreaming_chat_completion_async(
                 frequency_penalty=0.2,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning_effort="high",
             )
             response = response.choices[0].message.content
 
@@ -714,6 +727,7 @@ async def test_nonstreaming_chat_completion_async(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert (
             json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
@@ -742,6 +756,7 @@ async def test_nonstreaming_chat_completion_async(
                 frequency_penalty=0.2,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning_effort="high",
             )
             response = response.choices[0].message.content
 
@@ -759,6 +774,7 @@ async def test_nonstreaming_chat_completion_async(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert (
             json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
@@ -886,6 +902,7 @@ def test_streaming_chat_completion_no_prompts(
                 frequency_penalty=0.2,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning_effort="high",
             )
             response_string = "".join(
                 map(lambda x: x.choices[0].delta.content, response_stream)
@@ -904,6 +921,7 @@ def test_streaming_chat_completion_no_prompts(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
@@ -939,6 +957,7 @@ def test_streaming_chat_completion_no_prompts(
                 frequency_penalty=0.2,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning_effort="high",
             )
             response_string = "".join(
                 map(lambda x: x.choices[0].delta.content, response_stream)
@@ -958,6 +977,7 @@ def test_streaming_chat_completion_no_prompts(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
@@ -1580,6 +1600,7 @@ def test_streaming_chat_completion(
                 frequency_penalty=0.2,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning_effort="high",
             )
             response_string = "".join(
                 map(lambda x: x.choices[0].delta.content, response_stream)
@@ -1597,6 +1618,7 @@ def test_streaming_chat_completion(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert (
             json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
@@ -1646,6 +1668,7 @@ def test_streaming_chat_completion(
                 frequency_penalty=0.2,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning_effort="high",
             )
             response_string = "".join(
                 map(lambda x: x.choices[0].delta.content, response_stream)
@@ -1664,6 +1687,7 @@ def test_streaming_chat_completion(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert (
             json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
@@ -1797,6 +1821,7 @@ async def test_streaming_chat_completion_async_no_prompts(
                 frequency_penalty=0.2,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning_effort="high",
             )
 
             response_string = ""
@@ -1816,6 +1841,7 @@ async def test_streaming_chat_completion_async_no_prompts(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
@@ -1852,6 +1878,7 @@ async def test_streaming_chat_completion_async_no_prompts(
                 frequency_penalty=0.2,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning_effort="high",
             )
 
             response_string = ""
@@ -1872,6 +1899,7 @@ async def test_streaming_chat_completion_async_no_prompts(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
@@ -2074,6 +2102,7 @@ async def test_streaming_chat_completion_async(
                 frequency_penalty=0.2,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning_effort="high",
             )
 
             response_string = ""
@@ -2093,6 +2122,7 @@ async def test_streaming_chat_completion_async(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
@@ -2142,6 +2172,7 @@ async def test_streaming_chat_completion_async(
                 frequency_penalty=0.2,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning_effort="high",
             )
 
             response_string = ""
@@ -2162,6 +2193,7 @@ async def test_streaming_chat_completion_async(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
@@ -3890,6 +3922,7 @@ def test_ai_client_span_responses_api_no_pii(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
         sentry_sdk.flush()
@@ -3901,6 +3934,7 @@ def test_ai_client_span_responses_api_no_pii(
             "gen_ai.request.max_tokens": 100,
             "gen_ai.request.temperature": 0.7,
             "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
             "gen_ai.request.model": "gpt-4o",
             "gen_ai.response.model": "response-model-id",
             "gen_ai.response.streaming": False,
@@ -3933,6 +3967,7 @@ def test_ai_client_span_responses_api_no_pii(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
         spans = [item.payload for item in items]
@@ -3943,6 +3978,7 @@ def test_ai_client_span_responses_api_no_pii(
             "gen_ai.request.max_tokens": 100,
             "gen_ai.request.temperature": 0.7,
             "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
             "gen_ai.request.model": "gpt-4o",
             "gen_ai.response.model": "response-model-id",
             "gen_ai.response.streaming": False,
@@ -3974,6 +4010,7 @@ def test_ai_client_span_responses_api_no_pii(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
         (transaction,) = events
@@ -3987,6 +4024,7 @@ def test_ai_client_span_responses_api_no_pii(
             "gen_ai.request.max_tokens": 100,
             "gen_ai.request.temperature": 0.7,
             "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
             "gen_ai.request.model": "gpt-4o",
             "gen_ai.response.model": "response-model-id",
             "gen_ai.response.streaming": False,
@@ -4186,6 +4224,7 @@ def test_ai_client_span_responses_api(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
         sentry_sdk.flush()
@@ -4198,6 +4237,7 @@ def test_ai_client_span_responses_api(
             "gen_ai.request.max_tokens": 100,
             "gen_ai.request.temperature": 0.7,
             "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
             "gen_ai.system": "openai",
             "gen_ai.response.model": "response-model-id",
             "gen_ai.response.streaming": False,
@@ -4233,6 +4273,7 @@ def test_ai_client_span_responses_api(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
         spans = [item.payload for item in items]
@@ -4244,6 +4285,7 @@ def test_ai_client_span_responses_api(
             "gen_ai.request.max_tokens": 100,
             "gen_ai.request.temperature": 0.7,
             "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
             "gen_ai.system": "openai",
             "gen_ai.response.model": "response-model-id",
             "gen_ai.response.streaming": False,
@@ -4279,6 +4321,7 @@ def test_ai_client_span_responses_api(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
         (transaction,) = events
@@ -4293,6 +4336,7 @@ def test_ai_client_span_responses_api(
             "gen_ai.request.max_tokens": 100,
             "gen_ai.request.temperature": 0.7,
             "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
             "gen_ai.system": "openai",
             "gen_ai.response.model": "response-model-id",
             "gen_ai.response.streaming": False,
@@ -4734,6 +4778,7 @@ async def test_ai_client_span_responses_async_api(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
         sentry_sdk.flush()
@@ -4746,6 +4791,7 @@ async def test_ai_client_span_responses_async_api(
             "gen_ai.request.max_tokens": 100,
             "gen_ai.request.temperature": 0.7,
             "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
             "gen_ai.request.messages": safe_serialize(expected_request_messages),
             "gen_ai.request.model": "gpt-4o",
             "gen_ai.response.model": "response-model-id",
@@ -4781,6 +4827,7 @@ async def test_ai_client_span_responses_async_api(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
         spans = [item.payload for item in items]
@@ -4792,6 +4839,7 @@ async def test_ai_client_span_responses_async_api(
             "gen_ai.request.max_tokens": 100,
             "gen_ai.request.temperature": 0.7,
             "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
             "gen_ai.request.messages": safe_serialize(expected_request_messages),
             "gen_ai.request.model": "gpt-4o",
             "gen_ai.response.model": "response-model-id",
@@ -4827,6 +4875,7 @@ async def test_ai_client_span_responses_async_api(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
         (transaction,) = events
@@ -4841,6 +4890,7 @@ async def test_ai_client_span_responses_async_api(
             "gen_ai.request.max_tokens": 100,
             "gen_ai.request.temperature": 0.7,
             "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
             "gen_ai.request.messages": safe_serialize(expected_request_messages[-1:]),
             "gen_ai.request.model": "gpt-4o",
             "gen_ai.response.model": "response-model-id",
@@ -5059,6 +5109,7 @@ async def test_ai_client_span_streaming_responses_async_api(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
             async for _ in result:
                 pass
@@ -5079,6 +5130,7 @@ async def test_ai_client_span_streaming_responses_async_api(
             "gen_ai.request.messages": safe_serialize(expected_request_messages),
             "gen_ai.request.temperature": 0.7,
             "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
             "gen_ai.response.model": "response-model-id",
             "gen_ai.response.streaming": True,
             "gen_ai.system": "openai",
@@ -5120,6 +5172,7 @@ async def test_ai_client_span_streaming_responses_async_api(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
             async for _ in result:
                 pass
@@ -5138,6 +5191,7 @@ async def test_ai_client_span_streaming_responses_async_api(
             "gen_ai.request.messages": safe_serialize(expected_request_messages[-1:]),
             "gen_ai.request.temperature": 0.7,
             "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
             "gen_ai.response.model": "response-model-id",
             "gen_ai.response.streaming": True,
             "gen_ai.system": "openai",
@@ -5384,6 +5438,7 @@ def test_streaming_responses_api(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
             response_string = ""
@@ -5400,6 +5455,7 @@ def test_streaming_responses_api(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
 
@@ -5428,6 +5484,7 @@ def test_streaming_responses_api(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
             response_string = ""
@@ -5444,6 +5501,7 @@ def test_streaming_responses_api(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
 
@@ -5512,6 +5570,7 @@ async def test_streaming_responses_api_async(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
             response_string = ""
@@ -5528,6 +5587,7 @@ async def test_streaming_responses_api_async(
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
 
@@ -5556,6 +5616,7 @@ async def test_streaming_responses_api_async(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
             response_string = ""
@@ -5572,6 +5633,7 @@ async def test_streaming_responses_api_async(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
 
