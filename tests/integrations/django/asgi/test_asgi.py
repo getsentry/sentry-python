@@ -85,7 +85,7 @@ async def test_basic(
 
         assert response["status"] == 500
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
 
         (exception,) = event["exception"]["values"]
         assert exception["type"] == "ZeroDivisionError"
@@ -176,7 +176,7 @@ async def test_async_views(
 
         assert response["status"] == 200
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
 
@@ -526,7 +526,7 @@ async def test_has_trace_if_performance_disabled(
         (
             msg_event,
             error_event,
-        ) = (item.payload for item in items if item.type == "event")
+        ) = (item.payload for item in items)
     else:
         events = capture_events()
 
@@ -644,9 +644,7 @@ async def test_trace_from_headers_if_performance_disabled(
 
         assert response["status"] == 500
 
-        (msg_event, error_event) = (
-            item.payload for item in items if item.type == "event"
-        )
+        (msg_event, error_event) = (item.payload for item in items)
     else:
         events = capture_events()
 
@@ -802,7 +800,7 @@ async def test_asgi_request_body(
         assert response["body"] == body
 
         sentry_sdk.flush()
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         envelopes = capture_envelopes()
 
