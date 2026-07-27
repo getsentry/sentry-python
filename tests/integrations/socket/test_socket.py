@@ -15,7 +15,7 @@ def test_getaddrinfo_trace(sentry_init, capture_events, capture_items, span_stre
     sentry_init(
         integrations=[SocketIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -60,7 +60,7 @@ def test_create_connection_trace(
     sentry_init(
         integrations=[SocketIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -118,7 +118,7 @@ def test_span_origin(sentry_init, capture_events, capture_items, span_streaming)
     sentry_init(
         integrations=[SocketIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:

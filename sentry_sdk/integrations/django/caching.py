@@ -61,6 +61,8 @@ def _patch_cache_method(
 
         span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         if span_streaming:
+            if sentry_sdk.traces.get_current_span() is None:
+                return original_method(*args, **kwargs)
             with sentry_sdk.traces.start_span(
                 name=description,
                 attributes={

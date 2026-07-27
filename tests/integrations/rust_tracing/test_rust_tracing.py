@@ -79,7 +79,7 @@ def test_on_new_span_on_close(
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -165,7 +165,7 @@ def test_nested_on_new_span_on_close(
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -303,16 +303,16 @@ def test_on_new_span_without_transaction(sentry_init, span_streaming):
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
         assert sentry_sdk.traces.get_current_span() is None
 
+        # In streaming mode we do not create an orphan root segment when there
+        # is no active span
         rust_tracing.new_span(RustTracingLevel.Info, 3)
-        current_span = sentry_sdk.traces.get_current_span()
-        assert current_span is not None
-        assert current_span._segment is current_span
+        assert sentry_sdk.traces.get_current_span() is None
     else:
         assert sentry_sdk.get_current_span() is None
 
@@ -339,7 +339,7 @@ def test_on_event_exception(
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("event")
@@ -399,7 +399,7 @@ def test_on_event_breadcrumb(
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("event")
@@ -454,7 +454,7 @@ def test_on_event_event(
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("event")
@@ -514,7 +514,7 @@ def test_on_event_ignored(
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -574,7 +574,7 @@ def test_span_filter(
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -638,7 +638,7 @@ def test_record(sentry_init, span_streaming):
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -681,7 +681,7 @@ def test_record_in_ignored_span(sentry_init, span_streaming):
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -742,7 +742,7 @@ def test_include_tracing_fields(
         integrations=[integration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:

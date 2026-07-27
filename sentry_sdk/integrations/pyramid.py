@@ -15,6 +15,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    has_data_collection_enabled,
     reraise,
 )
 
@@ -86,10 +87,16 @@ class PyramidIntegration(Integration):
 
             scope = sentry_sdk.get_isolation_scope()
 
-            if should_send_default_pii() and has_span_streaming_enabled(client.options):
-                user_id = authenticated_userid(request)
-                if user_id:
-                    scope.set_user({"id": user_id})
+            if has_span_streaming_enabled(client.options):
+                if has_data_collection_enabled(client.options):
+                    if client.options["data_collection"]["user_info"]:
+                        user_id = authenticated_userid(request)
+                        if user_id:
+                            scope.set_user({"id": user_id})
+                elif should_send_default_pii():
+                    user_id = authenticated_userid(request)
+                    if user_id:
+                        scope.set_user({"id": user_id})
 
             scope.add_event_processor(
                 _make_event_processor(weakref.ref(request), integration)
@@ -229,7 +236,13 @@ def _make_event_processor(
         with capture_internal_exceptions():
             PyramidRequestExtractor(request).extract_into_event(event)
 
-        if should_send_default_pii():
+        client_options = sentry_sdk.get_client().options
+        if has_data_collection_enabled(client_options):
+            if client_options["data_collection"]["user_info"]:
+                with capture_internal_exceptions():
+                    user_info = event.setdefault("user", {})
+                    user_info.setdefault("id", authenticated_userid(request))
+        elif should_send_default_pii():
             with capture_internal_exceptions():
                 user_info = event.setdefault("user", {})
                 user_info.setdefault("id", authenticated_userid(request))

@@ -5,7 +5,7 @@ import sys
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.traces import SegmentSource
+from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -104,7 +104,7 @@ def _patch_ray_remote() -> None:
                         attributes={
                             "sentry.op": OP.QUEUE_TASK_RAY,
                             "sentry.origin": RayIntegration.origin,
-                            "sentry.span.source": SegmentSource.TASK,
+                            "sentry.segment.name.source": SegmentNameSource.TASK,
                         },
                         parent_span=None,
                     ):
@@ -156,6 +156,23 @@ def _patch_ray_remote() -> None:
                 )
                 if span_streaming:
                     function_name = qualname_from_function(user_f)
+
+                    if sentry_sdk.traces.get_current_span() is None:
+                        tracing = {
+                            k: v
+                            for k, v in sentry_sdk.get_current_scope().iter_trace_propagation_headers()
+                        }
+                        try:
+                            result = old_remote_method(
+                                *args, **kwargs, _sentry_tracing=tracing
+                            )
+                        except Exception:
+                            exc_info = sys.exc_info()
+                            _capture_exception(exc_info)
+                            reraise(*exc_info)
+
+                        return result
+
                     with sentry_sdk.traces.start_span(
                         name="unknown Ray task"
                         if function_name is None

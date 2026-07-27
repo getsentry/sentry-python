@@ -5,6 +5,7 @@ from functools import wraps
 from typing import TYPE_CHECKING
 
 import sentry_sdk
+from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query_string
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
@@ -17,6 +18,8 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    has_data_collection_enabled,
+    parse_url,
 )
 
 if TYPE_CHECKING:
@@ -203,7 +206,39 @@ async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
 
             segment.set_attributes(header_attributes)
 
-            if should_send_default_pii():
+            client_options = sentry_sdk.get_client().options
+            filtered_query_string = None
+            if has_data_collection_enabled(client_options):
+                query_string = request_websocket.query_string.decode(
+                    "utf-8", errors="replace"
+                )
+                if query_string:
+                    filtered_query_string = (
+                        _apply_data_collection_filtering_to_query_string(
+                            query_string=query_string,
+                            behaviour=client_options["data_collection"][
+                                "url_query_params"
+                            ],
+                        )
+                    )
+                    if filtered_query_string:
+                        segment.set_attribute(
+                            "url.query",
+                            filtered_query_string,
+                        )
+
+                parsed_url = parse_url(request_websocket.url)
+                segment.set_attribute(
+                    "url.full",
+                    f"{parsed_url.url}?{filtered_query_string}"
+                    if filtered_query_string
+                    else parsed_url.url,
+                )
+
+                # TODO: Add the user properties that are seen in the branch below here once
+                # code is added to respect the `user_info` settings within the data collection
+                # configuration
+            elif should_send_default_pii():
                 segment.set_attribute("url.full", request_websocket.url)
                 segment.set_attribute(
                     "url.query",

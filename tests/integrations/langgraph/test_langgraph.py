@@ -279,7 +279,7 @@ def test_pregel_invoke(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_state = {
@@ -465,7 +465,7 @@ def test_pregel_ainvoke(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_state = {"messages": [MockMessage("What's the weather like?", name="user")]}
@@ -613,7 +613,7 @@ def test_pregel_invoke_error(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_state = {"messages": [MockMessage("This will fail")]}
@@ -677,7 +677,7 @@ def test_pregel_ainvoke_error(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_state = {"messages": [MockMessage("This will fail async")]}
@@ -793,7 +793,7 @@ def test_pregel_invoke_with_different_graph_names(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     pregel = MockPregelInstance(graph_name) if graph_name else MockPregelInstance()
@@ -876,7 +876,7 @@ def test_pregel_invoke_span_includes_usage_data(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_state = {
@@ -994,7 +994,7 @@ def test_pregel_ainvoke_span_includes_usage_data(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_state = {
@@ -1112,7 +1112,7 @@ def test_pregel_invoke_multiple_llm_calls_aggregate_usage(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_state = {
@@ -1229,7 +1229,7 @@ def test_pregel_ainvoke_multiple_llm_calls_aggregate_usage(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_state = {
@@ -1346,7 +1346,7 @@ def test_pregel_invoke_span_includes_response_model(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_state = {
@@ -1457,7 +1457,7 @@ def test_pregel_ainvoke_span_includes_response_model(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_state = {
@@ -1568,7 +1568,7 @@ def test_pregel_invoke_span_uses_last_response_model(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_state = {
@@ -1690,7 +1690,7 @@ def test_pregel_ainvoke_span_uses_last_response_model(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_state = {
@@ -1857,7 +1857,7 @@ def test_extraction_functions_complex_scenario(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     pregel = MockPregelInstance("complex_graph")
@@ -1970,7 +1970,7 @@ def test_langgraph_message_role_mapping(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     # Mock a langgraph message with mixed roles

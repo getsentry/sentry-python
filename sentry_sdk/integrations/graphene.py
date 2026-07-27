@@ -149,6 +149,10 @@ def graphql_span(
     )
 
     if is_span_streaming_enabled:
+        if sentry_sdk.traces.get_current_span() is None:
+            yield
+            return
+
         additional_attributes = {}
         if should_send_default_pii():
             additional_attributes["graphql.document"] = source

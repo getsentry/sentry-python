@@ -47,6 +47,11 @@ urlpatterns = [
     path("nomessage", views.nomessage, name="nomessage"),
     path("view-with-signal", views.view_with_signal, name="view_with_signal"),
     path("mylogin", views.mylogin, name="mylogin"),
+    path(
+        "mylogin-with-exception",
+        views.mylogin_with_exception,
+        name="mylogin_with_exception",
+    ),
     path("classbased", views.ClassBasedView.as_view(), name="classbased"),
     path("sentryclass", views.SentryClassBasedView(), name="sentryclass"),
     path(

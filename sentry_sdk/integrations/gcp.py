@@ -8,11 +8,12 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
+from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query_string
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.cloud_resource_context import CLOUD_PROVIDER
 from sentry_sdk.scope import Scope, should_send_default_pii
-from sentry_sdk.traces import SegmentSource
+from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -20,6 +21,7 @@ from sentry_sdk.utils import (
     TimeoutThread,
     capture_internal_exceptions,
     event_from_exception,
+    has_data_collection_enabled,
     logger,
     reraise,
 )
@@ -100,10 +102,20 @@ def _wrap_func(func: "F") -> "F":
             if hasattr(gcp_event, "method"):
                 additional_attributes["http.request.method"] = gcp_event.method
 
-            if should_send_default_pii() and hasattr(gcp_event, "query_string"):
-                additional_attributes["url.query"] = gcp_event.query_string.decode(
-                    "utf-8", errors="replace"
-                )
+            if hasattr(gcp_event, "query_string"):
+                query_string = gcp_event.query_string.decode("utf-8", errors="replace")
+                if query_string:
+                    if has_data_collection_enabled(client.options):
+                        filtered_qs = _apply_data_collection_filtering_to_query_string(
+                            query_string=query_string,
+                            behaviour=client.options["data_collection"][
+                                "url_query_params"
+                            ],
+                        )
+                        if filtered_qs:
+                            additional_attributes["url.query"] = filtered_qs
+                    elif should_send_default_pii():
+                        additional_attributes["url.query"] = query_string
 
             sampling_context = {
                 "gcp_env": {
@@ -138,7 +150,7 @@ def _wrap_func(func: "F") -> "F":
                     attributes={
                         "sentry.op": OP.FUNCTION_GCP,
                         "sentry.origin": GcpIntegration.origin,
-                        "sentry.span.source": SegmentSource.COMPONENT,
+                        "sentry.segment.name.source": SegmentNameSource.COMPONENT,
                         "cloud.provider": CLOUD_PROVIDER.GCP,
                         "faas.name": function_name,
                         **header_attributes,
@@ -235,9 +247,18 @@ def _make_request_event_processor(
             request["method"] = gcp_event.method
 
         if hasattr(gcp_event, "query_string"):
-            request["query_string"] = gcp_event.query_string.decode(
-                "utf-8", errors="replace"
-            )
+            query_string = gcp_event.query_string.decode("utf-8", errors="replace")
+            client_options = sentry_sdk.get_client().options
+            if has_data_collection_enabled(client_options):
+                if query_string:
+                    filtered_qs = _apply_data_collection_filtering_to_query_string(
+                        query_string=query_string,
+                        behaviour=client_options["data_collection"]["url_query_params"],
+                    )
+                    if filtered_qs:
+                        request["query_string"] = filtered_qs
+            else:
+                request["query_string"] = query_string
 
         if hasattr(gcp_event, "headers"):
             request["headers"] = _filter_headers(gcp_event.headers)
