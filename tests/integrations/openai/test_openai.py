@@ -39,10 +39,8 @@ try:
         InputTokensDetails,
         OutputTokensDetails,
     )
-    from openai.types.shared.reasoning import Reasoning
 except ImportError:
     SKIP_RESPONSES_TESTS = True
-    Reasoning = None
 
 from unittest import mock  # python 3.3 and above
 
@@ -4394,11 +4392,6 @@ def test_responses_api_conversation_id(
         pytest.param(None, None, id="none"),
         pytest.param({"summary": "auto"}, None, id="dict_without_effort"),
         pytest.param({"effort": "high"}, "high", id="dict"),
-        pytest.param(
-            Reasoning(effort="low") if Reasoning is not None else None,
-            "low" if Reasoning is not None else None,
-            id="object",
-        ),
     ],
 )
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")

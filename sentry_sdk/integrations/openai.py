@@ -363,14 +363,11 @@ def _set_responses_api_input_data(
             set_on_span(SPANDATA.GEN_AI_CONVERSATION_ID, conversation_id)
 
     reasoning = kwargs.get("reasoning")
-    if reasoning is not None and _is_given(reasoning):
-        reasoning_effort: "Optional[str]" = None
-        if isinstance(reasoning, dict):
-            reasoning_effort = reasoning.get("effort")
-        else:
-            reasoning_effort = getattr(reasoning, "effort", None)
-        if reasoning_effort is not None:
-            set_on_span(SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL, reasoning_effort)
+    if isinstance(reasoning, dict) and "effort" in reasoning:
+        set_on_span(
+            SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL,
+            reasoning["effort"],
+        )
 
     if not should_send_default_pii() or not integration.include_prompts:
         set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
