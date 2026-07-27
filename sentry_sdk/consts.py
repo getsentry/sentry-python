@@ -695,7 +695,7 @@ class SPANDATA:
     Example: 0.1
     """
 
-    GEN_AI_REQUEST_REASONING_LEVEL = "gen_ai.request.reasoning_level"
+    GEN_AI_REQUEST_REASONING_LEVEL = "gen_ai.request.reasoning.level"
     """
     The reasoning or thinking effort level requested for a GenAI model.
     Example: "high"
