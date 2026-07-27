@@ -397,6 +397,12 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
             stacklevel=2,
         )
 
+    if rv["before_send_span"] and not has_span_streaming_enabled(rv):
+        warnings.warn(
+            "The `before_send_span` parameter only works when `trace_lifecycle` is set to `stream`.",
+            stacklevel=2,
+        )
+
     return rv
 
 
