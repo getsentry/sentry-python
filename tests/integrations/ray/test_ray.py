@@ -11,7 +11,7 @@ import sentry_sdk
 from sentry_sdk.envelope import Envelope
 from sentry_sdk.integrations.ray import RayIntegration
 from sentry_sdk.integrations.stdlib import StdlibIntegration
-from sentry_sdk.traces import SegmentSource
+from sentry_sdk.traces import SegmentNameSource
 from tests.conftest import TestTransport
 
 
@@ -51,7 +51,7 @@ def setup_sentry(span_streaming=False, transport=None):
         integrations=[RayIntegration()],
         transport=RayTestTransport() if transport is None else transport,
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
 
@@ -185,7 +185,7 @@ def test_tracing_in_ray_tasks(task_options, task, span_streaming):
         disabled_integrations=[StdlibIntegration],
         transport=RayTestTransport(),
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     # Setup ray task, calling decorator directly instead of @,
@@ -240,8 +240,8 @@ def test_tracing_in_ray_tasks(task_options, task, span_streaming):
             == f"tests.integrations.ray.test_ray.{task.__name__}"
         )
         assert (
-            worker_spans[1]["attributes"]["sentry.span.source"]["value"]
-            == SegmentSource.TASK
+            worker_spans[1]["attributes"]["sentry.segment.name.source"]["value"]
+            == SegmentNameSource.TASK
         )
 
         span = client_spans[0]
@@ -314,7 +314,7 @@ def test_errors_in_ray_tasks(span_streaming):
         disabled_integrations=[StdlibIntegration],
         transport=RayTestTransport(),
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     ray_temp_dir = os.path.join("/tmp", f"ray_test_{uuid.uuid4().hex[:8]}")
@@ -374,7 +374,7 @@ def test_tracing_in_ray_actors(remote_kwargs, span_streaming):
         disabled_integrations=[StdlibIntegration],
         transport=RayTestTransport(),
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     # Setup ray actor
@@ -489,7 +489,7 @@ def test_errors_in_ray_actors(span_streaming):
         disabled_integrations=[StdlibIntegration],
         transport=RayLoggingTransport(),
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     ray_temp_dir = os.path.join("/tmp", f"ray_test_{uuid.uuid4().hex[:8]}")

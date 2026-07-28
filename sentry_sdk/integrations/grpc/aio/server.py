@@ -4,7 +4,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
-from sentry_sdk.traces import SegmentSource
+from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import event_from_exception
@@ -67,7 +67,7 @@ class ServerInterceptor(grpc.aio.ServerInterceptor):  # type: ignore
                             name=name,
                             attributes={
                                 "sentry.op": OP.GRPC_SERVER,
-                                "sentry.span.source": SegmentSource.CUSTOM.value,
+                                "sentry.segment.name.source": SegmentNameSource.CUSTOM.value,
                                 "sentry.origin": SPAN_ORIGIN,
                             },
                             parent_span=None,

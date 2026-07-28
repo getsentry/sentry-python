@@ -169,7 +169,7 @@ def test_openfeature_span_integration(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[OpenFeatureIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     api.set_provider(

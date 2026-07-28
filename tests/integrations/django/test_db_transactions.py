@@ -39,7 +39,7 @@ def test_db_transaction_spans_disabled_no_autocommit(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if "postgres" not in connections:
@@ -285,7 +285,7 @@ def test_db_transaction_spans_disabled_atomic(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if "postgres" not in connections:
@@ -513,7 +513,7 @@ def test_db_no_autocommit_execute(
     sentry_init(
         integrations=[DjangoIntegration(db_transaction_spans=True)],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if "postgres" not in connections:
@@ -625,7 +625,7 @@ def test_db_no_autocommit_executemany(
     sentry_init(
         integrations=[DjangoIntegration(db_transaction_spans=True)],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -795,7 +795,7 @@ def test_db_no_autocommit_rollback_execute(
     sentry_init(
         integrations=[DjangoIntegration(db_transaction_spans=True)],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if "postgres" not in connections:
@@ -908,7 +908,7 @@ def test_db_no_autocommit_rollback_executemany(
     sentry_init(
         integrations=[DjangoIntegration(db_transaction_spans=True)],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -1077,7 +1077,7 @@ def test_db_atomic_execute(
     sentry_init(
         integrations=[DjangoIntegration(db_transaction_spans=True)],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if "postgres" not in connections:
@@ -1190,7 +1190,7 @@ def test_db_atomic_executemany(
         integrations=[DjangoIntegration(db_transaction_spans=True)],
         send_default_pii=True,
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -1351,7 +1351,7 @@ def test_db_atomic_rollback_execute(
         integrations=[DjangoIntegration(db_transaction_spans=True)],
         send_default_pii=True,
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if "postgres" not in connections:
@@ -1466,7 +1466,7 @@ def test_db_atomic_rollback_executemany(
         integrations=[DjangoIntegration(db_transaction_spans=True)],
         send_default_pii=True,
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -1632,7 +1632,7 @@ def test_db_atomic_execute_exception(
         integrations=[DjangoIntegration(db_transaction_spans=True)],
         send_default_pii=True,
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if "postgres" not in connections:
@@ -1746,7 +1746,7 @@ def test_db_atomic_executemany_exception(
         integrations=[DjangoIntegration(db_transaction_spans=True)],
         send_default_pii=True,
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
