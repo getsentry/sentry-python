@@ -9,6 +9,8 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 ## Removed
 
+- The SDK no longer supports Python 3.6. The oldest supported version is now 3.7.
+
 ## Deprecated
 
 
