@@ -332,7 +332,7 @@ def _extract_handler_data_from_args(
         elif original_kwargs.get("arguments"):
             arguments = original_kwargs["arguments"]
 
-        arguments = {"name": handler_name, **(arguments or {})}
+        arguments = arguments or {}
 
     else:  # resource
         handler_name = "unknown"
