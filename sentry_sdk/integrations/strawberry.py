@@ -15,6 +15,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    has_data_collection_enabled,
     package_version,
 )
 
@@ -193,8 +194,13 @@ class SentryAsyncExtension(SchemaExtension):
                 return
 
             additional_attributes: "dict[str, Any]" = {}
+            if has_data_collection_enabled(client.options):
+                if client.options["data_collection"]["graphql"]["document"]:
+                    additional_attributes["graphql.document"] = (
+                        self.execution_context.query
+                    )
 
-            if should_send_default_pii():
+            elif should_send_default_pii():
                 additional_attributes["graphql.document"] = self.execution_context.query
 
             if operation_name:
@@ -218,7 +224,12 @@ class SentryAsyncExtension(SchemaExtension):
             graphql_span.__enter__()
 
         if type(graphql_span) is Span:
-            if should_send_default_pii():
+            if has_data_collection_enabled(client.options):
+                if client.options["data_collection"]["graphql"]["document"]:
+                    graphql_span.set_data(
+                        "graphql.document", self.execution_context.query
+                    )
+            elif should_send_default_pii():
                 graphql_span.set_data("graphql.document", self.execution_context.query)
 
             graphql_span.set_data("graphql.operation.type", operation_type)
@@ -465,8 +476,35 @@ def _make_request_event_processor(
     execution_context: "ExecutionContext",
 ) -> "EventProcessor":
     def inner(event: "Event", hint: "dict[str, Any]") -> "Event":
+        client_options = sentry_sdk.get_client().options
         with capture_internal_exceptions():
-            if should_send_default_pii():
+            if has_data_collection_enabled(client_options):
+                request_data = event.setdefault("request", {})
+                if client_options["data_collection"]["graphql"]["document"]:
+                    request_data["api_target"] = "graphql"
+
+                if not request_data.get("data"):
+                    execution_context_data: "dict[str, Any]" = (
+                        {"query": execution_context.query}
+                        if client_options["data_collection"]["graphql"]["document"]
+                        else {}
+                    )
+
+                    if (
+                        client_options["data_collection"]["graphql"]["variables"]
+                        and execution_context.variables
+                    ):
+                        execution_context_data["variables"] = (
+                            execution_context.variables
+                        )
+
+                    if execution_context.operation_name:
+                        execution_context_data["operationName"] = (
+                            execution_context.operation_name
+                        )
+
+                    request_data["data"] = execution_context_data
+            elif should_send_default_pii():
                 request_data = event.setdefault("request", {})
                 request_data["api_target"] = "graphql"
 
