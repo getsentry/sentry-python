@@ -205,15 +205,6 @@ class SentryAsgiMiddleware:
                     return await self.app(scope, receive, send)
 
             except Exception as exc:
-                suppress_chained_exceptions = (
-                    sentry_sdk.get_client()
-                    .options.get("_experiments", {})
-                    .get("suppress_asgi_chained_exceptions", True)
-                )
-                if suppress_chained_exceptions:
-                    self._capture_lifespan_exception(exc)
-                    raise exc from None
-
                 exc_info = sys.exc_info()
                 with capture_internal_exceptions():
                     self._capture_lifespan_exception(exc)
@@ -365,15 +356,6 @@ class SentryAsgiMiddleware:
                                 )
 
                         except Exception as exc:
-                            suppress_chained_exceptions = (
-                                sentry_sdk.get_client()
-                                .options.get("_experiments", {})
-                                .get("suppress_asgi_chained_exceptions", True)
-                            )
-                            if suppress_chained_exceptions:
-                                self._capture_request_exception(exc)
-                                raise exc from None
-
                             exc_info = sys.exc_info()
                             with capture_internal_exceptions():
                                 self._capture_request_exception(exc)
