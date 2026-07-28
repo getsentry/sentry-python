@@ -2040,7 +2040,7 @@ class Scope:
         while this scope is active will inherit attributes set on the scope.
         """
         for attribute, value in attributes.items():
-            self._attributes[attribute] = format_attribute(value)
+            self.set_attribute(attribute, value)
 
     def remove_attribute(self, attribute: str) -> None:
         """Remove an attribute if set on the scope. No-op if there is no such attribute."""
