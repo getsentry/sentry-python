@@ -140,10 +140,10 @@ def _make_request_event_processor(data: "GraphQLSchema") -> "EventProcessor":
 
             if has_data_collection_enabled(client_options):
                 dc_graphql = client_options["data_collection"]["graphql"]
+                collect_variables = dc_graphql["variables"]
                 collect_document = dc_graphql[
                     "document"
                 ] and request_body_within_bounds(get_client(), content_length)
-                collect_variables = dc_graphql["variables"]
 
                 if collect_document or collect_variables:
                     request_info = event.setdefault("request", {})
@@ -155,8 +155,6 @@ def _make_request_event_processor(data: "GraphQLSchema") -> "EventProcessor":
                         and (key != "variables" or collect_variables)
                     }
                 elif event.get("request", {}).get("data"):
-                    # Neither the document nor the variables may be collected,
-                    # so scrub any request data other integrations attached.
                     del event["request"]["data"]
 
             elif should_send_default_pii() and request_body_within_bounds(

@@ -395,11 +395,6 @@ def test_request_data_collection(
     expect_query,
     expect_variables,
 ):
-    """
-    Verify that the ``data_collection`` ``graphql.document`` and
-    ``graphql.variables`` toggles independently filter the request data
-    attached to error events.
-    """
     _init_all_integrations(sentry_init, **init_kwargs)
     events = capture_events()
 
