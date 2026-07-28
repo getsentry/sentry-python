@@ -703,7 +703,11 @@ async def test_fastmcp_multiple_tools(
                 params={
                     "name": "tool_two",
                     "arguments": {
-                        "y": int(result1.message.result["content"][0]["text"])
+                        "y": int(
+                            result1.message.result["content"][0]["text"]
+                            if FASTMCP_VERSION is not None and FASTMCP_VERSION >= (4,)
+                            else result1.message.root.result["content"][0]["text"]
+                        )
                     },
                 },
                 request_id="req-multi",
@@ -715,7 +719,11 @@ async def test_fastmcp_multiple_tools(
                 params={
                     "name": "tool_three",
                     "arguments": {
-                        "z": int(result2.message.result["content"][0]["text"])
+                        "z": int(
+                            result2.message.result["content"][0]["text"]
+                            if FASTMCP_VERSION is not None and FASTMCP_VERSION >= (4,)
+                            else result2.message.root.result["content"][0]["text"]
+                        )
                     },
                 },
                 request_id="req-multi",
