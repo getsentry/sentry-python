@@ -29,6 +29,7 @@ import anyio
 import pytest
 
 import sentry_sdk
+from sentry_sdk.utils import parse_version
 
 try:
     from unittest.mock import AsyncMock
@@ -89,7 +90,9 @@ except ImportError:
     ReadResourceRequest = None
 
 try:
-    from fastmcp import __version__ as FASTMCP_VERSION
+    from fastmcp import __version__
+
+    FASTMCP_VERSION = parse_version(__version__)
 except ImportError:
     FASTMCP_VERSION = None
 
@@ -645,7 +648,11 @@ async def test_fastmcp_multiple_tools(
                 params={
                     "name": "tool_two",
                     "arguments": {
-                        "y": int(result1.message.result["content"][0]["text"])
+                        "y": int(
+                            result1.message.result["content"][0]["text"]
+                            if FASTMCP_VERSION is not None and FASTMCP_VERSION > (4,)
+                            else result1.message.root.result["content"][0]["text"]
+                        )
                     },
                 },
                 request_id="req-multi",
@@ -657,7 +664,11 @@ async def test_fastmcp_multiple_tools(
                 params={
                     "name": "tool_three",
                     "arguments": {
-                        "z": int(result2.message.result["content"][0]["text"])
+                        "z": int(
+                            result2.message.result["content"][0]["text"]
+                            if FASTMCP_VERSION is not None and FASTMCP_VERSION > (4,)
+                            else result2.message.root.result["content"][0]["text"]
+                        )
                     },
                 },
                 request_id="req-multi",
@@ -964,7 +975,7 @@ async def test_fastmcp_prompt_async(
                 },
             }
 
-            if FASTMCP_VERSION is not None and FASTMCP_VERSION.startswith("3"):
+            if FASTMCP_VERSION is not None and FASTMCP_VERSION > (3,):
                 message1 = Message(message1)
                 message2 = Message(message2)
 
