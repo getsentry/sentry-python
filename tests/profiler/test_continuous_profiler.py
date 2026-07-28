@@ -200,6 +200,63 @@ def assert_single_transaction_with_profile_chunks(
         )
 
 
+def assert_single_segment_with_profile_chunks(
+    envelopes, thread, max_chunks=None, segments=1
+):
+    items = defaultdict(list)
+    for envelope in envelopes:
+        for item in envelope.items:
+            items[item.type].append(item)
+
+    assert len(items["profile_chunk"]) > 0
+    if max_chunks is not None:
+        assert len(items["profile_chunk"]) <= max_chunks
+
+    for chunk_item in items["profile_chunk"]:
+        chunk = chunk_item.payload.json
+        headers = chunk_item.headers
+        assert chunk["platform"] == headers["platform"]
+
+    segments_list = []
+    child_span_list = []
+    for span in items["span"]:
+        for item in span.payload.json["items"]:
+            if item["is_segment"]:
+                segments_list.append(item)
+            else:
+                child_span_list.append(item)
+
+    assert len(segments_list) == segments
+
+    segment = segments_list[0]
+
+    assert segment["attributes"]["thread.id"]["value"] == str(thread.ident)
+    assert segment["attributes"]["thread.name"]["value"] == thread.name
+
+    profiler_id = segment["attributes"]["sentry.profiler_id"]["value"]
+
+    assert len(child_span_list) > 0
+    for span in child_span_list:
+        assert span["attributes"]["sentry.profiler_id"]["value"] == profiler_id
+        assert span["attributes"]["thread.id"]["value"] == str(thread.ident)
+        assert span["attributes"]["thread.name"]["value"] == thread.name
+
+    for profile_chunk_item in items["profile_chunk"]:
+        profile_chunk = profile_chunk_item.payload.json
+        del profile_chunk["profile"]  # make the diff easier to read
+        assert profile_chunk == ApproxDict(
+            {
+                "client_sdk": {
+                    "name": mock.ANY,
+                    "version": VERSION,
+                },
+                "platform": "python",
+                "profiler_id": profiler_id,
+                "version": "2",
+            }
+        )
+
+
 def assert_single_transaction_without_profile_chunks(envelopes):
     items = defaultdict(list)
     for envelope in envelopes:
@@ -211,6 +268,25 @@ def assert_single_transaction_without_profile_chunks(envelopes):
 
     transaction = items["transaction"][0].payload.json
     assert "profile" not in transaction["contexts"]
+
+
+def assert_single_segment_without_profile_chunks(envelopes):
+    items = defaultdict(list)
+    for envelope in envelopes:
+        for item in envelope.items:
+            items[item.type].append(item)
+
+    segments_list = []
+    for span in items["span"]:
+        for item in span.payload.json["items"]:
+            if item["is_segment"]:
+                segments_list.append(item)
+
+    assert len(segments_list) == 1
+    assert len(items["profile_chunk"]) == 0
+
+    segment = segments_list[0]
+    assert "sentry.profiler_id" not in segment["attributes"]
 
 
 @pytest.mark.forked
@@ -290,6 +366,89 @@ def test_continuous_profiler_auto_start_and_manual_stop(
     stop_profiler_func()
 
     assert_single_transaction_with_profile_chunks(envelopes, thread)
+
+
+@pytest.mark.forked
+@pytest.mark.parametrize(
+    "mode",
+    [
+        pytest.param("thread"),
+        pytest.param("gevent", marks=requires_gevent),
+    ],
+)
+@pytest.mark.parametrize(
+    ["start_profiler_func", "stop_profiler_func"],
+    [
+        pytest.param(
+            start_profile_session,
+            stop_profile_session,
+            id="start_profile_session/stop_profile_session (deprecated)",
+        ),
+        pytest.param(
+            start_profiler,
+            stop_profiler,
+            id="start_profiler/stop_profiler",
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "make_options",
+    [
+        pytest.param(get_client_options(True), id="non-experiment"),
+        pytest.param(get_client_options(False), id="experiment"),
+    ],
+)
+def test_continuous_profiler_auto_start_and_manual_stop_span_streaming(
+    sentry_init,
+    capture_envelopes,
+    mode,
+    start_profiler_func,
+    stop_profiler_func,
+    make_options,
+    teardown_profiling,
+):
+    options = make_options(mode=mode, auto_start=True)
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **options,
+    )
+
+    envelopes = capture_envelopes()
+
+    thread = threading.current_thread()
+
+    with sentry_sdk.traces.start_span(name="profiling"):
+        with sentry_sdk.traces.start_span(name="op"):
+            pass
+
+    for _ in range(3):
+        stop_profiler_func()
+
+        sentry_sdk.flush()
+        assert_single_segment_with_profile_chunks(envelopes, thread)
+
+        envelopes.clear()
+
+        with sentry_sdk.traces.start_span(name="profiling"):
+            with sentry_sdk.traces.start_span(name="op"):
+                time.sleep(0.05)
+
+        sentry_sdk.flush()
+        assert_single_segment_without_profile_chunks(envelopes)
+
+        start_profiler_func()
+
+        envelopes.clear()
+
+        with sentry_sdk.traces.start_span(name="profiling"):
+            with sentry_sdk.traces.start_span(name="op"):
+                pass
+
+    stop_profiler_func()
+
+    sentry_sdk.flush()
+    assert_single_segment_with_profile_chunks(envelopes, thread)
 
 
 @pytest.mark.parametrize(
@@ -387,6 +546,91 @@ def test_continuous_profiler_manual_start_and_stop_sampled(
         pytest.param(
             start_profile_session,
             stop_profile_session,
+            id="start_profile_session/stop_profile_session  (deprecated)",
+        ),
+        pytest.param(
+            start_profiler,
+            stop_profiler,
+            id="start_profiler/stop_profiler",
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "make_options",
+    [
+        pytest.param(get_client_options(True), id="non-experiment"),
+        pytest.param(get_client_options(False), id="experiment"),
+    ],
+)
+@mock.patch("sentry_sdk.profiler.continuous_profiler.PROFILE_BUFFER_SECONDS", 0.01)
+def test_continuous_profiler_manual_start_and_stop_sampled_span_streaming(
+    sentry_init,
+    capture_envelopes,
+    mode,
+    start_profiler_func,
+    stop_profiler_func,
+    make_options,
+    teardown_profiling,
+):
+    options = make_options(
+        mode=mode, profile_session_sample_rate=1.0, lifecycle="manual"
+    )
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **options,
+    )
+
+    envelopes = capture_envelopes()
+
+    thread = threading.current_thread()
+
+    for _ in range(3):
+        start_profiler_func()
+
+        envelopes.clear()
+
+        with sentry_sdk.traces.start_span(name="profiling"):
+            assert get_profiler_id() is not None, "profiler should be running"
+            with sentry_sdk.traces.start_span(name="op"):
+                time.sleep(0.1)
+            assert get_profiler_id() is not None, "profiler should be running"
+
+        assert get_profiler_id() is not None, "profiler should be running"
+
+        stop_profiler_func()
+
+        sentry_sdk.flush()
+        assert_single_segment_with_profile_chunks(envelopes, thread)
+
+        # the profiler stops immediately in manual mode
+        assert get_profiler_id() is None, "profiler should not be running"
+
+        envelopes.clear()
+
+        with sentry_sdk.traces.start_span(name="profiling"):
+            assert get_profiler_id() is None, "profiler should not be running"
+            with sentry_sdk.traces.start_span(name="op"):
+                time.sleep(0.1)
+            assert get_profiler_id() is None, "profiler should not be running"
+
+        sentry_sdk.flush()
+        assert_single_segment_without_profile_chunks(envelopes)
+
+
+@pytest.mark.parametrize(
+    "mode",
+    [
+        pytest.param("thread"),
+        pytest.param("gevent", marks=requires_gevent),
+    ],
+)
+@pytest.mark.parametrize(
+    ["start_profiler_func", "stop_profiler_func"],
+    [
+        pytest.param(
+            start_profile_session,
+            stop_profile_session,
             id="start_profile_session/stop_profile_session (deprecated)",
         ),
         pytest.param(
@@ -431,6 +675,67 @@ def test_continuous_profiler_manual_start_and_stop_unsampled(
     stop_profiler_func()
 
     assert_single_transaction_without_profile_chunks(envelopes)
+
+
+@pytest.mark.parametrize(
+    "mode",
+    [
+        pytest.param("thread"),
+        pytest.param("gevent", marks=requires_gevent),
+    ],
+)
+@pytest.mark.parametrize(
+    ["start_profiler_func", "stop_profiler_func"],
+    [
+        pytest.param(
+            start_profile_session,
+            stop_profile_session,
+            id="start_profile_session/stop_profile_session (deprecated)",
+        ),
+        pytest.param(
+            start_profiler,
+            stop_profiler,
+            id="start_profiler/stop_profiler",
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "make_options",
+    [
+        pytest.param(get_client_options(True), id="non-experiment"),
+        pytest.param(get_client_options(False), id="experiment"),
+    ],
+)
+def test_continuous_profiler_manual_start_and_stop_unsampled_span_streaming(
+    sentry_init,
+    capture_envelopes,
+    mode,
+    start_profiler_func,
+    stop_profiler_func,
+    make_options,
+    teardown_profiling,
+):
+    options = make_options(
+        mode=mode, profile_session_sample_rate=0.0, lifecycle="manual"
+    )
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **options,
+    )
+
+    envelopes = capture_envelopes()
+
+    start_profiler_func()
+
+    with sentry_sdk.traces.start_span(name="profiling"):
+        with sentry_sdk.traces.start_span(name="op"):
+            pass
+
+    stop_profiler_func()
+
+    sentry_sdk.flush()
+    assert_single_segment_without_profile_chunks(envelopes)
 
 
 @pytest.mark.parametrize(
@@ -530,6 +835,91 @@ def test_continuous_profiler_auto_start_and_stop_sampled(
         pytest.param(get_client_options(False), id="experiment"),
     ],
 )
+@mock.patch("sentry_sdk.profiler.continuous_profiler.DEFAULT_SAMPLING_FREQUENCY", 21)
+def test_continuous_profiler_auto_start_and_stop_sampled_span_streaming(
+    sentry_init,
+    capture_envelopes,
+    mode,
+    make_options,
+    teardown_profiling,
+):
+    options = make_options(
+        mode=mode, profile_session_sample_rate=1.0, lifecycle="trace"
+    )
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **options,
+    )
+
+    envelopes = capture_envelopes()
+
+    thread = threading.current_thread()
+
+    all_profiler_ids = set()
+
+    for _ in range(3):
+        envelopes.clear()
+
+        profiler_ids = set()
+
+        with sentry_sdk.traces.start_span(name="profiling 1"):
+            profiler_id = get_profiler_id()
+            assert profiler_id is not None, "profiler should be running"
+            profiler_ids.add(profiler_id)
+            with sentry_sdk.traces.start_span(name="op"):
+                time.sleep(0.1)
+            profiler_id = get_profiler_id()
+            assert profiler_id is not None, "profiler should be running"
+            profiler_ids.add(profiler_id)
+
+        time.sleep(0.03)
+
+        # the profiler takes a while to stop in auto mode so if we start
+        # a transaction immediately, it'll be part of the same chunk
+        profiler_id = get_profiler_id()
+        assert profiler_id is not None, "profiler should be running"
+        profiler_ids.add(profiler_id)
+
+        with sentry_sdk.traces.start_span(name="profiling 2"):
+            profiler_id = get_profiler_id()
+            assert profiler_id is not None, "profiler should be running"
+            profiler_ids.add(profiler_id)
+            with sentry_sdk.traces.start_span(name="op"):
+                time.sleep(0.1)
+            profiler_id = get_profiler_id()
+            assert profiler_id is not None, "profiler should be running"
+            profiler_ids.add(profiler_id)
+
+        # wait at least 1 cycle for the profiler to stop
+        time.sleep(0.2)
+        assert get_profiler_id() is None, "profiler should not be running"
+
+        assert len(profiler_ids) == 1
+        all_profiler_ids.add(profiler_ids.pop())
+
+        sentry_sdk.flush()
+        assert_single_segment_with_profile_chunks(
+            envelopes, thread, max_chunks=1, segments=2
+        )
+
+    assert len(all_profiler_ids) == 3
+
+
+@pytest.mark.parametrize(
+    "mode",
+    [
+        pytest.param("thread"),
+        pytest.param("gevent", marks=requires_gevent),
+    ],
+)
+@pytest.mark.parametrize(
+    "make_options",
+    [
+        pytest.param(get_client_options(True), id="non-experiment"),
+        pytest.param(get_client_options(False), id="experiment"),
+    ],
+)
 @mock.patch("sentry_sdk.profiler.continuous_profiler.PROFILE_BUFFER_SECONDS", 0.01)
 def test_continuous_profiler_auto_start_and_stop_unsampled(
     sentry_init,
@@ -559,6 +949,54 @@ def test_continuous_profiler_auto_start_and_stop_unsampled(
 
         assert get_profiler_id() is None, "profiler should not be running"
         assert_single_transaction_without_profile_chunks(envelopes)
+
+
+@pytest.mark.parametrize(
+    "mode",
+    [
+        pytest.param("thread"),
+        pytest.param("gevent", marks=requires_gevent),
+    ],
+)
+@pytest.mark.parametrize(
+    "make_options",
+    [
+        pytest.param(get_client_options(True), id="non-experiment"),
+        pytest.param(get_client_options(False), id="experiment"),
+    ],
+)
+@mock.patch("sentry_sdk.profiler.continuous_profiler.PROFILE_BUFFER_SECONDS", 0.01)
+def test_continuous_profiler_auto_start_and_stop_unsampled_span_streaming(
+    sentry_init,
+    capture_envelopes,
+    mode,
+    make_options,
+    teardown_profiling,
+):
+    options = make_options(
+        mode=mode, profile_session_sample_rate=0.0, lifecycle="trace"
+    )
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **options,
+    )
+
+    envelopes = capture_envelopes()
+
+    for _ in range(3):
+        envelopes.clear()
+
+        with sentry_sdk.traces.start_span(name="profiling"):
+            assert get_profiler_id() is None, "profiler should not be running"
+            with sentry_sdk.traces.start_span(name="op"):
+                time.sleep(0.05)
+            assert get_profiler_id() is None, "profiler should not be running"
+
+        assert get_profiler_id() is None, "profiler should not be running"
+
+        sentry_sdk.flush()
+        assert_single_segment_without_profile_chunks(envelopes)
 
 
 @pytest.mark.parametrize(
@@ -624,6 +1062,70 @@ def test_continuous_profiler_manual_start_and_stop_noop_when_using_trace_lifecyl
         mock_teardown.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    ["mode", "class_name"],
+    [
+        pytest.param("thread", "ThreadContinuousScheduler"),
+        pytest.param(
+            "gevent",
+            "GeventContinuousScheduler",
+            marks=requires_gevent,
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    ["start_profiler_func", "stop_profiler_func"],
+    [
+        pytest.param(
+            start_profile_session,
+            stop_profile_session,
+            id="start_profile_session/stop_profile_session (deprecated)",
+        ),
+        pytest.param(
+            start_profiler,
+            stop_profiler,
+            id="start_profiler/stop_profiler",
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "make_options",
+    [
+        pytest.param(get_client_options(True), id="non-experiment"),
+        pytest.param(get_client_options(False), id="experiment"),
+    ],
+)
+def test_continuous_profiler_manual_start_and_stop_noop_when_using_trace_lifecyle_span_streaming(
+    sentry_init,
+    mode,
+    start_profiler_func,
+    stop_profiler_func,
+    class_name,
+    make_options,
+    teardown_profiling,
+):
+    options = make_options(
+        mode=mode, profile_session_sample_rate=0.0, lifecycle="trace"
+    )
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **options,
+    )
+
+    with mock.patch(
+        f"sentry_sdk.profiler.continuous_profiler.{class_name}.ensure_running"
+    ) as mock_ensure_running:
+        start_profiler_func()
+        mock_ensure_running.assert_not_called()
+
+    with mock.patch(
+        f"sentry_sdk.profiler.continuous_profiler.{class_name}.teardown"
+    ) as mock_teardown:
+        stop_profiler_func()
+        mock_teardown.assert_not_called()
+
+
 def test_continuous_profiler_run_does_not_null_buffer(
     sentry_init,
     capture_envelopes,
@@ -667,6 +1169,75 @@ def test_continuous_profiler_run_does_not_null_buffer(
     stop_profiler()
 
     assert_single_transaction_with_profile_chunks(envelopes, thread)
+
+    # Now set up a fresh buffer and mark the scheduler as not running
+    # (simulating the state right after ensure_running() created a new buffer
+    # but the old thread hasn't done cleanup yet).
+    scheduler.reset_buffer()
+    buffer_before = scheduler.buffer
+    assert buffer_before is not None
+
+    # Simulate what happens when run() exits its while loop:
+    # self.running is already False, so the while loop exits immediately.
+    scheduler.running = False
+    scheduler.run()
+
+    # After the fix, run() should NOT have set self.buffer = None.
+    # It should only flush using a local reference.
+    assert scheduler.buffer is not None, (
+        "run() must not set self.buffer = None; "
+        "this would destroy buffers created by concurrent ensure_running() calls"
+    )
+
+
+def test_continuous_profiler_run_does_not_null_buffer_span_streaming(
+    sentry_init,
+    capture_envelopes,
+    teardown_profiling,
+):
+    """
+    Verifies that ContinuousScheduler.run() does not set self.buffer = None
+    after exiting its sampling loop.
+
+    Previously, run() would execute `self.buffer = None` after the while
+    loop exited. During rapid stop/start cycles, this could race with
+    ensure_running() which creates a new buffer: the old thread's cleanup
+    would destroy the newly-created buffer, causing the new profiler thread
+    to silently drop all samples (self.buffer is None in the sampler).
+
+    The fix uses a local buffer reference for flushing and never sets
+    self.buffer = None from run().
+    """
+    from sentry_sdk.profiler import continuous_profiler as cp
+
+    options = get_client_options(True)(
+        mode="thread", profile_session_sample_rate=1.0, lifecycle="manual"
+    )
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **options,
+    )
+    envelopes = capture_envelopes()
+    thread = threading.current_thread()
+
+    # Start and verify profiler works
+    start_profiler()
+    envelopes.clear()
+    with sentry_sdk.traces.start_span(name="profiling"):
+        with sentry_sdk.traces.start_span(name="op"):
+            pass
+
+    # Get the scheduler and create a sentinel buffer.
+    # We'll call run() directly to verify it doesn't null out self.buffer.
+    scheduler = cp._scheduler
+    assert scheduler is not None
+
+    # Stop the profiler so the thread exits cleanly
+    stop_profiler()
+
+    sentry_sdk.flush()
+    assert_single_segment_with_profile_chunks(envelopes, thread)
 
     # Now set up a fresh buffer and mark the scheduler as not running
     # (simulating the state right after ensure_running() created a new buffer

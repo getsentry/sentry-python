@@ -64,7 +64,7 @@ def test_orm_queries(
     if span_streaming:
         items = capture_items("event")
         capture_message("hi")
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
         capture_message("hi")

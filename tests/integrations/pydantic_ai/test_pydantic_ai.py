@@ -1381,7 +1381,7 @@ async def test_error_handling(
         await agent.run("Hello")
 
         # At minimum, we should have a transaction
-        transaction = next(item.payload for item in items if item.type == "transaction")
+        transaction = next(item.payload for item in items)
 
         assert transaction["transaction"] == "invoke_agent test_error"
         # Transaction should complete successfully (status key may not exist if no error)
@@ -2490,7 +2490,7 @@ async def test_agent_data_from_scope(
         await agent.run("Test input")
 
         # Verify agent name is capture
-        (transaction,) = (item.payload for item in items if item.type == "transaction")
+        (transaction,) = (item.payload for item in items)
 
         # Verify agent name is captured
         assert transaction["transaction"] == "invoke_agent test_scope_agent"
@@ -2809,7 +2809,7 @@ async def test_agent_without_name(
         await agent.run("Test input")
 
         # Should still create transaction, just with default name
-        (transaction,) = (item.payload for item in items if item.type == "transaction")
+        (transaction,) = (item.payload for item in items)
 
         # Transaction name should be "invoke_agent agent" or similar default
         assert "invoke_agent" in transaction["transaction"]
@@ -3999,7 +3999,7 @@ async def test_binary_content_encoding_image(
             _set_input_messages(span, [mock_msg])
             span.finish()
 
-        (event,) = (item.payload for item in items if item.type == "transaction")
+        (event,) = (item.payload for item in items)
         span_data = event["spans"][0]["data"]
         messages_data = _get_messages_from_span(span_data)
         assert _find_binary_content(messages_data, "image", "image/png")
@@ -4099,7 +4099,7 @@ async def test_binary_content_encoding_mixed_content(
             _set_input_messages(span, [mock_msg])
             span.finish()
 
-        (event,) = (item.payload for item in items if item.type == "transaction")
+        (event,) = (item.payload for item in items)
         span_data = event["spans"][0]["data"]
         messages_data = _get_messages_from_span(span_data)
 
@@ -4263,7 +4263,7 @@ async def test_set_usage_data_with_cache_tokens(
             _set_usage_data(span, usage)
             span.finish()
 
-        (event,) = (item.payload for item in items if item.type == "transaction")
+        (event,) = (item.payload for item in items)
         (span_data,) = event["spans"]
         assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
         assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20

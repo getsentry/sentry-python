@@ -235,10 +235,8 @@ def test_before_send_span_basic(sentry_init, capture_items):
 
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={
-            "before_send_span": before_send_span,
-            "trace_lifecycle": "stream",
-        },
+        trace_lifecycle="stream",
+        before_send_span=before_send_span,
     )
 
     items = capture_items("span")
@@ -278,10 +276,8 @@ def test_before_send_span_invalid_return_value(
 
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={
-            "before_send_span": before_send_span,
-            "trace_lifecycle": "stream",
-        },
+        trace_lifecycle="stream",
+        before_send_span=before_send_span,
     )
 
     items = capture_items("span")
@@ -307,10 +303,8 @@ def test_before_send_span_unsupported_edit(sentry_init, capture_items):
 
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={
-            "before_send_span": before_send_span,
-            "trace_lifecycle": "stream",
-        },
+        trace_lifecycle="stream",
+        before_send_span=before_send_span,
     )
 
     items = capture_items("span")
@@ -338,13 +332,11 @@ def test_before_send_span_doesnt_receive_ignored_spans(sentry_init, capture_item
 
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={
-            "before_send_span": before_send_span,
-            "trace_lifecycle": "stream",
-            "ignore_spans": [
-                "ignored",
-            ],
-        },
+        trace_lifecycle="stream",
+        before_send_span=before_send_span,
+        ignore_spans=[
+            "ignored",
+        ],
     )
 
     items = capture_items("span")
@@ -370,10 +362,8 @@ def test_before_send_span_raises_does_not_crash_application(sentry_init, capture
 
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={
-            "before_send_span": before_send_span,
-            "trace_lifecycle": "stream",
-        },
+        trace_lifecycle="stream",
+        before_send_span=before_send_span,
     )
 
     items = capture_items("span")
@@ -392,6 +382,84 @@ def test_before_send_span_raises_does_not_crash_application(sentry_init, capture
     assert span["name"] == "span"
     assert span["attributes"]["original"] == "value"
     assert "mutated" not in span["attributes"]
+
+
+def test_before_send_span_set_in_experiments(sentry_init, capture_items):
+    def before_send_span(span, hint):
+        span["name"] = "from experiments"
+        return span
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        _experiments={
+            "before_send_span": before_send_span,
+        },
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="span"):
+        ...
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    assert len(spans) == 1
+    (span,) = spans
+
+    assert span["name"] == "from experiments"
+
+
+def test_before_send_span_top_level_takes_precedence_over_experiments(
+    sentry_init, capture_items
+):
+    def top_level(span, hint):
+        span["name"] = "top-level"
+        return span
+
+    def experimental(span, hint):
+        span["name"] = "experimental"
+        return span
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        before_send_span=top_level,
+        _experiments={
+            "before_send_span": experimental,
+        },
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="span"):
+        ...
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    assert len(spans) == 1
+    (span,) = spans
+
+    assert span["name"] == "top-level"
+
+
+def test_before_send_span_warns_without_span_streaming(sentry_init):
+    import warnings
+
+    def before_send_span(span, hint):
+        return span
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        sentry_init(
+            traces_sample_rate=1.0,
+            before_send_span=before_send_span,
+        )
+
+    (warning,) = [x for x in w if "before_send_span" in str(x.message)]
+    assert "trace_lifecycle" in str(warning.message)
 
 
 def test_span_attributes(sentry_init, capture_items):

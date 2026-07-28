@@ -434,9 +434,7 @@ def test_span_templates_ai_dicts(
         with sentry_sdk.start_transaction(name="test-transaction"):
             my_agent()
 
-        (agent_span, tool_span, chat_span) = (
-            item.payload for item in items if item.type == "span"
-        )
+        (agent_span, tool_span, chat_span) = (item.payload for item in items)
 
         assert (
             agent_span["name"]
@@ -637,9 +635,7 @@ def test_span_templates_ai_objects(
         with sentry_sdk.start_transaction(name="test-transaction"):
             my_agent()
 
-        (agent_span, tool_span, chat_span) = (
-            item.payload for item in items if item.type == "span"
-        )
+        (agent_span, tool_span, chat_span) = (item.payload for item in items)
 
         assert (
             agent_span["name"]
@@ -822,7 +818,7 @@ def test_span_templates_ai_pii(
         with sentry_sdk.start_transaction(name="test-transaction"):
             my_agent(22, 33, arg1=44, arg2=55)
 
-        (_, tool_span, _) = (item.payload for item in items if item.type == "span")
+        (_, tool_span, _) = (item.payload for item in items)
 
         if send_default_pii:
             assert (
