@@ -88,7 +88,7 @@ async def test_agent_run_async(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_agent = get_test_agent()
@@ -236,7 +236,7 @@ async def test_agent_run_async_model_error(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     def failing_model(messages, info):
@@ -308,7 +308,7 @@ def test_agent_run_sync(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_agent = get_test_agent()
@@ -402,7 +402,7 @@ def test_agent_run_sync_model_error(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     def failing_model(messages, info):
@@ -474,7 +474,7 @@ async def test_agent_run_stream(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_agent = get_test_agent()
@@ -626,7 +626,7 @@ async def test_agent_run_stream_events(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     # Consume all events
@@ -736,7 +736,7 @@ async def test_agent_with_tools(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_agent = get_test_agent()
@@ -846,7 +846,7 @@ async def test_agent_with_tool_model_retry(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     retries = 0
@@ -989,7 +989,7 @@ async def test_agent_with_tool_validation_error(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_agent = get_test_agent()
@@ -1113,7 +1113,7 @@ async def test_agent_with_tools_streaming(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_agent = get_test_agent()
@@ -1201,7 +1201,7 @@ async def test_model_settings(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_agent_with_settings = get_test_agent_with_settings()
@@ -1279,7 +1279,7 @@ async def test_system_prompt_attribute(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming or stream_gen_ai_spans:
@@ -1360,7 +1360,7 @@ async def test_error_handling(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -1381,7 +1381,7 @@ async def test_error_handling(
         await agent.run("Hello")
 
         # At minimum, we should have a transaction
-        transaction = next(item.payload for item in items if item.type == "transaction")
+        transaction = next(item.payload for item in items)
 
         assert transaction["transaction"] == "invoke_agent test_error"
         # Transaction should complete successfully (status key may not exist if no error)
@@ -1422,7 +1422,7 @@ async def test_without_pii(
         traces_sample_rate=1.0,
         send_default_pii=False,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming or stream_gen_ai_spans:
@@ -1480,7 +1480,7 @@ async def test_without_pii_tools(
         traces_sample_rate=1.0,
         send_default_pii=False,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_agent = get_test_agent()
@@ -1544,7 +1544,7 @@ async def test_multiple_agents_concurrent(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_agent = get_test_agent()
@@ -1619,7 +1619,7 @@ async def test_message_history(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     # Second message with history
@@ -1697,7 +1697,7 @@ async def test_gen_ai_system(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_agent = get_test_agent()
@@ -1757,7 +1757,7 @@ async def test_include_prompts_false(
         traces_sample_rate=1.0,
         send_default_pii=True,  # Even with PII enabled, prompts should not be captured
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_agent = get_test_agent()
@@ -1815,7 +1815,7 @@ async def test_include_prompts_true(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_agent = get_test_agent()
@@ -1873,7 +1873,7 @@ async def test_include_prompts_false_with_tools(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_agent = get_test_agent()
@@ -1938,7 +1938,7 @@ async def test_include_prompts_requires_pii(
         traces_sample_rate=1.0,
         send_default_pii=False,  # PII disabled
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_agent = get_test_agent()
@@ -2158,7 +2158,7 @@ async def test_invoke_agent_with_list_user_prompt(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -2249,7 +2249,7 @@ async def test_invoke_agent_with_instructions(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming or stream_gen_ai_spans:
@@ -2415,7 +2415,7 @@ async def test_usage_data_partial(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming or stream_gen_ai_spans:
@@ -2470,7 +2470,7 @@ async def test_agent_data_from_scope(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -2490,7 +2490,7 @@ async def test_agent_data_from_scope(
         await agent.run("Test input")
 
         # Verify agent name is capture
-        (transaction,) = (item.payload for item in items if item.type == "transaction")
+        (transaction,) = (item.payload for item in items)
 
         # Verify agent name is captured
         assert transaction["transaction"] == "invoke_agent test_scope_agent"
@@ -2525,7 +2525,7 @@ async def test_available_tools_without_description(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_agent = get_test_agent()
@@ -2586,7 +2586,7 @@ async def test_output_with_tool_calls(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     test_agent = get_test_agent()
@@ -2661,7 +2661,7 @@ async def test_message_formatting_with_different_parts(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     # Create message history with different part types
@@ -2791,7 +2791,7 @@ async def test_agent_without_name(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -2809,7 +2809,7 @@ async def test_agent_without_name(
         await agent.run("Test input")
 
         # Should still create transaction, just with default name
-        (transaction,) = (item.payload for item in items if item.type == "transaction")
+        (transaction,) = (item.payload for item in items)
 
         # Transaction name should be "invoke_agent agent" or similar default
         assert "invoke_agent" in transaction["transaction"]
@@ -3007,7 +3007,7 @@ async def test_message_parts_with_tool_return(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming or stream_gen_ai_spans:
@@ -3954,7 +3954,7 @@ async def test_binary_content_encoding_image(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -3999,7 +3999,7 @@ async def test_binary_content_encoding_image(
             _set_input_messages(span, [mock_msg])
             span.finish()
 
-        (event,) = (item.payload for item in items if item.type == "transaction")
+        (event,) = (item.payload for item in items)
         span_data = event["spans"][0]["data"]
         messages_data = _get_messages_from_span(span_data)
         assert _find_binary_content(messages_data, "image", "image/png")
@@ -4041,7 +4041,7 @@ async def test_binary_content_encoding_mixed_content(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -4099,7 +4099,7 @@ async def test_binary_content_encoding_mixed_content(
             _set_input_messages(span, [mock_msg])
             span.finish()
 
-        (event,) = (item.payload for item in items if item.type == "transaction")
+        (event,) = (item.payload for item in items)
         span_data = event["spans"][0]["data"]
         messages_data = _get_messages_from_span(span_data)
 
@@ -4163,7 +4163,7 @@ async def test_binary_content_in_agent_run(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     binary_content = BinaryContent(
@@ -4221,7 +4221,7 @@ async def test_set_usage_data_with_cache_tokens(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -4263,7 +4263,7 @@ async def test_set_usage_data_with_cache_tokens(
             _set_usage_data(span, usage)
             span.finish()
 
-        (event,) = (item.payload for item in items if item.type == "transaction")
+        (event,) = (item.payload for item in items)
         (span_data,) = event["spans"]
         assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
         assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
@@ -4347,7 +4347,7 @@ def test_image_url_base64_content_in_span(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     found_image = False
@@ -4455,7 +4455,7 @@ async def test_invoke_agent_image_url(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     agent = Agent("test", name="test_image_url_agent")
@@ -4535,7 +4535,7 @@ async def test_tool_description_in_execute_tool_span(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming or stream_gen_ai_spans:

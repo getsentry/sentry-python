@@ -732,17 +732,20 @@ def test_outgoing_trace_headers_span_streaming(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[HttpxIntegration()],
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     url = "http://example.com/"
 
     items = capture_items("span")
 
-    if asyncio.iscoroutinefunction(httpx_client.get):
-        response = asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
-    else:
-        response = httpx_client.get(url)
+    with sentry_sdk.traces.start_span(name="test"):
+        if asyncio.iscoroutinefunction(httpx_client.get):
+            response = asyncio.get_event_loop().run_until_complete(
+                httpx_client.get(url)
+            )
+        else:
+            response = httpx_client.get(url)
 
     sentry_sdk.flush()
 
@@ -773,7 +776,7 @@ def test_outgoing_trace_headers_append_to_baggage_span_streaming(
         traces_sample_rate=1.0,
         integrations=[HttpxIntegration()],
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     url = "http://example.com/"
@@ -781,12 +784,13 @@ def test_outgoing_trace_headers_append_to_baggage_span_streaming(
     items = capture_items("span")
 
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=500000):
-        if asyncio.iscoroutinefunction(httpx_client.get):
-            response = asyncio.get_event_loop().run_until_complete(
-                httpx_client.get(url, headers={"baGGage": "custom=data"})
-            )
-        else:
-            response = httpx_client.get(url, headers={"baGGage": "custom=data"})
+        with sentry_sdk.traces.start_span(name="test"):
+            if asyncio.iscoroutinefunction(httpx_client.get):
+                response = asyncio.get_event_loop().run_until_complete(
+                    httpx_client.get(url, headers={"baGGage": "custom=data"})
+                )
+            else:
+                response = httpx_client.get(url, headers={"baGGage": "custom=data"})
 
     sentry_sdk.flush()
 
@@ -797,6 +801,87 @@ def test_outgoing_trace_headers_append_to_baggage_span_streaming(
     assert f"sentry-trace_id={http_span['trace_id']}" in baggage
     assert "sentry-sample_rand=0.500000" in baggage
     assert "sentry-sampled=true" in baggage
+
+
+def test_outgoing_trace_headers_span_streaming_no_current_span(sentry_init, httpx_mock):
+    """
+    Even when there is no active span, trace propagation headers should still
+    be attached to outgoing requests when span streaming is enabled.
+
+    This is deliberately different from the legacy (transaction-based) approach,
+    which does not propagate outside of a transaction (see
+    ``test_do_not_propagate_outside_transaction``). The streamed approach
+    propagates from the current scope's propagation context regardless of
+    whether a span is active.
+    """
+    httpx_mock.add_response()
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_propagation_targets=[MATCH_ALL],
+        integrations=[HttpxIntegration()],
+        trace_lifecycle="stream",
+    )
+
+    url = "http://example.com/"
+
+    httpx_client = httpx.Client()
+
+    # No start_span / start_transaction -> get_current_span() is None
+    assert sentry_sdk.traces.get_current_span() is None
+
+    response = httpx_client.get(url)
+
+    assert response.status_code == 200
+
+    # Trace is still propagated from the scope's propagation context
+    request_headers = httpx_mock.get_request().headers
+    assert "sentry-trace" in request_headers
+    assert "baggage" in request_headers
+
+    # The propagated headers describe a single, coherent trace: the trace_id in
+    # sentry-trace matches the one carried in baggage.
+    trace_id = request_headers["sentry-trace"].split("-")[0]
+    assert f"sentry-trace_id={trace_id}" in request_headers["baggage"]
+
+
+def test_outgoing_trace_headers_span_streaming_no_current_span_async(
+    sentry_init, httpx_mock
+):
+    """
+    The async client must match the sync client: trace propagation headers are
+    attached to outgoing requests even when there is no active span and span
+    streaming is enabled.
+    """
+    httpx_mock.add_response()
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_propagation_targets=[MATCH_ALL],
+        integrations=[HttpxIntegration()],
+        trace_lifecycle="stream",
+    )
+
+    url = "http://example.com/"
+
+    httpx_client = httpx.AsyncClient()
+
+    # No start_span / start_transaction -> get_current_span() is None
+    assert sentry_sdk.traces.get_current_span() is None
+
+    response = asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
+
+    assert response.status_code == 200
+
+    # Trace is still propagated from the scope's propagation context
+    request_headers = httpx_mock.get_request().headers
+    assert "sentry-trace" in request_headers
+    assert "baggage" in request_headers
+
+    # The propagated headers describe a single, coherent trace: the trace_id in
+    # sentry-trace matches the one carried in baggage.
+    trace_id = request_headers["sentry-trace"].split("-")[0]
+    assert f"sentry-trace_id={trace_id}" in request_headers["baggage"]
 
 
 @pytest.mark.parametrize(
@@ -813,17 +898,18 @@ def test_request_source_disabled_span_streaming(
         traces_sample_rate=1.0,
         enable_http_request_source=False,
         http_request_source_threshold_ms=0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
 
     url = "http://example.com/"
 
-    if asyncio.iscoroutinefunction(httpx_client.get):
-        asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
-    else:
-        httpx_client.get(url)
+    with sentry_sdk.traces.start_span(name="test"):
+        if asyncio.iscoroutinefunction(httpx_client.get):
+            asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
+        else:
+            httpx_client.get(url)
 
     sentry_sdk.flush()
 
@@ -853,7 +939,7 @@ def test_request_source_enabled_span_streaming(
         "integrations": [HttpxIntegration()],
         "traces_sample_rate": 1.0,
         "http_request_source_threshold_ms": 0,
-        "_experiments": {"trace_lifecycle": "stream"},
+        "trace_lifecycle": "stream",
     }
     if enable_http_request_source is not None:
         sentry_options["enable_http_request_source"] = enable_http_request_source
@@ -864,10 +950,11 @@ def test_request_source_enabled_span_streaming(
 
     url = "http://example.com/"
 
-    if asyncio.iscoroutinefunction(httpx_client.get):
-        asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
-    else:
-        httpx_client.get(url)
+    with sentry_sdk.traces.start_span(name="test"):
+        if asyncio.iscoroutinefunction(httpx_client.get):
+            asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
+        else:
+            httpx_client.get(url)
 
     sentry_sdk.flush()
 
@@ -893,17 +980,18 @@ def test_request_source_span_streaming(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
 
     url = "http://example.com/"
 
-    if asyncio.iscoroutinefunction(httpx_client.get):
-        asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
-    else:
-        httpx_client.get(url)
+    with sentry_sdk.traces.start_span(name="test"):
+        if asyncio.iscoroutinefunction(httpx_client.get):
+            asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
+        else:
+            httpx_client.get(url)
 
     sentry_sdk.flush()
 
@@ -950,23 +1038,24 @@ def test_request_source_with_module_in_search_path_span_streaming(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
 
     url = "http://example.com/"
 
-    if asyncio.iscoroutinefunction(httpx_client.get):
-        from httpx_helpers.helpers import async_get_request_with_client
+    with sentry_sdk.traces.start_span(name="test"):
+        if asyncio.iscoroutinefunction(httpx_client.get):
+            from httpx_helpers.helpers import async_get_request_with_client
 
-        asyncio.get_event_loop().run_until_complete(
-            async_get_request_with_client(httpx_client, url)
-        )
-    else:
-        from httpx_helpers.helpers import get_request_with_client
+            asyncio.get_event_loop().run_until_complete(
+                async_get_request_with_client(httpx_client, url)
+            )
+        else:
+            from httpx_helpers.helpers import get_request_with_client
 
-        get_request_with_client(httpx_client, url)
+            get_request_with_client(httpx_client, url)
 
     sentry_sdk.flush()
 
@@ -1011,17 +1100,18 @@ def test_no_request_source_if_duration_too_short_span_streaming(
         enable_http_request_source=True,
         # Threshold so high no real request will ever exceed it
         http_request_source_threshold_ms=9999999,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
 
     url = "http://example.com/"
 
-    if asyncio.iscoroutinefunction(httpx_client.get):
-        asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
-    else:
-        httpx_client.get(url)
+    with sentry_sdk.traces.start_span(name="test"):
+        if asyncio.iscoroutinefunction(httpx_client.get):
+            asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
+        else:
+            httpx_client.get(url)
 
     sentry_sdk.flush()
 
@@ -1048,17 +1138,18 @@ def test_request_source_if_duration_over_threshold_span_streaming(
         enable_http_request_source=True,
         # Threshold of 0 means any non-zero duration qualifies
         http_request_source_threshold_ms=0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
 
     url = "http://example.com/"
 
-    if asyncio.iscoroutinefunction(httpx_client.get):
-        asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
-    else:
-        httpx_client.get(url)
+    with sentry_sdk.traces.start_span(name="test"):
+        if asyncio.iscoroutinefunction(httpx_client.get):
+            asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
+        else:
+            httpx_client.get(url)
 
     sentry_sdk.flush()
 
@@ -1100,17 +1191,18 @@ def test_span_origin_span_streaming(
     sentry_init(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
 
     url = "http://example.com/"
 
-    if asyncio.iscoroutinefunction(httpx_client.get):
-        asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
-    else:
-        httpx_client.get(url)
+    with sentry_sdk.traces.start_span(name="test"):
+        if asyncio.iscoroutinefunction(httpx_client.get):
+            asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
+        else:
+            httpx_client.get(url)
 
     sentry_sdk.flush()
 
@@ -1133,17 +1225,18 @@ def test_http_url_attributes_span_streaming(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
 
     url = "http://example.com/?foo=bar#frag"
 
-    if asyncio.iscoroutinefunction(httpx_client.get):
-        asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
-    else:
-        httpx_client.get(url)
+    with sentry_sdk.traces.start_span(name="test"):
+        if asyncio.iscoroutinefunction(httpx_client.get):
+            asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
+        else:
+            httpx_client.get(url)
 
     sentry_sdk.flush()
 
@@ -1153,7 +1246,7 @@ def test_http_url_attributes_span_streaming(
     assert http_span["attributes"]["http.response.status_code"] == 200
 
     if send_default_pii:
-        assert http_span["attributes"]["url.full"] == "http://example.com/"
+        assert http_span["attributes"]["url.full"] == "http://example.com/?foo=bar#frag"
         assert http_span["attributes"]["url.query"] == "foo=bar"
         assert http_span["attributes"]["url.fragment"] == "frag"
     else:
@@ -1176,17 +1269,18 @@ def test_http_url_attributes_no_query_or_fragment_span_streaming(
         integrations=[HttpxIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
 
     url = "http://example.com/"
 
-    if asyncio.iscoroutinefunction(httpx_client.get):
-        asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
-    else:
-        httpx_client.get(url)
+    with sentry_sdk.traces.start_span(name="test"):
+        if asyncio.iscoroutinefunction(httpx_client.get):
+            asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
+        else:
+            httpx_client.get(url)
 
     sentry_sdk.flush()
 

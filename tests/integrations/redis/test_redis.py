@@ -63,7 +63,7 @@ def test_redis_pipeline(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     connection = FakeStrictRedis()
@@ -123,7 +123,7 @@ def test_sensitive_data(sentry_init, capture_events, capture_items, span_streami
             integrations=[RedisIntegration()],
             traces_sample_rate=1.0,
             send_default_pii=True,
-            _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+            trace_lifecycle="stream" if span_streaming else "static",
         )
 
         connection = FakeStrictRedis()
@@ -159,7 +159,7 @@ def test_pii_data_redacted(sentry_init, capture_events, capture_items, span_stre
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     connection = FakeStrictRedis()
@@ -207,7 +207,7 @@ def test_pii_data_sent(sentry_init, capture_events, capture_items, span_streamin
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     connection = FakeStrictRedis()
@@ -263,7 +263,7 @@ def test_no_data_truncation_by_default(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     connection = FakeStrictRedis()
@@ -313,7 +313,7 @@ def test_data_truncation_custom(
         integrations=[RedisIntegration(max_data_size=30)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     connection = FakeStrictRedis()
@@ -411,7 +411,7 @@ def test_db_connection_attributes_client(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[RedisIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -459,7 +459,7 @@ def test_db_connection_attributes_pipeline(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[RedisIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -512,7 +512,7 @@ def test_span_origin(sentry_init, capture_events, capture_items, span_streaming)
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     connection = FakeStrictRedis()

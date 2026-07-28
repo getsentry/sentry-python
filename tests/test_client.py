@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 import time
+import warnings
 from collections import Counter, defaultdict
 from collections.abc import Mapping
 from textwrap import dedent
@@ -1522,6 +1523,28 @@ def test_dropped_transaction(sentry_init, capture_record_lost_event_calls, test_
 def test_enable_tracing_deprecated(sentry_init, enable_tracing):
     with pytest.warns(DeprecationWarning):
         sentry_init(enable_tracing=enable_tracing)
+
+
+def test_ignore_spans_warns_without_streaming(sentry_init):
+    with pytest.warns(UserWarning, match=r"`ignore_spans` parameter only works"):
+        sentry_init(ignore_spans=["/health"], trace_lifecycle="static")
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"ignore_spans": ["/health"], "trace_lifecycle": "stream"},
+        {"ignore_spans": ["/health"], "_experiments": {"trace_lifecycle": "stream"}},
+        {},
+    ],
+)
+def test_ignore_spans_does_not_warn(sentry_init, options):
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        sentry_init(**options)
+
+    ignore_spans_warnings = [w for w in caught if "ignore_spans" in str(w.message)]
+    assert ignore_spans_warnings == []
 
 
 def make_options_transport_cls():
