@@ -28,6 +28,11 @@ targets:
           - python3.11
           - python3.12
           - python3.13
+          - python3.14
+    compatibleArchitectures:
+      # Both x86_64 and arm64 are supported by default; explicitly listing for better visibility
+      - x86_64
+      - arm64
     license: MIT
   - name: sentry-pypi
     internalPypiRepo: getsentry/pypi
