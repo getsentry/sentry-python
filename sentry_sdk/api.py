@@ -76,6 +76,7 @@ __all__ = [
     "push_scope",
     "remove_attribute",
     "set_attribute",
+    "set_attributes",
     "set_context",
     "set_extra",
     "set_level",
@@ -298,10 +299,21 @@ def set_attribute(attribute: str, value: "Any") -> None:
     """
     Set an attribute.
 
-    Any attributes-based telemetry (logs, metrics) captured in this scope will
-    include this attribute.
+    Any attributes-based telemetry (logs, metrics, streamed spans) captured in
+    this scope will include this attribute.
     """
     return get_isolation_scope().set_attribute(attribute, value)
+
+
+@scopemethod
+def set_attributes(attributes: "dict[str, Any]") -> None:
+    """
+    Set multiple attributes.
+
+    Any attributes-based telemetry (logs, metrics, streamed spans) captured in
+    this scope will include these attributes.
+    """
+    return get_isolation_scope().set_attributes(attributes)
 
 
 @scopemethod

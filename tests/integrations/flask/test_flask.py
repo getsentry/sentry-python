@@ -130,7 +130,7 @@ def test_transaction_or_segment_style(
 
     if span_streaming:
         sentry_sdk.flush()
-        spans = [i.payload for i in items if i.type == "span"]
+        spans = [i.payload for i in items]
         assert len(spans) == 1
         (segment,) = spans
         assert segment["name"] == expected_transaction
@@ -1122,7 +1122,7 @@ def test_span_origin(sentry_init, app, capture_events, capture_items, span_strea
 
     if span_streaming:
         sentry_sdk.flush()
-        spans = [i.payload for i in items if i.type == "span"]
+        spans = [i.payload for i in items]
         assert len(spans) == 1
         (segment,) = spans
         assert segment["attributes"]["sentry.origin"] == "auto.http.flask"
@@ -1165,7 +1165,7 @@ def test_transaction_or_segment_http_method_default(
 
     if span_streaming:
         sentry_sdk.flush()
-        spans = [i.payload for i in items if i.type == "span"]
+        spans = [i.payload for i in items]
         assert len(spans) == 1
         (segment,) = spans
         assert segment["attributes"]["http.request.method"] == "GET"
@@ -1216,7 +1216,7 @@ def test_transaction_or_segment_http_method_custom(
 
     if span_streaming:
         sentry_sdk.flush()
-        spans = [i.payload for i in items if i.type == "span"]
+        spans = [i.payload for i in items]
         assert len(spans) == 2
         (options_segment, head_segment) = spans
         assert options_segment["attributes"]["http.request.method"] == "OPTIONS"
@@ -1360,7 +1360,7 @@ def test_span_http_query_data_collection(
 
     sentry_sdk.flush()
 
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     (segment,) = spans
 
     if expected_query is None:
@@ -1424,7 +1424,7 @@ def test_user_info_span_attributes_data_collection(
 
     sentry_sdk.flush()
 
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     (segment,) = spans
 
     if expect_ip:
@@ -1575,7 +1575,7 @@ def test_flask_login_user_identity_span_attributes_data_collection(
 
     sentry_sdk.flush()
 
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     segment = next(s for s in spans if s["name"] == "hi")
 
     if expect_user:
