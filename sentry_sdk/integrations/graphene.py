@@ -116,12 +116,13 @@ def _event_processor(event: "Event", hint: "Dict[str, Any]") -> "Event":
         if client_options["data_collection"]["graphql"]["document"]:
             request_info = event.setdefault("request", {})
             request_info["api_target"] = "graphql"
+        elif event.get("request", {}).get("data"):
+            del event["request"]["data"]
     elif should_send_default_pii():
         request_info = event.setdefault("request", {})
         request_info["api_target"] = "graphql"
-    else:
-        if event.get("request", {}).get("data"):
-            del event["request"]["data"]
+    elif event.get("request", {}).get("data"):
+        del event["request"]["data"]
 
     return event
 

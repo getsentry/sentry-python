@@ -3211,7 +3211,7 @@ def test_langchain_error(
         with start_transaction(), pytest.raises(ValueError):
             list(agent_executor.stream({"input": "How many letters in the word eudca"}))
 
-        (error,) = (item.payload for item in items if item.type == "event")
+        (error,) = (item.payload for item in items)
     else:
         events = capture_events()
 
