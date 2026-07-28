@@ -15,7 +15,7 @@ def test_getaddrinfo_trace(sentry_init, capture_events, capture_items, span_stre
     sentry_init(
         integrations=[SocketIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -24,7 +24,7 @@ def test_getaddrinfo_trace(sentry_init, capture_events, capture_items, span_stre
             socket.getaddrinfo("localhost", PORT)
         sentry_sdk.flush()
 
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         dns_span, _root = spans
 
         assert dns_span["attributes"]["sentry.op"] == "socket.dns"
@@ -60,7 +60,7 @@ def test_create_connection_trace(
     sentry_init(
         integrations=[SocketIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -69,7 +69,7 @@ def test_create_connection_trace(
             socket.create_connection(("localhost", PORT), timeout, None)
         sentry_sdk.flush()
 
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         # as getaddrinfo gets called in create_connection it should also contain a dns span
         # spans finish in order: dns (inner) ends first, connect ends, then root
         dns_span, connect_span, _root = spans
@@ -118,7 +118,7 @@ def test_span_origin(sentry_init, capture_events, capture_items, span_streaming)
     sentry_init(
         integrations=[SocketIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -127,7 +127,7 @@ def test_span_origin(sentry_init, capture_events, capture_items, span_streaming)
             socket.create_connection(("localhost", PORT), 1, None)
         sentry_sdk.flush()
 
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         dns_span, connect_span, _root = spans
 
         assert connect_span["attributes"]["sentry.op"] == "socket.connection"

@@ -240,7 +240,7 @@ def test_launchdarkly_span_integration(
         sentry_init(
             traces_sample_rate=1.0,
             integrations=[LaunchDarklyIntegration()],
-            _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+            trace_lifecycle="stream" if span_streaming else "static",
         )
         client = ldclient.get()
     else:
@@ -248,7 +248,7 @@ def test_launchdarkly_span_integration(
         sentry_init(
             traces_sample_rate=1.0,
             integrations=[LaunchDarklyIntegration(ld_client=client)],
-            _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+            trace_lifecycle="stream" if span_streaming else "static",
         )
 
     if span_streaming:

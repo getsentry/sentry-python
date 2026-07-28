@@ -161,10 +161,6 @@ class CommandTracer(monitoring.CommandListener):
                     **db_data,
                 }
 
-                span = sentry_sdk.traces.start_span(
-                    name=query, attributes=span_first_data
-                )
-
                 with capture_internal_exceptions():
                     sentry_sdk.add_breadcrumb(
                         message=query,
@@ -172,6 +168,13 @@ class CommandTracer(monitoring.CommandListener):
                         type=OP.DB,
                         data=span_first_data,
                     )
+
+                if sentry_sdk.traces.get_current_span() is None:
+                    return
+
+                span = sentry_sdk.traces.start_span(
+                    name=query, attributes=span_first_data
+                )
 
             else:
                 tags = {

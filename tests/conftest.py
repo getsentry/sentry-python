@@ -1432,6 +1432,7 @@ def nonstreaming_responses_model_response():
             input_tokens=10,
             input_tokens_details=openai.types.responses.response_usage.InputTokensDetails(
                 cached_tokens=0,
+                cache_write_tokens=0,
             ),
             output_tokens=20,
             output_tokens_details=openai.types.responses.response_usage.OutputTokensDetails(

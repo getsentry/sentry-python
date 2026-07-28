@@ -508,7 +508,7 @@ def test_active_thread_id_span_streaming(sentry_init, capture_items, endpoint):
         auto_enabling_integrations=False,  # Ensure httpx is not auto-enabled; its legacy start_span interferes with streaming mode
         integrations=[StarletteIntegration(), FastApiIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     app = fastapi_app_factory()
 
@@ -725,7 +725,8 @@ def test_transaction_name(
         segment = segments[0]
         assert segment["name"] == expected_transaction_name
         assert (
-            segment["attributes"]["sentry.span.source"] == expected_transaction_source
+            segment["attributes"]["sentry.segment.name.source"]
+            == expected_transaction_source
         )
     else:
         (_, transaction_envelope) = envelopes
@@ -780,7 +781,7 @@ def test_transaction_name_with_prefix(
         assert len(segments) == 1
         segment = segments[0]
         assert segment["name"] == "/api/users/{user_id}"
-        assert segment["attributes"]["sentry.span.source"] == "route"
+        assert segment["attributes"]["sentry.segment.name.source"] == "route"
     else:
         (transaction_envelope,) = envelopes
         transaction_event = transaction_envelope.get_transaction_event()
