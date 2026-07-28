@@ -695,6 +695,12 @@ class SPANDATA:
     Example: 0.1
     """
 
+    GEN_AI_REQUEST_REASONING_LEVEL = "gen_ai.request.reasoning.level"
+    """
+    The reasoning or thinking effort level requested for a GenAI model.
+    Example: "high"
+    """
+
     GEN_AI_REQUEST_SEED = "gen_ai.request.seed"
     """
     The seed, ideally models given the same seed and same other parameters will produce the exact same output.
@@ -1336,6 +1342,7 @@ class ClientConstructor:
         trace_ignore_status_codes: "AbstractSet[int]" = frozenset(),
         enable_metrics: bool = True,
         before_send_metric: "Optional[Callable[[Metric, Hint], Optional[Metric]]]" = None,
+        before_send_span: "Optional[Callable[[SpanJSON, Hint], Optional[SpanJSON]]]" = None,
         org_id: "Optional[str]" = None,
         strict_trace_continuation: bool = False,
         stream_gen_ai_spans: bool = True,
@@ -1755,6 +1762,11 @@ class ClientConstructor:
         :param org_id: An optional organization ID. The SDK will try to extract if from the DSN in most cases
             but you can provide it explicitly for self-hosted and Relay setups. This value is used for
             trace propagation and for features like `strict_trace_continuation`.
+
+        :param before_send_span: An optional function to modify spans before they're sent to Sentry.
+            Modifications to the span's attributes and name will be retained. Unlike ``before_send_log``
+            and ``before_send_metric``, spans cannot be dropped by returning None. Only works when
+            ``trace_lifecycle="stream"`` is enabled.
 
         :param stream_gen_ai_spans: When set, generative AI spans are sent in a new transport format to
             reduce downstream data loss.
