@@ -8,11 +8,14 @@ from urllib.parse import urlsplit
 import sentry_sdk
 from sentry_sdk import continue_trace
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.data_collection import (
+    _apply_data_collection_filtering_to_query_string,
+)
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import SegmentSource, StreamedSpan
+from sentry_sdk.traces import SegmentNameSource, StreamedSpan
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -21,6 +24,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    has_data_collection_enabled,
     parse_version,
     reraise,
 )
@@ -192,8 +196,12 @@ async def _context_enter(request: "Request") -> None:
         sentry_sdk.traces.continue_trace(dict(request.headers))
         scope.set_custom_sampling_context({"sanic_request": request})
 
-        if should_send_default_pii() and request.remote_addr:
-            scope.set_attribute(SPANDATA.USER_IP_ADDRESS, request.remote_addr)
+        if request.remote_addr:
+            if has_data_collection_enabled(client.options):
+                if client.options["data_collection"]["user_info"]:
+                    scope.set_attribute(SPANDATA.USER_IP_ADDRESS, request.remote_addr)
+            elif should_send_default_pii():
+                scope.set_attribute(SPANDATA.USER_IP_ADDRESS, request.remote_addr)
 
         span = sentry_sdk.traces.start_span(
             # Unless the request results in a 404 error, the name and source
@@ -202,7 +210,7 @@ async def _context_enter(request: "Request") -> None:
             attributes={
                 "sentry.op": OP.HTTP_SERVER,
                 "sentry.origin": SanicIntegration.origin,
-                "sentry.span.source": SegmentSource.URL.value,
+                "sentry.segment.name.source": SegmentNameSource.URL.value,
             },
             parent_span=None,
         )
@@ -379,19 +387,40 @@ def _get_request_attributes(request: "Request") -> "Dict[str, Any]":
         attributes[f"{SPANDATA.HTTP_REQUEST_HEADER}.{header.lower()}"] = value
 
     urlparts = urlsplit(request.url)
+    client_options = sentry_sdk.get_client().options
 
-    if should_send_default_pii():
+    if has_data_collection_enabled(client_options):
+        attributes["url.path"] = urlparts.path
+
+        filtered_query = None
+        if urlparts.query:
+            filtered_query = _apply_data_collection_filtering_to_query_string(
+                query_string=urlparts.query,
+                behaviour=client_options["data_collection"]["url_query_params"],
+            )
+            if filtered_query:
+                attributes[SPANDATA.HTTP_QUERY] = filtered_query
+
+        attributes[SPANDATA.URL_FULL] = urlparts._replace(
+            query=filtered_query or ""
+        ).geturl()
+
+        if request.remote_addr:
+            if client_options["data_collection"]["user_info"]:
+                attributes[SPANDATA.CLIENT_ADDRESS] = request.remote_addr
+
+    elif should_send_default_pii():
         attributes[SPANDATA.URL_FULL] = request.url
         attributes["url.path"] = urlparts.path
 
         if urlparts.query:
             attributes[SPANDATA.HTTP_QUERY] = urlparts.query
 
+        if request.remote_addr:
+            attributes[SPANDATA.CLIENT_ADDRESS] = request.remote_addr
+
     if urlparts.scheme:
         attributes[SPANDATA.NETWORK_PROTOCOL_NAME] = urlparts.scheme
-
-    if should_send_default_pii() and request.remote_addr:
-        attributes[SPANDATA.CLIENT_ADDRESS] = request.remote_addr
 
     return attributes
 
@@ -421,7 +450,18 @@ def _make_request_processor(weak_request: "Callable[[], Request]") -> "EventProc
                 urlparts.path,
             )
 
-            request_info["query_string"] = urlparts.query
+            client_options = sentry_sdk.get_client().options
+            if has_data_collection_enabled(client_options):
+                if urlparts.query:
+                    filtered_query = _apply_data_collection_filtering_to_query_string(
+                        query_string=urlparts.query,
+                        behaviour=client_options["data_collection"]["url_query_params"],
+                    )
+                    if filtered_query:
+                        request_info["query_string"] = filtered_query
+            else:
+                request_info["query_string"] = urlparts.query
+
             request_info["method"] = request.method
             request_info["env"] = {"REMOTE_ADDR": request.remote_addr}
             request_info["headers"] = _filter_headers(dict(request.headers))

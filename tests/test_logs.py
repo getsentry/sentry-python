@@ -163,6 +163,29 @@ def test_logs_before_send_log_experimental_option_still_works(
 
 
 @minimum_python_37
+@pytest.mark.tests_internal_exceptions
+def test_logs_before_send_log_raises_does_not_crash_application(
+    sentry_init, capture_items
+):
+    def _before_log(record, hint):
+        raise ValueError("before_send_log error")
+
+    sentry_init(
+        enable_logs=True,
+        before_send_log=_before_log,
+    )
+    items = capture_items("log")
+
+    sentry_sdk.logger.error("This is an error log...")
+
+    get_client().flush()
+    logs = [item.payload for item in items]
+
+    # The exception in before_send_log is swallowed and the log is dropped.
+    assert not logs
+
+
+@minimum_python_37
 def test_logs_attributes(sentry_init, capture_items):
     """
     Passing arbitrary attributes to log messages.
@@ -282,6 +305,24 @@ def test_logs_tied_to_transactions(sentry_init, capture_items):
 
 
 @minimum_python_37
+def test_logs_tied_to_segments(sentry_init, capture_items):
+    """
+    Log messages are also tied to segments.
+    """
+    sentry_init(enable_logs=True, traces_sample_rate=1.0, trace_lifecycle="stream")
+    items = capture_items("log")
+
+    with sentry_sdk.traces.start_span(name="test-segment") as sgmt:
+        sentry_sdk.logger.warning("This is a log tied to a segment")
+
+    sentry_sdk.flush()
+    logs = [item.payload for item in items]
+
+    assert "span_id" in logs[0]
+    assert logs[0]["span_id"] == sgmt.span_id
+
+
+@minimum_python_37
 def test_logs_no_span_id_without_active_span(sentry_init, capture_items):
     """
     Per the metrics spec, span_id is only attached when a span is active
@@ -312,6 +353,23 @@ def test_logs_tied_to_spans(sentry_init, capture_items):
             sentry_sdk.logger.warning("This is a log tied to a span")
 
     get_client().flush()
+    logs = [item.payload for item in items]
+    assert logs[0]["span_id"] == span.span_id
+
+
+@minimum_python_37
+def test_logs_tied_to_spans_span_streaming(sentry_init, capture_items):
+    """
+    Log messages are also tied to spans.
+    """
+    sentry_init(enable_logs=True, traces_sample_rate=1.0, trace_lifecycle="stream")
+    items = capture_items("log")
+
+    with sentry_sdk.traces.start_span(name="test-segment"):
+        with sentry_sdk.traces.start_span(name="test-span") as span:
+            sentry_sdk.logger.warning("This is a log tied to a span")
+
+    sentry_sdk.flush()
     logs = [item.payload for item in items]
     assert logs[0]["span_id"] == span.span_id
 

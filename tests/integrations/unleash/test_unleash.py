@@ -181,7 +181,7 @@ def test_unleash_span_integration(
         sentry_init(
             traces_sample_rate=1.0,
             integrations=[UnleashIntegration()],
-            _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+            trace_lifecycle="stream" if span_streaming else "static",
         )
 
         client = UnleashClient()  # type: ignore[arg-type]

@@ -9,6 +9,7 @@ import pytest
 import sentry_sdk
 from sentry_sdk import set_measurement, start_span, start_transaction
 from sentry_sdk.consts import MATCH_ALL
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span, Transaction
 from sentry_sdk.tracing_utils import should_propagate_trace
 from sentry_sdk.utils import Dsn
@@ -176,6 +177,23 @@ def test_finds_transaction_on_scope(sentry_init):
     assert scope._span.name == "dogpark"
 
 
+def test_finds_segment_on_scope(sentry_init):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    with sentry_sdk.traces.start_span(name="dogpark"):
+        scope = sentry_sdk.get_current_scope()
+        assert scope.streamed_span is not None
+        assert isinstance(scope.streamed_span, StreamedSpan)
+        assert scope.streamed_span.name == "dogpark"
+
+        assert scope._span is not None
+        assert isinstance(scope._span, StreamedSpan)
+        assert scope._span.name == "dogpark"
+
+
 def test_finds_transaction_when_descendent_span_is_on_scope(
     sentry_init,
 ):
@@ -227,6 +245,22 @@ def test_finds_non_orphan_span_on_scope(sentry_init):
     assert scope._span is not None
     assert isinstance(scope._span, Span)
     assert scope._span.op == "sniffing"
+
+
+def test_finds_non_orphan_span_on_scope_span_streaming(sentry_init):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    segment = sentry_sdk.traces.start_span(name="dogpark")
+    sentry_sdk.traces.start_span(name="sniffing", parent_span=segment)
+
+    scope = sentry_sdk.get_current_scope()
+
+    assert scope._span is not None
+    assert isinstance(scope._span, StreamedSpan)
+    assert scope._span.name == "sniffing"
 
 
 def test_circular_references(monkeypatch, sentry_init, request):
@@ -302,7 +336,50 @@ def test_circular_references(monkeypatch, sentry_init, request):
     assert gc.collect() == 0
 
 
-def test_set_meaurement(sentry_init, capture_events):
+def test_circular_references_span_streaming(monkeypatch, sentry_init, request):
+    gc.disable()
+    request.addfinalizer(gc.enable)
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    # Make sure that we're starting with a clean slate before we start creating
+    # transaction/span reference cycles
+    gc.collect()
+
+    dogpark_segment = sentry_sdk.traces.start_span(name="dogpark")
+    sniffing_span = sentry_sdk.traces.start_span(
+        name="sniffing", parent_span=dogpark_segment
+    )
+    wagging_span = sentry_sdk.traces.start_span(
+        name="wagging", parent_span=dogpark_segment
+    )
+
+    # At some point, you have to stop sniffing - there are balls to chase! - so finish
+    # this span while the dogpark transaction is still open
+    sniffing_span.end()
+
+    # The wagging, however, continues long past the dogpark, so that span will
+    # NOT finish before the transaction ends. (Doing it in this order proves
+    # that both finished and unfinished spans get their cycles broken.)
+    dogpark_segment.end()
+
+    # Eventually you gotta sleep...
+    wagging_span.end()
+
+    # assuming there are no cycles by this point, these should all be able to go
+    # out of scope and get their memory deallocated without the garbage
+    # collector having anything to do
+    del sniffing_span
+    del wagging_span
+    del dogpark_segment
+
+    assert gc.collect() == 0
+
+
+def test_set_measurement(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0)
 
     events = capture_events()
@@ -330,7 +407,7 @@ def test_set_meaurement(sentry_init, capture_events):
     assert event["measurements"]["metric.foobar"] == {"value": 17.99, "unit": "percent"}
 
 
-def test_set_meaurement_public_api(sentry_init, capture_events):
+def test_set_measurement_public_api(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0)
 
     events = capture_events()
@@ -498,7 +575,7 @@ def test_transaction_dropped_debug_not_started(sentry_init, sampled):
         )
 
 
-def test_transaction_dropeed_sampled_false(sentry_init):
+def test_transaction_dropped_sampled_false(sentry_init):
     sentry_init(traces_sample_rate=1.0)
 
     tx = Transaction(sampled=False)

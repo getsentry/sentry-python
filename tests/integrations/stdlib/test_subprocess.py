@@ -63,7 +63,7 @@ def test_subprocess_basic(
     sentry_init(
         integrations=[StdlibIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -298,7 +298,7 @@ def test_subprocess_empty_env(
     sentry_init(
         integrations=[StdlibIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         with sentry_sdk.traces.start_span(name="custom parent"):
@@ -327,7 +327,7 @@ def test_subprocess_invalid_args(
 ):
     sentry_init(
         integrations=[StdlibIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     with pytest.raises(TypeError) as excinfo:
@@ -346,7 +346,7 @@ def test_subprocess_span_origin(
     sentry_init(
         integrations=[StdlibIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:

@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan, get_current_span
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
@@ -118,7 +117,7 @@ async def _wrap_async_handler(
             # Extract information from request
             request_info = event.get("request", {})
             if info:
-                if "cookies" in info and should_send_default_pii():
+                if "cookies" in info:
                     request_info["cookies"] = info["cookies"]
                 if "data" in info:
                     request_info["data"] = info["data"]

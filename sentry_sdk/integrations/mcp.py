@@ -17,11 +17,10 @@ import sentry_sdk
 from sentry_sdk.ai.utils import _set_span_data_attribute, get_start_span_function
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.integrations._wsgi_common import nullcontext
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
-from sentry_sdk.utils import package_version, safe_serialize
+from sentry_sdk.utils import nullcontext, package_version, safe_serialize
 
 MCP_PACKAGE_VERSION = package_version("mcp")
 
@@ -363,15 +362,6 @@ def _set_span_output_data(
 
 
 # Handler data preparation and wrapping
-
-
-def _is_v2_context(original_args: "tuple[Any, ...]") -> bool:
-    """Check if original_args contains a v2 ServerRequestContext as the first element."""
-    return (
-        ServerRequestContext is not None
-        and bool(original_args)
-        and isinstance(original_args[0], ServerRequestContext)
-    )
 
 
 def _extract_handler_data_from_params(
