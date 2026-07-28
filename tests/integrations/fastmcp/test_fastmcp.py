@@ -293,7 +293,7 @@ async def test_fastmcp_tool_sync(
         integrations=[MCPIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp = FastMCP("Test Server")
@@ -324,7 +324,7 @@ async def test_fastmcp_tool_sync(
         }
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert len(spans) == 2
 
         # Verify span structure
@@ -405,7 +405,7 @@ async def test_fastmcp_tool_async(
         integrations=[MCPIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp = FastMCP("Test Server")
@@ -446,7 +446,7 @@ async def test_fastmcp_tool_async(
         }
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         spans = [
             span
             for span in spans
@@ -526,7 +526,7 @@ async def test_fastmcp_tool_with_error(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp = FastMCP("Test Server")
@@ -622,7 +622,7 @@ async def test_fastmcp_multiple_tools(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp = FastMCP("Test Server")
@@ -685,7 +685,7 @@ async def test_fastmcp_multiple_tools(
 
         sentry_sdk.flush()
         # Verify three spans were created
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         tool_spans = [
             s for s in spans if s["attributes"].get("sentry.op") == OP.MCP_SERVER
         ]
@@ -761,7 +761,7 @@ async def test_fastmcp_tool_with_complex_return(
         integrations=[MCPIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp = FastMCP("Test Server")
@@ -798,7 +798,7 @@ async def test_fastmcp_tool_with_complex_return(
 
         sentry_sdk.flush()
         # Verify span was created with complex data
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         tool_spans = [
             s for s in spans if s["attributes"].get("sentry.op") == OP.MCP_SERVER
         ]
@@ -866,7 +866,7 @@ async def test_fastmcp_prompt_sync(
         integrations=[MCPIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp = FastMCP("Test Server")
@@ -911,7 +911,7 @@ async def test_fastmcp_prompt_sync(
 
             sentry_sdk.flush()
             # Verify prompt span was created
-            spans = [item.payload for item in items if item.type == "span"]
+            spans = [item.payload for item in items]
             prompt_spans = [
                 s for s in spans if s["attributes"].get("sentry.op") == OP.MCP_SERVER
             ]
@@ -1058,7 +1058,7 @@ async def test_fastmcp_resource_sync(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp = FastMCP("Test Server")
@@ -1099,7 +1099,7 @@ async def test_fastmcp_resource_sync(
 
                 sentry_sdk.flush()
                 # Verify resource span was created
-                spans = [item.payload for item in items if item.type == "span"]
+                spans = [item.payload for item in items]
                 resource_spans = [
                     s
                     for s in spans
@@ -1167,7 +1167,7 @@ async def test_fastmcp_resource_async(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp = FastMCP("Test Server")
@@ -1214,7 +1214,7 @@ async def test_fastmcp_resource_async(
                 assert "resource data" in result.json()["result"]["contents"][0]["text"]
 
                 sentry_sdk.flush()
-                spans = [item.payload for item in items if item.type == "span"]
+                spans = [item.payload for item in items]
                 spans = [
                     span
                     for span in spans
@@ -1284,7 +1284,7 @@ async def test_fastmcp_span_origin(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp = FastMCP("Test Server")
@@ -1309,7 +1309,7 @@ async def test_fastmcp_span_origin(
 
         sentry_sdk.flush()
 
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         assert spans[-1]["attributes"]["sentry.origin"] == "manual"
 
         # Verify MCP span has correct origin
@@ -1361,7 +1361,7 @@ async def test_fastmcp_sse_transport(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp = FastMCP("Test Server")
@@ -1424,7 +1424,7 @@ async def test_fastmcp_sse_transport(
 
         sentry_sdk.flush()
         # Find MCP spans
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         mcp_spans = [
             s for s in spans if s["attributes"].get("sentry.op") == OP.MCP_SERVER
         ]
@@ -1486,7 +1486,7 @@ def test_fastmcp_http_transport(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp = FastMCP("Test Server")
@@ -1526,7 +1526,7 @@ def test_fastmcp_http_transport(
         }
 
         sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         spans = [
             span
             for span in spans
@@ -1581,7 +1581,7 @@ async def test_fastmcp_stdio_transport(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp = FastMCP("Test Server")
@@ -1610,7 +1610,7 @@ async def test_fastmcp_stdio_transport(
 
         sentry_sdk.flush()
         # Find MCP spans
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         mcp_spans = [
             s for s in spans if s["attributes"].get("sentry.op") == OP.MCP_SERVER
         ]
@@ -1818,7 +1818,7 @@ async def test_fastmcp_mixed_sync_async_tools(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     mcp = FastMCP("Test Server")
@@ -1861,7 +1861,7 @@ async def test_fastmcp_mixed_sync_async_tools(
 
         sentry_sdk.flush()
         # Verify both sync and async tool spans were created
-        spans = [item.payload for item in items if item.type == "span"]
+        spans = [item.payload for item in items]
         mcp_spans = [
             s for s in spans if s["attributes"].get("sentry.op") == OP.MCP_SERVER
         ]

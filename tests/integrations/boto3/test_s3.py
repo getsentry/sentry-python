@@ -28,7 +28,7 @@ def test_basic(
         # disabled because session.resource() or s3.Bucket() result in a subprocess span for a
         # shell that runs "uname -p 2> /dev/null" on Python 3.7 with boto3 version 1.12.49.
         default_integrations=False,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     s3 = session.resource("s3")
@@ -85,7 +85,7 @@ def test_streaming(
         traces_sample_rate=1.0,
         integrations=[Boto3Integration()],
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     s3 = session.resource("s3")
@@ -187,7 +187,7 @@ def test_streaming_close(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[Boto3Integration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     s3 = session.resource("s3")
@@ -243,7 +243,7 @@ def test_omit_url_data_if_parsing_fails(
         traces_sample_rate=1.0,
         integrations=[Boto3Integration()],
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     s3 = session.resource("s3")
@@ -329,7 +329,7 @@ def test_span_origin(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[Boto3Integration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     s3 = session.resource("s3")

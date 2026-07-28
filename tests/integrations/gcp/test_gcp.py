@@ -598,7 +598,7 @@ def test_span_streaming_no_error(run_cloud_function):
         + FUNCTIONS_PRELUDE
         + dedent(
             """
-        init_sdk(traces_sample_rate=1.0, _experiments={"trace_lifecycle": "stream"})
+        init_sdk(traces_sample_rate=1.0, trace_lifecycle="stream")
         gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
         """
         )
@@ -611,7 +611,7 @@ def test_span_streaming_no_error(run_cloud_function):
     assert segment_span["name"] == "Google Cloud function"
     assert segment_span["attributes"]["sentry.op"] == "function.gcp"
     assert segment_span["attributes"]["sentry.origin"] == "auto.function.gcp"
-    assert segment_span["attributes"]["sentry.span.source"] == "component"
+    assert segment_span["attributes"]["sentry.segment.name.source"] == "component"
     assert segment_span["attributes"]["cloud.provider"] == "gcp"
     assert segment_span["attributes"]["faas.name"] == "Google Cloud function"
     assert segment_span["attributes"]["gcp.project.id"] == "serverless_project"
@@ -632,7 +632,7 @@ def test_span_streaming_error(run_cloud_function):
         + FUNCTIONS_PRELUDE
         + dedent(
             """
-        init_sdk(traces_sample_rate=1.0, _experiments={"trace_lifecycle": "stream"})
+        init_sdk(traces_sample_rate=1.0, trace_lifecycle="stream")
         gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
         """
         )
@@ -651,7 +651,7 @@ def test_span_streaming_error(run_cloud_function):
     assert segment_span["name"] == "Google Cloud function"
     assert segment_span["attributes"]["sentry.op"] == "function.gcp"
     assert segment_span["attributes"]["sentry.origin"] == "auto.function.gcp"
-    assert segment_span["attributes"]["sentry.span.source"] == "component"
+    assert segment_span["attributes"]["sentry.segment.name.source"] == "component"
     assert segment_span["attributes"]["cloud.provider"] == "gcp"
     assert segment_span["attributes"]["faas.name"] == "Google Cloud function"
     assert segment_span["attributes"]["gcp.project.id"] == "serverless_project"
@@ -684,7 +684,7 @@ def test_span_streaming_existing_trace_context(run_cloud_function):
         + FUNCTIONS_PRELUDE
         + dedent(
             """
-        init_sdk(traces_sample_rate=1.0, _experiments={"trace_lifecycle": "stream"})
+        init_sdk(traces_sample_rate=1.0, trace_lifecycle="stream")
         gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
         """
         )
@@ -700,7 +700,7 @@ def test_span_streaming_existing_trace_context(run_cloud_function):
     assert segment_span["name"] == "Google Cloud function"
     assert segment_span["attributes"]["sentry.op"] == "function.gcp"
     assert segment_span["attributes"]["sentry.origin"] == "auto.function.gcp"
-    assert segment_span["attributes"]["sentry.span.source"] == "component"
+    assert segment_span["attributes"]["sentry.segment.name.source"] == "component"
     assert segment_span["attributes"]["cloud.provider"] == "gcp"
     assert segment_span["attributes"]["faas.name"] == "Google Cloud function"
     assert segment_span["attributes"]["gcp.project.id"] == "serverless_project"
@@ -729,7 +729,7 @@ def test_span_streaming_request_attributes(run_cloud_function):
         + FUNCTIONS_PRELUDE
         + dedent(
             """
-        init_sdk(traces_sample_rate=1.0, send_default_pii=True, _experiments={"trace_lifecycle": "stream"})
+        init_sdk(traces_sample_rate=1.0, send_default_pii=True, trace_lifecycle="stream")
         gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
         """
         )
@@ -770,7 +770,7 @@ def test_span_streaming_no_query_string_without_pii(run_cloud_function):
         + FUNCTIONS_PRELUDE
         + dedent(
             """
-        init_sdk(traces_sample_rate=1.0, send_default_pii=False, _experiments={"trace_lifecycle": "stream"})
+        init_sdk(traces_sample_rate=1.0, send_default_pii=False, trace_lifecycle="stream")
         gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
         """
         )
@@ -786,3 +786,170 @@ def test_span_streaming_no_query_string_without_pii(run_cloud_function):
     assert attrs["gcp.project.id"] == "serverless_project"
     assert attrs["faas.identity"] == "func_ID"
     assert attrs["faas.entry_point"] == "cloud_function"
+
+
+# Each case is (send_default_pii, data_collection, expected_event, expected_span).
+# ``send_default_pii`` / ``data_collection`` of None means the option is omitted.
+# The two paths only diverge for the legacy (no ``data_collection``) rows: the
+# event processor always records the raw query string, while the span-streaming
+# path gates the ``url.query`` attribute on ``send_default_pii``.
+_QUERY_STRING_DATA_COLLECTION_CASES = [
+    pytest.param(
+        True,
+        None,
+        "toy=tennisball&color=red&auth=secret",
+        "toy=tennisball&color=red&auth=secret",
+        id="send_default_pii_true",
+    ),
+    pytest.param(
+        False,
+        None,
+        "toy=tennisball&color=red&auth=secret",
+        None,
+        id="send_default_pii_false",
+    ),
+    pytest.param(
+        None,
+        None,
+        "toy=tennisball&color=red&auth=secret",
+        None,
+        id="defaults",
+    ),
+    # data_collection configured: query string is routed through filtering.
+    # Spec defaults -> denylist: only the sensitive ``auth`` is redacted.
+    pytest.param(
+        None,
+        {},
+        "toy=tennisball&color=red&auth=%5BFiltered%5D",
+        "toy=tennisball&color=red&auth=%5BFiltered%5D",
+        id="data_collection_denylist_default",
+    ),
+    pytest.param(
+        None,
+        {"url_query_params": {"mode": "denylist", "terms": ["toy"]}},
+        "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
+        "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
+        id="data_collection_denylist_custom_terms",
+    ),
+    # allowlist with only ``toy`` allowed: ``color`` is redacted even though it
+    # is not sensitive, proving the redaction comes from the allowlist.
+    pytest.param(
+        None,
+        {"url_query_params": {"mode": "allowlist", "terms": ["toy"]}},
+        "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+        "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+        id="data_collection_allowlist",
+    ),
+    pytest.param(
+        None,
+        {"url_query_params": {"mode": "off"}},
+        None,
+        None,
+        id="data_collection_off",
+    ),
+]
+
+
+def _build_init_kwargs(send_default_pii, data_collection):
+    """Render the keyword-argument string passed to ``init_sdk`` in the
+    subprocess."""
+    kwargs = []
+    if send_default_pii is not None:
+        kwargs.append("send_default_pii=%r" % send_default_pii)
+    if data_collection is not None:
+        kwargs.append("_experiments=%r" % {"data_collection": data_collection})
+
+    return ", ".join(kwargs)
+
+
+@pytest.mark.parametrize(
+    "send_default_pii, data_collection, expected_event, expected_span",
+    _QUERY_STRING_DATA_COLLECTION_CASES,
+)
+def test_query_string_data_collection_event_processor(
+    run_cloud_function,
+    send_default_pii,
+    data_collection,
+    expected_event,
+    expected_span,
+):
+    init_kwargs = _build_init_kwargs(send_default_pii, data_collection)
+    envelope_items, _, _ = run_cloud_function(
+        dedent(
+            """
+        functionhandler = None
+
+        from collections import namedtuple
+        GCPEvent = namedtuple("GCPEvent", ["headers", "method", "query_string"])
+        event = GCPEvent(
+            headers={},
+            method="GET",
+            query_string=b"toy=tennisball&color=red&auth=secret",
+        )
+
+        def cloud_function(functionhandler, event):
+            raise Exception("something went wrong")
+        """
+        )
+        + FUNCTIONS_PRELUDE
+        + dedent(
+            """
+        init_sdk(%s)
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
+        """
+            % init_kwargs
+        )
+    )
+
+    request = envelope_items[0]["request"]
+    if expected_event is None:
+        assert "query_string" not in request
+    else:
+        assert request["query_string"] == expected_event
+
+
+@pytest.mark.parametrize(
+    "send_default_pii, data_collection, expected_event, expected_span",
+    _QUERY_STRING_DATA_COLLECTION_CASES,
+)
+def test_query_string_data_collection_span_streaming(
+    run_cloud_function,
+    send_default_pii,
+    data_collection,
+    expected_event,
+    expected_span,
+):
+    init_kwargs = _build_init_kwargs(send_default_pii, data_collection)
+    _, _, span_items = run_cloud_function(
+        dedent(
+            """
+        functionhandler = None
+
+        from collections import namedtuple
+        GCPEvent = namedtuple("GCPEvent", ["headers", "method", "query_string"])
+        event = GCPEvent(
+            headers={},
+            method="GET",
+            query_string=b"toy=tennisball&color=red&auth=secret",
+        )
+
+        def cloud_function(functionhandler, event):
+            return "ok"
+        """
+        )
+        + FUNCTIONS_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=1.0, trace_lifecycle="stream", %s)
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
+        """
+            % init_kwargs
+        )
+    )
+
+    assert len(span_items) == 1
+    attrs = span_items[0]["attributes"]
+    if expected_span is None:
+        assert "url.query" not in attrs
+    else:
+        assert attrs["url.query"] == expected_span

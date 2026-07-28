@@ -13,6 +13,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    has_data_collection_enabled,
     package_version,
 )
 
@@ -142,7 +143,8 @@ def _set_transaction_name_and_source(
 
 
 def _request_started(app: "Flask", **kwargs: "Any") -> None:
-    integration = sentry_sdk.get_client().get_integration(FlaskIntegration)
+    client = sentry_sdk.get_client()
+    integration = client.get_integration(FlaskIntegration)
     if integration is None:
         return
 
@@ -156,7 +158,13 @@ def _request_started(app: "Flask", **kwargs: "Any") -> None:
 
     scope = sentry_sdk.get_isolation_scope()
 
-    if should_send_default_pii():
+    if has_data_collection_enabled(client.options):
+        if client.options["data_collection"]["user_info"]:
+            with capture_internal_exceptions():
+                user_properties = _get_flask_user_properties()
+                if user_properties:
+                    scope.set_user(user_properties)
+    elif should_send_default_pii():
         with capture_internal_exceptions():
             user_properties = _get_flask_user_properties()
             if user_properties:
@@ -208,7 +216,12 @@ def _make_request_event_processor(
         with capture_internal_exceptions():
             FlaskRequestExtractor(request).extract_into_event(event)
 
-        if should_send_default_pii():
+        client_options = sentry_sdk.get_client().options
+        if has_data_collection_enabled(client_options):
+            if client_options["data_collection"]["user_info"]:
+                with capture_internal_exceptions():
+                    _add_user_to_event(event)
+        elif should_send_default_pii():
             with capture_internal_exceptions():
                 _add_user_to_event(event)
 

@@ -57,6 +57,9 @@ def _patch_create_connection() -> None:
             return real_create_connection(address, timeout, source_address)
 
         if has_span_streaming_enabled(client.options):
+            if sentry_sdk.traces.get_current_span() is None:
+                return real_create_connection(address, timeout, source_address)
+
             with sentry_sdk.traces.start_span(
                 name=_get_span_description(address[0], address[1]),
                 attributes={
@@ -105,6 +108,9 @@ def _patch_getaddrinfo() -> None:
             return real_getaddrinfo(host, port, family, type, proto, flags)
 
         if has_span_streaming_enabled(client.options):
+            if sentry_sdk.traces.get_current_span() is None:
+                return real_getaddrinfo(host, port, family, type, proto, flags)
+
             with sentry_sdk.traces.start_span(
                 name=_get_span_description(host, port),
                 attributes={

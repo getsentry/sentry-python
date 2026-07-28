@@ -110,7 +110,7 @@ def test_cache_spans_disabled_middleware(
             )
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -153,7 +153,7 @@ def test_cache_spans_disabled_decorator(
             )
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -196,7 +196,7 @@ def test_cache_spans_disabled_templatetag(
             )
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -239,7 +239,7 @@ def test_cache_spans_middleware(
             )
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client.application.load_middleware()
@@ -361,7 +361,7 @@ def test_cache_spans_decorator(
             )
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -461,7 +461,7 @@ def test_cache_spans_templatetag(
             )
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -598,7 +598,7 @@ def test_cache_spans_location_with_port(
             )
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -651,7 +651,7 @@ def test_cache_spans_location_without_port(
             )
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -700,7 +700,7 @@ def test_cache_spans_location_with_cluster(
             )
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -748,7 +748,7 @@ def test_cache_spans_item_size(
             )
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -827,7 +827,7 @@ def test_cache_spans_get_custom_default(
             )
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     id = os.getpid()
@@ -940,7 +940,7 @@ def test_cache_spans_get_many(
             )
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     id = os.getpid()
@@ -1043,7 +1043,7 @@ def test_cache_spans_set_many(
             )
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     id = os.getpid()
@@ -1116,7 +1116,7 @@ def test_span_origin_cache(
             )
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     cache_span_found = False
     if span_streaming:

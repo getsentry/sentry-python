@@ -11,6 +11,7 @@ from urllib.parse import urlencode
 import sentry_sdk
 from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
+from sentry_sdk.data_collection import _apply_key_value_collection_filtering
 from sentry_sdk.integrations import Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.cloud_resource_context import (
@@ -18,7 +19,7 @@ from sentry_sdk.integrations.cloud_resource_context import (
     CLOUD_PROVIDER,
 )
 from sentry_sdk.scope import Scope, should_send_default_pii
-from sentry_sdk.traces import SegmentSource
+from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -27,6 +28,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    has_data_collection_enabled,
     logger,
     reraise,
 )
@@ -164,10 +166,20 @@ def _wrap_handler(handler: "F") -> "F":
                     "httpMethod"
                 ]
 
-            if should_send_default_pii() and "queryStringParameters" in request_data:
+            if "queryStringParameters" in request_data:
                 qs = request_data["queryStringParameters"]
                 if qs:
-                    additional_attributes["url.query"] = urlencode(qs)
+                    if has_data_collection_enabled(client.options):
+                        filtered_qs = _apply_key_value_collection_filtering(
+                            items=qs,
+                            behaviour=client.options["data_collection"][
+                                "url_query_params"
+                            ],
+                        )
+                        if filtered_qs:
+                            additional_attributes["url.query"] = urlencode(filtered_qs)
+                    elif should_send_default_pii():
+                        additional_attributes["url.query"] = urlencode(qs)
 
             sampling_context = {
                 "aws_event": aws_event,
@@ -185,7 +197,7 @@ def _wrap_handler(handler: "F") -> "F":
                     attributes={
                         "sentry.op": OP.FUNCTION_AWS,
                         "sentry.origin": AwsLambdaIntegration.origin,
-                        "sentry.span.source": SegmentSource.COMPONENT,
+                        "sentry.segment.name.source": SegmentNameSource.COMPONENT,
                         "cloud.region": aws_region,
                         "cloud.resource_id": aws_context.invoked_function_arn,
                         "cloud.platform": CLOUD_PLATFORM.AWS_LAMBDA,
@@ -409,7 +421,18 @@ def _make_request_event_processor(
         request["url"] = _get_url(aws_event, aws_context)
 
         if "queryStringParameters" in aws_event:
-            request["query_string"] = aws_event["queryStringParameters"]
+            query_string = aws_event["queryStringParameters"]
+            client_options = sentry_sdk.get_client().options
+            if has_data_collection_enabled(client_options):
+                if query_string:
+                    filtered_qs = _apply_key_value_collection_filtering(
+                        items=query_string,
+                        behaviour=client_options["data_collection"]["url_query_params"],
+                    )
+                    if filtered_qs:
+                        request["query_string"] = filtered_qs
+            else:
+                request["query_string"] = query_string
 
         if "headers" in aws_event:
             request["headers"] = _filter_headers(aws_event["headers"])

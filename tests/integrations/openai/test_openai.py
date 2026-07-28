@@ -96,6 +96,7 @@ else:
             input_tokens=20,
             input_tokens_details=InputTokensDetails(
                 cached_tokens=5,
+                cache_write_tokens=0,
             ),
             output_tokens=10,
             output_tokens_details=OutputTokensDetails(
@@ -132,7 +133,7 @@ def test_nonstreaming_chat_completion_no_prompts(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -173,7 +174,7 @@ def test_nonstreaming_chat_completion_no_prompts(
 
         assert response == "the model response"
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
@@ -333,7 +334,7 @@ def test_nonstreaming_chat_completion(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -371,7 +372,7 @@ def test_nonstreaming_chat_completion(
 
         assert response == "the model response"
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
@@ -471,7 +472,7 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -509,7 +510,7 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
 
         assert response == "the model response"
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
@@ -667,7 +668,7 @@ async def test_nonstreaming_chat_completion_async(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -702,7 +703,7 @@ async def test_nonstreaming_chat_completion_async(
 
         assert response == "the model response"
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
@@ -814,7 +815,7 @@ def test_streaming_chat_completion_no_prompts(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -892,7 +893,7 @@ def test_streaming_chat_completion_no_prompts(
 
         assert response_string == "hello world"
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
@@ -996,7 +997,7 @@ def test_streaming_chat_completion_with_usage_in_stream(
         traces_sample_rate=1.0,
         send_default_pii=False,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -1057,7 +1058,7 @@ def test_streaming_chat_completion_with_usage_in_stream(
                 pass
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
         assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
         assert span["attributes"]["gen_ai.usage.output_tokens"] == 10
@@ -1110,7 +1111,7 @@ def test_streaming_chat_completion_empty_content_preserves_token_usage(
         traces_sample_rate=1.0,
         send_default_pii=False,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -1152,7 +1153,7 @@ def test_streaming_chat_completion_empty_content_preserves_token_usage(
                 pass
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
         assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
         assert "gen_ai.usage.output_tokens" not in span["attributes"]
@@ -1207,7 +1208,7 @@ async def test_streaming_chat_completion_empty_content_preserves_token_usage_asy
         traces_sample_rate=1.0,
         send_default_pii=False,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -1251,7 +1252,7 @@ async def test_streaming_chat_completion_empty_content_preserves_token_usage_asy
                 pass
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
         assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
         assert "gen_ai.usage.output_tokens" not in span["attributes"]
@@ -1306,7 +1307,7 @@ async def test_streaming_chat_completion_async_with_usage_in_stream(
         traces_sample_rate=1.0,
         send_default_pii=False,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -1369,7 +1370,7 @@ async def test_streaming_chat_completion_async_with_usage_in_stream(
                 pass
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
         assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
         assert span["attributes"]["gen_ai.usage.output_tokens"] == 10
@@ -1511,7 +1512,7 @@ def test_streaming_chat_completion(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -1585,7 +1586,7 @@ def test_streaming_chat_completion(
             )
         assert response_string == "hello world"
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
@@ -1723,7 +1724,7 @@ async def test_streaming_chat_completion_async_no_prompts(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -1804,7 +1805,7 @@ async def test_streaming_chat_completion_async_no_prompts(
 
         assert response_string == "hello world"
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
@@ -2002,7 +2003,7 @@ async def test_streaming_chat_completion_async(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2081,7 +2082,7 @@ async def test_streaming_chat_completion_async(
 
         assert response_string == "hello world"
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
@@ -2200,7 +2201,7 @@ def test_bad_chat_completion(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -2270,7 +2271,7 @@ def test_span_status_error(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming or stream_gen_ai_spans:
@@ -2328,7 +2329,7 @@ async def test_bad_chat_completion_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2399,7 +2400,7 @@ def test_embeddings_create_no_pii(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -2427,7 +2428,7 @@ def test_embeddings_create_no_pii(
         assert len(response.data[0].embedding) == 3
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.embeddings"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert (
@@ -2548,7 +2549,7 @@ def test_embeddings_create(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -2576,7 +2577,7 @@ def test_embeddings_create(
         assert len(response.data[0].embedding) == 3
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.embeddings"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert (
@@ -2643,7 +2644,7 @@ async def test_embeddings_create_async_no_pii(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2671,7 +2672,7 @@ async def test_embeddings_create_async_no_pii(
         assert len(response.data[0].embedding) == 3
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.embeddings"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert (
@@ -2793,7 +2794,7 @@ async def test_embeddings_create_async(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -2821,7 +2822,7 @@ async def test_embeddings_create_async(
         assert len(response.data[0].embedding) == 3
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.embeddings"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert (
@@ -2883,7 +2884,7 @@ def test_embeddings_create_raises_error(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -2946,7 +2947,7 @@ async def test_embeddings_create_raises_error_async(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -3007,7 +3008,7 @@ def test_span_origin_nonstreaming_chat(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -3025,7 +3026,19 @@ def test_span_origin_nonstreaming_chat(
         )
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        with sentry_sdk.traces.start_span(name="openai tx"):
+            client.chat.completions.create(
+                model="some-model", messages=[{"role": "system", "content": "hello"}]
+            )
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[1]["attributes"]["sentry.origin"] == "manual"
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="openai tx"):
@@ -3069,7 +3082,7 @@ async def test_span_origin_nonstreaming_chat_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -3087,7 +3100,19 @@ async def test_span_origin_nonstreaming_chat_async(
         )
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        with sentry_sdk.traces.start_span(name="openai tx"):
+            await client.chat.completions.create(
+                model="some-model", messages=[{"role": "system", "content": "hello"}]
+            )
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[1]["attributes"]["sentry.origin"] == "manual"
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="openai tx"):
@@ -3129,7 +3154,7 @@ def test_span_origin_streaming_chat(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -3170,7 +3195,22 @@ def test_span_origin_streaming_chat(
         ),
     ]
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        client.chat.completions._post = mock.Mock(return_value=returned_stream)
+        with sentry_sdk.traces.start_span(name="openai tx"):
+            response_stream = client.chat.completions.create(
+                model="some-model", messages=[{"role": "system", "content": "hello"}]
+            )
+
+            "".join(map(lambda x: x.choices[0].delta.content, response_stream))
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[1]["attributes"]["sentry.origin"] == "manual"
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         client.chat.completions._post = mock.Mock(return_value=returned_stream)
@@ -3220,7 +3260,7 @@ async def test_span_origin_streaming_chat_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -3267,7 +3307,23 @@ async def test_span_origin_streaming_chat_async(
 
     client.chat.completions._post = AsyncMock(return_value=returned_stream)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        with sentry_sdk.traces.start_span(name="openai tx"):
+            response_stream = await client.chat.completions.create(
+                model="some-model", messages=[{"role": "system", "content": "hello"}]
+            )
+            async for _ in response_stream:
+                pass
+
+            # "".join(map(lambda x: x.choices[0].delta.content, response_stream))
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[1]["attributes"]["sentry.origin"] == "manual"
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="openai tx"):
@@ -3317,7 +3373,7 @@ def test_span_origin_embeddings(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -3334,7 +3390,17 @@ def test_span_origin_embeddings(
 
     client.embeddings._post = mock.Mock(return_value=returned_embedding)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        with sentry_sdk.traces.start_span(name="openai tx"):
+            client.embeddings.create(input="hello", model="text-embedding-3-large")
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[1]["attributes"]["sentry.origin"] == "manual"
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="openai tx"):
@@ -3373,7 +3439,7 @@ async def test_span_origin_embeddings_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -3390,7 +3456,19 @@ async def test_span_origin_embeddings_async(
 
     client.embeddings._post = AsyncMock(return_value=returned_embedding)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
+        items = capture_items("transaction", "span")
+
+        with sentry_sdk.traces.start_span(name="openai tx"):
+            await client.embeddings.create(
+                input="hello", model="text-embedding-3-large"
+            )
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[1]["attributes"]["sentry.origin"] == "manual"
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
+    elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
         with start_transaction(name="openai tx"):
@@ -3795,7 +3873,7 @@ def test_ai_client_span_responses_api_no_pii(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -3812,6 +3890,7 @@ def test_ai_client_span_responses_api_no_pii(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
         sentry_sdk.flush()
@@ -3823,6 +3902,7 @@ def test_ai_client_span_responses_api_no_pii(
             "gen_ai.request.max_tokens": 100,
             "gen_ai.request.temperature": 0.7,
             "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
             "gen_ai.request.model": "gpt-4o",
             "gen_ai.response.model": "response-model-id",
             "gen_ai.response.streaming": False,
@@ -3855,6 +3935,7 @@ def test_ai_client_span_responses_api_no_pii(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
         spans = [item.payload for item in items]
@@ -3865,6 +3946,7 @@ def test_ai_client_span_responses_api_no_pii(
             "gen_ai.request.max_tokens": 100,
             "gen_ai.request.temperature": 0.7,
             "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
             "gen_ai.request.model": "gpt-4o",
             "gen_ai.response.model": "response-model-id",
             "gen_ai.response.streaming": False,
@@ -3896,6 +3978,7 @@ def test_ai_client_span_responses_api_no_pii(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
         (transaction,) = events
@@ -3909,6 +3992,7 @@ def test_ai_client_span_responses_api_no_pii(
             "gen_ai.request.max_tokens": 100,
             "gen_ai.request.temperature": 0.7,
             "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
             "gen_ai.request.model": "gpt-4o",
             "gen_ai.response.model": "response-model-id",
             "gen_ai.response.streaming": False,
@@ -4091,7 +4175,7 @@ def test_ai_client_span_responses_api(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -4108,6 +4192,7 @@ def test_ai_client_span_responses_api(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
         sentry_sdk.flush()
@@ -4120,6 +4205,7 @@ def test_ai_client_span_responses_api(
             "gen_ai.request.max_tokens": 100,
             "gen_ai.request.temperature": 0.7,
             "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
             "gen_ai.system": "openai",
             "gen_ai.response.model": "response-model-id",
             "gen_ai.response.streaming": False,
@@ -4155,6 +4241,7 @@ def test_ai_client_span_responses_api(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
         spans = [item.payload for item in items]
@@ -4166,6 +4253,7 @@ def test_ai_client_span_responses_api(
             "gen_ai.request.max_tokens": 100,
             "gen_ai.request.temperature": 0.7,
             "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
             "gen_ai.system": "openai",
             "gen_ai.response.model": "response-model-id",
             "gen_ai.response.streaming": False,
@@ -4201,6 +4289,7 @@ def test_ai_client_span_responses_api(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
         (transaction,) = events
@@ -4215,6 +4304,7 @@ def test_ai_client_span_responses_api(
             "gen_ai.request.max_tokens": 100,
             "gen_ai.request.temperature": 0.7,
             "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
             "gen_ai.system": "openai",
             "gen_ai.response.model": "response-model-id",
             "gen_ai.response.streaming": False,
@@ -4263,7 +4353,7 @@ def test_responses_api_conversation_id(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -4280,7 +4370,7 @@ def test_responses_api_conversation_id(
             )
 
         sentry_sdk.flush()
-        (span,) = (item.payload for item in items if item.type == "span")
+        (span,) = (item.payload for item in items)
 
         if expected_id is None:
             assert "gen_ai.conversation.id" not in span["attributes"]
@@ -4307,6 +4397,80 @@ def test_responses_api_conversation_id(
 
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "reasoning, expected_level",
+    [
+        pytest.param(omit, None, id="omit"),
+        pytest.param(None, None, id="none"),
+        pytest.param({"summary": "auto"}, None, id="dict_without_effort"),
+        pytest.param({"effort": "high"}, "high", id="dict"),
+    ],
+)
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_responses_api_reasoning_level(
+    sentry_init,
+    capture_events,
+    capture_items,
+    reasoning,
+    expected_level,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = OpenAI(api_key="z")
+    client.responses._post = mock.Mock(return_value=EXAMPLE_RESPONSE)
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            client.responses.create(
+                model="gpt-4o",
+                input="hello",
+                reasoning=reasoning,
+            )
+
+        sentry_sdk.flush()
+        span = next(item.payload for item in items if item.type == "span")
+
+        if expected_level is None:
+            assert SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL not in span["attributes"]
+        else:
+            assert (
+                span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL]
+                == expected_level
+            )
+
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            client.responses.create(
+                model="gpt-4o",
+                input="hello",
+                reasoning=reasoning,
+            )
+
+        (transaction,) = events
+        span = transaction["spans"][0]
+
+        if expected_level is None:
+            assert SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL not in span["data"]
+        else:
+            assert (
+                span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == expected_level
+            )
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 def test_error_in_responses_api(
     sentry_init,
@@ -4321,7 +4485,7 @@ def test_error_in_responses_api(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -4565,7 +4729,7 @@ async def test_ai_client_span_responses_async_api(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -4582,6 +4746,7 @@ async def test_ai_client_span_responses_async_api(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
         sentry_sdk.flush()
@@ -4594,6 +4759,7 @@ async def test_ai_client_span_responses_async_api(
             "gen_ai.request.max_tokens": 100,
             "gen_ai.request.temperature": 0.7,
             "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
             "gen_ai.request.messages": safe_serialize(expected_request_messages),
             "gen_ai.request.model": "gpt-4o",
             "gen_ai.response.model": "response-model-id",
@@ -4629,6 +4795,7 @@ async def test_ai_client_span_responses_async_api(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
         spans = [item.payload for item in items]
@@ -4640,6 +4807,7 @@ async def test_ai_client_span_responses_async_api(
             "gen_ai.request.max_tokens": 100,
             "gen_ai.request.temperature": 0.7,
             "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
             "gen_ai.request.messages": safe_serialize(expected_request_messages),
             "gen_ai.request.model": "gpt-4o",
             "gen_ai.response.model": "response-model-id",
@@ -4675,6 +4843,7 @@ async def test_ai_client_span_responses_async_api(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
         (transaction,) = events
@@ -4689,6 +4858,7 @@ async def test_ai_client_span_responses_async_api(
             "gen_ai.request.max_tokens": 100,
             "gen_ai.request.temperature": 0.7,
             "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
             "gen_ai.request.messages": safe_serialize(expected_request_messages[-1:]),
             "gen_ai.request.model": "gpt-4o",
             "gen_ai.response.model": "response-model-id",
@@ -4878,7 +5048,7 @@ async def test_ai_client_span_streaming_responses_async_api(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -4907,6 +5077,7 @@ async def test_ai_client_span_streaming_responses_async_api(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
             async for _ in result:
                 pass
@@ -4927,6 +5098,7 @@ async def test_ai_client_span_streaming_responses_async_api(
             "gen_ai.request.messages": safe_serialize(expected_request_messages),
             "gen_ai.request.temperature": 0.7,
             "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
             "gen_ai.response.model": "response-model-id",
             "gen_ai.response.streaming": True,
             "gen_ai.system": "openai",
@@ -4968,6 +5140,7 @@ async def test_ai_client_span_streaming_responses_async_api(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
             async for _ in result:
                 pass
@@ -4986,6 +5159,7 @@ async def test_ai_client_span_streaming_responses_async_api(
             "gen_ai.request.messages": safe_serialize(expected_request_messages[-1:]),
             "gen_ai.request.temperature": 0.7,
             "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
             "gen_ai.response.model": "response-model-id",
             "gen_ai.response.streaming": True,
             "gen_ai.system": "openai",
@@ -5025,7 +5199,7 @@ async def test_error_in_responses_async_api(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -5166,6 +5340,7 @@ else:
                     input_tokens=20,
                     input_tokens_details=InputTokensDetails(
                         cached_tokens=5,
+                        cache_write_tokens=0,
                     ),
                     output_tokens=10,
                     output_tokens_details=OutputTokensDetails(
@@ -5206,7 +5381,7 @@ def test_streaming_responses_api(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -5231,6 +5406,7 @@ def test_streaming_responses_api(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
             response_string = ""
@@ -5241,12 +5417,13 @@ def test_streaming_responses_api(
         assert response_string == "hello world"
 
         sentry_sdk.flush()
-        (span,) = (item.payload for item in items if item.type == "span")
+        (span,) = (item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.responses"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
 
@@ -5275,6 +5452,7 @@ def test_streaming_responses_api(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
             response_string = ""
@@ -5291,6 +5469,7 @@ def test_streaming_responses_api(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
 
@@ -5336,7 +5515,7 @@ async def test_streaming_responses_api_async(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -5359,6 +5538,7 @@ async def test_streaming_responses_api_async(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
             response_string = ""
@@ -5369,12 +5549,13 @@ async def test_streaming_responses_api_async(
         assert response_string == "hello world"
 
         sentry_sdk.flush()
-        (span,) = (item.payload for item in items if item.type == "span")
+        (span,) = (item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.responses"
         assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
 
@@ -5403,6 +5584,7 @@ async def test_streaming_responses_api_async(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
             response_string = ""
@@ -5419,6 +5601,7 @@ async def test_streaming_responses_api_async(
         assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
         assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
 
@@ -5458,7 +5641,7 @@ def test_empty_tools_in_chat_completion(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -5487,7 +5670,7 @@ def test_empty_tools_in_chat_completion(
             )
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
 
         assert "gen_ai.request.available_tools" not in span["attributes"]
     else:
@@ -5504,6 +5687,96 @@ def test_empty_tools_in_chat_completion(
         span = event["spans"][0]
 
         assert "gen_ai.request.available_tools" not in span["data"]
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+# Feature added in https://github.com/openai/openai-python/pull/1952
+@pytest.mark.skipif(
+    OPENAI_VERSION is None or OPENAI_VERSION < (1, 58, 0),
+    reason="OpenAI versions <1.58.0 do not support the reasoning_effort parameter.",
+)
+@pytest.mark.parametrize(
+    "reasoning_effort,expected_level",
+    [
+        pytest.param(omit, None, id="omit"),
+        pytest.param(None, None, id="none"),
+        pytest.param("high", "high", id="high"),
+        pytest.param("minimal", "minimal", id="minimal"),
+    ],
+)
+def test_chat_completion_reasoning_level(
+    sentry_init,
+    capture_events,
+    capture_items,
+    reasoning_effort,
+    expected_level,
+    nonstreaming_chat_completions_model_response,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
+        )
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "system", "content": "hello"}],
+                reasoning_effort=reasoning_effort,
+            )
+
+        sentry_sdk.flush()
+        span = next(item.payload for item in items if item.type == "span")
+
+        if expected_level is None:
+            assert SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL not in span["attributes"]
+        else:
+            assert (
+                span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL]
+                == expected_level
+            )
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "system", "content": "hello"}],
+                reasoning_effort=reasoning_effort,
+            )
+
+        (event,) = events
+        span = event["spans"][0]
+
+        if expected_level is None:
+            assert SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL not in span["data"]
+        else:
+            assert (
+                span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == expected_level
+            )
 
 
 # Test messages with mixed roles including "ai" that should be mapped to "assistant"
@@ -5541,7 +5814,7 @@ def test_openai_message_role_mapping(
         traces_sample_rate=1.0,
         send_default_pii=True,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -5569,7 +5842,7 @@ def test_openai_message_role_mapping(
 
         # Verify that the span was created correctly
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
 
@@ -5677,7 +5950,7 @@ def test_streaming_chat_completion_ttft(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -5733,7 +6006,7 @@ def test_streaming_chat_completion_ttft(
                 pass
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
 
         # Verify TTFT is captured
@@ -5790,7 +6063,7 @@ async def test_streaming_chat_completion_ttft_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -5848,7 +6121,7 @@ async def test_streaming_chat_completion_ttft_async(
                 pass
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.chat"
 
         # Verify TTFT is captured
@@ -5904,7 +6177,7 @@ def test_streaming_responses_api_ttft(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = OpenAI(api_key="z")
@@ -5930,7 +6203,7 @@ def test_streaming_responses_api_ttft(
                 pass
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.responses"
 
         # Verify TTFT is captured
@@ -5988,7 +6261,7 @@ async def test_streaming_responses_api_ttft_async(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         stream_gen_ai_spans=stream_gen_ai_spans,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = AsyncOpenAI(api_key="z")
@@ -6014,7 +6287,7 @@ async def test_streaming_responses_api_ttft_async(
                 pass
 
         sentry_sdk.flush()
-        span = next(item.payload for item in items if item.type == "span")
+        span = next(item.payload for item in items)
         assert span["attributes"]["sentry.op"] == "gen_ai.responses"
 
         # Verify TTFT is captured

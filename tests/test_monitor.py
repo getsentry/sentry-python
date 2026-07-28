@@ -90,6 +90,38 @@ def test_transaction_uses_downsampled_rate(
     )
 
 
+def test_segment_uses_downsampled_rate(
+    sentry_init, capture_record_lost_event_calls, monkeypatch
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        transport=UnhealthyTestTransport(),
+    )
+
+    record_lost_event_calls = capture_record_lost_event_calls()
+
+    monitor = sentry_sdk.get_client().monitor
+    monitor.interval = 0.1
+
+    assert monitor.is_healthy() is True
+    monitor.run()
+    assert monitor.is_healthy() is False
+    assert monitor.downsample_factor == 1
+
+    # make sure we don't sample the segment
+    with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=750000):
+        with sentry_sdk.traces.start_span(name="foobar") as segment:
+            assert segment.sampled is False
+            assert segment._sample_rate == 0.5
+
+    assert Counter(record_lost_event_calls) == Counter(
+        [
+            ("backpressure", "span", None, 1),
+        ]
+    )
+
+
 def test_monitor_no_thread_on_shutdown_no_errors(sentry_init):
     sentry_init(transport=HealthyTestTransport())
 
