@@ -6,6 +6,7 @@ Based on Tom Christie's `sentry-asgi <https://github.com/encode/sentry-asgi>`.
 
 import inspect
 import sys
+from contextlib import nullcontext
 from copy import deepcopy
 from functools import partial
 from typing import TYPE_CHECKING
@@ -48,7 +49,6 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     logger,
-    nullcontext,
     qualname_from_function,
     reraise,
     transaction_from_function,

@@ -1,5 +1,6 @@
 import functools
 import sys
+from contextlib import nullcontext
 
 import sentry_sdk
 from sentry_sdk.consts import OP
@@ -12,7 +13,6 @@ from sentry_sdk.utils import (
     event_from_exception,
     is_internal_task,
     logger,
-    nullcontext,
     reraise,
 )
 
