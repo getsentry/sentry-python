@@ -391,15 +391,6 @@ def _set_span_output_data(
 # Handler data preparation and wrapping
 
 
-def _is_v2_context(original_args: "tuple[Any, ...]") -> bool:
-    """Check if original_args contains a v2 ServerRequestContext as the first element."""
-    return (
-        ServerRequestContext is not None
-        and bool(original_args)
-        and isinstance(original_args[0], ServerRequestContext)
-    )
-
-
 def _extract_handler_data_from_params(
     handler_type: str,
     params: "Any",
