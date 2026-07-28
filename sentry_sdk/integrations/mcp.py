@@ -178,33 +178,6 @@ def _get_request_context_data(
     return request_id, session_id, mcp_transport
 
 
-def _get_span_config(
-    handler_type: str, item_name: str
-) -> "tuple[str, str, str, Optional[str]]":
-    """
-    Get span configuration based on handler type.
-
-    Returns:
-        Tuple of (span_data_key, span_name, mcp_method_name, result_data_key)
-        Note: result_data_key is None for resources
-    """
-    if handler_type == "tool":
-        span_data_key = SPANDATA.MCP_TOOL_NAME
-        mcp_method_name = "tools/call"
-        result_data_key = SPANDATA.MCP_TOOL_RESULT_CONTENT
-    elif handler_type == "prompt":
-        span_data_key = SPANDATA.MCP_PROMPT_NAME
-        mcp_method_name = "prompts/get"
-        result_data_key = SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT
-    else:  # resource
-        span_data_key = SPANDATA.MCP_RESOURCE_URI
-        mcp_method_name = "resources/read"
-        result_data_key = None  # Resources don't capture result content
-
-    span_name = f"{mcp_method_name} {item_name}"
-    return span_data_key, span_name, mcp_method_name, result_data_key
-
-
 def _set_span_input_data(
     span: "Union[StreamedSpan, Span]",
     handler_name: str,
@@ -294,110 +267,7 @@ def _extract_text_from_content_blocks(content_blocks: "Any") -> "Any":
     return " ".join(texts) if texts else content_blocks
 
 
-def _set_span_output_data(
-    span: "Union[StreamedSpan, Span]",
-    result: "Any",
-    result_data_key: "Optional[str]",
-    handler_type: str,
-) -> None:
-    """Set output span data for MCP handlers."""
-    if result is None:
-        return
-
-    # Get integration to check PII settings
-    integration = sentry_sdk.get_client().get_integration(MCPIntegration)
-    if integration is None:
-        return
-
-    # Check if we should include sensitive data
-    should_include_data = should_send_default_pii() and integration.include_prompts
-
-    # For tools, extract the meaningful content
-    if handler_type == "tool":
-        extracted = _extract_tool_result_content(result)
-        if (
-            extracted is not None
-            and should_include_data
-            and result_data_key is not None
-        ):
-            _set_span_data_attribute(span, result_data_key, safe_serialize(extracted))
-            # Set content count if result is a dict
-            if isinstance(extracted, dict):
-                _set_span_data_attribute(
-                    span, SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT, len(extracted)
-                )
-    elif handler_type == "prompt":
-        # For prompts, count messages and set role/content only for single-message prompts
-        try:
-            messages: "Optional[list[str]]" = None
-            message_count = 0
-
-            # Check if result has messages attribute (GetPromptResult)
-            if hasattr(result, "messages") and result.messages:
-                messages = result.messages
-                message_count = len(messages)
-            # Also check if result is a dict with messages
-            elif isinstance(result, dict) and result.get("messages"):
-                messages = result["messages"]
-                message_count = len(messages)
-
-            # Always set message count if we found messages
-            if message_count > 0:
-                _set_span_data_attribute(
-                    span, SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT, message_count
-                )
-
-            # Only set role and content for single-message prompts if PII is allowed
-            if message_count == 1 and should_include_data and messages:
-                first_message = messages[0]
-                # Extract role
-                role = None
-                if hasattr(first_message, "role"):
-                    role = first_message.role
-                elif isinstance(first_message, dict) and "role" in first_message:
-                    role = first_message["role"]
-
-                if role:
-                    _set_span_data_attribute(
-                        span, SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE, role
-                    )
-
-                # Extract content text
-                content_text = None
-                if hasattr(first_message, "content"):
-                    msg_content = first_message.content
-                    # Content can be a TextContent object or similar
-                    if hasattr(msg_content, "text"):
-                        content_text = msg_content.text
-                    elif isinstance(msg_content, dict) and "text" in msg_content:
-                        content_text = msg_content["text"]
-                    elif isinstance(msg_content, str):
-                        content_text = msg_content
-                elif isinstance(first_message, dict) and "content" in first_message:
-                    msg_content = first_message["content"]
-                    if isinstance(msg_content, dict) and "text" in msg_content:
-                        content_text = msg_content["text"]
-                    elif isinstance(msg_content, str):
-                        content_text = msg_content
-
-                if content_text and result_data_key is not None:
-                    _set_span_data_attribute(span, result_data_key, content_text)
-        except Exception:
-            # Silently ignore if we can't extract message info
-            pass
-    # Resources don't capture result content (result_data_key is None)
-
-
 # Handler data preparation and wrapping
-
-
-def _is_v2_context(original_args: "tuple[Any, ...]") -> bool:
-    """Check if original_args contains a v2 ServerRequestContext as the first element."""
-    return (
-        ServerRequestContext is not None
-        and bool(original_args)
-        and isinstance(original_args[0], ServerRequestContext)
-    )
 
 
 def _extract_handler_data_from_params(
@@ -477,50 +347,6 @@ def _extract_handler_data_from_args(
     return handler_name, arguments
 
 
-def _prepare_handler_data(
-    handler_type: str,
-    original_args: "tuple[Any, ...]",
-    original_kwargs: "Optional[dict[str, Any]]" = None,
-    params: "Optional[Any]" = None,
-) -> "tuple[str, dict[str, Any], str, str, str, Optional[str]]":
-    """
-    Prepare common handler data for both v1 and v2 MCP SDK.
-
-    Args:
-        handler_type: "tool", "prompt", or "resource"
-        original_args: Original positional args (v1 path)
-        original_kwargs: Original keyword args (v1 path)
-        params: Typed params object from v2 ServerRequestContext path
-
-    Returns:
-        Tuple of (handler_name, arguments, span_data_key, span_name, mcp_method_name, result_data_key)
-    """
-    if params is not None:
-        handler_name, arguments = _extract_handler_data_from_params(
-            handler_type, params
-        )
-    elif _is_v2_context(original_args):
-        handler_name = "unknown"
-        arguments = {}
-    else:
-        handler_name, arguments = _extract_handler_data_from_args(
-            handler_type, original_args, original_kwargs
-        )
-
-    span_data_key, span_name, mcp_method_name, result_data_key = _get_span_config(
-        handler_type, handler_name
-    )
-
-    return (
-        handler_name,
-        arguments,
-        span_data_key,
-        span_name,
-        mcp_method_name,
-        result_data_key,
-    )
-
-
 async def _tool_handler_wrapper(
     func: "Callable[..., Awaitable[Union[CallToolResult, InputRequiredResult]]]",
     original_args: "tuple[Any, ...]",
@@ -550,16 +376,16 @@ async def _tool_handler_wrapper(
         and isinstance(original_args[0], ServerRequestContext)
     ):
         ctx = original_args[0]
-        params = original_args[1] if len(original_args) > 1 else None
-
-    (
-        handler_name,
-        arguments,
-        span_data_key,
-        span_name,
-        mcp_method_name,
-        result_data_key,
-    ) = _prepare_handler_data("tool", original_args, original_kwargs, params=params)
+        if len(original_args) > 1:
+            params = original_args[1]
+            handler_name, arguments = _extract_handler_data_from_params("tool", params)
+        else:
+            handler_name = "unknown"
+            arguments = {}
+    else:
+        handler_name, arguments = _extract_handler_data_from_args(
+            "tool", original_args, original_kwargs
+        )
 
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
@@ -571,7 +397,7 @@ async def _tool_handler_wrapper(
         span_mgr: "Union[Span, StreamedSpan]"
         if span_streaming:
             span_mgr = sentry_sdk.traces.start_span(
-                name=span_name,
+                name=f"tools/call {handler_name}",
                 attributes={
                     "sentry.op": OP.MCP_SERVER,
                     "sentry.origin": MCPIntegration.origin,
@@ -580,7 +406,7 @@ async def _tool_handler_wrapper(
         else:
             span_mgr = get_start_span_function()(
                 op=OP.MCP_SERVER,
-                name=span_name,
+                name=f"tools/call {handler_name}",
                 origin=MCPIntegration.origin,
             )
 
@@ -589,8 +415,8 @@ async def _tool_handler_wrapper(
             _set_span_input_data(
                 span,
                 handler_name,
-                span_data_key,
-                mcp_method_name,
+                SPANDATA.MCP_TOOL_NAME,
+                "tools/call",
                 arguments,
                 request_id,
                 session_id,
@@ -612,7 +438,29 @@ async def _tool_handler_wrapper(
                 sentry_sdk.capture_exception(e)
                 raise
 
-            _set_span_output_data(span, result, result_data_key, "tool")
+            if result is None:
+                return result
+
+            # Get integration to check PII settings
+            integration = sentry_sdk.get_client().get_integration(MCPIntegration)
+            if integration is None:
+                return result
+
+            # Check if we should include sensitive data
+            should_include_data = (
+                should_send_default_pii() and integration.include_prompts
+            )
+
+            extracted = _extract_tool_result_content(result)
+            if extracted is not None and should_include_data:
+                _set_span_data_attribute(
+                    span, SPANDATA.MCP_TOOL_RESULT_CONTENT, safe_serialize(extracted)
+                )
+                # Set content count if result is a dict
+                if isinstance(extracted, dict):
+                    _set_span_data_attribute(
+                        span, SPANDATA.MCP_TOOL_RESULT_CONTENT_COUNT, len(extracted)
+                    )
 
     return result
 
@@ -639,23 +487,23 @@ async def _prompt_handler_wrapper(
 
     # Detect v1 vs v2: MCP SDK v2 passes (ServerRequestContext, params) to handlers
     ctx: "Optional[Any]" = None
-    params: "Optional[Any]" = None
     if (
         ServerRequestContext is not None
         and original_args
         and isinstance(original_args[0], ServerRequestContext)
     ):
         ctx = original_args[0]
-        params = original_args[1] if len(original_args) > 1 else None
-
-    (
-        handler_name,
-        arguments,
-        span_data_key,
-        span_name,
-        mcp_method_name,
-        result_data_key,
-    ) = _prepare_handler_data("prompt", original_args, original_kwargs, params=params)
+        if len(original_args) > 1:
+            handler_name, arguments = _extract_handler_data_from_params(
+                "prompt", original_args[1]
+            )
+        else:
+            handler_name = "unknown"
+            arguments = {}
+    else:
+        handler_name, arguments = _extract_handler_data_from_args(
+            "prompt", original_args, original_kwargs
+        )
 
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
@@ -667,7 +515,7 @@ async def _prompt_handler_wrapper(
         span_mgr: "Union[Span, StreamedSpan]"
         if span_streaming:
             span_mgr = sentry_sdk.traces.start_span(
-                name=span_name,
+                name=f"prompts/get {handler_name}",
                 attributes={
                     "sentry.op": OP.MCP_SERVER,
                     "sentry.origin": MCPIntegration.origin,
@@ -676,7 +524,7 @@ async def _prompt_handler_wrapper(
         else:
             span_mgr = get_start_span_function()(
                 op=OP.MCP_SERVER,
-                name=span_name,
+                name=f"prompts/get {handler_name}",
                 origin=MCPIntegration.origin,
             )
 
@@ -685,8 +533,8 @@ async def _prompt_handler_wrapper(
             _set_span_input_data(
                 span,
                 handler_name,
-                span_data_key,
-                mcp_method_name,
+                SPANDATA.MCP_PROMPT_NAME,
+                "prompts/get",
                 arguments,
                 request_id,
                 session_id,
@@ -706,7 +554,81 @@ async def _prompt_handler_wrapper(
                 sentry_sdk.capture_exception(e)
                 raise
 
-            _set_span_output_data(span, result, result_data_key, "prompt")
+            if result is None:
+                return result
+
+            # Get integration to check PII settings
+            integration = sentry_sdk.get_client().get_integration(MCPIntegration)
+            if integration is None:
+                return result
+
+            # Check if we should include sensitive data
+            should_include_data = (
+                should_send_default_pii() and integration.include_prompts
+            )
+
+            # For prompts, count messages and set role/content only for single-message prompts
+            try:
+                messages: "Optional[list[str]]" = None
+                message_count = 0
+
+                # Check if result has messages attribute (GetPromptResult)
+                if hasattr(result, "messages") and result.messages:
+                    messages = result.messages  # type: ignore[assignment]
+                    message_count = len(messages)  # type: ignore[arg-type]
+                # Also check if result is a dict with messages
+                elif isinstance(result, dict) and result.get("messages"):
+                    messages = result["messages"]
+                    message_count = len(messages)
+
+                # Always set message count if we found messages
+                if message_count > 0:
+                    _set_span_data_attribute(
+                        span, SPANDATA.MCP_PROMPT_RESULT_MESSAGE_COUNT, message_count
+                    )
+
+                # Only set role and content for single-message prompts if PII is allowed
+                if message_count == 1 and should_include_data and messages:
+                    first_message = messages[0]
+                    # Extract role
+                    role = None
+                    if hasattr(first_message, "role"):
+                        role = first_message.role
+                    elif isinstance(first_message, dict) and "role" in first_message:
+                        role = first_message["role"]
+
+                    if role:
+                        _set_span_data_attribute(
+                            span, SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE, role
+                        )
+
+                    # Extract content text
+                    content_text = None
+                    if hasattr(first_message, "content"):
+                        msg_content = first_message.content
+                        # Content can be a TextContent object or similar
+                        if hasattr(msg_content, "text"):
+                            content_text = msg_content.text
+                        elif isinstance(msg_content, dict) and "text" in msg_content:
+                            content_text = msg_content["text"]
+                        elif isinstance(msg_content, str):
+                            content_text = msg_content
+                    elif isinstance(first_message, dict) and "content" in first_message:
+                        msg_content = first_message["content"]
+                        if isinstance(msg_content, dict) and "text" in msg_content:
+                            content_text = msg_content["text"]
+                        elif isinstance(msg_content, str):
+                            content_text = msg_content
+
+                    if content_text:
+                        _set_span_data_attribute(
+                            span,
+                            SPANDATA.MCP_PROMPT_RESULT_MESSAGE_CONTENT,
+                            content_text,
+                        )
+            except Exception:
+                # Silently ignore if we can't extract message info
+                pass
 
     return result
 
@@ -740,16 +662,18 @@ async def _resource_handler_wrapper(
         and isinstance(original_args[0], ServerRequestContext)
     ):
         ctx = original_args[0]
-        params = original_args[1] if len(original_args) > 1 else None
-
-    (
-        handler_name,
-        arguments,
-        span_data_key,
-        span_name,
-        mcp_method_name,
-        result_data_key,
-    ) = _prepare_handler_data("resource", original_args, original_kwargs, params=params)
+        if len(original_args) > 1:
+            params = original_args[1]
+            handler_name, arguments = _extract_handler_data_from_params(
+                "resource", params
+            )
+        else:
+            handler_name = "unknown"
+            arguments = {}
+    else:
+        handler_name, arguments = _extract_handler_data_from_args(
+            "resource", original_args, original_kwargs
+        )
 
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
@@ -761,7 +685,7 @@ async def _resource_handler_wrapper(
         span_mgr: "Union[Span, StreamedSpan]"
         if span_streaming:
             span_mgr = sentry_sdk.traces.start_span(
-                name=span_name,
+                name=f"resources/read {handler_name}",
                 attributes={
                     "sentry.op": OP.MCP_SERVER,
                     "sentry.origin": MCPIntegration.origin,
@@ -770,7 +694,7 @@ async def _resource_handler_wrapper(
         else:
             span_mgr = get_start_span_function()(
                 op=OP.MCP_SERVER,
-                name=span_name,
+                name=f"resources/read {handler_name}",
                 origin=MCPIntegration.origin,
             )
 
@@ -779,8 +703,8 @@ async def _resource_handler_wrapper(
             _set_span_input_data(
                 span,
                 handler_name,
-                span_data_key,
-                mcp_method_name,
+                SPANDATA.MCP_RESOURCE_URI,
+                "resources/read",
                 arguments,
                 request_id,
                 session_id,
@@ -818,8 +742,6 @@ async def _resource_handler_wrapper(
             except Exception as e:
                 sentry_sdk.capture_exception(e)
                 raise
-
-            _set_span_output_data(span, result, result_data_key, "resource")
 
     return result
 
