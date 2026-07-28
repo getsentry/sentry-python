@@ -650,7 +650,7 @@ async def test_fastmcp_multiple_tools(
                     "arguments": {
                         "y": int(
                             result1.message.result["content"][0]["text"]
-                            if FASTMCP_VERSION is not None and FASTMCP_VERSION > (4,)
+                            if FASTMCP_VERSION is not None and FASTMCP_VERSION >= (4,)
                             else result1.message.root.result["content"][0]["text"]
                         )
                     },
@@ -666,7 +666,7 @@ async def test_fastmcp_multiple_tools(
                     "arguments": {
                         "z": int(
                             result2.message.result["content"][0]["text"]
-                            if FASTMCP_VERSION is not None and FASTMCP_VERSION > (4,)
+                            if FASTMCP_VERSION is not None and FASTMCP_VERSION >= (4,)
                             else result2.message.root.result["content"][0]["text"]
                         )
                     },
@@ -858,7 +858,7 @@ async def test_fastmcp_prompt_sync(
                 },
             }
 
-            if FASTMCP_VERSION is not None and FASTMCP_VERSION.startswith("3"):
+            if FASTMCP_VERSION is not None and FASTMCP_VERSION >= (3,):
                 message = Message(message)
 
             return [message]
@@ -975,7 +975,7 @@ async def test_fastmcp_prompt_async(
                 },
             }
 
-            if FASTMCP_VERSION is not None and FASTMCP_VERSION > (3,):
+            if FASTMCP_VERSION is not None and FASTMCP_VERSION >= (3,):
                 message1 = Message(message1)
                 message2 = Message(message2)
 
