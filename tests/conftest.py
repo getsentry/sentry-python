@@ -115,14 +115,22 @@ except ImportError:
 try:
     from anyio import EndOfStream, create_memory_object_stream, create_task_group
     from mcp.shared.message import SessionMessage
-    from mcp.types import (
-        JSONRPCMessage,
-        JSONRPCNotification,
-        JSONRPCRequest,
-    )
 
     _MCP_VERSION = package_version("mcp")
     _IS_MCP_V2 = _MCP_VERSION is not None and _MCP_VERSION >= (2, 0, 0)
+
+    if _IS_MCP_V2:
+        from mcp_types import (
+            JSONRPCMessage,
+            JSONRPCNotification,
+            JSONRPCRequest,
+        )
+    else:
+        from mcp.types import (
+            JSONRPCMessage,
+            JSONRPCNotification,
+            JSONRPCRequest,
+        )
 except ImportError:
     create_memory_object_stream = None
     create_task_group = None
