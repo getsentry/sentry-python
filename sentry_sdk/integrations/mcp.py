@@ -332,8 +332,6 @@ def _extract_handler_data_from_args(
         elif original_kwargs.get("arguments"):
             arguments = original_kwargs["arguments"]
 
-        arguments = arguments or {}
-
     else:  # resource
         handler_name = "unknown"
         if original_args:
