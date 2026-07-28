@@ -308,7 +308,7 @@ TEST_SUITE_CONFIG = {
     "fastmcp": {
         "package": "fastmcp",
         "deps": {
-            "*": ["pytest-asyncio"],
+            "*": ["pytest-asyncio", "httpx"],
         },
     },
     "openai-base": {
