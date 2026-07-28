@@ -11,7 +11,6 @@ from sentry_sdk.integrations.flask import FlaskIntegration
 from sentry_sdk.integrations.graphene import GrapheneIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
 
-
 DATA_COLLECTION_GRAPHQL_DOCUMENTS_PARAMS = [
     pytest.param(
         {"graphql": {"document": True}},
