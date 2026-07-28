@@ -14,6 +14,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    has_data_collection_enabled,
     parse_version,
     reraise,
 )
@@ -180,16 +181,25 @@ def _make_event_processor(
             tags["arq_task_id"] = ctx["job_id"]
             tags["arq_task_retry"] = ctx["job_try"] > 1
             extra = event.setdefault("extra", {})
-            extra["arq-job"] = {
+
+            arq_job_dict = {
                 "task": ctx["job_name"],
-                "args": (
-                    args if should_send_default_pii() else SENSITIVE_DATA_SUBSTITUTE
-                ),
-                "kwargs": (
-                    kwargs if should_send_default_pii() else SENSITIVE_DATA_SUBSTITUTE
-                ),
                 "retry": ctx["job_try"],
             }
+            client_options = sentry_sdk.get_client().options
+
+            if has_data_collection_enabled(client_options):
+                if client_options["data_collection"]["queues"]:
+                    arq_job_dict["args"] = args
+                    arq_job_dict["kwargs"] = kwargs
+            elif should_send_default_pii():
+                arq_job_dict["args"] = args
+                arq_job_dict["kwargs"] = kwargs
+            else:
+                arq_job_dict["args"] = SENSITIVE_DATA_SUBSTITUTE
+                arq_job_dict["kwargs"] = SENSITIVE_DATA_SUBSTITUTE
+
+            extra["arq-job"] = arq_job_dict
 
         return event
 

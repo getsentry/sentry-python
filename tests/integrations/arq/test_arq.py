@@ -13,6 +13,7 @@ import sentry_sdk
 from sentry_sdk import get_client, start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.arq import ArqIntegration
+from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 
 
 def async_partial(async_fn, *args, **kwargs):
@@ -49,6 +50,7 @@ def init_arq(sentry_init):
         kw_functions=None,
         kw_cron_jobs=None,
         allow_abort_jobs_=False,
+        init_kwargs=None,
     ):
         cls_functions = cls_functions or []
         cls_cron_jobs = cls_cron_jobs or []
@@ -59,12 +61,14 @@ def init_arq(sentry_init):
         if kw_cron_jobs is not None:
             kwargs["cron_jobs"] = kw_cron_jobs
 
-        sentry_init(
-            integrations=[ArqIntegration()],
-            traces_sample_rate=1.0,
-            send_default_pii=True,
-            trace_lifecycle="stream" if span_streaming else "static",
-        )
+        sentry_init_kwargs = {
+            "integrations": [ArqIntegration()],
+            "traces_sample_rate": 1.0,
+            "send_default_pii": True,
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        }
+        sentry_init_kwargs.update(init_kwargs or {})
+        sentry_init(**sentry_init_kwargs)
 
         server = FakeRedis()
         pool = ArqRedis(pool_or_conn=server.connection_pool)
@@ -96,6 +100,7 @@ def init_arq_with_dict_settings(sentry_init):
         kw_functions=None,
         kw_cron_jobs=None,
         allow_abort_jobs_=False,
+        init_kwargs=None,
     ):
         cls_functions = cls_functions or []
         cls_cron_jobs = cls_cron_jobs or []
@@ -106,12 +111,14 @@ def init_arq_with_dict_settings(sentry_init):
         if kw_cron_jobs is not None:
             kwargs["cron_jobs"] = kw_cron_jobs
 
-        sentry_init(
-            integrations=[ArqIntegration()],
-            traces_sample_rate=1.0,
-            send_default_pii=True,
-            trace_lifecycle="stream" if span_streaming else "static",
-        )
+        sentry_init_kwargs = {
+            "integrations": [ArqIntegration()],
+            "traces_sample_rate": 1.0,
+            "send_default_pii": True,
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        }
+        sentry_init_kwargs.update(init_kwargs or {})
+        sentry_init(**sentry_init_kwargs)
 
         server = FakeRedis()
         pool = ArqRedis(pool_or_conn=server.connection_pool)
@@ -146,6 +153,7 @@ def init_arq_with_kwarg_settings(sentry_init):
         kw_functions=None,
         kw_cron_jobs=None,
         allow_abort_jobs_=False,
+        init_kwargs=None,
     ):
         cls_functions = cls_functions or []
         cls_cron_jobs = cls_cron_jobs or []
@@ -156,12 +164,14 @@ def init_arq_with_kwarg_settings(sentry_init):
         if kw_cron_jobs is not None:
             kwargs["cron_jobs"] = kw_cron_jobs
 
-        sentry_init(
-            integrations=[ArqIntegration()],
-            traces_sample_rate=1.0,
-            send_default_pii=True,
-            trace_lifecycle="stream" if span_streaming else "static",
-        )
+        sentry_init_kwargs = {
+            "integrations": [ArqIntegration()],
+            "traces_sample_rate": 1.0,
+            "send_default_pii": True,
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        }
+        sentry_init_kwargs.update(init_kwargs or {})
+        sentry_init(**sentry_init_kwargs)
 
         server = FakeRedis()
         pool = ArqRedis(pool_or_conn=server.connection_pool)
@@ -445,6 +455,101 @@ async def test_job_transaction(
         assert cron_extra["task"] == "cron:division"
         assert cron_extra["kwargs"] == {}
         assert cron_extra["retry"] == 1
+
+
+@pytest.mark.parametrize(
+    "init_kwargs,expected_args,expected_kwargs",
+    [
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            [1],
+            {"b": 0},
+            id="data_collection_default",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"queues": True}}},
+            [1],
+            {"b": 0},
+            id="data_collection_queues_on",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"queues": False}}},
+            None,
+            None,
+            id="data_collection_queues_off",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            SENSITIVE_DATA_SUBSTITUTE,
+            SENSITIVE_DATA_SUBSTITUTE,
+            id="no_pii",
+        ),
+        pytest.param(
+            {
+                "_experiments": {"data_collection": {"queues": False}},
+                "send_default_pii": False,
+            },
+            None,
+            None,
+            id="data_collection_queues_off_with_no_pii",
+        ),
+        pytest.param(
+            {
+                "_experiments": {"data_collection": {"queues": True}},
+                "send_default_pii": False,
+            },
+            [1],
+            {"b": 0},
+            id="data_collection_queues_on_with_no_pii",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_job_args_kwargs_data_collection(
+    capture_events,
+    capture_items,
+    init_arq,
+    span_streaming,
+    init_kwargs,
+    expected_args,
+    expected_kwargs,
+):
+    async def division(_, a, b=1):
+        return a / b
+
+    division.__qualname__ = division.__name__
+
+    pool, worker = init_arq(
+        span_streaming,
+        cls_functions=[division],
+        init_kwargs=init_kwargs,
+    )
+
+    job = await pool.enqueue_job("division", 1, b=0)
+
+    if span_streaming:
+        items = capture_items("event")
+    else:
+        events = capture_events()
+
+    await worker.run_job(job.job_id, timestamp_ms())
+
+    if span_streaming:
+        events = [item.payload for item in items]
+
+    (event,) = [event for event in events if "exception" in event]
+
+    arq_job = event["extra"]["arq-job"]
+    assert arq_job["task"] == "division"
+    assert arq_job["retry"] == 1
+
+    if expected_args is None:
+        assert "args" not in arq_job
+        assert "kwargs" not in arq_job
+    else:
+        assert arq_job["args"] == expected_args
+        assert arq_job["kwargs"] == expected_kwargs
 
 
 @pytest.mark.parametrize("source", ["cls_functions", "kw_functions"])
