@@ -1063,6 +1063,8 @@ async def test_fastmcp_resource_sync(
                         )
                     raise
 
+                print("events are", events)
+
                 (tx,) = events
                 assert tx["type"] == "transaction"
 
