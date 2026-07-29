@@ -1,18 +1,13 @@
 import random
 import time
-from unittest import mock
+from contextvars import ContextVar
 
 import pytest
 
 
-def _run_contextvar_threaded_test():
+@pytest.mark.forked
+def test_leaks(maybe_monkeypatched_threading):
     import threading
-
-    # Need to explicitly call _get_contextvars because the SDK has already
-    # decided upon gevent on import.
-    from sentry_sdk import utils
-
-    _, ContextVar = utils._get_contextvars()  # noqa: N806
 
     ts = []
 
@@ -39,14 +34,3 @@ def _run_contextvar_threaded_test():
         t.join()
 
     assert len(success) == 20
-
-
-@pytest.mark.forked
-def test_leaks(maybe_monkeypatched_threading):
-    _run_contextvar_threaded_test()
-
-
-@pytest.mark.forked
-@mock.patch("sentry_sdk.utils._is_contextvars_broken", return_value=True)
-def test_leaks_when_is_contextvars_broken_is_false(maybe_monkeypatched_threading):
-    _run_contextvar_threaded_test()

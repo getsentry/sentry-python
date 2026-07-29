@@ -99,7 +99,6 @@ def patch_django_asgi_handler_impl(cls: "Any") -> None:
 
         middleware = SentryAsgiMiddleware(
             old_app.__get__(self, cls),
-            unsafe_context_data=True,
             span_origin=DjangoIntegration.origin,
             http_methods_to_capture=integration.http_methods_to_capture,
         )._run_asgi3
@@ -154,7 +153,6 @@ def patch_channels_asgi_handler_impl(cls: "Any") -> None:
 
             middleware = SentryAsgiMiddleware(
                 lambda _scope: old_app.__get__(self, cls),
-                unsafe_context_data=True,
                 span_origin=DjangoIntegration.origin,
                 http_methods_to_capture=integration.http_methods_to_capture,
             )

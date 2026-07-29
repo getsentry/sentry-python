@@ -1,5 +1,6 @@
 import warnings
 from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import TYPE_CHECKING
 
 from sentry_sdk import (
@@ -17,10 +18,7 @@ from sentry_sdk.tracing import (
     Span,
     Transaction,
 )
-from sentry_sdk.utils import (
-    ContextVar,
-    logger,
-)
+from sentry_sdk.utils import logger
 
 if TYPE_CHECKING:
     from typing import (
@@ -86,7 +84,7 @@ def _suppress_hub_deprecation_warning() -> "Generator[None, None, None]":
         yield
 
 
-_local = ContextVar("sentry_current_hub")
+_local: "ContextVar[Optional[Hub]]" = ContextVar("sentry_current_hub")
 
 
 class HubMeta(type):

@@ -7,6 +7,7 @@ import sys
 import uuid
 import warnings
 from collections.abc import Iterable, Mapping
+from contextvars import ContextVar
 from datetime import datetime, timezone
 from importlib import import_module
 from typing import TYPE_CHECKING, Dict, List, cast, overload
@@ -50,7 +51,6 @@ from sentry_sdk.transport import (
 )
 from sentry_sdk.utils import (
     AnnotatedValue,
-    ContextVar,
     capture_internal_exceptions,
     current_stacktrace,
     datetime_from_isoformat,
@@ -93,7 +93,7 @@ if TYPE_CHECKING:
 
     I = TypeVar("I", bound=Integration)  # noqa: E741
 
-_client_init_debug = ContextVar("client_init_debug")
+_client_init_debug: "ContextVar[bool]" = ContextVar("client_init_debug")
 
 
 SDK_INFO: "SDKInfo" = {

@@ -1,4 +1,5 @@
 import sys
+from contextvars import ContextVar
 from functools import partial
 from typing import TYPE_CHECKING
 
@@ -17,7 +18,6 @@ from sentry_sdk.traces import SegmentNameSource, StreamedSpan
 from sentry_sdk.tracing import Span, TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
-    ContextVar,
     capture_internal_exceptions,
     event_from_exception,
     has_data_collection_enabled,
@@ -56,7 +56,9 @@ if TYPE_CHECKING:
             pass
 
 
-_wsgi_middleware_applied = ContextVar("sentry_wsgi_middleware_applied")
+_wsgi_middleware_applied: "ContextVar[bool]" = ContextVar(
+    "sentry_wsgi_middleware_applied"
+)
 _DEFAULT_TRANSACTION_NAME = "generic WSGI request"
 
 

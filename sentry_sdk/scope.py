@@ -4,6 +4,7 @@ import sys
 import warnings
 from collections import deque
 from contextlib import contextmanager
+from contextvars import ContextVar
 from copy import copy, deepcopy
 from datetime import datetime, timezone
 from enum import Enum
@@ -49,7 +50,6 @@ from sentry_sdk.tracing_utils import (
     is_ignored_span,
 )
 from sentry_sdk.utils import (
-    ContextVar,
     capture_internal_exception,
     capture_internal_exceptions,
     datetime_from_isoformat,
@@ -118,11 +118,15 @@ _global_scope: "Optional[Scope]" = None
 # This is used to isolate data for different requests or users.
 # The isolation scope is usually created by integrations, but may also
 # be created manually
-_isolation_scope = ContextVar("isolation_scope", default=None)
+_isolation_scope: "ContextVar[Optional[Scope]]" = ContextVar(
+    "isolation_scope", default=None
+)
 
 # Holds data for the active span.
 # This can be used to manually add additional data to a span.
-_current_scope = ContextVar("current_scope", default=None)
+_current_scope: "ContextVar[Optional[Scope]]" = ContextVar(
+    "current_scope", default=None
+)
 
 global_event_processors: "List[EventProcessor]" = []
 
