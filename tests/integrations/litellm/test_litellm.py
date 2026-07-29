@@ -3427,11 +3427,12 @@ def test_text_completion_operation_name(
     get_model_response,
     reset_litellm_executor,
 ):
-    """text_completion calls get the text_completion op, not the chat fallback."""
+    """text_completion calls get the text_completion op and record their prompt."""
     sentry_init(
-        integrations=[LiteLLMIntegration()],
+        integrations=[LiteLLMIntegration(include_prompts=True)],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        send_default_pii=True,
         stream_gen_ai_spans=False,
     )
     events = capture_events()
@@ -3476,6 +3477,9 @@ def test_text_completion_operation_name(
     assert span["op"] == OP.GEN_AI_TEXT_COMPLETION
     assert span["description"] == "text_completion gpt-3.5-turbo-instruct"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "text_completion"
+    assert json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
+        {"role": "user", "content": "Hello!"}
+    ]
 
 
 def test_responses_operation_name(
@@ -3485,11 +3489,12 @@ def test_responses_operation_name(
     nonstreaming_responses_model_response,
     reset_litellm_executor,
 ):
-    """Responses API calls get the responses op, not the chat fallback."""
+    """Responses API calls get the responses op and record their input."""
     sentry_init(
-        integrations=[LiteLLMIntegration()],
+        integrations=[LiteLLMIntegration(include_prompts=True)],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        send_default_pii=True,
         stream_gen_ai_spans=False,
     )
     events = capture_events()
@@ -3521,3 +3526,6 @@ def test_responses_operation_name(
     assert span["op"] == OP.GEN_AI_RESPONSES
     assert span["description"] == "responses gpt-4"
     assert span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "responses"
+    assert json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
+        {"role": "user", "content": "Hello!"}
+    ]
