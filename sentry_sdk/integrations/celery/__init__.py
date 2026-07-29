@@ -23,6 +23,7 @@ from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     event_from_exception,
+    has_data_collection_enabled,
     reraise,
 )
 
@@ -140,15 +141,22 @@ def _make_event_processor(
             tags = event.setdefault("tags", {})
             tags["celery_task_id"] = uuid
             extra = event.setdefault("extra", {})
-            extra["celery-job"] = {
-                "task_name": task.name,
-                "args": (
-                    args if should_send_default_pii() else SENSITIVE_DATA_SUBSTITUTE
-                ),
-                "kwargs": (
-                    kwargs if should_send_default_pii() else SENSITIVE_DATA_SUBSTITUTE
-                ),
-            }
+
+            celery_job = {"task_name": task.name}
+
+            client_options = sentry_sdk.get_client().options
+            if has_data_collection_enabled(client_options):
+                if client_options["data_collection"]["queues"]:
+                    celery_job["args"] = args
+                    celery_job["kwargs"] = kwargs
+            elif should_send_default_pii():
+                celery_job["args"] = args
+                celery_job["kwargs"] = kwargs
+            else:
+                celery_job["args"] = SENSITIVE_DATA_SUBSTITUTE
+                celery_job["kwargs"] = SENSITIVE_DATA_SUBSTITUTE
+
+            extra["celery-job"] = celery_job
 
         if "exc_info" in hint:
             with capture_internal_exceptions():
