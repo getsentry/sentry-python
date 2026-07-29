@@ -2,7 +2,6 @@ import importlib
 import json
 import sys
 import threading
-from importlib.metadata import version
 from unittest import mock
 
 import pytest
@@ -16,6 +15,11 @@ from sentry_sdk import (
 )
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.integrations.logging import LoggingIntegration
+
+try:
+    from importlib.metadata import version
+except ImportError:
+    from importlib_metadata import version
 
 QUART_VERSION = tuple([int(v) for v in version("quart").split(".")])
 
