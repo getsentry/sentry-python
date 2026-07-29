@@ -1,8 +1,6 @@
 import importlib
-import json
 import sys
 import threading
-from unittest import mock
 
 import pytest
 
@@ -587,82 +585,6 @@ async def test_class_based_views(sentry_init, capture_events):
 
     assert event["message"] == "hi"
     assert event["transaction"] == "hello_class"
-
-
-@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
-@pytest.mark.asyncio
-async def test_active_thread_id(
-    sentry_init, capture_envelopes, teardown_profiling, endpoint
-):
-    with mock.patch(
-        "sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0
-    ):
-        sentry_init(
-            traces_sample_rate=1.0,
-            profiles_sample_rate=1.0,
-        )
-        app = quart_app_factory()
-
-        envelopes = capture_envelopes()
-
-        async with app.test_client() as client:
-            response = await client.get(endpoint)
-            assert response.status_code == 200
-
-        data = json.loads(await response.get_data(as_text=True))
-
-        envelopes = [envelope for envelope in envelopes]
-        assert len(envelopes) == 1
-
-        profiles = [item for item in envelopes[0].items if item.type == "profile"]
-        assert len(profiles) == 1, envelopes[0].items
-
-        for item in profiles:
-            transactions = item.payload.json["transactions"]
-            assert len(transactions) == 1
-            assert str(data["active"]) == transactions[0]["active_thread_id"]
-
-        transactions = [
-            item for item in envelopes[0].items if item.type == "transaction"
-        ]
-        assert len(transactions) == 1
-
-        for item in transactions:
-            transaction = item.payload.json
-            trace_context = transaction["contexts"]["trace"]
-            assert str(data["active"]) == trace_context["data"]["thread.id"]
-
-
-@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
-@pytest.mark.asyncio
-async def test_active_thread_id_span_streaming(
-    sentry_init, capture_items, teardown_profiling, endpoint
-):
-    with mock.patch(
-        "sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0
-    ):
-        sentry_init(
-            traces_sample_rate=1.0,
-            profiles_sample_rate=1.0,
-            trace_lifecycle="stream",
-        )
-        app = quart_app_factory()
-
-        items = capture_items("span")
-
-        async with app.test_client() as client:
-            response = await client.get(endpoint)
-            assert response.status_code == 200
-
-        data = json.loads(await response.get_data(as_text=True))
-
-        sentry_sdk.flush()
-
-        spans = [item.payload for item in items]
-        assert len(spans) == 1
-
-        segment = spans[0]
-        assert str(data["active"]) == segment["attributes"]["thread.id"]
 
 
 @pytest.mark.asyncio

@@ -274,7 +274,6 @@ if TYPE_CHECKING:
             "monitor_config": Mapping[str, object],
             "monitor_slug": Optional[str],
             "platform": Literal["python"],
-            "profile": object,  # Should be sentry_sdk.profiler.Profile, but we can't import that here due to circular imports
             "release": Optional[str],
             "request": dict[str, object],
             "sdk": Mapping[str, object],
@@ -418,7 +417,6 @@ if TYPE_CHECKING:
         "attachment",
         "session",
         "internal",
-        "profile",
         "profile_chunk",
         "monitor",
         "span",

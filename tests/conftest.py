@@ -61,7 +61,6 @@ from sentry_sdk.integrations import (  # noqa: F401
     _installed_integrations,
     _processed_integrations,
 )
-from sentry_sdk.profiler import teardown_profiler
 from sentry_sdk.profiler.continuous_profiler import teardown_continuous_profiler
 from sentry_sdk.transport import Transport
 from sentry_sdk.utils import package_version, reraise
@@ -776,13 +775,11 @@ def object_described_by_matcher():
 @pytest.fixture
 def teardown_profiling():
     # Make sure that a previous test didn't leave the profiler running
-    teardown_profiler()
     teardown_continuous_profiler()
 
     yield
 
-    # Make sure that to shut down the profiler after the test
-    teardown_profiler()
+    # Make sure to shut down the profiler after the test
     teardown_continuous_profiler()
 
 

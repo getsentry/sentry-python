@@ -614,33 +614,6 @@ def test_auto_session_tracking_with_aggregates(
     assert sum(agg.get("crashed", 0) for agg in session_aggregates) == 1
 
 
-@mock.patch("sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0)
-def test_profile_sent(
-    sentry_init,
-    capture_envelopes,
-    teardown_profiling,
-):
-    def test_app(environ, start_response):
-        start_response("200 OK", [])
-        return ["Go get the ball! Good dog!"]
-
-    sentry_init(
-        traces_sample_rate=1.0,
-        _experiments={"profiles_sample_rate": 1.0},
-    )
-    app = SentryWsgiMiddleware(test_app)
-    envelopes = capture_envelopes()
-
-    client = Client(app)
-    client.get("/")
-
-    envelopes = [envelope for envelope in envelopes]
-    assert len(envelopes) == 1
-
-    profiles = [item for item in envelopes[0].items if item.type == "profile"]
-    assert len(profiles) == 1
-
-
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_span_origin_manual(sentry_init, capture_events, capture_items, span_streaming):
     def dogpark(environ, start_response):

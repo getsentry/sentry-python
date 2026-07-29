@@ -43,7 +43,6 @@ if TYPE_CHECKING:
         SamplingContext,
     )
     from sentry_sdk.profiler.continuous_profiler import ContinuousProfile
-    from sentry_sdk.profiler.transaction_profiler import Profile
 
     class SpanKwargs(TypedDict, total=False):
         trace_id: str
@@ -817,7 +816,6 @@ class Transaction(Span):
         "sample_rate",
         "_measurements",
         "_contexts",
-        "_profile",
         "_continuous_profile",
         "_baggage",
         "_sample_rand",
@@ -839,7 +837,6 @@ class Transaction(Span):
         self.parent_sampled = parent_sampled
         self._measurements: "Dict[str, MeasurementValue]" = {}
         self._contexts: "Dict[str, Any]" = {}
-        self._profile: "Optional[Profile]" = None
         self._continuous_profile: "Optional[ContinuousProfile]" = None
         self._baggage = baggage
 
@@ -888,17 +885,11 @@ class Transaction(Span):
 
         super().__enter__()
 
-        if self._profile is not None:
-            self._profile.__enter__()
-
         return self
 
     def __exit__(
         self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
     ) -> None:
-        if self._profile is not None:
-            self._profile.__exit__(ty, value, tb)
-
         if self._continuous_profile is not None:
             self._continuous_profile.stop()
 
@@ -1104,10 +1095,6 @@ class Transaction(Span):
 
         if has_gen_ai_span:
             event["_has_gen_ai_span"] = True
-
-        if self._profile is not None and self._profile.valid():
-            event["profile"] = self._profile
-            self._profile = None
 
         event["measurements"] = self._measurements
 

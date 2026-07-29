@@ -32,11 +32,6 @@ from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
 from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.monitor import Monitor
 from sentry_sdk.profiler.continuous_profiler import setup_continuous_profiler
-from sentry_sdk.profiler.transaction_profiler import (
-    Profile,
-    has_profiling_enabled,
-    setup_profiler,
-)
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.serializer import serialize
 from sentry_sdk.sessions import SessionFlusher
@@ -632,7 +627,6 @@ class _Client(BaseClient):
                 self.options["send_default_pii"] = True
                 self.options["error_sampler"] = sample_all
                 self.options["traces_sampler"] = sample_all
-                self.options["profiles_sampler"] = sample_all
                 # data_collection was resolved in _get_options() before this
                 # spotlight override flipped send_default_pii on. Re-derive it so
                 # data_collection agrees with should_send_default_pii() in
@@ -708,20 +702,14 @@ class _Client(BaseClient):
             SDK_INFO["name"] = sdk_name
             logger.debug("Setting SDK name to '%s'", sdk_name)
 
-            if has_profiling_enabled(self.options):
-                try:
-                    setup_profiler(self.options)
-                except Exception as e:
-                    logger.debug("Can not set up profiler. (%s)", e)
-            else:
-                try:
-                    setup_continuous_profiler(
-                        self.options,
-                        sdk_info=SDK_INFO,
-                        capture_func=_capture_envelope,
-                    )
-                except Exception as e:
-                    logger.debug("Can not set up continuous profiler. (%s)", e)
+            try:
+                setup_continuous_profiler(
+                    self.options,
+                    sdk_info=SDK_INFO,
+                    capture_func=_capture_envelope,
+                )
+            except Exception as e:
+                logger.debug("Can not set up continuous profiler. (%s)", e)
 
         finally:
             _client_init_debug.set(old_debug)
@@ -733,7 +721,6 @@ class _Client(BaseClient):
             or self.log_batcher
             or self.metrics_batcher
             or self.span_batcher
-            or has_profiling_enabled(self.options)
             or isinstance(self.transport, HttpTransportCore)
         ):
             # If we have anything on that could spawn a background thread, we
@@ -1121,8 +1108,6 @@ class _Client(BaseClient):
         if not self._should_capture(event, hint, scope):
             return None
 
-        profile = event.pop("profile", None)
-
         event_id = event.get("event_id")
         if event_id is None:
             event["event_id"] = event_id = uuid.uuid4().hex
@@ -1162,9 +1147,6 @@ class _Client(BaseClient):
             headers["trace"] = dynamic_sampling_context
 
         envelope = Envelope(headers=headers)
-
-        if is_transaction and isinstance(profile, Profile):
-            envelope.add_profile(profile.to_json(event_opt, self.options))
 
         if is_transaction and not span_recorder_has_gen_ai_span:
             envelope.add_transaction(event_opt)

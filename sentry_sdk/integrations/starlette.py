@@ -622,8 +622,6 @@ def patch_request_response() -> None:
                     current_scope.transaction.update_active_thread()
 
                 sentry_scope = sentry_sdk.get_isolation_scope()
-                if sentry_scope.profile is not None:
-                    sentry_scope.profile.update_active_thread_id()
 
                 request = args[0]
 

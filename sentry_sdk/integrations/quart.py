@@ -133,10 +133,6 @@ def patch_scaffold_route() -> None:
                         if current_scope.transaction is not None:
                             current_scope.transaction.update_active_thread()
 
-                    sentry_scope = sentry_sdk.get_isolation_scope()
-                    if sentry_scope.profile is not None:
-                        sentry_scope.profile.update_active_thread_id()
-
                     return old_func(*args, **kwargs)
 
                 return old_decorator(_sentry_func)

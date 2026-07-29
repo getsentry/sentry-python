@@ -1301,8 +1301,6 @@ class ClientConstructor:
         traces_sample_rate: "Optional[float]" = None,
         trace_lifecycle: "Optional[Literal['static', 'stream']]" = None,
         traces_sampler: "Optional[TracesSampler]" = None,
-        profiles_sample_rate: "Optional[float]" = None,
-        profiles_sampler: "Optional[TracesSampler]" = None,
         profiler_mode: "Optional[ProfilerMode]" = None,
         profile_lifecycle: 'Literal["manual", "trace"]' = "manual",
         profile_session_sample_rate: "Optional[float]" = None,
@@ -1704,16 +1702,6 @@ class ClientConstructor:
 
             Return a string for that repr value to be used or `None` to continue serializing how Sentry would have
             done it anyway.
-
-        :param profiles_sample_rate: A number between `0` and `1`, controlling the percentage chance a given sampled
-            transaction will be profiled.
-
-            (`0` represents 0% while `1` represents 100%.) Applies equally to all transactions created in the app.
-
-            This is relative to the tracing sample rate - e.g. `0.5` means 50% of sampled transactions will be
-            profiled.
-
-        :param profiles_sampler:
 
         :param profiler_mode:
 

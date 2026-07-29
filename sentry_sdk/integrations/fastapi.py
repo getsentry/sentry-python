@@ -181,10 +181,6 @@ def patch_get_request_handler() -> None:
                 elif current_scope.transaction is not None:
                     current_scope.transaction.update_active_thread()
 
-                sentry_scope = sentry_sdk.get_isolation_scope()
-                if sentry_scope.profile is not None:
-                    sentry_scope.profile.update_active_thread_id()
-
                 return old_call(*args, **kwargs)
 
             _sentry_call._sentry_is_patched = True  # type: ignore[attr-defined]
