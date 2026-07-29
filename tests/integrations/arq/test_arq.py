@@ -13,7 +13,7 @@ import sentry_sdk
 from sentry_sdk import get_client, start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.arq import ArqIntegration
-from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
+from tests.integrations.utils import DATA_COLLECTION_QUEUES_CASES
 
 
 def async_partial(async_fn, *args, **kwargs):
@@ -459,50 +459,7 @@ async def test_job_transaction(
 
 @pytest.mark.parametrize(
     "init_kwargs,expected_args,expected_kwargs",
-    [
-        pytest.param(
-            {"_experiments": {"data_collection": {}}},
-            [1],
-            {"b": 0},
-            id="data_collection_default",
-        ),
-        pytest.param(
-            {"_experiments": {"data_collection": {"queues": True}}},
-            [1],
-            {"b": 0},
-            id="data_collection_queues_on",
-        ),
-        pytest.param(
-            {"_experiments": {"data_collection": {"queues": False}}},
-            None,
-            None,
-            id="data_collection_queues_off",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            SENSITIVE_DATA_SUBSTITUTE,
-            SENSITIVE_DATA_SUBSTITUTE,
-            id="no_pii",
-        ),
-        pytest.param(
-            {
-                "_experiments": {"data_collection": {"queues": False}},
-                "send_default_pii": False,
-            },
-            None,
-            None,
-            id="data_collection_queues_off_with_no_pii",
-        ),
-        pytest.param(
-            {
-                "_experiments": {"data_collection": {"queues": True}},
-                "send_default_pii": False,
-            },
-            [1],
-            {"b": 0},
-            id="data_collection_queues_on_with_no_pii",
-        ),
-    ],
+    DATA_COLLECTION_QUEUES_CASES,
 )
 @pytest.mark.asyncio
 @pytest.mark.parametrize("span_streaming", [True, False])

@@ -10,7 +10,8 @@ from sentry_sdk import start_transaction
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.huey import HueyIntegration
 from sentry_sdk.traces import SegmentNameSource, SpanStatus
-from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE, parse_version
+from sentry_sdk.utils import parse_version
+from tests.integrations.utils import DATA_COLLECTION_QUEUES_CASES
 
 HUEY_VERSION = parse_version(HUEY_VERSION)
 
@@ -301,50 +302,7 @@ def test_task_lock(
 
 @pytest.mark.parametrize(
     "init_kwargs,expected_args,expected_kwargs",
-    [
-        pytest.param(
-            {"_experiments": {"data_collection": {}}},
-            [1],
-            {"b": 0},
-            id="data_collection_default",
-        ),
-        pytest.param(
-            {"_experiments": {"data_collection": {"queues": True}}},
-            [1],
-            {"b": 0},
-            id="data_collection_queues_on",
-        ),
-        pytest.param(
-            {"_experiments": {"data_collection": {"queues": False}}},
-            None,
-            None,
-            id="data_collection_queues_off",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            SENSITIVE_DATA_SUBSTITUTE,
-            SENSITIVE_DATA_SUBSTITUTE,
-            id="no_pii",
-        ),
-        pytest.param(
-            {
-                "_experiments": {"data_collection": {"queues": False}},
-                "send_default_pii": False,
-            },
-            None,
-            None,
-            id="data_collection_queues_off_with_no_pii",
-        ),
-        pytest.param(
-            {
-                "_experiments": {"data_collection": {"queues": True}},
-                "send_default_pii": False,
-            },
-            [1],
-            {"b": 0},
-            id="data_collection_queues_on_with_no_pii",
-        ),
-    ],
+    DATA_COLLECTION_QUEUES_CASES,
 )
 @pytest.mark.parametrize(
     "has_span_streaming", [True, False], ids=["streaming", "no_streaming"]
