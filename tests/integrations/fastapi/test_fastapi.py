@@ -4,7 +4,6 @@ import logging
 import os
 import threading
 import warnings
-from unittest import mock
 
 import fastapi
 import pytest
@@ -462,44 +461,6 @@ def test_legacy_setup(
 
     (event,) = events
     assert event["transaction"] == "/message/{message_id}"
-
-
-@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
-@mock.patch("sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0)
-def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, endpoint):
-    sentry_init(
-        traces_sample_rate=1.0,
-        profiles_sample_rate=1.0,
-    )
-    app = fastapi_app_factory()
-    asgi_app = SentryAsgiMiddleware(app)
-
-    envelopes = capture_envelopes()
-
-    client = TestClient(asgi_app)
-    response = client.get(endpoint)
-    assert response.status_code == 200
-
-    data = json.loads(response.content)
-
-    envelopes = [envelope for envelope in envelopes]
-    assert len(envelopes) == 1
-
-    profiles = [item for item in envelopes[0].items if item.type == "profile"]
-    assert len(profiles) == 1
-
-    for item in profiles:
-        transactions = item.payload.json["transactions"]
-        assert len(transactions) == 1
-        assert str(data["active"]) == transactions[0]["active_thread_id"]
-
-    transactions = [item for item in envelopes[0].items if item.type == "transaction"]
-    assert len(transactions) == 1
-
-    for item in transactions:
-        transaction = item.payload.json
-        trace_context = transaction["contexts"]["trace"]
-        assert str(data["active"]) == trace_context["data"]["thread.id"]
 
 
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])

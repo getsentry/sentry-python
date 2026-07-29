@@ -1325,7 +1325,7 @@ def test_uwsgi_warnings(sentry_init, recwarn, opt, missing_flags):
     uwsgi = mock.MagicMock()
     uwsgi.opt = opt
     with mock.patch.dict("sys.modules", uwsgi=uwsgi):
-        sentry_init(profiles_sample_rate=1.0)
+        sentry_init()
         if missing_flags:
             assert len(recwarn) == 1
             record = recwarn.pop()
