@@ -1,7 +1,9 @@
+import re
 import warnings
 from typing import TYPE_CHECKING
 
 import sentry_sdk
+from sentry_sdk.utils import logger, parse_version
 
 if TYPE_CHECKING:
     from typing import Any, ContextManager, Optional
@@ -42,10 +44,6 @@ class _InitGuard:
 
 
 def _check_version_deprecations() -> None:
-    import re
-
-    from sentry_sdk.utils import logger, parse_version
-
     try:
         import gevent
 
