@@ -29,7 +29,7 @@ import anyio
 import pytest
 
 import sentry_sdk
-from sentry_sdk.utils import parse_version
+from sentry_sdk.utils import package_version, parse_version
 
 try:
     from unittest.mock import AsyncMock
@@ -88,6 +88,8 @@ except ImportError:
     CallToolRequest = None
     GetPromptRequest = None
     ReadResourceRequest = None
+
+MCP_PACKAGE_VERSION = package_version("mcp")
 
 try:
     from fastmcp import __version__
@@ -644,7 +646,8 @@ async def test_fastmcp_multiple_tools(
                     "arguments": {
                         "y": int(
                             result1.message.result["content"][0]["text"]
-                            if FASTMCP_VERSION is not None and FASTMCP_VERSION >= (4,)
+                            if MCP_PACKAGE_VERSION is not None
+                            and MCP_PACKAGE_VERSION >= (2,)
                             else result1.message.root.result["content"][0]["text"]
                         )
                     },
@@ -660,7 +663,8 @@ async def test_fastmcp_multiple_tools(
                     "arguments": {
                         "z": int(
                             result2.message.result["content"][0]["text"]
-                            if FASTMCP_VERSION is not None and FASTMCP_VERSION >= (4,)
+                            if MCP_PACKAGE_VERSION is not None
+                            and MCP_PACKAGE_VERSION >= (2,)
                             else result2.message.root.result["content"][0]["text"]
                         )
                     },
@@ -699,7 +703,8 @@ async def test_fastmcp_multiple_tools(
                     "arguments": {
                         "y": int(
                             result1.message.result["content"][0]["text"]
-                            if FASTMCP_VERSION is not None and FASTMCP_VERSION >= (4,)
+                            if MCP_PACKAGE_VERSION is not None
+                            and MCP_PACKAGE_VERSION >= (2,)
                             else result1.message.root.result["content"][0]["text"]
                         )
                     },
@@ -715,7 +720,8 @@ async def test_fastmcp_multiple_tools(
                     "arguments": {
                         "z": int(
                             result2.message.result["content"][0]["text"]
-                            if FASTMCP_VERSION is not None and FASTMCP_VERSION >= (4,)
+                            if MCP_PACKAGE_VERSION is not None
+                            and MCP_PACKAGE_VERSION >= (2,)
                             else result2.message.root.result["content"][0]["text"]
                         )
                     },
@@ -1005,7 +1011,7 @@ async def test_fastmcp_prompt_async(
 
 
 @pytest.mark.skipif(
-    FASTMCP_VERSION is None or FASTMCP_VERSION < (0, 4, 1),
+    HAS_STANDALONE_FASTMCP and (FASTMCP_VERSION is None or FASTMCP_VERSION < (0, 4, 1)),
     reason="Resource URI templates not supported before fastmcp 0.4.1",
 )
 @pytest.mark.asyncio
@@ -1100,7 +1106,7 @@ async def test_fastmcp_resource_sync(
 
 
 @pytest.mark.skipif(
-    FASTMCP_VERSION is None or FASTMCP_VERSION < (0, 4, 1),
+    HAS_STANDALONE_FASTMCP and (FASTMCP_VERSION is None or FASTMCP_VERSION < (0, 4, 1)),
     reason="Resource URI templates not supported before fastmcp 0.4.1",
 )
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
