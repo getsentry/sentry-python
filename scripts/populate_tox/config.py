@@ -398,6 +398,7 @@ TEST_SUITE_CONFIG = {
                 "hypercorn<0.15.0",
             ],
             "py3.8": ["taskgroup==0.0.0a4"],
+            "py3.6,py3.7": ["importlib_metadata"],
         },
         "num_versions": 2,
     },
