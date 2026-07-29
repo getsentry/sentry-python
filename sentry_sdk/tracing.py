@@ -75,9 +75,6 @@ if TYPE_CHECKING:
         description: str
         """A description of what operation is being performed within the span. This argument is DEPRECATED. Please use the `name` parameter, instead."""
 
-        hub: "Optional[sentry_sdk.Hub]"
-        """The hub to use for this span. This argument is DEPRECATED. Please use the `scope` parameter, instead."""
-
         status: str
         """The span's status. Possible values are listed at https://develop.sentry.dev/sdk/event-payloads/span/"""
 
@@ -239,7 +236,6 @@ class Span:
         .. deprecated:: 2.15.0
             Please use the `name` parameter, instead.
     :param name: A string describing what operation is being performed within the span.
-    :param hub: The hub to use for this span.
 
         .. deprecated:: 2.0.0
             Please use the `scope` parameter, instead.
@@ -267,7 +263,6 @@ class Span:
         "_tags",
         "_data",
         "_span_recorder",
-        "hub",
         "_context_manager_state",
         "_containing_transaction",
         "scope",
@@ -286,7 +281,6 @@ class Span:
         sampled: "Optional[bool]" = None,
         op: "Optional[str]" = None,
         description: "Optional[str]" = None,
-        hub: "Optional[sentry_sdk.Hub]" = None,  # deprecated
         status: "Optional[str]" = None,
         containing_transaction: "Optional[Transaction]" = None,
         start_timestamp: "Optional[Union[datetime, float]]" = None,
@@ -302,7 +296,6 @@ class Span:
         self.op = op
         self.description = name or description
         self.status = status
-        self.hub = hub  # backwards compatibility
         self.scope = scope
         self.origin = origin
         self._measurements: "Dict[str, MeasurementValue]" = {}
@@ -311,15 +304,6 @@ class Span:
         self._containing_transaction = containing_transaction
         self._flags: "Dict[str, bool]" = {}
         self._flags_capacity = 10
-
-        if hub is not None:
-            warnings.warn(
-                "The `hub` parameter is deprecated. Please use `scope` instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
-            self.scope = self.scope or hub.scope
 
         if start_timestamp is None:
             start_timestamp = datetime.now(timezone.utc)
@@ -906,38 +890,6 @@ class Transaction(Span):
         # reference.
         return self
 
-    def _get_scope_from_finish_args(
-        self,
-        scope_arg: "Optional[Union[sentry_sdk.Scope, sentry_sdk.Hub]]",
-        hub_arg: "Optional[Union[sentry_sdk.Scope, sentry_sdk.Hub]]",
-    ) -> "Optional[sentry_sdk.Scope]":
-        """
-        Logic to get the scope from the arguments passed to finish. This
-        function exists for backwards compatibility with the old finish.
-
-        TODO: Remove this function in the next major version.
-        """
-        scope_or_hub = scope_arg
-        if hub_arg is not None:
-            warnings.warn(
-                "The `hub` parameter is deprecated. Please use the `scope` parameter, instead.",
-                DeprecationWarning,
-                stacklevel=3,
-            )
-
-            scope_or_hub = hub_arg
-
-        if isinstance(scope_or_hub, sentry_sdk.Hub):
-            warnings.warn(
-                "Passing a Hub to finish is deprecated. Please pass a Scope, instead.",
-                DeprecationWarning,
-                stacklevel=3,
-            )
-
-            return scope_or_hub.scope
-
-        return scope_or_hub
-
     def _get_log_representation(self) -> str:
         return "{op}transaction <{name}>".format(
             op=("<" + self.op + "> " if self.op else ""), name=self.name
@@ -947,8 +899,6 @@ class Transaction(Span):
         self,
         scope: "Optional[sentry_sdk.Scope]" = None,
         end_timestamp: "Optional[Union[float, datetime]]" = None,
-        *,
-        hub: "Optional[sentry_sdk.Hub]" = None,
     ) -> "Optional[str]":
         """Finishes the transaction and sends it to Sentry.
         All finished spans in the transaction will also be sent to Sentry.
@@ -957,9 +907,6 @@ class Transaction(Span):
             If not provided, the current Scope will be used.
         :param end_timestamp: Optional timestamp that should
             be used as timestamp instead of the current time.
-        :param hub: The hub to use for this transaction.
-            This argument is DEPRECATED. Please use the `scope`
-            parameter, instead.
 
         :return: The event ID if the transaction was sent to Sentry,
             otherwise None.
@@ -967,10 +914,6 @@ class Transaction(Span):
         if self.timestamp is not None:
             # This transaction is already finished, ignore.
             return None
-
-        # For backwards compatibility, we must handle the case where `scope`
-        # or `hub` could both either be a `Scope` or a `Hub`.
-        scope = self._get_scope_from_finish_args(scope, hub)
 
         scope = scope or self.scope or sentry_sdk.get_current_scope()
         client = sentry_sdk.get_client()
@@ -1332,12 +1275,7 @@ class NoOpSpan(Span):
         self,
         scope: "Optional[sentry_sdk.Scope]" = None,
         end_timestamp: "Optional[Union[float, datetime]]" = None,
-        *,
-        hub: "Optional[sentry_sdk.Hub]" = None,
     ) -> "Optional[str]":
-        """
-        The `hub` parameter is deprecated. Please use the `scope` parameter, instead.
-        """
         pass
 
     def set_measurement(
