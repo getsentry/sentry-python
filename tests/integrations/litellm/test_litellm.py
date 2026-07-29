@@ -2662,7 +2662,7 @@ def test_response_without_usage(
             )
 
         sentry_sdk.flush()
-        (span,) = (item.payload for item in items if item.type == "span")
+        (span,) = (item.payload for item in items)
 
         # Span should still be created even without usage info
         assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT

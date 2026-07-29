@@ -146,6 +146,23 @@ def test_metrics_with_span(sentry_init, capture_items):
     assert metrics[0]["span_id"] == transaction.span_id
 
 
+def test_metrics_with_span_span_streaming(sentry_init, capture_items):
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    items = capture_items("trace_metric")
+
+    with sentry_sdk.traces.start_span(name="test-span") as segment:
+        sentry_sdk.metrics.count("test.span.counter", 1)
+
+    sentry_sdk.flush()
+
+    metrics = [item.payload for item in items]
+    assert len(metrics) == 1
+
+    assert metrics[0]["trace_id"] is not None
+    assert metrics[0]["trace_id"] == segment.trace_id
+    assert metrics[0]["span_id"] == segment.span_id
+
+
 def test_metrics_tracing_without_performance(sentry_init, capture_items):
     sentry_init()
     items = capture_items("trace_metric")

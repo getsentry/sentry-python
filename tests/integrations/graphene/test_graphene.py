@@ -11,6 +11,33 @@ from sentry_sdk.integrations.flask import FlaskIntegration
 from sentry_sdk.integrations.graphene import GrapheneIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
 
+DATA_COLLECTION_GRAPHQL_DOCUMENTS_PARAMS = [
+    pytest.param(
+        {"graphql": {"document": True}},
+        None,
+        True,
+        id="document_on_collects_graphql_data",
+    ),
+    pytest.param(
+        {"graphql": {"document": False}},
+        None,
+        False,
+        id="document_off_omits_graphql_data",
+    ),
+    pytest.param(
+        {"graphql": {"document": False}},
+        True,
+        False,
+        id="data_collection_takes_precedence_over_send_default_pii_on",
+    ),
+    pytest.param(
+        {"graphql": {"document": True}},
+        False,
+        True,
+        id="data_collection_takes_precedence_over_send_default_pii_off",
+    ),
+]
+
 
 class Query(ObjectType):
     hello = String(first_name=String(default_value="stranger"))
@@ -151,32 +178,7 @@ def test_do_not_capture_request_if_send_pii_is_off_sync(sentry_init, capture_eve
 
 @pytest.mark.parametrize(
     "data_collection,send_default_pii,expect_api_target",
-    [
-        pytest.param(
-            {"graphql": {"document": True}},
-            None,
-            True,
-            id="document_on_sets_api_target",
-        ),
-        pytest.param(
-            {"graphql": {"document": False}},
-            None,
-            False,
-            id="document_off_does_not_set_api_target",
-        ),
-        pytest.param(
-            {"graphql": {"document": False}},
-            True,
-            False,
-            id="data_collection_takes_precedence_over_send_default_pii_on",
-        ),
-        pytest.param(
-            {"graphql": {"document": True}},
-            False,
-            True,
-            id="data_collection_takes_precedence_over_send_default_pii_off",
-        ),
-    ],
+    DATA_COLLECTION_GRAPHQL_DOCUMENTS_PARAMS,
 )
 def test_event_processor_data_collection_sync(
     sentry_init, capture_events, data_collection, send_default_pii, expect_api_target
@@ -210,19 +212,32 @@ def test_event_processor_data_collection_sync(
     assert event["exception"]["values"][0]["mechanism"]["type"] == "graphene"
     if expect_api_target:
         assert event["request"]["api_target"] == "graphql"
+        assert "data" in event.get("request", {})
     else:
         assert "api_target" not in event.get("request", {})
+        assert "data" not in event.get("request", {})
 
 
-def test_event_processor_data_collection_async(sentry_init, capture_events):
-    sentry_init(
-        integrations=[
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,expect_api_target",
+    DATA_COLLECTION_GRAPHQL_DOCUMENTS_PARAMS,
+)
+def test_event_processor_data_collection_async(
+    sentry_init, capture_events, data_collection, send_default_pii, expect_api_target
+):
+    init_kwargs = {
+        "integrations": [
             GrapheneIntegration(),
             FastApiIntegration(),
             StarletteIntegration(),
         ],
-        _experiments={"data_collection": {"graphql": {"document": True}}},
-    )
+        "_experiments": {"data_collection": data_collection},
+    }
+
+    if send_default_pii is not None:
+        init_kwargs["send_default_pii"] = send_default_pii
+    sentry_init(**init_kwargs)
+
     events = capture_events()
 
     schema = Schema(query=Query)
@@ -243,7 +258,13 @@ def test_event_processor_data_collection_async(sentry_init, capture_events):
 
     (event,) = events
     assert event["exception"]["values"][0]["mechanism"]["type"] == "graphene"
-    assert event["request"]["api_target"] == "graphql"
+
+    if expect_api_target:
+        assert event["request"]["api_target"] == "graphql"
+        assert "data" in event.get("request", {})
+    else:
+        assert "api_target" not in event.get("request", {})
+        assert "data" not in event.get("request", {})
 
 
 def test_no_event_if_no_errors_async(sentry_init, capture_events):
@@ -354,32 +375,7 @@ def test_graphql_span_holds_query_information(
 
 @pytest.mark.parametrize(
     "data_collection,send_default_pii,expect_document",
-    [
-        pytest.param(
-            {"graphql": {"document": True}},
-            None,
-            True,
-            id="document_on_sets_graphql_document",
-        ),
-        pytest.param(
-            {"graphql": {"document": False}},
-            None,
-            False,
-            id="document_off_omits_graphql_document",
-        ),
-        pytest.param(
-            {"graphql": {"document": False}},
-            True,
-            False,
-            id="data_collection_takes_precedence_over_send_default_pii_on",
-        ),
-        pytest.param(
-            {"graphql": {"document": True}},
-            False,
-            True,
-            id="data_collection_takes_precedence_over_send_default_pii_off",
-        ),
-    ],
+    DATA_COLLECTION_GRAPHQL_DOCUMENTS_PARAMS,
 )
 def test_graphql_span_data_collection(
     sentry_init, capture_events, data_collection, send_default_pii, expect_document
@@ -488,32 +484,7 @@ def test_graphql_streamed_span_holds_query_information(
 
 @pytest.mark.parametrize(
     "data_collection,send_default_pii,expect_document",
-    [
-        pytest.param(
-            {"graphql": {"document": True}},
-            None,
-            True,
-            id="document_on_sets_graphql_document",
-        ),
-        pytest.param(
-            {"graphql": {"document": False}},
-            None,
-            False,
-            id="document_off_omits_graphql_document",
-        ),
-        pytest.param(
-            {"graphql": {"document": False}},
-            True,
-            False,
-            id="data_collection_takes_precedence_over_send_default_pii_on",
-        ),
-        pytest.param(
-            {"graphql": {"document": True}},
-            False,
-            True,
-            id="data_collection_takes_precedence_over_send_default_pii_off",
-        ),
-    ],
+    DATA_COLLECTION_GRAPHQL_DOCUMENTS_PARAMS,
 )
 def test_graphql_streamed_span_data_collection(
     sentry_init, capture_items, data_collection, send_default_pii, expect_document

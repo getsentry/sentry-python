@@ -236,6 +236,9 @@ TEST_SUITE_CONFIG = {
     "huey": {
         "package": "huey",
         "num_versions": 2,
+        "python": {
+            ">=3.3.0": ">3.7",
+        },
     },
     "huggingface_hub": {
         "package": "huggingface_hub",
@@ -302,14 +305,13 @@ TEST_SUITE_CONFIG = {
     "mcp": {
         "package": "mcp",
         "deps": {
-            "*": ["pytest-asyncio"],
+            "*": ["pytest-asyncio", "httpx"],
         },
-        "include": "<2.0.0a1",  # Alphas are currently being released, will come back to these before the release that's expected at the end of July 2026
     },
     "fastmcp": {
         "package": "fastmcp",
         "deps": {
-            "*": ["pytest-asyncio"],
+            "*": ["pytest-asyncio", "httpx"],
         },
     },
     "openai-base": {

@@ -397,15 +397,13 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
             stacklevel=2,
         )
 
+    if rv["before_send_span"] and not has_span_streaming_enabled(rv):
+        warnings.warn(
+            "The `before_send_span` parameter only works when `trace_lifecycle` is set to `stream`.",
+            stacklevel=2,
+        )
+
     return rv
-
-
-try:
-    # Python 3.6+
-    module_not_found_error = ModuleNotFoundError
-except Exception:
-    # Older Python versions
-    module_not_found_error = ImportError  # type: ignore
 
 
 class BaseClient:
@@ -559,7 +557,7 @@ class _Client(BaseClient):
                 function_obj = getattr(module_obj, function_name)
                 setattr(module_obj, function_name, trace(function_obj))
                 logger.debug("Enabled tracing for %s", function_qualname)
-            except module_not_found_error:
+            except ModuleNotFoundError:
                 try:
                     # Try to import a class
                     # ex: "mymodule.submodule.MyClassName.member_function"
