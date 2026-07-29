@@ -5,12 +5,18 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 ## New Features
 
+
 ## Changed
+
+- The UnraisableHookIntegration is now enabled by default.
+- We now don't suppress chained exceptions in the ASGI and asyncio integrations by default. The related `suppress_asgi_chained_exceptions` experimental option was removed.
 
 ## Removed
 
 - Dropped support for gevent versions below 20.9.
 - Dropped support for greenlet versions below 0.4.17.
+- Removed the deprecated Hub class and all uses of hub throughout the SDK in arguments, options, etc. Use a scope instead.
+- Removed the `auto_session_tracing` decorator. Use `track_session` instead.
 
 ## Deprecated
 

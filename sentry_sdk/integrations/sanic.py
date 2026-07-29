@@ -231,7 +231,7 @@ async def _context_exit(
         response_status = None if response is None else response.status
 
         # This capture_internal_exceptions block has been intentionally nested here, so that in case an exception
-        # happens while trying to end the transaction, we still attempt to exit the hub.
+        # happens while trying to end the transaction, we still attempt to exit the scope.
         with capture_internal_exceptions():
             span = request.ctx._sentry_root_span
             if isinstance(span, StreamedSpan):

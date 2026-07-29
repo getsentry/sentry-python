@@ -33,7 +33,6 @@ import sys
 import threading
 import time
 import uuid
-import warnings
 from abc import ABC, abstractmethod
 from collections import deque
 from typing import TYPE_CHECKING
@@ -200,7 +199,6 @@ class Profile:
         self,
         sampled: "Optional[bool]",
         start_ns: int,
-        hub: "Optional[sentry_sdk.Hub]" = None,
         scheduler: "Optional[Scheduler]" = None,
     ) -> None:
         self.scheduler = _scheduler if scheduler is None else scheduler
@@ -229,16 +227,6 @@ class Profile:
         self.samples: "List[ProcessedSample]" = []
 
         self.unique_samples = 0
-
-        # Backwards compatibility with the old hub property
-        self._hub: "Optional[sentry_sdk.Hub]" = None
-        if hub is not None:
-            self._hub = hub
-            warnings.warn(
-                "The `hub` parameter is deprecated. Please do not use it.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
 
     def update_active_thread_id(self) -> None:
         self.active_thread_id = get_current_thread_meta()[0]
@@ -501,24 +489,6 @@ class Profile:
             return False
 
         return True
-
-    @property
-    def hub(self) -> "Optional[sentry_sdk.Hub]":
-        warnings.warn(
-            "The `hub` attribute is deprecated. Please do not access it.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self._hub
-
-    @hub.setter
-    def hub(self, value: "Optional[sentry_sdk.Hub]") -> None:
-        warnings.warn(
-            "The `hub` attribute is deprecated. Please do not set it.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        self._hub = value
 
 
 class Scheduler(ABC):

@@ -15,7 +15,6 @@ import pytest
 import sentry_sdk
 from sentry_sdk import (
     Client,
-    Hub,
     add_breadcrumb,
     capture_event,
     capture_exception,
@@ -633,31 +632,6 @@ def test_atexit(tmpdir, monkeypatch, num_messages, http2):
     assert int(end - start) >= num_messages / 10
 
     assert output.count(b"HI") == num_messages
-
-
-def test_configure_scope_available(
-    sentry_init, request, monkeypatch, suppress_deprecation_warnings
-):
-    """
-    Test that scope is configured if client is configured
-
-    This test can be removed once configure_scope and the Hub are removed.
-    """
-    sentry_init()
-
-    with configure_scope() as scope:
-        assert scope is Hub.current.scope
-        scope.set_tag("foo", "bar")
-
-    calls = []
-
-    def callback(scope):
-        calls.append(scope)
-        scope.set_tag("foo", "bar")
-
-    assert configure_scope(callback) is None
-    assert len(calls) == 1
-    assert calls[0] is Hub.current.scope
 
 
 @pytest.mark.tests_internal_exceptions
