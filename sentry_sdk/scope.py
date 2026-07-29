@@ -471,8 +471,9 @@ class Scope:
         If no client is available a :py:class:`sentry_sdk.client.NonRecordingClient` is returned.
         """
         current_scope = _current_scope.get()
+
         try:
-            client = current_scope.client
+            client = current_scope.client  # type: ignore[union-attr]
         except AttributeError:
             client = None
 
@@ -481,7 +482,7 @@ class Scope:
 
         isolation_scope = _isolation_scope.get()
         try:
-            client = isolation_scope.client
+            client = isolation_scope.client  # type: ignore[union-attr]
         except AttributeError:
             client = None
 
