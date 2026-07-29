@@ -9,7 +9,6 @@ from unittest import mock
 
 import pytest
 
-import sentry_sdk
 from sentry_sdk import start_transaction
 from sentry_sdk._lru_cache import LRUCache
 from sentry_sdk.profiler.transaction_profiler import (
@@ -812,24 +811,6 @@ def test_profile_processing(
             assert processed["frames"] == expected["frames"]
             assert processed["stacks"] == expected["stacks"]
             assert processed["samples"] == expected["samples"]
-
-
-def test_hub_backwards_compatibility(suppress_deprecation_warnings):
-    hub = sentry_sdk.Hub()
-
-    with pytest.warns(DeprecationWarning):
-        profile = Profile(True, 0, hub=hub)
-
-    with pytest.warns(DeprecationWarning):
-        assert profile.hub is hub
-
-    new_hub = sentry_sdk.Hub()
-
-    with pytest.warns(DeprecationWarning):
-        profile.hub = new_hub
-
-    with pytest.warns(DeprecationWarning):
-        assert profile.hub is new_hub
 
 
 def test_no_warning_without_hub():

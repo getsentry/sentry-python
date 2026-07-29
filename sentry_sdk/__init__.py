@@ -8,7 +8,6 @@ from sentry_sdk.transport import HttpTransport, Transport
 from sentry_sdk.api import *  # noqa # isort: skip
 
 __all__ = [  # noqa
-    "Hub",
     "Scope",
     "Client",
     "Transport",
@@ -66,6 +65,3 @@ from sentry_sdk.debug import init_debug_support
 
 init_debug_support()
 del init_debug_support
-
-# circular imports
-from sentry_sdk.hub import Hub

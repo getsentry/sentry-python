@@ -139,7 +139,7 @@ class ScopeType(Enum):
 
 
 class _ScopeManager:
-    def __init__(self, hub: "Optional[Any]" = None) -> None:
+    def __init__(self) -> None:
         self._old_scopes: "List[Scope]" = []
 
     def __enter__(self) -> "Scope":
