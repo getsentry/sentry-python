@@ -1531,14 +1531,18 @@ async def test_multiple_handlers(
         assert "tools/call tool_b" in span_names
         assert "prompts/get prompt_a" in span_names
     else:
-        (tx,) = events
-        assert tx["type"] == "transaction"
-        assert len(tx["spans"]) == 3
+        (tx1, tx2, tx3) = events
 
-        span_ops = [span["op"] for span in tx["spans"]]
-        assert all(op == OP.MCP_SERVER for op in span_ops)
+        assert all(
+            op == OP.MCP_SERVER
+            for op in (
+                tx1["contexts"]["trace"]["op"],
+                tx1["contexts"]["trace"]["op"],
+                tx1["contexts"]["trace"]["op"],
+            )
+        )
 
-        span_descriptions = [span["description"] for span in tx["spans"]]
+        span_descriptions = [tx1["transaction"], tx2["transaction"], tx3["transaction"]]
         assert "tools/call tool_a" in span_descriptions
         assert "tools/call tool_b" in span_descriptions
         assert "prompts/get prompt_a" in span_descriptions
