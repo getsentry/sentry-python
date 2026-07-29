@@ -427,7 +427,7 @@ if TYPE_CHECKING:
     SessionStatus = Literal["ok", "exited", "crashed", "abnormal"]
 
     ContinuousProfilerMode = Literal["thread", "gevent", "unknown"]
-    ProfilerMode = Union[ContinuousProfilerMode, Literal["sleep"]]
+    ProfilerMode = Union[ContinuousProfilerMode]
 
     MonitorConfigScheduleType = Literal["crontab", "interval"]
     MonitorConfigScheduleUnit = Literal[
