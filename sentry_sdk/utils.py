@@ -264,7 +264,8 @@ def datetime_from_isoformat(value: str) -> "datetime":
     try:
         result = datetime.fromisoformat(value)
     except (AttributeError, ValueError):
-        # py 3.6
+        # until 3.11, datetime.fromisoformat didn't support all possible formats,
+        # so we still need this manual fallback
         timestamp_format = (
             "%Y-%m-%dT%H:%M:%S.%f" if "." in value else "%Y-%m-%dT%H:%M:%S"
         )
