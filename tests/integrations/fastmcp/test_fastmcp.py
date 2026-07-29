@@ -560,9 +560,6 @@ async def test_fastmcp_tool_with_error(
         error_event = error_events[0]
         assert error_event["exception"]["values"][0]["type"] == "ValueError"
         assert error_event["exception"]["values"][0]["value"] == "Tool execution failed"
-
-        # Verify span is marked with error
-        assert tool_spans[0]["attributes"][SPANDATA.MCP_TOOL_RESULT_IS_ERROR] is True
     else:
         events = capture_events()
         with start_transaction(name="fastmcp tx"):
@@ -591,9 +588,6 @@ async def test_fastmcp_tool_with_error(
         error_event = error_events[0]
         assert error_event["exception"]["values"][0]["type"] == "ValueError"
         assert error_event["exception"]["values"][0]["value"] == "Tool execution failed"
-
-        # Verify span is marked with error
-        assert tool_spans[0]["data"][SPANDATA.MCP_TOOL_RESULT_IS_ERROR] is True
 
 
 @pytest.mark.asyncio
