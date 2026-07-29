@@ -28,6 +28,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 - Transaction profiling and related code was removed.
 - Removed the deprecated Hub class and all uses of hub throughout the SDK in arguments, options, etc. Use a scope instead.
+- The `SentrySpanProcessor`, `SentryPropagator`, `instrumenter`, and associated OpenTelemetry compatibility code was removed. Use the `OTLPIntegration` instead.
 - Removed the `auto_session_tracing` decorator. Use `track_session` instead.
 
 ## Deprecated

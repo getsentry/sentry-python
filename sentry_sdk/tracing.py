@@ -5,7 +5,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, cast
 
 import sentry_sdk
-from sentry_sdk.consts import INSTRUMENTER, SPANDATA, SPANSTATUS, SPANTEMPLATE
+from sentry_sdk.consts import SPANDATA, SPANSTATUS, SPANTEMPLATE
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -412,19 +412,13 @@ class Span:
         # referencing themselves)
         return self._containing_transaction
 
-    def start_child(
-        self, instrumenter: str = INSTRUMENTER.SENTRY, **kwargs: "Any"
-    ) -> "Span":
+    def start_child(self, **kwargs: "Any") -> "Span":
         """
         Start a sub-span from the current span or transaction.
 
         Takes the same arguments as the initializer of :py:class:`Span`. The
         trace id, sampling decision, transaction pointer, and span recorder are
         inherited from the current span/transaction.
-
-        The instrumenter parameter is deprecated for user code, and it will
-        be removed in the next major version. Going forward, it should only
-        be used by the SDK itself.
         """
         if kwargs.get("description") is not None:
             warnings.warn(
@@ -432,11 +426,6 @@ class Span:
                 DeprecationWarning,
                 stacklevel=2,
             )
-
-        configuration_instrumenter = sentry_sdk.get_client().options["instrumenter"]
-
-        if instrumenter != configuration_instrumenter:
-            return NoOpSpan()
 
         kwargs.setdefault("sampled", self.sampled)
 
@@ -1227,9 +1216,7 @@ class NoOpSpan(Span):
     def containing_transaction(self) -> "Optional[Transaction]":
         return None
 
-    def start_child(
-        self, instrumenter: str = INSTRUMENTER.SENTRY, **kwargs: "Any"
-    ) -> "NoOpSpan":
+    def start_child(self, **kwargs: "Any") -> "NoOpSpan":
         return NoOpSpan()
 
     def to_traceparent(self) -> str:

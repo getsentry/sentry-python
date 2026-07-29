@@ -70,7 +70,6 @@ if TYPE_CHECKING:
             "record_sql_params": Optional[bool],
             "continuous_profiling_auto_start": Optional[bool],
             "continuous_profiling_mode": Optional[ContinuousProfilerMode],
-            "otel_powered_performance": Optional[bool],
             "transport_zlib_compression_level": Optional[int],
             "transport_compression_level": Optional[int],
             "transport_compression_algo": Optional[CompressionAlgo],
@@ -112,11 +111,6 @@ class SPANTEMPLATE(str, Enum):
 
     def __str__(self) -> str:
         return self.value
-
-
-class INSTRUMENTER:
-    SENTRY = "sentry"
-    OTEL = "otel"
 
 
 class SPANNAME:
@@ -1310,7 +1304,6 @@ class ClientConstructor:
         send_client_reports: bool = True,
         _experiments: "Experiments" = {},  # noqa: B006
         proxy_headers: "Optional[Dict[str, str]]" = None,
-        instrumenter: "Optional[str]" = INSTRUMENTER.SENTRY,
         before_send_transaction: "Optional[TransactionProcessor]" = None,
         project_root: "Optional[str]" = None,
         enable_tracing: "Optional[bool]" = None,
@@ -1717,7 +1710,6 @@ class ClientConstructor:
 
         :param spotlight:
 
-        :param instrumenter:
 
         :param enable_logs: Set `enable_logs` to True to enable the SDK to emit
             Sentry logs. Defaults to False.
