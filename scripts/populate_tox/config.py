@@ -236,6 +236,9 @@ TEST_SUITE_CONFIG = {
     "huey": {
         "package": "huey",
         "num_versions": 2,
+        "python": {
+            ">=3.3.0": ">3.7",
+        },
     },
     "huggingface_hub": {
         "package": "huggingface_hub",
@@ -308,7 +311,7 @@ TEST_SUITE_CONFIG = {
     "fastmcp": {
         "package": "fastmcp",
         "deps": {
-            "*": ["pytest-asyncio"],
+            "*": ["pytest-asyncio", "httpx"],
         },
     },
     "openai-base": {
