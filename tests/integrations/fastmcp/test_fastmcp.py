@@ -1011,7 +1011,7 @@ async def test_fastmcp_prompt_async(
 
 
 @pytest.mark.skipif(
-    FASTMCP_VERSION is not None and FASTMCP_VERSION < (0, 4, 1),
+    FASTMCP_VERSION is None or FASTMCP_VERSION < (0, 4, 1),
     reason="Resource URI templates not supported before fastmcp 0.4.1",
 )
 @pytest.mark.asyncio
@@ -1106,7 +1106,7 @@ async def test_fastmcp_resource_sync(
 
 
 @pytest.mark.skipif(
-    FASTMCP_VERSION is not None and FASTMCP_VERSION < (0, 4, 1),
+    FASTMCP_VERSION is None or FASTMCP_VERSION < (0, 4, 1),
     reason="Resource URI templates not supported before fastmcp 0.4.1",
 )
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
