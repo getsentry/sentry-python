@@ -55,7 +55,7 @@ def _check_version_deprecations() -> None:
                 "sentry-sdk 3.x supports gevent 20.9.0 or newer. "
                 "Please upgrade gevent or downgrade to sentry-sdk 2.x."
             )
-    except ImportError:
+    except Exception:
         pass
 
     try:
@@ -67,7 +67,7 @@ def _check_version_deprecations() -> None:
                 "sentry-sdk 3.x supports greenlet 0.4.17 or newer. "
                 "Please upgrade greenlet or downgrade to sentry-sdk 2.x."
             )
-    except ImportError:
+    except Exception:
         pass
 
 
