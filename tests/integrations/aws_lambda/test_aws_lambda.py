@@ -14,6 +14,7 @@ from .utils import SAM_PORT, LocalLambdaStack, SentryServerForTesting
 
 DOCKER_NETWORK_NAME = "lambda-test-network"
 SAM_TEMPLATE_FILE = "sam.template.yaml"
+SAM_SHUTDOWN_TIMEOUT = 60
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -78,13 +79,12 @@ def test_environment():
 
     finally:
         print("[test_environment fixture] Tearing down AWS Lambda test infrastructure")
-
         process.terminate()
-        process.wait(timeout=10)  # Give it time to shut down gracefully
-
-        # Force kill if still running
-        if process.poll() is None:
+        try:
+            process.wait(timeout=SAM_SHUTDOWN_TIMEOUT)
+        except subprocess.TimeoutExpired:
             process.kill()
+            process.wait()
 
 
 @pytest.fixture(autouse=True)
