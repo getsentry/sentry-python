@@ -28,7 +28,7 @@ from sentry_sdk.data_collection import (
     _resolve_data_collection,
 )
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
-from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
+from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.monitor import Monitor
 from sentry_sdk.profiler.continuous_profiler import setup_continuous_profiler
@@ -674,19 +674,6 @@ class _Client(BaseClient):
                         max_request_body_size
                     )
                 )
-
-            if self.options["_experiments"].get("otel_powered_performance", False):
-                logger.debug(
-                    "[OTel] Enabling experimental OTel-powered performance monitoring."
-                )
-                self.options["instrumenter"] = INSTRUMENTER.OTEL
-                if (
-                    "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration"
-                    not in _DEFAULT_INTEGRATIONS
-                ):
-                    _DEFAULT_INTEGRATIONS.append(
-                        "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration",
-                    )
 
             self.integrations = setup_integrations(
                 self.options["integrations"],
