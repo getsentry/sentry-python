@@ -164,7 +164,6 @@ GROUPS = {
     "Misc": [
         "loguru",
         "otlp",
-        "potel",
         "pure_eval",
         "trytond",
         "typer",
