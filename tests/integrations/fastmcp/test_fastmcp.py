@@ -1303,6 +1303,10 @@ async def test_fastmcp_span_origin(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
 @pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.skipif(
+    StandaloneFastMCP and (FASTMCP_VERSION is not None and FASTMCP_VERSION >= (4,)),
+    reason="SSE tracing not (yet) supported in v4.",
+)
 async def test_fastmcp_sse_transport(
     sentry_init,
     capture_events,
