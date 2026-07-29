@@ -69,7 +69,6 @@ IGNORE = {
     "shadowed_module",
     "gcp",
     "gevent",
-    "opentelemetry",
     "otlp",
 }
 
