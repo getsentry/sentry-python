@@ -62,9 +62,9 @@ def _check_version_deprecations() -> None:
         import greenlet
 
         greenlet_version = parse_version(greenlet.__version__)
-        if greenlet_version is not None and greenlet_version < (0, 5):
+        if greenlet_version is not None and greenlet_version < (0, 4, 17):
             logger.warning(
-                "sentry-sdk 3.x supports greenlet 0.5 or newer. "
+                "sentry-sdk 3.x supports greenlet 0.4.17 or newer. "
                 "Please upgrade greenlet or downgrade to sentry-sdk 2.x."
             )
     except ImportError:
