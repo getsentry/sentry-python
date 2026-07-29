@@ -302,13 +302,13 @@ TEST_SUITE_CONFIG = {
     "mcp": {
         "package": "mcp",
         "deps": {
-            "*": ["pytest-asyncio"],
+            "*": ["pytest-asyncio", "httpx"],
         },
     },
     "fastmcp": {
         "package": "fastmcp",
         "deps": {
-            "*": ["pytest-asyncio"],
+            "*": ["pytest-asyncio", "httpx"],
         },
     },
     "openai-base": {
