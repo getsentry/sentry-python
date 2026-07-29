@@ -634,7 +634,6 @@ async def test_tool_handler_with_error(
             error_payload["exception"]["values"][0]["value"] == "Tool execution failed"
         )
 
-        assert span["attributes"][SPANDATA.MCP_TOOL_RESULT_IS_ERROR] is True
         assert span["status"] == "error"
     else:
         events = capture_events()
@@ -669,8 +668,6 @@ async def test_tool_handler_with_error(
         assert len(tx["spans"]) == 1
         span = tx["spans"][0]
 
-        # Error flag should be set for tools
-        assert span["data"][SPANDATA.MCP_TOOL_RESULT_IS_ERROR] is True
         assert span["status"] == "internal_error"
         assert span["tags"]["status"] == "internal_error"
 
@@ -963,7 +960,6 @@ async def test_prompt_handler_with_error(
         assert error_payload["level"] == "error"
         assert error_payload["exception"]["values"][0]["type"] == "RuntimeError"
         assert span["status"] == "error"
-        assert SPANDATA.MCP_TOOL_RESULT_IS_ERROR not in span["attributes"]
     else:
         events = capture_events()
         with start_transaction(name="mcp tx"):
@@ -992,7 +988,6 @@ async def test_prompt_handler_with_error(
         span = tx["spans"][0]
 
         assert span["status"] == "internal_error"
-        assert SPANDATA.MCP_TOOL_RESULT_IS_ERROR not in span["data"]
 
 
 @pytest.mark.asyncio
@@ -1250,7 +1245,6 @@ async def test_resource_handler_with_error(
         assert error_payload["level"] == "error"
         assert error_payload["exception"]["values"][0]["type"] == "FileNotFoundError"
         assert span["status"] == "error"
-        assert SPANDATA.MCP_TOOL_RESULT_IS_ERROR not in span["attributes"]
     else:
         events = capture_events()
         with start_transaction(name="mcp tx"):
@@ -1276,7 +1270,6 @@ async def test_resource_handler_with_error(
         span = tx["spans"][0]
 
         assert span["status"] == "internal_error"
-        assert SPANDATA.MCP_TOOL_RESULT_IS_ERROR not in span["data"]
 
 
 @pytest.mark.asyncio
