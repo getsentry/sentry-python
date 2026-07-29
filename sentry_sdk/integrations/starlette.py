@@ -375,7 +375,11 @@ def _add_user_to_sentry_scope(scope: "Dict[str, Any]") -> None:
     if "user" not in scope:
         return
 
-    if not should_send_default_pii():
+    client_options = sentry_sdk.get_client().options
+    if has_data_collection_enabled(client_options):
+        if not client_options["data_collection"]["user_info"]:
+            return
+    elif not should_send_default_pii():
         return
 
     user_info: "Dict[str, Any]" = {}
