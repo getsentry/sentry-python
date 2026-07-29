@@ -9,6 +9,9 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 ## Removed
 
+- Support for gevent versions below 20.9 has been removed.
+- Support for greenlet versions below 0.5 has been removed.
+
 ## Deprecated
 
 
