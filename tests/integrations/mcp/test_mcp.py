@@ -1537,8 +1537,8 @@ async def test_multiple_handlers(
             op == OP.MCP_SERVER
             for op in (
                 tx1["contexts"]["trace"]["op"],
-                tx1["contexts"]["trace"]["op"],
-                tx1["contexts"]["trace"]["op"],
+                tx2["contexts"]["trace"]["op"],
+                tx3["contexts"]["trace"]["op"],
             )
         )
 
@@ -1805,7 +1805,7 @@ async def test_sse_transport_detection(
         ]
         assert len(transactions) == 1
         tx = transactions[0]
-        data = tx["contexts"]["trace"]["data"]
+        data = tx["spans"][0]["data"]
 
     # Check that SSE transport is detected
     assert data[SPANDATA.MCP_TRANSPORT] == "sse"
