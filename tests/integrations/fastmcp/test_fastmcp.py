@@ -45,6 +45,7 @@ from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.mcp import MCPIntegration
+from sentry_sdk.utils import parse_version
 
 try:
     from fastmcp.prompts import Message
@@ -89,7 +90,9 @@ except ImportError:
     ReadResourceRequest = None
 
 try:
-    from fastmcp import __version__ as FASTMCP_VERSION
+    from fastmcp import __version__
+
+    FASTMCP_VERSION = parse_version(__version__)
 except ImportError:
     FASTMCP_VERSION = None
 
@@ -885,7 +888,7 @@ async def test_fastmcp_prompt_sync(
                 },
             }
 
-            if FASTMCP_VERSION is not None and FASTMCP_VERSION.startswith("3"):
+            if FASTMCP_VERSION is not None and FASTMCP_VERSION >= (3,):
                 message = Message(message)
 
             return [message]
@@ -1014,7 +1017,7 @@ async def test_fastmcp_prompt_async(
                 },
             }
 
-            if FASTMCP_VERSION is not None and FASTMCP_VERSION.startswith("3"):
+            if FASTMCP_VERSION is not None and FASTMCP_VERSION >= (3,):
                 message1 = Message(message1)
                 message2 = Message(message2)
 
@@ -1043,6 +1046,10 @@ async def test_fastmcp_prompt_async(
 # =============================================================================
 
 
+@pytest.mark.skipif(
+    FASTMCP_VERSION is not None and FASTMCP_VERSION < (0, 4, 1),
+    "Resource URI templates not supported before fastmcp 0.4.1",
+)
 @pytest.mark.asyncio
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -1064,93 +1071,86 @@ async def test_fastmcp_resource_sync(
     mcp = FastMCP("Test Server")
 
     # Try to register a resource handler
-    try:
-        if hasattr(mcp, "resource"):
+    if hasattr(mcp, "resource"):
 
-            @mcp.resource("file:///{path}")
-            def read_file(path: str):
-                """Read a file resource"""
-                return "file contents"
+        @mcp.resource("file:///{path}")
+        def read_file(path: str):
+            """Read a file resource"""
+            return "file contents"
 
-            if span_streaming:
-                items = capture_items("span")
-                with sentry_sdk.traces.start_span(name="custom parent"):
-                    try:
-                        result = await stdio(
-                            mcp._mcp_server,
-                            method="resources/read",
-                            params={
-                                "uri": "file:///test.txt",
-                            },
-                            request_id="req-resource",
+        if span_streaming:
+            items = capture_items("span")
+            with sentry_sdk.traces.start_span(name="custom parent"):
+                try:
+                    result = await stdio(
+                        mcp._mcp_server,
+                        method="resources/read",
+                        params={
+                            "uri": "file:///test.txt",
+                        },
+                        request_id="req-resource",
+                    )
+                except ValueError as e:
+                    # Older FastMCP versions may not support this URI pattern
+                    if "Unknown resource" in str(e):
+                        pytest.skip(
+                            f"Resource URI not supported in this FastMCP version: {e}"
                         )
-                    except ValueError as e:
-                        # Older FastMCP versions may not support this URI pattern
-                        if "Unknown resource" in str(e):
-                            pytest.skip(
-                                f"Resource URI not supported in this FastMCP version: {e}"
-                            )
-                        raise
+                    raise
 
-                # Resource content is returned as-is
-                assert (
-                    "file contents" in result.message.root.result["contents"][0]["text"]
-                )
+            # Resource content is returned as-is
+            assert "file contents" in result.message.root.result["contents"][0]["text"]
 
-                sentry_sdk.flush()
-                # Verify resource span was created
-                spans = [item.payload for item in items]
-                resource_spans = [
-                    s
-                    for s in spans
-                    if s["attributes"].get("sentry.op") == OP.MCP_SERVER
-                ]
-                assert len(resource_spans) == 1
-                span = resource_spans[0]
-                assert span["attributes"]["sentry.origin"] == "auto.ai.mcp"
-                assert span["name"] == "resources/read file:///test.txt"
-                assert span["attributes"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "file"
-            else:
-                events = capture_events()
-                with start_transaction(name="fastmcp tx"):
-                    try:
-                        result = await stdio(
-                            mcp._mcp_server,
-                            method="resources/read",
-                            params={
-                                "uri": "file:///test.txt",
-                            },
-                            request_id="req-resource",
+            sentry_sdk.flush()
+            # Verify resource span was created
+            spans = [item.payload for item in items]
+            resource_spans = [
+                s for s in spans if s["attributes"].get("sentry.op") == OP.MCP_SERVER
+            ]
+            assert len(resource_spans) == 1
+            span = resource_spans[0]
+            assert span["attributes"]["sentry.origin"] == "auto.ai.mcp"
+            assert span["name"] == "resources/read file:///test.txt"
+            assert span["attributes"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "file"
+        else:
+            events = capture_events()
+            with start_transaction(name="fastmcp tx"):
+                try:
+                    result = await stdio(
+                        mcp._mcp_server,
+                        method="resources/read",
+                        params={
+                            "uri": "file:///test.txt",
+                        },
+                        request_id="req-resource",
+                    )
+                except ValueError as e:
+                    # Older FastMCP versions may not support this URI pattern
+                    if "Unknown resource" in str(e):
+                        pytest.skip(
+                            f"Resource URI not supported in this FastMCP version: {e}"
                         )
-                    except ValueError as e:
-                        # Older FastMCP versions may not support this URI pattern
-                        if "Unknown resource" in str(e):
-                            pytest.skip(
-                                f"Resource URI not supported in this FastMCP version: {e}"
-                            )
-                        raise
+                    raise
 
-                # Resource content is returned as-is
-                assert (
-                    "file contents" in result.message.root.result["contents"][0]["text"]
-                )
+            # Resource content is returned as-is
+            assert "file contents" in result.message.root.result["contents"][0]["text"]
 
-                (tx,) = events
-                assert tx["type"] == "transaction"
+            (tx,) = events
+            assert tx["type"] == "transaction"
 
-                # Verify resource span was created
-                resource_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
-                assert len(resource_spans) == 1
-                span = resource_spans[0]
-                assert span["origin"] == "auto.ai.mcp"
-                assert span["description"] == "resources/read file:///test.txt"
-                assert span["data"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "file"
-
-    except (AttributeError, TypeError):
-        # Resource handler not supported in this version
-        pytest.skip("Resource handlers not supported in this FastMCP version")
+            # Verify resource span was created
+            resource_spans = [s for s in tx["spans"] if s["op"] == OP.MCP_SERVER]
+            assert len(resource_spans) == 1
+            span = resource_spans[0]
+            assert span["origin"] == "auto.ai.mcp"
+            assert span["description"] == "resources/read file:///test.txt"
+            assert span["data"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "file"
 
 
+@pytest.mark.skipif(
+    FASTMCP_VERSION is not None and FASTMCP_VERSION < (0, 4, 1),
+    "Resource URI templates not supported before fastmcp 0.4.1",
+)
 @pytest.mark.parametrize("FastMCP", fastmcp_implementations, ids=fastmcp_ids)
 @pytest.mark.asyncio
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -1185,83 +1185,79 @@ async def test_fastmcp_resource_async(
     )
 
     # Try to register an async resource handler
-    try:
-        if hasattr(mcp, "resource"):
-            if span_streaming:
-                items = capture_items("span")
+    if hasattr(mcp, "resource"):
+        if span_streaming:
+            items = capture_items("span")
 
-                @mcp.resource("https://example.com/{resource}")
-                async def read_url(resource: str):
-                    """Read a URL resource"""
-                    return "resource data"
+            @mcp.resource("https://example.com/{resource}")
+            async def read_url(resource: str):
+                """Read a URL resource"""
+                return "resource data"
 
-                _, result = json_rpc(
-                    app,
-                    method="resources/read",
-                    params={
-                        "uri": "https://example.com/resource",
-                    },
-                    request_id="req-async-resource",
-                )
-                # Older FastMCP versions may not support this URI pattern
-                if (
-                    "error" in result.json()
-                    and "Unknown resource" in result.json()["error"]["message"]
-                ):
-                    pytest.skip("Resource URI not supported in this FastMCP version.")
-                    return
+            _, result = json_rpc(
+                app,
+                method="resources/read",
+                params={
+                    "uri": "https://example.com/resource",
+                },
+                request_id="req-async-resource",
+            )
+            # Older FastMCP versions may not support this URI pattern
+            if (
+                "error" in result.json()
+                and "Unknown resource" in result.json()["error"]["message"]
+            ):
+                pytest.skip("Resource URI not supported in this FastMCP version.")
+                return
 
-                assert "resource data" in result.json()["result"]["contents"][0]["text"]
+            assert "resource data" in result.json()["result"]["contents"][0]["text"]
 
-                sentry_sdk.flush()
-                spans = [item.payload for item in items]
-                spans = [
-                    span
-                    for span in spans
-                    if span["attributes"].get("mcp.method.name") == "resources/read"
-                ]
-                assert len(spans) == 1
-                span = spans[0]
+            sentry_sdk.flush()
+            spans = [item.payload for item in items]
+            spans = [
+                span
+                for span in spans
+                if span["attributes"].get("mcp.method.name") == "resources/read"
+            ]
+            assert len(spans) == 1
+            span = spans[0]
 
-                assert span["attributes"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "https"
-            else:
-                events = capture_events()
+            assert span["attributes"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "https"
+        else:
+            events = capture_events()
 
-                @mcp.resource("https://example.com/{resource}")
-                async def read_url(resource: str):
-                    """Read a URL resource"""
-                    return "resource data"
+            @mcp.resource("https://example.com/{resource}")
+            async def read_url(resource: str):
+                """Read a URL resource"""
+                return "resource data"
 
-                _, result = json_rpc(
-                    app,
-                    method="resources/read",
-                    params={
-                        "uri": "https://example.com/resource",
-                    },
-                    request_id="req-async-resource",
-                )
-                # Older FastMCP versions may not support this URI pattern
-                if (
-                    "error" in result.json()
-                    and "Unknown resource" in result.json()["error"]["message"]
-                ):
-                    pytest.skip("Resource URI not supported in this FastMCP version.")
-                    return
+            _, result = json_rpc(
+                app,
+                method="resources/read",
+                params={
+                    "uri": "https://example.com/resource",
+                },
+                request_id="req-async-resource",
+            )
+            # Older FastMCP versions may not support this URI pattern
+            if (
+                "error" in result.json()
+                and "Unknown resource" in result.json()["error"]["message"]
+            ):
+                pytest.skip("Resource URI not supported in this FastMCP version.")
+                return
 
-                assert "resource data" in result.json()["result"]["contents"][0]["text"]
+            assert "resource data" in result.json()["result"]["contents"][0]["text"]
 
-                transactions = select_transactions_with_mcp_spans(
-                    events, method_name="resources/read"
-                )
-                assert len(transactions) == 1
-                tx = transactions[0]
-                assert len(tx["spans"]) == 1
-                span = tx["spans"][0]
+            transactions = select_transactions_with_mcp_spans(
+                events, method_name="resources/read"
+            )
+            assert len(transactions) == 1
+            tx = transactions[0]
+            assert len(tx["spans"]) == 1
+            span = tx["spans"][0]
 
-                assert span["data"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "https"
-    except (AttributeError, TypeError):
-        # Resource handler not supported in this version
-        pytest.skip("Resource handlers not supported in this FastMCP version")
+            assert span["data"][SPANDATA.MCP_RESOURCE_PROTOCOL] == "https"
 
 
 # =============================================================================
