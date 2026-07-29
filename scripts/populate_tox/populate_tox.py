@@ -71,7 +71,6 @@ IGNORE = {
     "gevent",
     "opentelemetry",
     "otlp",
-    "potel",
 }
 
 # Free-threading is experimentally supported in 3.13, and officially supported in 3.14.
