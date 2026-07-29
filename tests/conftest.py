@@ -271,12 +271,7 @@ def reset_integrations():
     but this also means some other stuff will be monkeypatched twice.
     """
     global _DEFAULT_INTEGRATIONS, _processed_integrations
-    try:
-        _DEFAULT_INTEGRATIONS.remove(
-            "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration"
-        )
-    except ValueError:
-        pass
+
     _processed_integrations.clear()
     _installed_integrations.clear()
 

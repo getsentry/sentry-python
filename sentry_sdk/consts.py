@@ -70,7 +70,6 @@ if TYPE_CHECKING:
             "record_sql_params": Optional[bool],
             "continuous_profiling_auto_start": Optional[bool],
             "continuous_profiling_mode": Optional[ContinuousProfilerMode],
-            "otel_powered_performance": Optional[bool],
             "transport_zlib_compression_level": Optional[int],
             "transport_compression_level": Optional[int],
             "transport_compression_algo": Optional[CompressionAlgo],
