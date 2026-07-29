@@ -8,6 +8,19 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 ## Changed
 
+- The Strawberry integration won't auto-enable anymore if we detect `strawberry-graphql` is installed. Set it up manually, setting the `async_execution` integration option to either `True` or `False` depending on if your app is async or sync.
+
+  ```python
+  from sentry_sdk.integrations.strawberry import StrawberryIntegration
+
+  sentry_sdk.init(
+      integrations=[
+          StrawberryIntegration(async_execution=True),  # or False
+      ],
+      ...
+  )
+  ```
+
 - The UnraisableHookIntegration is now enabled by default.
 - We now don't suppress chained exceptions in the ASGI and asyncio integrations by default. The related `suppress_asgi_chained_exceptions` experimental option was removed.
 
