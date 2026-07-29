@@ -17,7 +17,6 @@ from sentry_sdk._span_batcher import SpanBatcher
 from sentry_sdk.consts import (
     DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
-    INSTRUMENTER,
     SPANDATA,
     SPANSTATUS,
     VERSION,
@@ -330,9 +329,6 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
 
     if rv["server_name"] is None and hasattr(socket, "gethostname"):
         rv["server_name"] = socket.gethostname()
-
-    if rv["instrumenter"] is None:
-        rv["instrumenter"] = INSTRUMENTER.SENTRY
 
     if rv["project_root"] is None:
         try:

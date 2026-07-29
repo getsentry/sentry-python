@@ -42,9 +42,6 @@ envlist =
     # GCP
     {py3.7}-gcp
 
-    # OpenTelemetry (OTel)
-    {py3.7,py3.9,py3.12,py3.13,py3.14,py3.14t}-opentelemetry
-
     # OpenTelemetry with OTLP
     {py3.7,py3.9,py3.12,py3.13,py3.14}-otlp
 
@@ -135,10 +132,6 @@ deps =
     aws_lambda: requests
     aws_lambda: uvicorn
     aws_lambda: pyyaml
-
-    # OpenTelemetry (OTel)
-    opentelemetry: opentelemetry-distro
-    opentelemetry: pytest-forked
 
     # OpenTelemetry with OTLP
     otlp: opentelemetry-distro[otlp]
@@ -233,7 +226,6 @@ setenv =
     aws_lambda: _TESTPATH=tests/integrations/aws_lambda
     cloud_resource_context: _TESTPATH=tests/integrations/cloud_resource_context
     gcp: _TESTPATH=tests/integrations/gcp
-    opentelemetry: _TESTPATH=tests/integrations/opentelemetry
     otlp: _TESTPATH=tests/integrations/otlp
     socket: _TESTPATH=tests/integrations/socket
 

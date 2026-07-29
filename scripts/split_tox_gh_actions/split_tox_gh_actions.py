@@ -163,7 +163,6 @@ GROUPS = {
     ],
     "Misc": [
         "loguru",
-        "opentelemetry",
         "otlp",
         "pure_eval",
         "trytond",

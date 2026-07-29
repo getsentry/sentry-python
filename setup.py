@@ -73,7 +73,6 @@ setup(
         "mcp": ["mcp>=1.15.0"],
         "openai": ["openai>=1.0.0", "tiktoken>=0.3.0"],
         "openfeature": ["openfeature-sdk>=0.7.1"],
-        "opentelemetry": ["opentelemetry-distro>=0.35b0"],
         "opentelemetry-otlp": ["opentelemetry-distro[otlp]>=0.35b0"],
         "pure-eval": ["pure_eval", "executing", "asttokens"],
         "pydantic_ai": ["pydantic-ai>=1.0.0"],
@@ -89,11 +88,6 @@ setup(
         "tornado": ["tornado>=6"],
         "unleash": ["UnleashClient>=6.0.1"],
         "google-genai": ["google-genai>=1.29.0"],
-    },
-    entry_points={
-        "opentelemetry_propagator": [
-            "sentry=sentry_sdk.integrations.opentelemetry:SentryPropagator"
-        ]
     },
     classifiers=[
         "Development Status :: 5 - Production/Stable",

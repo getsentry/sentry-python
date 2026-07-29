@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 
 from sentry_sdk import Client, tracing_utils
 from sentry_sdk._init_implementation import init
-from sentry_sdk.consts import INSTRUMENTER
 from sentry_sdk.crons import monitor
 from sentry_sdk.scope import Scope, _ScopeManager, isolation_scope, new_scope
 from sentry_sdk.traces import StreamedSpan
@@ -383,7 +382,6 @@ def start_span(
 @scopemethod
 def start_transaction(
     transaction: "Optional[Transaction]" = None,
-    instrumenter: str = INSTRUMENTER.SENTRY,
     custom_sampling_context: "Optional[SamplingContext]" = None,
     **kwargs: "Unpack[TransactionKwargs]",
 ) -> "Union[Transaction, NoOpSpan]":
@@ -411,15 +409,13 @@ def start_transaction(
 
     :param transaction: The transaction to start. If omitted, we create and
         start a new transaction.
-    :param instrumenter: This parameter is meant for internal use only. It
-        will be removed in the next major version.
     :param custom_sampling_context: The transaction's custom sampling context.
     :param kwargs: Optional keyword arguments to be passed to the Transaction
         constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
         available arguments.
     """
     return get_current_scope().start_transaction(
-        transaction, instrumenter, custom_sampling_context, **kwargs
+        transaction, custom_sampling_context, **kwargs
     )
 
 

@@ -17,7 +17,6 @@ from sentry_sdk.attachments import Attachment
 from sentry_sdk.consts import (
     DEFAULT_MAX_BREADCRUMBS,
     FALSE_VALUES,
-    INSTRUMENTER,
     SPANDATA,
 )
 from sentry_sdk.feature_flags import DEFAULT_FLAG_CAPACITY, FlagBuffer
@@ -1093,7 +1092,6 @@ class Scope:
     def start_transaction(
         self,
         transaction: "Optional[Transaction]" = None,
-        instrumenter: str = INSTRUMENTER.SENTRY,
         custom_sampling_context: "Optional[SamplingContext]" = None,
         **kwargs: "Unpack[TransactionKwargs]",
     ) -> "Union[Transaction, NoOpSpan]":
@@ -1121,8 +1119,6 @@ class Scope:
 
         :param transaction: The transaction to start. If omitted, we create and
             start a new transaction.
-        :param instrumenter: This parameter is meant for internal use only. It
-            will be removed in the next major version.
         :param custom_sampling_context: The transaction's custom sampling context.
         :param kwargs: Optional keyword arguments to be passed to the Transaction
             constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
@@ -1138,11 +1134,6 @@ class Scope:
             return NoOpSpan()
 
         kwargs.setdefault("scope", self)
-
-        configuration_instrumenter = client.options["instrumenter"]
-
-        if instrumenter != configuration_instrumenter:
-            return NoOpSpan()
 
         try_autostart_continuous_profiler()
 
@@ -1194,9 +1185,7 @@ class Scope:
 
         return transaction
 
-    def start_span(
-        self, instrumenter: str = INSTRUMENTER.SENTRY, **kwargs: "Any"
-    ) -> "Span":
+    def start_span(self, **kwargs: "Any") -> "Span":
         """
         Start a span whose parent is the currently active span or transaction, if any.
 
@@ -1211,10 +1200,6 @@ class Scope:
         one is not already in progress.
 
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
-
-        The instrumenter parameter is deprecated for user code, and it will
-        be removed in the next major version. Going forward, it should only
-        be used by the SDK itself.
         """
         client = sentry_sdk.get_client()
         if has_span_streaming_enabled(client.options):
@@ -1236,11 +1221,6 @@ class Scope:
             kwargs.setdefault("scope", self)
 
             client = self.get_client()
-
-            configuration_instrumenter = client.options["instrumenter"]
-
-            if instrumenter != configuration_instrumenter:
-                return NoOpSpan()
 
             # get current span or transaction
             span = self.span or self.get_isolation_scope().span

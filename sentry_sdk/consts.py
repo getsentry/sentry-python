@@ -113,11 +113,6 @@ class SPANTEMPLATE(str, Enum):
         return self.value
 
 
-class INSTRUMENTER:
-    SENTRY = "sentry"
-    OTEL = "otel"
-
-
 class SPANNAME:
     DB_COMMIT = "COMMIT"
     DB_ROLLBACK = "ROLLBACK"
@@ -1309,7 +1304,6 @@ class ClientConstructor:
         send_client_reports: bool = True,
         _experiments: "Experiments" = {},  # noqa: B006
         proxy_headers: "Optional[Dict[str, str]]" = None,
-        instrumenter: "Optional[str]" = INSTRUMENTER.SENTRY,
         before_send_transaction: "Optional[TransactionProcessor]" = None,
         project_root: "Optional[str]" = None,
         enable_tracing: "Optional[bool]" = None,
@@ -1716,7 +1710,6 @@ class ClientConstructor:
 
         :param spotlight:
 
-        :param instrumenter:
 
         :param enable_logs: Set `enable_logs` to True to enable the SDK to emit
             Sentry logs. Defaults to False.
