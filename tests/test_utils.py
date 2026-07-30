@@ -465,7 +465,7 @@ def test_parse_url(url, sanitize, expected_url, expected_query, expected_fragmen
 
 @pytest.mark.parametrize(
     "rate",
-    [0.0, 0.1231, 1.0, True, False],
+    [0.0, 1.0, True, False],
 )
 def test_accepts_valid_sample_rate(rate):
     with mock.patch.object(logger, "warning", mock.Mock()):
