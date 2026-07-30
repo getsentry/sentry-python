@@ -1,5 +1,8 @@
 # Autoresearch: fewer common-suite tests, same coverage
 
+**STATUS: CONCLUDED (user decision).** Result: 2720 -> 2289 (-15.8%),
+coverage flat. See `.auto/summary.md`. Resume only for integrations scope.
+
 ## Objective
 
 Reduce the number of collected tests in the sentry-python **common test suite**
