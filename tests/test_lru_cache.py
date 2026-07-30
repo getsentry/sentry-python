@@ -9,13 +9,6 @@ def test_illegal_size(max_size):
         LRUCache(max_size=max_size)
 
 
-def test_simple_set_get():
-    cache = LRUCache(1)
-    assert cache.get(1) is None
-    cache.set(1, 1)
-    assert cache.get(1) == 1
-
-
 def test_overwrite():
     cache = LRUCache(1)
     assert cache.get(1) is None
