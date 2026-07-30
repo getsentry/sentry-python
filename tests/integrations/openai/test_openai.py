@@ -30,6 +30,11 @@ from openai.types.chat.chat_completion_custom_tool_param import Custom
 from openai.types.create_embedding_response import Usage as EmbeddingTokenUsage
 from openai.types.shared_params import FunctionDefinition
 
+try:
+    from openai.types.chat import ChatCompletionCustomToolParam
+except ImportError:
+    pass
+
 SKIP_RESPONSES_TESTS = False
 
 try:
@@ -115,8 +120,8 @@ else:
 
 
 @pytest.mark.skipif(
-    OPENAI_VERSION <= (1, 1, 0),
-    reason="OpenAI versions <=1.1.0 do not support the tools parameter.",
+    OPENAI_VERSION <= (2, 10, 0),
+    reason="ChatCompletionCustomToolParam is unavailable before.",
 )
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
