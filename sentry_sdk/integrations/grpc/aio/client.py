@@ -4,7 +4,6 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.grpc.consts import SPAN_ORIGIN
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 try:
     from google.protobuf.message import Message
@@ -50,54 +49,28 @@ class SentryUnaryUnaryClientInterceptor(ClientInterceptor, UnaryUnaryClientInter
     ) -> "Union[UnaryUnaryCall, Message]":
         method = client_call_details.method
 
-        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-        if span_streaming:
-            if sentry_sdk.traces.get_current_span() is None:
-                client_call_details = (
-                    self._update_client_call_details_metadata_from_scope(
-                        client_call_details
-                    )
-                )
-                return await continuation(client_call_details, request)
-            with sentry_sdk.traces.start_span(
-                name="unary unary call to %s" % method.decode(),
-                attributes={
-                    "sentry.op": OP.GRPC_CLIENT,
-                    "sentry.origin": SPAN_ORIGIN,
-                    SPANDATA.RPC_METHOD: method.decode(),
-                },
-            ) as span:
-                client_call_details = (
-                    self._update_client_call_details_metadata_from_scope(
-                        client_call_details
-                    )
-                )
+        if sentry_sdk.traces.get_current_span() is None:
+            client_call_details = self._update_client_call_details_metadata_from_scope(
+                client_call_details
+            )
+            return await continuation(client_call_details, request)
+        with sentry_sdk.traces.start_span(
+            name="unary unary call to %s" % method.decode(),
+            attributes={
+                "sentry.op": OP.GRPC_CLIENT,
+                "sentry.origin": SPAN_ORIGIN,
+                SPANDATA.RPC_METHOD: method.decode(),
+            },
+        ) as span:
+            client_call_details = self._update_client_call_details_metadata_from_scope(
+                client_call_details
+            )
 
-                response = await continuation(client_call_details, request)
-                status_code = await response.code()
-                span.set_attribute(SPANDATA.RPC_RESPONSE_STATUS_CODE, status_code.name)
+            response = await continuation(client_call_details, request)
+            status_code = await response.code()
+            span.set_attribute(SPANDATA.RPC_RESPONSE_STATUS_CODE, status_code.name)
 
-                return response
-        else:
-            with sentry_sdk.start_span(
-                op=OP.GRPC_CLIENT,
-                name="unary unary call to %s" % method.decode(),
-                origin=SPAN_ORIGIN,
-            ) as span:
-                span.set_data("type", "unary unary")
-                span.set_data("method", method)
-
-                client_call_details = (
-                    self._update_client_call_details_metadata_from_scope(
-                        client_call_details
-                    )
-                )
-
-                response = await continuation(client_call_details, request)
-                status_code = await response.code()
-                span.set_data("code", status_code.name)
-
-                return response
+            return response
 
 
 class SentryUnaryStreamClientInterceptor(
@@ -112,49 +85,23 @@ class SentryUnaryStreamClientInterceptor(
     ) -> "Union[AsyncIterable[Any], UnaryStreamCall]":
         method = client_call_details.method
 
-        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-        if span_streaming:
-            if sentry_sdk.traces.get_current_span() is None:
-                client_call_details = (
-                    self._update_client_call_details_metadata_from_scope(
-                        client_call_details
-                    )
-                )
-                return await continuation(client_call_details, request)
-            with sentry_sdk.traces.start_span(
-                name="unary stream call to %s" % method.decode(),
-                attributes={
-                    "sentry.op": OP.GRPC_CLIENT,
-                    "sentry.origin": SPAN_ORIGIN,
-                    SPANDATA.RPC_METHOD: method.decode(),
-                },
-            ) as span:
-                client_call_details = (
-                    self._update_client_call_details_metadata_from_scope(
-                        client_call_details
-                    )
-                )
+        if sentry_sdk.traces.get_current_span() is None:
+            client_call_details = self._update_client_call_details_metadata_from_scope(
+                client_call_details
+            )
+            return await continuation(client_call_details, request)
 
-                response = await continuation(client_call_details, request)
+        with sentry_sdk.traces.start_span(
+            name="unary stream call to %s" % method.decode(),
+            attributes={
+                "sentry.op": OP.GRPC_CLIENT,
+                "sentry.origin": SPAN_ORIGIN,
+                SPANDATA.RPC_METHOD: method.decode(),
+            },
+        ):
+            client_call_details = self._update_client_call_details_metadata_from_scope(
+                client_call_details
+            )
 
-                return response
-        else:
-            with sentry_sdk.start_span(
-                op=OP.GRPC_CLIENT,
-                name="unary stream call to %s" % method.decode(),
-                origin=SPAN_ORIGIN,
-            ) as span:
-                span.set_data("type", "unary stream")
-                span.set_data("method", method)
-
-                client_call_details = (
-                    self._update_client_call_details_metadata_from_scope(
-                        client_call_details
-                    )
-                )
-
-                response = await continuation(client_call_details, request)
-                # status_code = await response.code()
-                # span.set_data("code", status_code)
-
-                return response
+            response = await continuation(client_call_details, request)
+            return response

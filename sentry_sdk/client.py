@@ -36,7 +36,6 @@ from sentry_sdk.serializer import serialize
 from sentry_sdk.sessions import SessionFlusher
 from sentry_sdk.traces import SpanStatus, StreamedSpan
 from sentry_sdk.tracing import trace
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.transport import (
     AsyncHttpTransport,
     HttpTransportCore,
@@ -366,24 +365,6 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
             env_to_bool(os.environ.get("SENTRY_KEEP_ALIVE"), strict=True) or False
         )
 
-    if rv["trace_ignore_status_codes"] and has_span_streaming_enabled(rv):
-        warnings.warn(
-            "The `trace_ignore_status_codes` parameter is ignored in span streaming mode.",
-            stacklevel=2,
-        )
-
-    if rv["ignore_spans"] and not has_span_streaming_enabled(rv):
-        warnings.warn(
-            "The `ignore_spans` parameter only works when `trace_lifecycle` is set to `stream`.",
-            stacklevel=2,
-        )
-
-    if rv["before_send_span"] and not has_span_streaming_enabled(rv):
-        warnings.warn(
-            "The `before_send_span` parameter only works when `trace_lifecycle` is set to `stream`.",
-            stacklevel=2,
-        )
-
     return rv
 
 
@@ -646,12 +627,10 @@ class _Client(BaseClient):
                     record_lost_func=_record_lost_event,
                 )
 
-            self.span_batcher = None
-            if has_span_streaming_enabled(self.options):
-                self.span_batcher = SpanBatcher(
-                    capture_func=_capture_envelope,
-                    record_lost_func=_record_lost_event,
-                )
+            self.span_batcher = SpanBatcher(
+                capture_func=_capture_envelope,
+                record_lost_func=_record_lost_event,
+            )
 
             max_request_body_size = ("always", "never", "small", "medium")
             if self.options["max_request_body_size"] not in max_request_body_size:

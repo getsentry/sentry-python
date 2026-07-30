@@ -106,29 +106,6 @@ def has_tracing_enabled(options: "Optional[Dict[str, Any]]") -> bool:
     )
 
 
-def has_span_streaming_enabled(options: "Optional[dict[str, Any]]") -> bool:
-    if options is None:
-        return False
-
-    is_enabled_in_experiment_config = (options.get("_experiments") or {}).get(
-        "trace_lifecycle"
-    ) == "stream"
-
-    if options.get("trace_lifecycle") is not None:
-        return options.get("trace_lifecycle") == "stream"
-
-    return is_enabled_in_experiment_config
-
-
-def should_truncate_gen_ai_input(options: "Optional[dict[str, Any]]") -> bool:
-    if options is None:
-        return True
-
-    return not options.get(
-        "stream_gen_ai_spans", True
-    ) and not has_span_streaming_enabled(options)
-
-
 @contextlib.contextmanager
 def record_sql_queries(
     cursor: "Any",
@@ -167,31 +144,19 @@ def record_sql_queries(
     with capture_internal_exceptions():
         sentry_sdk.add_breadcrumb(message=query, category="query", data=data)
 
-    if has_span_streaming_enabled(client.options):
-        additional_attributes = {}
-        if query is not None:
-            additional_attributes["db.query.text"] = query
+    additional_attributes = {}
+    if query is not None:
+        additional_attributes["db.query.text"] = query
 
-        with sentry_sdk.traces.start_span(
-            name="<unknown SQL query>" if query is None else query,
-            attributes={
-                "sentry.origin": span_origin,
-                "sentry.op": span_op_override_value
-                if span_op_override_value
-                else OP.DB,
-                **additional_attributes,
-            },
-        ) as span:
-            yield span
-    else:
-        with sentry_sdk.start_span(
-            op=span_op_override_value if span_op_override_value is not None else OP.DB,
-            name=query,
-            origin=span_origin,
-        ) as span:
-            for k, v in data.items():
-                span.set_data(k, v)
-            yield span
+    with sentry_sdk.traces.start_span(
+        name="<unknown SQL query>" if query is None else query,
+        attributes={
+            "sentry.origin": span_origin,
+            "sentry.op": span_op_override_value if span_op_override_value else OP.DB,
+            **additional_attributes,
+        },
+    ) as span:
+        yield span
 
 
 def maybe_create_breadcrumbs_from_span(
@@ -1162,14 +1127,6 @@ def create_streaming_span_decorator(
 
         @functools.wraps(f)
         async def async_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
-            client = sentry_sdk.get_client()
-            if client.is_active() and not has_span_streaming_enabled(client.options):
-                warnings.warn(
-                    "Using span streaming API in non-span-streaming mode. Use "
-                    "@sentry_sdk.trace instead.",
-                    stacklevel=2,
-                )
-
             span_name = name or qualname_from_function(f) or ""
 
             with start_streaming_span(
@@ -1185,14 +1142,6 @@ def create_streaming_span_decorator(
 
         @functools.wraps(f)
         def sync_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
-            client = sentry_sdk.get_client()
-            if client.is_active() and not has_span_streaming_enabled(client.options):
-                warnings.warn(
-                    "Using span streaming API in non-span-streaming mode. Use "
-                    "@sentry_sdk.trace instead.",
-                    stacklevel=2,
-                )
-
             span_name = name or qualname_from_function(f) or ""
 
             with start_streaming_span(

@@ -7,7 +7,6 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     parse_url,
@@ -64,50 +63,26 @@ def _sentry_request_created(
     if client.get_integration(Boto3Integration) is None:
         return
 
-    is_span_streaming_enabled = has_span_streaming_enabled(client.options)
-    span: "Union[Span, StreamedSpan]"
-    if is_span_streaming_enabled:
-        if sentry_sdk.traces.get_current_span() is None:
-            return
-        span = sentry_sdk.traces.start_span(
-            name=description,
-            attributes={
-                "sentry.op": OP.HTTP_CLIENT,
-                "sentry.origin": Boto3Integration.origin,
-                SPANDATA.RPC_METHOD: f"{service_id}/{operation_name}",
-            },
-        )
-        if request.url is not None and should_send_default_pii():
-            with capture_internal_exceptions():
-                parsed_url = parse_url(request.url, sanitize=False)
-                span.set_attribute(SPANDATA.URL_FULL, parsed_url.url)
-                span.set_attribute(SPANDATA.URL_QUERY, parsed_url.query)
-                span.set_attribute(SPANDATA.URL_FRAGMENT, parsed_url.fragment)
+    if sentry_sdk.traces.get_current_span() is None:
+        return
 
-        if request.method is not None:
-            span.set_attribute(SPANDATA.HTTP_REQUEST_METHOD, request.method)
-    else:
-        span = sentry_sdk.start_span(
-            op=OP.HTTP_CLIENT,
-            name=description,
-            origin=Boto3Integration.origin,
-        )
+    span = sentry_sdk.traces.start_span(
+        name=description,
+        attributes={
+            "sentry.op": OP.HTTP_CLIENT,
+            "sentry.origin": Boto3Integration.origin,
+            SPANDATA.RPC_METHOD: f"{service_id}/{operation_name}",
+        },
+    )
+    if request.url is not None and should_send_default_pii():
+        with capture_internal_exceptions():
+            parsed_url = parse_url(request.url, sanitize=False)
+            span.set_attribute(SPANDATA.URL_FULL, parsed_url.url)
+            span.set_attribute(SPANDATA.URL_QUERY, parsed_url.query)
+            span.set_attribute(SPANDATA.URL_FRAGMENT, parsed_url.fragment)
 
-        if request.url is not None:
-            with capture_internal_exceptions():
-                parsed_url = parse_url(request.url, sanitize=False)
-                span.set_data("aws.request.url", parsed_url.url)
-                span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-                span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
-
-        span.set_tag("aws.service_id", service_id.hyphenize())
-        span.set_tag("aws.operation_name", operation_name)
-        if request.method is not None:
-            span.set_data(SPANDATA.HTTP_METHOD, request.method)
-
-    # We do it in order for subsequent http calls/retries be
-    # attached to this span.
-    span.__enter__()
+    if request.method is not None:
+        span.set_attribute(SPANDATA.HTTP_REQUEST_METHOD, request.method)
 
     # request.context is an open-ended data-structure
     # where we can add anything useful in request life cycle.

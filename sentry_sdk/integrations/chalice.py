@@ -10,8 +10,6 @@ from sentry_sdk.traces import (
     StreamedSpan,
     get_current_span,
 )
-from sentry_sdk.tracing import TransactionSource
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -78,73 +76,53 @@ def _get_view_function_response(
                     )
                 )
 
-            if has_span_streaming_enabled(client.options):
-                current_span = get_current_span()
-                segment = None
-                if type(current_span) is StreamedSpan:
-                    # A segment already exists (created by the AWS Lambda
-                    # integration), so decorate it with Chalice attributes
-                    # The AWS Lambda integration owns the span lifecycle
-                    # (end + flush), but Chalice converts unhandled view exceptions
-                    # into 500 responses, so the error must be captured here.
-                    request_dict = app.current_request.to_dict()
-                    headers = request_dict.get("headers", {})
+            current_span = get_current_span()
+            segment = None
+            if type(current_span) is StreamedSpan:
+                # A segment already exists (created by the AWS Lambda
+                # integration), so decorate it with Chalice attributes
+                # The AWS Lambda integration owns the span lifecycle
+                # (end + flush), but Chalice converts unhandled view exceptions
+                # into 500 responses, so the error must be captured here.
+                request_dict = app.current_request.to_dict()
+                headers = request_dict.get("headers", {})
 
-                    header_attrs: "Dict[str, Any]" = {}
-                    for header, value in _filter_headers(
-                        headers, use_annotated_value=False
-                    ).items():
-                        header_attrs[f"http.request.header.{header.lower()}"] = value
+                header_attrs: "Dict[str, Any]" = {}
+                for header, value in _filter_headers(
+                    headers, use_annotated_value=False
+                ).items():
+                    header_attrs[f"http.request.header.{header.lower()}"] = value
 
-                    additional_attrs: "Dict[str, Any]" = {}
-                    if "method" in request_dict:
-                        additional_attrs["http.request.method"] = request_dict["method"]
+                additional_attrs: "Dict[str, Any]" = {}
+                if "method" in request_dict:
+                    additional_attrs["http.request.method"] = request_dict["method"]
 
-                    attributes = {
-                        "sentry.origin": ChaliceIntegration.origin,
-                        **header_attrs,
-                        **additional_attrs,
-                    }
+                attributes = {
+                    "sentry.origin": ChaliceIntegration.origin,
+                    **header_attrs,
+                    **additional_attrs,
+                }
 
-                    segment = current_span._segment
-                    segment.set_attributes(attributes)
+                segment = current_span._segment
+                segment.set_attributes(attributes)
 
-                try:
-                    return view_function(**function_args)
-                except Exception as exc:
-                    if isinstance(exc, ChaliceViewError):
-                        raise
-                    exc_info = sys.exc_info()
-                    if segment:
-                        segment.status = SpanStatus.ERROR.value
-                    sentry_event, hint = event_from_exception(
-                        exc_info,
-                        client_options=client.options,
-                        mechanism={"type": "chalice", "handled": False},
-                    )
-                    sentry_sdk.capture_event(sentry_event, hint=hint)
-                    if segment is None:
-                        client.flush()
+            try:
+                return view_function(**function_args)
+            except Exception as exc:
+                if isinstance(exc, ChaliceViewError):
                     raise
-            else:
-                scope.set_transaction_name(
-                    app.lambda_context.function_name,
-                    source=TransactionSource.COMPONENT,
+                exc_info = sys.exc_info()
+                if segment:
+                    segment.status = SpanStatus.ERROR.value
+                sentry_event, hint = event_from_exception(
+                    exc_info,
+                    client_options=client.options,
+                    mechanism={"type": "chalice", "handled": False},
                 )
-                try:
-                    return view_function(**function_args)
-                except Exception as exc:
-                    if isinstance(exc, ChaliceViewError):
-                        raise
-                    exc_info = sys.exc_info()
-                    sentry_event, hint = event_from_exception(
-                        exc_info,
-                        client_options=client.options,
-                        mechanism={"type": "chalice", "handled": False},
-                    )
-                    sentry_sdk.capture_event(sentry_event, hint=hint)
+                sentry_sdk.capture_event(sentry_event, hint=hint)
+                if segment is None:
                     client.flush()
-                    raise
+                raise
 
     return wrapped_view_function  # type: ignore
 

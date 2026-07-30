@@ -25,7 +25,6 @@ from sentry_sdk.ai._openai_responses_api import (
 )
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import (
-    get_start_span_function,
     normalize_message_roles,
     set_data_normalized,
     truncate_and_annotate_embedding_inputs,
@@ -36,7 +35,6 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
-    has_span_streaming_enabled,
     should_truncate_gen_ai_input,
 )
 from sentry_sdk.utils import (
@@ -739,27 +737,15 @@ def _new_sync_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
     # Same bool handling as in https://github.com/openai/openai-python/blob/acd0c54d8a68efeedde0e5b4e6c310eef1ce7867/src/openai/resources/completions.py#L585
     is_streaming_response = kwargs.get("stream", False) or False
 
-    if has_span_streaming_enabled(client.options):
-        span = sentry_sdk.traces.start_span(
-            name=f"chat {model}",
-            attributes={
-                "sentry.op": consts.OP.GEN_AI_CHAT,
-                "sentry.origin": OpenAIIntegration.origin,
-                SPANDATA.GEN_AI_SYSTEM: "openai",
-                SPANDATA.GEN_AI_RESPONSE_STREAMING: is_streaming_response,
-            },
-        )
-
-    else:
-        span = get_start_span_function()(
-            op=consts.OP.GEN_AI_CHAT,
-            name=f"chat {model}",
-            origin=OpenAIIntegration.origin,
-        )
-        span.__enter__()
-
-        span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
-        span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, is_streaming_response)
+    span = sentry_sdk.traces.start_span(
+        name=f"chat {model}",
+        attributes={
+            "sentry.op": consts.OP.GEN_AI_CHAT,
+            "sentry.origin": OpenAIIntegration.origin,
+            SPANDATA.GEN_AI_SYSTEM: "openai",
+            SPANDATA.GEN_AI_RESPONSE_STREAMING: is_streaming_response,
+        },
+    )
 
     _set_completions_api_input_data(span, kwargs, integration)
 
@@ -820,26 +806,15 @@ async def _new_async_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") ->
     # Same bool handling as in https://github.com/openai/openai-python/blob/acd0c54d8a68efeedde0e5b4e6c310eef1ce7867/src/openai/resources/completions.py#L585
     is_streaming_response = kwargs.get("stream", False) or False
 
-    if has_span_streaming_enabled(client.options):
-        span = sentry_sdk.traces.start_span(
-            name=f"chat {model}",
-            attributes={
-                "sentry.op": consts.OP.GEN_AI_CHAT,
-                "sentry.origin": OpenAIIntegration.origin,
-                SPANDATA.GEN_AI_SYSTEM: "openai",
-                SPANDATA.GEN_AI_RESPONSE_STREAMING: is_streaming_response,
-            },
-        )
-    else:
-        span = get_start_span_function()(
-            op=consts.OP.GEN_AI_CHAT,
-            name=f"chat {model}",
-            origin=OpenAIIntegration.origin,
-        )
-        span.__enter__()
-
-        span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
-        span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, is_streaming_response)
+    span = sentry_sdk.traces.start_span(
+        name=f"chat {model}",
+        attributes={
+            "sentry.op": consts.OP.GEN_AI_CHAT,
+            "sentry.origin": OpenAIIntegration.origin,
+            SPANDATA.GEN_AI_SYSTEM: "openai",
+            SPANDATA.GEN_AI_RESPONSE_STREAMING: is_streaming_response,
+        },
+    )
 
     _set_completions_api_input_data(span, kwargs, integration)
 
@@ -1237,52 +1212,29 @@ def _new_sync_embeddings_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
 
     model = kwargs.get("model")
 
-    if has_span_streaming_enabled(client.options):
-        with sentry_sdk.traces.start_span(
-            name=f"embeddings {model}",
-            attributes={
-                "sentry.op": consts.OP.GEN_AI_EMBEDDINGS,
-                "sentry.origin": OpenAIIntegration.origin,
-                SPANDATA.GEN_AI_SYSTEM: "openai",
-            },
-        ) as span:
-            _set_embeddings_input_data(span, kwargs, integration)
+    with sentry_sdk.traces.start_span(
+        name=f"embeddings {model}",
+        attributes={
+            "sentry.op": consts.OP.GEN_AI_EMBEDDINGS,
+            "sentry.origin": OpenAIIntegration.origin,
+            SPANDATA.GEN_AI_SYSTEM: "openai",
+        },
+    ) as span:
+        _set_embeddings_input_data(span, kwargs, integration)
 
-            try:
-                response = f(*args, **kwargs)
-            except Exception as exc:
-                exc_info = sys.exc_info()
-                with capture_internal_exceptions():
-                    _capture_exception(exc)
-                reraise(*exc_info)
+        try:
+            response = f(*args, **kwargs)
+        except Exception as exc:
+            exc_info = sys.exc_info()
+            with capture_internal_exceptions():
+                _capture_exception(exc)
+            reraise(*exc_info)
 
-            _set_embeddings_output_data(
-                span, response, kwargs, integration, finish_span=False
-            )
+        _set_embeddings_output_data(
+            span, response, kwargs, integration, finish_span=False
+        )
 
-            return response
-    else:
-        with get_start_span_function()(
-            op=consts.OP.GEN_AI_EMBEDDINGS,
-            name=f"embeddings {model}",
-            origin=OpenAIIntegration.origin,
-        ) as span:
-            span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
-            _set_embeddings_input_data(span, kwargs, integration)
-
-            try:
-                response = f(*args, **kwargs)
-            except Exception as exc:
-                exc_info = sys.exc_info()
-                with capture_internal_exceptions():
-                    _capture_exception(exc)
-                reraise(*exc_info)
-
-            _set_embeddings_output_data(
-                span, response, kwargs, integration, finish_span=False
-            )
-
-            return response
+        return response
 
 
 async def _new_async_embeddings_create(
@@ -1295,52 +1247,29 @@ async def _new_async_embeddings_create(
 
     model = kwargs.get("model")
 
-    if has_span_streaming_enabled(client.options):
-        with sentry_sdk.traces.start_span(
-            name=f"embeddings {model}",
-            attributes={
-                "sentry.op": consts.OP.GEN_AI_EMBEDDINGS,
-                "sentry.origin": OpenAIIntegration.origin,
-                SPANDATA.GEN_AI_SYSTEM: "openai",
-            },
-        ) as span:
-            _set_embeddings_input_data(span, kwargs, integration)
+    with sentry_sdk.traces.start_span(
+        name=f"embeddings {model}",
+        attributes={
+            "sentry.op": consts.OP.GEN_AI_EMBEDDINGS,
+            "sentry.origin": OpenAIIntegration.origin,
+            SPANDATA.GEN_AI_SYSTEM: "openai",
+        },
+    ) as span:
+        _set_embeddings_input_data(span, kwargs, integration)
 
-            try:
-                response = await f(*args, **kwargs)
-            except Exception as exc:
-                exc_info = sys.exc_info()
-                with capture_internal_exceptions():
-                    _capture_exception(exc)
-                reraise(*exc_info)
+        try:
+            response = await f(*args, **kwargs)
+        except Exception as exc:
+            exc_info = sys.exc_info()
+            with capture_internal_exceptions():
+                _capture_exception(exc)
+            reraise(*exc_info)
 
-            _set_embeddings_output_data(
-                span, response, kwargs, integration, finish_span=False
-            )
+        _set_embeddings_output_data(
+            span, response, kwargs, integration, finish_span=False
+        )
 
-            return response
-    else:
-        with get_start_span_function()(
-            op=consts.OP.GEN_AI_EMBEDDINGS,
-            name=f"embeddings {model}",
-            origin=OpenAIIntegration.origin,
-        ) as span:
-            span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
-            _set_embeddings_input_data(span, kwargs, integration)
-
-            try:
-                response = await f(*args, **kwargs)
-            except Exception as exc:
-                exc_info = sys.exc_info()
-                with capture_internal_exceptions():
-                    _capture_exception(exc)
-                reraise(*exc_info)
-
-            _set_embeddings_output_data(
-                span, response, kwargs, integration, finish_span=False
-            )
-
-            return response
+        return response
 
 
 def _wrap_embeddings_create(f: "Any") -> "Any":
@@ -1378,26 +1307,15 @@ def _new_sync_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any"
     # Same bool handling as in https://github.com/openai/openai-python/blob/acd0c54d8a68efeedde0e5b4e6c310eef1ce7867/src/openai/resources/responses/responses.py#L940
     is_streaming_response = kwargs.get("stream", False) or False
 
-    if has_span_streaming_enabled(client.options):
-        span = sentry_sdk.traces.start_span(
-            name=f"responses {model}",
-            attributes={
-                "sentry.op": consts.OP.GEN_AI_RESPONSES,
-                "sentry.origin": OpenAIIntegration.origin,
-                SPANDATA.GEN_AI_SYSTEM: "openai",
-                SPANDATA.GEN_AI_RESPONSE_STREAMING: is_streaming_response,
-            },
-        )
-    else:
-        span = get_start_span_function()(
-            op=consts.OP.GEN_AI_RESPONSES,
-            name=f"responses {model}",
-            origin=OpenAIIntegration.origin,
-        )
-        span.__enter__()
-
-        span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
-        span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, is_streaming_response)
+    span = sentry_sdk.traces.start_span(
+        name=f"responses {model}",
+        attributes={
+            "sentry.op": consts.OP.GEN_AI_RESPONSES,
+            "sentry.origin": OpenAIIntegration.origin,
+            SPANDATA.GEN_AI_SYSTEM: "openai",
+            SPANDATA.GEN_AI_RESPONSE_STREAMING: is_streaming_response,
+        },
+    )
 
     _set_responses_api_input_data(span, kwargs, integration)
 
@@ -1448,26 +1366,15 @@ async def _new_async_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -
     # Same bool handling as in https://github.com/openai/openai-python/blob/acd0c54d8a68efeedde0e5b4e6c310eef1ce7867/src/openai/resources/responses/responses.py#L940
     is_streaming_response = kwargs.get("stream", False) or False
 
-    if has_span_streaming_enabled(client.options):
-        span = sentry_sdk.traces.start_span(
-            name=f"responses {model}",
-            attributes={
-                "sentry.op": consts.OP.GEN_AI_RESPONSES,
-                "sentry.origin": OpenAIIntegration.origin,
-                SPANDATA.GEN_AI_SYSTEM: "openai",
-                SPANDATA.GEN_AI_RESPONSE_STREAMING: is_streaming_response,
-            },
-        )
-    else:
-        span = get_start_span_function()(
-            op=consts.OP.GEN_AI_RESPONSES,
-            name=f"responses {model}",
-            origin=OpenAIIntegration.origin,
-        )
-        span.__enter__()
-
-        span.set_data(SPANDATA.GEN_AI_SYSTEM, "openai")
-        span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, is_streaming_response)
+    span = sentry_sdk.traces.start_span(
+        name=f"responses {model}",
+        attributes={
+            "sentry.op": consts.OP.GEN_AI_RESPONSES,
+            "sentry.origin": OpenAIIntegration.origin,
+            SPANDATA.GEN_AI_SYSTEM: "openai",
+            SPANDATA.GEN_AI_RESPONSE_STREAMING: is_streaming_response,
+        },
+    )
 
     _set_responses_api_input_data(span, kwargs, integration)
 

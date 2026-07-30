@@ -7,14 +7,11 @@ import sentry_sdk
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import (
     _set_span_data_attribute,
-    get_start_span_function,
     set_data_normalized,
 )
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
@@ -22,9 +19,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Iterable, Union
-
-    from sentry_sdk.tracing import Span
+    from typing import Any, Callable, Iterable
 
 try:
     import huggingface_hub.inference._client
@@ -91,21 +86,13 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
         model = client.model or kwargs.get("model") or ""
         operation_name = op.split(".")[-1]
 
-        span: "Union[Span, StreamedSpan]"
-        if has_span_streaming_enabled(sentry_sdk.get_client().options):
-            span = sentry_sdk.traces.start_span(
-                name=f"{operation_name} {model}",
-                attributes={
-                    "sentry.op": op,
-                    "sentry.origin": HuggingfaceHubIntegration.origin,
-                },
-            )
-        else:
-            span = get_start_span_function()(
-                op=op,
-                name=f"{operation_name} {model}",
-                origin=HuggingfaceHubIntegration.origin,
-            )
+        span = sentry_sdk.traces.start_span(
+            name=f"{operation_name} {model}",
+            attributes={
+                "sentry.op": op,
+                "sentry.origin": HuggingfaceHubIntegration.origin,
+            },
+        )
         span.__enter__()
 
         _set_span_data_attribute(span, SPANDATA.GEN_AI_OPERATION_NAME, operation_name)

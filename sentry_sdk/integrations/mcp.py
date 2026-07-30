@@ -14,12 +14,11 @@ from functools import wraps
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.ai.utils import _set_span_data_attribute, get_start_span_function
+from sentry_sdk.ai.utils import _set_span_data_attribute
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import nullcontext, package_version, safe_serialize
 
 MCP_PACKAGE_VERSION = package_version("mcp")
@@ -387,27 +386,15 @@ async def _tool_handler_wrapper(
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
-    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-
     # Start span and execute
     with _active_http_scopes(ctx=ctx):
-        span_mgr: "Union[Span, StreamedSpan]"
-        if span_streaming:
-            span_mgr = sentry_sdk.traces.start_span(
-                name=f"tools/call {handler_name}",
-                attributes={
-                    "sentry.op": OP.MCP_SERVER,
-                    "sentry.origin": MCPIntegration.origin,
-                },
-            )
-        else:
-            span_mgr = get_start_span_function()(
-                op=OP.MCP_SERVER,
-                name=f"tools/call {handler_name}",
-                origin=MCPIntegration.origin,
-            )
-
-        with span_mgr as span:
+        with sentry_sdk.traces.start_span(
+            name=f"tools/call {handler_name}",
+            attributes={
+                "sentry.op": OP.MCP_SERVER,
+                "sentry.origin": MCPIntegration.origin,
+            },
+        ) as span:
             # Set input span data
             _set_span_input_data(
                 span,
@@ -503,27 +490,15 @@ async def _prompt_handler_wrapper(
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
-    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-
     # Start span and execute
     with _active_http_scopes(ctx=ctx):
-        span_mgr: "Union[Span, StreamedSpan]"
-        if span_streaming:
-            span_mgr = sentry_sdk.traces.start_span(
-                name=f"prompts/get {handler_name}",
-                attributes={
-                    "sentry.op": OP.MCP_SERVER,
-                    "sentry.origin": MCPIntegration.origin,
-                },
-            )
-        else:
-            span_mgr = get_start_span_function()(
-                op=OP.MCP_SERVER,
-                name=f"prompts/get {handler_name}",
-                origin=MCPIntegration.origin,
-            )
-
-        with span_mgr as span:
+        with sentry_sdk.traces.start_span(
+            name=f"prompts/get {handler_name}",
+            attributes={
+                "sentry.op": OP.MCP_SERVER,
+                "sentry.origin": MCPIntegration.origin,
+            },
+        ) as span:
             # Set input span data
             _set_span_input_data(
                 span,
@@ -673,27 +648,15 @@ async def _resource_handler_wrapper(
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
-    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-
     # Start span and execute
     with _active_http_scopes(ctx=ctx):
-        span_mgr: "Union[Span, StreamedSpan]"
-        if span_streaming:
-            span_mgr = sentry_sdk.traces.start_span(
-                name=f"resources/read {handler_name}",
-                attributes={
-                    "sentry.op": OP.MCP_SERVER,
-                    "sentry.origin": MCPIntegration.origin,
-                },
-            )
-        else:
-            span_mgr = get_start_span_function()(
-                op=OP.MCP_SERVER,
-                name=f"resources/read {handler_name}",
-                origin=MCPIntegration.origin,
-            )
-
-        with span_mgr as span:
+        with sentry_sdk.traces.start_span(
+            name=f"resources/read {handler_name}",
+            attributes={
+                "sentry.op": OP.MCP_SERVER,
+                "sentry.origin": MCPIntegration.origin,
+            },
+        ) as span:
             # Set input span data
             _set_span_input_data(
                 span,

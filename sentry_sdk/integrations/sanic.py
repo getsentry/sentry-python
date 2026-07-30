@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
 import sentry_sdk
-from sentry_sdk import continue_trace
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.data_collection import (
     _apply_data_collection_filtering_to_query_string,
@@ -15,9 +14,8 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import SegmentNameSource, StreamedSpan
+from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.tracing import TransactionSource
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     CONTEXTVARS_ERROR_MESSAGE,
     HAS_REAL_CONTEXTVARS,
@@ -174,7 +172,6 @@ async def _context_enter(request: "Request") -> None:
         return
 
     client = sentry_sdk.get_client()
-    is_span_streaming_enabled = has_span_streaming_enabled(client.options)
 
     weak_request = weakref.ref(request)
     request.ctx._sentry_scope = sentry_sdk.isolation_scope()
@@ -182,51 +179,35 @@ async def _context_enter(request: "Request") -> None:
     scope.clear_breadcrumbs()
     scope.add_event_processor(_make_request_processor(weak_request))
 
-    if is_span_streaming_enabled:
-        integration = client.get_integration(SanicIntegration)
-        if (
-            isinstance(integration, SanicIntegration)
-            and integration._unsampled_statuses
-        ):
-            warnings.warn(
-                "The `unsampled_statuses` option of SanicIntegration has no effect when span streaming is enabled.",
-                stacklevel=2,
-            )
+    integration = client.get_integration(SanicIntegration)
+    if isinstance(integration, SanicIntegration) and integration._unsampled_statuses:
+        warnings.warn(
+            "The `unsampled_statuses` option of SanicIntegration has no effect when span streaming is enabled.",
+            stacklevel=2,
+        )
 
-        sentry_sdk.traces.continue_trace(dict(request.headers))
-        scope.set_custom_sampling_context({"sanic_request": request})
+    sentry_sdk.traces.continue_trace(dict(request.headers))
+    scope.set_custom_sampling_context({"sanic_request": request})
 
-        if request.remote_addr:
-            if has_data_collection_enabled(client.options):
-                if client.options["data_collection"]["user_info"]:
-                    scope.set_attribute(SPANDATA.USER_IP_ADDRESS, request.remote_addr)
-            elif should_send_default_pii():
+    if request.remote_addr:
+        if has_data_collection_enabled(client.options):
+            if client.options["data_collection"]["user_info"]:
                 scope.set_attribute(SPANDATA.USER_IP_ADDRESS, request.remote_addr)
+        elif should_send_default_pii():
+            scope.set_attribute(SPANDATA.USER_IP_ADDRESS, request.remote_addr)
 
-        span = sentry_sdk.traces.start_span(
-            # Unless the request results in a 404 error, the name and source
-            # will get overwritten in _set_transaction
-            name=request.path,
-            attributes={
-                "sentry.op": OP.HTTP_SERVER,
-                "sentry.origin": SanicIntegration.origin,
-                "sentry.segment.name.source": SegmentNameSource.URL.value,
-            },
-            parent_span=None,
-        )
-        request.ctx._sentry_root_span = span
-    else:
-        transaction = continue_trace(
-            dict(request.headers),
-            op=OP.HTTP_SERVER,
-            # Unless the request results in a 404 error, the name and source will get overwritten in _set_transaction
-            name=request.path,
-            source=TransactionSource.URL,
-            origin=SanicIntegration.origin,
-        )
-        request.ctx._sentry_root_span = sentry_sdk.start_transaction(
-            transaction
-        ).__enter__()
+    span = sentry_sdk.traces.start_span(
+        # Unless the request results in a 404 error, the name and source
+        # will get overwritten in _set_transaction
+        name=request.path,
+        attributes={
+            "sentry.op": OP.HTTP_SERVER,
+            "sentry.origin": SanicIntegration.origin,
+            "sentry.segment.name.source": SegmentNameSource.URL.value,
+        },
+        parent_span=None,
+    )
+    request.ctx._sentry_root_span = span
 
 
 async def _context_exit(
@@ -236,32 +217,20 @@ async def _context_exit(
         if not request.ctx._sentry_do_integration:
             return
 
-        integration = sentry_sdk.get_client().get_integration(SanicIntegration)
-
         response_status = None if response is None else response.status
 
         # This capture_internal_exceptions block has been intentionally nested here, so that in case an exception
         # happens while trying to end the transaction, we still attempt to exit the scope.
         with capture_internal_exceptions():
             span = request.ctx._sentry_root_span
-            if isinstance(span, StreamedSpan):
-                with capture_internal_exceptions():
-                    for attr, value in _get_request_attributes(request).items():
-                        span.set_attribute(attr, value)
-                if response_status is not None:
-                    span.set_attribute(SPANDATA.HTTP_STATUS_CODE, response_status)
-                    span.status = "error" if response_status >= 400 else "ok"
+            with capture_internal_exceptions():
+                for attr, value in _get_request_attributes(request).items():
+                    span.set_attribute(attr, value)
+            if response_status is not None:
+                span.set_attribute(SPANDATA.HTTP_STATUS_CODE, response_status)
+                span.status = "error" if response_status >= 400 else "ok"
 
-                span.end()
-
-            else:
-                span.set_http_status(response_status)
-                span.sampled &= (
-                    isinstance(integration, SanicIntegration)
-                    and response_status not in integration._unsampled_statuses
-                )
-
-                span.__exit__(None, None, None)
+            span.end()
 
         request.ctx._sentry_scope.__exit__(None, None, None)
 

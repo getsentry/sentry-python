@@ -9,8 +9,6 @@ from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE
-from sentry_sdk.tracing import SOURCE_FOR_STYLE as TRANSACTION_SOURCE_FOR_STYLE
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -87,16 +85,15 @@ class PyramidIntegration(Integration):
 
             scope = sentry_sdk.get_isolation_scope()
 
-            if has_span_streaming_enabled(client.options):
-                if has_data_collection_enabled(client.options):
-                    if client.options["data_collection"]["user_info"]:
-                        user_id = authenticated_userid(request)
-                        if user_id:
-                            scope.set_user({"id": user_id})
-                elif should_send_default_pii():
+            if has_data_collection_enabled(client.options):
+                if client.options["data_collection"]["user_info"]:
                     user_id = authenticated_userid(request)
                     if user_id:
                         scope.set_user({"id": user_id})
+            elif should_send_default_pii():
+                user_id = authenticated_userid(request)
+                if user_id:
+                    scope.set_user({"id": user_id})
 
             scope.add_event_processor(
                 _make_event_processor(weakref.ref(request), integration)
@@ -174,14 +171,7 @@ def _set_transaction_name_and_source(
             "route_name": request.matched_route.name,
             "route_pattern": request.matched_route.pattern,
         }
-        is_span_streaming_enabled = has_span_streaming_enabled(
-            sentry_sdk.get_client().options
-        )
-        source = (
-            SEGMENT_SOURCE_FOR_STYLE[transaction_style]
-            if is_span_streaming_enabled
-            else TRANSACTION_SOURCE_FOR_STYLE[transaction_style]
-        )
+        source = SEGMENT_SOURCE_FOR_STYLE[transaction_style]
         scope.set_transaction_name(
             name_for_style[transaction_style],
             source=source,

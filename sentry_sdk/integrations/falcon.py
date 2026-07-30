@@ -5,7 +5,6 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -113,7 +112,7 @@ class SentryFalconMiddleware:
         """
         client = sentry_sdk.get_client()
         integration = client.get_integration(FalconIntegration)
-        if integration is None or not has_span_streaming_enabled(client.options):
+        if integration is None:
             return
 
         name_for_style = {

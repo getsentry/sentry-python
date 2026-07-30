@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlencode
 
 import sentry_sdk
-from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.data_collection import _apply_key_value_collection_filtering
 from sentry_sdk.integrations import Integration
@@ -20,8 +19,6 @@ from sentry_sdk.integrations.cloud_resource_context import (
 )
 from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.traces import SegmentNameSource
-from sentry_sdk.tracing import TransactionSource
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     AnnotatedValue,
     TimeoutThread,
@@ -188,45 +185,31 @@ def _wrap_handler(handler: "F") -> "F":
 
             function_name = aws_context.function_name
 
-            if has_span_streaming_enabled(client.options):
-                sentry_sdk.traces.continue_trace(headers)
-                Scope.set_custom_sampling_context(sampling_context)
-                span_ctx = sentry_sdk.traces.start_span(
-                    name=function_name,
-                    parent_span=None,
-                    attributes={
-                        "sentry.op": OP.FUNCTION_AWS,
-                        "sentry.origin": AwsLambdaIntegration.origin,
-                        "sentry.segment.name.source": SegmentNameSource.COMPONENT,
-                        "cloud.region": aws_region,
-                        "cloud.resource_id": aws_context.invoked_function_arn,
-                        "cloud.platform": CLOUD_PLATFORM.AWS_LAMBDA,
-                        "cloud.provider": CLOUD_PROVIDER.AWS,
-                        "faas.name": function_name,
-                        "faas.invocation_id": aws_context.aws_request_id,
-                        "faas.version": aws_context.function_version,
-                        "aws.lambda.invoked_arn": aws_context.invoked_function_arn,
-                        "aws.log.group.names": [aws_context.log_group_name],
-                        "aws.log.stream.names": [aws_context.log_stream_name],
-                        "messaging.batch.message_count": batch_size,
-                        **header_attributes,
-                        **additional_attributes,
-                    },
-                )
-            else:
-                transaction = continue_trace(
-                    headers,
-                    op=OP.FUNCTION_AWS,
-                    name=function_name,
-                    source=TransactionSource.COMPONENT,
-                    origin=AwsLambdaIntegration.origin,
-                )
+            sentry_sdk.traces.continue_trace(headers)
+            Scope.set_custom_sampling_context(sampling_context)
 
-                span_ctx = sentry_sdk.start_transaction(
-                    transaction, custom_sampling_context=sampling_context
-                )
-
-            with span_ctx:
+            with sentry_sdk.traces.start_span(
+                name=function_name,
+                parent_span=None,
+                attributes={
+                    "sentry.op": OP.FUNCTION_AWS,
+                    "sentry.origin": AwsLambdaIntegration.origin,
+                    "sentry.segment.name.source": SegmentNameSource.COMPONENT,
+                    "cloud.region": aws_region,
+                    "cloud.resource_id": aws_context.invoked_function_arn,
+                    "cloud.platform": CLOUD_PLATFORM.AWS_LAMBDA,
+                    "cloud.provider": CLOUD_PROVIDER.AWS,
+                    "faas.name": function_name,
+                    "faas.invocation_id": aws_context.aws_request_id,
+                    "faas.version": aws_context.function_version,
+                    "aws.lambda.invoked_arn": aws_context.invoked_function_arn,
+                    "aws.log.group.names": [aws_context.log_group_name],
+                    "aws.log.stream.names": [aws_context.log_stream_name],
+                    "messaging.batch.message_count": batch_size,
+                    **header_attributes,
+                    **additional_attributes,
+                },
+            ):
                 try:
                     return handler(aws_event, aws_context, *args, **kwargs)
                 except Exception:

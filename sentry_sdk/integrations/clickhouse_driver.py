@@ -7,7 +7,6 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import capture_internal_exceptions
 
 # Hack to get new Python features working in older versions
@@ -81,34 +80,17 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
 
         connection = args[0]
         query = args[1]
-        query_id = args[2] if len(args) > 2 else kwargs.get("query_id")
-        params = args[3] if len(args) > 3 else kwargs.get("params")
 
-        if has_span_streaming_enabled(client.options):
-            span = None
-            if sentry_sdk.traces.get_current_span() is not None:
-                span = sentry_sdk.traces.start_span(
-                    name=query,  # type: ignore
-                    attributes={
-                        "sentry.op": OP.DB,
-                        "sentry.origin": ClickhouseDriverIntegration.origin,
-                        SPANDATA.DB_QUERY_TEXT: str(query),
-                    },
-                )
-        else:
-            span = sentry_sdk.start_span(
-                op=OP.DB,
-                name=query,
-                origin=ClickhouseDriverIntegration.origin,
+        span = None
+        if sentry_sdk.traces.get_current_span() is not None:
+            span = sentry_sdk.traces.start_span(
+                name=query,  # type: ignore
+                attributes={
+                    "sentry.op": OP.DB,
+                    "sentry.origin": ClickhouseDriverIntegration.origin,
+                    SPANDATA.DB_QUERY_TEXT: str(query),
+                },
             )
-
-            span.set_data("query", query)
-
-            if query_id:
-                span.set_data("db.query_id", query_id)
-
-            if params and should_send_default_pii():
-                span.set_data("db.params", params)
 
         connection._sentry_span = span  # type: ignore[attr-defined]
 

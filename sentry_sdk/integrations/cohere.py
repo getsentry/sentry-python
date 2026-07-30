@@ -4,10 +4,9 @@ from typing import TYPE_CHECKING
 
 from sentry_sdk import consts
 from sentry_sdk.ai.monitoring import record_token_usage
-from sentry_sdk.ai.utils import get_start_span_function, set_data_normalized
+from sentry_sdk.ai.utils import set_data_normalized
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Iterator, Union
@@ -140,9 +139,6 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
     @wraps(f)
     def new_chat(*args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(CohereIntegration)
-        is_span_streaming_enabled = has_span_streaming_enabled(
-            sentry_sdk.get_client().options
-        )
 
         if (
             integration is None
@@ -153,21 +149,13 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
 
         message = kwargs.get("message")
 
-        if is_span_streaming_enabled:
-            span = sentry_sdk.traces.start_span(
-                name="cohere.client.Chat",
-                attributes={
-                    "sentry.op": consts.OP.COHERE_CHAT_COMPLETIONS_CREATE,
-                    "sentry.origin": CohereIntegration.origin,
-                },
-            )
-        else:
-            span = get_start_span_function()(
-                op=consts.OP.COHERE_CHAT_COMPLETIONS_CREATE,
-                name="cohere.client.Chat",
-                origin=CohereIntegration.origin,
-            )
-            span.__enter__()
+        span = sentry_sdk.traces.start_span(
+            name="cohere.client.Chat",
+            attributes={
+                "sentry.op": consts.OP.COHERE_CHAT_COMPLETIONS_CREATE,
+                "sentry.origin": CohereIntegration.origin,
+            },
+        )
         try:
             res = f(*args, **kwargs)
         except Exception as e:
@@ -245,26 +233,13 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
         if integration is None:
             return f(*args, **kwargs)
 
-        is_span_streaming_enabled = has_span_streaming_enabled(
-            sentry_sdk.get_client().options
-        )
-
-        if is_span_streaming_enabled:
-            span_ctx = sentry_sdk.traces.start_span(
-                name="Cohere Embedding Creation",
-                attributes={
-                    "sentry.op": consts.OP.COHERE_EMBEDDINGS_CREATE,
-                    "sentry.origin": CohereIntegration.origin,
-                },
-            )
-        else:
-            span_ctx = get_start_span_function()(
-                op=consts.OP.COHERE_EMBEDDINGS_CREATE,
-                name="Cohere Embedding Creation",
-                origin=CohereIntegration.origin,
-            )
-
-        with span_ctx as span:
+        with sentry_sdk.traces.start_span(
+            name="Cohere Embedding Creation",
+            attributes={
+                "sentry.op": consts.OP.COHERE_EMBEDDINGS_CREATE,
+                "sentry.origin": CohereIntegration.origin,
+            },
+        ) as span:
             if "texts" in kwargs and (
                 should_send_default_pii() and integration.include_prompts
             ):

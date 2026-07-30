@@ -8,7 +8,6 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.traces import StreamedSpan, get_current_span
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import transaction_from_function
 
 if TYPE_CHECKING:
@@ -170,16 +169,11 @@ def patch_get_request_handler() -> None:
             def _sentry_call(*args: "Any", **kwargs: "Any") -> "Any":
                 current_scope = sentry_sdk.get_current_scope()
 
-                client = sentry_sdk.get_client()
-                if has_span_streaming_enabled(client.options):
-                    current_span = current_scope.streamed_span
+                current_span = current_scope.streamed_span
 
-                    if type(current_span) is StreamedSpan:
-                        segment = current_span._segment
-                        segment._update_active_thread()
-
-                elif current_scope.transaction is not None:
-                    current_scope.transaction.update_active_thread()
+                if type(current_span) is StreamedSpan:
+                    segment = current_span._segment
+                    segment._update_active_thread()
 
                 return old_call(*args, **kwargs)
 

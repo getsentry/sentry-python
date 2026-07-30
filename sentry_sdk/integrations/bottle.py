@@ -12,7 +12,6 @@ from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.traces import SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE
 from sentry_sdk.tracing import SOURCE_FOR_STYLE as TRANSACTION_SOURCE_FOR_STYLE
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -104,10 +103,9 @@ class BottleIntegration(Integration):
             )
             res = old_handle(self, environ)
 
-            if has_span_streaming_enabled(sentry_sdk.get_client().options):
-                _set_segment_name_and_source(
-                    transaction_style=integration.transaction_style
-                )
+            _set_segment_name_and_source(
+                transaction_style=integration.transaction_style
+            )
 
             return res
 

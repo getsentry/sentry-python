@@ -6,7 +6,6 @@ from os import environ
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP
 from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query_string
 from sentry_sdk.integrations import Integration
@@ -14,8 +13,6 @@ from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.cloud_resource_context import CLOUD_PROVIDER
 from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.traces import SegmentNameSource
-from sentry_sdk.tracing import TransactionSource
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     AnnotatedValue,
     TimeoutThread,
@@ -141,36 +138,22 @@ def _wrap_func(func: "F") -> "F":
             if environ.get("ENTRY_POINT"):
                 additional_attributes["faas.entry_point"] = environ.get("ENTRY_POINT")
 
-            if has_span_streaming_enabled(client.options):
-                sentry_sdk.traces.continue_trace(headers)
-                Scope.set_custom_sampling_context(sampling_context)
-                span_ctx = sentry_sdk.traces.start_span(
-                    name=function_name,
-                    parent_span=None,
-                    attributes={
-                        "sentry.op": OP.FUNCTION_GCP,
-                        "sentry.origin": GcpIntegration.origin,
-                        "sentry.segment.name.source": SegmentNameSource.COMPONENT,
-                        "cloud.provider": CLOUD_PROVIDER.GCP,
-                        "faas.name": function_name,
-                        **header_attributes,
-                        **additional_attributes,
-                    },
-                )
-            else:
-                transaction = continue_trace(
-                    headers,
-                    op=OP.FUNCTION_GCP,
-                    name=environ.get("FUNCTION_NAME", ""),
-                    source=TransactionSource.COMPONENT,
-                    origin=GcpIntegration.origin,
-                )
+            sentry_sdk.traces.continue_trace(headers)
+            Scope.set_custom_sampling_context(sampling_context)
 
-                span_ctx = sentry_sdk.start_transaction(
-                    transaction, custom_sampling_context=sampling_context
-                )
-
-            with span_ctx:
+            with sentry_sdk.traces.start_span(
+                name=function_name,
+                parent_span=None,
+                attributes={
+                    "sentry.op": OP.FUNCTION_GCP,
+                    "sentry.origin": GcpIntegration.origin,
+                    "sentry.segment.name.source": SegmentNameSource.COMPONENT,
+                    "cloud.provider": CLOUD_PROVIDER.GCP,
+                    "faas.name": function_name,
+                    **header_attributes,
+                    **additional_attributes,
+                },
+            ):
                 try:
                     return func(functionhandler, gcp_event, *args, **kwargs)
                 except Exception:

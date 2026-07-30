@@ -4,8 +4,6 @@ from typing import TYPE_CHECKING, Any
 
 import sentry_sdk
 from sentry_sdk._lru_cache import LRUCache
-from sentry_sdk.tracing import Span
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 
 if TYPE_CHECKING:
     from typing import TypedDict
@@ -59,17 +57,9 @@ def add_feature_flag(flag: str, result: bool) -> None:
     Records a flag and its value to be sent on subsequent error events.
     We recommend you do this on flag evaluations. Flags are buffered per Sentry scope.
     """
-    client = sentry_sdk.get_client()
-
     flags = sentry_sdk.get_isolation_scope().flags
     flags.set(flag, result)
 
-    if has_span_streaming_enabled(client.options):
-        span = sentry_sdk.traces.get_current_span()
-        if span and isinstance(span, sentry_sdk.traces.StreamedSpan):
-            span.set_attribute(f"flag.evaluation.{flag}", result)
-
-    else:
-        span = sentry_sdk.get_current_span()
-        if span and isinstance(span, Span):
-            span.set_flag(f"flag.evaluation.{flag}", result)
+    span = sentry_sdk.traces.get_current_span()
+    if span and isinstance(span, sentry_sdk.traces.StreamedSpan):
+        span.set_attribute(f"flag.evaluation.{flag}", result)

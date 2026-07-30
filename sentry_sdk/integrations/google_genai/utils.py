@@ -30,7 +30,6 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
-    has_span_streaming_enabled,
     should_truncate_gen_ai_input,
 )
 from sentry_sdk.utils import (
@@ -673,28 +672,16 @@ def _create_tool_span(
     tool_name: str, tool_doc: "Optional[str]"
 ) -> "Union[Span, StreamedSpan]":
     """Create a span for tool execution."""
-    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-    if span_streaming:
-        span = sentry_sdk.traces.start_span(
-            name=f"execute_tool {tool_name}",
-            attributes={
-                "sentry.op": OP.GEN_AI_EXECUTE_TOOL,
-                "sentry.origin": ORIGIN,
-                SPANDATA.GEN_AI_TOOL_NAME: tool_name,
-            },
-        )
-        if tool_doc:
-            span.set_attribute(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool_doc)
-        return span
-
-    span = sentry_sdk.start_span(
-        op=OP.GEN_AI_EXECUTE_TOOL,
+    span = sentry_sdk.traces.start_span(
         name=f"execute_tool {tool_name}",
-        origin=ORIGIN,
+        attributes={
+            "sentry.op": OP.GEN_AI_EXECUTE_TOOL,
+            "sentry.origin": ORIGIN,
+            SPANDATA.GEN_AI_TOOL_NAME: tool_name,
+        },
     )
-    span.set_data(SPANDATA.GEN_AI_TOOL_NAME, tool_name)
     if tool_doc:
-        span.set_data(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool_doc)
+        span.set_attribute(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool_doc)
     return span
 
 

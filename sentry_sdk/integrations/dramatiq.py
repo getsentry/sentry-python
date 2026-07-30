@@ -2,17 +2,15 @@ import json
 from typing import TypeVar
 
 import sentry_sdk
-from sentry_sdk.api import continue_trace, get_baggage, get_traceparent
-from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
+from sentry_sdk.api import get_baggage, get_traceparent
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import request_body_within_bounds
 from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
-    TransactionSource,
 )
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
@@ -132,39 +130,18 @@ class SentryMiddleware(Middleware):  # type: ignore[misc]
             # start new trace in case of retrying
             sentry_headers = {}
 
-        if has_span_streaming_enabled(client.options):
-            sentry_sdk.traces.continue_trace(sentry_headers)
-            span = sentry_sdk.traces.start_span(
-                name=message.actor_name,
-                attributes={
-                    "sentry.op": OP.QUEUE_TASK_DRAMATIQ,
-                    "sentry.origin": DramatiqIntegration.origin,
-                    "sentry.segment.name.source": SegmentNameSource.TASK.value,
-                    SPANDATA.MESSAGING_DESTINATION_NAME: message.queue_name,
-                },
-                parent_span=None,
-            )
-            message._sentry_span_ctx = span
-        else:
-            transaction = continue_trace(
-                sentry_headers,
-                name=message.actor_name,
-                op=OP.QUEUE_TASK_DRAMATIQ,
-                source=TransactionSource.TASK,
-                origin=DramatiqIntegration.origin,
-            )
-            transaction.set_status(SPANSTATUS.OK)
-            sentry_sdk.start_transaction(
-                transaction,
-                name=message.actor_name,
-                op=OP.QUEUE_TASK_DRAMATIQ,
-                source=TransactionSource.TASK,
-            )
-            transaction.__enter__()
-            transaction.set_data(
-                SPANDATA.MESSAGING_DESTINATION_NAME, message.queue_name
-            )
-            message._sentry_span_ctx = transaction
+        sentry_sdk.traces.continue_trace(sentry_headers)
+        span = sentry_sdk.traces.start_span(
+            name=message.actor_name,
+            attributes={
+                "sentry.op": OP.QUEUE_TASK_DRAMATIQ,
+                "sentry.origin": DramatiqIntegration.origin,
+                "sentry.segment.name.source": SegmentNameSource.TASK.value,
+                SPANDATA.MESSAGING_DESTINATION_NAME: message.queue_name,
+            },
+            parent_span=None,
+        )
+        message._sentry_span_ctx = span
 
     def after_process_message(
         self,

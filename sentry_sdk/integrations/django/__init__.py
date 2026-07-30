@@ -19,7 +19,6 @@ from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
 from sentry_sdk.tracing_utils import (
     add_query_source,
-    has_span_streaming_enabled,
     record_sql_queries,
 )
 from sentry_sdk.utils import (
@@ -501,13 +500,11 @@ def _after_get_response(request: "WSGIRequest") -> None:
         scope = sentry_sdk.get_current_scope()
         _attempt_resolve_again(request, scope, integration.transaction_style)
 
-    span_streaming = has_span_streaming_enabled(client.options)
-    if span_streaming:
-        if has_data_collection_enabled(client.options):
-            if client.options["data_collection"]["user_info"]:
-                _get_user_from_request_and_set_on_scope(request)
-        elif should_send_default_pii():
+    if has_data_collection_enabled(client.options):
+        if client.options["data_collection"]["user_info"]:
             _get_user_from_request_and_set_on_scope(request)
+    elif should_send_default_pii():
+        _get_user_from_request_and_set_on_scope(request)
 
 
 def _patch_get_response() -> None:
@@ -736,27 +733,17 @@ def install_sql_hook() -> None:
         with capture_internal_exceptions():
             sentry_sdk.add_breadcrumb(message="connect", category="query")
 
-        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-        if span_streaming:
-            if sentry_sdk.traces.get_current_span() is None:
-                return real_connect(self)
-            with sentry_sdk.traces.start_span(
-                name="connect",
-                attributes={
-                    "sentry.op": OP.DB,
-                    "sentry.origin": DjangoIntegration.origin_db,
-                },
-            ) as span:
-                _set_db_data(span, self)
-                return real_connect(self)
-        else:
-            with sentry_sdk.start_span(
-                op=OP.DB,
-                name="connect",
-                origin=DjangoIntegration.origin_db,
-            ) as span:
-                _set_db_data(span, self)
-                return real_connect(self)
+        if sentry_sdk.traces.get_current_span() is None:
+            return real_connect(self)
+        with sentry_sdk.traces.start_span(
+            name="connect",
+            attributes={
+                "sentry.op": OP.DB,
+                "sentry.origin": DjangoIntegration.origin_db,
+            },
+        ) as span:
+            _set_db_data(span, self)
+            return real_connect(self)
 
     def _commit(self: "BaseDatabaseWrapper") -> None:
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
@@ -764,27 +751,17 @@ def install_sql_hook() -> None:
         if integration is None or not integration.db_transaction_spans:
             return real_commit(self)
 
-        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-        if span_streaming:
-            if sentry_sdk.traces.get_current_span() is None:
-                return real_commit(self)
-            with sentry_sdk.traces.start_span(
-                name=SPANNAME.DB_COMMIT,
-                attributes={
-                    "sentry.op": OP.DB,
-                    "sentry.origin": DjangoIntegration.origin_db,
-                },
-            ) as span:
-                _set_db_data(span, self, SPANNAME.DB_COMMIT)
-                return real_commit(self)
-        else:
-            with sentry_sdk.start_span(
-                op=OP.DB,
-                name=SPANNAME.DB_COMMIT,
-                origin=DjangoIntegration.origin_db,
-            ) as span:
-                _set_db_data(span, self, SPANNAME.DB_COMMIT)
-                return real_commit(self)
+        if sentry_sdk.traces.get_current_span() is None:
+            return real_commit(self)
+        with sentry_sdk.traces.start_span(
+            name=SPANNAME.DB_COMMIT,
+            attributes={
+                "sentry.op": OP.DB,
+                "sentry.origin": DjangoIntegration.origin_db,
+            },
+        ) as span:
+            _set_db_data(span, self, SPANNAME.DB_COMMIT)
+            return real_commit(self)
 
     def _rollback(self: "BaseDatabaseWrapper") -> None:
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
@@ -792,27 +769,17 @@ def install_sql_hook() -> None:
         if integration is None or not integration.db_transaction_spans:
             return real_rollback(self)
 
-        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-        if span_streaming:
-            if sentry_sdk.traces.get_current_span() is None:
-                return real_rollback(self)
-            with sentry_sdk.traces.start_span(
-                name=SPANNAME.DB_ROLLBACK,
-                attributes={
-                    "sentry.op": OP.DB,
-                    "sentry.origin": DjangoIntegration.origin_db,
-                },
-            ) as span:
-                _set_db_data(span, self, SPANNAME.DB_ROLLBACK)
-                return real_rollback(self)
-        else:
-            with sentry_sdk.start_span(
-                op=OP.DB,
-                name=SPANNAME.DB_ROLLBACK,
-                origin=DjangoIntegration.origin_db,
-            ) as span:
-                _set_db_data(span, self, SPANNAME.DB_ROLLBACK)
-                return real_rollback(self)
+        if sentry_sdk.traces.get_current_span() is None:
+            return real_rollback(self)
+        with sentry_sdk.traces.start_span(
+            name=SPANNAME.DB_ROLLBACK,
+            attributes={
+                "sentry.op": OP.DB,
+                "sentry.origin": DjangoIntegration.origin_db,
+            },
+        ) as span:
+            _set_db_data(span, self, SPANNAME.DB_ROLLBACK)
+            return real_rollback(self)
 
     CursorWrapper.execute = execute
     CursorWrapper.executemany = executemany

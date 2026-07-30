@@ -7,7 +7,6 @@ from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
@@ -150,32 +149,20 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
             return await old_call(self, scope, receive, send)
 
         middleware_name = self.__class__.__name__
-        is_span_streaming_enabled = has_span_streaming_enabled(client.options)
 
         def _start_middleware_span(op: str, name: str) -> "Any":
-            if is_span_streaming_enabled:
-                if sentry_sdk.traces.get_current_span() is None:
-                    return nullcontext()
-                return sentry_sdk.traces.start_span(
-                    name=name,
-                    attributes={
-                        "sentry.op": op,
-                        "sentry.origin": StarliteIntegration.origin,
-                        SPANDATA.MIDDLEWARE_NAME: middleware_name,
-                    },
-                )
-            return sentry_sdk.start_span(
-                op=op,
+            if sentry_sdk.traces.get_current_span() is None:
+                return nullcontext()
+            return sentry_sdk.traces.start_span(
                 name=name,
-                origin=StarliteIntegration.origin,
+                attributes={
+                    "sentry.op": op,
+                    "sentry.origin": StarliteIntegration.origin,
+                    SPANDATA.MIDDLEWARE_NAME: middleware_name,
+                },
             )
 
-        with _start_middleware_span(
-            op=OP.MIDDLEWARE_STARLITE, name=middleware_name
-        ) as middleware_span:
-            if not is_span_streaming_enabled:
-                middleware_span.set_tag("starlite.middleware_name", middleware_name)
-
+        with _start_middleware_span(op=OP.MIDDLEWARE_STARLITE, name=middleware_name):
             # Creating spans for the "receive" callback
             async def _sentry_receive(
                 *args: "Any", **kwargs: "Any"
@@ -185,9 +172,7 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                 with _start_middleware_span(
                     op=OP.MIDDLEWARE_STARLITE_RECEIVE,
                     name=getattr(receive, "__qualname__", str(receive)),
-                ) as span:
-                    if not is_span_streaming_enabled:
-                        span.set_tag("starlite.middleware_name", middleware_name)
+                ):
                     return await receive(*args, **kwargs)
 
             receive_name = getattr(receive, "__name__", str(receive))
@@ -201,9 +186,7 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                 with _start_middleware_span(
                     op=OP.MIDDLEWARE_STARLITE_SEND,
                     name=getattr(send, "__qualname__", str(send)),
-                ) as span:
-                    if not is_span_streaming_enabled:
-                        span.set_tag("starlite.middleware_name", middleware_name)
+                ):
                     return await send(message)
 
             send_name = getattr(send, "__name__", str(send))

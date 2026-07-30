@@ -9,7 +9,6 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
     add_query_source,
-    has_span_streaming_enabled,
     record_sql_queries,
 )
 from sentry_sdk.utils import (
@@ -171,42 +170,22 @@ def _wrap_connect(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
         if client.get_integration(AioMySQLIntegration) is None:
             return await f(self)
 
-        if has_span_streaming_enabled(client.options):
-            breadcrumb_data = _get_connect_data(self, use_streaming_keys=True)
+        breadcrumb_data = _get_connect_data(self, use_streaming_keys=True)
 
-            with capture_internal_exceptions():
-                sentry_sdk.add_breadcrumb(
-                    message="connect", category="query", data=breadcrumb_data
-                )
+        with capture_internal_exceptions():
+            sentry_sdk.add_breadcrumb(
+                message="connect", category="query", data=breadcrumb_data
+            )
 
-            if sentry_sdk.traces.get_current_span() is None:
-                return await f(self)
+        if sentry_sdk.traces.get_current_span() is None:
+            return await f(self)
 
-            span_attributes: dict[str, Any] = {
-                "sentry.op": OP.DB,
-                "sentry.origin": AioMySQLIntegration.origin,
-            } | breadcrumb_data
+        span_attributes: dict[str, Any] = {
+            "sentry.op": OP.DB,
+            "sentry.origin": AioMySQLIntegration.origin,
+        } | breadcrumb_data
 
-            with sentry_sdk.traces.start_span(
-                name="connect", attributes=span_attributes
-            ):
-                return await f(self)
-
-        connect_data = _get_connect_data(self)
-
-        with sentry_sdk.start_span(
-            op=OP.DB,
-            name="connect",
-            origin=AioMySQLIntegration.origin,
-        ) as span:
-            _set_db_data(span, self)
-
-            with capture_internal_exceptions():
-                sentry_sdk.add_breadcrumb(
-                    message="connect",
-                    category="query",
-                    data=connect_data,
-                )
+        with sentry_sdk.traces.start_span(name="connect", attributes=span_attributes):
             return await f(self)
 
     return _inner

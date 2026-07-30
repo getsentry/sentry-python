@@ -14,7 +14,6 @@ from sentry_sdk.integrations.redis.utils import (
     _set_pipeline_data,
 )
 from sentry_sdk.tracing import Span
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
@@ -39,25 +38,17 @@ def patch_redis_pipeline(
         if client.get_integration(RedisIntegration) is None:
             return old_execute(self, *args, **kwargs)
 
-        span_streaming = has_span_streaming_enabled(client.options)
+        if sentry_sdk.traces.get_current_span() is None:
+            return old_execute(self, *args, **kwargs)
 
         span: "Union[Span, StreamedSpan]"
-        if span_streaming:
-            if sentry_sdk.traces.get_current_span() is None:
-                return old_execute(self, *args, **kwargs)
-            span = sentry_sdk.traces.start_span(
-                name="redis.pipeline.execute",
-                attributes={
-                    "sentry.origin": SPAN_ORIGIN,
-                    "sentry.op": OP.DB_REDIS,
-                },
-            )
-        else:
-            span = sentry_sdk.start_span(
-                op=OP.DB_REDIS,
-                name="redis.pipeline.execute",
-                origin=SPAN_ORIGIN,
-            )
+        span = sentry_sdk.traces.start_span(
+            name="redis.pipeline.execute",
+            attributes={
+                "sentry.origin": SPAN_ORIGIN,
+                "sentry.op": OP.DB_REDIS,
+            },
+        )
 
         with span:
             with capture_internal_exceptions():
@@ -102,9 +93,7 @@ def patch_redis_client(
         if integration is None:
             return old_execute_command(self, name, *args, **kwargs)
 
-        span_streaming = has_span_streaming_enabled(client.options)
-
-        if span_streaming and sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.traces.get_current_span() is None:
             return old_execute_command(self, name, *args, **kwargs)
 
         cache_properties = _compile_cache_span_properties(
@@ -122,21 +111,14 @@ def patch_redis_client(
 
         cache_span: "Optional[Union[Span, StreamedSpan]]" = None
         if cache_properties["is_cache_key"] and cache_properties["op"] is not None:
-            if span_streaming:
-                cache_span = sentry_sdk.traces.start_span(
-                    name=cache_properties["description"],
-                    attributes={
-                        "sentry.op": cache_properties["op"],
-                        "sentry.origin": SPAN_ORIGIN,
-                        **additional_cache_span_attributes,
-                    },
-                )
-            else:
-                cache_span = sentry_sdk.start_span(
-                    op=cache_properties["op"],
-                    name=cache_properties["description"],
-                    origin=SPAN_ORIGIN,
-                )
+            cache_span = sentry_sdk.traces.start_span(
+                name=cache_properties["description"],
+                attributes={
+                    "sentry.op": cache_properties["op"],
+                    "sentry.origin": SPAN_ORIGIN,
+                    **additional_cache_span_attributes,
+                },
+            )
             cache_span.__enter__()
 
         db_properties = _compile_db_span_properties(integration, name, args)
@@ -148,21 +130,14 @@ def patch_redis_client(
             )
 
         db_span: "Union[Span, StreamedSpan]"
-        if span_streaming:
-            db_span = sentry_sdk.traces.start_span(
-                name=db_properties["description"],
-                attributes={
-                    "sentry.op": db_properties["op"],
-                    "sentry.origin": SPAN_ORIGIN,
-                    **additional_db_span_attributes,
-                },
-            )
-        else:
-            db_span = sentry_sdk.start_span(
-                op=db_properties["op"],
-                name=db_properties["description"],
-                origin=SPAN_ORIGIN,
-            )
+        db_span = sentry_sdk.traces.start_span(
+            name=db_properties["description"],
+            attributes={
+                "sentry.op": db_properties["op"],
+                "sentry.origin": SPAN_ORIGIN,
+                **additional_db_span_attributes,
+            },
+        )
         db_span.__enter__()
 
         set_db_data_fn(db_span, self)
