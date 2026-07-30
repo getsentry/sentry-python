@@ -1905,7 +1905,6 @@ async def test_server_url_query_data_collection_span_streaming(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
-        _experiments=init_kwargs.pop("_experiments", {}),
         **init_kwargs,
     )
 
@@ -1948,7 +1947,6 @@ async def test_client_url_query_data_collection_span_streaming(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
-        _experiments=init_kwargs.pop("_experiments", {}),
         **init_kwargs,
     )
 
