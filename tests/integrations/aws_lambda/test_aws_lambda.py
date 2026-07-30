@@ -55,7 +55,7 @@ def test_environment():
             "--template",
             SAM_TEMPLATE_FILE,
             "--warm-containers",
-            "EAGER",
+            "LAZY",  # Start each Docker container on its function's first invocation
             "--docker-network",
             DOCKER_NETWORK_NAME,
         ],
