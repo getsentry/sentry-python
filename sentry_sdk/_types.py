@@ -138,7 +138,7 @@ Annotated = Union[AnnotatedValue, T]
 
 
 if TYPE_CHECKING:
-    from collections.abc import Container, MutableMapping, Sequence
+    from collections.abc import MutableMapping, Sequence
     from datetime import datetime
     from types import TracebackType
     from typing import Any, Callable, Dict, List, Mapping, NotRequired, Optional, Type
@@ -451,8 +451,6 @@ if TYPE_CHECKING:
         },
         total=False,
     )
-
-    HttpStatusCodeRange = Union[int, Container[int]]
 
     class TextPart(TypedDict):
         type: Literal["text"]
