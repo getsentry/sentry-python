@@ -236,17 +236,6 @@ if TYPE_CHECKING:
         "exbibyte",
     ]
 
-    FractionUnit = Literal["ratio", "percent"]
-    MeasurementUnit = Union[DurationUnit, InformationUnit, FractionUnit, str]
-
-    MeasurementValue = TypedDict(
-        "MeasurementValue",
-        {
-            "value": float,
-            "unit": NotRequired[Optional[MeasurementUnit]],
-        },
-    )
-
     Event = TypedDict(
         "Event",
         {
@@ -268,7 +257,6 @@ if TYPE_CHECKING:
             "level": LogLevelStr,
             "logentry": Mapping[str, object],
             "logger": str,
-            "measurements": dict[str, MeasurementValue],
             "message": str,
             "modules": dict[str, str],
             "monitor_config": Mapping[str, object],

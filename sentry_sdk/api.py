@@ -34,7 +34,6 @@ if TYPE_CHECKING:
         ExcInfo,
         Hint,
         LogLevelStr,
-        MeasurementUnit,
         SamplingContext,
     )
     from sentry_sdk.client import BaseClient
@@ -79,7 +78,6 @@ __all__ = [
     "set_context",
     "set_extra",
     "set_level",
-    "set_measurement",
     "set_tag",
     "set_tags",
     "set_user",
@@ -417,16 +415,6 @@ def start_transaction(
     return get_current_scope().start_transaction(
         transaction, custom_sampling_context, **kwargs
     )
-
-
-def set_measurement(name: str, value: float, unit: "MeasurementUnit" = "") -> None:
-    """
-    .. deprecated:: 2.28.0
-        This function is deprecated and will be removed in the next major release.
-    """
-    transaction = get_current_scope().transaction
-    if transaction is not None:
-        transaction.set_measurement(name, value, unit)
 
 
 def get_current_span(
