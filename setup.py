@@ -51,7 +51,6 @@ setup(
         "flask": ["flask", "blinker>=1.1", "markupsafe"],
         "grpcio": ["grpcio>=1.21.1", "protobuf>=3.8.0"],
         "http2": ["httpcore[http2]==1.*"],
-        "openai": ["openai", "tiktoken>=0.3.0"],
         "opentelemetry-otlp": ["opentelemetry-distro[otlp]>=0.35b0"],
         "pure-eval": ["pure_eval", "executing", "asttokens"],
         "quart": ["quart", "blinker>=1.1"],
