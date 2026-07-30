@@ -38,7 +38,7 @@ echo "=== pytest tail (exit=$PYTEST_EXIT) ==="
 tail -n 12 .auto/last_run.log
 
 # --- Metrics ----------------------------------------------------------------
-TEST_COUNT=$(grep -c '<testcase ' .auto/junit.xml || true)
+TEST_COUNT=$(grep -o '<testcase ' .auto/junit.xml | wc -l | tr -d ' ')
 FAILED=$(grep -o 'failures="[0-9]*"' .auto/junit.xml | head -1 | grep -o '[0-9]*' || echo 0)
 ERRORS=$(grep -o 'errors="[0-9]*"' .auto/junit.xml | head -1 | grep -o '[0-9]*' || echo 0)
 SKIPPED=$(grep -o 'skipped="[0-9]*"' .auto/junit.xml | head -1 | grep -o '[0-9]*' || echo 0)
