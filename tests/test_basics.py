@@ -19,7 +19,6 @@ from sentry_sdk import (
     isolation_scope,
     last_event_id,
     new_scope,
-    push_scope,
     start_transaction,
 )
 from sentry_sdk.integrations import (
@@ -265,23 +264,6 @@ def test_breadcrumb_arguments(sentry_init, capture_events):
     assert_hint.clear()
     add_breadcrumb(foo=42)
     add_breadcrumb(crumb=dict(foo=42))
-
-
-def test_push_scope(sentry_init, capture_events, suppress_deprecation_warnings):
-    sentry_init()
-    events = capture_events()
-
-    with push_scope() as scope:
-        scope.level = "warning"
-        try:
-            1 / 0
-        except Exception as e:
-            capture_exception(e)
-
-    (event,) = events
-
-    assert event["level"] == "warning"
-    assert "exception" in event
 
 
 def test_breadcrumbs(sentry_init, capture_events):

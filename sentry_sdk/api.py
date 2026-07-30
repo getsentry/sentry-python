@@ -1,12 +1,11 @@
 import inspect
 import warnings
-from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 from sentry_sdk import Client, tracing_utils
 from sentry_sdk._init_implementation import init
 from sentry_sdk.crons import monitor
-from sentry_sdk.scope import Scope, _ScopeManager, isolation_scope, new_scope
+from sentry_sdk.scope import Scope, isolation_scope, new_scope
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.traces import get_current_span as _get_current_streamed_span
 from sentry_sdk.tracing import NoOpSpan, Transaction, trace
@@ -16,9 +15,7 @@ if TYPE_CHECKING:
     from typing import (
         Any,
         Callable,
-        ContextManager,
         Dict,
-        Generator,
         Optional,
         TypeVar,
         Union,
@@ -34,7 +31,6 @@ if TYPE_CHECKING:
         ExcInfo,
         Hint,
         LogLevelStr,
-        MeasurementUnit,
         SamplingContext,
     )
     from sentry_sdk.client import BaseClient
@@ -57,7 +53,6 @@ __all__ = [
     "capture_event",
     "capture_exception",
     "capture_message",
-    "configure_scope",
     "continue_trace",
     "flush",
     "flush_async",
@@ -72,14 +67,12 @@ __all__ = [
     "isolation_scope",
     "last_event_id",
     "new_scope",
-    "push_scope",
     "remove_attribute",
     "set_attribute",
     "set_attributes",
     "set_context",
     "set_extra",
     "set_level",
-    "set_measurement",
     "set_tag",
     "set_tags",
     "set_user",
@@ -203,94 +196,6 @@ def add_breadcrumb(
     **kwargs: "Any",
 ) -> None:
     return get_isolation_scope().add_breadcrumb(crumb, hint, **kwargs)
-
-
-@overload
-def configure_scope() -> "ContextManager[Scope]":
-    pass
-
-
-@overload
-def configure_scope(  # noqa: F811
-    callback: "Callable[[Scope], None]",
-) -> None:
-    pass
-
-
-def configure_scope(  # noqa: F811
-    callback: "Optional[Callable[[Scope], None]]" = None,
-) -> "Optional[ContextManager[Scope]]":
-    """
-    Reconfigures the scope.
-
-    :param callback: If provided, call the callback with the current scope.
-
-    :returns: If no callback is provided, returns a context manager that returns the scope.
-    """
-    warnings.warn(
-        "sentry_sdk.configure_scope is deprecated and will be removed in the next major version. "
-        "Please consult our migration guide to learn how to migrate to the new API: "
-        "https://docs.sentry.io/platforms/python/migration/1.x-to-2.x#scope-configuring",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
-    scope = get_isolation_scope()
-    scope.generate_propagation_context()
-
-    if callback is not None:
-        # TODO: used to return None when client is None. Check if this changes behavior.
-        callback(scope)
-
-        return None
-
-    @contextmanager
-    def inner() -> "Generator[Scope, None, None]":
-        yield scope
-
-    return inner()
-
-
-@overload
-def push_scope() -> "ContextManager[Scope]":
-    pass
-
-
-@overload
-def push_scope(  # noqa: F811
-    callback: "Callable[[Scope], None]",
-) -> None:
-    pass
-
-
-def push_scope(  # noqa: F811
-    callback: "Optional[Callable[[Scope], None]]" = None,
-) -> "Optional[ContextManager[Scope]]":
-    """
-    Pushes a new layer on the scope stack.
-
-    :param callback: If provided, this method pushes a scope, calls
-        `callback`, and pops the scope again.
-
-    :returns: If no `callback` is provided, a context manager that should
-        be used to pop the scope again.
-    """
-    warnings.warn(
-        "sentry_sdk.push_scope is deprecated and will be removed in the next major version. "
-        "Please consult our migration guide to learn how to migrate to the new API: "
-        "https://docs.sentry.io/platforms/python/migration/1.x-to-2.x#scope-pushing",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
-    if callback is not None:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            with push_scope() as scope:
-                callback(scope)
-        return None
-
-    return _ScopeManager()
 
 
 @scopemethod
@@ -417,16 +322,6 @@ def start_transaction(
     return get_current_scope().start_transaction(
         transaction, custom_sampling_context, **kwargs
     )
-
-
-def set_measurement(name: str, value: float, unit: "MeasurementUnit" = "") -> None:
-    """
-    .. deprecated:: 2.28.0
-        This function is deprecated and will be removed in the next major release.
-    """
-    transaction = get_current_scope().transaction
-    if transaction is not None:
-        transaction.set_measurement(name, value, unit)
 
 
 def get_current_span(
