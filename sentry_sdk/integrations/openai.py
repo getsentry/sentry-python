@@ -366,7 +366,10 @@ def _set_responses_api_input_data(
 
     client_options = sentry_sdk.get_client().options
     if has_data_collection_enabled(client_options):
-        if client_options["data_collection"]["gen_ai"]["inputs"]:
+        if (
+            integration.include_prompts
+            and client_options["data_collection"]["gen_ai"]["inputs"]
+        ):
             tools = kwargs.get("tools")
             if tools is not None and _is_given(tools) and len(tools) > 0:
                 set_data_normalized(
