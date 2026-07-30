@@ -476,19 +476,12 @@ def _set_completions_api_input_data(
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
 ) -> None:
-    messages: "Optional[Union[str, Iterable[ChatCompletionMessageParam]]]" = kwargs.get(
-        "messages"
-    )
-
-    tools = kwargs.get("tools")
-    if tools is not None and _is_given(tools) and len(tools) > 0:
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
-        )
-
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
     )
+
+    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+
     model = kwargs.get("model")
     if model is not None:
         set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
@@ -517,17 +510,47 @@ def _set_completions_api_input_data(
     if reasoning_level is not None and _is_given(reasoning_level):
         set_on_span(SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL, reasoning_level)
 
-    if (
-        not should_send_default_pii()
-        or not integration.include_prompts
-        or messages is None
-    ):
-        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+    client = sentry_sdk.get_client()
+    if has_data_collection_enabled(client.options):
+        if (
+            integration.include_prompts
+            and client.options["data_collection"]["gen_ai"]["inputs"]
+        ):
+            tools = kwargs.get("tools")
+            if tools is not None and _is_given(tools) and len(tools) > 0:
+                set_data_normalized(
+                    span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
+                )
+    else:
+        # Pre-data collection this was always set, so this needs to be left here for now until
+        # we deprecate `send_default_pii`. Once we do, this 'else' branch should be removed,
+        # and the above branch placed below the "if not should_send_default_pii() or not integration.include_prompts"
+        # line below
+        tools = kwargs.get("tools")
+        if tools is not None and _is_given(tools) and len(tools) > 0:
+            set_data_normalized(
+                span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
+            )
+
+
+    messages: "Optional[Union[str, Iterable[ChatCompletionMessageParam]]]" = kwargs.get(
+        "messages"
+    )
+
+    if has_data_collection_enabled(client.options):
+        # This takes precedence over the global data collection settings
+        if not integration.include_prompts:
+            return
+        if not client.options["data_collection"]["gen_ai"]["inputs"]:
+            return
+    elif not should_send_default_pii() or not integration.include_prompts:
+        return
+
+    if messages is None:
         return
 
     if isinstance(messages, str):
         normalized_messages = normalize_message_roles([messages])  # type: ignore
-        client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
         messages_data = (
             truncate_and_annotate_messages(normalized_messages, span, scope)
@@ -538,12 +561,10 @@ def _set_completions_api_input_data(
             set_data_normalized(
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
             )
-        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
         return
 
     # dict special case following https://github.com/openai/openai-python/blob/3e0c05b84a2056870abf3bd6a5e7849020209cc3/src/openai/_utils/_transform.py#L194-L197
     if not isinstance(messages, Iterable) or isinstance(messages, dict):
-        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
         return
 
     messages = list(messages)
@@ -574,8 +595,6 @@ def _set_completions_api_input_data(
             set_data_normalized(
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
             )
-
-    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "chat")
 
 
 def _set_embeddings_input_data(
