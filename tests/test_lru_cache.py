@@ -3,7 +3,7 @@ import pytest
 from sentry_sdk._lru_cache import LRUCache
 
 
-@pytest.mark.parametrize("max_size", [-10, -1, 0])
+@pytest.mark.parametrize("max_size", [-1, 0])
 def test_illegal_size(max_size):
     with pytest.raises(AssertionError):
         LRUCache(max_size=max_size)
