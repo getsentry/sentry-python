@@ -1,0 +1,41 @@
+name: AWS Lambda Flake Check
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  aws-lambda-flake:
+    name: aws_lambda py${{ matrix.python-version }} #${{ matrix.attempt }}
+    timeout-minutes: 30
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.8", "3.9", "3.11", "3.13"]
+        attempt: [1, 2, 3, 4, 5]
+    services:
+      docker:
+        image: docker:dind
+        options: --privileged
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          enable-cache: false
+      - name: Setup Test Env
+        run: uv sync
+      - name: Test aws_lambda (attempt ${{ matrix.attempt }})
+        run: |
+          set -x
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-aws_lambda"
