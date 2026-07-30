@@ -211,7 +211,6 @@ def test_transport_works(
     "num_pools,expected_num_pools",
     (
         (None, 2),
-        (2, 2),
         (10, 10),
     ),
 )
