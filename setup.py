@@ -44,6 +44,9 @@ setup(
         "certifi",
     ],
     extras_require={
+        # Only add an extra if our integration needs something additional to
+        # work with the framework (a dependency or an extra). For instance,
+        # our Flask integration has a hard dependency on blinker.
         "asyncio": ["httpcore[asyncio]==1.*"],
         "flask": ["flask", "blinker>=1.1", "markupsafe"],
         "grpcio": ["grpcio>=1.21.1", "protobuf>=3.8.0"],
