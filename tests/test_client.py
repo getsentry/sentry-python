@@ -19,7 +19,6 @@ from sentry_sdk import (
     capture_event,
     capture_exception,
     capture_message,
-    configure_scope,
     set_tag,
     start_transaction,
 )
@@ -650,27 +649,6 @@ def test_client_debug_option_disabled(with_client, sentry_init, caplog):
 
     capture_internal_exception((ValueError, ValueError("OK"), None))
     assert "OK" not in caplog.text
-
-
-@pytest.mark.skip(
-    reason="New behavior in SDK 2.0: You have a scope before init and add data to it."
-)
-def test_scope_initialized_before_client(sentry_init, capture_events):
-    """
-    This is a consequence of how configure_scope() works. We must
-    make `configure_scope()` a noop if no client is configured. Even
-    if the user later configures a client: We don't know that.
-    """
-    with configure_scope() as scope:
-        scope.set_tag("foo", 42)
-
-    sentry_init()
-
-    events = capture_events()
-    capture_message("hi")
-    (event,) = events
-
-    assert "tags" not in event
 
 
 def test_weird_chars(sentry_init, capture_events):
@@ -1491,12 +1469,6 @@ class TestSpanClientReports:
 )
 def test_dropped_transaction(sentry_init, capture_record_lost_event_calls, test_config):
     test_config.run(sentry_init, capture_record_lost_event_calls)
-
-
-@pytest.mark.parametrize("enable_tracing", [True, False])
-def test_enable_tracing_deprecated(sentry_init, enable_tracing):
-    with pytest.warns(DeprecationWarning):
-        sentry_init(enable_tracing=enable_tracing)
 
 
 def test_ignore_spans_warns_without_streaming(sentry_init):

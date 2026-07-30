@@ -6,7 +6,6 @@ import pytest
 import sentry_sdk
 from sentry_sdk import (
     capture_exception,
-    configure_scope,
     continue_trace,
     get_baggage,
     get_client,
@@ -16,7 +15,6 @@ from sentry_sdk import (
     get_isolation_scope,
     get_traceparent,
     is_initialized,
-    push_scope,
     set_tags,
     start_transaction,
 )
@@ -312,18 +310,6 @@ def test_set_tags(sentry_init, capture_events):
         "tag2": "updated",
         "tag3": "new",
     }, "Updating tags with empty dict changed tags"
-
-
-def test_configure_scope_deprecation():
-    with pytest.warns(DeprecationWarning):
-        with configure_scope():
-            ...
-
-
-def test_push_scope_deprecation():
-    with pytest.warns(DeprecationWarning):
-        with push_scope():
-            ...
 
 
 def test_init_context_manager_deprecation():
