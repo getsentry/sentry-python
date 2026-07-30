@@ -19,7 +19,6 @@ from openai import AsyncOpenAI, AsyncStream, OpenAI, OpenAIError, Stream
 from openai.types import CompletionUsage, CreateEmbeddingResponse, Embedding
 from openai.types.chat import (
     ChatCompletionChunk,
-    ChatCompletionCustomToolParam,
     ChatCompletionFunctionToolParam,
     ChatCompletionMessage,
 )
