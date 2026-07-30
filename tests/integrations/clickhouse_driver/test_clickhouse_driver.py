@@ -642,8 +642,8 @@ def test_clickhouse_client_span_streaming_with_data_collection(
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         _experiments={
-            "trace_lifecycle": "stream",
             "data_collection": {"database_query_data": True},
         },
     )
@@ -742,9 +742,9 @@ def test_clickhouse_client_spans(
 ):
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
+        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={
             "record_sql_params": True,
-            "trace_lifecycle": "stream" if span_streaming else "static",
         },
         traces_sample_rate=1.0,
     )
@@ -1033,9 +1033,9 @@ def test_clickhouse_client_spans_with_pii(
 ):
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
+        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={
             "record_sql_params": True,
-            "trace_lifecycle": "stream" if span_streaming else "static",
         },
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -1489,9 +1489,9 @@ def test_clickhouse_dbapi_spans(
 ):
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
+        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={
             "record_sql_params": True,
-            "trace_lifecycle": "stream" if span_streaming else "static",
         },
         traces_sample_rate=1.0,
     )
@@ -1746,9 +1746,9 @@ def test_clickhouse_dbapi_spans_with_pii(
 ):
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
+        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={
             "record_sql_params": True,
-            "trace_lifecycle": "stream" if span_streaming else "static",
         },
         traces_sample_rate=1.0,
         send_default_pii=True,

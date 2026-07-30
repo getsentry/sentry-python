@@ -296,9 +296,7 @@ async def test_request_info_json_body(
         traces_sample_rate=1.0,
         send_default_pii=True,
         integrations=[StarletteIntegration()],
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     starlette_app = starlette_app_factory()
@@ -367,9 +365,7 @@ async def test_formdata_request_body(
         send_default_pii=True,
         max_request_body_size="always",
         integrations=[StarletteIntegration()],
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     starlette_app = starlette_app_factory()
@@ -447,9 +443,7 @@ async def test_request_body_too_big(
         traces_sample_rate=1.0,
         send_default_pii=True,
         integrations=[StarletteIntegration()],
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     starlette_app = starlette_app_factory()
@@ -765,10 +759,8 @@ def test_span_http_query_data_collection(
         auto_enabling_integrations=False,
         integrations=[StarletteIntegration()],
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream",
-            **init_kwargs.pop("_experiments", {}),
-        },
+        trace_lifecycle="stream",
+        **init_kwargs.pop("_experiments", {}),
         **init_kwargs,
     )
 
@@ -1115,9 +1107,7 @@ def test_middleware_spans(sentry_init, capture_events, capture_items, span_strea
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration(middleware_spans=True)],
         auto_enabling_integrations=False,  # disable because httpx will enable otherwise, leading to the segment span being an `http.client` sentry.op (the TestClient initiating the request), rather than the more realistic `http.server`.
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     starlette_app = starlette_app_factory(
         middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
@@ -1187,9 +1177,7 @@ def test_middleware_spans_disabled(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration(middleware_spans=False)],
         auto_enabling_integrations=False,  # disable because httpx will enable otherwise, leading to the segment span being an `http.client` sentry.op (the TestClient initiating the request), rather than the more realistic `http.server`.
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     starlette_app = starlette_app_factory(
         middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
@@ -1229,9 +1217,7 @@ def test_middleware_callback_spans(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration(middleware_spans=True)],
         auto_enabling_integrations=False,  # disable because httpx will enable otherwise, leading to the segment span being an `http.client` sentry.op (the TestClient initiating the request), rather than the more realistic `http.server`.
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     starlette_app = starlette_app_factory(middleware=[Middleware(SampleMiddleware)])
 
@@ -1749,9 +1735,7 @@ def test_span_origin(sentry_init, capture_events, capture_items, span_streaming)
         auto_enabling_integrations=False,  # avoid httpx auto-instrumentation leaking spans
         integrations=[StarletteIntegration(middleware_spans=True)],
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     starlette_app = starlette_app_factory(
         middleware=[Middleware(AuthenticationMiddleware, backend=BasicAuthBackend())]
@@ -1896,9 +1880,7 @@ def test_request_url(sentry_init, capture_events, capture_items, span_streaming)
         integrations=[
             StarletteIntegration(),
         ],
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     starlette_app = starlette_app_factory()

@@ -155,9 +155,7 @@ def test_transaction_with_error(
     sentry_init(
         send_default_pii=True,
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
@@ -226,9 +224,7 @@ def test_transaction_no_error(
     sentry_init(
         send_default_pii=send_pii,
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
@@ -294,9 +290,7 @@ def test_has_trace_if_performance_enabled(
 
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
@@ -390,9 +384,7 @@ def test_trace_from_headers_if_performance_enabled(
 
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryWsgiMiddleware(dogpark)
     client = Client(app)
@@ -483,9 +475,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
     sentry_init(
         send_default_pii=True,
         traces_sampler=traces_sampler,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryWsgiMiddleware(app)
     client = Client(app)
@@ -529,9 +519,7 @@ def test_session_mode_defaults_to_request_mode_in_wsgi_handler(
     sentry_init(
         send_default_pii=True,
         traces_sampler=traces_sampler,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryWsgiMiddleware(app)
     envelopes = capture_envelopes()
@@ -574,9 +562,7 @@ def test_auto_session_tracking_with_aggregates(
     sentry_init(
         send_default_pii=True,
         traces_sampler=traces_sampler,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryWsgiMiddleware(sample_app)
     envelopes = capture_envelopes()
@@ -650,9 +636,7 @@ def test_span_origin_manual(sentry_init, capture_events, capture_items, span_str
     sentry_init(
         send_default_pii=True,
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryWsgiMiddleware(dogpark)
 
@@ -683,9 +667,7 @@ def test_span_origin_custom(sentry_init, capture_events, capture_items, span_str
     sentry_init(
         send_default_pii=True,
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryWsgiMiddleware(
         dogpark,
@@ -1249,10 +1231,8 @@ def test_span_http_query_data_collection(
 
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream",
-            **init_kwargs.pop("_experiments", {}),
-        },
+        trace_lifecycle="stream",
+        **init_kwargs.pop("_experiments", {}),
         **init_kwargs,
     )
     app = SentryWsgiMiddleware(dogpark)
