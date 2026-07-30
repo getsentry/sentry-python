@@ -1964,40 +1964,14 @@ async def test_tool_execution_span(
         available_tool = {
             "name": "simple_test_tool",
             "description": "A simple tool",
-            "params_json_schema": {
+            "parameters": {
                 "properties": {"message": {"title": "Message", "type": "string"}},
                 "required": ["message"],
                 "title": "simple_test_tool_args",
                 "type": "object",
                 "additionalProperties": False,
             },
-            "on_invoke_tool": mock.ANY,
-            "strict_json_schema": True,
-            "is_enabled": True,
         }
-
-        if parse_version(OPENAI_AGENTS_VERSION) >= (0, 3, 3):
-            available_tool.update(
-                {"tool_input_guardrails": None, "tool_output_guardrails": None}
-            )
-
-        if parse_version(OPENAI_AGENTS_VERSION) >= (
-            0,
-            8,
-        ):
-            available_tool["needs_approval"] = False
-        if parse_version(OPENAI_AGENTS_VERSION) >= (
-            0,
-            9,
-            0,
-        ):
-            available_tool.update(
-                {
-                    "timeout_seconds": None,
-                    "timeout_behavior": "error_as_result",
-                    "timeout_error_function": None,
-                }
-            )
 
         assert agent_span["name"] == "invoke_agent test_agent"
         assert agent_span["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
@@ -2184,40 +2158,14 @@ async def test_tool_execution_span(
         available_tool = {
             "name": "simple_test_tool",
             "description": "A simple tool",
-            "params_json_schema": {
+            "parameters": {
                 "properties": {"message": {"title": "Message", "type": "string"}},
                 "required": ["message"],
                 "title": "simple_test_tool_args",
                 "type": "object",
                 "additionalProperties": False,
             },
-            "on_invoke_tool": mock.ANY,
-            "strict_json_schema": True,
-            "is_enabled": True,
         }
-
-        if parse_version(OPENAI_AGENTS_VERSION) >= (0, 3, 3):
-            available_tool.update(
-                {"tool_input_guardrails": None, "tool_output_guardrails": None}
-            )
-
-        if parse_version(OPENAI_AGENTS_VERSION) >= (
-            0,
-            8,
-        ):
-            available_tool["needs_approval"] = False
-        if parse_version(OPENAI_AGENTS_VERSION) >= (
-            0,
-            9,
-            0,
-        ):
-            available_tool.update(
-                {
-                    "timeout_seconds": None,
-                    "timeout_behavior": "error_as_result",
-                    "timeout_error_function": None,
-                }
-            )
 
         assert agent_span["name"] == "invoke_agent test_agent"
         assert agent_span["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
@@ -2395,40 +2343,14 @@ async def test_tool_execution_span(
         available_tool = {
             "name": "simple_test_tool",
             "description": "A simple tool",
-            "params_json_schema": {
+            "parameters": {
                 "properties": {"message": {"title": "Message", "type": "string"}},
                 "required": ["message"],
                 "title": "simple_test_tool_args",
                 "type": "object",
                 "additionalProperties": False,
             },
-            "on_invoke_tool": mock.ANY,
-            "strict_json_schema": True,
-            "is_enabled": True,
         }
-
-        if parse_version(OPENAI_AGENTS_VERSION) >= (0, 3, 3):
-            available_tool.update(
-                {"tool_input_guardrails": None, "tool_output_guardrails": None}
-            )
-
-        if parse_version(OPENAI_AGENTS_VERSION) >= (
-            0,
-            8,
-        ):
-            available_tool["needs_approval"] = False
-        if parse_version(OPENAI_AGENTS_VERSION) >= (
-            0,
-            9,
-            0,
-        ):
-            available_tool.update(
-                {
-                    "timeout_seconds": None,
-                    "timeout_behavior": "error_as_result",
-                    "timeout_error_function": None,
-                }
-            )
 
         assert transaction["transaction"] == "test_agent workflow"
         assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"

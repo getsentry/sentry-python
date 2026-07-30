@@ -2,10 +2,46 @@ import json
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.ai._openai_responses_api import _transform_tool_definitions
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
+
+try:
+    from agents import (
+        CodeInterpreterTool,
+        ComputerTool,
+        FileSearchTool,
+        FunctionTool,
+        HostedMCPTool,
+        ImageGenerationTool,
+        LocalShellTool,
+        WebSearchTool,
+    )
+except ImportError:
+    raise DidNotEnable("OpenAI Agents not installed")
+
+try:
+    from agents import ApplyPatchTool, ShellTool
+except ImportError:
+    ShellTool = None
+    ApplyPatchTool = None
+
+try:
+    from agents import ToolSearchTool
+except ImportError:
+    ToolSearchTool = None
+
+try:
+    from agents import CustomTool
+except ImportError:
+    CustomTool = None
+
+try:
+    from agents import ProgrammaticToolCallingTool
+except ImportError:
+    ProgrammaticToolCallingTool = None
+
 
 from ..consts import SPAN_ORIGIN
 from ..utils import (
@@ -18,7 +54,146 @@ from ..utils import (
 if TYPE_CHECKING:
     from typing import Any, Optional, Union
 
-    from agents import Agent
+    from agents import Agent, Tool
+
+    from sentry_sdk._types import ToolDefinition
+
+
+def _transform_tool_definitions(tools: "list[Tool]") -> "list[ToolDefinition]":
+    """
+    Transform tool definitions to the schema used by the "gen_ai.tool.definitions" attribute.
+    Includes special handling for tools where the type includes a name, description or parameters.
+
+    Note: These are generated from the same OpenAPI spec as Responses API tools.
+    """
+    if not isinstance(tools, list):
+        return []
+
+    tool_definitions = []
+    for tool in tools:
+        if isinstance(tool, FunctionTool):
+            tool_definitions.append(
+                {
+                    "type": "function",
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": tool.params_json_schema,
+                }
+            )
+            continue
+
+        if isinstance(tool, WebSearchTool):
+            tool_definitions.append(
+                {
+                    "type": "web_search",
+                    "name": tool.name,
+                }
+            )
+            continue
+
+        if isinstance(tool, FileSearchTool):
+            tool_definitions.append(
+                {
+                    "type": "function",
+                    "name": tool.name,
+                }
+            )
+            continue
+
+        if isinstance(tool, ComputerTool):
+            tool_definitions.append(
+                {
+                    "type": "function",
+                    "name": tool.name,
+                }
+            )
+            continue
+
+        if CustomTool is not None and isinstance(tool, CustomTool):
+            tool_definitions.append(
+                {
+                    "type": "function",
+                    "name": tool.name,
+                    "description": tool.description,
+                }
+            )
+            continue
+
+        if isinstance(tool, HostedMCPTool):
+            tool_definitions.append(
+                {
+                    "type": "function",
+                    "name": tool.name,
+                }
+            )
+            continue
+
+        if ApplyPatchTool is not None and isinstance(tool, ApplyPatchTool):
+            tool_definitions.append(
+                {
+                    "type": "function",
+                    "name": tool.name,
+                }
+            )
+            continue
+
+        if ShellTool is not None and isinstance(tool, ShellTool):
+            tool_definitions.append(
+                {
+                    "type": "function",
+                    "name": tool.name,
+                }
+            )
+            continue
+
+        if isinstance(tool, ImageGenerationTool):
+            tool_definitions.append(
+                {
+                    "type": "function",
+                    "name": tool.name,
+                }
+            )
+            continue
+
+        if isinstance(tool, CodeInterpreterTool):
+            tool_definitions.append(
+                {
+                    "type": "function",
+                    "name": tool.name,
+                }
+            )
+            continue
+
+        if isinstance(tool, LocalShellTool):
+            tool_definitions.append(
+                {
+                    "type": "function",
+                    "name": tool.name,
+                }
+            )
+            continue
+
+        if ToolSearchTool is not None and isinstance(tool, ToolSearchTool):
+            tool_definitions.append(
+                {
+                    "type": "function",
+                    "name": tool.name,
+                }
+            )
+            continue
+
+        if ProgrammaticToolCallingTool is not None and isinstance(
+            tool, ProgrammaticToolCallingTool
+        ):
+            tool_definitions.append(
+                {
+                    "type": "function",
+                    "name": tool.name,
+                }
+            )
+            continue
+
+    return tool_definitions
 
 
 def ai_client_span(
