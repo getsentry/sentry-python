@@ -34,7 +34,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - Removed the `auto_session_tracing` decorator. Use `track_session` instead.
 - The deprecated `set_measurement` API was removed.
 - The experimental option `otel_powered_performance` has been removed together with the associated `OpenTelemetryIntegration` and `opentelemetry-experimental` extra.
-- The `failed_request_status_codes` option of some integrations now only supports a set of integers as input. Lists of integers or containers of integers are no longer supported.
+- The `failed_request_status_codes` integration option now only supports a set of integers as input. Lists of integers or containers of integers are no longer supported.
 
 ## Deprecated
 
