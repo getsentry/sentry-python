@@ -14,7 +14,8 @@ from .utils import SAM_PORT, LocalLambdaStack, SentryServerForTesting
 
 DOCKER_NETWORK_NAME = "lambda-test-network"
 SAM_TEMPLATE_FILE = "sam.template.yaml"
-SAM_SHUTDOWN_TIMEOUT = 60
+# Teardown is typically ~7s; escalate with kill if SAM exceeds this.
+SAM_SHUTDOWN_TIMEOUT = 10
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -83,6 +84,7 @@ def test_environment():
         try:
             process.wait(timeout=SAM_SHUTDOWN_TIMEOUT)
         except subprocess.TimeoutExpired:
+            # Don't fail the suite if SAM is slow to stop warm containers.
             process.kill()
             process.wait()
 
