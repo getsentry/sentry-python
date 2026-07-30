@@ -26,6 +26,9 @@ from sentry_sdk.ai._openai_responses_api import (
 from sentry_sdk.ai._openai_responses_api import (
     _is_system_instruction as _is_system_instruction_responses,
 )
+from sentry_sdk.ai._openai_responses_api import (
+    _transform_tool_definitions as _transform_tool_definitions_responses,
+)
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import (
     get_start_span_function,
@@ -46,7 +49,6 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     reraise,
-    safe_serialize,
 )
 
 if TYPE_CHECKING:
@@ -330,15 +332,17 @@ def _set_responses_api_input_data(
     explicit_instructions: "Union[Optional[str], Omit]" = kwargs.get("instructions")
     messages: "Optional[Union[str, ResponseInputParam]]" = kwargs.get("input")
 
-    tools = kwargs.get("tools")
-    if tools is not None and _is_given(tools) and len(tools) > 0:
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
-        )
-
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
     )
+
+    tools = kwargs.get("tools")
+    if tools is not None and _is_given(tools):
+        set_on_span(
+            SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+            json.dumps(_transform_tool_definitions_responses(tools)),
+        )
+
     model = kwargs.get("model")
     if model is not None:
         set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
