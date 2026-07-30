@@ -57,14 +57,7 @@ async def _get_all_tools(
 
             return sentry_wrapped_on_invoke_tool
 
-        wrapped_tool = agents.FunctionTool(
-            name=tool.name,
-            description=tool.description,
-            params_json_schema=tool.params_json_schema,
-            on_invoke_tool=create_wrapped_invoke(tool, original_on_invoke),
-            strict_json_schema=tool.strict_json_schema,
-            is_enabled=tool.is_enabled,
-        )
-        wrapped_tools.append(wrapped_tool)
+        tool.on_invoke_tool = create_wrapped_invoke(tool, original_on_invoke)
+        wrapped_tools.append(tool)
 
     return wrapped_tools
