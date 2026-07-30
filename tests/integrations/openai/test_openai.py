@@ -17,22 +17,19 @@ except ImportError:
 
 from openai import AsyncOpenAI, AsyncStream, OpenAI, OpenAIError, Stream
 from openai.types import CompletionUsage, CreateEmbeddingResponse, Embedding
-from openai.types.chat import (
-    ChatCompletionChunk,
-    ChatCompletionMessage,
-)
+from openai.types.chat import ChatCompletionChunk, ChatCompletionMessage
 from openai.types.chat.chat_completion import Choice
 from openai.types.chat.chat_completion_chunk import Choice as DeltaChoice
 from openai.types.chat.chat_completion_chunk import ChoiceDelta
-from openai.types.chat.chat_completion_custom_tool_param import Custom
 from openai.types.create_embedding_response import Usage as EmbeddingTokenUsage
-from openai.types.shared_params import FunctionDefinition
 
 try:
     from openai.types.chat import (
         ChatCompletionCustomToolParam,
         ChatCompletionFunctionToolParam,
     )
+    from openai.types.chat.chat_completion_custom_tool_param import Custom
+    from openai.types.shared_params import FunctionDefinition
 except ImportError:
     pass
 
