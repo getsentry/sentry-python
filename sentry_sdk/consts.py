@@ -1291,7 +1291,6 @@ class ClientConstructor:
         debug: "Optional[bool]" = None,
         attach_stacktrace: bool = False,
         ca_certs: "Optional[str]" = None,
-        propagate_traces: bool = True,
         traces_sample_rate: "Optional[float]" = None,
         trace_lifecycle: "Optional[Literal['static', 'stream']]" = None,
         traces_sampler: "Optional[TracesSampler]" = None,
@@ -1703,8 +1702,6 @@ class ClientConstructor:
         :param profile_session_sample_rate:
 
         :param enable_tracing:
-
-        :param propagate_traces:
 
         :param auto_session_tracking:
 

@@ -32,6 +32,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - Removed the `auto_session_tracing` decorator. Use `track_session` instead.
 - The deprecated `set_measurement` API was removed.
 - The experimental option `otel_powered_performance` has been removed together with the associated `OpenTelemetryIntegration` and `opentelemetry-experimental` extra.
+- The deprecated `propagate_traces` option has been removed. Use `trace_propagation_targets` instead, which gives you more power over trace propagation. Note that only the top-level `init` option was removed; the `propagate_traces` option of the Celery integration remains available.
 
 ## Deprecated
 
