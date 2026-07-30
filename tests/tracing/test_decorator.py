@@ -264,9 +264,7 @@ def test_trace_decorator_child_span_streaming(sentry_init, capture_items):
     """Spans created with @trace show up as children if a span is active."""
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream",
-        },
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -299,9 +297,7 @@ async def test_trace_decorator_async_child_span_streaming(sentry_init, capture_i
     """Spans created with @trace show up as children if a span is active."""
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream",
-        },
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")

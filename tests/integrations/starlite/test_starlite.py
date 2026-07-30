@@ -143,9 +143,7 @@ def test_transaction_name_and_source(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarliteIntegration()],
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     starlite_app = starlite_app_factory()
     client = TestClient(starlite_app)
@@ -181,9 +179,7 @@ def test_middleware_spans(sentry_init, capture_events, capture_items, span_strea
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarliteIntegration()],
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     logging_config = LoggingMiddlewareConfig()
@@ -262,9 +258,7 @@ def test_middleware_callback_spans(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarliteIntegration()],
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     starlite_app = starlite_app_factory(middleware=[SampleMiddleware])
 
@@ -392,9 +386,7 @@ def test_middleware_partial_receive_send(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarliteIntegration()],
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     starlite_app = starlite_app_factory(middleware=[SamplePartialReceiveSendMiddleware])
 
@@ -478,9 +470,7 @@ def test_span_origin(sentry_init, capture_events, capture_items, span_streaming)
     sentry_init(
         integrations=[StarliteIntegration()],
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     logging_config = LoggingMiddlewareConfig()

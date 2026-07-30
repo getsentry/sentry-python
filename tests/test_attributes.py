@@ -191,9 +191,7 @@ def test_user_attributes(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={
-            "trace_lifecycle": "stream",
-        },
+        trace_lifecycle="stream",
     )
 
     items = capture_items("trace_metric", "span")
