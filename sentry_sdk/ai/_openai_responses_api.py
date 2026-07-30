@@ -49,10 +49,10 @@ def _transform_tool_definitions(tools: "Iterable[ToolParam]") -> "list[ToolDefin
             if "name" in tool:
                 tool_definition["name"] = tool["name"]
 
-            if "description" in tool:
+            if "description" in tool and tool["description"] is not None:
                 tool_definition["description"] = tool["description"]
 
-            if "parameters" in tool:
+            if "parameters" in tool and tool["parameters"] is not None:
                 tool_definition["parameters"] = tool["parameters"]
 
             tool_definitions.append(tool_definition)
