@@ -14,6 +14,7 @@ from agents import (
     ModelSettings,
     Usage,
 )
+from agents.computer import Computer
 from agents.exceptions import MaxTurnsExceeded, ModelBehaviorError
 from agents.items import (
     ResponseFunctionToolCall,
@@ -24,6 +25,46 @@ from agents.models.openai_responses import OpenAIResponsesModel
 from agents.tool import HostedMCPTool
 from agents.version import __version__ as OPENAI_AGENTS_VERSION
 from openai import AsyncOpenAI, InternalServerError
+from openai.types.responses.tool_param import CodeInterpreter, ImageGeneration
+
+from sentry_sdk.integrations import DidNotEnable
+
+try:
+    from agents import (
+        CodeInterpreterTool,
+        ComputerTool,
+        FileSearchTool,
+        HostedMCPTool,
+        ImageGenerationTool,
+        LocalShellTool,
+        WebSearchTool,
+    )
+except ImportError:
+    raise DidNotEnable("OpenAI Agents not installed")
+
+try:
+    from agents import ApplyPatchTool, ShellTool
+except ImportError:
+    ShellTool = None
+    ApplyPatchTool = None
+
+try:
+    from agents import ToolSearchTool
+except ImportError:
+    ToolSearchTool = None
+
+try:
+    from agents import CustomTool
+except ImportError:
+    CustomTool = None
+
+try:
+    from agents import ProgrammaticToolCallingTool
+except ImportError:
+    ProgrammaticToolCallingTool = None
+
+
+from typing import Any, cast
 
 import sentry_sdk
 from sentry_sdk import start_span
@@ -171,6 +212,225 @@ def test_agent_custom_model():
             frequency_penalty=0.0,
         ),
     )
+
+
+class DummyEditor:
+    def create_file(self, operation):
+        return None
+
+    def update_file(self, operation):
+        return None
+
+    def delete_file(self, operation):
+        return None
+
+
+class TrackingComputer(Computer):
+    def __init__(self):
+        self.calls = []
+
+    @property
+    def environment(self):
+        return "mac"
+
+    @property
+    def dimensions(self):
+        return (1, 1)
+
+    def screenshot(self):
+        self.calls.append("screenshot")
+        return "img"
+
+    def click(self, _x, _y, _button):
+        self.calls.append("click")
+
+    def double_click(self, _x, _y):
+        self.calls.append("double_click")
+
+    def scroll(self, _x, _y, _scroll_x, _scroll_y):
+        self.calls.append("scroll")
+
+    def type(self, _text):
+        self.calls.append("type")
+
+    def wait(self):
+        self.calls.append("wait")
+
+    def move(self, _x, _y):
+        self.calls.append("move")
+
+    def keypress(self, _keys):
+        self.calls.append("keypress")
+
+    def drag(self, _path):
+        self.calls.append("drag")
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.asyncio
+async def test_tool_definitions(
+    sentry_init,
+    capture_events,
+    capture_items,
+    test_agent,
+    nonstreaming_responses_model_response,
+    get_model_response,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    client = AsyncOpenAI(api_key="test-key")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+
+    def some_function(a: str, b: list[int]) -> str:
+        return "hello"
+
+    tools = [
+        agents.function_tool(some_function, defer_loading=True),
+        WebSearchTool(),
+        FileSearchTool(vector_store_ids=[]),
+        ComputerTool(computer=TrackingComputer()),
+        HostedMCPTool(
+            tool_config=cast(
+                Any,
+                {
+                    "type": "mcp",
+                    "server_label": "docs_server",
+                    "server_url": "https://example.com/mcp",
+                },
+            )
+        ),
+        ImageGenerationTool(
+            tool_config=cast(
+                ImageGeneration, {"type": "image_generation", "model": "gpt-image-1"}
+            )
+        ),
+        CodeInterpreterTool(
+            tool_config=cast(
+                CodeInterpreter, {"type": "code_interpreter", "container": "python"}
+            )
+        ),
+        LocalShellTool(executor=lambda req: "ok"),
+    ]
+
+    if CustomTool is not None:
+        tools.append(
+            CustomTool(
+                name="custom",
+                description="Custom tool",
+                on_invoke_tool=lambda _context, _input: "ok",
+            )
+        )
+
+    if ApplyPatchTool is not None:
+        tools.append(ApplyPatchTool(editor=DummyEditor()))
+
+    if ShellTool is not None:
+        tools.append(ShellTool(executor=lambda req: "ok"))
+
+    if ToolSearchTool is not None:
+        tools.append(ToolSearchTool())
+
+    if ProgrammaticToolCallingTool is not None:
+        tools.append(ProgrammaticToolCallingTool())
+
+    agent = test_agent.clone(model=model, tools=tools)
+
+    response = get_model_response(
+        nonstreaming_responses_model_response, serialize_pydantic=True
+    )
+
+    if span_streaming:
+        with patch.object(
+            agent.model._client._client,
+            "send",
+            return_value=response,
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                disabled_integrations=[StdlibIntegration],
+                traces_sample_rate=1.0,
+                send_default_pii=False,
+                stream_gen_ai_spans=stream_gen_ai_spans,
+                trace_lifecycle="stream",
+            )
+
+            items = capture_items("span")
+
+            result = await agents.Runner.run(
+                agent,
+                "Test input",
+                run_config=test_run_config,
+            )
+
+            assert result is not None
+            assert result.final_output == "Hello, how can I help you?"
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        ai_client_span = next(
+            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        )
+
+        assert ai_client_span["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS] == 1.0
+    elif stream_gen_ai_spans:
+        with patch.object(
+            agent.model._client._client,
+            "send",
+            return_value=response,
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=False,
+                stream_gen_ai_spans=stream_gen_ai_spans,
+            )
+
+            items = capture_items("span", "transaction")
+
+            result = await agents.Runner.run(
+                agent,
+                "Test input",
+                run_config=test_run_config,
+            )
+
+            assert result is not None
+            assert result.final_output == "Hello, how can I help you?"
+
+        spans = [item.payload for item in items if item.type == "span"]
+        ai_client_span = next(
+            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        )
+
+        assert ai_client_span["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS] == 1.0
+    else:
+        with patch.object(
+            agent.model._client._client,
+            "send",
+            return_value=response,
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=False,
+                stream_gen_ai_spans=stream_gen_ai_spans,
+            )
+            events = capture_events()
+
+            result = await agents.Runner.run(
+                agent,
+                "Test input",
+                run_config=test_run_config,
+            )
+
+            assert result is not None
+            assert result.final_output == "Hello, how can I help you?"
+
+        (transaction,) = events
+        spans = transaction["spans"]
+        ai_client_span = next(span for span in spans if span["op"] == OP.GEN_AI_CHAT)
+
+        assert ai_client_span["data"][SPANDATA.GEN_AI_TOOL_DEFINITIONS] == 1.0
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
