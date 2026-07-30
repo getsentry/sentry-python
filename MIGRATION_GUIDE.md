@@ -26,13 +26,16 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 ## Removed
 
+- The `enable_tracing` option was removed. Use `traces_sample_rate=1.0` instead.
+- The deprecated `push_scope` and `configure_scope` APIs have been removed. Use `with new_scope():` to push a new scope and `scope = get_current_scope()` to retrieve the current scope instead.
 - Transaction profiling and related code was removed.
 - Removed the deprecated Hub class and all uses of hub throughout the SDK in arguments, options, etc. Use a scope instead.
 - The `SentrySpanProcessor`, `SentryPropagator`, `instrumenter`, and associated OpenTelemetry compatibility code was removed along with the `opentelemetry` extra and the `SentryPropagator` entrypoint. Use the `OTLPIntegration` instead.
 - Removed the `auto_session_tracing` decorator. Use `track_session` instead.
+- The deprecated `set_measurement` API was removed.
 - The experimental option `otel_powered_performance` has been removed together with the associated `OpenTelemetryIntegration` and `opentelemetry-experimental` extra.
 - A number of extras (installable via `sentry-sdk[extra-name]`) has been removed. Use the base package (`sentry-sdk`) instead; there is no difference in functionality. The following extras have been removed: `aiohttp`, `anthropic`, `arq`, `asyncpg`, `beam`, `bottle`, `celery`, `celery-redbeat`, `chalice`, `clickhouse-driver`, `django`, `falcon`, `fastapi`, `google-genai`, `httpx`, `huey`, `huggingface_hub`, `langchain`, `langgraph`, `launchdarkly`, `litellm`, `litestar`, `loguru`, `mcp`, `openai`, `openfeature`, `pymongo`, `pyspark`, `rq`, `sanic`, `sqlalchemy`, `starlette`, `starlite`, `statsig`, `tornado`, `unleash`.
-
+- The deprecated `propagate_traces` option has been removed. Use `trace_propagation_targets` instead, which gives you more power over trace propagation. Note that only the top-level `init` option was removed; the `propagate_traces` option of the Celery integration remains available.
 
 ## Deprecated
 

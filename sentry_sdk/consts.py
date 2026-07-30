@@ -1291,7 +1291,6 @@ class ClientConstructor:
         debug: "Optional[bool]" = None,
         attach_stacktrace: bool = False,
         ca_certs: "Optional[str]" = None,
-        propagate_traces: bool = True,
         traces_sample_rate: "Optional[float]" = None,
         trace_lifecycle: "Optional[Literal['static', 'stream']]" = None,
         traces_sampler: "Optional[TracesSampler]" = None,
@@ -1306,7 +1305,6 @@ class ClientConstructor:
         proxy_headers: "Optional[Dict[str, str]]" = None,
         before_send_transaction: "Optional[TransactionProcessor]" = None,
         project_root: "Optional[str]" = None,
-        enable_tracing: "Optional[bool]" = None,
         include_local_variables: "Optional[bool]" = True,
         include_source_context: "Optional[bool]" = True,
         trace_propagation_targets: "Optional[Sequence[str]]" = [  # noqa: B006
@@ -1701,10 +1699,6 @@ class ClientConstructor:
         :param profile_lifecycle:
 
         :param profile_session_sample_rate:
-
-        :param enable_tracing:
-
-        :param propagate_traces:
 
         :param auto_session_tracking:
 

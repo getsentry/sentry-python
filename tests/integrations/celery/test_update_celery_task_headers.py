@@ -189,39 +189,3 @@ def test_celery_trace_propagation_traces_sample_rate(
     else:
         assert "sentry-monitor-start-timestamp-s" not in outgoing_headers
         assert "sentry-monitor-start-timestamp-s" not in outgoing_headers["headers"]
-
-
-@pytest.mark.parametrize(
-    "enable_tracing,monitor_beat_tasks",
-    list(itertools.product([None, True, False], [True, False])),
-)
-def test_celery_trace_propagation_enable_tracing(
-    sentry_init, enable_tracing, monitor_beat_tasks
-):
-    """
-    The celery integration does not check the traces_sample_rate.
-    By default traces_sample_rate is None which means "do not propagate traces".
-    But the celery integration does not check this value.
-    The Celery integration has its own mechanism to propagate traces:
-    https://docs.sentry.io/platforms/python/integrations/celery/#distributed-traces
-    """
-    sentry_init(enable_tracing=enable_tracing)
-
-    headers = {}
-    span = None
-
-    scope = sentry_sdk.get_isolation_scope()
-
-    outgoing_headers = _update_celery_task_headers(headers, span, monitor_beat_tasks)
-
-    assert outgoing_headers["sentry-trace"] == scope.get_traceparent()
-    assert outgoing_headers["headers"]["sentry-trace"] == scope.get_traceparent()
-    assert outgoing_headers["baggage"] == scope.get_baggage().serialize()
-    assert outgoing_headers["headers"]["baggage"] == scope.get_baggage().serialize()
-
-    if monitor_beat_tasks:
-        assert "sentry-monitor-start-timestamp-s" in outgoing_headers
-        assert "sentry-monitor-start-timestamp-s" in outgoing_headers["headers"]
-    else:
-        assert "sentry-monitor-start-timestamp-s" not in outgoing_headers
-        assert "sentry-monitor-start-timestamp-s" not in outgoing_headers["headers"]
