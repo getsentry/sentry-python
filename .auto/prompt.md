@@ -102,4 +102,21 @@ flakiness of runtime and coverage totals.
 
 ## What's Been Tried
 
-(nothing yet — baseline pending)
+- **Baseline**: 2720 tests, covered_lines=9779, covered_branches=2781 (deterministic
+  across 2 runs), runtime ~152s. `.auto/baseline_coverage.json` is the guard.
+- **KEEP (run 3)**: deleted 5 permanently-skipped dead tests (6 testcases) from
+  test_basics.py/test_client.py → 2714.
+- **Attribution map**: ran suite with `--cov-context=test` (profiler/continuous file
+  segfaults under it — excluded; 16 ctx-sensitive tests fail — excluded; both make the
+  map CONSERVATIVE). `.auto/analyze.py` + `.coverage` DB → `.auto/attribution.json`,
+  `.auto/redundant_tests.txt` (2223 pairwise-redundant), `.auto/deletable_set.txt`
+  (**greedy maximal deletable set: 2011 tests**, 1630 outside integrations — deleting
+  ALL keeps every attributed line+arc covered on py3.14).
+- **Deletable-set caveats**: (a) advisory only, guard is authoritative; (b) py3.14-only
+  view — avoid deleting env/version-conditional (skipif) tests, their coverage may be
+  unique on other envs; (c) tests/integrations/** still off-limits for edits;
+  (d) assertion value still reviewed per batch — coverage redundancy != semantic
+  redundancy.
+- **Largest deletable pools**: test_transport.py 318, test_utils.py 195,
+  test_client.py 194, tracing/test_span_streaming.py 97, tracing/test_sampling.py 88,
+  test_ai_monitoring.py 88, tracing/test_sample_rand.py 78.

@@ -109,15 +109,41 @@ def mock_transaction_envelope(span_count: int) -> "Envelope":
     return envelope
 
 
-@pytest.mark.parametrize("debug", (True, False))
-@pytest.mark.parametrize("client_flush_method", ["close", "flush"])
-@pytest.mark.parametrize("use_pickle", (True, False))
-@pytest.mark.parametrize("compression_level", (0, 9, None))
+def _transport_works_cases():
+    """
+    Curated subset of the full parameter cross-product.
+
+    The compression-relevant dimensions (level x algo x http2) are fully
+    crossed; debug, flush method and pickling are rotated through the cases
+    so every value of every dimension is still exercised. The full
+    cross-product ran the same assertions 192 times without covering any
+    additional code paths.
+    """
+    algos = ("gzip", "br", "<invalid>", None) if PY37 else ("gzip", "<invalid>", None)
+    http2_options = (True, False) if PY38 else (False,)
+    cases = []
+    i = 0
+    for compression_level in (None, 0, 9):
+        for compression_algo in algos:
+            for http2 in http2_options:
+                cases.append(
+                    (
+                        i % 2 == 0,  # debug
+                        ("close", "flush")[i % 2],  # client_flush_method
+                        (i // 2) % 2 == 0,  # use_pickle
+                        compression_level,
+                        compression_algo,
+                        http2,
+                    )
+                )
+                i += 1
+    return cases
+
+
 @pytest.mark.parametrize(
-    "compression_algo",
-    (("gzip", "br", "<invalid>", None) if PY37 else ("gzip", "<invalid>", None)),
+    "debug,client_flush_method,use_pickle,compression_level,compression_algo,http2",
+    _transport_works_cases(),
 )
-@pytest.mark.parametrize("http2", [True, False] if PY38 else [False])
 def test_transport_works(
     capturing_server,
     request,
