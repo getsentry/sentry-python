@@ -866,7 +866,6 @@ def test_user_info_data_collection_with_streamed_spans(
         integrations=[StarletteIntegration()],
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
-        _experiments=kwargs.pop("_experiments", {}),
         **kwargs,
     )
 
