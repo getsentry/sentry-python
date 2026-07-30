@@ -1,10 +1,11 @@
+import json
 from typing import TYPE_CHECKING
 
 import sentry_sdk
+from sentry_sdk.ai._openai_responses_api import _transform_tool_definitions
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
-from sentry_sdk.utils import safe_serialize
 
 from ..consts import SPAN_ORIGIN
 from ..utils import (
@@ -56,11 +57,10 @@ def ai_client_span(
 
     _set_agent_data(span, agent)
 
-    if len(agent.tools) > 0:
-        set_on_span(
-            SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
-            safe_serialize([vars(tool) for tool in agent.tools]),
-        )
+    set_on_span(
+        SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+        json.dumps(_transform_tool_definitions(agent.tools)),
+    )
 
     _set_input_data(span, get_response_kwargs)
 

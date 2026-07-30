@@ -2016,7 +2016,7 @@ async def test_tool_execution_span(
         assert ai_client_span1["attributes"]["gen_ai.agent.name"] == "test_agent"
 
         ai_client_span1_available_tool = json.loads(
-            ai_client_span1["attributes"]["gen_ai.request.available_tools"]
+            ai_client_span1["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]
         )[0]
 
         assert all(
@@ -2083,7 +2083,7 @@ async def test_tool_execution_span(
         assert ai_client_span2["attributes"]["gen_ai.operation.name"] == "chat"
 
         ai_client_span2_available_tool = json.loads(
-            ai_client_span2["attributes"]["gen_ai.request.available_tools"]
+            ai_client_span2["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]
         )[0]
 
         assert all(
@@ -2236,7 +2236,7 @@ async def test_tool_execution_span(
         assert ai_client_span1["attributes"]["gen_ai.agent.name"] == "test_agent"
 
         ai_client_span1_available_tool = json.loads(
-            ai_client_span1["attributes"]["gen_ai.request.available_tools"]
+            ai_client_span1["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]
         )[0]
 
         assert all(
@@ -2303,7 +2303,7 @@ async def test_tool_execution_span(
         assert ai_client_span2["attributes"]["gen_ai.operation.name"] == "chat"
 
         ai_client_span2_available_tool = json.loads(
-            ai_client_span2["attributes"]["gen_ai.request.available_tools"]
+            ai_client_span2["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]
         )[0]
 
         assert all(
@@ -2450,7 +2450,7 @@ async def test_tool_execution_span(
         assert ai_client_span1["data"]["gen_ai.agent.name"] == "test_agent"
 
         ai_client_span1_available_tool = json.loads(
-            ai_client_span1["data"]["gen_ai.request.available_tools"]
+            ai_client_span1["data"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]
         )[0]
         assert all(
             ai_client_span1_available_tool[k] == v for k, v in available_tool.items()
@@ -2510,7 +2510,7 @@ async def test_tool_execution_span(
         assert ai_client_span2["data"]["gen_ai.operation.name"] == "chat"
 
         ai_client_span2_available_tool = json.loads(
-            ai_client_span2["data"]["gen_ai.request.available_tools"]
+            ai_client_span2["data"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]
         )[0]
         assert all(
             ai_client_span2_available_tool[k] == v for k, v in available_tool.items()
