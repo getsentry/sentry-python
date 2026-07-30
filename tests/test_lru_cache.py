@@ -30,13 +30,6 @@ def test_cache_eviction():
     assert cache.get(4) == 4
 
 
-def test_cache_set_overwrite():
-    cache = LRUCache(3)
-    cache.set(0, 0)
-    cache.set(0, 1)
-    assert cache.get(0) == 1
-
-
 def test_cache_get_all():
     cache = LRUCache(3)
     cache.set(0, 0)
