@@ -1,0 +1,45 @@
+name: Profiler Auto Start/Stop Flake Check
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  profiler-auto-start-stop-flake:
+    name: py${{ matrix.python-version }} #${{ matrix.attempt }}
+    timeout-minutes: 15
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.6", "3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14", "3.14t"]
+        attempt: [1, 2, 3, 4, 5]
+    env:
+      TOX_UV_PYTHON_PREFERENCE: ${{ matrix.python-version == '3.6' && 'only-system' || 'managed' }}
+      TESTPATH: tests/profiler/test_continuous_profiler.py
+    container: ${{ matrix.python-version == '3.6' && 'python:3.6' || null }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          enable-cache: false
+      - name: Mark workspace safe for git (3.6 container)
+        if: ${{ matrix.python-version == '3.6' }}
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Setup Test Env
+        run: uv sync
+      - name: Test profiler auto start/stop (attempt ${{ matrix.attempt }})
+        run: |
+          set -x
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-common" \
+            -k "test_continuous_profiler_auto_start_and_stop_sampled"
