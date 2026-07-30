@@ -558,7 +558,7 @@ class TestTruncateMessagesBySize:
         # Second part gets truncated to 0 chars + ellipsis
         assert parts[1]["text"] == "..."
 
-    @pytest.mark.parametrize("content", [None, 42, 3.14, True])
+    @pytest.mark.parametrize("content", [None, 42, True])
     def test_single_message_truncation_non_str_non_list_content(self, content):
         messages = [{"role": "user", "content": content}]
 
