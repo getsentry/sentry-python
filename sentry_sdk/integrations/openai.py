@@ -384,6 +384,9 @@ def _set_responses_api_input_data(
             )
 
     if has_data_collection_enabled(client_options):
+        # This takes precedence over the global data collection settings
+        if not integration.include_prompts:
+            return
         if not client_options["data_collection"]["gen_ai"]["inputs"]:
             return
     elif not should_send_default_pii() or not integration.include_prompts:

@@ -4358,7 +4358,7 @@ def test_ai_client_span_responses_api(
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
-    "data_collection,extra_kwargs,expected_present,expected_absent",
+    "data_collection,extra_kwargs,expected_present,expected_absent,include_prompts",
     [
         pytest.param(
             {"gen_ai": {"inputs": True}},
@@ -4382,6 +4382,7 @@ def test_ai_client_span_responses_api(
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS: safe_serialize(EXAMPLE_TOOLS),
             },
             [],
+            True,
             id="inputs-enabled-string-input",
         ),
         pytest.param(
@@ -4403,6 +4404,7 @@ def test_ai_client_span_responses_api(
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
             ],
+            True,
             id="inputs-enabled-instructions-only",
         ),
         pytest.param(
@@ -4429,6 +4431,7 @@ def test_ai_client_span_responses_api(
                 ),
             },
             [SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS],
+            True,
             id="inputs-enabled-list-input-with-system-message",
         ),
         pytest.param(
@@ -4444,6 +4447,7 @@ def test_ai_client_span_responses_api(
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
             ],
+            True,
             id="inputs-disabled",
         ),
         pytest.param(
@@ -4459,6 +4463,7 @@ def test_ai_client_span_responses_api(
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS: safe_serialize(EXAMPLE_TOOLS),
             },
             [SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS],
+            True,
             id="gen-ai-omitted-defaults-to-enabled",
         ),
         pytest.param(
@@ -4470,7 +4475,24 @@ def test_ai_client_span_responses_api(
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
             ],
+            True,
             id="inputs-enabled-no-input-provided",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            {
+                "instructions": "You are a coding assistant that talks like a pirate.",
+                "input": "How do I check if a Python object is an instance of a class?",
+                "tools": EXAMPLE_TOOLS,
+            },
+            {},
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+            ],
+            False,
+            id="include-prompts-disabled-overrides-inputs-enabled",
         ),
     ],
 )
@@ -4483,11 +4505,12 @@ def test_responses_api_data_collection(
     extra_kwargs,
     expected_present,
     expected_absent,
+    include_prompts,
     stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init(
-        integrations=[OpenAIIntegration()],
+        integrations=[OpenAIIntegration(include_prompts=include_prompts)],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         _experiments={"data_collection": data_collection},
