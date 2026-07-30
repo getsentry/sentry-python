@@ -1132,7 +1132,6 @@ async def test_get_request_attributes_query_data_collection(
     sentry_init(
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
-        _experiments=init_kwargs.get("_experiments", {}),
         **kwargs,
     )
     app = SentryAsgiMiddleware(asgi3_app)
@@ -1234,12 +1233,10 @@ async def test_get_request_data_env_user_info(
 async def test_get_request_attributes_client_address_user_info(
     sentry_init, capture_items, asgi3_app, init_kwargs, has_client, expect_ip
 ):
-    kwargs = {k: v for k, v in init_kwargs.items() if k != "_experiments"}
     sentry_init(
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
-        _experiments=init_kwargs.get("_experiments", {}),
-        **kwargs,
+        **init_kwargs,
     )
     app = SentryAsgiMiddleware(asgi3_app)
 
@@ -1498,7 +1495,6 @@ async def test_user_ip_address_on_all_spans(
     sentry_init(
         trace_lifecycle="stream",
         traces_sample_rate=1.0,
-        _experiments=kwargs.pop("_experiments", {}),
         **kwargs,
     )
     sentry_app = SentryAsgiMiddleware(app)

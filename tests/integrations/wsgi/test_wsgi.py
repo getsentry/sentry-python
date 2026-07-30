@@ -1232,7 +1232,6 @@ def test_span_http_query_data_collection(
     sentry_init(
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
-        **init_kwargs.pop("_experiments", {}),
         **init_kwargs,
     )
     app = SentryWsgiMiddleware(dogpark)
@@ -1295,12 +1294,10 @@ def test_user_info_span_attributes_data_collection(
         return ["Go get the ball! Good dog!"]
 
     init_kwargs = dict(init_kwargs)  # shallow copy so we can mutate
-    experiments = init_kwargs.pop("_experiments", {})
 
     sentry_init(
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
-        _experiments=experiments,
         **init_kwargs,
     )
     app = SentryWsgiMiddleware(dogpark)
