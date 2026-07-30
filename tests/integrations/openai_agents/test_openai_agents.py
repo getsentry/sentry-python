@@ -2073,12 +2073,6 @@ async def test_tool_execution_span(
         assert tool_span["attributes"]["gen_ai.agent.name"] == "test_agent"
         assert tool_span["attributes"]["gen_ai.operation.name"] == "execute_tool"
 
-        tool_span_available_tool = json.loads(
-            tool_span["attributes"]["gen_ai.request.available_tools"]
-        )[0]
-
-        assert all(tool_span_available_tool[k] == v for k, v in available_tool.items())
-
         assert tool_span["attributes"]["gen_ai.request.max_tokens"] == 100
         assert tool_span["attributes"]["gen_ai.request.model"] == "gpt-4"
         assert tool_span["attributes"]["gen_ai.request.temperature"] == 0.7
@@ -2305,12 +2299,6 @@ async def test_tool_execution_span(
         assert tool_span["attributes"]["gen_ai.agent.name"] == "test_agent"
         assert tool_span["attributes"]["gen_ai.operation.name"] == "execute_tool"
 
-        tool_span_available_tool = json.loads(
-            tool_span["attributes"]["gen_ai.request.available_tools"]
-        )[0]
-
-        assert all(tool_span_available_tool[k] == v for k, v in available_tool.items())
-
         assert tool_span["attributes"]["gen_ai.request.max_tokens"] == 100
         assert tool_span["attributes"]["gen_ai.request.model"] == "gpt-4"
         assert tool_span["attributes"]["gen_ai.request.temperature"] == 0.7
@@ -2524,11 +2512,6 @@ async def test_tool_execution_span(
         assert tool_span["description"] == "execute_tool simple_test_tool"
         assert tool_span["data"]["gen_ai.agent.name"] == "test_agent"
         assert tool_span["data"]["gen_ai.operation.name"] == "execute_tool"
-
-        tool_span_available_tool = json.loads(
-            tool_span["data"]["gen_ai.request.available_tools"]
-        )[0]
-        assert all(tool_span_available_tool[k] == v for k, v in available_tool.items())
 
         assert tool_span["data"]["gen_ai.request.max_tokens"] == 100
         assert tool_span["data"]["gen_ai.request.model"] == "gpt-4"

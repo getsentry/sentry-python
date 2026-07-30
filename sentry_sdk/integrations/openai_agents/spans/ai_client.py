@@ -4,6 +4,7 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
+from sentry_sdk.utils import safe_serialize
 
 from ..consts import SPAN_ORIGIN
 from ..utils import (
@@ -40,6 +41,8 @@ def ai_client_span(
                 SPANDATA.GEN_AI_OPERATION_NAME: "chat",
             },
         )
+
+        set_on_span = span.set_attribute
     else:
         span = sentry_sdk.start_span(
             op=OP.GEN_AI_CHAT,
@@ -49,7 +52,16 @@ def ai_client_span(
         # TODO-anton: remove hardcoded stuff and replace something that also works for embedding and so on
         span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
 
+        set_on_span = span.set_data
+
     _set_agent_data(span, agent)
+
+    if len(agent.tools) > 0:
+        set_on_span(
+            SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+            safe_serialize([vars(tool) for tool in agent.tools]),
+        )
+
     _set_input_data(span, get_response_kwargs)
 
     return span
