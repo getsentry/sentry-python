@@ -17,10 +17,7 @@ except ImportError:
 
 from openai import AsyncOpenAI, AsyncStream, OpenAI, OpenAIError, Stream
 from openai.types import CompletionUsage, CreateEmbeddingResponse, Embedding
-from openai.types.chat import (
-    ChatCompletionChunk,
-    ChatCompletionMessage,
-)
+from openai.types.chat import ChatCompletionChunk, ChatCompletionMessage
 from openai.types.chat.chat_completion import Choice
 from openai.types.chat.chat_completion_chunk import Choice as DeltaChoice
 from openai.types.chat.chat_completion_chunk import ChoiceDelta
