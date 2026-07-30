@@ -120,3 +120,48 @@ flakiness of runtime and coverage totals.
 - **Largest deletable pools**: test_transport.py 318, test_utils.py 195,
   test_client.py 194, tracing/test_span_streaming.py 97, tracing/test_sampling.py 88,
   test_ai_monitoring.py 88, tracing/test_sample_rand.py 78.
+
+## Progress (runs 4-13)
+
+2720 -> 2289 (-431, -15.8%), runtime 152s -> ~120s. All keeps:
+- run 4: test_transport_works 192 -> 24 curated (level x algo x http2 crossed,
+  debug/flush/pickle rotated)
+- run 5: test_transport_works_async 96 -> 12 same pattern
+- run 6: test_env_to_bool 64 -> 22 (case-permutation equivalence class)
+- run 7: proxy matrices http2 only for representatives (42->24, 18->10)
+- run 8 (checks_failed): spotlight precedence dropped a fall-through arm -
+  LESSON: when slimming precedence tables keep one case per if/elif arm,
+  including the no-op/fall-through arm. Guard pinpoints the file+branch.
+- run 9: debug/spotlight precedence tables 42 -> 17
+- run 10: 4x sample_rand grids 80 -> 24 (boundary cases of rand < rate)
+- run 11: invalid sampler tables 9 -> 5 rows (wrong-type equivalence class)
+- run 12: safe_repr prefix x char grid 12 -> 4 corner set
+- run 13: warns_on_invalid_sample_rate 9 -> 5; IGNORE_SPANS_CASES -4
+  attr-irrelevant dupes
+
+## Patterns that work (reuse)
+
+1. Cross-product matrices with identical per-case assertions -> curate:
+   fully cross the behavior-relevant dims, rotate the rest.
+2. Equivalence-class rows (case permutations, wrong-type variants) -> keep
+   1-2 representatives + boundary rows.
+3. Precedence tables (option x env) -> keep one row per branch arm incl.
+   fall-through; env parsing is already tested in test_utils.
+4. http2/async twin multipliers -> run full matrix on one protocol, 1-3
+   representatives on the other.
+
+## Reviewed and intentionally KEPT (don't re-analyze)
+
+- Parser/spec tables where each row is a distinct input->output mapping:
+  test_parse_version, test_sanitize_url*, test_match_regex_list,
+  test_datetime_from_isoformat, test_error_sampler, test_set_in_app_in_frames,
+  test_uwsgi_warnings (uwsgi option coercion forms), base64 tables,
+  test_get_frame_name, test_logs_with_literal_braces,
+  test_load_trace_data_from_env, test_keep_alive, IGNORE_SPANS matcher rows.
+- new_scopes_compat/*: pins legacy SDK-1 API contracts; map calls them
+  redundant but they assert API behavior, not just lines.
+- feature_flags async/sync twins: async variant tests contextvars under
+  asyncio - legit.
+- _span_streaming twins in test_sampling/test_span_streaming: different
+  pipeline (transactions vs streamed spans), keep both.
+- tests/integrations/**: off-limits this session.
