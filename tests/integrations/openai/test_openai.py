@@ -19,7 +19,6 @@ from openai import AsyncOpenAI, AsyncStream, OpenAI, OpenAIError, Stream
 from openai.types import CompletionUsage, CreateEmbeddingResponse, Embedding
 from openai.types.chat import (
     ChatCompletionChunk,
-    ChatCompletionFunctionToolParam,
     ChatCompletionMessage,
 )
 from openai.types.chat.chat_completion import Choice
@@ -30,7 +29,10 @@ from openai.types.create_embedding_response import Usage as EmbeddingTokenUsage
 from openai.types.shared_params import FunctionDefinition
 
 try:
-    from openai.types.chat import ChatCompletionCustomToolParam
+    from openai.types.chat import (
+        ChatCompletionCustomToolParam,
+        ChatCompletionFunctionToolParam,
+    )
 except ImportError:
     pass
 
