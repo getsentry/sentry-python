@@ -318,9 +318,20 @@ def test_transport_option(monkeypatch):
     assert str(Client(transport=transport).dsn) == dsn
 
 
-@pytest.mark.parametrize("testcase", PROXY_TESTCASES)
+# Representative cases also exercised over HTTP/2; the proxy resolution
+# logic is protocol-independent, so running the full matrix twice only
+# re-tested the same code paths.
+_PROXY_HTTP2_CASE_INDICES = (0, 15, 20)
+
+
 @pytest.mark.parametrize(
-    "http2", [True, False] if sys.version_info >= (3, 8) else [False]
+    "testcase,http2",
+    [(testcase, False) for testcase in PROXY_TESTCASES]
+    + [
+        (PROXY_TESTCASES[i], True)
+        for i in _PROXY_HTTP2_CASE_INDICES
+        if sys.version_info >= (3, 8)
+    ],
 )
 def test_proxy(monkeypatch, testcase, http2):
     if testcase["env_http_proxy"] is not None:
@@ -371,9 +382,14 @@ def test_proxy(monkeypatch, testcase, http2):
             assert proxy_headers == testcase["arg_proxy_headers"]
 
 
-@pytest.mark.parametrize("testcase", SOCKS_PROXY_TESTCASES)
 @pytest.mark.parametrize(
-    "http2", [True, False] if sys.version_info >= (3, 8) else [False]
+    "testcase,http2",
+    [(testcase, False) for testcase in SOCKS_PROXY_TESTCASES]
+    + [
+        (SOCKS_PROXY_TESTCASES[3], True)  # one representative HTTP/2 case
+    ]
+    if sys.version_info >= (3, 8)
+    else [(testcase, False) for testcase in SOCKS_PROXY_TESTCASES],
 )
 def test_socks_proxy(testcase, http2):
     kwargs = {}
