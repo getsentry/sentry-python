@@ -1471,12 +1471,6 @@ def test_dropped_transaction(sentry_init, capture_record_lost_event_calls, test_
     test_config.run(sentry_init, capture_record_lost_event_calls)
 
 
-@pytest.mark.parametrize("enable_tracing", [True, False])
-def test_enable_tracing_deprecated(sentry_init, enable_tracing):
-    with pytest.warns(DeprecationWarning):
-        sentry_init(enable_tracing=enable_tracing)
-
-
 def test_ignore_spans_warns_without_streaming(sentry_init):
     with pytest.warns(UserWarning, match=r"`ignore_spans` parameter only works"):
         sentry_init(ignore_spans=["/health"], trace_lifecycle="static")

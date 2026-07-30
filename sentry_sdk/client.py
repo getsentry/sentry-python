@@ -338,9 +338,6 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
 
         rv["project_root"] = project_root
 
-    if rv["enable_tracing"] is True and rv["traces_sample_rate"] is None:
-        rv["traces_sample_rate"] = 1.0
-
     rv["data_collection"] = _resolve_data_collection(rv)
 
     # Do not add the event scrubber if data collection is enabled as it can remove data that's
@@ -367,13 +364,6 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
     if rv["keep_alive"] is None:
         rv["keep_alive"] = (
             env_to_bool(os.environ.get("SENTRY_KEEP_ALIVE"), strict=True) or False
-        )
-
-    if rv["enable_tracing"] is not None:
-        warnings.warn(
-            "The `enable_tracing` parameter is deprecated. Please use `traces_sample_rate` instead.",
-            DeprecationWarning,
-            stacklevel=2,
         )
 
     if rv["trace_ignore_status_codes"] and has_span_streaming_enabled(rv):
