@@ -38,8 +38,6 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import (
         Event,
-        MeasurementUnit,
-        MeasurementValue,
         SamplingContext,
     )
     from sentry_sdk.profiler.continuous_profiler import ContinuousProfile
@@ -255,7 +253,6 @@ class Span:
         "sampled",
         "op",
         "description",
-        "_measurements",
         "start_timestamp",
         "_start_timestamp_monotonic_ns",
         "status",
@@ -298,7 +295,6 @@ class Span:
         self.status = status
         self.scope = scope
         self.origin = origin
-        self._measurements: "Dict[str, MeasurementValue]" = {}
         self._tags: "MutableMapping[str, str]" = {}
         self._data: "Dict[str, Any]" = {}
         self._containing_transaction = containing_transaction
@@ -586,21 +582,6 @@ class Span:
     def set_status(self, value: str) -> None:
         self.status = value
 
-    def set_measurement(
-        self, name: str, value: float, unit: "MeasurementUnit" = ""
-    ) -> None:
-        """
-        .. deprecated:: 2.28.0
-            This function is deprecated and will be removed in the next major release.
-        """
-
-        warnings.warn(
-            "`set_measurement()` is deprecated and will be removed in the next major version. Please use `set_data()` instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        self._measurements[name] = {"value": value, "unit": unit}
-
     def set_thread(
         self, thread_id: "Optional[int]", thread_name: "Optional[str]"
     ) -> None:
@@ -696,9 +677,6 @@ class Span:
             # TODO-neel remove redundant tag in major
             self._tags["status"] = self.status
 
-        if len(self._measurements) > 0:
-            rv["measurements"] = self._measurements
-
         tags = self._tags
         if tags:
             rv["tags"] = tags
@@ -787,7 +765,6 @@ class Transaction(Span):
         "parent_sampled",
         # used to create baggage value for head SDKs in dynamic sampling
         "sample_rate",
-        "_measurements",
         "_contexts",
         "_continuous_profile",
         "_baggage",
@@ -808,7 +785,6 @@ class Transaction(Span):
         self.source = source
         self.sample_rate: "Optional[float]" = None
         self.parent_sampled = parent_sampled
-        self._measurements: "Dict[str, MeasurementValue]" = {}
         self._contexts: "Dict[str, Any]" = {}
         self._continuous_profile: "Optional[ContinuousProfile]" = None
         self._baggage = baggage
@@ -1028,24 +1004,7 @@ class Transaction(Span):
         if has_gen_ai_span:
             event["_has_gen_ai_span"] = True
 
-        event["measurements"] = self._measurements
-
         return scope.capture_event(event)
-
-    def set_measurement(
-        self, name: str, value: float, unit: "MeasurementUnit" = ""
-    ) -> None:
-        """
-        .. deprecated:: 2.28.0
-            This function is deprecated and will be removed in the next major release.
-        """
-
-        warnings.warn(
-            "`set_measurement()` is deprecated and will be removed in the next major version. Please use `set_data()` instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        self._measurements[name] = {"value": value, "unit": unit}
 
     def set_context(self, key: str, value: "dict[str, Any]") -> None:
         """Sets a context. Transactions can have multiple contexts
@@ -1263,11 +1222,6 @@ class NoOpSpan(Span):
         scope: "Optional[sentry_sdk.Scope]" = None,
         end_timestamp: "Optional[Union[float, datetime]]" = None,
     ) -> "Optional[str]":
-        pass
-
-    def set_measurement(
-        self, name: str, value: float, unit: "MeasurementUnit" = ""
-    ) -> None:
         pass
 
     def set_context(self, key: str, value: "dict[str, Any]") -> None:
