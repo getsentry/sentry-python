@@ -69,7 +69,7 @@ def _transform_tool_definitions(tools: "list[Tool]") -> "list[ToolDefinition]":
     if not isinstance(tools, list):
         return []
 
-    tool_definitions = []
+    tool_definitions: "list[ToolDefinition]" = []
     for tool in tools:
         if isinstance(tool, FunctionTool):
             tool_definitions.append(
