@@ -5,3 +5,7 @@ last_run.log
 log.jsonl
 baseline_coverage.json
 __pycache__/
+attribution.json
+coverage_ctx.json
+deletable_set.txt
+redundant_tests.txt
