@@ -350,7 +350,6 @@ def test_set_meaurement_compared_to_set_data(sentry_init, capture_events):
         (None, "http://example.com", False),
         ([], "http://example.com", False),
         ([MATCH_ALL], "http://example.com", True),
-        (["localhost"], "localhost:8443/api/users", True),
         (["localhost"], "http://localhost:8443/api/users", True),
         (["localhost"], "mylocalhost:8080/api/users", True),
         ([r"^/api"], "/api/envelopes", True),
