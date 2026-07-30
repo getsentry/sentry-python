@@ -678,27 +678,6 @@ def test_client_debug_option_disabled(with_client, sentry_init, caplog):
     assert "OK" not in caplog.text
 
 
-@pytest.mark.skip(
-    reason="New behavior in SDK 2.0: You have a scope before init and add data to it."
-)
-def test_scope_initialized_before_client(sentry_init, capture_events):
-    """
-    This is a consequence of how configure_scope() works. We must
-    make `configure_scope()` a noop if no client is configured. Even
-    if the user later configures a client: We don't know that.
-    """
-    with configure_scope() as scope:
-        scope.set_tag("foo", 42)
-
-    sentry_init()
-
-    events = capture_events()
-    capture_message("hi")
-    (event,) = events
-
-    assert "tags" not in event
-
-
 def test_weird_chars(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
