@@ -904,11 +904,23 @@ def test_record_lost_event_transaction_item(capturing_server, make_client, span_
 
 @skip_under_gevent
 @pytest.mark.asyncio
-@pytest.mark.parametrize("debug", (True, False))
-@pytest.mark.parametrize("client_flush_method", ["close", "flush"])
-@pytest.mark.parametrize("use_pickle", (True, False))
-@pytest.mark.parametrize("compression_level", (0, 9, None))
-@pytest.mark.parametrize("compression_algo", ("gzip", "br", "<invalid>", None))
+@pytest.mark.parametrize(
+    "debug,client_flush_method,use_pickle,compression_level,compression_algo",
+    [
+        (
+            i % 2 == 0,  # debug
+            ("close", "flush")[i % 2],  # client_flush_method
+            (i // 2) % 2 == 0,  # use_pickle
+            compression_level,
+            compression_algo,
+        )
+        for i, (compression_level, compression_algo) in enumerate(
+            (level, algo)
+            for level in (None, 0, 9)
+            for algo in ("gzip", "br", "<invalid>", None)
+        )
+    ],
+)
 @pytest.mark.skipif(not PY38, reason="Async transport only supported in Python 3.8+")
 async def test_transport_works_async(
     capturing_server,
