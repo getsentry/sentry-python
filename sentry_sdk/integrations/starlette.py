@@ -1,7 +1,6 @@
 import functools
 import json
 import sys
-import warnings
 from collections.abc import Set
 from copy import deepcopy
 from json import JSONDecodeError
@@ -19,7 +18,6 @@ from sentry_sdk.integrations import (
 from sentry_sdk.integrations._asgi_common import _RootPathInPath
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
-    HttpCodeRangeContainer,
     _is_json_content_type,
     request_body_within_bounds,
 )
@@ -51,10 +49,9 @@ if TYPE_CHECKING:
         Dict,
         Optional,
         Tuple,
-        Union,
     )
 
-    from sentry_sdk._types import Event, HttpStatusCodeRange
+    from sentry_sdk._types import Event
 try:
     import starlette
     from starlette import __version__ as STARLETTE_VERSION
@@ -113,7 +110,7 @@ class StarletteIntegration(Integration):
     def __init__(
         self,
         transaction_style: str = "url",
-        failed_request_status_codes: "Union[Set[int], list[HttpStatusCodeRange], None]" = _DEFAULT_FAILED_REQUEST_STATUS_CODES,
+        failed_request_status_codes: "Set[int]" = _DEFAULT_FAILED_REQUEST_STATUS_CODES,
         middleware_spans: bool = False,
         http_methods_to_capture: "tuple[str, ...]" = DEFAULT_HTTP_METHODS_TO_CAPTURE,
     ):
@@ -126,24 +123,7 @@ class StarletteIntegration(Integration):
         self.middleware_spans = middleware_spans
         self.http_methods_to_capture = tuple(map(str.upper, http_methods_to_capture))
 
-        if isinstance(failed_request_status_codes, Set):
-            self.failed_request_status_codes: "Container[int]" = (
-                failed_request_status_codes
-            )
-        else:
-            warnings.warn(
-                "Passing a list or None for failed_request_status_codes is deprecated. "
-                "Please pass a set of int instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
-            if failed_request_status_codes is None:
-                self.failed_request_status_codes = _DEFAULT_FAILED_REQUEST_STATUS_CODES
-            else:
-                self.failed_request_status_codes = HttpCodeRangeContainer(
-                    failed_request_status_codes
-                )
+        self.failed_request_status_codes: "Container[int]" = failed_request_status_codes
 
     @staticmethod
     def setup_once() -> None:
