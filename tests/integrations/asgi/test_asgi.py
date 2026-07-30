@@ -1128,11 +1128,10 @@ async def test_get_request_attributes_query_data_collection(
     expected_query,
     expected_url_full,
 ):
-    kwargs = {k: v for k, v in init_kwargs.items() if k != "_experiments"}
     sentry_init(
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
-        **kwargs,
+        **init_kwargs,
     )
     app = SentryAsgiMiddleware(asgi3_app)
 
