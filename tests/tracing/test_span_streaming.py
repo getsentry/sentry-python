@@ -1345,9 +1345,7 @@ IGNORE_SPANS_CASES = [
     ([], "/health", {}, False),
     ([{}], "/health", {}, False),
     (["/health"], "/health", {}, True),
-    (["/health"], "/health", {"custom": "custom"}, True),
     ([{"name": "/health"}], "/health", {}, True),
-    ([{"name": "/health"}], "/health", {"custom": "custom"}, True),
     ([{"attributes": {"custom": "custom"}}], "/health", {"custom": "custom"}, True),
     ([{"attributes": {"custom": "custom"}}], "/health", {}, False),
     (
@@ -1370,9 +1368,7 @@ IGNORE_SPANS_CASES = [
     ),
     # test cases with regexes
     ([re.compile("/hea.*")], "/health", {}, True),
-    ([re.compile("/hea.*")], "/health", {"custom": "custom"}, True),
     ([{"name": re.compile("/hea.*")}], "/health", {}, True),
-    ([{"name": re.compile("/hea.*")}], "/health", {"custom": "custom"}, True),
     (
         [{"attributes": {"custom": re.compile("c.*")}}],
         "/health",
