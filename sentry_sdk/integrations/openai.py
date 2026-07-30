@@ -532,7 +532,6 @@ def _set_completions_api_input_data(
                 span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
             )
 
-
     messages: "Optional[Union[str, Iterable[ChatCompletionMessageParam]]]" = kwargs.get(
         "messages"
     )
