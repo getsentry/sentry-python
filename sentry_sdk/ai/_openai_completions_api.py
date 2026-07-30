@@ -78,7 +78,7 @@ def _transform_tool_definitions(
 
     tool_definitions = []
     for tool in tools:
-        if not isinstance(tool, dict):
+        if not isinstance(tool, dict) or "type" not in tool:
             continue
 
         if tool["type"] == "function":

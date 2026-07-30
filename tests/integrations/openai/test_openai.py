@@ -17,25 +17,34 @@ except ImportError:
 
 from openai import AsyncOpenAI, AsyncStream, OpenAI, OpenAIError, Stream
 from openai.types import CompletionUsage, CreateEmbeddingResponse, Embedding
-from openai.types.chat import ChatCompletionChunk, ChatCompletionMessage
+from openai.types.chat import (
+    ChatCompletionChunk,
+    ChatCompletionFunctionToolParam,
+    ChatCompletionMessage,
+)
 from openai.types.chat.chat_completion import Choice
 from openai.types.chat.chat_completion_chunk import Choice as DeltaChoice
 from openai.types.chat.chat_completion_chunk import ChoiceDelta
+from openai.types.chat.chat_completion_custom_tool_param import Custom
 from openai.types.create_embedding_response import Usage as EmbeddingTokenUsage
-from openai.types.responses import (
-    CustomToolParam,
-    FunctionToolParam,
-    WebSearchToolParam,
-)
+from openai.types.shared_params import FunctionDefinition
+
+try:
+    from openai.types.chat import ChatCompletionCustomToolParam
+except ImportError:
+    pass
 
 SKIP_RESPONSES_TESTS = False
 
 try:
     from openai.types.responses import (
+        CustomToolParam,
+        FunctionToolParam,
         Response,
         ResponseOutputMessage,
         ResponseOutputText,
         ResponseUsage,
+        WebSearchToolParam,
     )
     from openai.types.responses.response_completed_event import ResponseCompletedEvent
     from openai.types.responses.response_created_event import ResponseCreatedEvent
@@ -112,6 +121,10 @@ else:
     )
 
 
+@pytest.mark.skipif(
+    OPENAI_VERSION <= (2, 10, 0),
+    reason="ChatCompletionCustomToolParam is unavailable before.",
+)
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_chat_completion_tool_definitions(
@@ -156,12 +169,12 @@ def test_chat_completion_tool_definitions(
                     {"role": "user", "content": "hello"},
                 ],
                 tools=[
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": "name",
-                            "description": "description",
-                            "parameters": {
+                    ChatCompletionFunctionToolParam(
+                        type="function",
+                        function=FunctionDefinition(
+                            name="name",
+                            description="description",
+                            parameters={
                                 "type": "object",
                                 "properties": {
                                     "city": {"type": "string"},
@@ -170,16 +183,16 @@ def test_chat_completion_tool_definitions(
                                 "required": ["city", "state"],
                                 "additionalProperties": False,
                             },
-                            "strict": True,
-                        },
-                    },
-                    {
-                        "type": "custom",
-                        "custom": {
-                            "name": "name",
-                            "description": "description",
-                        },
-                    },
+                            strict=True,
+                        ),
+                    ),
+                    ChatCompletionCustomToolParam(
+                        type="custom",
+                        custom=Custom(
+                            name="name",
+                            description="description",
+                        ),
+                    ),
                 ],
             )
 
@@ -218,12 +231,12 @@ def test_chat_completion_tool_definitions(
                     {"role": "user", "content": "hello"},
                 ],
                 tools=[
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": "name",
-                            "description": "description",
-                            "parameters": {
+                    ChatCompletionFunctionToolParam(
+                        type="function",
+                        function=FunctionDefinition(
+                            name="name",
+                            description="description",
+                            parameters={
                                 "type": "object",
                                 "properties": {
                                     "city": {"type": "string"},
@@ -232,25 +245,23 @@ def test_chat_completion_tool_definitions(
                                 "required": ["city", "state"],
                                 "additionalProperties": False,
                             },
-                            "strict": True,
-                        },
-                    },
-                    {
-                        "type": "custom",
-                        "custom": {
-                            "name": "name",
-                            "description": "description",
-                        },
-                    },
+                            strict=True,
+                        ),
+                    ),
+                    ChatCompletionCustomToolParam(
+                        type="custom",
+                        custom=Custom(
+                            name="name",
+                            description="description",
+                        ),
+                    ),
                 ],
             )
 
         tx = events[0]
         assert tx["type"] == "transaction"
-        span = tx["spans"][0]
-        print(tx["spans"])
 
-        assert json.loads(span["data"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]) == [
+        assert json.loads(tx["spans"][0]["data"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]) == [
             {
                 "type": "function",
                 "name": "name",
