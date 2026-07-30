@@ -107,6 +107,25 @@ else:
     )
 
 
+EXAMPLE_TOOLS = [
+    {
+        "type": "function",
+        "name": "get_current_weather",
+        "description": "Get the current weather in a given location",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "location": {
+                    "type": "string",
+                    "description": "The city and state, e.g. San Francisco, CA",
+                },
+            },
+            "required": ["location"],
+        },
+    }
+]
+
+
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
@@ -3891,6 +3910,7 @@ def test_ai_client_span_responses_api_no_pii(
                 temperature=0.7,
                 top_p=0.9,
                 reasoning={"effort": "high"},
+                tools=EXAMPLE_TOOLS,
             )
 
         sentry_sdk.flush()
@@ -3915,6 +3935,8 @@ def test_ai_client_span_responses_api_no_pii(
             "sentry.op": "gen_ai.responses",
             "sentry.origin": "auto.ai.openai",
             "sentry.segment.name": "openai tx",
+            # Tools are recorded regardless of PII in legacy (send_default_pii) mode
+            "gen_ai.request.available_tools": safe_serialize(EXAMPLE_TOOLS),
         }
 
         for attr, value in expected_attributes.items():
@@ -3936,6 +3958,7 @@ def test_ai_client_span_responses_api_no_pii(
                 temperature=0.7,
                 top_p=0.9,
                 reasoning={"effort": "high"},
+                tools=EXAMPLE_TOOLS,
             )
 
         spans = [item.payload for item in items]
@@ -3959,6 +3982,8 @@ def test_ai_client_span_responses_api_no_pii(
             "sentry.op": "gen_ai.responses",
             "sentry.origin": "auto.ai.openai",
             "sentry.segment.name": "openai tx",
+            # Tools are recorded regardless of PII in legacy (send_default_pii) mode
+            "gen_ai.request.available_tools": safe_serialize(EXAMPLE_TOOLS),
         }
 
         for attr, value in expected_attributes.items():
@@ -3979,6 +4004,7 @@ def test_ai_client_span_responses_api_no_pii(
                 temperature=0.7,
                 top_p=0.9,
                 reasoning={"effort": "high"},
+                tools=EXAMPLE_TOOLS,
             )
 
         (transaction,) = events
@@ -4002,6 +4028,8 @@ def test_ai_client_span_responses_api_no_pii(
             "gen_ai.usage.output_tokens": 10,
             "gen_ai.usage.output_tokens.reasoning": 8,
             "gen_ai.usage.total_tokens": 30,
+            # Tools are recorded regardless of PII in legacy (send_default_pii) mode
+            "gen_ai.request.available_tools": safe_serialize(EXAMPLE_TOOLS),
         }
 
         for key, value in expected_data.items():
@@ -4325,6 +4353,208 @@ def test_ai_client_span_responses_api(
 
         for attr, value in expected_data.items():
             assert spans[0]["data"][attr] == value
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,extra_kwargs,expected_present,expected_absent",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            {
+                "instructions": "You are a coding assistant that talks like a pirate.",
+                "input": "How do I check if a Python object is an instance of a class?",
+                "tools": EXAMPLE_TOOLS,
+            },
+            {
+                SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
+                    ["How do I check if a Python object is an instance of a class?"]
+                ),
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: safe_serialize(
+                    [
+                        {
+                            "type": "text",
+                            "content": "You are a coding assistant that talks like a pirate.",
+                        }
+                    ]
+                ),
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS: safe_serialize(EXAMPLE_TOOLS),
+            },
+            [],
+            id="inputs-enabled-string-input",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            {
+                "instructions": "You are a coding assistant that talks like a pirate.",
+            },
+            {
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: safe_serialize(
+                    [
+                        {
+                            "type": "text",
+                            "content": "You are a coding assistant that talks like a pirate.",
+                        }
+                    ]
+                ),
+            },
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+            ],
+            id="inputs-enabled-instructions-only",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            {
+                "instructions": "You are a coding assistant that talks like a pirate.",
+                "input": [
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": "hello"},
+                ],
+            },
+            {
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: safe_serialize(
+                    [
+                        {
+                            "type": "text",
+                            "content": "You are a coding assistant that talks like a pirate.",
+                        },
+                        {"type": "text", "content": "You are a helpful assistant."},
+                    ]
+                ),
+                SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
+                    [{"role": "user", "content": "hello"}]
+                ),
+            },
+            [SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS],
+            id="inputs-enabled-list-input-with-system-message",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            {
+                "instructions": "You are a coding assistant that talks like a pirate.",
+                "input": "How do I check if a Python object is an instance of a class?",
+                "tools": EXAMPLE_TOOLS,
+            },
+            {},
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+            ],
+            id="inputs-disabled",
+        ),
+        pytest.param(
+            {},
+            {
+                "input": "How do I check if a Python object is an instance of a class?",
+                "tools": EXAMPLE_TOOLS,
+            },
+            {
+                SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
+                    ["How do I check if a Python object is an instance of a class?"]
+                ),
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS: safe_serialize(EXAMPLE_TOOLS),
+            },
+            [SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS],
+            id="gen-ai-omitted-defaults-to-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            {},
+            {},
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+            ],
+            id="inputs-enabled-no-input-provided",
+        ),
+    ],
+)
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_responses_api_data_collection(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    extra_kwargs,
+    expected_present,
+    expected_absent,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        _experiments={"data_collection": data_collection},
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = OpenAI(api_key="z")
+    client.responses._post = mock.Mock(return_value=EXAMPLE_RESPONSE)
+
+    create_kwargs = {
+        "model": "gpt-4o",
+        "max_output_tokens": 100,
+        "temperature": 0.7,
+        "top_p": 0.9,
+        "reasoning": {"effort": "high"},
+    }
+    create_kwargs.update(extra_kwargs)
+
+    if span_streaming:
+        items = capture_items("span")
+
+        with sentry_sdk.traces.start_span(name="openai tx"):
+            client.responses.create(**create_kwargs)
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+
+        assert len(spans) == 2
+        span_data = spans[0]["attributes"]
+    elif stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            client.responses.create(**create_kwargs)
+
+        spans = [item.payload for item in items]
+
+        assert len(spans) == 1
+        span_data = spans[0]["attributes"]
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            client.responses.create(**create_kwargs)
+
+        (transaction,) = events
+        spans = transaction["spans"]
+
+        assert len(spans) == 1
+        assert spans[0]["op"] == "gen_ai.responses"
+        span_data = spans[0]["data"]
+
+    # Non-input data is always collected, regardless of data collection config
+    assert span_data["gen_ai.operation.name"] == "responses"
+    assert span_data["gen_ai.request.model"] == "gpt-4o"
+    assert span_data["gen_ai.request.max_tokens"] == 100
+    assert span_data["gen_ai.request.temperature"] == 0.7
+    assert span_data["gen_ai.request.top_p"] == 0.9
+    assert span_data["gen_ai.request.reasoning.level"] == "high"
+    assert span_data["gen_ai.system"] == "openai"
+
+    for key, value in expected_present.items():
+        assert span_data[key] == value
+
+    for key in expected_absent:
+        assert key not in span_data
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
