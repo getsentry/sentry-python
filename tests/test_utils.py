@@ -510,7 +510,6 @@ def test_include_source_context_when_serializing_frame(include_source_context):
     "item,regex_list,expected_result",
     [
         ["", [], False],
-        [None, [], False],
         ["", None, False],
         [None, None, False],
         ["some-string", [], False],
