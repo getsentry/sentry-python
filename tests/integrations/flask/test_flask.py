@@ -1346,7 +1346,6 @@ def test_span_http_query_data_collection(
         integrations=[flask_sentry.FlaskIntegration()],
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
-        _experiments=init_kwargs.pop("_experiments", {}),
         **init_kwargs,
     )
     monkeypatch.setattr(flask_sentry, "flask_login", None)
