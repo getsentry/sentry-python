@@ -224,12 +224,12 @@ def test_chat_completion_tool_definitions(
                     {"role": "user", "content": "hello"},
                 ],
                 tools=[
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": "name",
-                            "description": "description",
-                            "parameters": {
+                    ChatCompletionFunctionToolParam(
+                        type="function",
+                        function=FunctionDefinition(
+                            name="name",
+                            description="description",
+                            parameters={
                                 "type": "object",
                                 "properties": {
                                     "city": {"type": "string"},
@@ -238,16 +238,16 @@ def test_chat_completion_tool_definitions(
                                 "required": ["city", "state"],
                                 "additionalProperties": False,
                             },
-                            "strict": True,
-                        },
-                    },
-                    {
-                        "type": "custom",
-                        "custom": {
-                            "name": "name",
-                            "description": "description",
-                        },
-                    },
+                            strict=True,
+                        ),
+                    ),
+                    ChatCompletionCustomToolParam(
+                        type="custom",
+                        custom=Custom(
+                            name="name",
+                            description="description",
+                        ),
+                    ),
                 ],
             )
 
