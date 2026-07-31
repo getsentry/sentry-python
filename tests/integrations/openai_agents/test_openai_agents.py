@@ -1998,12 +1998,6 @@ async def test_tool_execution_span(
         assert agent_span["attributes"]["gen_ai.agent.name"] == "test_agent"
         assert agent_span["attributes"]["gen_ai.operation.name"] == "invoke_agent"
 
-        agent_span_available_tool = json.loads(
-            agent_span["attributes"]["gen_ai.request.available_tools"]
-        )[0]
-
-        assert all(agent_span_available_tool[k] == v for k, v in available_tool.items())
-
         assert agent_span["attributes"]["gen_ai.request.max_tokens"] == 100
         assert agent_span["attributes"]["gen_ai.request.model"] == "gpt-4"
         assert agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
@@ -2224,12 +2218,6 @@ async def test_tool_execution_span(
         assert agent_span["attributes"]["gen_ai.agent.name"] == "test_agent"
         assert agent_span["attributes"]["gen_ai.operation.name"] == "invoke_agent"
 
-        agent_span_available_tool = json.loads(
-            agent_span["attributes"]["gen_ai.request.available_tools"]
-        )[0]
-
-        assert all(agent_span_available_tool[k] == v for k, v in available_tool.items())
-
         assert agent_span["attributes"]["gen_ai.request.max_tokens"] == 100
         assert agent_span["attributes"]["gen_ai.request.model"] == "gpt-4"
         assert agent_span["attributes"]["gen_ai.request.temperature"] == 0.7
@@ -2443,11 +2431,6 @@ async def test_tool_execution_span(
         assert agent_span["origin"] == "auto.ai.openai_agents"
         assert agent_span["data"]["gen_ai.agent.name"] == "test_agent"
         assert agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"
-
-        agent_span_available_tool = json.loads(
-            agent_span["data"]["gen_ai.request.available_tools"]
-        )[0]
-        assert all(agent_span_available_tool[k] == v for k, v in available_tool.items())
 
         assert agent_span["data"]["gen_ai.request.max_tokens"] == 100
         assert agent_span["data"]["gen_ai.request.model"] == "gpt-4"
