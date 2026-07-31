@@ -8,7 +8,7 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
-from sentry_sdk.utils import capture_internal_exceptions
+from sentry_sdk.utils import capture_internal_exceptions, has_data_collection_enabled
 
 # Hack to get new Python features working in older versions
 # without introducing a hard dependency on `typing_extensions`
@@ -107,8 +107,12 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
             if query_id:
                 span.set_data("db.query_id", query_id)
 
-            if params and should_send_default_pii():
-                span.set_data("db.params", params)
+            if params:
+                if has_data_collection_enabled(client.options):
+                    if client.options["data_collection"]["database_query_data"]:
+                        span.set_data("db.params", params)
+                elif should_send_default_pii():
+                    span.set_data("db.params", params)
 
         connection._sentry_span = span  # type: ignore[attr-defined]
 
@@ -135,8 +139,13 @@ def _wrap_end(f: "Callable[P, T]") -> "Callable[P, T]":
         if isinstance(span, StreamedSpan):
             span.end()
         else:
-            if res is not None and should_send_default_pii():
-                span.set_data("db.result", res)
+            if res is not None:
+                client_options = sentry_sdk.get_client().options
+                if has_data_collection_enabled(client_options):
+                    if client_options["data_collection"]["database_query_data"]:
+                        span.set_data("db.result", res)
+                elif should_send_default_pii():
+                    span.set_data("db.result", res)
 
             with capture_internal_exceptions():
                 span.scope.add_breadcrumb(
@@ -167,7 +176,29 @@ def _wrap_send_data() -> None:
         if span is not None:
             _set_db_data(span, self.connection)
 
-            if should_send_default_pii():
+            client_options = sentry_sdk.get_client().options
+            if has_data_collection_enabled(client_options):
+                if client_options["data_collection"]["database_query_data"]:
+                    db_params = span._data.get("db.params", [])
+                    if isinstance(data, (list, tuple)):
+                        db_params.extend(data)
+
+                    else:  # data is a generic iterator
+                        orig_data = data
+
+                        # Wrap the generator to add items to db.params as they are yielded.
+                        # This allows us to send the params to Sentry without needing to allocate
+                        # memory for the entire generator at once.
+                        def wrapped_generator() -> "Iterator[Any]":
+                            for item in orig_data:
+                                db_params.append(item)
+                                yield item
+
+                        # Replace the original iterator with the wrapped one.
+                        data = wrapped_generator()
+
+                    span.set_data("db.params", db_params)
+            elif should_send_default_pii():
                 db_params = span._data.get("db.params", [])
 
                 if isinstance(data, (list, tuple)):

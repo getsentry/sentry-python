@@ -838,9 +838,7 @@ async def test_client_span_custom_model(
                 disabled_integrations=[StdlibIntegration],
                 traces_sample_rate=1.0,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={
-                    "trace_lifecycle": "stream" if span_streaming else "static"
-                },
+                trace_lifecycle="stream" if span_streaming else "static",
             )
 
             items = capture_items("span")
@@ -1603,9 +1601,7 @@ async def test_handoff_span(
                 disabled_integrations=[StdlibIntegration],
                 traces_sample_rate=1.0,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={
-                    "trace_lifecycle": "stream" if span_streaming else "static"
-                },
+                trace_lifecycle="stream" if span_streaming else "static",
             )
 
             items = capture_items("transaction", "span")
@@ -1782,9 +1778,7 @@ async def test_max_turns_before_handoff_span(
                 disabled_integrations=[StdlibIntegration],
                 traces_sample_rate=1.0,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={
-                    "trace_lifecycle": "stream" if span_streaming else "static"
-                },
+                trace_lifecycle="stream" if span_streaming else "static",
             )
 
             items = capture_items("transaction", "span")
@@ -3211,9 +3205,7 @@ async def test_error_captures_input_data(
                 traces_sample_rate=1.0,
                 send_default_pii=True,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={
-                    "trace_lifecycle": "stream" if span_streaming else "static"
-                },
+                trace_lifecycle="stream" if span_streaming else "static",
             )
 
             items = capture_items("event", "span")
@@ -3645,9 +3637,7 @@ async def test_tool_execution_error_tracing(
                 traces_sample_rate=1.0,
                 send_default_pii=True,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={
-                    "trace_lifecycle": "stream" if span_streaming else "static"
-                },
+                trace_lifecycle="stream" if span_streaming else "static",
             )
             items = capture_items("span", "transaction")
 
@@ -3798,9 +3788,7 @@ async def test_invoke_agent_span_includes_usage_data(
                 traces_sample_rate=1.0,
                 send_default_pii=True,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={
-                    "trace_lifecycle": "stream" if span_streaming else "static"
-                },
+                trace_lifecycle="stream" if span_streaming else "static",
             )
             items = capture_items("span", "transaction")
 
@@ -3942,9 +3930,7 @@ async def test_ai_client_span_includes_response_model(
                 traces_sample_rate=1.0,
                 send_default_pii=True,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={
-                    "trace_lifecycle": "stream" if span_streaming else "static"
-                },
+                trace_lifecycle="stream" if span_streaming else "static",
             )
             items = capture_items("span", "transaction")
 
@@ -4073,9 +4059,7 @@ async def test_ai_client_span_response_model_with_chat_completions(
                 disabled_integrations=[StdlibIntegration],
                 traces_sample_rate=1.0,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={
-                    "trace_lifecycle": "stream" if span_streaming else "static"
-                },
+                trace_lifecycle="stream" if span_streaming else "static",
             )
 
             items = capture_items("span", "transaction")
@@ -4416,9 +4400,7 @@ async def test_invoke_agent_span_includes_response_model(
                 traces_sample_rate=1.0,
                 send_default_pii=True,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={
-                    "trace_lifecycle": "stream" if span_streaming else "static"
-                },
+                trace_lifecycle="stream" if span_streaming else "static",
             )
 
             items = capture_items("span", "transaction")
@@ -5054,9 +5036,7 @@ async def test_conversation_id_on_all_spans(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={
-                    "trace_lifecycle": "stream" if span_streaming else "static"
-                },
+                trace_lifecycle="stream" if span_streaming else "static",
             )
 
             items = capture_items("span", "transaction")

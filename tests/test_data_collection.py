@@ -250,7 +250,7 @@ def _get(dc, path):
         ),
     ],
 )
-def test_initalize_client_data_collection(options, expected):
+def test_initialize_client_data_collection(options, expected):
     dc = _initialize_client_with_config(**options)
     for path, value in expected.items():
         assert _get(dc, path) == value, f"{path} != {value!r}"
