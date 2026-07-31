@@ -902,18 +902,22 @@ def test_record_lost_event_transaction_item(capturing_server, make_client, span_
 @pytest.mark.parametrize(
     "debug,client_flush_method,use_pickle,compression_level,compression_algo",
     [
-        (
-            i % 2 == 0,  # debug
-            ("close", "flush")[i % 2],  # client_flush_method
-            (i // 2) % 2 == 0,  # use_pickle
-            compression_level,
-            compression_algo,
-        )
-        for i, (compression_level, compression_algo) in enumerate(
-            (level, algo)
-            for level in (None, 0, 9)
-            for algo in ("gzip", "br", "<invalid>", None)
-        )
+        # debug and client_flush_method alternate every case; use_pickle
+        # alternates every two cases. This rotates those dimensions through the
+        # fully-crossed (compression_level x compression_algo) grid so each
+        # value is exercised without running the full cross product.
+        (True, "close", True, None, "gzip"),
+        (False, "flush", True, None, "br"),
+        (True, "close", False, None, "<invalid>"),
+        (False, "flush", False, None, None),
+        (True, "close", True, 0, "gzip"),
+        (False, "flush", True, 0, "br"),
+        (True, "close", False, 0, "<invalid>"),
+        (False, "flush", False, 0, None),
+        (True, "close", True, 9, "gzip"),
+        (False, "flush", True, 9, "br"),
+        (True, "close", False, 9, "<invalid>"),
+        (False, "flush", False, 9, None),
     ],
 )
 @pytest.mark.skipif(not PY38, reason="Async transport only supported in Python 3.8+")
