@@ -14,6 +14,7 @@ from .utils import SAM_PORT, LocalLambdaStack, SentryServerForTesting
 
 DOCKER_NETWORK_NAME = "lambda-test-network"
 SAM_TEMPLATE_FILE = "sam.template.yaml"
+SAM_SHUTDOWN_TIMEOUT = 10
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -54,7 +55,7 @@ def test_environment():
             "--template",
             SAM_TEMPLATE_FILE,
             "--warm-containers",
-            "EAGER",
+            "LAZY",  # Start each Docker container on its function's first invocation
             "--docker-network",
             DOCKER_NETWORK_NAME,
         ],
@@ -78,13 +79,13 @@ def test_environment():
 
     finally:
         print("[test_environment fixture] Tearing down AWS Lambda test infrastructure")
-
         process.terminate()
-        process.wait(timeout=10)  # Give it time to shut down gracefully
-
-        # Force kill if still running
-        if process.poll() is None:
+        try:
+            # Teardown is typically ~7s; escalate with kill if SAM exceeds this.
+            process.wait(timeout=SAM_SHUTDOWN_TIMEOUT)
+        except subprocess.TimeoutExpired:
             process.kill()
+            process.wait()
 
 
 @pytest.fixture(autouse=True)
@@ -429,8 +430,8 @@ def test_request_data_with_send_default_pii_true(lambda_client, test_environment
           "stageVariables": null,
           "requestContext": {
             "identity": {
-              "sourceIp": "213.47.147.207",
-              "userArn": "42"
+                "sourceIp": "213.47.147.207",
+                "userArn": "42"
             }
           },
           "body": null,
@@ -463,6 +464,66 @@ def test_request_data_with_send_default_pii_true(lambda_client, test_environment
         "url": "https://iwsz2c7uwi.execute-api.us-east-1.amazonaws.com/asd",
         "data": None,
     }
+
+    # Legacy send_default_pii=True attaches the user identity.
+    assert transaction_event["user"] == {
+        "id": "42",
+        "ip_address": "213.47.147.207",
+    }
+
+
+USER_INFO_PAYLOAD = b"""
+    {
+      "resource": "/asd",
+      "path": "/asd",
+      "httpMethod": "GET",
+      "headers": {
+        "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
+        "User-Agent": "custom",
+        "X-Forwarded-Proto": "https"
+      },
+      "queryStringParameters": {
+        "bonkers": "true"
+      },
+      "pathParameters": null,
+      "stageVariables": null,
+      "requestContext": {
+        "identity": {
+            "sourceIp": "213.47.147.207",
+            "userArn": "42"
+        }
+      },
+      "body": null,
+      "isBase64Encoded": false
+    }
+"""
+
+
+def test_user_info_with_data_collection_user_info_on(lambda_client, test_environment):
+    lambda_client.invoke(
+        FunctionName="BasicOkDataCollectionUserInfoOn",
+        Payload=USER_INFO_PAYLOAD,
+    )
+    envelopes = test_environment["server"].envelopes
+
+    (transaction_event,) = envelopes
+
+    assert transaction_event["user"] == {
+        "id": "42",
+        "ip_address": "213.47.147.207",
+    }
+
+
+def test_user_info_with_data_collection_user_info_off(lambda_client, test_environment):
+    lambda_client.invoke(
+        FunctionName="BasicOkDataCollectionUserInfoOff",
+        Payload=USER_INFO_PAYLOAD,
+    )
+    envelopes = test_environment["server"].envelopes
+
+    (transaction_event,) = envelopes
+
+    assert "user" not in transaction_event
 
 
 def test_request_data_with_data_collection_allowlist(lambda_client, test_environment):

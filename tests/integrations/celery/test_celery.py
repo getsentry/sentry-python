@@ -232,6 +232,111 @@ def test_simple_without_performance(
     assert exception["stacktrace"]["frames"][0]["vars"]["foo"] == "42"
 
 
+@pytest.mark.parametrize(
+    "init_kwargs,expected_args,expected_kwargs",
+    [
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "included",
+            "included",
+            id="data_collection_default",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"queues": True}}},
+            "included",
+            "included",
+            id="data_collection_queues_on",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"queues": False}}},
+            None,
+            None,
+            id="data_collection_queues_off",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            SENSITIVE_DATA_SUBSTITUTE,
+            SENSITIVE_DATA_SUBSTITUTE,
+            id="no_pii",
+        ),
+        pytest.param(
+            {
+                "_experiments": {"data_collection": {"queues": False}},
+                "send_default_pii": False,
+            },
+            None,
+            None,
+            id="data_collection_queues_off_with_no_pii",
+        ),
+        pytest.param(
+            {
+                "_experiments": {"data_collection": {"queues": True}},
+                "send_default_pii": False,
+            },
+            "included",
+            "included",
+            id="data_collection_queues_on_with_no_pii",
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "invocation_style,task_args,task_kwargs",
+    [
+        pytest.param("positional", [1, 0], {}, id="positional_args"),
+        pytest.param("keyword", [], {"x": 1, "y": 0}, id="keyword_args"),
+    ],
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_task_args_kwargs_data_collection(
+    capture_events,
+    capture_items,
+    init_celery,
+    span_streaming,
+    invocation_style,
+    task_args,
+    task_kwargs,
+    init_kwargs,
+    expected_args,
+    expected_kwargs,
+):
+    init_dict = {"send_default_pii": True, **init_kwargs}
+    celery = init_celery(
+        trace_lifecycle="stream" if span_streaming else "static",
+        **init_dict,
+    )
+
+    @celery.task(name="dummy_task")
+    def dummy_task(x, y):
+        return x / y
+
+    if invocation_style == "positional":
+        invoke = lambda: dummy_task.apply_async((1, 0))
+    else:
+        invoke = lambda: dummy_task.apply_async(kwargs=dict(x=1, y=0))
+
+    if span_streaming:
+        items = capture_items("event")
+        invoke()
+        sentry_sdk.flush()
+        (error_event,) = (item.payload for item in items)
+    else:
+        events = capture_events()
+        invoke()
+        (error_event,) = events
+
+    celery_job = error_event["extra"]["celery-job"]
+
+    if expected_args is None:
+        assert "args" not in celery_job
+        assert "kwargs" not in celery_job
+    elif expected_args == "included":
+        assert celery_job["args"] == task_args
+        assert celery_job["kwargs"] == task_kwargs
+    else:
+        assert celery_job["args"] == SENSITIVE_DATA_SUBSTITUTE
+        assert celery_job["kwargs"] == SENSITIVE_DATA_SUBSTITUTE
+
+
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("task_fails", [True, False], ids=["error", "success"])
 def test_transaction_events(

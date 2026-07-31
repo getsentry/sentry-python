@@ -286,7 +286,6 @@ def _extract_handler_data_from_params(
     elif handler_type == "prompt":
         handler_name = getattr(params, "name", "unknown")
         arguments = getattr(params, "arguments", None) or {}
-        arguments = {"name": handler_name, **arguments}
     else:  # resource
         handler_name = str(getattr(params, "uri", "unknown"))
         arguments = {}
@@ -332,8 +331,6 @@ def _extract_handler_data_from_args(
             arguments = original_args[1]
         elif original_kwargs.get("arguments"):
             arguments = original_kwargs["arguments"]
-
-        arguments = {"name": handler_name, **(arguments or {})}
 
     else:  # resource
         handler_name = "unknown"
@@ -433,8 +430,6 @@ async def _tool_handler_wrapper(
                     result = await result
 
             except Exception as e:
-                # Set error flag for tools
-                _set_span_data_attribute(span, SPANDATA.MCP_TOOL_RESULT_IS_ERROR, True)
                 sentry_sdk.capture_exception(e)
                 raise
 

@@ -236,6 +236,9 @@ TEST_SUITE_CONFIG = {
     "huey": {
         "package": "huey",
         "num_versions": 2,
+        "python": {
+            ">=3.3.0": ">3.7",
+        },
     },
     "huggingface_hub": {
         "package": "huggingface_hub",
@@ -302,14 +305,16 @@ TEST_SUITE_CONFIG = {
     "mcp": {
         "package": "mcp",
         "deps": {
-            "*": ["pytest-asyncio"],
+            "*": ["pytest-asyncio", "httpx"],
         },
-        "include": "<2.0.0a1",  # Alphas are currently being released, will come back to these before the release that's expected at the end of July 2026
     },
     "fastmcp": {
         "package": "fastmcp",
         "deps": {
-            "*": ["pytest-asyncio"],
+            "*": ["pytest-asyncio", "httpx"],
+            "<0.3.0": [
+                "mcp<2"
+            ],  # Pin added to package in https://github.com/PrefectHQ/fastmcp/commit/5f58621f8b7c7ba257c9837333b09b391f868456#diff-50c86b7ed8ac2cf95bd48334961bf0530cdc77b5a56f852c5c61b89d735fd711
         },
     },
     "openai-base": {

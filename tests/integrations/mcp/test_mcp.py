@@ -36,7 +36,6 @@ except ImportError:
 
 from mcp.server.lowlevel import Server
 from mcp.server.lowlevel.helper_types import ReadResourceContents
-from mcp.types import GetPromptResult, PromptMessage, TextContent
 
 MCP_PACKAGE_VERSION = package_version("mcp")
 IS_MCP_V2 = MCP_PACKAGE_VERSION is not None and MCP_PACKAGE_VERSION >= (2, 0, 0)
@@ -52,14 +51,19 @@ except ImportError:
     request_ctx = None
 
 if IS_MCP_V2:
-    from mcp.types import (
+    from mcp_types import (
         CallToolRequestParams,
         CallToolResult,
         GetPromptRequestParams,
+        GetPromptResult,
+        PromptMessage,
         ReadResourceRequestParams,
         ReadResourceResult,
+        TextContent,
         TextResourceContents,
     )
+else:
+    from mcp.types import GetPromptResult, PromptMessage, TextContent
 
 from mcp.server.sse import SseServerTransport
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
@@ -71,10 +75,6 @@ import sentry_sdk
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.mcp import MCPIntegration
-
-
-def _experiments_for(span_streaming):
-    return {"trace_lifecycle": "stream" if span_streaming else "static"}
 
 
 def _get_response(session_message):
@@ -172,7 +172,7 @@ async def test_tool_handler_constructor_registration(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments=_experiments_for(span_streaming),
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     async def test_tool(ctx, params):
@@ -272,7 +272,7 @@ async def test_wrapping_handler_is_idempotent(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments=_experiments_for(span_streaming),
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     async def test_tool(ctx, params):
@@ -336,7 +336,7 @@ async def test_tool_handler_stdio(
         integrations=[MCPIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments=_experiments_for(span_streaming),
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     server = Server("test-server")
@@ -461,7 +461,7 @@ async def test_tool_handler_streamable_http(
         integrations=[MCPIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments=_experiments_for(span_streaming),
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     server = Server("test-server")
@@ -583,7 +583,7 @@ async def test_tool_handler_with_error(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments=_experiments_for(span_streaming),
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     server = Server("test-server")
@@ -630,7 +630,6 @@ async def test_tool_handler_with_error(
             error_payload["exception"]["values"][0]["value"] == "Tool execution failed"
         )
 
-        assert span["attributes"][SPANDATA.MCP_TOOL_RESULT_IS_ERROR] is True
         assert span["status"] == "error"
     else:
         events = capture_events()
@@ -665,8 +664,6 @@ async def test_tool_handler_with_error(
         assert len(tx["spans"]) == 1
         span = tx["spans"][0]
 
-        # Error flag should be set for tools
-        assert span["data"][SPANDATA.MCP_TOOL_RESULT_IS_ERROR] is True
         assert span["status"] == "internal_error"
         assert span["tags"]["status"] == "internal_error"
 
@@ -691,7 +688,7 @@ async def test_prompt_handler_stdio(
         integrations=[MCPIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments=_experiments_for(span_streaming),
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     server = Server("test-server")
@@ -773,7 +770,6 @@ async def test_prompt_handler_stdio(
     assert data[SPANDATA.MCP_METHOD_NAME] == "prompts/get"
     assert data[SPANDATA.MCP_TRANSPORT] == "stdio"
     assert data[SPANDATA.MCP_REQUEST_ID] == "req-prompt"
-    assert data["mcp.request.argument.name"] == "code_help"
     assert data["mcp.request.argument.language"] == "python"
 
     # Message count is always captured
@@ -811,7 +807,7 @@ async def test_prompt_handler_streamable_http(
         integrations=[MCPIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments=_experiments_for(span_streaming),
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     server = Server("test-server")
@@ -918,7 +914,7 @@ async def test_prompt_handler_with_error(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments=_experiments_for(span_streaming),
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     server = Server("test-server")
@@ -960,7 +956,6 @@ async def test_prompt_handler_with_error(
         assert error_payload["level"] == "error"
         assert error_payload["exception"]["values"][0]["type"] == "RuntimeError"
         assert span["status"] == "error"
-        assert SPANDATA.MCP_TOOL_RESULT_IS_ERROR not in span["attributes"]
     else:
         events = capture_events()
         with start_transaction(name="mcp tx"):
@@ -989,7 +984,6 @@ async def test_prompt_handler_with_error(
         span = tx["spans"][0]
 
         assert span["status"] == "internal_error"
-        assert SPANDATA.MCP_TOOL_RESULT_IS_ERROR not in span["data"]
 
 
 @pytest.mark.asyncio
@@ -1001,7 +995,7 @@ async def test_resource_handler_stdio(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments=_experiments_for(span_streaming),
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     server = Server("test-server")
@@ -1103,7 +1097,7 @@ async def test_resource_handler_streamable_http(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments=_experiments_for(span_streaming),
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     server = Server("test-server")
@@ -1208,7 +1202,7 @@ async def test_resource_handler_with_error(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments=_experiments_for(span_streaming),
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     server = Server("test-server")
@@ -1247,7 +1241,6 @@ async def test_resource_handler_with_error(
         assert error_payload["level"] == "error"
         assert error_payload["exception"]["values"][0]["type"] == "FileNotFoundError"
         assert span["status"] == "error"
-        assert SPANDATA.MCP_TOOL_RESULT_IS_ERROR not in span["attributes"]
     else:
         events = capture_events()
         with start_transaction(name="mcp tx"):
@@ -1273,7 +1266,6 @@ async def test_resource_handler_with_error(
         span = tx["spans"][0]
 
         assert span["status"] == "internal_error"
-        assert SPANDATA.MCP_TOOL_RESULT_IS_ERROR not in span["data"]
 
 
 @pytest.mark.asyncio
@@ -1296,7 +1288,7 @@ async def test_tool_result_extraction_tuple(
         integrations=[MCPIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments=_experiments_for(span_streaming),
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     server = Server("test-server")
@@ -1384,7 +1376,7 @@ async def test_tool_result_extraction_unstructured(
         integrations=[MCPIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments=_experiments_for(span_streaming),
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     server = Server("test-server")
@@ -1460,7 +1452,7 @@ async def test_multiple_handlers(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments=_experiments_for(span_streaming),
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     server = Server("test-server")
@@ -1600,7 +1592,7 @@ async def test_prompt_with_dict_result(
         integrations=[MCPIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments=_experiments_for(span_streaming),
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     server = Server("test-server")
@@ -1684,7 +1676,7 @@ async def test_tool_with_complex_arguments(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments=_experiments_for(span_streaming),
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     server = Server("test-server")
@@ -1760,7 +1752,7 @@ async def test_sse_transport_detection(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments=_experiments_for(span_streaming),
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     server = Server("test-server")
@@ -1868,7 +1860,7 @@ async def test_sse_transport_detection_v2(
     sentry_init(
         integrations=[MCPIntegration()],
         traces_sample_rate=1.0,
-        _experiments=_experiments_for(span_streaming),
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     server = Server("test-server")
