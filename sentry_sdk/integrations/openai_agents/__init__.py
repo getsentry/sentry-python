@@ -8,6 +8,7 @@ from .patches import (
     _create_run_wrapper,
     _execute_final_output,
     _execute_handoffs,
+    _get_all_tools,
     _get_model,
     _patch_error_tracing,
     _run_single_turn,
@@ -63,6 +64,7 @@ class OpenAIAgentsIntegration(Integration):
     """
     NOTE: With version 0.8.0, the class methods below have been refactored to functions.
     - `AgentRunner._get_model()` -> `agents.run_internal.turn_preparation.get_model()`
+    - `AgentRunner._get_all_tools()` -> `agents.run_internal.turn_preparation.get_all_tools()`
     - `AgentRunner._run_single_turn()` -> `agents.run_internal.run_loop.run_single_turn()`
     - `RunImpl.execute_handoffs()` -> `agents.run_internal.turn_resolution.execute_handoffs()`
     - `RunImpl.execute_final_output()` -> `agents.run_internal.turn_resolution.execute_final_output()`
@@ -74,6 +76,7 @@ class OpenAIAgentsIntegration(Integration):
         - `DEFAULT_AGENT_RUNNER.run()` and `DEFAULT_AGENT_RUNNER.run_streamed()` are patched in `_patch_runner()` with `_create_run_wrapper()` and `_create_run_streamed_wrapper()`, respectively.
     3. In a loop, the agent repeatedly calls the Responses API, maintaining a conversation history that includes previous messages and tool results, which is passed to each call.
         - A Model instance is created at the start of the loop by calling the `Runner._get_model()`. We patch the Model instance using `patches._get_model()`.
+        - Available tools are also deteremined at the start of the loop, with `Runner._get_all_tools()`. We patch Tool instances by iterating through the returned tools in `patches._get_all_tools()`.
         - In each loop iteration, `run_single_turn()` or `run_single_turn_streamed()` is responsible for calling the Responses API, patched with `patches._run_single_turn()` and `patches._run_single_turn_streamed()`.
     4. On loop termination, `RunImpl.execute_final_output()` is called. The function is patched with `patches._execute_final_output()`.
 
@@ -97,6 +100,17 @@ class OpenAIAgentsIntegration(Integration):
             8,
         ):
             if run_loop is not None:
+
+                @wraps(run_loop.get_all_tools)
+                async def new_wrapped_get_all_tools(
+                    agent: "agents.Agent",
+                    context_wrapper: "agents.RunContextWrapper",
+                ) -> "list[agents.Tool]":
+                    return await _get_all_tools(
+                        run_loop.get_all_tools, agent, context_wrapper
+                    )
+
+                agents.run.get_all_tools = new_wrapped_get_all_tools
 
                 @wraps(run_loop.run_single_turn)
                 async def new_wrapped_run_single_turn(
@@ -160,6 +174,18 @@ class OpenAIAgentsIntegration(Integration):
                 )
 
             return
+
+        original_get_all_tools = AgentRunner._get_all_tools
+
+        @wraps(AgentRunner._get_all_tools.__func__)
+        async def old_wrapped_get_all_tools(
+            cls: "agents.Runner",
+            agent: "agents.Agent",
+            context_wrapper: "agents.RunContextWrapper",
+        ) -> "list[agents.Tool]":
+            return await _get_all_tools(original_get_all_tools, agent, context_wrapper)
+
+        agents.run.AgentRunner._get_all_tools = classmethod(old_wrapped_get_all_tools)
 
         original_get_model = AgentRunner._get_model
 
