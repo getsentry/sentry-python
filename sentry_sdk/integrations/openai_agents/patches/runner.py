@@ -1,13 +1,21 @@
 import sys
 from functools import wraps
 
+from agents import FunctionTool, RunHooks
+
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.utils import capture_internal_exceptions, reraise
 
-from ..spans import agent_workflow_span, update_invoke_agent_span
+from ..spans import (
+    agent_workflow_span,
+    execute_tool_span,
+    update_execute_tool_span,
+    update_invoke_agent_span,
+)
 from ..utils import _capture_exception
 
 try:
@@ -19,6 +27,39 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, AsyncIterator, Callable
+
+
+class _SentryRunHooks(RunHooks):
+    """
+    Creates and mangages tool execution spans.
+
+    The start hook creates a span and sets input attributes.
+    The end hook finishes the span and sets remaining attributes.
+    """
+
+    async def on_tool_start(self, context, agent, tool):
+        if not isinstance(tool, FunctionTool):
+            return
+
+        span = execute_tool_span(tool)
+
+        if isinstance(span, StreamedSpan) and should_send_default_pii():
+            span.set_attribute(SPANDATA.GEN_AI_TOOL_INPUT, context.tool_arguments)
+        elif should_send_default_pii():
+            span.set_data(SPANDATA.GEN_AI_TOOL_INPUT, context.tool_arguments)
+
+        span.__enter__()
+        context._sentry_span = span
+
+    async def on_tool_end(self, context, agent, tool, result):
+        if not isinstance(tool, FunctionTool):
+            return
+
+        span = getattr(context, "_sentry_span", None)
+        if span is not None:
+            del context._sentry_span
+            update_execute_tool_span(span, agent, tool, result)
+            span.__exit__(None, None, None)
 
 
 def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., Any]":
@@ -33,6 +74,26 @@ def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., A
 
     @wraps(original_func)
     async def wrapper(*args: "Any", **kwargs: "Any") -> "Any":
+        hooks = kwargs.get("hooks")
+        if hooks is None:
+            kwargs["hooks"] = _SentryRunHooks()
+        elif isinstance(hooks, RunHooks):
+            original_on_tool_start = hooks.on_tool_start
+            original_on_tool_end = hooks.on_tool_end
+
+            @wraps(original_on_tool_start)
+            async def sentry_on_tool_start(context, agent, tool):
+                await original_on_tool_start(context, agent, tool)
+                await _SentryRunHooks.on_tool_start(None, context, agent, tool)
+
+            @wraps(original_on_tool_end)
+            async def sentry_on_tool_end(context, agent, tool, result):
+                await original_on_tool_end(context, agent, tool, result)
+                await _SentryRunHooks.on_tool_end(None, context, agent, tool, result)
+
+            hooks.on_tool_start = sentry_on_tool_start
+            hooks.on_tool_end = sentry_on_tool_end
+
         # Isolate each workflow so that when agents are run in asyncio tasks they
         # don't touch each other's scopes
         with sentry_sdk.isolation_scope():
