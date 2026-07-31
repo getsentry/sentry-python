@@ -8,7 +8,7 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SpanStatus, StreamedSpan
 from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
-from sentry_sdk.utils import capture_internal_exceptions
+from sentry_sdk.utils import capture_internal_exceptions, has_data_collection_enabled
 
 try:
     from pymongo import monitoring
@@ -146,7 +146,10 @@ class CommandTracer(monitoring.CommandListener):
             db_name = event.database_name
 
             lsid = command.pop("lsid", None)
-            if not should_send_default_pii():
+            if has_data_collection_enabled(client.options):
+                if not client.options["data_collection"]["database_query_data"]:
+                    command = _strip_pii(command)
+            elif not should_send_default_pii():
                 command = _strip_pii(command)
 
             query = json.dumps(command, default=str)

@@ -338,10 +338,7 @@ def test_span_http_query_data_collection(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream",
-            **init_kwargs.pop("_experiments", {}),
-        },
+        trace_lifecycle="stream",
         **init_kwargs,
     )
 

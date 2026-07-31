@@ -881,9 +881,9 @@ def test_sql_psycopg2_string_composition(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
+        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={
             "record_sql_params": True,
-            "trace_lifecycle": "stream" if span_streaming else "static",
         },
     )
     from django.db import connections
@@ -933,9 +933,9 @@ def test_sql_psycopg2_placeholders(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
+        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={
             "record_sql_params": True,
-            "trace_lifecycle": "stream" if span_streaming else "static",
         },
     )
     from django.db import connections
