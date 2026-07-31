@@ -28,9 +28,7 @@ async def _get_all_tools(
     wrapped_tools = []
     for tool in tools:
         # Wrap only the function tools (for now)
-        if tool.__class__.__name__ != "FunctionTool" or getattr(
-            tool.on_invoke_tool, "_sentry_wrapped", False
-        ):
+        if tool.__class__.__name__ != "FunctionTool":
             wrapped_tools.append(tool)
             continue
 
@@ -59,7 +57,6 @@ async def _get_all_tools(
 
             return sentry_wrapped_on_invoke_tool
 
-        tool.on_invoke_tool._sentry_wrapped = True
         tool.on_invoke_tool = create_wrapped_invoke(tool, original_on_invoke)
         wrapped_tools.append(tool)
 
