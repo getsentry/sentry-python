@@ -2724,7 +2724,7 @@ async def test_tool_execution_span(
         }
 
         parsed_tool_calls = json.loads(
-            ai_client_span1["attributes"]["gen_ai.response.tool_calls"]
+            ai_client_span1["data"]["gen_ai.response.tool_calls"]
         )
         assert len(parsed_tool_calls) == 1
         assert tool_call.items() <= parsed_tool_calls[0].items()
