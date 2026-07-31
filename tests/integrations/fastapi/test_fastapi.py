@@ -132,9 +132,7 @@ async def test_request_info_json_body(
         traces_sample_rate=1.0,
         send_default_pii=True,
         integrations=[StarletteIntegration()],
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     app = fastapi_app_factory()
@@ -203,9 +201,7 @@ async def test_formdata_request_body(
         send_default_pii=True,
         max_request_body_size="always",
         integrations=[StarletteIntegration()],
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     app = fastapi_app_factory()
@@ -283,9 +279,7 @@ async def test_request_body_too_big(
         traces_sample_rate=1.0,
         send_default_pii=True,
         integrations=[StarletteIntegration()],
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     app = fastapi_app_factory()
@@ -496,9 +490,7 @@ async def test_original_request_not_scrubbed(
         auto_enabling_integrations=False,  # Ensure httpx is not auto-enabled; its legacy start_span interferes with streaming mode
         integrations=[StarletteIntegration(), FastApiIntegration()],
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     app = FastAPI()
@@ -663,9 +655,7 @@ def test_transaction_name(
             FastApiIntegration(transaction_style=transaction_style),
         ],
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -713,9 +703,7 @@ def test_transaction_name_with_prefix(
             FastApiIntegration(transaction_style="url"),
         ],
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -974,9 +962,7 @@ def test_request_url(sentry_init, capture_events, capture_items, span_streaming)
         integrations=[
             StarletteIntegration(),
         ],
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     starlette_app = fastapi_app_factory()

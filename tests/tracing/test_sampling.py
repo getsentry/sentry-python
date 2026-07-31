@@ -120,9 +120,7 @@ def test_uses_traces_sample_rate_correctly_span_streaming(
 ):
     sentry_init(
         traces_sample_rate=traces_sample_rate,
-        _experiments={
-            "trace_lifecycle": "stream",
-        },
+        trace_lifecycle="stream",
     )
 
     sentry_sdk.traces.continue_trace(
@@ -163,9 +161,7 @@ def test_uses_traces_sampler_return_value_correctly_span_streaming(
 ):
     sentry_init(
         traces_sampler=mock.Mock(return_value=traces_sampler_return_value),
-        _experiments={
-            "trace_lifecycle": "stream",
-        },
+        trace_lifecycle="stream",
     )
 
     sentry_sdk.traces.continue_trace(
@@ -334,9 +330,7 @@ def test_only_captures_segment_when_sampled_is_true_span_streaming(
         traces_sampler=mock.Mock(
             return_value=sampling_decision,
         ),
-        _experiments={
-            "trace_lifecycle": "stream",
-        },
+        trace_lifecycle="stream",
     )
     items = capture_items()
 
@@ -383,9 +377,7 @@ def test_prefers_traces_sampler_to_traces_sample_rate_span_streaming(
     sentry_init(
         traces_sample_rate=traces_sample_rate,
         traces_sampler=traces_sampler,
-        _experiments={
-            "trace_lifecycle": "stream",
-        },
+        trace_lifecycle="stream",
     )
 
     span = sentry_sdk.traces.start_span(name="dogpark")

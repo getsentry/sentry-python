@@ -76,9 +76,7 @@ async def test_create_task(
         integrations=[
             AsyncioIntegration(),
         ],
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -171,9 +169,7 @@ async def test_gather(
         integrations=[
             AsyncioIntegration(),
         ],
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -463,9 +459,7 @@ async def test_span_origin(
     sentry_init(
         integrations=[AsyncioIntegration()],
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -520,9 +514,7 @@ async def test_task_spans_false(
         integrations=[
             AsyncioIntegration(task_spans=False),
         ],
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -594,9 +586,7 @@ async def test_delayed_enable_integration(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     assert "asyncio" not in sentry_sdk.get_client().integrations
@@ -711,9 +701,7 @@ async def test_delayed_enable_integration_after_disabling(
     sentry_init(
         disabled_integrations=[AsyncioIntegration()],
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     assert "asyncio" not in sentry_sdk.get_client().integrations
@@ -782,9 +770,7 @@ async def test_internal_tasks_not_wrapped(
     sentry_init(
         integrations=[AsyncioIntegration()],
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     async def user_task():
