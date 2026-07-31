@@ -59,7 +59,6 @@ async def _get_all_tools(
 
             return sentry_wrapped_on_invoke_tool
 
-        tool.on_invoke_tool._sentry_wrapped = True
         tool.on_invoke_tool = create_wrapped_invoke(tool, original_on_invoke)
         wrapped_tools.append(tool)
 
