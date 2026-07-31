@@ -17,6 +17,9 @@ from sentry_sdk.ai._openai_completions_api import (
 from sentry_sdk.ai._openai_completions_api import (
     _is_system_instruction as _is_system_instruction_completions,
 )
+from sentry_sdk.ai._openai_completions_api import (
+    _transform_tool_definitions as _transform_tool_definitions_completions,
+)
 from sentry_sdk.ai._openai_responses_api import (
     _get_system_instructions as _get_system_instructions_responses,
 )
@@ -44,7 +47,6 @@ from sentry_sdk.utils import (
     event_from_exception,
     has_data_collection_enabled,
     reraise,
-    safe_serialize,
 )
 
 if TYPE_CHECKING:
@@ -371,9 +373,10 @@ def _set_responses_api_input_data(
             and client_options["data_collection"]["gen_ai"]["inputs"]
         ):
             tools = kwargs.get("tools")
-            if tools is not None and _is_given(tools) and len(tools) > 0:
-                set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
+            if tools is not None and _is_given(tools):
+                set_on_span(
+                    SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+                    json.dumps(_transform_tool_definitions_completions(tools)),
                 )
     else:
         # Pre-data collection this was always set, so this needs to be left here for now until
@@ -381,9 +384,10 @@ def _set_responses_api_input_data(
         # and the above branch placed below the "if not should_send_default_pii() or not integration.include_prompts"
         # line below
         tools = kwargs.get("tools")
-        if tools is not None and _is_given(tools) and len(tools) > 0:
-            set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
+        if tools is not None and _is_given(tools):
+            set_on_span(
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+                json.dumps(_transform_tool_definitions_completions(tools)),
             )
 
     if has_data_collection_enabled(client_options):
@@ -480,15 +484,10 @@ def _set_completions_api_input_data(
         "messages"
     )
 
-    tools = kwargs.get("tools")
-    if tools is not None and _is_given(tools) and len(tools) > 0:
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
-        )
-
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
     )
+
     model = kwargs.get("model")
     if model is not None:
         set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)

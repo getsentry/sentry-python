@@ -23,14 +23,27 @@ from openai.types.chat.chat_completion_chunk import Choice as DeltaChoice
 from openai.types.chat.chat_completion_chunk import ChoiceDelta
 from openai.types.create_embedding_response import Usage as EmbeddingTokenUsage
 
+try:
+    from openai.types.chat import (
+        ChatCompletionCustomToolParam,
+        ChatCompletionFunctionToolParam,
+    )
+    from openai.types.chat.chat_completion_custom_tool_param import Custom
+    from openai.types.shared_params import FunctionDefinition
+except ImportError:
+    pass
+
 SKIP_RESPONSES_TESTS = False
 
 try:
     from openai.types.responses import (
+        CustomToolParam,
+        FunctionToolParam,
         Response,
         ResponseOutputMessage,
         ResponseOutputText,
         ResponseUsage,
+        WebSearchToolParam,
     )
     from openai.types.responses.response_completed_event import ResponseCompletedEvent
     from openai.types.responses.response_created_event import ResponseCreatedEvent
@@ -106,7 +119,6 @@ else:
         ),
     )
 
-
 EXAMPLE_TOOLS = [
     {
         "type": "function",
@@ -124,6 +136,169 @@ EXAMPLE_TOOLS = [
         },
     }
 ]
+
+
+@pytest.mark.skipif(
+    OPENAI_VERSION <= (2, 10, 0),
+    reason="ChatCompletionCustomToolParam is unavailable before.",
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_chat_completion_tool_definitions(
+    sentry_init,
+    capture_events,
+    capture_items,
+    nonstreaming_chat_completions_model_response,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
+        )
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            client.chat.completions.create(
+                model="some-model",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": "hello"},
+                ],
+                tools=[
+                    ChatCompletionFunctionToolParam(
+                        type="function",
+                        function=FunctionDefinition(
+                            name="name",
+                            description="description",
+                            parameters={
+                                "type": "object",
+                                "properties": {
+                                    "city": {"type": "string"},
+                                    "state": {"type": "string"},
+                                },
+                                "required": ["city", "state"],
+                                "additionalProperties": False,
+                            },
+                            strict=True,
+                        ),
+                    ),
+                    ChatCompletionCustomToolParam(
+                        type="custom",
+                        custom=Custom(
+                            name="name",
+                            description="description",
+                        ),
+                    ),
+                ],
+            )
+
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]) == [
+            {
+                "type": "function",
+                "name": "name",
+                "description": "description",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "city": {"type": "string"},
+                        "state": {"type": "string"},
+                    },
+                    "required": ["city", "state"],
+                    "additionalProperties": False,
+                },
+            },
+            {
+                "type": "custom",
+                "name": "name",
+                "description": "description",
+            },
+        ]
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            client.chat.completions.create(
+                model="some-model",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": "hello"},
+                ],
+                tools=[
+                    ChatCompletionFunctionToolParam(
+                        type="function",
+                        function=FunctionDefinition(
+                            name="name",
+                            description="description",
+                            parameters={
+                                "type": "object",
+                                "properties": {
+                                    "city": {"type": "string"},
+                                    "state": {"type": "string"},
+                                },
+                                "required": ["city", "state"],
+                                "additionalProperties": False,
+                            },
+                            strict=True,
+                        ),
+                    ),
+                    ChatCompletionCustomToolParam(
+                        type="custom",
+                        custom=Custom(
+                            name="name",
+                            description="description",
+                        ),
+                    ),
+                ],
+            )
+
+        tx = events[0]
+        assert tx["type"] == "transaction"
+
+        assert json.loads(tx["spans"][0]["data"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]) == [
+            {
+                "type": "function",
+                "name": "name",
+                "description": "description",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "city": {"type": "string"},
+                        "state": {"type": "string"},
+                    },
+                    "required": ["city", "state"],
+                    "additionalProperties": False,
+                },
+            },
+            {
+                "type": "custom",
+                "name": "name",
+                "description": "description",
+            },
+        ]
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -4042,6 +4217,197 @@ def test_ai_client_span_responses_api_no_pii(
 
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_ai_client_span_responses_tool_definitions(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = OpenAI(api_key="z")
+    client.responses._post = mock.Mock(return_value=EXAMPLE_RESPONSE)
+
+    if span_streaming:
+        items = capture_items("span")
+
+        with sentry_sdk.traces.start_span(name="openai tx"):
+            client.responses.create(
+                model="gpt-4o",
+                input="How do I check if a Python object is an instance of a class?",
+                tools=[
+                    FunctionToolParam(
+                        type="function",
+                        name="name",
+                        description="description",
+                        parameters={
+                            "type": "object",
+                            "properties": {
+                                "city": {"type": "string"},
+                                "state": {"type": "string"},
+                            },
+                            "required": ["city", "state"],
+                            "additionalProperties": False,
+                        },
+                        strict=True,
+                    ),
+                    CustomToolParam(
+                        type="custom", name="name", description="description"
+                    ),
+                    WebSearchToolParam(type="web_search"),
+                ],
+            )
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        assert json.loads(spans[0]["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]) == [
+            {
+                "type": "function",
+                "name": "name",
+                "description": "description",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "city": {"type": "string"},
+                        "state": {"type": "string"},
+                    },
+                    "required": ["city", "state"],
+                    "additionalProperties": False,
+                },
+            },
+            {
+                "type": "custom",
+                "name": "name",
+                "description": "description",
+            },
+            {
+                "type": "web_search",
+            },
+        ]
+    elif stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            client.responses.create(
+                model="gpt-4o",
+                input="How do I check if a Python object is an instance of a class?",
+                tools=[
+                    FunctionToolParam(
+                        type="function",
+                        name="name",
+                        description="description",
+                        parameters={
+                            "type": "object",
+                            "properties": {
+                                "city": {"type": "string"},
+                                "state": {"type": "string"},
+                            },
+                            "required": ["city", "state"],
+                            "additionalProperties": False,
+                        },
+                        strict=True,
+                    ),
+                    CustomToolParam(
+                        type="custom", name="name", description="description"
+                    ),
+                    WebSearchToolParam(type="web_search"),
+                ],
+            )
+
+        spans = [item.payload for item in items]
+        assert json.loads(spans[0]["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]) == [
+            {
+                "type": "function",
+                "name": "name",
+                "description": "description",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "city": {"type": "string"},
+                        "state": {"type": "string"},
+                    },
+                    "required": ["city", "state"],
+                    "additionalProperties": False,
+                },
+            },
+            {
+                "type": "custom",
+                "name": "name",
+                "description": "description",
+            },
+            {
+                "type": "web_search",
+            },
+        ]
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            client.responses.create(
+                model="gpt-4o",
+                input="How do I check if a Python object is an instance of a class?",
+                tools=[
+                    FunctionToolParam(
+                        type="function",
+                        name="name",
+                        description="description",
+                        parameters={
+                            "type": "object",
+                            "properties": {
+                                "city": {"type": "string"},
+                                "state": {"type": "string"},
+                            },
+                            "required": ["city", "state"],
+                            "additionalProperties": False,
+                        },
+                        strict=True,
+                    ),
+                    CustomToolParam(
+                        type="custom", name="name", description="description"
+                    ),
+                    WebSearchToolParam(type="web_search"),
+                ],
+            )
+
+        (transaction,) = events
+        spans = transaction["spans"]
+
+        assert json.loads(spans[0]["data"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]) == [
+            {
+                "type": "function",
+                "name": "name",
+                "description": "description",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "city": {"type": "string"},
+                        "state": {"type": "string"},
+                    },
+                    "required": ["city", "state"],
+                    "additionalProperties": False,
+                },
+            },
+            {
+                "type": "custom",
+                "name": "name",
+                "description": "description",
+            },
+            {
+                "type": "web_search",
+            },
+        ]
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "instructions,input,expected_system_instructions,expected_request_messages",
     [
@@ -5868,78 +6234,6 @@ async def test_streaming_responses_api_async(
         assert span["data"]["gen_ai.usage.input_tokens"] == 20
         assert span["data"]["gen_ai.usage.output_tokens"] == 10
         assert span["data"]["gen_ai.usage.total_tokens"] == 30
-
-
-@pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
-@pytest.mark.skipif(
-    OPENAI_VERSION <= (1, 1, 0),
-    reason="OpenAI versions <=1.1.0 do not support the tools parameter.",
-)
-@pytest.mark.parametrize(
-    "tools",
-    [[], None, NOT_GIVEN, omit],
-)
-def test_empty_tools_in_chat_completion(
-    sentry_init,
-    capture_events,
-    capture_items,
-    tools,
-    nonstreaming_chat_completions_model_response,
-    stream_gen_ai_spans,
-    span_streaming,
-):
-    sentry_init(
-        integrations=[OpenAIIntegration()],
-        disabled_integrations=[StdlibIntegration],
-        traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
-        trace_lifecycle="stream" if span_streaming else "static",
-    )
-
-    client = OpenAI(api_key="z")
-    client.chat.completions._post = mock.Mock(
-        return_value=nonstreaming_chat_completions_model_response(
-            response_id="chat-id",
-            response_model="gpt-3.5-turbo",
-            message_content="the model response",
-            created=10000000,
-            usage=CompletionUsage(
-                prompt_tokens=20,
-                completion_tokens=10,
-                total_tokens=30,
-            ),
-        )
-    )
-
-    if span_streaming or stream_gen_ai_spans:
-        items = capture_items("span")
-
-        with start_transaction(name="openai tx"):
-            client.chat.completions.create(
-                model="some-model",
-                messages=[{"role": "system", "content": "hello"}],
-                tools=tools,
-            )
-
-        sentry_sdk.flush()
-        span = next(item.payload for item in items)
-
-        assert "gen_ai.request.available_tools" not in span["attributes"]
-    else:
-        events = capture_events()
-
-        with start_transaction(name="openai tx"):
-            client.chat.completions.create(
-                model="some-model",
-                messages=[{"role": "system", "content": "hello"}],
-                tools=tools,
-            )
-
-        (event,) = events
-        span = event["spans"][0]
-
-        assert "gen_ai.request.available_tools" not in span["data"]
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
