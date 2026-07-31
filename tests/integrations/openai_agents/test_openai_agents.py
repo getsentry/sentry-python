@@ -317,7 +317,9 @@ async def test_tool_definitions(
     ]
 
     expected_available_tools = [
-        {"type": "web_search", "name": "web_search"},
+        {"type": "web_search", "name": "web_search_preview"}
+        if parse_version(OPENAI_AGENTS_VERSION) >= (0, 3, 0)
+        else {"type": "web_search", "name": "web_search"},
         {"type": "file_search", "name": "file_search"},
         {"type": "computer", "name": "computer_use_preview"},
         {"type": "mcp", "name": "hosted_mcp"},
