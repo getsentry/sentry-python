@@ -37,10 +37,13 @@ SKIP_RESPONSES_TESTS = False
 
 try:
     from openai.types.responses import (
+        CustomToolParam,
+        FunctionToolParam,
         Response,
         ResponseOutputMessage,
         ResponseOutputText,
         ResponseUsage,
+        WebSearchToolParam,
     )
     from openai.types.responses.response_completed_event import ResponseCompletedEvent
     from openai.types.responses.response_created_event import ResponseCreatedEvent
@@ -4183,6 +4186,197 @@ def test_ai_client_span_responses_api_no_pii(
         assert "gen_ai.system_instructions" not in spans[0]["data"]
         assert "gen_ai.request.messages" not in spans[0]["data"]
         assert "gen_ai.response.text" not in spans[0]["data"]
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_ai_client_span_responses_tool_definitions(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = OpenAI(api_key="z")
+    client.responses._post = mock.Mock(return_value=EXAMPLE_RESPONSE)
+
+    if span_streaming:
+        items = capture_items("span")
+
+        with sentry_sdk.traces.start_span(name="openai tx"):
+            client.responses.create(
+                model="gpt-4o",
+                input="How do I check if a Python object is an instance of a class?",
+                tools=[
+                    FunctionToolParam(
+                        type="function",
+                        name="name",
+                        description="description",
+                        parameters={
+                            "type": "object",
+                            "properties": {
+                                "city": {"type": "string"},
+                                "state": {"type": "string"},
+                            },
+                            "required": ["city", "state"],
+                            "additionalProperties": False,
+                        },
+                        strict=True,
+                    ),
+                    CustomToolParam(
+                        type="custom", name="name", description="description"
+                    ),
+                    WebSearchToolParam(type="web_search"),
+                ],
+            )
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        assert json.loads(spans[0]["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]) == [
+            {
+                "type": "function",
+                "name": "name",
+                "description": "description",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "city": {"type": "string"},
+                        "state": {"type": "string"},
+                    },
+                    "required": ["city", "state"],
+                    "additionalProperties": False,
+                },
+            },
+            {
+                "type": "custom",
+                "name": "name",
+                "description": "description",
+            },
+            {
+                "type": "web_search",
+            },
+        ]
+    elif stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            client.responses.create(
+                model="gpt-4o",
+                input="How do I check if a Python object is an instance of a class?",
+                tools=[
+                    FunctionToolParam(
+                        type="function",
+                        name="name",
+                        description="description",
+                        parameters={
+                            "type": "object",
+                            "properties": {
+                                "city": {"type": "string"},
+                                "state": {"type": "string"},
+                            },
+                            "required": ["city", "state"],
+                            "additionalProperties": False,
+                        },
+                        strict=True,
+                    ),
+                    CustomToolParam(
+                        type="custom", name="name", description="description"
+                    ),
+                    WebSearchToolParam(type="web_search"),
+                ],
+            )
+
+        spans = [item.payload for item in items]
+        assert json.loads(spans[0]["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]) == [
+            {
+                "type": "function",
+                "name": "name",
+                "description": "description",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "city": {"type": "string"},
+                        "state": {"type": "string"},
+                    },
+                    "required": ["city", "state"],
+                    "additionalProperties": False,
+                },
+            },
+            {
+                "type": "custom",
+                "name": "name",
+                "description": "description",
+            },
+            {
+                "type": "web_search",
+            },
+        ]
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            client.responses.create(
+                model="gpt-4o",
+                input="How do I check if a Python object is an instance of a class?",
+                tools=[
+                    FunctionToolParam(
+                        type="function",
+                        name="name",
+                        description="description",
+                        parameters={
+                            "type": "object",
+                            "properties": {
+                                "city": {"type": "string"},
+                                "state": {"type": "string"},
+                            },
+                            "required": ["city", "state"],
+                            "additionalProperties": False,
+                        },
+                        strict=True,
+                    ),
+                    CustomToolParam(
+                        type="custom", name="name", description="description"
+                    ),
+                    WebSearchToolParam(type="web_search"),
+                ],
+            )
+
+        (transaction,) = events
+        spans = transaction["spans"]
+
+        assert json.loads(spans[0]["data"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]) == [
+            {
+                "type": "function",
+                "name": "name",
+                "description": "description",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "city": {"type": "string"},
+                        "state": {"type": "string"},
+                    },
+                    "required": ["city", "state"],
+                    "additionalProperties": False,
+                },
+            },
+            {
+                "type": "custom",
+                "name": "name",
+                "description": "description",
+            },
+            {
+                "type": "web_search",
+            },
+        ]
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
