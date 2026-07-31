@@ -38,6 +38,8 @@ def invoke_agent_span(
                 SPANDATA.GEN_AI_OPERATION_NAME: "invoke_agent",
             },
         )
+
+        set_on_span = span.set_attribute
     else:
         start_span_function = get_start_span_function()
         span = start_span_function(
@@ -48,6 +50,8 @@ def invoke_agent_span(
         span.__enter__()
 
         span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
+
+        set_on_span = span.set_data
 
     if should_send_default_pii():
         messages = []
@@ -96,6 +100,12 @@ def invoke_agent_span(
                 )
 
     _set_agent_data(span, agent)
+
+    if len(agent.tools) > 0:
+        set_on_span(
+            SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+            safe_serialize([vars(tool) for tool in agent.tools]),
+        )
 
     return span
 

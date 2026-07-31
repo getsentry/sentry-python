@@ -90,12 +90,6 @@ def _set_agent_data(
             agent.model_settings.frequency_penalty,
         )
 
-    if len(agent.tools) > 0:
-        set_on_span(
-            SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
-            safe_serialize([vars(tool) for tool in agent.tools]),
-        )
-
 
 def _set_usage_data(
     span: "Union[sentry_sdk.tracing.Span, StreamedSpan]", usage: "Usage"
