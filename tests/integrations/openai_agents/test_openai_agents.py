@@ -290,7 +290,6 @@ async def test_tool_definitions(
         return "hello"
 
     tools = [
-        agents.function_tool(some_function, defer_loading=True),
         WebSearchTool(),
         FileSearchTool(vector_store_ids=[]),
         ComputerTool(computer=TrackingComputer()),
@@ -318,21 +317,6 @@ async def test_tool_definitions(
     ]
 
     expected_available_tools = [
-        {
-            "type": "function",
-            "name": "some_function",
-            "description": "",
-            "parameters": {
-                "properties": {
-                    "a": {"title": "A", "type": "string"},
-                    "b": {"items": {"type": "integer"}, "title": "B", "type": "array"},
-                },
-                "required": ["a", "b"],
-                "title": "some_function_args",
-                "type": "object",
-                "additionalProperties": False,
-            },
-        },
         {"type": "web_search", "name": "web_search"},
         {"type": "file_search", "name": "file_search"},
         {"type": "computer", "name": "computer_use_preview"},
@@ -367,7 +351,29 @@ async def test_tool_definitions(
         )
 
     if ToolSearchTool is not None:
+        tools.append(agents.function_tool(some_function, defer_loading=True))
         tools.append(ToolSearchTool())
+        expected_available_tools.append(
+            {
+                "type": "function",
+                "name": "some_function",
+                "description": "",
+                "parameters": {
+                    "properties": {
+                        "a": {"title": "A", "type": "string"},
+                        "b": {
+                            "items": {"type": "integer"},
+                            "title": "B",
+                            "type": "array",
+                        },
+                    },
+                    "required": ["a", "b"],
+                    "title": "some_function_args",
+                    "type": "object",
+                    "additionalProperties": False,
+                },
+            },
+        )
         expected_available_tools.append(
             {"type": "tool_search", "name": "tool_search"},
         )
