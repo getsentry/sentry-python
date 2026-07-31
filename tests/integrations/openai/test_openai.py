@@ -137,6 +137,26 @@ EXAMPLE_TOOLS = [
     }
 ]
 
+EXAMPLE_COMPLETIONS_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_current_weather",
+            "description": "Get the current weather in a given location",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "location": {
+                        "type": "string",
+                        "description": "The city and state, e.g. San Francisco, CA",
+                    },
+                },
+                "required": ["location"],
+            },
+        },
+    }
+]
+
 
 @pytest.mark.skipif(
     OPENAI_VERSION <= (2, 10, 0),
@@ -637,6 +657,154 @@ def test_nonstreaming_chat_completion(
         assert span["data"]["gen_ai.usage.output_tokens"] == 10
         assert span["data"]["gen_ai.usage.input_tokens"] == 20
         assert span["data"]["gen_ai.usage.total_tokens"] == 30
+
+
+@pytest.mark.skipif(
+    OPENAI_VERSION <= (1, 1, 0),
+    reason="OpenAI versions <=1.1.0 do not support the tools parameter.",
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,include_prompts,expected_present,expected_absent",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            True,
+            {
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: json.dumps(
+                    [{"type": "text", "content": "You are a helpful assistant."}]
+                ),
+                SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
+                    [{"role": "user", "content": "hello"}]
+                ),
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS: safe_serialize(EXAMPLE_TOOLS),
+            },
+            [],
+            id="inputs-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            True,
+            {},
+            [
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+            ],
+            id="inputs-disabled",
+        ),
+        pytest.param(
+            {},
+            True,
+            {
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: json.dumps(
+                    [{"type": "text", "content": "You are a helpful assistant."}]
+                ),
+                SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
+                    [{"role": "user", "content": "hello"}]
+                ),
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS: safe_serialize(EXAMPLE_TOOLS),
+            },
+            [],
+            id="gen-ai-omitted-defaults-to-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            False,
+            {},
+            [
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+            ],
+            id="include-prompts-disabled-overrides-inputs-enabled",
+        ),
+    ],
+)
+def test_completions_api_data_collection(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    include_prompts,
+    expected_present,
+    expected_absent,
+    nonstreaming_chat_completions_model_response,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=include_prompts)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        _experiments={"data_collection": data_collection},
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
+        )
+    )
+
+    create_kwargs = {
+        "model": "some-model",
+        "messages": [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "hello"},
+        ],
+        "max_tokens": 100,
+        "presence_penalty": 0.1,
+        "frequency_penalty": 0.2,
+        "temperature": 0.7,
+        "top_p": 0.9,
+        "tools": EXAMPLE_COMPLETIONS_TOOLS,
+    }
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            client.chat.completions.create(**create_kwargs)
+
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items)
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            client.chat.completions.create(**create_kwargs)
+
+        (transaction,) = events
+        (span,) = transaction["spans"]
+        span_data = span["data"]
+
+    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span_data[SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span_data[SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span_data[SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span_data[SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+    assert span_data[SPANDATA.GEN_AI_SYSTEM] == "openai"
+
+    for key, value in expected_present.items():
+        assert span_data[key] == value
+
+    for key in expected_absent:
+        assert key not in span_data
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
