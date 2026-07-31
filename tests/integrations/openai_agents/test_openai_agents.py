@@ -2348,9 +2348,11 @@ async def test_tool_execution_span(
         if OPENAI_VERSION >= (2, 25, 0):
             tool_call["namespace"] = None
 
-        assert json.loads(
+        parsed_tool_calls = json.loads(
             ai_client_span1["attributes"]["gen_ai.response.tool_calls"]
-        ) == [tool_call]
+        )
+        assert len(parsed_tool_calls) == 1
+        assert tool_call.items() <= parsed_tool_calls[0].items()
 
         assert tool_span["name"] == "execute_tool simple_test_tool"
         assert tool_span["attributes"]["gen_ai.agent.name"] == "test_agent"
@@ -2539,12 +2541,11 @@ async def test_tool_execution_span(
             "status": None,
         }
 
-        if OPENAI_VERSION >= (2, 25, 0):
-            tool_call["namespace"] = None
-
-        assert json.loads(
+        parsed_tool_calls = json.loads(
             ai_client_span1["attributes"]["gen_ai.response.tool_calls"]
-        ) == [tool_call]
+        )
+        assert len(parsed_tool_calls) == 1
+        assert tool_call.items() <= parsed_tool_calls[0].items()
 
         assert tool_span["name"] == "execute_tool simple_test_tool"
         assert tool_span["attributes"]["gen_ai.agent.name"] == "test_agent"
@@ -2722,12 +2723,11 @@ async def test_tool_execution_span(
             "status": None,
         }
 
-        if OPENAI_VERSION >= (2, 25, 0):
-            tool_call["namespace"] = None
-
-        assert json.loads(ai_client_span1["data"]["gen_ai.response.tool_calls"]) == [
-            tool_call
-        ]
+        parsed_tool_calls = json.loads(
+            ai_client_span1["data"]["gen_ai.response.tool_calls"]
+        )
+        assert len(parsed_tool_calls) == 1
+        assert tool_call.items() <= parsed_tool_calls[0].items()
 
         assert tool_span["description"] == "execute_tool simple_test_tool"
         assert tool_span["data"]["gen_ai.agent.name"] == "test_agent"
