@@ -8,23 +8,14 @@ in use.
 import re
 from typing import TYPE_CHECKING
 
+from django.urls import get_resolver
+from django.urls.resolvers import RoutePattern
+
 if TYPE_CHECKING:
     from re import Pattern
     from typing import Dict, List, Optional, Tuple, Union
 
     from django.urls.resolvers import URLPattern, URLResolver
-
-from django import VERSION as DJANGO_VERSION
-
-if DJANGO_VERSION >= (2, 0):
-    from django.urls.resolvers import RoutePattern
-else:
-    RoutePattern = None
-
-try:
-    from django.urls import get_resolver
-except ImportError:
-    from django.core.urlresolvers import get_resolver
 
 
 def get_regex(resolver_or_pattern: "Union[URLPattern, URLResolver]") -> "Pattern[str]":
@@ -61,11 +52,7 @@ class RavenResolver:
         """
         # "new-style" path patterns can be parsed directly without turning them
         # into regexes first
-        if (
-            RoutePattern is not None
-            and hasattr(pattern, "pattern")
-            and isinstance(pattern.pattern, RoutePattern)
-        ):
+        if hasattr(pattern, "pattern") and isinstance(pattern.pattern, RoutePattern):
             return self._new_style_group_matcher.sub(
                 lambda m: "{%s}" % m.group(2), str(pattern.pattern._route)
             )
