@@ -41,18 +41,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-loguru"
-      - name: Test opentelemetry
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-opentelemetry"
       - name: Test otlp
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-otlp"
-      - name: Test potel
-        run: |
-          set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-potel"
       - name: Test pure_eval
         run: |
           set -x # print commands that are executed

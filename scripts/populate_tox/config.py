@@ -231,6 +231,9 @@ TEST_SUITE_CONFIG = {
     "huey": {
         "package": "huey",
         "num_versions": 2,
+        "python": {
+            ">=3.3.0": ">3.7",
+        },
     },
     "huggingface_hub": {
         "package": "huggingface_hub",
@@ -297,13 +300,16 @@ TEST_SUITE_CONFIG = {
     "mcp": {
         "package": "mcp",
         "deps": {
-            "*": ["pytest-asyncio"],
+            "*": ["pytest-asyncio", "httpx"],
         },
     },
     "fastmcp": {
         "package": "fastmcp",
         "deps": {
-            "*": ["pytest-asyncio"],
+            "*": ["pytest-asyncio", "httpx"],
+            "<0.3.0": [
+                "mcp<2"
+            ],  # Pin added to package in https://github.com/PrefectHQ/fastmcp/commit/5f58621f8b7c7ba257c9837333b09b391f868456#diff-50c86b7ed8ac2cf95bd48334961bf0530cdc77b5a56f852c5c61b89d735fd711
         },
     },
     "openai-base": {

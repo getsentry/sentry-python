@@ -110,7 +110,6 @@ _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.sqlalchemy.SqlalchemyIntegration",
     "sentry_sdk.integrations.starlette.StarletteIntegration",
     "sentry_sdk.integrations.starlite.StarliteIntegration",
-    "sentry_sdk.integrations.strawberry.StrawberryIntegration",
     "sentry_sdk.integrations.tornado.TornadoIntegration",
 ]
 

@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 
+import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis.consts import (
     _COMMANDS_INCLUDING_SENSITIVE_DATA,
@@ -11,7 +12,7 @@ from sentry_sdk.integrations.redis.consts import (
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span
-from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
+from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE, has_data_collection_enabled
 
 if TYPE_CHECKING:
     from typing import Any, Optional, Sequence, Union
@@ -22,6 +23,7 @@ def _get_safe_command(name: str, args: "Sequence[Any]") -> str:
 
     name_low = name.lower()
     send_default_pii = should_send_default_pii()
+    client_options = sentry_sdk.get_client().options
 
     for i, arg in enumerate(args):
         if i > _MAX_NUM_ARGS:
@@ -35,7 +37,10 @@ def _get_safe_command(name: str, args: "Sequence[Any]") -> str:
         if arg_is_the_key:
             command_parts.append(repr(arg))
         else:
-            if send_default_pii:
+            if has_data_collection_enabled(client_options):
+                if client_options["data_collection"]["database_query_data"]:
+                    command_parts.append(repr(arg))
+            elif send_default_pii:
                 command_parts.append(repr(arg))
             else:
                 command_parts.append(SENSITIVE_DATA_SUBSTITUTE)

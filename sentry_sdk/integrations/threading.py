@@ -11,7 +11,6 @@ from sentry_sdk.scope import use_isolation_scope, use_scope
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    logger,
     reraise,
 )
 
@@ -27,22 +26,8 @@ if TYPE_CHECKING:
 class ThreadingIntegration(Integration):
     identifier = "threading"
 
-    def __init__(
-        self, propagate_hub: "Optional[bool]" = None, propagate_scope: bool = True
-    ) -> None:
-        if propagate_hub is not None:
-            logger.warning(
-                "Deprecated: propagate_hub is deprecated. This will be removed in the future."
-            )
-
-        # Note: propagate_hub did not have any effect on propagation of scope data
-        # scope data was always propagated no matter what the value of propagate_hub was
-        # This is why the default for propagate_scope is True
-
+    def __init__(self, propagate_scope: bool = True) -> None:
         self.propagate_scope = propagate_scope
-
-        if propagate_hub is not None:
-            self.propagate_scope = propagate_hub
 
     @staticmethod
     def setup_once() -> None:

@@ -1,10 +1,8 @@
 import asyncio
 import base64
 import inspect
-import json
 import os
 import sys
-from unittest import mock
 
 import django
 import pytest
@@ -197,85 +195,6 @@ async def test_async_views(
     }
 
 
-@pytest.mark.parametrize("application", APPS)
-@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
-@pytest.mark.parametrize("middleware_spans", [False, True])
-@pytest.mark.asyncio
-@pytest.mark.skipif(
-    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
-)
-@pytest.mark.parametrize("span_streaming", [True, False])
-async def test_active_thread_id(
-    sentry_init,
-    capture_envelopes,
-    capture_items,
-    teardown_profiling,
-    endpoint,
-    application,
-    middleware_spans,
-    span_streaming,
-):
-    sentry_init(
-        integrations=[DjangoIntegration(middleware_spans=middleware_spans)],
-        traces_sample_rate=1.0,
-        profiles_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
-    )
-
-    comm = HttpCommunicator(application, "GET", endpoint)
-
-    if span_streaming:
-        with mock.patch(
-            "sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0
-        ):
-            items = capture_items("span")
-            response = await comm.get_response()
-            await comm.wait()
-
-            assert response["status"] == 200, response["body"]
-
-        data = json.loads(response["body"])
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-
-        for span in spans:
-            if span["is_segment"] is False:
-                continue
-            assert str(data["active"]) == span["attributes"]["thread.id"]
-    else:
-        with mock.patch(
-            "sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0
-        ):
-            envelopes = capture_envelopes()
-            response = await comm.get_response()
-            await comm.wait()
-
-            assert response["status"] == 200, response["body"]
-
-        assert len(envelopes) == 1
-
-        profiles = [item for item in envelopes[0].items if item.type == "profile"]
-        assert len(profiles) == 1
-
-        data = json.loads(response["body"])
-
-        for item in profiles:
-            transactions = item.payload.json["transactions"]
-            assert len(transactions) == 1
-            assert str(data["active"]) == transactions[0]["active_thread_id"]
-
-        transactions = [
-            item for item in envelopes[0].items if item.type == "transaction"
-        ]
-        assert len(transactions) == 1
-
-        for item in transactions:
-            transaction = item.payload.json
-            trace_context = transaction["contexts"]["trace"]
-            assert str(data["active"]) == trace_context["data"]["thread.id"]
-
-
 @pytest.mark.asyncio
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
@@ -377,9 +296,9 @@ async def test_async_middleware_spans(
     sentry_init(
         integrations=[DjangoIntegration(middleware_spans=True)],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={
             "record_sql_params": True,
-            "trace_lifecycle": "stream" if span_streaming else "static",
         },
     )
 

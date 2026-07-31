@@ -5,7 +5,7 @@ import sentry_sdk
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.data_collection import _apply_key_value_collection_filtering
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import AnnotatedValue, has_data_collection_enabled, logger
+from sentry_sdk.utils import AnnotatedValue, has_data_collection_enabled
 
 try:
     from django.http.request import RawPostDataException
@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any, Dict, Mapping, MutableMapping, Optional, Union
 
-    from sentry_sdk._types import Event, HttpStatusCodeRange
+    from sentry_sdk._types import Event
 
 
 SENSITIVE_ENV_KEYS = (
@@ -247,36 +247,3 @@ def _filter_headers(
             )
             for k, v in headers.items()
         }
-
-
-def _in_http_status_code_range(
-    code: object, code_ranges: "list[HttpStatusCodeRange]"
-) -> bool:
-    for target in code_ranges:
-        if isinstance(target, int):
-            if code == target:
-                return True
-            continue
-
-        try:
-            if code in target:
-                return True
-        except TypeError:
-            logger.warning(
-                "failed_request_status_codes has to be a list of integers or containers"
-            )
-
-    return False
-
-
-class HttpCodeRangeContainer:
-    """
-    Wrapper to make it possible to use list[HttpStatusCodeRange] as a Container[int].
-    Used for backwards compatibility with the old `failed_request_status_codes` option.
-    """
-
-    def __init__(self, code_ranges: "list[HttpStatusCodeRange]") -> None:
-        self._code_ranges = code_ranges
-
-    def __contains__(self, item: object) -> bool:
-        return _in_http_status_code_range(item, self._code_ranges)

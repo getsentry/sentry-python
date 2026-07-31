@@ -9,6 +9,7 @@ from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.rq import RqIntegration
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE, parse_version
+from tests.integrations.utils import DATA_COLLECTION_QUEUES_CASES
 
 
 @pytest.fixture(autouse=True)
@@ -35,7 +36,7 @@ def _patch_rq_get_server_version(monkeypatch):
                 pass
 
 
-def crashing_job(foo):
+def crashing_job(foo, b=1):
     1 / 0
 
 
@@ -106,6 +107,54 @@ def test_basic(
     # older versions don't persist started_at correctly
     if tuple(map(int, rq.VERSION.split("."))) >= (0, 9):
         assert "started_at" in extra
+
+
+@pytest.mark.parametrize(
+    "init_kwargs,expected_args,expected_kwargs",
+    DATA_COLLECTION_QUEUES_CASES,
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_job_args_kwargs_data_collection(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+    init_kwargs,
+    expected_args,
+    expected_kwargs,
+):
+    sentry_init(
+        integrations=[RqIntegration()],
+        trace_lifecycle="stream" if span_streaming else "static",
+        **init_kwargs,
+    )
+
+    queue = rq.Queue(connection=FakeStrictRedis())
+    worker = rq.SimpleWorker([queue], connection=queue.connection)
+
+    if span_streaming:
+        items = capture_items("event")
+
+        queue.enqueue(crashing_job, 1, b=0)
+        worker.work(burst=True)
+
+        (event,) = (item.payload for item in items)
+    else:
+        events = capture_events()
+
+        queue.enqueue(crashing_job, 1, b=0)
+        worker.work(burst=True)
+
+        (event,) = events
+
+    rq_job = event["extra"]["rq-job"]
+
+    if expected_args is None:
+        assert "args" not in rq_job
+        assert "kwargs" not in rq_job
+    else:
+        assert rq_job["args"] == expected_args
+        assert rq_job["kwargs"] == expected_kwargs
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])

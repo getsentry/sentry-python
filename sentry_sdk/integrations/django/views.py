@@ -99,12 +99,6 @@ def _wrap_sync_view(callback: "Any") -> "Any":
             if current_scope.transaction is not None:
                 current_scope.transaction.update_active_thread()
 
-        sentry_scope = sentry_sdk.get_isolation_scope()
-        # set the active thread id to the handler thread for sync views
-        # this isn't necessary for async views since that runs on main
-        if sentry_scope.profile is not None:
-            sentry_scope.profile.update_active_thread_id()
-
         integration = client.get_integration(DjangoIntegration)
         if not integration or not integration.middleware_spans:
             return callback(request, *args, **kwargs)

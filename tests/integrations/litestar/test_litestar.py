@@ -169,9 +169,7 @@ def test_transaction_name_and_source(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     litestar_app = litestar_app_factory()
     client = TestClient(litestar_app)
