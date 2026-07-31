@@ -678,27 +678,6 @@ def test_client_debug_option_disabled(with_client, sentry_init, caplog):
     assert "OK" not in caplog.text
 
 
-@pytest.mark.skip(
-    reason="New behavior in SDK 2.0: You have a scope before init and add data to it."
-)
-def test_scope_initialized_before_client(sentry_init, capture_events):
-    """
-    This is a consequence of how configure_scope() works. We must
-    make `configure_scope()` a noop if no client is configured. Even
-    if the user later configures a client: We don't know that.
-    """
-    with configure_scope() as scope:
-        scope.set_tag("foo", 42)
-
-    sentry_init()
-
-    events = capture_events()
-    capture_message("hi")
-    (event,) = events
-
-    assert "tags" not in event
-
-
 def test_weird_chars(sentry_init, capture_events):
     sentry_init()
     events = capture_events()
@@ -1115,36 +1094,17 @@ def test_max_value_length_option(sentry_init, capture_events):
 @pytest.mark.parametrize(
     "client_option,env_var_value,debug_output_expected",
     [
+        # env var parsing itself (env_to_bool) is exhaustively tested in
+        # tests/test_utils.py; what is specified here is the precedence:
+        # explicit option beats env var, env var only applies otherwise.
         (None, "", False),
         (None, "t", True),
-        (None, "1", True),
-        (None, "True", True),
-        (None, "true", True),
         (None, "f", False),
-        (None, "0", False),
-        (None, "False", False),
-        (None, "false", False),
         (None, "xxx", False),
         (True, "", True),
-        (True, "t", True),
-        (True, "1", True),
-        (True, "True", True),
-        (True, "true", True),
         (True, "f", True),
-        (True, "0", True),
-        (True, "False", True),
-        (True, "false", True),
-        (True, "xxx", True),
         (False, "", False),
         (False, "t", False),
-        (False, "1", False),
-        (False, "True", False),
-        (False, "true", False),
-        (False, "f", False),
-        (False, "0", False),
-        (False, "False", False),
-        (False, "false", False),
-        (False, "xxx", False),
     ],
 )
 @pytest.mark.tests_internal_exceptions
@@ -1173,14 +1133,14 @@ def test_debug_option(
 @pytest.mark.parametrize(
     "client_option,env_var_value,spotlight_url_expected",
     [
+        # option x env precedence: option in {None, False, True, URL} crossed
+        # with env in {unset, falsy, truthy, URL}; env bool parsing itself is
+        # covered in tests/test_utils.py::test_env_to_bool.
         (None, None, None),
-        (None, "", None),
         (None, "F", None),
         (False, None, None),
-        (False, "", None),
         (False, "t", None),
         (None, "t", DEFAULT_SPOTLIGHT_URL),
-        (None, "1", DEFAULT_SPOTLIGHT_URL),
         (True, None, DEFAULT_SPOTLIGHT_URL),
         # Per spec: spotlight=True + env URL -> use env URL
         (True, "http://localhost:8080/slurp", "http://localhost:8080/slurp"),

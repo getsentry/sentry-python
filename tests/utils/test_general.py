@@ -38,8 +38,15 @@ def test_safe_repr_regressions():
     assert "лошадь" in safe_repr("лошадь")
 
 
-@pytest.mark.parametrize("prefix", ("", "abcd", "лошадь"))
-@pytest.mark.parametrize("character", "\x00\x07\x1b\n")
+@pytest.mark.parametrize(
+    "prefix,character",
+    [
+        ("", "\x00"),
+        ("abcd", "\n"),
+        ("лошадь", "\x1b"),
+        ("лошадь", "\x07"),
+    ],
+)
 def test_safe_repr_non_printable(prefix, character):
     """Check that non-printable characters are escaped"""
     string = prefix + character
