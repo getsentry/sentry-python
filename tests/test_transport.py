@@ -109,36 +109,70 @@ def mock_transaction_envelope(span_count: int) -> "Envelope":
     return envelope
 
 
-def _transport_works_cases():
-    """
-    The compression-relevant dimensions (level x algo x http2) are fully
-    crossed; debug, flush method and pickling are rotated through the cases
-    so every value of every dimension is still exercised.
-    """
-    algos = ("gzip", "br", "<invalid>", None) if PY37 else ("gzip", "<invalid>", None)
-    http2_options = (True, False) if PY38 else (False,)
-    cases = []
-    i = 0
-    for compression_level in (None, 0, 9):
-        for compression_algo in algos:
-            for http2 in http2_options:
-                cases.append(
-                    (
-                        i % 2 == 0,  # debug
-                        ("close", "flush")[i % 2],  # client_flush_method
-                        (i // 2) % 2 == 0,  # use_pickle
-                        compression_level,
-                        compression_algo,
-                        http2,
-                    )
-                )
-                i += 1
-    return cases
+# The compression-relevant dimensions (level x algo x http2) are fully
+# crossed; debug, flush method and pickling are rotated through the cases
+# so every value of every dimension is still exercised.
+#
+# (debug, client_flush_method, use_pickle, compression_level, compression_algo, http2)
+if PY38:
+    _transport_works_cases = [
+        (True, "close", True, None, "gzip", True),
+        (False, "flush", True, None, "gzip", False),
+        (True, "close", False, None, "br", True),
+        (False, "flush", False, None, "br", False),
+        (True, "close", True, None, "<invalid>", True),
+        (False, "flush", True, None, "<invalid>", False),
+        (True, "close", False, None, None, True),
+        (False, "flush", False, None, None, False),
+        (True, "close", True, 0, "gzip", True),
+        (False, "flush", True, 0, "gzip", False),
+        (True, "close", False, 0, "br", True),
+        (False, "flush", False, 0, "br", False),
+        (True, "close", True, 0, "<invalid>", True),
+        (False, "flush", True, 0, "<invalid>", False),
+        (True, "close", False, 0, None, True),
+        (False, "flush", False, 0, None, False),
+        (True, "close", True, 9, "gzip", True),
+        (False, "flush", True, 9, "gzip", False),
+        (True, "close", False, 9, "br", True),
+        (False, "flush", False, 9, "br", False),
+        (True, "close", True, 9, "<invalid>", True),
+        (False, "flush", True, 9, "<invalid>", False),
+        (True, "close", False, 9, None, True),
+        (False, "flush", False, 9, None, False),
+    ]
+elif PY37:
+    _transport_works_cases = [
+        (True, "close", True, None, "gzip", False),
+        (False, "flush", True, None, "br", False),
+        (True, "close", False, None, "<invalid>", False),
+        (False, "flush", False, None, None, False),
+        (True, "close", True, 0, "gzip", False),
+        (False, "flush", True, 0, "br", False),
+        (True, "close", False, 0, "<invalid>", False),
+        (False, "flush", False, 0, None, False),
+        (True, "close", True, 9, "gzip", False),
+        (False, "flush", True, 9, "br", False),
+        (True, "close", False, 9, "<invalid>", False),
+        (False, "flush", False, 9, None, False),
+    ]
+else:
+    _transport_works_cases = [
+        (True, "close", True, None, "gzip", False),
+        (False, "flush", True, None, "<invalid>", False),
+        (True, "close", False, None, None, False),
+        (False, "flush", False, 0, "gzip", False),
+        (True, "close", True, 0, "<invalid>", False),
+        (False, "flush", True, 0, None, False),
+        (True, "close", False, 9, "gzip", False),
+        (False, "flush", False, 9, "<invalid>", False),
+        (True, "close", True, 9, None, False),
+    ]
 
 
 @pytest.mark.parametrize(
     "debug,client_flush_method,use_pickle,compression_level,compression_algo,http2",
-    _transport_works_cases(),
+    _transport_works_cases,
 )
 def test_transport_works(
     capturing_server,
