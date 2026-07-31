@@ -610,31 +610,36 @@ def _set_embeddings_input_data(
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
 ) -> None:
-    messages: "Union[str, SequenceNotStr[str], Iterable[int], Iterable[Iterable[int]]]" = kwargs.get(
-        "input"
-    )
+
+    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
 
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
     )
+
     model = kwargs.get("model")
     if model is not None:
         set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
 
-    if (
-        not should_send_default_pii()
-        or not integration.include_prompts
-        or messages is None
-    ):
-        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
+    messages: "Union[str, SequenceNotStr[str], Iterable[int], Iterable[Iterable[int]]]" = kwargs.get(
+        "input"
+    )
 
+    client = sentry_sdk.get_client()
+    if has_data_collection_enabled(client.options):
+        # This takes precedence over the global data collection settings
+        if not integration.include_prompts:
+            return
+        if not client.options["data_collection"]["gen_ai"]["inputs"]:
+            return
+    elif not should_send_default_pii() or not integration.include_prompts:
+        return
+
+    if messages is None:
         return
 
     if isinstance(messages, str):
-        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
-
         normalized_messages = normalize_message_roles([messages])  # type: ignore
-        client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
         messages_data = (
             truncate_and_annotate_embedding_inputs(normalized_messages, span, scope)
@@ -650,7 +655,6 @@ def _set_embeddings_input_data(
 
     # dict special case following https://github.com/openai/openai-python/blob/3e0c05b84a2056870abf3bd6a5e7849020209cc3/src/openai/_utils/_transform.py#L194-L197
     if not isinstance(messages, Iterable) or isinstance(messages, dict):
-        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
         return
 
     messages = list(messages)
@@ -658,7 +662,6 @@ def _set_embeddings_input_data(
 
     if len(messages) > 0:
         normalized_messages = normalize_message_roles(messages)
-        client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
         messages_data = (
             truncate_and_annotate_embedding_inputs(normalized_messages, span, scope)
@@ -669,9 +672,6 @@ def _set_embeddings_input_data(
             set_data_normalized(
                 span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, messages_data, unpack=False
             )
-
-    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
-
 
 def _set_common_output_data(
     span: "Union[Span, StreamedSpan]",

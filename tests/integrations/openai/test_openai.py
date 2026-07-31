@@ -2980,6 +2980,206 @@ def test_embeddings_create(
         assert span["data"]["gen_ai.usage.total_tokens"] == 30
 
 
+def _collect_embeddings_span_data(
+    capture_events, capture_items, span_streaming, stream_gen_ai_spans, create
+):
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            response = create()
+
+        assert len(response.data[0].embedding) == 3
+
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.embeddings"
+        return span["attributes"]
+
+    events = capture_events()
+
+    with start_transaction(name="openai tx"):
+        response = create()
+
+    assert len(response.data[0].embedding) == 3
+
+    tx = events[0]
+    assert tx["type"] == "transaction"
+    span = tx["spans"][0]
+    assert span["op"] == "gen_ai.embeddings"
+    return span["data"]
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,include_prompts,expect_input",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            False,
+            True,
+            True,
+            id="inputs-enabled-overrides-pii-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            True,
+            True,
+            False,
+            id="inputs-disabled-overrides-pii-enabled",
+        ),
+        pytest.param(
+            {},
+            False,
+            True,
+            True,
+            id="gen-ai-omitted-defaults-to-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            False,
+            True,
+            False,
+            id="inputs-disabled-and-pii-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            True,
+            False,
+            False,
+            id="include-prompts-disabled-overrides-inputs-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            True,
+            False,
+            id="no-experiment-falls-back-to-pii",
+        ),
+    ],
+)
+def test_embeddings_create_data_collection(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    send_default_pii,
+    include_prompts,
+    expect_input,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    init_kwargs = {
+        "integrations": [OpenAIIntegration(include_prompts=include_prompts)],
+        "disabled_integrations": [StdlibIntegration],
+        "traces_sample_rate": 1.0,
+        "send_default_pii": send_default_pii,
+        "stream_gen_ai_spans": stream_gen_ai_spans,
+        "trace_lifecycle": "stream" if span_streaming else "static",
+    }
+
+    sentry_init_kwargs = dict(init_kwargs)
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    sentry_init(**sentry_init_kwargs)
+
+    client = OpenAI(api_key="z")
+
+    returned_embedding = CreateEmbeddingResponse(
+        data=[Embedding(object="embedding", index=0, embedding=[1.0, 2.0, 3.0])],
+        model="some-model",
+        object="list",
+        usage=EmbeddingTokenUsage(
+            prompt_tokens=20,
+            total_tokens=30,
+        ),
+    )
+
+    client.embeddings._post = mock.Mock(return_value=returned_embedding)
+
+    span_data = _collect_embeddings_span_data(
+        capture_events,
+        capture_items,
+        span_streaming,
+        stream_gen_ai_spans,
+        lambda: client.embeddings.create(input="hello", model="text-embedding-3-large"),
+    )
+
+    assert span_data[SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
+
+    if expect_input:
+        assert json.loads(span_data[SPANDATA.GEN_AI_EMBEDDINGS_INPUT]) == ["hello"]
+    else:
+        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span_data
+
+    assert span_data["gen_ai.usage.input_tokens"] == 20
+    assert span_data["gen_ai.usage.total_tokens"] == 30
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "get_input",
+    [
+        lambda: "hello",
+        lambda: ["First text", "Second text"],
+        lambda: iter(["First text", "Second text"]),
+        lambda: [5, 8, 13, 21, 34],
+        lambda: [[5, 8, 13], [8, 13, 21]],
+        lambda: {"text": "hello"},
+    ],
+)
+def test_embeddings_create_data_collection_inputs_disabled_input_shapes(
+    sentry_init,
+    capture_events,
+    capture_items,
+    get_input,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+        _experiments={"data_collection": {"gen_ai": {"inputs": False}}},
+    )
+
+    client = OpenAI(api_key="z")
+
+    returned_embedding = CreateEmbeddingResponse(
+        data=[Embedding(object="embedding", index=0, embedding=[1.0, 2.0, 3.0])],
+        model="some-model",
+        object="list",
+        usage=EmbeddingTokenUsage(
+            prompt_tokens=20,
+            total_tokens=30,
+        ),
+    )
+
+    client.embeddings._post = mock.Mock(return_value=returned_embedding)
+
+    span_data = _collect_embeddings_span_data(
+        capture_events,
+        capture_items,
+        span_streaming,
+        stream_gen_ai_spans,
+        lambda: client.embeddings.create(
+            input=get_input(), model="text-embedding-3-large"
+        ),
+    )
+
+    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
+    assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span_data
+
+
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
@@ -3223,6 +3423,132 @@ async def test_embeddings_create_async(
 
         assert span["data"]["gen_ai.usage.input_tokens"] == 20
         assert span["data"]["gen_ai.usage.total_tokens"] == 30
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,include_prompts,expect_input",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            False,
+            True,
+            True,
+            id="inputs-enabled-overrides-pii-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            True,
+            True,
+            False,
+            id="inputs-disabled-overrides-pii-enabled",
+        ),
+        pytest.param(
+            {},
+            False,
+            True,
+            True,
+            id="gen-ai-omitted-defaults-to-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            True,
+            False,
+            False,
+            id="include-prompts-disabled-overrides-inputs-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            True,
+            False,
+            id="no-experiment-falls-back-to-pii",
+        ),
+    ],
+)
+async def test_embeddings_create_async_data_collection(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    send_default_pii,
+    include_prompts,
+    expect_input,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    init_kwargs = {
+        "integrations": [OpenAIIntegration(include_prompts=include_prompts)],
+        "disabled_integrations": [StdlibIntegration],
+        "traces_sample_rate": 1.0,
+        "send_default_pii": send_default_pii,
+        "stream_gen_ai_spans": stream_gen_ai_spans,
+        "trace_lifecycle": "stream" if span_streaming else "static",
+    }
+
+    sentry_init_kwargs = dict(init_kwargs)
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    sentry_init(**sentry_init_kwargs)
+
+    client = AsyncOpenAI(api_key="z")
+
+    returned_embedding = CreateEmbeddingResponse(
+        data=[Embedding(object="embedding", index=0, embedding=[1.0, 2.0, 3.0])],
+        model="some-model",
+        object="list",
+        usage=EmbeddingTokenUsage(
+            prompt_tokens=20,
+            total_tokens=30,
+        ),
+    )
+
+    client.embeddings._post = AsyncMock(return_value=returned_embedding)
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            response = await client.embeddings.create(
+                input="hello", model="text-embedding-3-large"
+            )
+
+        assert len(response.data[0].embedding) == 3
+
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.embeddings"
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            response = await client.embeddings.create(
+                input="hello", model="text-embedding-3-large"
+            )
+
+        assert len(response.data[0].embedding) == 3
+
+        tx = events[0]
+        assert tx["type"] == "transaction"
+        span = tx["spans"][0]
+        assert span["op"] == "gen_ai.embeddings"
+        span_data = span["data"]
+
+    assert span_data[SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
+
+    if expect_input:
+        assert json.loads(span_data[SPANDATA.GEN_AI_EMBEDDINGS_INPUT]) == ["hello"]
+    else:
+        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span_data
+
+    assert span_data["gen_ai.usage.input_tokens"] == 20
+    assert span_data["gen_ai.usage.total_tokens"] == 30
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
