@@ -42,7 +42,7 @@ def _transform_tool_definitions(tools: "Iterable[ToolParam]") -> "list[ToolDefin
             continue
 
         if tool["type"] == "function":
-            tool_definition: ToolDefinition = {
+            tool_definition: "ToolDefinition" = {
                 "type": "function",
             }
 
