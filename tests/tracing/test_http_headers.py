@@ -32,9 +32,7 @@ def test_to_traceparent(sampled):
 def test_to_traceparent_span_streaming(sentry_init, traces_sample_rate):
     sentry_init(
         traces_sample_rate=traces_sample_rate,
-        _experiments={
-            "trace_lifecycle": "stream",
-        },
+        trace_lifecycle="stream",
     )
 
     with sentry_sdk.traces.start_span(name="/interactions/other-dogs/new-dog") as span:
@@ -111,9 +109,7 @@ def test_iter_headers(monkeypatch):
 def test_iter_headers_span_streaming(sentry_init, monkeypatch):
     sentry_init(
         traces_sample_rate=0.0,
-        _experiments={
-            "trace_lifecycle": "stream",
-        },
+        trace_lifecycle="stream",
     )
     monkeypatch.setattr(
         StreamedSpan,

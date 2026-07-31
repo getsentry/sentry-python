@@ -1904,10 +1904,7 @@ async def test_server_url_query_data_collection_span_streaming(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream",
-            **init_kwargs.pop("_experiments", {}),
-        },
+        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -1949,10 +1946,7 @@ async def test_client_url_query_data_collection_span_streaming(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream",
-            **init_kwargs.pop("_experiments", {}),
-        },
+        trace_lifecycle="stream",
         **init_kwargs,
     )
 
