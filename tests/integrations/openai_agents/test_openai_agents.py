@@ -382,6 +382,9 @@ async def test_tool_definitions(
 
     if ProgrammaticToolCallingTool is not None:
         tools.append(ProgrammaticToolCallingTool())
+        expected_available_tools.append(
+            {"type": "programmatic_tool_calling", "name": "programmatic_tool_calling"},
+        )
 
     agent = test_agent.clone(model=model, tools=tools)
 
