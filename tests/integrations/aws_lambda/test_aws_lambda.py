@@ -837,8 +837,7 @@ def test_span_streaming(lambda_client, test_environment):
     assert segment_span["name"] == "BasicOkSpanStreaming"
     _assert_segment_span_attrs(segment_span["attributes"], "BasicOkSpanStreaming")
     assert (
-        _get_span_attr(segment_span["attributes"], "messaging.batch.message_count")
-        == 1
+        _get_span_attr(segment_span["attributes"], "messaging.batch.message_count") == 1
     )
 
     # Error case: an error event plus an errored segment span.
@@ -865,12 +864,9 @@ def test_span_streaming(lambda_client, test_environment):
 
     assert segment_span["name"] == "RaiseErrorSpanStreaming"
     assert segment_span["status"] == "error"
-    _assert_segment_span_attrs(
-        segment_span["attributes"], "RaiseErrorSpanStreaming"
-    )
+    _assert_segment_span_attrs(segment_span["attributes"], "RaiseErrorSpanStreaming")
     assert (
-        _get_span_attr(segment_span["attributes"], "messaging.batch.message_count")
-        == 1
+        _get_span_attr(segment_span["attributes"], "messaging.batch.message_count") == 1
     )
 
     # Trace continuation: an incoming sentry-trace header is continued by
@@ -903,9 +899,7 @@ def test_span_streaming(lambda_client, test_environment):
     segment_span = segment_spans[0]
     assert segment_span["trace_id"] == trace_id
     assert segment_span["name"] == "RaiseErrorSpanStreaming"
-    _assert_segment_span_attrs(
-        segment_span["attributes"], "RaiseErrorSpanStreaming"
-    )
+    _assert_segment_span_attrs(segment_span["attributes"], "RaiseErrorSpanStreaming")
 
 
 def test_span_streaming_request_attributes(lambda_client, test_environment):
@@ -979,4 +973,3 @@ def test_span_streaming_request_attributes(lambda_client, test_environment):
         _get_span_attr(attrs, "url.query")
         == "page=2&tracking=%5BFiltered%5D&token=%5BFiltered%5D"
     )
-
