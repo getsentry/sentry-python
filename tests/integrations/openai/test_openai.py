@@ -4085,7 +4085,6 @@ def test_ai_client_span_responses_api_no_pii(
                 temperature=0.7,
                 top_p=0.9,
                 reasoning={"effort": "high"},
-                tools=EXAMPLE_TOOLS,
             )
 
         sentry_sdk.flush()
@@ -4110,8 +4109,6 @@ def test_ai_client_span_responses_api_no_pii(
             "sentry.op": "gen_ai.responses",
             "sentry.origin": "auto.ai.openai",
             "sentry.segment.name": "openai tx",
-            # Tools are recorded regardless of PII in legacy (send_default_pii) mode
-            "gen_ai.request.available_tools": safe_serialize(EXAMPLE_TOOLS),
         }
 
         for attr, value in expected_attributes.items():
@@ -4157,8 +4154,6 @@ def test_ai_client_span_responses_api_no_pii(
             "sentry.op": "gen_ai.responses",
             "sentry.origin": "auto.ai.openai",
             "sentry.segment.name": "openai tx",
-            # Tools are recorded regardless of PII in legacy (send_default_pii) mode
-            "gen_ai.request.available_tools": safe_serialize(EXAMPLE_TOOLS),
         }
 
         for attr, value in expected_attributes.items():
@@ -4179,7 +4174,6 @@ def test_ai_client_span_responses_api_no_pii(
                 temperature=0.7,
                 top_p=0.9,
                 reasoning={"effort": "high"},
-                tools=EXAMPLE_TOOLS,
             )
 
         (transaction,) = events
@@ -4203,8 +4197,6 @@ def test_ai_client_span_responses_api_no_pii(
             "gen_ai.usage.output_tokens": 10,
             "gen_ai.usage.output_tokens.reasoning": 8,
             "gen_ai.usage.total_tokens": 30,
-            # Tools are recorded regardless of PII in legacy (send_default_pii) mode
-            "gen_ai.request.available_tools": safe_serialize(EXAMPLE_TOOLS),
         }
 
         for key, value in expected_data.items():
@@ -4745,7 +4737,7 @@ def test_ai_client_span_responses_api(
                         }
                     ]
                 ),
-                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS: safe_serialize(EXAMPLE_TOOLS),
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS: safe_serialize(EXAMPLE_TOOLS),
             },
             [],
             True,
@@ -4768,7 +4760,7 @@ def test_ai_client_span_responses_api(
             },
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
             ],
             True,
             id="inputs-enabled-instructions-only",
@@ -4796,7 +4788,7 @@ def test_ai_client_span_responses_api(
                     [{"role": "user", "content": "hello"}]
                 ),
             },
-            [SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS],
+            [SPANDATA.GEN_AI_TOOL_DEFINITIONS],
             True,
             id="inputs-enabled-list-input-with-system-message",
         ),
@@ -4811,7 +4803,7 @@ def test_ai_client_span_responses_api(
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
             ],
             True,
             id="inputs-disabled",
@@ -4826,7 +4818,7 @@ def test_ai_client_span_responses_api(
                 SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
                     ["How do I check if a Python object is an instance of a class?"]
                 ),
-                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS: safe_serialize(EXAMPLE_TOOLS),
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS: safe_serialize(EXAMPLE_TOOLS),
             },
             [SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS],
             True,
@@ -4839,7 +4831,7 @@ def test_ai_client_span_responses_api(
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
             ],
             True,
             id="inputs-enabled-no-input-provided",
@@ -4855,7 +4847,7 @@ def test_ai_client_span_responses_api(
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
             ],
             False,
             id="include-prompts-disabled-overrides-inputs-enabled",
