@@ -3,7 +3,7 @@ import sys
 import time
 from collections.abc import Iterable
 from functools import wraps
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import sentry_sdk
 from sentry_sdk import consts
@@ -48,6 +48,7 @@ from sentry_sdk.tracing_utils import (
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
+    has_data_collection_enabled,
     reraise,
 )
 
@@ -329,19 +330,11 @@ def _set_responses_api_input_data(
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
 ) -> None:
-    explicit_instructions: "Union[Optional[str], Omit]" = kwargs.get("instructions")
-    messages: "Optional[Union[str, ResponseInputParam]]" = kwargs.get("input")
-
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
     )
 
-    tools = kwargs.get("tools")
-    if tools is not None and _is_given(tools):
-        set_on_span(
-            SPANDATA.GEN_AI_TOOL_DEFINITIONS,
-            json.dumps(_transform_tool_definitions_responses(tools)),
-        )
+    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
 
     model = kwargs.get("model")
     if model is not None:
@@ -376,40 +369,67 @@ def _set_responses_api_input_data(
             reasoning["effort"],
         )
 
-    if not should_send_default_pii() or not integration.include_prompts:
-        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
+    client_options = sentry_sdk.get_client().options
+    if has_data_collection_enabled(client_options):
+        if (
+            integration.include_prompts
+            and client_options["data_collection"]["gen_ai"]["inputs"]
+        ):
+            tools = kwargs.get("tools")
+            if tools is not None and _is_given(tools):
+                set_on_span(
+                    SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+                    json.dumps(_transform_tool_definitions_responses(tools)),
+                )
+    else:
+        # Pre-data collection this was always set, so this needs to be left here for now until
+        # we deprecate `send_default_pii`. Once we do, this 'else' branch should be removed,
+        # and the above branch placed below the "if not should_send_default_pii() or not integration.include_prompts"
+        # line below
+        tools = kwargs.get("tools")
+        if tools is not None and _is_given(tools):
+            set_on_span(
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+                json.dumps(_transform_tool_definitions_responses(tools)),
+            )
+
+    if has_data_collection_enabled(client_options):
+        # This takes precedence over the global data collection settings
+        if not integration.include_prompts:
+            return
+        if not client_options["data_collection"]["gen_ai"]["inputs"]:
+            return
+    elif not should_send_default_pii() or not integration.include_prompts:
         return
 
-    if (
-        messages is None
-        and explicit_instructions is not None
-        and _is_given(explicit_instructions)
-    ):
-        set_on_span(
-            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-            json.dumps(
-                [
-                    {
-                        "type": "text",
-                        "content": explicit_instructions,
-                    }
-                ]
-            ),
-        )
-
-        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
-        return
+    explicit_instructions: "Union[Optional[str], Omit]" = kwargs.get("instructions")
+    has_explicit_instructions = explicit_instructions is not None and _is_given(
+        explicit_instructions
+    )
+    messages: "Optional[Union[str, ResponseInputParam]]" = kwargs.get("input")
+    instructions_text_parts: "list[TextPart]" = []
 
     if messages is None:
-        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
+        if has_explicit_instructions:
+            set_on_span(
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                json.dumps(
+                    [
+                        {
+                            "type": "text",
+                            "content": explicit_instructions,
+                        }
+                    ]
+                ),
+            )
+        # No messages to record (only instructions at most)
         return
 
-    instructions_text_parts: "list[TextPart]" = []
-    if explicit_instructions is not None and _is_given(explicit_instructions):
+    if has_explicit_instructions:
         instructions_text_parts.append(
             {
                 "type": "text",
-                "content": explicit_instructions,
+                "content": cast(str, explicit_instructions),
             }
         )
 
@@ -417,13 +437,13 @@ def _set_responses_api_input_data(
     # Deliberate use of function accepting completions API type because
     # of shared structure FOR THIS PURPOSE ONLY.
     instructions_text_parts += _transform_system_instructions(system_instructions)
-
     if len(instructions_text_parts) > 0:
         set_on_span(
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
             json.dumps(instructions_text_parts),
         )
 
+    # Input was provided as a single string
     if isinstance(messages, str):
         normalized_messages = normalize_message_roles([messages])  # type: ignore
         client = sentry_sdk.get_client()
@@ -437,10 +457,9 @@ def _set_responses_api_input_data(
             set_data_normalized(
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
             )
-
-        set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
         return
 
+    # Input was provided as a list (potentially a multi-turn conversation)
     non_system_messages = [
         message for message in messages if not _is_system_instruction_responses(message)
     ]
@@ -457,8 +476,6 @@ def _set_responses_api_input_data(
             set_data_normalized(
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
             )
-
-    set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "responses")
 
 
 def _set_completions_api_input_data(
