@@ -330,10 +330,6 @@ def test_timeout_error_scope_modified(lambda_client, test_environment):
 @pytest.mark.parametrize(
     "aws_event, has_request_data, batch_size",
     [
-        # Scalar events (int/float/string/bool) are one equivalence class:
-        # not a list, not a dict, so request_data falls back to {}.
-        # (An empty list hits the identical path: len < 1 -> else arm ->
-        # non-dict reset.)
         (b"1231", False, 1),
         (
             b"""
@@ -459,7 +455,6 @@ USER_INFO_PAYLOAD = b"""
 
 
 def test_user_info_with_data_collection(lambda_client, test_environment):
-    # user_info collection on: the user identity is attached.
     lambda_client.invoke(
         FunctionName="BasicOkDataCollectionUserInfoOn",
         Payload=USER_INFO_PAYLOAD,
@@ -473,7 +468,6 @@ def test_user_info_with_data_collection(lambda_client, test_environment):
         "ip_address": "213.47.147.207",
     }
 
-    # user_info collection off: no user identity is attached.
     test_environment["before_test"]()
     lambda_client.invoke(
         FunctionName="BasicOkDataCollectionUserInfoOff",
@@ -514,7 +508,6 @@ def _request_data_payload(extra_headers=None):
 
 
 def test_request_data_with_data_collection(lambda_client, test_environment):
-    # Allowlist behaviour: only allowlisted, non-sensitive headers pass through.
     lambda_client.invoke(
         FunctionName="BasicOkDataCollectionAllowlist",
         Payload=_request_data_payload({"X-Allow-Me": "yes"}),
@@ -542,8 +535,6 @@ def test_request_data_with_data_collection(lambda_client, test_environment):
         "url": "https://iwsz2c7uwi.execute-api.us-east-1.amazonaws.com/asd",
     }
 
-    # Denylist behaviour: headers denied by custom terms or the built-in
-    # sensitive denylist are substituted.
     test_environment["before_test"]()
     lambda_client.invoke(
         FunctionName="BasicOkDataCollectionDenylist",
@@ -555,7 +546,6 @@ def test_request_data_with_data_collection(lambda_client, test_environment):
 
     assert transaction_event["request"] == {
         "headers": {
-            # Not denied by any term -> pass through.
             "Host": "iwsz2c7uwi.execute-api.us-east-1.amazonaws.com",
             "X-Custom": "keep-me",
             # Denied by custom terms.
@@ -571,7 +561,6 @@ def test_request_data_with_data_collection(lambda_client, test_environment):
         "url": "https://iwsz2c7uwi.execute-api.us-east-1.amazonaws.com/asd",
     }
 
-    # Collection off: no headers are collected.
     test_environment["before_test"]()
     lambda_client.invoke(
         FunctionName="BasicOkDataCollectionOff",
@@ -651,8 +640,6 @@ URL_QUERY_PAYLOAD = b"""
 
 
 def test_url_query_params_with_data_collection(lambda_client, test_environment):
-    # Denylist behaviour: params denied by custom terms or the built-in
-    # sensitive denylist are substituted.
     lambda_client.invoke(
         FunctionName="BasicOkDataCollectionUrlQueryDenylist",
         Payload=URL_QUERY_PAYLOAD,
@@ -690,7 +677,6 @@ def test_url_query_params_with_data_collection(lambda_client, test_environment):
         "token": "[Filtered]",
     }
 
-    # Collection off: no query string is collected.
     test_environment["before_test"]()
     lambda_client.invoke(
         FunctionName="BasicOkDataCollectionUrlQueryOff",
@@ -700,7 +686,6 @@ def test_url_query_params_with_data_collection(lambda_client, test_environment):
 
     (transaction_event,) = envelopes
 
-    # With url_query_params collection turned off, no query string is collected.
     assert "query_string" not in transaction_event["request"]
 
 
@@ -800,8 +785,9 @@ def _get_span_attr(attrs, key):
 
 
 def _assert_segment_span_attrs(attrs, function_name):
-    """Assert the full attribute set of an aws_lambda segment span."""
+
     arn = "arn:aws:lambda:us-east-1:012345678912:function:%s" % function_name
+
     assert _get_span_attr(attrs, "sentry.op") == "function.aws"
     assert _get_span_attr(attrs, "sentry.origin") == "auto.function.aws_lambda"
     assert _get_span_attr(attrs, "sentry.segment.name.source") == "component"
@@ -944,9 +930,6 @@ def test_span_streaming_request_attributes(lambda_client, test_environment):
     ]
     assert _get_span_attr(attrs, "aws.log.stream.names") == ["$LATEST"]
 
-    # url.query attribute with data_collection filtering: "page" passes
-    # through; "tracking" is denied by a custom term and "token" by the
-    # built-in sensitive denylist.
     test_environment["before_test"]()
     payload = {
         "httpMethod": "GET",
