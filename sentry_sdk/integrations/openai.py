@@ -114,7 +114,7 @@ class OpenAIIntegration(Integration):
 
     def __init__(
         self: "OpenAIIntegration",
-        include_prompts: bool = True,
+        include_prompts: "Optional[bool]" = None,
         tiktoken_encoding_name: "Optional[str]" = None,
     ) -> None:
         self.include_prompts = include_prompts
@@ -325,6 +325,18 @@ def _calculate_responses_token_usage(
     )
 
 
+def _set_tool_definitions_responses_api(
+    set_on_span: "Callable[[str, Any], None]",
+    kwargs: "dict[str, Any]",
+) -> None:
+    tools = kwargs.get("tools")
+    if tools is not None and _is_given(tools):
+        set_on_span(
+            SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+            json.dumps(_transform_tool_definitions_responses(tools)),
+        )
+
+
 def _set_responses_api_input_data(
     span: "Union[Span, StreamedSpan]",
     kwargs: "dict[str, Any]",
@@ -371,33 +383,24 @@ def _set_responses_api_input_data(
 
     client_options = sentry_sdk.get_client().options
     if has_data_collection_enabled(client_options):
-        if (
-            integration.include_prompts
-            and client_options["data_collection"]["gen_ai"]["inputs"]
-        ):
-            tools = kwargs.get("tools")
-            if tools is not None and _is_given(tools):
-                set_on_span(
-                    SPANDATA.GEN_AI_TOOL_DEFINITIONS,
-                    json.dumps(_transform_tool_definitions_responses(tools)),
-                )
+        if integration.include_prompts is not None:
+            if integration.include_prompts:
+                _set_tool_definitions_responses_api(set_on_span, kwargs)
+        elif client_options["data_collection"]["gen_ai"]["inputs"]:
+            _set_tool_definitions_responses_api(set_on_span, kwargs)
     else:
         # Pre-data collection this was always set, so this needs to be left here for now until
         # we deprecate `send_default_pii`. Once we do, this 'else' branch should be removed,
         # and the above branch placed below the "if not should_send_default_pii() or not integration.include_prompts"
         # line below
-        tools = kwargs.get("tools")
-        if tools is not None and _is_given(tools):
-            set_on_span(
-                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
-                json.dumps(_transform_tool_definitions_responses(tools)),
-            )
+        _set_tool_definitions_responses_api(set_on_span, kwargs)
 
     if has_data_collection_enabled(client_options):
         # This takes precedence over the global data collection settings
-        if not integration.include_prompts:
-            return
-        if not client_options["data_collection"]["gen_ai"]["inputs"]:
+        if integration.include_prompts is not None:
+            if not integration.include_prompts:
+                return
+        elif not client_options["data_collection"]["gen_ai"]["inputs"]:
             return
     elif not should_send_default_pii() or not integration.include_prompts:
         return
@@ -478,6 +481,18 @@ def _set_responses_api_input_data(
             )
 
 
+def _set_tool_definitions_completions_api(
+    set_on_span: "Callable[[str, Any], None]",
+    kwargs: "dict[str, Any]",
+) -> None:
+    tools = kwargs.get("tools")
+    if tools is not None and _is_given(tools):
+        set_on_span(
+            SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+            json.dumps(_transform_tool_definitions_completions(tools)),
+        )
+
+
 def _set_completions_api_input_data(
     span: "Union[Span, StreamedSpan]",
     kwargs: "dict[str, Any]",
@@ -519,27 +534,17 @@ def _set_completions_api_input_data(
 
     client = sentry_sdk.get_client()
     if has_data_collection_enabled(client.options):
-        if (
-            integration.include_prompts
-            and client.options["data_collection"]["gen_ai"]["inputs"]
-        ):
-            tools = kwargs.get("tools")
-            if tools is not None and _is_given(tools):
-                set_on_span(
-                    SPANDATA.GEN_AI_TOOL_DEFINITIONS,
-                    json.dumps(_transform_tool_definitions_completions(tools)),
-                )
+        if integration.include_prompts is not None:
+            if integration.include_prompts:
+                _set_tool_definitions_completions_api(set_on_span, kwargs)
+        elif client.options["data_collection"]["gen_ai"]["inputs"]:
+            _set_tool_definitions_completions_api(set_on_span, kwargs)
     else:
         # Pre-data collection this was always set, so this needs to be left here for now until
         # we deprecate `send_default_pii`. Once we do, this 'else' branch should be removed,
         # and the above branch placed below the "if not should_send_default_pii() or not integration.include_prompts"
         # line below
-        tools = kwargs.get("tools")
-        if tools is not None and _is_given(tools):
-            set_on_span(
-                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
-                json.dumps(_transform_tool_definitions_completions(tools)),
-            )
+        _set_tool_definitions_completions_api(set_on_span, kwargs)
 
     messages: "Optional[Union[str, Iterable[ChatCompletionMessageParam]]]" = kwargs.get(
         "messages"
@@ -547,9 +552,10 @@ def _set_completions_api_input_data(
 
     if has_data_collection_enabled(client.options):
         # This takes precedence over the global data collection settings
-        if not integration.include_prompts:
-            return
-        if not client.options["data_collection"]["gen_ai"]["inputs"]:
+        if integration.include_prompts is not None:
+            if not integration.include_prompts:
+                return
+        elif not client.options["data_collection"]["gen_ai"]["inputs"]:
             return
     elif not should_send_default_pii() or not integration.include_prompts:
         return
@@ -628,9 +634,10 @@ def _set_embeddings_input_data(
     client = sentry_sdk.get_client()
     if has_data_collection_enabled(client.options):
         # This takes precedence over the global data collection settings
-        if not integration.include_prompts:
-            return
-        if not client.options["data_collection"]["gen_ai"]["inputs"]:
+        if integration.include_prompts is not None:
+            if not integration.include_prompts:
+                return
+        elif not client.options["data_collection"]["gen_ai"]["inputs"]:
             return
     elif not should_send_default_pii() or not integration.include_prompts:
         return
@@ -763,11 +770,24 @@ def _set_common_output_data(
             span.__exit__(None, None, None)
 
 
+def _resolve_include_prompts(
+    integration: "OpenAIIntegration", options: "Optional[dict[str, Any]]"
+) -> None:
+    if integration.include_prompts is None and not has_data_collection_enabled(options):
+        # Pre-data-collection behavior: prompts were included by default (subject
+        # to send_default_pii). Resolve the unset default here, at call time,
+        # rather than in __init__ so that integrations constructed before
+        # sentry_sdk.init() still see the active client's options.
+        integration.include_prompts = True
+
+
 def _new_sync_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
     client = sentry_sdk.get_client()
     integration = client.get_integration(OpenAIIntegration)
     if integration is None:
         return f(*args, **kwargs)
+
+    _resolve_include_prompts(integration, client.options)
 
     if "messages" not in kwargs:
         # invalid call (in all versions of openai), let it return error
@@ -849,6 +869,8 @@ async def _new_async_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") ->
     integration = client.get_integration(OpenAIIntegration)
     if integration is None:
         return await f(*args, **kwargs)
+
+    _resolve_include_prompts(integration, client.options)
 
     if "messages" not in kwargs:
         # invalid call (in all versions of openai), let it return error
@@ -1280,6 +1302,8 @@ def _new_sync_embeddings_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any
     if integration is None:
         return f(*args, **kwargs)
 
+    _resolve_include_prompts(integration, client.options)
+
     model = kwargs.get("model")
 
     if has_span_streaming_enabled(client.options):
@@ -1337,6 +1361,8 @@ async def _new_async_embeddings_create(
     integration = client.get_integration(OpenAIIntegration)
     if integration is None:
         return await f(*args, **kwargs)
+
+    _resolve_include_prompts(integration, client.options)
 
     model = kwargs.get("model")
 
@@ -1418,6 +1444,8 @@ def _new_sync_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -> "Any"
     if integration is None:
         return f(*args, **kwargs)
 
+    _resolve_include_prompts(integration, client.options)
+
     model = kwargs.get("model")
 
     # Same bool handling as in https://github.com/openai/openai-python/blob/acd0c54d8a68efeedde0e5b4e6c310eef1ce7867/src/openai/resources/responses/responses.py#L940
@@ -1487,6 +1515,8 @@ async def _new_async_responses_create(f: "Any", *args: "Any", **kwargs: "Any") -
     integration = client.get_integration(OpenAIIntegration)
     if integration is None:
         return await f(*args, **kwargs)
+
+    _resolve_include_prompts(integration, client.options)
 
     model = kwargs.get("model")
 

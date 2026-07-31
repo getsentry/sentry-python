@@ -158,6 +158,31 @@ EXAMPLE_COMPLETIONS_TOOLS = [
 ]
 
 
+@pytest.mark.parametrize(
+    "data_collection_enabled",
+    [True, False],
+    ids=["data-collection-enabled", "data-collection-disabled"],
+)
+@pytest.mark.parametrize("include_prompts", [None, True, False])
+def test_include_prompts_init_stores_passed_value(
+    sentry_init, data_collection_enabled, include_prompts
+):
+    init_kwargs = {
+        "traces_sample_rate": 1.0,
+        "disabled_integrations": [StdlibIntegration],
+    }
+    if data_collection_enabled:
+        init_kwargs["_experiments"] = {"data_collection": {"gen_ai": {"inputs": True}}}
+    sentry_init(**init_kwargs)
+
+    integration = OpenAIIntegration(include_prompts=include_prompts)
+
+    # The constructor stores the value as passed; the None default is resolved
+    # lazily at call time based on the active client's options (covered by the
+    # data_collection parametrizations below).
+    assert integration.include_prompts is include_prompts
+
+
 @pytest.mark.skipif(
     OPENAI_VERSION <= (2, 10, 0),
     reason="ChatCompletionCustomToolParam is unavailable before.",
@@ -686,13 +711,17 @@ def test_nonstreaming_chat_completion(
         pytest.param(
             {"gen_ai": {"inputs": False}},
             True,
-            {},
-            [
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
-            ],
-            id="inputs-disabled",
+            {
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: json.dumps(
+                    [{"type": "text", "content": "You are a helpful assistant."}]
+                ),
+                SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
+                    [{"role": "user", "content": "hello"}]
+                ),
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS: safe_serialize(EXAMPLE_TOOLS),
+            },
+            [],
+            id="include-prompts-enabled-overrides-inputs-disabled",
         ),
         pytest.param(
             {},
@@ -719,6 +748,47 @@ def test_nonstreaming_chat_completion(
                 SPANDATA.GEN_AI_TOOL_DEFINITIONS,
             ],
             id="include-prompts-disabled-overrides-inputs-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            None,
+            {
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: json.dumps(
+                    [{"type": "text", "content": "You are a helpful assistant."}]
+                ),
+                SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
+                    [{"role": "user", "content": "hello"}]
+                ),
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS: safe_serialize(EXAMPLE_TOOLS),
+            },
+            [],
+            id="include-prompts-default-follows-inputs-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            None,
+            {},
+            [
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+            ],
+            id="include-prompts-default-follows-inputs-disabled",
+        ),
+        pytest.param(
+            {},
+            None,
+            {
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: json.dumps(
+                    [{"type": "text", "content": "You are a helpful assistant."}]
+                ),
+                SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
+                    [{"role": "user", "content": "hello"}]
+                ),
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS: safe_serialize(EXAMPLE_TOOLS),
+            },
+            [],
+            id="include-prompts-default-follows-default-enabled",
         ),
     ],
 )
@@ -3026,8 +3096,8 @@ def _collect_embeddings_span_data(
             {"gen_ai": {"inputs": False}},
             True,
             True,
-            False,
-            id="inputs-disabled-overrides-pii-enabled",
+            True,
+            id="include-prompts-overrides-inputs-disabled",
         ),
         pytest.param(
             {},
@@ -3040,8 +3110,8 @@ def _collect_embeddings_span_data(
             {"gen_ai": {"inputs": False}},
             False,
             True,
-            False,
-            id="inputs-disabled-and-pii-disabled",
+            True,
+            id="include-prompts-overrides-inputs-disabled-and-pii-disabled",
         ),
         pytest.param(
             {"gen_ai": {"inputs": True}},
@@ -3056,6 +3126,27 @@ def _collect_embeddings_span_data(
             True,
             False,
             id="no-experiment-falls-back-to-pii",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            False,
+            None,
+            True,
+            id="include-prompts-default-follows-inputs-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            True,
+            None,
+            False,
+            id="include-prompts-default-follows-inputs-disabled",
+        ),
+        pytest.param(
+            {},
+            False,
+            None,
+            True,
+            id="include-prompts-default-follows-default-enabled",
         ),
     ],
 )
@@ -3142,7 +3233,7 @@ def test_embeddings_create_data_collection_inputs_disabled_input_shapes(
     span_streaming,
 ):
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=True)],
+        integrations=[OpenAIIntegration(include_prompts=False)],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
@@ -3442,8 +3533,8 @@ async def test_embeddings_create_async(
             {"gen_ai": {"inputs": False}},
             True,
             True,
-            False,
-            id="inputs-disabled-overrides-pii-enabled",
+            True,
+            id="include-prompts-overrides-inputs-disabled",
         ),
         pytest.param(
             {},
@@ -3465,6 +3556,27 @@ async def test_embeddings_create_async(
             True,
             False,
             id="no-experiment-falls-back-to-pii",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            False,
+            None,
+            True,
+            id="include-prompts-default-follows-inputs-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            True,
+            None,
+            False,
+            id="include-prompts-default-follows-inputs-disabled",
+        ),
+        pytest.param(
+            {},
+            False,
+            None,
+            True,
+            id="include-prompts-default-follows-default-enabled",
         ),
     ],
 )
@@ -5293,14 +5405,23 @@ def test_ai_client_span_responses_api(
                 "input": "How do I check if a Python object is an instance of a class?",
                 "tools": EXAMPLE_TOOLS,
             },
-            {},
-            [
-                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
-            ],
+            {
+                SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
+                    ["How do I check if a Python object is an instance of a class?"]
+                ),
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: safe_serialize(
+                    [
+                        {
+                            "type": "text",
+                            "content": "You are a coding assistant that talks like a pirate.",
+                        }
+                    ]
+                ),
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS: safe_serialize(EXAMPLE_TOOLS),
+            },
+            [],
             True,
-            id="inputs-disabled",
+            id="include-prompts-enabled-overrides-inputs-disabled",
         ),
         pytest.param(
             {},
@@ -5345,6 +5466,63 @@ def test_ai_client_span_responses_api(
             ],
             False,
             id="include-prompts-disabled-overrides-inputs-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            {
+                "instructions": "You are a coding assistant that talks like a pirate.",
+                "input": "How do I check if a Python object is an instance of a class?",
+                "tools": EXAMPLE_TOOLS,
+            },
+            {
+                SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
+                    ["How do I check if a Python object is an instance of a class?"]
+                ),
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: safe_serialize(
+                    [
+                        {
+                            "type": "text",
+                            "content": "You are a coding assistant that talks like a pirate.",
+                        }
+                    ]
+                ),
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS: safe_serialize(EXAMPLE_TOOLS),
+            },
+            [],
+            None,
+            id="include-prompts-default-follows-inputs-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            {
+                "instructions": "You are a coding assistant that talks like a pirate.",
+                "input": "How do I check if a Python object is an instance of a class?",
+                "tools": EXAMPLE_TOOLS,
+            },
+            {},
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+            ],
+            None,
+            id="include-prompts-default-follows-inputs-disabled",
+        ),
+        pytest.param(
+            {},
+            {
+                "input": "How do I check if a Python object is an instance of a class?",
+                "tools": EXAMPLE_TOOLS,
+            },
+            {
+                SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
+                    ["How do I check if a Python object is an instance of a class?"]
+                ),
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS: safe_serialize(EXAMPLE_TOOLS),
+            },
+            [SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS],
+            None,
+            id="include-prompts-default-follows-default-enabled",
         ),
     ],
 )
