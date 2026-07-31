@@ -17,6 +17,9 @@ from sentry_sdk.ai._openai_completions_api import (
 from sentry_sdk.ai._openai_completions_api import (
     _is_system_instruction as _is_system_instruction_completions,
 )
+from sentry_sdk.ai._openai_completions_api import (
+    _transform_tool_definitions as _transform_tool_definitions_completions,
+)
 from sentry_sdk.ai._openai_responses_api import (
     _get_system_instructions as _get_system_instructions_responses,
 )
@@ -463,15 +466,16 @@ def _set_completions_api_input_data(
         "messages"
     )
 
-    tools = kwargs.get("tools")
-    if tools is not None and _is_given(tools) and len(tools) > 0:
-        set_data_normalized(
-            span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
-        )
-
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
     )
+    tools = kwargs.get("tools")
+    if tools is not None and _is_given(tools):
+        set_on_span(
+            SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+            json.dumps(_transform_tool_definitions_completions(tools)),
+        )
+
     model = kwargs.get("model")
     if model is not None:
         set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
