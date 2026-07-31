@@ -137,6 +137,26 @@ EXAMPLE_TOOLS = [
     }
 ]
 
+EXAMPLE_COMPLETIONS_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_current_weather",
+            "description": "Get the current weather in a given location",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "location": {
+                        "type": "string",
+                        "description": "The city and state, e.g. San Francisco, CA",
+                    },
+                },
+                "required": ["location"],
+            },
+        },
+    }
+]
+
 
 @pytest.mark.skipif(
     OPENAI_VERSION <= (2, 10, 0),
@@ -658,7 +678,7 @@ def test_nonstreaming_chat_completion(
                 SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
                     [{"role": "user", "content": "hello"}]
                 ),
-                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS: safe_serialize(EXAMPLE_TOOLS),
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS: safe_serialize(EXAMPLE_TOOLS),
             },
             [],
             id="inputs-enabled",
@@ -670,7 +690,7 @@ def test_nonstreaming_chat_completion(
             [
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
             ],
             id="inputs-disabled",
         ),
@@ -684,7 +704,7 @@ def test_nonstreaming_chat_completion(
                 SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
                     [{"role": "user", "content": "hello"}]
                 ),
-                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS: safe_serialize(EXAMPLE_TOOLS),
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS: safe_serialize(EXAMPLE_TOOLS),
             },
             [],
             id="gen-ai-omitted-defaults-to-enabled",
@@ -696,7 +716,7 @@ def test_nonstreaming_chat_completion(
             [
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
             ],
             id="include-prompts-disabled-overrides-inputs-enabled",
         ),
@@ -749,7 +769,7 @@ def test_completions_api_data_collection(
         "frequency_penalty": 0.2,
         "temperature": 0.7,
         "top_p": 0.9,
-        "tools": EXAMPLE_TOOLS,
+        "tools": EXAMPLE_COMPLETIONS_TOOLS,
     }
 
     if span_streaming or stream_gen_ai_spans:
