@@ -279,6 +279,10 @@ async def test_tool_definitions(
     stream_gen_ai_spans,
     span_streaming,
 ):
+    """
+    Verifies that the `gen_ai.tool.definitions` attribute is set.
+    Provides one instance of each tool type to an agent.
+    """
     client = AsyncOpenAI(api_key="test-key")
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
 
@@ -313,6 +317,31 @@ async def test_tool_definitions(
         LocalShellTool(executor=lambda req: "ok"),
     ]
 
+    expected_available_tools = [
+        {
+            "type": "function",
+            "name": "some_function",
+            "description": "",
+            "parameters": {
+                "properties": {
+                    "a": {"title": "A", "type": "string"},
+                    "b": {"items": {"type": "integer"}, "title": "B", "type": "array"},
+                },
+                "required": ["a", "b"],
+                "title": "some_function_args",
+                "type": "object",
+                "additionalProperties": False,
+            },
+        },
+        {"type": "web_search", "name": "web_search"},
+        {"type": "file_search", "name": "file_search"},
+        {"type": "computer", "name": "computer_use_preview"},
+        {"type": "mcp", "name": "hosted_mcp"},
+        {"type": "image_generation", "name": "image_generation"},
+        {"type": "code_interpreter", "name": "code_interpreter"},
+        {"type": "local_shell", "name": "local_shell"},
+    ]
+
     if CustomTool is not None:
         tools.append(
             CustomTool(
@@ -321,15 +350,27 @@ async def test_tool_definitions(
                 on_invoke_tool=lambda _context, _input: "ok",
             )
         )
+        expected_available_tools.append(
+            {"type": "custom", "name": "custom", "description": "Custom tool"},
+        )
 
     if ApplyPatchTool is not None:
         tools.append(ApplyPatchTool(editor=DummyEditor()))
+        expected_available_tools.append(
+            {"type": "apply_patch", "name": "apply_patch"},
+        )
 
     if ShellTool is not None:
         tools.append(ShellTool(executor=lambda req: "ok"))
+        expected_available_tools.append(
+            {"type": "shell", "name": "shell"},
+        )
 
     if ToolSearchTool is not None:
         tools.append(ToolSearchTool())
+        expected_available_tools.append(
+            {"type": "tool_search", "name": "tool_search"},
+        )
 
     if ProgrammaticToolCallingTool is not None:
         tools.append(ProgrammaticToolCallingTool())
@@ -372,7 +413,10 @@ async def test_tool_definitions(
             span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
         )
 
-        assert ai_client_span["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS] == 1.0
+        assert (
+            json.loads(ai_client_span["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS])
+            == expected_available_tools
+        )
     elif stream_gen_ai_spans:
         with patch.object(
             agent.model._client._client,
@@ -402,7 +446,10 @@ async def test_tool_definitions(
             span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
         )
 
-        assert ai_client_span["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS] == 1.0
+        assert (
+            json.loads(ai_client_span["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS])
+            == expected_available_tools
+        )
     else:
         with patch.object(
             agent.model._client._client,
@@ -430,7 +477,10 @@ async def test_tool_definitions(
         spans = transaction["spans"]
         ai_client_span = next(span for span in spans if span["op"] == OP.GEN_AI_CHAT)
 
-        assert ai_client_span["data"][SPANDATA.GEN_AI_TOOL_DEFINITIONS] == 1.0
+        assert (
+            json.loads(ai_client_span["data"][SPANDATA.GEN_AI_TOOL_DEFINITIONS])
+            == expected_available_tools
+        )
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])

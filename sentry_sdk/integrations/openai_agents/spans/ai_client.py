@@ -94,7 +94,7 @@ def _transform_tool_definitions(tools: "list[Tool]") -> "list[ToolDefinition]":
         if isinstance(tool, FileSearchTool):
             tool_definitions.append(
                 {
-                    "type": "function",
+                    "type": "file_search",
                     "name": tool.name,
                 }
             )
@@ -103,7 +103,7 @@ def _transform_tool_definitions(tools: "list[Tool]") -> "list[ToolDefinition]":
         if isinstance(tool, ComputerTool):
             tool_definitions.append(
                 {
-                    "type": "function",
+                    "type": "computer",
                     "name": tool.name,
                 }
             )
@@ -112,7 +112,7 @@ def _transform_tool_definitions(tools: "list[Tool]") -> "list[ToolDefinition]":
         if CustomTool is not None and isinstance(tool, CustomTool):
             tool_definitions.append(
                 {
-                    "type": "function",
+                    "type": "custom",
                     "name": tool.name,
                     "description": tool.description,
                 }
@@ -122,7 +122,7 @@ def _transform_tool_definitions(tools: "list[Tool]") -> "list[ToolDefinition]":
         if isinstance(tool, HostedMCPTool):
             tool_definitions.append(
                 {
-                    "type": "function",
+                    "type": "mcp",
                     "name": tool.name,
                 }
             )
@@ -131,7 +131,7 @@ def _transform_tool_definitions(tools: "list[Tool]") -> "list[ToolDefinition]":
         if ApplyPatchTool is not None and isinstance(tool, ApplyPatchTool):
             tool_definitions.append(
                 {
-                    "type": "function",
+                    "type": "apply_patch",
                     "name": tool.name,
                 }
             )
@@ -140,7 +140,7 @@ def _transform_tool_definitions(tools: "list[Tool]") -> "list[ToolDefinition]":
         if ShellTool is not None and isinstance(tool, ShellTool):
             tool_definitions.append(
                 {
-                    "type": "function",
+                    "type": "shell",
                     "name": tool.name,
                 }
             )
@@ -149,7 +149,7 @@ def _transform_tool_definitions(tools: "list[Tool]") -> "list[ToolDefinition]":
         if isinstance(tool, ImageGenerationTool):
             tool_definitions.append(
                 {
-                    "type": "function",
+                    "type": "image_generation",
                     "name": tool.name,
                 }
             )
@@ -158,7 +158,7 @@ def _transform_tool_definitions(tools: "list[Tool]") -> "list[ToolDefinition]":
         if isinstance(tool, CodeInterpreterTool):
             tool_definitions.append(
                 {
-                    "type": "function",
+                    "type": "code_interpreter",
                     "name": tool.name,
                 }
             )
@@ -167,7 +167,7 @@ def _transform_tool_definitions(tools: "list[Tool]") -> "list[ToolDefinition]":
         if isinstance(tool, LocalShellTool):
             tool_definitions.append(
                 {
-                    "type": "function",
+                    "type": "local_shell",
                     "name": tool.name,
                 }
             )
@@ -176,7 +176,7 @@ def _transform_tool_definitions(tools: "list[Tool]") -> "list[ToolDefinition]":
         if ToolSearchTool is not None and isinstance(tool, ToolSearchTool):
             tool_definitions.append(
                 {
-                    "type": "function",
+                    "type": "tool_search",
                     "name": tool.name,
                 }
             )
@@ -187,7 +187,7 @@ def _transform_tool_definitions(tools: "list[Tool]") -> "list[ToolDefinition]":
         ):
             tool_definitions.append(
                 {
-                    "type": "function",
+                    "type": "programmatic_tool_calling",
                     "name": tool.name,
                 }
             )
