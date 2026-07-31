@@ -673,6 +673,7 @@ def _set_embeddings_input_data(
                 span, SPANDATA.GEN_AI_EMBEDDINGS_INPUT, messages_data, unpack=False
             )
 
+
 def _set_common_output_data(
     span: "Union[Span, StreamedSpan]",
     response: "Any",
