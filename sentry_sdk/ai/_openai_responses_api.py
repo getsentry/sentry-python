@@ -72,9 +72,6 @@ def _transform_tool_definitions(tools: "Iterable[ToolParam]") -> "list[ToolDefin
             tool_definitions.append(tool_definition)
             continue
 
-        if "type" not in tool:
-            continue
-
         tool_definitions.append({"type": tool["type"]})
 
     return tool_definitions

@@ -186,9 +186,7 @@ async def test_capture_transaction(
     sentry_init(
         send_default_pii=should_send_pii,
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryAsgiMiddleware(asgi3_app)
 
@@ -262,9 +260,7 @@ async def test_capture_transaction_with_error(
     sentry_init(
         send_default_pii=True,
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     app = SentryAsgiMiddleware(asgi3_app_with_error)
@@ -330,9 +326,7 @@ async def test_has_trace_if_performance_enabled(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryAsgiMiddleware(asgi3_app_with_error_and_msg)
 
@@ -425,9 +419,7 @@ async def test_trace_from_headers_if_performance_enabled(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryAsgiMiddleware(asgi3_app_with_error_and_msg)
 
@@ -526,9 +518,7 @@ async def test_websocket(
     sentry_init(
         send_default_pii=True,
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     asgi3_ws_app = SentryAsgiMiddleware(asgi3_ws_app)
@@ -655,9 +645,7 @@ async def test_transaction_style(
     sentry_init(
         send_default_pii=True,
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryAsgiMiddleware(asgi3_app, transaction_style=transaction_style)
 
@@ -874,8 +862,8 @@ async def test_get_request_attributes_url_with_filtered_host(
     sentry_init(
         send_default_pii=True,
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         _experiments={
-            "trace_lifecycle": "stream",
             "data_collection": {
                 "http_headers": {"request": {"mode": "allowlist", "terms": []}}
             },
@@ -906,8 +894,8 @@ async def test_get_request_attributes_url_with_headers_off(
     sentry_init(
         send_default_pii=True,
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         _experiments={
-            "trace_lifecycle": "stream",
             "data_collection": {"http_headers": {"request": {"mode": "off"}}},
         },
     )
@@ -1140,9 +1128,11 @@ async def test_get_request_attributes_query_data_collection(
     expected_query,
     expected_url_full,
 ):
-    kwargs = {k: v for k, v in init_kwargs.items() if k != "_experiments"}
-    experiments = {"trace_lifecycle": "stream", **init_kwargs.get("_experiments", {})}
-    sentry_init(traces_sample_rate=1.0, _experiments=experiments, **kwargs)
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
     app = SentryAsgiMiddleware(asgi3_app)
 
     items = capture_items("span")
@@ -1242,9 +1232,11 @@ async def test_get_request_data_env_user_info(
 async def test_get_request_attributes_client_address_user_info(
     sentry_init, capture_items, asgi3_app, init_kwargs, has_client, expect_ip
 ):
-    kwargs = {k: v for k, v in init_kwargs.items() if k != "_experiments"}
-    experiments = {"trace_lifecycle": "stream", **init_kwargs.get("_experiments", {})}
-    sentry_init(traces_sample_rate=1.0, _experiments=experiments, **kwargs)
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
     app = SentryAsgiMiddleware(asgi3_app)
 
     scope = _http_scope()
@@ -1304,9 +1296,7 @@ async def test_transaction_name(
     """
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -1390,9 +1380,7 @@ async def test_transaction_name_in_traces_sampler(
     sentry_init(
         traces_sampler=dummy_traces_sampler,
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     app = SentryAsgiMiddleware(asgi3_app, transaction_style=transaction_style)
@@ -1415,9 +1403,7 @@ async def test_custom_transaction_name(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryAsgiMiddleware(asgi3_custom_transaction_app)
 
@@ -1505,11 +1491,9 @@ async def test_user_ip_address_on_all_spans(
         await send({"type": "http.response.body", "body": b"Hello, world!"})
 
     kwargs = dict(init_kwargs)
-    experiments = kwargs.pop("_experiments", {})
     sentry_init(
         trace_lifecycle="stream",
         traces_sample_rate=1.0,
-        _experiments=experiments,
         **kwargs,
     )
     sentry_app = SentryAsgiMiddleware(app)

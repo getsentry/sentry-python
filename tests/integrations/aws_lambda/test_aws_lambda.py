@@ -14,6 +14,7 @@ from .utils import SAM_PORT, LocalLambdaStack, SentryServerForTesting
 
 DOCKER_NETWORK_NAME = "lambda-test-network"
 SAM_TEMPLATE_FILE = "sam.template.yaml"
+SAM_SHUTDOWN_TIMEOUT = 10
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -54,7 +55,7 @@ def test_environment():
             "--template",
             SAM_TEMPLATE_FILE,
             "--warm-containers",
-            "EAGER",
+            "LAZY",  # Start each Docker container on its function's first invocation
             "--docker-network",
             DOCKER_NETWORK_NAME,
         ],
@@ -78,13 +79,13 @@ def test_environment():
 
     finally:
         print("[test_environment fixture] Tearing down AWS Lambda test infrastructure")
-
         process.terminate()
-        process.wait(timeout=10)  # Give it time to shut down gracefully
-
-        # Force kill if still running
-        if process.poll() is None:
+        try:
+            # Teardown is typically ~7s; escalate with kill if SAM exceeds this.
+            process.wait(timeout=SAM_SHUTDOWN_TIMEOUT)
+        except subprocess.TimeoutExpired:
             process.kill()
+            process.wait()
 
 
 @pytest.fixture(autouse=True)

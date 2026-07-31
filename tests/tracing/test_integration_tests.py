@@ -58,9 +58,7 @@ def test_basic(sentry_init, capture_events, sample_rate):
 
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])
 def test_basic_span_streaming(sentry_init, capture_items, sample_rate):
-    sentry_init(
-        traces_sample_rate=sample_rate, _experiments={"trace_lifecycle": "stream"}
-    )
+    sentry_init(traces_sample_rate=sample_rate, trace_lifecycle="stream")
     items = capture_items()
 
     with sentry_sdk.traces.start_span(name="hi"):

@@ -82,7 +82,7 @@ def _transform_tool_definitions(
             continue
 
         if tool["type"] == "function":
-            tool_definition: ToolDefinition = {
+            tool_definition: "ToolDefinition" = {
                 "type": "function",
             }
 
@@ -106,6 +106,10 @@ def _transform_tool_definitions(
             tool_definition = {
                 "type": "custom",
             }
+
+            if "custom" not in tool:
+                tool_definitions.append(tool_definition)
+                continue
 
             if "name" in tool["custom"]:
                 tool_definition["name"] = tool["custom"]["name"]
