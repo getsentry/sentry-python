@@ -26,6 +26,9 @@ from sentry_sdk.ai._openai_responses_api import (
 from sentry_sdk.ai._openai_responses_api import (
     _is_system_instruction as _is_system_instruction_responses,
 )
+from sentry_sdk.ai._openai_responses_api import (
+    _transform_tool_definitions as _transform_tool_definitions_responses,
+)
 from sentry_sdk.ai.monitoring import record_token_usage
 from sentry_sdk.ai.utils import (
     get_start_span_function,
@@ -376,7 +379,7 @@ def _set_responses_api_input_data(
             if tools is not None and _is_given(tools):
                 set_on_span(
                     SPANDATA.GEN_AI_TOOL_DEFINITIONS,
-                    json.dumps(_transform_tool_definitions_completions(tools)),
+                    json.dumps(_transform_tool_definitions_responses(tools)),
                 )
     else:
         # Pre-data collection this was always set, so this needs to be left here for now until
@@ -387,7 +390,7 @@ def _set_responses_api_input_data(
         if tools is not None and _is_given(tools):
             set_on_span(
                 SPANDATA.GEN_AI_TOOL_DEFINITIONS,
-                json.dumps(_transform_tool_definitions_completions(tools)),
+                json.dumps(_transform_tool_definitions_responses(tools)),
             )
 
     if has_data_collection_enabled(client_options):
@@ -487,6 +490,12 @@ def _set_completions_api_input_data(
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
     )
+    tools = kwargs.get("tools")
+    if tools is not None and _is_given(tools):
+        set_on_span(
+            SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+            json.dumps(_transform_tool_definitions_completions(tools)),
+        )
 
     model = kwargs.get("model")
     if model is not None:
