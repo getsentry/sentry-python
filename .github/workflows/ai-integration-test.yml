@@ -34,9 +34,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Python SDK Tests
-        # Pin includes OpenRouter Anthropic-compatible routing:
-        # https://github.com/getsentry/testing-ai-sdk-integrations/pull/154
-        uses: getsentry/testing-ai-sdk-integrations@fd9d21fa2739c01cb18a1a606c7b2b7fddf4f1fb
+        uses: getsentry/testing-ai-sdk-integrations@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
