@@ -35,6 +35,15 @@ def test_get_current_span():
     assert get_current_span(fake_scope) is None
 
 
+def test_get_current_span_span_streaming():
+    fake_scope = mock.MagicMock()
+    fake_scope.streamed_span = mock.MagicMock()
+    assert sentry_sdk.traces.get_current_span(fake_scope) == fake_scope.streamed_span
+
+    fake_scope.streamed_span = None
+    assert sentry_sdk.traces.get_current_span(fake_scope) is None
+
+
 def test_get_current_span_current_scope(sentry_init):
     sentry_init()
 

@@ -477,8 +477,6 @@ def test_accepts_valid_sample_rate(rate):
 @pytest.mark.parametrize(
     "rate",
     [
-        # One representative per wrong-type equivalence class (validation
-        # branch is type-agnostic), plus both out-of-range directions.
         "dogs are great",  # wrong type
         None,  # wrong type
         float("NaN"),  # wrong type (edge: float, but not a valid rate)

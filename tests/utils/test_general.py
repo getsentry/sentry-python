@@ -41,8 +41,6 @@ def test_safe_repr_regressions():
 @pytest.mark.parametrize(
     "prefix,character",
     [
-        # corner set of prefix x control char (same escape branch for all
-        # combinations)
         ("", "\x00"),
         ("abcd", "\n"),
         ("лошадь", "\x1b"),

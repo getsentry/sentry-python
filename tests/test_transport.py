@@ -111,13 +111,9 @@ def mock_transaction_envelope(span_count: int) -> "Envelope":
 
 def _transport_works_cases():
     """
-    Curated subset of the full parameter cross-product.
-
     The compression-relevant dimensions (level x algo x http2) are fully
     crossed; debug, flush method and pickling are rotated through the cases
-    so every value of every dimension is still exercised. The full
-    cross-product ran the same assertions 192 times without covering any
-    additional code paths.
+    so every value of every dimension is still exercised.
     """
     algos = ("gzip", "br", "<invalid>", None) if PY37 else ("gzip", "<invalid>", None)
     http2_options = (True, False) if PY38 else (False,)
