@@ -1,3 +1,4 @@
+import contextvars
 import inspect
 import sys
 from functools import wraps
@@ -32,6 +33,11 @@ except ImportError:
     raise DidNotEnable("Huggingface not installed")
 
 
+_active_huggingface_task = contextvars.ContextVar(
+    "active_huggingface_task", default=False
+)
+
+
 class HuggingfaceHubIntegration(Integration):
     identifier = "huggingface_hub"
     origin = f"auto.ai.{identifier}"
@@ -56,6 +62,29 @@ class HuggingfaceHubIntegration(Integration):
                 OP.GEN_AI_CHAT,
             )
         )
+        _patch_huggingface_chat_completion_alias()
+
+
+def _patch_huggingface_chat_completion_alias() -> None:
+    proxy_class = getattr(
+        huggingface_hub.inference._client, "ProxyClientChatCompletions", None
+    )
+    if proxy_class is None:
+        inference_client = huggingface_hub.inference._client.InferenceClient
+        try:
+            chat = getattr(inference_client(), "chat", None)
+            completions = getattr(chat, "completions", None)
+        except Exception:
+            return
+        if completions is None:
+            return
+        proxy_class = completions.__class__
+
+    create = getattr(proxy_class, "create", None)
+    if create is None or isinstance(create, property):
+        return
+
+    proxy_class.create = _wrap_huggingface_task(create, OP.GEN_AI_CHAT)
 
 
 def _capture_exception(exc: "Any") -> None:
@@ -87,7 +116,10 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
             # invalid call, dont instrument, let it return error
             return f(*args, **kwargs)
 
-        client = args[0]
+        client = getattr(args[0], "_client", args[0])
+        if _active_huggingface_task.get():
+            return f(*args, **kwargs)
+
         model = client.model or kwargs.get("model") or ""
         operation_name = op.split(".")[-1]
 
@@ -139,6 +171,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                     set_data_normalized(span, span_attribute, value, unpack=False)
 
         # LLM Execution
+        task_token = _active_huggingface_task.set(True)
         try:
             res = f(*args, **kwargs)
         except Exception as e:
@@ -147,6 +180,8 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                 _capture_exception(e)
                 span.__exit__(*exc_info)
             reraise(*exc_info)
+        finally:
+            _active_huggingface_task.reset(task_token)
 
         # Output attributes
         finish_reason = None
