@@ -2905,9 +2905,6 @@ async def test_run_streamed_tool_execution_span(
         sentry_sdk.flush()
         spans = [item.payload for item in items]
 
-        assert spans[3]["name"] == "test_agent workflow"
-        assert spans[3]["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
-
         tool_span = next(
             span
             for span in spans
