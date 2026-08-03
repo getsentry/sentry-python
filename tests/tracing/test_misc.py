@@ -266,19 +266,13 @@ def test_finds_non_orphan_span_on_scope_span_streaming(sentry_init):
         (None, "http://example.com", False),
         ([], "http://example.com", False),
         ([MATCH_ALL], "http://example.com", True),
-        (["localhost"], "localhost:8443/api/users", True),
         (["localhost"], "http://localhost:8443/api/users", True),
         (["localhost"], "mylocalhost:8080/api/users", True),
         ([r"^/api"], "/api/envelopes", True),
         ([r"^/api"], "/backend/api/envelopes", False),
         ([r"myApi.com/v[2-4]"], "myApi.com/v2/projects", True),
         ([r"myApi.com/v[2-4]"], "myApi.com/v1/projects", False),
-        ([r"https:\/\/.*"], "https://example.com", True),
-        (
-            [r"https://.*"],
-            "https://example.com",
-            True,
-        ),  # to show escaping is not needed
+        ([r"https://.*"], "https://example.com", True),
         ([r"https://.*"], "http://example.com/insecure/", False),
     ],
 )

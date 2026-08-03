@@ -5,9 +5,21 @@ import pytest
 import sentry_sdk
 from sentry_sdk.tracing_utils import Baggage
 
+# Boundary cases for the sampling decision `sample_rand < sample_rate`:
+# equality (strict <), below, above, and the degenerate rates 0.0 (never
+# samples) and 1.0 (always samples). The full grid re-tested the same
+# comparison 20 times per test.
+SAMPLE_RAND_RATE_CASES = [
+    (0.0, 0.0),
+    (0.0, 0.25),
+    (0.25, 0.5),
+    (0.5, 0.5),
+    (0.75, 0.5),
+    (0.75, 1.0),
+]
 
-@pytest.mark.parametrize("sample_rand", (0.0, 0.25, 0.5, 0.75))
-@pytest.mark.parametrize("sample_rate", (0.0, 0.25, 0.5, 0.75, 1.0))
+
+@pytest.mark.parametrize("sample_rand,sample_rate", SAMPLE_RAND_RATE_CASES)
 def test_deterministic_sampled(sentry_init, capture_events, sample_rate, sample_rand):
     """
     Test that sample_rand is generated on new traces, that it is used to
@@ -32,8 +44,7 @@ def test_deterministic_sampled(sentry_init, capture_events, sample_rate, sample_
     assert len(events) == int(sample_rand < sample_rate)
 
 
-@pytest.mark.parametrize("sample_rand", (0.0, 0.25, 0.5, 0.75))
-@pytest.mark.parametrize("sample_rate", (0.0, 0.25, 0.5, 0.75, 1.0))
+@pytest.mark.parametrize("sample_rand,sample_rate", SAMPLE_RAND_RATE_CASES)
 def test_deterministic_sampled_span_streaming(
     sentry_init, capture_items, sample_rate, sample_rand
 ):
@@ -64,8 +75,7 @@ def test_deterministic_sampled_span_streaming(
     assert len(items) == int(sample_rand < sample_rate)
 
 
-@pytest.mark.parametrize("sample_rand", (0.0, 0.25, 0.5, 0.75))
-@pytest.mark.parametrize("sample_rate", (0.0, 0.25, 0.5, 0.75, 1.0))
+@pytest.mark.parametrize("sample_rand,sample_rate", SAMPLE_RAND_RATE_CASES)
 def test_transaction_uses_incoming_sample_rand(
     sentry_init, capture_events, sample_rate, sample_rand
 ):
@@ -88,8 +98,7 @@ def test_transaction_uses_incoming_sample_rand(
     assert len(events) == int(sample_rand < sample_rate)
 
 
-@pytest.mark.parametrize("sample_rand", (0.0, 0.25, 0.5, 0.75))
-@pytest.mark.parametrize("sample_rate", (0.0, 0.25, 0.5, 0.75, 1.0))
+@pytest.mark.parametrize("sample_rand,sample_rate", SAMPLE_RAND_RATE_CASES)
 def test_segment_uses_incoming_sample_rand_span_streaming(
     sentry_init, capture_items, sample_rate, sample_rand
 ):

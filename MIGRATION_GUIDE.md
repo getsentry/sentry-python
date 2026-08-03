@@ -38,6 +38,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - A number of extras (installable via `sentry-sdk[extra-name]`) has been removed. Use the base package (`sentry-sdk`) instead; there is no difference in functionality. The following extras have been removed: `aiohttp`, `anthropic`, `arq`, `asyncpg`, `beam`, `bottle`, `celery`, `celery-redbeat`, `chalice`, `clickhouse-driver`, `django`, `falcon`, `fastapi`, `google-genai`, `httpx`, `huey`, `huggingface_hub`, `langchain`, `langgraph`, `launchdarkly`, `litellm`, `litestar`, `loguru`, `mcp`, `openai`, `openfeature`, `pydantic_ai`, `pymongo`, `pyspark`, `rq`, `sanic`, `sqlalchemy`, `starlette`, `starlite`, `statsig`, `tornado`, `unleash`.
 - The `failed_request_status_codes` integration option now only supports a set of integers as input. Lists of integers or containers of integers are no longer supported.
 - The deprecated `propagate_traces` option has been removed. Use `trace_propagation_targets` instead, which gives you more power over trace propagation. Note that only the top-level `init` option was removed; the `propagate_traces` option of the Celery integration remains available.
+- Removed Spotlight integration for Django. See [Spotlight 2.0](https://github.com/getsentry/spotlight/issues/891) for more context.
 
 ## Deprecated
 
