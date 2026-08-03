@@ -250,12 +250,10 @@ def _set_output_data(
     set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)
 
     try:
-        # Prefer OTEL gen_ai.output.messages (includes text + reasoning + tool_call);
-        # keep deprecated response.tool_calls for compatibility.
+        # OTEL gen_ai.output.messages (text + reasoning + tool_call).
         if not hasattr(response, "parts"):
             return
 
-        tool_calls = []
         message_parts = []  # type: List[Dict[str, Any]]
 
         for part in response.parts:
@@ -275,17 +273,6 @@ def _set_output_data(
                 continue
 
             name = getattr(part, "tool_name", None)
-            has_args = hasattr(part, "args")
-            args = part.args if has_args else None
-
-            # Deprecated response.tool_calls shape
-            tool_call_data = {"type": "function"}  # type: Dict[str, Any]
-            if name is not None:
-                tool_call_data["name"] = name
-            if has_args:
-                tool_call_data["arguments"] = safe_serialize(args)
-            tool_calls.append(tool_call_data)
-
             if not name:
                 continue
 
@@ -295,12 +282,9 @@ def _set_output_data(
             )
             if tool_call_id:
                 otel_tool_call["id"] = tool_call_id
-            if has_args:
-                otel_tool_call["arguments"] = _tool_call_arguments(args)
+            if hasattr(part, "args"):
+                otel_tool_call["arguments"] = _tool_call_arguments(part.args)
             message_parts.append(otel_tool_call)
-
-        if tool_calls:
-            set_on_span(SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(tool_calls))
 
         if message_parts:
             output_message = {
