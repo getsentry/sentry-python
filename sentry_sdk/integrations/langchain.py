@@ -561,37 +561,34 @@ class SentryLangchainCallback(BaseCallbackHandler):
             except IndexError:
                 generation = None
 
-            if generation is not None:
+            if isinstance(generation, ChatGeneration):
                 set_on_span = (
                     span.set_attribute
                     if isinstance(span, StreamedSpan)
                     else span.set_data
                 )
 
-                if isinstance(generation, ChatGeneration):
-                    response_model = generation.message.response_metadata.get(
-                        "model_name"
-                    )
-                    if response_model is not None:
-                        set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
+                response_model = generation.message.response_metadata.get("model_name")
+                if response_model is not None:
+                    set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
 
-                    if generation.generation_info is not None:
-                        finish_reason = generation.generation_info.get("finish_reason")
-                        if finish_reason is not None:
-                            set_on_span(
-                                SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
-                                [finish_reason],
-                            )
+                if generation.generation_info is not None:
+                    finish_reason = generation.generation_info.get("finish_reason")
+                    if finish_reason is not None:
+                        set_on_span(
+                            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
+                            [finish_reason],
+                        )
 
-                    if should_send_default_pii() and self.include_prompts:
-                        tool_calls = getattr(generation.message, "tool_calls", None)
-                        if tool_calls is not None and tool_calls != []:
-                            set_data_normalized(
-                                span,
-                                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-                                tool_calls,
-                                unpack=False,
-                            )
+                if should_send_default_pii() and self.include_prompts:
+                    tool_calls = getattr(generation.message, "tool_calls", None)
+                    if tool_calls is not None and tool_calls != []:
+                        set_data_normalized(
+                            span,
+                            SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                            tool_calls,
+                            unpack=False,
+                        )
 
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
