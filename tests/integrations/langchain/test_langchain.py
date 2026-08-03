@@ -671,7 +671,10 @@ def test_langchain_create_agent(
         assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens"] == 20
         assert chat_spans[0]["attributes"]["gen_ai.usage.total_tokens"] == 30
 
-        assert chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4"
+        if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
+            assert (
+                chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4"
+            )
 
         if send_default_pii and include_prompts:
             assert (
@@ -744,7 +747,10 @@ def test_langchain_create_agent(
         assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens"] == 20
         assert chat_spans[0]["attributes"]["gen_ai.usage.total_tokens"] == 30
 
-        assert chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4"
+        if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
+            assert (
+                chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4"
+            )
 
         if send_default_pii and include_prompts:
             assert (
@@ -810,7 +816,8 @@ def test_langchain_create_agent(
         assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 20
         assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 30
 
-        assert chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4"
+        if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
+            assert chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4"
 
         if send_default_pii and include_prompts:
             assert (
@@ -980,12 +987,15 @@ def test_tool_execution_span(
         assert chat_spans[1]["attributes"]["gen_ai.usage.total_tokens"] == 117
         assert chat_spans[1]["attributes"]["gen_ai.system"] == "openai-chat"
 
-        assert (
-            chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4-0613"
-        )
-        assert (
-            chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4-0613"
-        )
+        if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
+            assert (
+                chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+                == "gpt-4-0613"
+            )
+            assert (
+                chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+                == "gpt-4-0613"
+            )
 
         if send_default_pii and include_prompts:
             assert "word" in tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_INPUT]
@@ -1090,12 +1100,15 @@ def test_tool_execution_span(
         assert chat_spans[1]["attributes"]["gen_ai.usage.total_tokens"] == 117
         assert chat_spans[1]["attributes"]["gen_ai.system"] == "openai-chat"
 
-        assert (
-            chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4-0613"
-        )
-        assert (
-            chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4-0613"
-        )
+        if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
+            assert (
+                chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+                == "gpt-4-0613"
+            )
+            assert (
+                chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+                == "gpt-4-0613"
+            )
 
         if send_default_pii and include_prompts:
             assert "word" in tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_INPUT]
@@ -1200,8 +1213,9 @@ def test_tool_execution_span(
         assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
         assert chat_spans[1]["data"]["gen_ai.system"] == "openai-chat"
 
-        assert chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4-0613"
-        assert chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4-0613"
+        if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
+            assert chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4-0613"
+            assert chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4-0613"
 
         if send_default_pii and include_prompts:
             assert "word" in tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_INPUT]
@@ -1384,14 +1398,15 @@ def test_langchain_openai_tools_agent_no_prompts(
             assert chat_spans[1]["attributes"]["gen_ai.usage.output_tokens"] == 28
             assert chat_spans[1]["attributes"]["gen_ai.usage.total_tokens"] == 117
 
-        assert (
-            chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
-            == "gpt-3.5-turbo"
-        )
-        assert (
-            chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
-            == "gpt-3.5-turbo"
-        )
+        if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
+            assert (
+                chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+                == "gpt-3.5-turbo"
+            )
+            assert (
+                chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+                == "gpt-3.5-turbo"
+            )
 
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get(
             "attributes", {}
@@ -1502,14 +1517,15 @@ def test_langchain_openai_tools_agent_no_prompts(
             assert chat_spans[1]["attributes"]["gen_ai.usage.output_tokens"] == 28
             assert chat_spans[1]["attributes"]["gen_ai.usage.total_tokens"] == 117
 
-        assert (
-            chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
-            == "gpt-3.5-turbo"
-        )
-        assert (
-            chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
-            == "gpt-3.5-turbo"
-        )
+        if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
+            assert (
+                chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+                == "gpt-3.5-turbo"
+            )
+            assert (
+                chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+                == "gpt-3.5-turbo"
+            )
 
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get(
             "attributes", {}
@@ -1610,8 +1626,13 @@ def test_langchain_openai_tools_agent_no_prompts(
             assert chat_spans[1]["data"]["gen_ai.usage.output_tokens"] == 28
             assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
 
-        assert chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
-        assert chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+        if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
+            assert (
+                chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+            )
+            assert (
+                chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+            )
 
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get("data", {})
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("data", {})
@@ -1826,14 +1847,15 @@ def test_langchain_openai_tools_agent(
             assert chat_spans[1]["attributes"]["gen_ai.usage.output_tokens"] == 28
             assert chat_spans[1]["attributes"]["gen_ai.usage.total_tokens"] == 117
 
-        assert (
-            chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
-            == "gpt-3.5-turbo"
-        )
-        assert (
-            chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
-            == "gpt-3.5-turbo"
-        )
+        if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
+            assert (
+                chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+                == "gpt-3.5-turbo"
+            )
+            assert (
+                chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+                == "gpt-3.5-turbo"
+            )
 
         assert "5" in chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
         assert "word" in tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_INPUT]
@@ -1949,14 +1971,15 @@ def test_langchain_openai_tools_agent(
             assert chat_spans[1]["attributes"]["gen_ai.usage.output_tokens"] == 28
             assert chat_spans[1]["attributes"]["gen_ai.usage.total_tokens"] == 117
 
-        assert (
-            chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
-            == "gpt-3.5-turbo"
-        )
-        assert (
-            chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
-            == "gpt-3.5-turbo"
-        )
+        if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
+            assert (
+                chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+                == "gpt-3.5-turbo"
+            )
+            assert (
+                chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+                == "gpt-3.5-turbo"
+            )
 
         assert "5" in chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
         assert "word" in tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_INPUT]
@@ -2056,8 +2079,13 @@ def test_langchain_openai_tools_agent(
             assert chat_spans[1]["data"]["gen_ai.usage.output_tokens"] == 28
             assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
 
-        assert chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
-        assert chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+        if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
+            assert (
+                chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+            )
+            assert (
+                chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+            )
 
         assert "5" in chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
         assert "word" in tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_INPUT]
@@ -2381,14 +2409,15 @@ def test_langchain_openai_tools_agent_stream_no_prompts(
             assert chat_spans[1]["attributes"]["gen_ai.usage.output_tokens"] == 28
             assert chat_spans[1]["attributes"]["gen_ai.usage.total_tokens"] == 117
 
-        assert (
-            chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
-            == "gpt-3.5-turbo"
-        )
-        assert (
-            chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
-            == "gpt-3.5-turbo"
-        )
+        if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
+            assert (
+                chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+                == "gpt-3.5-turbo"
+            )
+            assert (
+                chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+                == "gpt-3.5-turbo"
+            )
 
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get(
             "attributes", {}
@@ -2502,14 +2531,15 @@ def test_langchain_openai_tools_agent_stream_no_prompts(
             assert chat_spans[1]["attributes"]["gen_ai.usage.output_tokens"] == 28
             assert chat_spans[1]["attributes"]["gen_ai.usage.total_tokens"] == 117
 
-        assert (
-            chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
-            == "gpt-3.5-turbo"
-        )
-        assert (
-            chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
-            == "gpt-3.5-turbo"
-        )
+        if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
+            assert (
+                chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+                == "gpt-3.5-turbo"
+            )
+            assert (
+                chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+                == "gpt-3.5-turbo"
+            )
 
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get(
             "attributes", {}
@@ -2611,8 +2641,13 @@ def test_langchain_openai_tools_agent_stream_no_prompts(
             assert chat_spans[1]["data"]["gen_ai.usage.output_tokens"] == 28
             assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
 
-        assert chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
-        assert chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+        if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
+            assert (
+                chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+            )
+            assert (
+                chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+            )
 
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_spans[0].get("data", {})
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in chat_spans[0].get("data", {})
@@ -2834,14 +2869,15 @@ def test_langchain_openai_tools_agent_stream(
             assert chat_spans[1]["attributes"]["gen_ai.usage.output_tokens"] == 28
             assert chat_spans[1]["attributes"]["gen_ai.usage.total_tokens"] == 117
 
-        assert (
-            chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
-            == "gpt-3.5-turbo"
-        )
-        assert (
-            chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
-            == "gpt-3.5-turbo"
-        )
+        if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
+            assert (
+                chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+                == "gpt-3.5-turbo"
+            )
+            assert (
+                chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+                == "gpt-3.5-turbo"
+            )
 
         assert "5" in chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
         assert "word" in tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_INPUT]
@@ -2963,14 +2999,15 @@ def test_langchain_openai_tools_agent_stream(
             assert chat_spans[1]["attributes"]["gen_ai.usage.output_tokens"] == 28
             assert chat_spans[1]["attributes"]["gen_ai.usage.total_tokens"] == 117
 
-        assert (
-            chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
-            == "gpt-3.5-turbo"
-        )
-        assert (
-            chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
-            == "gpt-3.5-turbo"
-        )
+        if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
+            assert (
+                chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+                == "gpt-3.5-turbo"
+            )
+            assert (
+                chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL]
+                == "gpt-3.5-turbo"
+            )
 
         assert "5" in chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
         assert "word" in tool_exec_span["attributes"][SPANDATA.GEN_AI_TOOL_INPUT]
@@ -3077,8 +3114,13 @@ def test_langchain_openai_tools_agent_stream(
             assert chat_spans[1]["data"]["gen_ai.usage.output_tokens"] == 28
             assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
 
-        assert chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
-        assert chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+        if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
+            assert (
+                chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+            )
+            assert (
+                chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+            )
 
         assert "5" in chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
         assert "word" in tool_exec_span["data"][SPANDATA.GEN_AI_TOOL_INPUT]
