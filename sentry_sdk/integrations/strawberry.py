@@ -8,13 +8,14 @@ from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import SegmentSource
+from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.tracing import Span, TransactionSource
 from sentry_sdk.tracing_utils import StreamedSpan, has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    has_data_collection_enabled,
     package_version,
 )
 
@@ -188,9 +189,18 @@ class SentryAsyncExtension(SchemaExtension):
         client = sentry_sdk.get_client()
         is_span_streaming_enabled = has_span_streaming_enabled(client.options)
         if is_span_streaming_enabled:
-            additional_attributes: "dict[str, Any]" = {}
+            if sentry_sdk.traces.get_current_span() is None:
+                yield
+                return
 
-            if should_send_default_pii():
+            additional_attributes: "dict[str, Any]" = {}
+            if has_data_collection_enabled(client.options):
+                if client.options["data_collection"]["graphql"]["document"]:
+                    additional_attributes["graphql.document"] = (
+                        self.execution_context.query
+                    )
+
+            elif should_send_default_pii():
                 additional_attributes["graphql.document"] = self.execution_context.query
 
             if operation_name:
@@ -214,7 +224,12 @@ class SentryAsyncExtension(SchemaExtension):
             graphql_span.__enter__()
 
         if type(graphql_span) is Span:
-            if should_send_default_pii():
+            if has_data_collection_enabled(client.options):
+                if client.options["data_collection"]["graphql"]["document"]:
+                    graphql_span.set_data(
+                        "graphql.document", self.execution_context.query
+                    )
+            elif should_send_default_pii():
                 graphql_span.set_data("graphql.document", self.execution_context.query)
 
             graphql_span.set_data("graphql.operation.type", operation_type)
@@ -227,7 +242,9 @@ class SentryAsyncExtension(SchemaExtension):
         if type(graphql_span) is StreamedSpan:
             if self.execution_context.operation_name:
                 segment = graphql_span._segment
-                segment.set_attribute("sentry.span.source", SegmentSource.COMPONENT)
+                segment.set_attribute(
+                    "sentry.segment.name.source", SegmentNameSource.COMPONENT
+                )
                 segment.set_attribute("sentry.op", op)
                 segment.name = self.execution_context.operation_name
         elif isinstance(graphql_span, Span):
@@ -244,6 +261,10 @@ class SentryAsyncExtension(SchemaExtension):
         is_span_streaming_enabled = has_span_streaming_enabled(client.options)
 
         if is_span_streaming_enabled:
+            if sentry_sdk.traces.get_current_span() is None:
+                yield
+                return
+
             validation_span = sentry_sdk.traces.start_span(
                 name="validation",
                 attributes={
@@ -272,6 +293,10 @@ class SentryAsyncExtension(SchemaExtension):
         is_span_streaming_enabled = has_span_streaming_enabled(client.options)
 
         if is_span_streaming_enabled:
+            if sentry_sdk.traces.get_current_span() is None:
+                yield
+                return
+
             parsing_span = sentry_sdk.traces.start_span(
                 name="parsing",
                 attributes={
@@ -333,6 +358,9 @@ class SentryAsyncExtension(SchemaExtension):
         client = sentry_sdk.get_client()
         is_span_streaming_enabled = has_span_streaming_enabled(client.options)
         if is_span_streaming_enabled:
+            if sentry_sdk.traces.get_current_span() is None:
+                return await self._resolve(_next, root, info, *args, **kwargs)
+
             with sentry_sdk.traces.start_span(
                 name=f"resolving {field_path}",
                 attributes={
@@ -372,6 +400,9 @@ class SentrySyncExtension(SentryAsyncExtension):
         client = sentry_sdk.get_client()
         is_span_streaming_enabled = has_span_streaming_enabled(client.options)
         if is_span_streaming_enabled:
+            if sentry_sdk.traces.get_current_span() is None:
+                return _next(root, info, *args, **kwargs)
+
             with sentry_sdk.traces.start_span(
                 name=f"resolving {field_path}",
                 attributes={
@@ -445,8 +476,35 @@ def _make_request_event_processor(
     execution_context: "ExecutionContext",
 ) -> "EventProcessor":
     def inner(event: "Event", hint: "dict[str, Any]") -> "Event":
+        client_options = sentry_sdk.get_client().options
         with capture_internal_exceptions():
-            if should_send_default_pii():
+            if has_data_collection_enabled(client_options):
+                request_data = event.setdefault("request", {})
+                if client_options["data_collection"]["graphql"]["document"]:
+                    request_data["api_target"] = "graphql"
+
+                if not request_data.get("data"):
+                    execution_context_data: "dict[str, Any]" = (
+                        {"query": execution_context.query}
+                        if client_options["data_collection"]["graphql"]["document"]
+                        else {}
+                    )
+
+                    if (
+                        client_options["data_collection"]["graphql"]["variables"]
+                        and execution_context.variables
+                    ):
+                        execution_context_data["variables"] = (
+                            execution_context.variables
+                        )
+
+                    if execution_context.operation_name:
+                        execution_context_data["operationName"] = (
+                            execution_context.operation_name
+                        )
+
+                    request_data["data"] = execution_context_data
+            elif should_send_default_pii():
                 request_data = event.setdefault("request", {})
                 request_data["api_target"] = "graphql"
 

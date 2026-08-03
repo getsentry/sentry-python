@@ -60,6 +60,26 @@ class Query:
 
 
 @strawberry.type
+class QueryWithArg:
+    @strawberry.field
+    def fail(self, value: str) -> str:
+        raise RuntimeError("oh no!")
+
+
+@strawberry.type
+class QueryWithCaptureException:
+    @strawberry.field
+    def echo(self, value: str) -> str:
+        sentry_sdk.capture_exception(RuntimeError("boom"))
+        return value
+
+    @strawberry.field
+    def hello(self) -> str:
+        sentry_sdk.capture_exception(RuntimeError("boom"))
+        return "Hello World"
+
+
+@strawberry.type
 class Mutation:
     @strawberry.mutation
     def change(self, attribute: str) -> str:
@@ -248,6 +268,196 @@ def test_do_not_capture_request_if_send_pii_is_off(
 
 
 @parameterize_strawberry_test
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,expect_api_target",
+    [
+        pytest.param(
+            {"graphql": {"document": True}},
+            None,
+            True,
+            id="document_on_sets_api_target",
+        ),
+        pytest.param(
+            {"graphql": {"document": False}},
+            None,
+            False,
+            id="document_off_omits_api_target",
+        ),
+        pytest.param(
+            {"graphql": {"document": False}},
+            True,
+            False,
+            id="data_collection_takes_precedence_over_send_default_pii_on",
+        ),
+        pytest.param(
+            {"graphql": {"document": True}},
+            False,
+            True,
+            id="data_collection_takes_precedence_over_send_default_pii_off",
+        ),
+    ],
+)
+def test_event_processor_data_collection(
+    request,
+    sentry_init,
+    capture_events,
+    client_factory,
+    async_execution,
+    framework_integrations,
+    data_collection,
+    send_default_pii,
+    expect_api_target,
+):
+    init_kwargs = {
+        "integrations": [StrawberryIntegration(async_execution=async_execution)]
+        + framework_integrations,
+        "_experiments": {"data_collection": data_collection},
+    }
+    if send_default_pii is not None:
+        init_kwargs["send_default_pii"] = send_default_pii
+    sentry_init(**init_kwargs)
+    events = capture_events()
+
+    schema = strawberry.Schema(QueryWithArg)
+
+    client_factory = request.getfixturevalue(client_factory)
+    client = client_factory(schema)
+
+    query = "query ErrorQuery($value: String!) { fail(value: $value) }"
+    client.post(
+        "/graphql",
+        json={
+            "query": query,
+            "operationName": "ErrorQuery",
+            "variables": {"value": "boom"},
+        },
+    )
+
+    assert len(events) == 1
+
+    (error_event,) = events
+    assert error_event["exception"]["values"][0]["mechanism"]["type"] == "strawberry"
+
+    # request.data comes from the framework integration and must not be
+    # overwritten by the strawberry integration
+    assert error_event["request"]["data"] == {
+        "query": query,
+        "operationName": "ErrorQuery",
+        "variables": {"value": "boom"},
+    }
+
+    if expect_api_target:
+        assert error_event["request"]["api_target"] == "graphql"
+    else:
+        assert "api_target" not in error_event.get("request", {})
+
+
+@pytest.mark.parametrize(
+    "data_collection,expect_query,expect_variables",
+    [
+        pytest.param(
+            {"graphql": {"document": True, "variables": True}},
+            True,
+            True,
+            id="document_and_variables_on",
+        ),
+        pytest.param(
+            {"graphql": {"document": False, "variables": True}},
+            False,
+            True,
+            id="document_off_variables_on",
+        ),
+        pytest.param(
+            {"graphql": {"document": True, "variables": False}},
+            True,
+            False,
+            id="document_on_variables_off",
+        ),
+        pytest.param(
+            {"graphql": {"document": False, "variables": False}},
+            False,
+            False,
+            id="document_and_variables_off",
+        ),
+        pytest.param(
+            {"user_info": False},
+            True,
+            True,
+            id="omitted_graphql_config_uses_spec_defaults",
+        ),
+    ],
+)
+def test_request_data_collection_no_framework(
+    sentry_init, capture_events, data_collection, expect_query, expect_variables
+):
+    # capturing an event during direct schema execution (without a web
+    # framework integration) exercises the request data collection through
+    # the integration's public event-processing path
+    sentry_init(
+        integrations=[StrawberryIntegration()],
+        _experiments={"data_collection": data_collection},
+    )
+    events = capture_events()
+
+    schema = strawberry.Schema(QueryWithCaptureException)
+
+    query = "query EchoQuery($value: String!) { echo(value: $value) }"
+    schema.execute_sync(
+        query,
+        variable_values={"value": "boom"},
+        operation_name="EchoQuery",
+    )
+
+    assert len(events) == 1
+
+    (error_event,) = events
+    assert error_event["exception"]["values"][0]["value"] == "boom"
+
+    request_data = error_event["request"]["data"]
+
+    # operationName is always collected when data collection is enabled,
+    # regardless of the document setting
+    assert request_data.get("operationName") == "EchoQuery"
+
+    if expect_query:
+        assert error_event["request"]["api_target"] == "graphql"
+        assert request_data.get("query") == query
+    else:
+        assert "api_target" not in error_event["request"]
+        assert "query" not in request_data
+
+    if expect_variables:
+        assert request_data.get("variables") == {"value": "boom"}
+    else:
+        assert "variables" not in request_data
+
+
+def test_request_data_collection_no_variables(sentry_init, capture_events):
+    sentry_init(
+        integrations=[StrawberryIntegration()],
+        _experiments={
+            "data_collection": {"graphql": {"document": True, "variables": True}}
+        },
+    )
+    events = capture_events()
+
+    schema = strawberry.Schema(QueryWithCaptureException)
+
+    schema.execute_sync(
+        "query HelloQuery { hello }",
+        operation_name="HelloQuery",
+    )
+
+    assert len(events) == 1
+
+    (error_event,) = events
+    assert error_event["request"]["data"] == {
+        "query": "query HelloQuery { hello }",
+        "operationName": "HelloQuery",
+    }
+
+
+@parameterize_strawberry_test
 def test_breadcrumb_no_operation_name(
     request,
     sentry_init,
@@ -308,7 +518,7 @@ def test_capture_transaction_on_error(
         ]
         + framework_integrations,
         traces_sample_rate=1,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -331,14 +541,8 @@ def test_capture_transaction_on_error(
 
         assert len(error_events) == 1
 
-        if async_execution:
-            # When FastAPI is run, there's an extra span from the httpx client
-            # so we need to account for that
-            assert len(spans) == 6
-            parse_span, validate_span, resolve_span, query_span, segment, _ = spans
-        else:
-            assert len(spans) == 5
-            parse_span, validate_span, resolve_span, query_span, segment = spans
+        assert len(spans) == 5
+        parse_span, validate_span, resolve_span, query_span, segment = spans
 
         assert segment["is_segment"] is True
         assert segment["name"] == "ErrorQuery"
@@ -453,7 +657,7 @@ def test_capture_transaction_on_success(
         + framework_integrations,
         traces_sample_rate=1,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -473,12 +677,8 @@ def test_capture_transaction_on_success(
         sentry_sdk.flush()
         spans = [i.payload for i in items]
 
-        if async_execution:
-            assert len(spans) == 6
-            parse_span, validate_span, resolve_span, query_span, segment, _ = spans
-        else:
-            assert len(spans) == 5
-            parse_span, validate_span, resolve_span, query_span, segment = spans
+        assert len(spans) == 5
+        parse_span, validate_span, resolve_span, query_span, segment = spans
 
         assert segment["is_segment"] is True
         assert segment["name"] == "GreetingQuery"
@@ -593,7 +793,7 @@ def test_transaction_no_operation_name(
         + framework_integrations,
         traces_sample_rate=1,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -613,12 +813,8 @@ def test_transaction_no_operation_name(
         sentry_sdk.flush()
         spans = [i.payload for i in items]
 
-        if async_execution:
-            assert len(spans) == 6
-            parse_span, validate_span, resolve_span, query_span, segment, _ = spans
-        else:
-            assert len(spans) == 5
-            parse_span, validate_span, resolve_span, query_span, segment = spans
+        assert len(spans) == 5
+        parse_span, validate_span, resolve_span, query_span, segment = spans
 
         assert segment["is_segment"] is True
         if async_execution:
@@ -738,7 +934,7 @@ def test_transaction_mutation(
         + framework_integrations,
         traces_sample_rate=1,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -758,12 +954,8 @@ def test_transaction_mutation(
         sentry_sdk.flush()
         spans = [i.payload for i in items]
 
-        if async_execution:
-            assert len(spans) == 6
-            parse_span, validate_span, resolve_span, mutation_span, segment, _ = spans
-        else:
-            assert len(spans) == 5
-            parse_span, validate_span, resolve_span, mutation_span, segment = spans
+        assert len(spans) == 5
+        parse_span, validate_span, resolve_span, mutation_span, segment = spans
 
         assert segment["is_segment"] is True
         assert segment["name"] == "Change"
@@ -855,6 +1047,109 @@ def test_transaction_mutation(
 
 
 @parameterize_strawberry_test
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,expect_document",
+    [
+        pytest.param(
+            {"graphql": {"document": True}},
+            None,
+            True,
+            id="document_on_sets_graphql_document",
+        ),
+        pytest.param(
+            {"graphql": {"document": False}},
+            None,
+            False,
+            id="document_off_omits_graphql_document",
+        ),
+        pytest.param(
+            {"graphql": {"document": False}},
+            True,
+            False,
+            id="data_collection_takes_precedence_over_send_default_pii_on",
+        ),
+        pytest.param(
+            {"graphql": {"document": True}},
+            False,
+            True,
+            id="data_collection_takes_precedence_over_send_default_pii_off",
+        ),
+    ],
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_graphql_span_data_collection(
+    request,
+    sentry_init,
+    capture_events,
+    capture_items,
+    client_factory,
+    async_execution,
+    framework_integrations,
+    data_collection,
+    send_default_pii,
+    expect_document,
+    span_streaming,
+):
+    init_kwargs = {
+        "integrations": [StrawberryIntegration(async_execution=async_execution)]
+        + framework_integrations,
+        "traces_sample_rate": 1,
+        "trace_lifecycle": "stream" if span_streaming else "static",
+        "_experiments": {"data_collection": data_collection},
+    }
+    if send_default_pii is not None:
+        init_kwargs["send_default_pii"] = send_default_pii
+    sentry_init(**init_kwargs)
+
+    if span_streaming:
+        items = capture_items("span")
+    else:
+        events = capture_events()
+
+    schema = strawberry.Schema(Query)
+
+    client_factory = request.getfixturevalue(client_factory)
+    client = client_factory(schema)
+
+    query = "query GreetingQuery { hello }"
+    client.post("/graphql", json={"query": query, "operationName": "GreetingQuery"})
+
+    if span_streaming:
+        sentry_sdk.flush()
+        spans = [i.payload for i in items]
+        assert len(spans) == 5
+        query_span = spans[3]
+
+        assert query_span["attributes"]["sentry.op"] == OP.GRAPHQL_QUERY
+        assert query_span["attributes"]["graphql.operation.type"] == "query"
+        # operation.name is always set when an operation name is present
+        assert query_span["attributes"]["graphql.operation.name"] == "GreetingQuery"
+
+        if expect_document:
+            assert query_span["attributes"]["graphql.document"] == query
+        else:
+            assert "graphql.document" not in query_span["attributes"]
+    else:
+        assert len(events) == 1
+        (transaction_event,) = events
+
+        query_spans = [
+            span
+            for span in transaction_event["spans"]
+            if span["op"] == OP.GRAPHQL_QUERY
+        ]
+        assert len(query_spans) == 1, "exactly one query span expected"
+        query_span = query_spans[0]
+        assert query_span["data"]["graphql.operation.type"] == "query"
+        assert query_span["data"]["graphql.operation.name"] == "GreetingQuery"
+
+        if expect_document:
+            assert query_span["data"]["graphql.document"] == query
+        else:
+            assert "graphql.document" not in query_span["data"]
+
+
+@parameterize_strawberry_test
 def test_handle_none_query_gracefully(
     request,
     sentry_init,
@@ -868,6 +1163,36 @@ def test_handle_none_query_gracefully(
             StrawberryIntegration(async_execution=async_execution),
         ]
         + framework_integrations,
+    )
+    events = capture_events()
+
+    schema = strawberry.Schema(Query)
+
+    client_factory = request.getfixturevalue(client_factory)
+    client = client_factory(schema)
+
+    client.post("/graphql", json={})
+
+    assert len(events) == 0, "expected no events to be sent to Sentry"
+
+
+@parameterize_strawberry_test
+def test_handle_none_query_gracefully_with_data_collection(
+    request,
+    sentry_init,
+    capture_events,
+    client_factory,
+    async_execution,
+    framework_integrations,
+):
+    sentry_init(
+        integrations=[
+            StrawberryIntegration(async_execution=async_execution),
+        ]
+        + framework_integrations,
+        _experiments={
+            "data_collection": {"graphql": {"document": True, "variables": True}}
+        },
     )
     events = capture_events()
 
@@ -902,7 +1227,7 @@ def test_span_origin(
         ]
         + framework_integrations,
         traces_sample_rate=1,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -924,12 +1249,8 @@ def test_span_origin(
         sentry_sdk.flush()
         spans = [i.payload for i in items]
 
-        if async_execution:
-            assert len(spans) == 6
-            parse_span, validate_span, resolve_span, mutation_span, segment, _ = spans
-        else:
-            assert len(spans) == 5
-            parse_span, validate_span, resolve_span, mutation_span, segment = spans
+        assert len(spans) == 5
+        parse_span, validate_span, resolve_span, mutation_span, segment = spans
 
         assert segment["is_segment"] is True
         if is_flask:
@@ -973,7 +1294,7 @@ def test_span_origin2(
         ]
         + framework_integrations,
         traces_sample_rate=1,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -995,12 +1316,8 @@ def test_span_origin2(
         sentry_sdk.flush()
         spans = [i.payload for i in items]
 
-        if async_execution:
-            assert len(spans) == 6
-            parse_span, validate_span, resolve_span, query_span, segment, _ = spans
-        else:
-            assert len(spans) == 5
-            parse_span, validate_span, resolve_span, query_span, segment = spans
+        assert len(spans) == 5
+        parse_span, validate_span, resolve_span, query_span, segment = spans
 
         assert segment["is_segment"] is True
         if is_flask:
@@ -1044,7 +1361,7 @@ def test_span_origin3(
         ]
         + framework_integrations,
         traces_sample_rate=1,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -1066,14 +1383,8 @@ def test_span_origin3(
         sentry_sdk.flush()
         spans = [i.payload for i in items]
 
-        if async_execution:
-            assert len(spans) == 6
-            parse_span, validate_span, resolve_span, subscription_span, segment, _ = (
-                spans
-            )
-        else:
-            assert len(spans) == 5
-            parse_span, validate_span, resolve_span, subscription_span, segment = spans
+        assert len(spans) == 5
+        parse_span, validate_span, resolve_span, subscription_span, segment = spans
 
         assert segment["is_segment"] is True
         if is_flask:

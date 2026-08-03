@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk._types import OVER_SIZE_LIMIT_SUBSTITUTE
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.data_collection import _apply_key_value_collection_filtering
 from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     DidNotEnable,
@@ -35,6 +36,8 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    has_data_collection_enabled,
+    nullcontext,
     parse_version,
     transaction_from_function,
 )
@@ -198,6 +201,8 @@ def _enable_span_for_middleware(
 
         def _start_middleware_span(op: str, name: str) -> "Any":
             if is_span_streaming_enabled:
+                if sentry_sdk.traces.get_current_span() is None:
+                    return nullcontext()
                 return sentry_sdk.traces.start_span(
                     name=name,
                     attributes={
@@ -370,7 +375,11 @@ def _add_user_to_sentry_scope(scope: "Dict[str, Any]") -> None:
     if "user" not in scope:
         return
 
-    if not should_send_default_pii():
+    client_options = sentry_sdk.get_client().options
+    if has_data_collection_enabled(client_options):
+        if not client_options["data_collection"]["user_info"]:
+            return
+    elif not should_send_default_pii():
         return
 
     user_info: "Dict[str, Any]" = {}
@@ -408,8 +417,8 @@ def patch_authentication_middleware(middleware_class: "Any") -> None:
             receive: "Callable[[], Awaitable[Dict[str, Any]]]",
             send: "Callable[[Dict[str, Any]], Awaitable[None]]",
         ) -> None:
-            await old_call(self, scope, receive, send)
             _add_user_to_sentry_scope(scope)
+            await old_call(self, scope, receive, send)
 
         middleware_class.__call__ = _sentry_authenticationmiddleware_call
 
@@ -422,7 +431,6 @@ def patch_middlewares() -> None:
     old_middleware_init = Middleware.__init__
 
     not_yet_patched = "_sentry_middleware_init" not in str(old_middleware_init)
-
     if not_yet_patched:
 
         def _sentry_middleware_init(
@@ -717,8 +725,15 @@ class StarletteRequestExtractor:
     def extract_cookies_from_request(
         self: "StarletteRequestExtractor",
     ) -> "Optional[Dict[str, Any]]":
+        client_options = sentry_sdk.get_client().options
         cookies: "Optional[Dict[str, Any]]" = None
-        if should_send_default_pii():
+
+        if has_data_collection_enabled(client_options):
+            cookies = _apply_key_value_collection_filtering(
+                items=self.cookies(),
+                behaviour=client_options["data_collection"]["cookies"],
+            )
+        elif should_send_default_pii():
             cookies = self.cookies()
 
         return cookies
@@ -732,7 +747,14 @@ class StarletteRequestExtractor:
 
         with capture_internal_exceptions():
             # Add cookies
-            if should_send_default_pii():
+            if has_data_collection_enabled(client.options):
+                cookies = _apply_key_value_collection_filtering(
+                    items=self.cookies(),
+                    behaviour=client.options["data_collection"]["cookies"],
+                )
+                if cookies:
+                    request_info["cookies"] = cookies
+            elif should_send_default_pii():
                 request_info["cookies"] = self.cookies()
 
             # If there is no body, just return the cookies

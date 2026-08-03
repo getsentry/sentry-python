@@ -9,6 +9,7 @@ from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.rq import RqIntegration
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE, parse_version
+from tests.integrations.utils import DATA_COLLECTION_QUEUES_CASES
 
 
 @pytest.fixture(autouse=True)
@@ -35,7 +36,7 @@ def _patch_rq_get_server_version(monkeypatch):
                 pass
 
 
-def crashing_job(foo):
+def crashing_job(foo, b=1):
     1 / 0
 
 
@@ -59,7 +60,7 @@ def test_basic(
     sentry_init(
         integrations=[RqIntegration()],
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     queue = rq.Queue(connection=FakeStrictRedis())
@@ -108,13 +109,61 @@ def test_basic(
         assert "started_at" in extra
 
 
+@pytest.mark.parametrize(
+    "init_kwargs,expected_args,expected_kwargs",
+    DATA_COLLECTION_QUEUES_CASES,
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_job_args_kwargs_data_collection(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+    init_kwargs,
+    expected_args,
+    expected_kwargs,
+):
+    sentry_init(
+        integrations=[RqIntegration()],
+        trace_lifecycle="stream" if span_streaming else "static",
+        **init_kwargs,
+    )
+
+    queue = rq.Queue(connection=FakeStrictRedis())
+    worker = rq.SimpleWorker([queue], connection=queue.connection)
+
+    if span_streaming:
+        items = capture_items("event")
+
+        queue.enqueue(crashing_job, 1, b=0)
+        worker.work(burst=True)
+
+        (event,) = (item.payload for item in items)
+    else:
+        events = capture_events()
+
+        queue.enqueue(crashing_job, 1, b=0)
+        worker.work(burst=True)
+
+        (event,) = events
+
+    rq_job = event["extra"]["rq-job"]
+
+    if expected_args is None:
+        assert "args" not in rq_job
+        assert "kwargs" not in rq_job
+    else:
+        assert rq_job["args"] == expected_args
+        assert rq_job["kwargs"] == expected_kwargs
+
+
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_transport_shutdown(
     sentry_init, capture_events_forksafe, capture_items_forksafe, span_streaming
 ):
     sentry_init(
         integrations=[RqIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     queue = rq.Queue(connection=FakeStrictRedis())
@@ -159,7 +208,7 @@ def test_transaction_with_error(
         integrations=[RqIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     queue = rq.Queue(connection=FakeStrictRedis())
@@ -250,7 +299,7 @@ def test_error_has_trace_context_if_tracing_disabled(
 ):
     sentry_init(
         integrations=[RqIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     queue = rq.Queue(connection=FakeStrictRedis())
@@ -284,7 +333,7 @@ def test_tracing_enabled(
     sentry_init(
         integrations=[RqIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     queue = rq.Queue(connection=FakeStrictRedis())
@@ -347,7 +396,7 @@ def test_tracing_disabled(
 ):
     sentry_init(
         integrations=[RqIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     queue = rq.Queue(connection=FakeStrictRedis())
@@ -394,7 +443,7 @@ def test_transaction_no_error(
         integrations=[RqIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     queue = rq.Queue(connection=FakeStrictRedis())
@@ -416,6 +465,7 @@ def test_transaction_no_error(
 
         assert span["attributes"]["sentry.op"] == "queue.task.rq"
         assert span["name"] == "tests.integrations.rq.test_rq.do_trick"
+        assert span["attributes"][SPANDATA.MESSAGING_DESTINATION_NAME] == queue.name
     else:
         events = capture_events()
 
@@ -427,6 +477,10 @@ def test_transaction_no_error(
         assert envelope["type"] == "transaction"
         assert envelope["contexts"]["trace"]["op"] == "queue.task.rq"
         assert envelope["transaction"] == "tests.integrations.rq.test_rq.do_trick"
+        assert (
+            envelope["contexts"]["trace"]["data"][SPANDATA.MESSAGING_DESTINATION_NAME]
+            == queue.name
+        )
         assert envelope["extra"]["rq-job"] == DictionaryContaining(
             {
                 "args": ["Maisey"] if send_default_pii else SENSITIVE_DATA_SUBSTITUTE,
@@ -452,7 +506,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
     sentry_init(
         integrations=[RqIntegration()],
         traces_sampler=traces_sampler,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     queue = rq.Queue(connection=FakeStrictRedis())
@@ -491,7 +545,7 @@ def test_job_with_retries(
 ):
     sentry_init(
         integrations=[RqIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     queue = rq.Queue(connection=FakeStrictRedis())
@@ -522,7 +576,7 @@ def test_span_origin(
     sentry_init(
         integrations=[RqIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     queue = rq.Queue(connection=FakeStrictRedis())

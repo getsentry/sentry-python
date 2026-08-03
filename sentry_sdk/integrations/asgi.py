@@ -24,7 +24,6 @@ from sentry_sdk.integrations._asgi_common import (
 )
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
-    nullcontext,
 )
 from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.sessions import track_session
@@ -32,7 +31,7 @@ from sentry_sdk.traces import (
     SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE,
 )
 from sentry_sdk.traces import (
-    SegmentSource,
+    SegmentNameSource,
     StreamedSpan,
 )
 from sentry_sdk.tracing import (
@@ -48,7 +47,9 @@ from sentry_sdk.utils import (
     _get_installed_modules,
     capture_internal_exceptions,
     event_from_exception,
+    has_data_collection_enabled,
     logger,
+    nullcontext,
     qualname_from_function,
     reraise,
     transaction_from_function,
@@ -246,17 +247,24 @@ class SentryAsgiMiddleware:
                     if span_streaming:
                         segment: "Optional[StreamedSpan]" = None
                         attributes: "Attributes" = {
-                            "sentry.span.source": getattr(
+                            "sentry.segment.name.source": getattr(
                                 transaction_source, "value", transaction_source
                             ),
                             "sentry.origin": self.span_origin,
                             "network.protocol.name": ty,
                         }
 
-                        if scope.get("client") and should_send_default_pii():
-                            sentry_scope.set_attribute(
-                                SPANDATA.USER_IP_ADDRESS, _get_ip(scope)
-                            )
+                        if scope.get("client"):
+                            client_options = sentry_sdk.get_client().options
+                            if has_data_collection_enabled(client_options):
+                                if client_options["data_collection"]["user_info"]:
+                                    sentry_scope.set_attribute(
+                                        SPANDATA.USER_IP_ADDRESS, _get_ip(scope)
+                                    )
+                            elif should_send_default_pii():
+                                sentry_scope.set_attribute(
+                                    SPANDATA.USER_IP_ADDRESS, _get_ip(scope)
+                                )
 
                         if ty in ("http", "websocket"):
                             if (
@@ -384,11 +392,13 @@ class SentryAsgiMiddleware:
                                 already_set = (
                                     span is not None
                                     and span.name != _DEFAULT_TRANSACTION_NAME
-                                    and span.get_attributes().get("sentry.span.source")
+                                    and span.get_attributes().get(
+                                        "sentry.segment.name.source"
+                                    )
                                     in [
-                                        SegmentSource.COMPONENT.value,
-                                        SegmentSource.ROUTE.value,
-                                        SegmentSource.CUSTOM.value,
+                                        SegmentNameSource.COMPONENT.value,
+                                        SegmentNameSource.ROUTE.value,
+                                        SegmentNameSource.CUSTOM.value,
                                     ]
                                 )
                                 with capture_internal_exceptions():
@@ -399,7 +409,9 @@ class SentryAsgiMiddleware:
                                             )
                                         )
                                         span.name = name
-                                        span.set_attribute("sentry.span.source", source)
+                                        span.set_attribute(
+                                            "sentry.segment.name.source", source
+                                        )
         finally:
             _asgi_middleware_applied.set(False)
 
@@ -514,7 +526,7 @@ class SentryAsgiMiddleware:
                         asgi_scope=asgi_scope, root_path_in_path=self.root_path_in_path
                     ),
                 )
-                source = SegmentSource.URL.value
+                source = SegmentNameSource.URL.value
 
         elif segment_style == "url":
             # FastAPI includes the route object in the scope to let Sentry extract the
@@ -533,11 +545,11 @@ class SentryAsgiMiddleware:
                         asgi_scope=asgi_scope, root_path_in_path=self.root_path_in_path
                     ),
                 )
-                source = SegmentSource.URL.value
+                source = SegmentNameSource.URL.value
 
         if name is None:
             name = _DEFAULT_TRANSACTION_NAME
-            source = SegmentSource.ROUTE.value
+            source = SegmentNameSource.ROUTE.value
             return name, source
 
         return name, source

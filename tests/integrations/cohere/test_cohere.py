@@ -29,7 +29,7 @@ def test_nonstreaming_chat(
         integrations=[CohereIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = Client(api_key="z")
@@ -139,7 +139,7 @@ def test_streaming_chat(
         integrations=[CohereIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = Client(api_key="z")
@@ -287,7 +287,7 @@ def test_span_status_error_streaming(sentry_init, capture_events, capture_items)
     sentry_init(
         integrations=[CohereIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
     items = capture_items("span")
 
@@ -323,7 +323,7 @@ def test_embed(
         integrations=[CohereIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     client = Client(api_key="z")

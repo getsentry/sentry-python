@@ -116,9 +116,9 @@ async def test_connect(
 ) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
+        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={
             "record_sql_params": True,
-            "trace_lifecycle": "stream" if span_streaming else "static",
         },
     )
 
@@ -154,9 +154,9 @@ async def test_execute(
 ) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
+        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={
             "record_sql_params": True,
-            "trace_lifecycle": "stream" if span_streaming else "static",
         },
     )
 
@@ -235,9 +235,9 @@ async def test_execute_many(
 ) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
+        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={
             "record_sql_params": True,
-            "trace_lifecycle": "stream" if span_streaming else "static",
         },
     )
 
@@ -564,9 +564,7 @@ async def test_query_source_disabled(
         "traces_sample_rate": 1.0,
         "enable_db_query_source": False,
         "db_query_source_threshold_ms": 0,
-        "_experiments": {
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        "trace_lifecycle": "stream" if span_streaming else "static",
     }
 
     sentry_init(**sentry_options)
@@ -628,9 +626,7 @@ async def test_query_source_enabled(
         "integrations": [AsyncPGIntegration()],
         "traces_sample_rate": 1.0,
         "db_query_source_threshold_ms": 0,
-        "_experiments": {
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        "trace_lifecycle": "stream" if span_streaming else "static",
     }
     if enable_db_query_source is not None:
         sentry_options["enable_db_query_source"] = enable_db_query_source
@@ -695,9 +691,7 @@ async def test_query_source(sentry_init, capture_events, capture_items, span_str
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -775,9 +769,7 @@ async def test_query_source_with_module_in_search_path(
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     from asyncpg_helpers.helpers import execute_query_in_connection
@@ -855,9 +847,7 @@ async def test_no_query_source_if_duration_too_short(
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=100,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -1004,9 +994,7 @@ async def test_span_origin(sentry_init, capture_events, capture_items, span_stre
     sentry_init(
         integrations=[AsyncPGIntegration()],
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -1063,9 +1051,7 @@ async def test_multiline_query_description_normalized(
     sentry_init(
         integrations=[AsyncPGIntegration()],
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -1203,9 +1189,7 @@ async def test_query_source_execute(
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -1264,9 +1248,7 @@ async def test_query_source_executemany(
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -1320,9 +1302,7 @@ async def test_query_source_prepare(
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -1384,9 +1364,7 @@ async def test_cursor_iteration_creates_db_cursor_iter_spans(
     sentry_init(
         integrations=[AsyncPGIntegration()],
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -1456,7 +1434,7 @@ async def test_cursor_fetch_methods_create_spans(
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:

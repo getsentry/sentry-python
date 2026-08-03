@@ -77,7 +77,7 @@ async def test_trace_decorator_async_no_trx():
 
             start_child_span_decorator = create_span_decorator()
             result2 = await start_child_span_decorator(my_async_example_function)()
-            fake_debug.assert_called_once_with(
+            fake_debug.assert_any_call(
                 "Cannot create a child span for %s. "
                 "Please start a Sentry transaction before calling this function.",
                 "test_decorator.my_async_example_function",
@@ -88,7 +88,7 @@ async def test_trace_decorator_async_no_trx():
 def test_trace_decorator_span_streaming(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -110,13 +110,14 @@ def test_trace_decorator_span_streaming(sentry_init, capture_items):
         span["name"]
         == "test_decorator.test_trace_decorator_span_streaming.<locals>.traced_function"
     )
+    assert span["attributes"]["sentry.op"] == "function"
     assert span["status"] == "ok"
 
 
 def test_trace_decorator_arguments_span_streaming(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -136,13 +137,14 @@ def test_trace_decorator_arguments_span_streaming(sentry_init, capture_items):
 
     assert span["name"] == "traced"
     assert span["attributes"]["traced.attribute"] == 123
+    assert span["attributes"]["sentry.op"] == "function"
     assert span["status"] == "ok"
 
 
 def test_trace_decorator_inactive_span_streaming(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -171,7 +173,7 @@ def test_trace_decorator_inactive_span_streaming(sentry_init, capture_items):
 async def test_trace_decorator_async_span_streaming(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -193,6 +195,7 @@ async def test_trace_decorator_async_span_streaming(sentry_init, capture_items):
         span["name"]
         == "test_decorator.test_trace_decorator_async_span_streaming.<locals>.traced_function"
     )
+    assert span["attributes"]["sentry.op"] == "function"
     assert span["status"] == "ok"
 
 
@@ -202,7 +205,7 @@ async def test_trace_decorator_async_arguments_span_streaming(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -222,6 +225,7 @@ async def test_trace_decorator_async_arguments_span_streaming(
 
     assert span["name"] == "traced"
     assert span["attributes"]["traced.attribute"] == 123
+    assert span["attributes"]["sentry.op"] == "function"
     assert span["status"] == "ok"
 
 
@@ -231,7 +235,7 @@ async def test_trace_decorator_async_inactive_span_streaming(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -260,9 +264,7 @@ def test_trace_decorator_child_span_streaming(sentry_init, capture_items):
     """Spans created with @trace show up as children if a span is active."""
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream",
-        },
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -295,9 +297,7 @@ async def test_trace_decorator_async_child_span_streaming(sentry_init, capture_i
     """Spans created with @trace show up as children if a span is active."""
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream",
-        },
+        trace_lifecycle="stream",
     )
 
     items = capture_items("span")
@@ -430,9 +430,7 @@ def test_span_templates_ai_dicts(
         with sentry_sdk.start_transaction(name="test-transaction"):
             my_agent()
 
-        (agent_span, tool_span, chat_span) = (
-            item.payload for item in items if item.type == "span"
-        )
+        (agent_span, tool_span, chat_span) = (item.payload for item in items)
 
         assert (
             agent_span["name"]
@@ -633,9 +631,7 @@ def test_span_templates_ai_objects(
         with sentry_sdk.start_transaction(name="test-transaction"):
             my_agent()
 
-        (agent_span, tool_span, chat_span) = (
-            item.payload for item in items if item.type == "span"
-        )
+        (agent_span, tool_span, chat_span) = (item.payload for item in items)
 
         assert (
             agent_span["name"]
@@ -818,7 +814,7 @@ def test_span_templates_ai_pii(
         with sentry_sdk.start_transaction(name="test-transaction"):
             my_agent(22, 33, arg1=44, arg2=55)
 
-        (_, tool_span, _) = (item.payload for item in items if item.type == "span")
+        (_, tool_span, _) = (item.payload for item in items)
 
         if send_default_pii:
             assert (

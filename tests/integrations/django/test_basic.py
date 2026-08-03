@@ -59,7 +59,7 @@ def test_view_exceptions(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     exceptions = capture_exceptions()
     if span_streaming:
@@ -69,7 +69,7 @@ def test_view_exceptions(
         (error,) = exceptions
         assert isinstance(error, ZeroDivisionError)
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
         client.get(reverse("view_exc"))
@@ -101,7 +101,7 @@ def test_ensures_x_forwarded_header_is_honored_in_sdk_when_enabled_in_django(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     exceptions = capture_exceptions()
     if span_streaming:
@@ -111,7 +111,7 @@ def test_ensures_x_forwarded_header_is_honored_in_sdk_when_enabled_in_django(
         (error,) = exceptions
         assert isinstance(error, ZeroDivisionError)
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
         client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"})
@@ -140,7 +140,7 @@ def test_ensures_x_forwarded_header_is_not_honored_when_unenabled_in_django(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     exceptions = capture_exceptions()
     if span_streaming:
@@ -149,7 +149,7 @@ def test_ensures_x_forwarded_header_is_not_honored_when_unenabled_in_django(
 
         (error,) = exceptions
         assert isinstance(error, ZeroDivisionError)
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
         client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"})
@@ -181,7 +181,7 @@ def test_request_captured(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("event")
@@ -191,7 +191,7 @@ def test_request_captured(
 
         assert content == b"ok"
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
 
         assert event["transaction"] == "/message"
         assert event["request"] == {
@@ -233,7 +233,7 @@ def test_transaction_with_class_view(
     sentry_init(
         integrations=[DjangoIntegration(transaction_style="function_name")],
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("event")
@@ -242,7 +242,7 @@ def test_transaction_with_class_view(
         )
         assert status.lower() == "200 ok"
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
         content, status, headers = unpack_werkzeug_response(
@@ -273,7 +273,7 @@ def test_has_trace_if_performance_enabled(
             )
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("event", "span")
@@ -332,7 +332,7 @@ def test_has_trace_if_performance_disabled(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("event")
@@ -341,7 +341,7 @@ def test_has_trace_if_performance_disabled(
         (
             msg_event,
             error_event,
-        ) = (item.payload for item in items if item.type == "event")
+        ) = (item.payload for item in items)
     else:
         events = capture_events()
         client.head(reverse("view_exc_with_msg"))
@@ -375,7 +375,7 @@ def test_trace_from_headers_if_performance_enabled(
             )
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     trace_id = "582b43a4192642f0b136d5159a501701"
@@ -442,7 +442,7 @@ def test_trace_from_headers_if_performance_disabled(
                 http_methods_to_capture=("HEAD",),
             )
         ],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     trace_id = "582b43a4192642f0b136d5159a501701"
@@ -457,7 +457,7 @@ def test_trace_from_headers_if_performance_disabled(
         (
             msg_event,
             error_event,
-        ) = (item.payload for item in items if item.type == "event")
+        ) = (item.payload for item in items)
     else:
         events = capture_events()
         client.head(
@@ -489,7 +489,7 @@ def test_user_captured(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("event")
@@ -506,7 +506,7 @@ def test_user_captured(
         )
         assert content == b"ok"
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
         content, status, headers = unpack_werkzeug_response(
@@ -542,7 +542,7 @@ def test_materialized_user_captured(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        trace_lifecycle="stream",
     )
 
     content, status, headers = unpack_werkzeug_response(client.get(reverse("mylogin")))
@@ -574,7 +574,7 @@ def test_queryset_repr(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     User.objects.create_user("john", "lennon@thebeatles.com", "johnpassword")
@@ -587,7 +587,7 @@ def test_queryset_repr(
         except Exception:
             capture_exception()
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
 
@@ -618,7 +618,7 @@ def test_context_nested_queryset_repr(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     User.objects.create_user("john", "lennon@thebeatles.com", "johnpassword")
     if span_streaming:
@@ -630,7 +630,7 @@ def test_context_nested_queryset_repr(
         except Exception:
             capture_exception()
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
 
@@ -658,14 +658,14 @@ def test_custom_error_handler_request_context(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("event")
         content, status, headers = unpack_werkzeug_response(client.post("/404"))
         assert status.lower() == "404 not found"
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
         content, status, headers = unpack_werkzeug_response(client.post("/404"))
@@ -735,7 +735,7 @@ def test_sql_queries(
 
         capture_message("HI")
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
 
@@ -792,7 +792,7 @@ def test_sql_dict_query_params(
 
         capture_message("HI")
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
         sentry_sdk.get_isolation_scope().clear_breadcrumbs()
@@ -830,7 +830,7 @@ def test_response_trace(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -881,9 +881,9 @@ def test_sql_psycopg2_string_composition(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
+        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={
             "record_sql_params": True,
-            "trace_lifecycle": "stream" if span_streaming else "static",
         },
     )
     from django.db import connections
@@ -905,7 +905,7 @@ def test_sql_psycopg2_string_composition(
 
         capture_message("HI")
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
 
@@ -933,9 +933,9 @@ def test_sql_psycopg2_placeholders(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
+        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={
             "record_sql_params": True,
-            "trace_lifecycle": "stream" if span_streaming else "static",
         },
     )
     from django.db import connections
@@ -969,7 +969,7 @@ def test_sql_psycopg2_placeholders(
 
         capture_message("HI")
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
         sentry_sdk.get_isolation_scope().clear_breadcrumbs()
@@ -1035,7 +1035,7 @@ def test_django_connect_trace(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     from django.db import connections
@@ -1098,7 +1098,7 @@ def test_django_connect_breadcrumbs(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     from django.db import connections
@@ -1117,7 +1117,7 @@ def test_django_connect_breadcrumbs(
 
         # trigger recording of event.
         capture_message("HI")
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
 
@@ -1151,7 +1151,7 @@ def test_db_connection_span_data(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     from django.db import connections
@@ -1265,7 +1265,7 @@ def test_transaction_style(
         integrations=[DjangoIntegration(transaction_style=transaction_style)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("event", "span")
@@ -1277,7 +1277,7 @@ def test_transaction_style(
         spans = [item.payload for item in items if item.type == "span"]
 
         assert spans[2]["is_segment"] is True
-        assert spans[2]["attributes"]["sentry.span.source"] == expected_source
+        assert spans[2]["attributes"]["sentry.segment.name.source"] == expected_source
 
         (event,) = (item.payload for item in items if item.type == "event")
     else:
@@ -1303,7 +1303,7 @@ def test_request_body(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("event")
@@ -1313,7 +1313,7 @@ def test_request_body(
         assert status.lower() == "200 ok"
         assert content == b"heyooo"
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
 
         assert event["message"] == "hi"
         assert event["request"]["data"] == ""
@@ -1333,7 +1333,7 @@ def test_request_body(
         assert status.lower() == "200 ok"
         assert content == b'{"hey": 42}'
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
         content, status, headers = unpack_werkzeug_response(
@@ -1380,7 +1380,7 @@ def test_read_request(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("event")
@@ -1395,7 +1395,7 @@ def test_read_request(
 
         assert status.lower() == "500 internal server error"
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
 
@@ -1424,7 +1424,7 @@ def test_request_body_already_read(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     class MockExtractor(DjangoRequestExtractor):
@@ -1443,7 +1443,7 @@ def test_request_body_already_read(
                 content_type="application/json",
             )
 
-            (event,) = (item.payload for item in items if item.type == "event")
+            (event,) = (item.payload for item in items)
 
     else:
         events = capture_events()
@@ -1473,7 +1473,7 @@ def test_template_tracing_meta(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("event")
@@ -1515,7 +1515,7 @@ def test_template_exception(
 ):
     sentry_init(
         integrations=[DjangoIntegration()] + with_executing_integration,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("event")
@@ -1525,7 +1525,7 @@ def test_template_exception(
         )
         assert status.lower() == "500 internal server error"
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         events = capture_events()
 
@@ -1599,7 +1599,7 @@ def test_rest_framework_basic(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         exceptions = capture_exceptions()
@@ -1617,7 +1617,7 @@ def test_rest_framework_basic(
         (error,) = exceptions
         assert isinstance(error, ZeroDivisionError)
 
-        (event,) = (item.payload for item in items if item.type == "event")
+        (event,) = (item.payload for item in items)
     else:
         exceptions = capture_exceptions()
         events = capture_events()
@@ -1659,7 +1659,7 @@ def test_does_not_capture_403(
 
     sentry_init(
         integrations=[DjangoIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("event", "transaction", "span")
@@ -1689,7 +1689,7 @@ def test_render_spans(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         views_tests = [
@@ -1788,7 +1788,7 @@ def test_middleware_spans(
             DjangoIntegration(middleware_spans=True, signals_spans=False),
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("event", "span")
@@ -1875,7 +1875,7 @@ def test_middleware_spans_disabled(
             DjangoIntegration(signals_spans=False),
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("event", "span")
@@ -1914,7 +1914,7 @@ def test_signals_spans(
             DjangoIntegration(middleware_spans=False),
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("event", "span")
@@ -1980,7 +1980,7 @@ def test_signals_spans_disabled(
             DjangoIntegration(middleware_spans=False, signals_spans=False),
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("event", "span")
@@ -2025,7 +2025,7 @@ def test_signals_spans_filtering(
             ),
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -2148,7 +2148,7 @@ def test_custom_urlconf_middleware(
     sentry_init(
         integrations=[DjangoIntegration(middleware_spans=middleware_spans)],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -2266,7 +2266,7 @@ def test_span_origin(
             )
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     signal_span_found = False
     if span_streaming:
@@ -2314,7 +2314,7 @@ def test_transaction_http_method_default(
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -2358,7 +2358,7 @@ def test_transaction_http_method_custom(
             )
         ],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     if span_streaming:
         items = capture_items("span")
@@ -2370,8 +2370,8 @@ def test_transaction_http_method_custom(
         sentry_sdk.flush()
         spans = [item.payload for item in items]
 
-        assert spans[4]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "OPTIONS"
-        assert spans[7]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "HEAD"
+        assert spans[2]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "OPTIONS"
+        assert spans[5]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "HEAD"
     else:
         events = capture_events()
 

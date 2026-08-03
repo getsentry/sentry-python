@@ -16,13 +16,14 @@ from sentry_sdk.integrations.celery.beat import (
 from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import Scope, should_send_default_pii
-from sentry_sdk.traces import StreamedSpan, get_current_span
+from sentry_sdk.traces import SegmentNameSource, StreamedSpan, get_current_span
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, Span, TransactionSource
 from sentry_sdk.tracing_utils import Baggage, has_span_streaming_enabled
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     event_from_exception,
+    has_data_collection_enabled,
     reraise,
 )
 
@@ -140,15 +141,22 @@ def _make_event_processor(
             tags = event.setdefault("tags", {})
             tags["celery_task_id"] = uuid
             extra = event.setdefault("extra", {})
-            extra["celery-job"] = {
-                "task_name": task.name,
-                "args": (
-                    args if should_send_default_pii() else SENSITIVE_DATA_SUBSTITUTE
-                ),
-                "kwargs": (
-                    kwargs if should_send_default_pii() else SENSITIVE_DATA_SUBSTITUTE
-                ),
-            }
+
+            celery_job = {"task_name": task.name}
+
+            client_options = sentry_sdk.get_client().options
+            if has_data_collection_enabled(client_options):
+                if client_options["data_collection"]["queues"]:
+                    celery_job["args"] = args
+                    celery_job["kwargs"] = kwargs
+            elif should_send_default_pii():
+                celery_job["args"] = args
+                celery_job["kwargs"] = kwargs
+            else:
+                celery_job["args"] = SENSITIVE_DATA_SUBSTITUTE
+                celery_job["kwargs"] = SENSITIVE_DATA_SUBSTITUTE
+
+            extra["celery-job"] = celery_job
 
         if "exc_info" in hint:
             with capture_internal_exceptions():
@@ -361,7 +369,7 @@ def _wrap_tracer(task: "Any", f: "F") -> "F":
                         parent_span=None,  # make this a segment
                         attributes={
                             "sentry.origin": CeleryIntegration.origin,
-                            "sentry.span.source": TransactionSource.TASK.value,
+                            "sentry.segment.name.source": SegmentNameSource.TASK.value,
                             "sentry.op": OP.QUEUE_TASK_CELERY,
                         },
                     )
@@ -419,6 +427,9 @@ def _wrap_task_call(task: "Any", f: "F") -> "F":
         span_streaming = has_span_streaming_enabled(client.options)
 
         try:
+            if span_streaming and get_current_span() is None:
+                return f(*args, **kwargs)
+
             span: "Union[Span, StreamedSpan]"
             if span_streaming:
                 span = sentry_sdk.traces.start_span(
@@ -462,7 +473,8 @@ def _wrap_task_call(task: "Any", f: "F") -> "F":
 
                 with capture_internal_exceptions():
                     set_on_span(
-                        SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT, task.request.retries
+                        SPANDATA.MESSAGING_MESSAGE_RETRY_COUNT,
+                        task.request.retries,
                     )
 
                 with capture_internal_exceptions():

@@ -12,6 +12,7 @@ from sentry_sdk.tracing_utils import (
     add_http_request_source,
     add_sentry_baggage_to_headers,
     has_span_streaming_enabled,
+    propagate_trace_headers,
     should_propagate_trace,
 )
 from sentry_sdk.utils import (
@@ -88,6 +89,11 @@ def _sentry_pyreqwest_span(request: "Request") -> "Generator[Any, None, None]":
 
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
     if span_streaming:
+        if sentry_sdk.traces.get_current_span() is None:
+            propagate_trace_headers(client=sentry_sdk.get_client(), request=request)
+            yield None
+            return
+
         with sentry_sdk.traces.start_span(
             name=f"{request.method} {parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE}",
             attributes={
@@ -101,26 +107,13 @@ def _sentry_pyreqwest_span(request: "Request") -> "Generator[Any, None, None]":
                 span.set_attribute(SPANDATA.URL_QUERY, parsed_url.query)
                 span.set_attribute(SPANDATA.URL_FRAGMENT, parsed_url.fragment)
 
-            if should_propagate_trace(sentry_sdk.get_client(), str(request.url)):
-                for (
-                    key,
-                    value,
-                ) in sentry_sdk.get_current_scope().iter_trace_propagation_headers():
-                    logger.debug(
-                        "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
-                            key=key, value=value, url=request.url
-                        )
-                    )
-
-                    if key == BAGGAGE_HEADER_NAME:
-                        add_sentry_baggage_to_headers(request.headers, value)
-                    else:
-                        request.headers[key] = value
+            propagate_trace_headers(client=sentry_sdk.get_client(), request=request)
 
             yield span
 
-            with capture_internal_exceptions():
-                add_http_request_source(span)
+            if span is not None:
+                with capture_internal_exceptions():
+                    add_http_request_source(span)
 
             return
 
@@ -171,7 +164,7 @@ async def sentry_async_middleware(
                 SPANDATA.HTTP_STATUS_CODE,
                 response.status,
             )
-        else:
+        elif span is not None:
             span.set_http_status(response.status)
 
     return response
@@ -191,7 +184,7 @@ def sentry_sync_middleware(
                 SPANDATA.HTTP_STATUS_CODE,
                 response.status,
             )
-        else:
+        elif span is not None:
             span.set_http_status(response.status)
 
     return response

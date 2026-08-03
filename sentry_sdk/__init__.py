@@ -40,6 +40,7 @@ __all__ = [  # noqa
     "push_scope",
     "remove_attribute",
     "set_attribute",
+    "set_attributes",
     "set_context",
     "set_extra",
     "set_level",

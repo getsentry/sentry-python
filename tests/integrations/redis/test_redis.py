@@ -63,7 +63,7 @@ def test_redis_pipeline(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     connection = FakeStrictRedis()
@@ -113,6 +113,72 @@ def test_redis_pipeline(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize(
+    "data_collection, expected_first_ten",
+    [
+        (
+            {"database_query_data": False},
+            ["GET 'foo'", "SET 'bar'", "SET 'baz'"],
+        ),
+        (
+            {"database_query_data": True},
+            ["GET 'foo'", "SET 'bar' 1", "SET 'baz' 2"],
+        ),
+    ],
+)
+def test_redis_pipeline_data_collection(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    expected_first_ten,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[RedisIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+        _experiments={"data_collection": data_collection},
+    )
+
+    connection = FakeStrictRedis()
+
+    if span_streaming:
+        items = capture_items("span")
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            pipeline = connection.pipeline(transaction=False)
+            pipeline.get("foo")
+            pipeline.set("bar", 1)
+            pipeline.set("baz", 2)
+            pipeline.execute()
+        sentry_sdk.flush()
+
+        assert len(items) == 2
+        pipeline_span, parent_span = items[0].payload, items[1].payload
+
+        assert parent_span["name"] == "custom parent"
+        assert pipeline_span["name"] == "redis.pipeline.execute"
+        assert pipeline_span["attributes"]["sentry.op"] == "db.redis"
+    else:
+        events = capture_events()
+        with start_transaction():
+            pipeline = connection.pipeline(transaction=False)
+            pipeline.get("foo")
+            pipeline.set("bar", 1)
+            pipeline.set("baz", 2)
+            pipeline.execute()
+
+        (event,) = events
+        (span,) = event["spans"]
+        assert span["op"] == "db.redis"
+        assert span["description"] == "redis.pipeline.execute"
+        assert span["data"]["redis.commands"] == {
+            "count": 3,
+            "first_ten": expected_first_ten,
+        }
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
 def test_sensitive_data(sentry_init, capture_events, capture_items, span_streaming):
     # fakeredis does not support the AUTH command, so we need to mock it
     with mock.patch(
@@ -123,7 +189,7 @@ def test_sensitive_data(sentry_init, capture_events, capture_items, span_streami
             integrations=[RedisIntegration()],
             traces_sample_rate=1.0,
             send_default_pii=True,
-            _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+            trace_lifecycle="stream" if span_streaming else "static",
         )
 
         connection = FakeStrictRedis()
@@ -159,7 +225,7 @@ def test_pii_data_redacted(sentry_init, capture_events, capture_items, span_stre
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     connection = FakeStrictRedis()
@@ -202,12 +268,123 @@ def test_pii_data_redacted(sentry_init, capture_events, capture_items, span_stre
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize(
+    "data_collection, expected_description",
+    [
+        ({"database_query_data": False}, "SET 'somekey1'"),
+        ({"database_query_data": True}, "SET 'somekey1' 'my secret string1'"),
+        ({}, "SET 'somekey1' 'my secret string1'"),
+    ],
+    ids=[
+        "database_query_data_disabled",
+        "database_query_data_enabled",
+        "database_query_data_not_provided_uses_defaults",
+    ],
+)
+def test_data_collection_database_query_data(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+    data_collection,
+    expected_description,
+):
+    sentry_init(
+        integrations=[RedisIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+        _experiments={"data_collection": data_collection},
+    )
+
+    connection = FakeStrictRedis()
+
+    if span_streaming:
+        items = capture_items("span")
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            connection.set("somekey1", "my secret string1")
+        sentry_sdk.flush()
+
+        assert len(items) == 2
+        set_span, parent = [item.payload for item in items]
+
+        assert parent["name"] == "custom parent"
+        assert set_span["name"] == expected_description
+        assert set_span["attributes"][SPANDATA.DB_QUERY_TEXT] == expected_description
+        assert set_span["attributes"]["sentry.op"] == "db.redis"
+    else:
+        events = capture_events()
+        with start_transaction():
+            connection.set("somekey1", "my secret string1")
+
+        (event,) = events
+        spans = event["spans"]
+        assert spans[0]["op"] == "db.redis"
+        assert spans[0]["description"] == expected_description
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize(
+    "data_collection, send_default_pii, expected_description",
+    [
+        ({"database_query_data": False}, True, "SET 'somekey1'"),
+        (
+            {"database_query_data": True},
+            False,
+            "SET 'somekey1' 'my secret string1'",
+        ),
+    ],
+)
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
+def test_database_query_data_takes_precedence_over_send_default_pii(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+    data_collection,
+    send_default_pii,
+    expected_description,
+):
+    sentry_init(
+        integrations=[RedisIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        trace_lifecycle="stream" if span_streaming else "static",
+        _experiments={"data_collection": data_collection},
+    )
+
+    connection = FakeStrictRedis()
+
+    if span_streaming:
+        items = capture_items("span")
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            connection.set("somekey1", "my secret string1")
+        sentry_sdk.flush()
+
+        assert len(items) == 2
+        set_span, parent = [item.payload for item in items]
+
+        assert parent["name"] == "custom parent"
+        assert set_span["name"] == expected_description
+        assert set_span["attributes"][SPANDATA.DB_QUERY_TEXT] == expected_description
+        assert set_span["attributes"]["sentry.op"] == "db.redis"
+    else:
+        events = capture_events()
+        with start_transaction():
+            connection.set("somekey1", "my secret string1")
+
+        (event,) = events
+        spans = event["spans"]
+        assert spans[0]["op"] == "db.redis"
+        assert spans[0]["description"] == expected_description
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
 def test_pii_data_sent(sentry_init, capture_events, capture_items, span_streaming):
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     connection = FakeStrictRedis()
@@ -263,7 +440,7 @@ def test_no_data_truncation_by_default(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     connection = FakeStrictRedis()
@@ -313,7 +490,7 @@ def test_data_truncation_custom(
         integrations=[RedisIntegration(max_data_size=30)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     connection = FakeStrictRedis()
@@ -411,7 +588,7 @@ def test_db_connection_attributes_client(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[RedisIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -459,7 +636,7 @@ def test_db_connection_attributes_pipeline(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[RedisIntegration()],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -512,7 +689,7 @@ def test_span_origin(sentry_init, capture_events, capture_items, span_streaming)
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     connection = FakeStrictRedis()

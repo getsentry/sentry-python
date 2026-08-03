@@ -5,7 +5,10 @@ from async_asgi_testclient import TestClient
 
 import sentry_sdk
 from sentry_sdk import capture_message
-from sentry_sdk.integrations._asgi_common import _get_headers, _get_ip
+from sentry_sdk.integrations._asgi_common import (
+    _get_headers,
+    _get_ip,
+)
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware, _looks_like_asgi3
 from sentry_sdk.tracing import TransactionSource
 
@@ -183,9 +186,7 @@ async def test_capture_transaction(
     sentry_init(
         send_default_pii=should_send_pii,
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryAsgiMiddleware(asgi3_app)
 
@@ -205,7 +206,7 @@ async def test_capture_transaction(
         assert span["is_segment"] is True
         assert span["name"] == "/some_url"
 
-        assert span["attributes"]["sentry.span.source"] == "url"
+        assert span["attributes"]["sentry.segment.name.source"] == "url"
         assert span["attributes"]["sentry.op"] == "http.server"
 
         assert span["attributes"]["network.protocol.name"] == "http"
@@ -259,9 +260,7 @@ async def test_capture_transaction_with_error(
     sentry_init(
         send_default_pii=True,
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     app = SentryAsgiMiddleware(asgi3_app_with_error)
@@ -327,9 +326,7 @@ async def test_has_trace_if_performance_enabled(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryAsgiMiddleware(asgi3_app_with_error_and_msg)
 
@@ -422,9 +419,7 @@ async def test_trace_from_headers_if_performance_enabled(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryAsgiMiddleware(asgi3_app_with_error_and_msg)
 
@@ -523,9 +518,7 @@ async def test_websocket(
     sentry_init(
         send_default_pii=True,
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     asgi3_ws_app = SentryAsgiMiddleware(asgi3_ws_app)
@@ -561,7 +554,7 @@ async def test_websocket(
         assert span.type == "span"
         span = span.payload
         assert span["name"] == request_url
-        assert span["attributes"]["sentry.span.source"] == "url"
+        assert span["attributes"]["sentry.segment.name.source"] == "url"
 
     else:
         msg_event, error_event, transaction_event = events
@@ -652,9 +645,7 @@ async def test_transaction_style(
     sentry_init(
         send_default_pii=True,
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryAsgiMiddleware(asgi3_app, transaction_style=transaction_style)
 
@@ -678,7 +669,7 @@ async def test_transaction_style(
         span = items[0].payload
 
         assert span["name"] == expected_transaction
-        assert span["attributes"]["sentry.span.source"] == expected_source
+        assert span["attributes"]["sentry.segment.name.source"] == expected_source
 
     else:
         (transaction_event,) = events
@@ -832,6 +823,442 @@ def test_get_headers():
 
 
 @pytest.mark.asyncio
+async def test_get_request_data_url_with_filtered_host(
+    sentry_init, capture_events, asgi3_app
+):
+    # allowlist mode in data collection that does not allow "host" scrubs the host
+    # header value, but the reported URL must still resolve rather than embedding the
+    # substituted "[Filtered]" value.
+    sentry_init(
+        traces_sample_rate=1.0,
+        _experiments={
+            "data_collection": {
+                "http_headers": {"request": {"mode": "allowlist", "terms": []}}
+            }
+        },
+    )
+    app = SentryAsgiMiddleware(asgi3_app)
+
+    events = capture_events()
+    scope = {"server": ("example.com", 80), "scheme": "http"}
+    async with TestClient(app, scope=scope) as client:
+        await client.get("/foo", headers={"host": "example.com"})
+
+    sentry_sdk.flush()
+
+    (transaction_event,) = events
+
+    assert transaction_event["request"]["headers"]["host"] == "[Filtered]"
+    assert transaction_event["request"]["url"] == "http://example.com/foo"
+
+
+@pytest.mark.asyncio
+async def test_get_request_attributes_url_with_filtered_host(
+    sentry_init, capture_items, asgi3_app
+):
+    # As with the request data, an allowlist mode that does not allow "host" scrubs
+    # the host header value, but "url.full" must still resolve rather than embedding
+    # the substituted value.
+    sentry_init(
+        send_default_pii=True,
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        _experiments={
+            "data_collection": {
+                "http_headers": {"request": {"mode": "allowlist", "terms": []}}
+            },
+        },
+    )
+    app = SentryAsgiMiddleware(asgi3_app)
+
+    items = capture_items("span")
+    scope = {"server": ("example.com", 80), "scheme": "http"}
+    async with TestClient(app, scope=scope) as client:
+        await client.get("/foo?somevalue=123", headers={"host": "example.com"})
+
+    sentry_sdk.flush()
+
+    assert len(items) == 1
+    attributes = items[0].payload["attributes"]
+
+    assert attributes["http.request.header.host"] == "[Filtered]"
+    assert attributes["url.full"] == "http://example.com/foo?somevalue=123"
+
+
+@pytest.mark.asyncio
+async def test_get_request_attributes_url_with_headers_off(
+    sentry_init, capture_items, asgi3_app
+):
+    # "off" mode in data collection captures no headers at all, but "url.full" must
+    # still resolve via the (uncaptured) host header rather than being dropped.
+    sentry_init(
+        send_default_pii=True,
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        _experiments={
+            "data_collection": {"http_headers": {"request": {"mode": "off"}}},
+        },
+    )
+    app = SentryAsgiMiddleware(asgi3_app)
+
+    items = capture_items("span")
+    scope = {"server": ("example.com", 80), "scheme": "http"}
+    async with TestClient(app, scope=scope) as client:
+        await client.get("/foo?somevalue=123", headers={"host": "example.com"})
+
+    sentry_sdk.flush()
+
+    assert len(items) == 1
+    attributes = items[0].payload["attributes"]
+
+    assert not any(key.startswith("http.request.header.") for key in attributes)
+    assert attributes["url.full"] == "http://example.com/foo?somevalue=123"
+
+
+QUERY_STRING = "token=abc&theme=dark&lang=en&session=xyz"
+
+
+def _http_scope():
+    return {"server": ("example.com", 80), "scheme": "http"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query_string",
+    [
+        pytest.param(
+            {"send_default_pii": True},
+            QUERY_STRING,
+            id="send_default_pii_true",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            QUERY_STRING,
+            id="send_default_pii_false",
+        ),
+        pytest.param(
+            {},
+            QUERY_STRING,
+            id="defaults",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "token=%5BFiltered%5D&theme=dark&lang=en&session=%5BFiltered%5D",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "denylist", "terms": ["theme"]}
+                    }
+                }
+            },
+            "token=%5BFiltered%5D&theme=%5BFiltered%5D&lang=en&session=%5BFiltered%5D",
+            id="data_collection_denylist_custom_terms",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["theme"]}
+                    }
+                }
+            },
+            "token=%5BFiltered%5D&theme=dark&lang=%5BFiltered%5D&session=%5BFiltered%5D",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["token"]}
+                    }
+                }
+            },
+            "token=%5BFiltered%5D&theme=%5BFiltered%5D&lang=%5BFiltered%5D&session=%5BFiltered%5D",
+            id="data_collection_allowlist_sensitive_term",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            None,
+            id="data_collection_off",
+        ),
+        # data_collection wins over send_default_pii: filtering still applies.
+        pytest.param(
+            {
+                "send_default_pii": True,
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                },
+            },
+            None,
+            id="data_collection_wins_over_send_default_pii",
+        ),
+    ],
+)
+async def test_get_request_data_query_string_data_collection(
+    sentry_init, capture_events, asgi3_app, init_kwargs, expected_query_string
+):
+    sentry_init(traces_sample_rate=1.0, **init_kwargs)
+    app = SentryAsgiMiddleware(asgi3_app)
+
+    events = capture_events()
+    async with TestClient(app, scope=_http_scope()) as client:
+        await client.get(f"/foo?{QUERY_STRING}", headers={"host": "example.com"})
+
+    sentry_sdk.flush()
+
+    (transaction_event,) = events
+    request_data = transaction_event["request"]
+
+    if expected_query_string is None:
+        assert "query_string" not in request_data
+    else:
+        assert request_data["query_string"] == expected_query_string
+
+
+@pytest.mark.asyncio
+async def test_get_request_data_query_string_empty_legacy_is_none(
+    sentry_init, capture_events, asgi3_app
+):
+    # Legacy path: the query string is always set even when empty (``None``).
+    sentry_init(send_default_pii=True, traces_sample_rate=1.0)
+    app = SentryAsgiMiddleware(asgi3_app)
+
+    events = capture_events()
+    async with TestClient(app, scope=_http_scope()) as client:
+        await client.get("/foo", headers={"host": "example.com"})
+
+    sentry_sdk.flush()
+
+    (transaction_event,) = events
+    assert transaction_event["request"]["query_string"] is None
+
+
+@pytest.mark.asyncio
+async def test_get_request_data_empty_query_string_dropped_with_data_collection(
+    sentry_init, capture_events, asgi3_app
+):
+    sentry_init(traces_sample_rate=1.0, _experiments={"data_collection": {}})
+    app = SentryAsgiMiddleware(asgi3_app)
+
+    events = capture_events()
+    async with TestClient(app, scope=_http_scope()) as client:
+        await client.get("/foo", headers={"host": "example.com"})
+
+    sentry_sdk.flush()
+
+    (transaction_event,) = events
+    assert "query_string" not in transaction_event["request"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query, expected_url_full",
+    [
+        pytest.param(
+            {"send_default_pii": True},
+            QUERY_STRING,
+            "http://example.com/foo?" + QUERY_STRING,
+            id="send_default_pii_true",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            None,
+            None,
+            id="send_default_pii_false",
+        ),
+        pytest.param(
+            {},
+            None,
+            None,
+            id="defaults",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "token=%5BFiltered%5D&theme=dark&lang=en&session=%5BFiltered%5D",
+            "http://example.com/foo?token=%5BFiltered%5D&theme=dark&lang=en&session=%5BFiltered%5D",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["theme"]}
+                    }
+                }
+            },
+            "token=%5BFiltered%5D&theme=dark&lang=%5BFiltered%5D&session=%5BFiltered%5D",
+            "http://example.com/foo?token=%5BFiltered%5D&theme=dark&lang=%5BFiltered%5D&session=%5BFiltered%5D",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            None,
+            "http://example.com/foo",
+            id="data_collection_off",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": True,
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                },
+            },
+            None,
+            "http://example.com/foo",
+            id="data_collection_wins_over_send_default_pii",
+        ),
+    ],
+)
+async def test_get_request_attributes_query_data_collection(
+    sentry_init,
+    capture_items,
+    asgi3_app,
+    init_kwargs,
+    expected_query,
+    expected_url_full,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+    app = SentryAsgiMiddleware(asgi3_app)
+
+    items = capture_items("span")
+    async with TestClient(app, scope=_http_scope()) as client:
+        await client.get(f"/foo?{QUERY_STRING}", headers={"host": "example.com"})
+
+    sentry_sdk.flush()
+
+    assert len(items) == 1
+    attributes = items[0].payload["attributes"]
+
+    if expected_query is None:
+        assert "http.query" not in attributes
+    else:
+        assert attributes["http.query"] == expected_query
+
+    if expected_url_full is None:
+        assert "url.full" not in attributes
+        assert "url.path" not in attributes
+    else:
+        assert attributes["url.full"] == expected_url_full
+        assert attributes["url.path"] == "/foo"
+
+
+USER_INFO_CASES = [
+    pytest.param(
+        {"_experiments": {"data_collection": {"user_info": False}}},
+        True,
+        False,
+        id="dc_user_info_false",
+    ),
+    pytest.param(
+        {"_experiments": {"data_collection": {}}},
+        True,
+        True,
+        id="dc_default_user_info",
+    ),
+    pytest.param(
+        {
+            "send_default_pii": True,
+            "_experiments": {"data_collection": {"user_info": False}},
+        },
+        True,
+        False,
+        id="dc_wins_over_pii",
+    ),
+    pytest.param(
+        {"send_default_pii": True},
+        True,
+        True,
+        id="legacy_pii_true",
+    ),
+    pytest.param(
+        {"send_default_pii": False},
+        True,
+        False,
+        id="legacy_pii_false",
+    ),
+    pytest.param(
+        {"_experiments": {"data_collection": {}}},
+        False,
+        False,
+        id="no_client",
+    ),
+]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("init_kwargs, has_client, expect_ip", USER_INFO_CASES)
+async def test_get_request_data_env_user_info(
+    sentry_init, capture_events, asgi3_app, init_kwargs, has_client, expect_ip
+):
+    sentry_init(traces_sample_rate=1.0, **init_kwargs)
+    app = SentryAsgiMiddleware(asgi3_app)
+
+    scope = _http_scope()
+    if has_client:
+        scope["client"] = ("127.0.0.1", 60457)
+
+    events = capture_events()
+    async with TestClient(app, scope=scope) as client:
+        await client.get("/foo", headers={"host": "example.com"})
+
+    sentry_sdk.flush()
+
+    (transaction_event,) = events
+    request_data = transaction_event["request"]
+
+    if expect_ip:
+        assert request_data["env"] == {"REMOTE_ADDR": "127.0.0.1"}
+    else:
+        assert "env" not in request_data
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("init_kwargs, has_client, expect_ip", USER_INFO_CASES)
+async def test_get_request_attributes_client_address_user_info(
+    sentry_init, capture_items, asgi3_app, init_kwargs, has_client, expect_ip
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+    app = SentryAsgiMiddleware(asgi3_app)
+
+    scope = _http_scope()
+    if has_client:
+        scope["client"] = ("127.0.0.1", 60457)
+
+    items = capture_items("span")
+    async with TestClient(app, scope=scope) as client:
+        await client.get("/foo", headers={"host": "example.com"})
+
+    sentry_sdk.flush()
+
+    assert len(items) == 1
+    attributes = items[0].payload["attributes"]
+
+    if expect_ip:
+        assert attributes["client.address"] == "127.0.0.1"
+    else:
+        assert "client.address" not in attributes
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "request_url,transaction_style,expected_transaction_name,expected_transaction_source",
     [
@@ -869,9 +1296,7 @@ async def test_transaction_name(
     """
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -891,7 +1316,10 @@ async def test_transaction_name(
         span = items[0].payload
 
         assert span["name"] == expected_transaction_name
-        assert span["attributes"]["sentry.span.source"] == expected_transaction_source
+        assert (
+            span["attributes"]["sentry.segment.name.source"]
+            == expected_transaction_source
+        )
 
     else:
         (transaction_envelope,) = envelopes
@@ -941,28 +1369,18 @@ async def test_transaction_name_in_traces_sampler(
     """
 
     def dummy_traces_sampler(sampling_context):
-        if span_streaming:
-            assert sampling_context["span_context"]["name"] == expected_transaction_name
-            assert (
-                sampling_context["span_context"]["attributes"]["sentry.span.source"]
-                == expected_transaction_source
-            )
-        else:
-            assert (
-                sampling_context["transaction_context"]["name"]
-                == expected_transaction_name
-            )
-            assert (
-                sampling_context["transaction_context"]["source"]
-                == expected_transaction_source
-            )
+        assert (
+            sampling_context["transaction_context"]["name"] == expected_transaction_name
+        )
+        assert (
+            sampling_context["transaction_context"]["source"]
+            == expected_transaction_source
+        )
 
     sentry_init(
         traces_sampler=dummy_traces_sampler,
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     app = SentryAsgiMiddleware(asgi3_app, transaction_style=transaction_style)
@@ -985,9 +1403,7 @@ async def test_custom_transaction_name(
 ):
     sentry_init(
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     app = SentryAsgiMiddleware(asgi3_custom_transaction_app)
 
@@ -1006,7 +1422,7 @@ async def test_custom_transaction_name(
 
         assert span["is_segment"] is True
         assert span["name"] == "foobar"
-        assert span["attributes"]["sentry.span.source"] == "custom"
+        assert span["attributes"]["sentry.segment.name.source"] == "custom"
 
     else:
         (transaction_event,) = events
@@ -1016,11 +1432,41 @@ async def test_custom_transaction_name(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("send_default_pii", [True, False])
+@pytest.mark.parametrize(
+    "init_kwargs, expect_ip",
+    [
+        pytest.param({"send_default_pii": True}, True, id="legacy_pii_true"),
+        pytest.param({"send_default_pii": False}, False, id="legacy_pii_false"),
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            True,
+            id="dc_default_user_info",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"user_info": True}}},
+            True,
+            id="dc_user_info_true",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"user_info": False}}},
+            False,
+            id="dc_user_info_false",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": True,
+                "_experiments": {"data_collection": {"user_info": False}},
+            },
+            False,
+            id="dc_wins_over_pii",
+        ),
+    ],
+)
 async def test_user_ip_address_on_all_spans(
     sentry_init,
     capture_items,
-    send_default_pii,
+    init_kwargs,
+    expect_ip,
 ):
     async def app(scope, receive, send):
         if scope["type"] == "lifespan":
@@ -1044,10 +1490,11 @@ async def test_user_ip_address_on_all_spans(
         )
         await send({"type": "http.response.body", "body": b"Hello, world!"})
 
+    kwargs = dict(init_kwargs)
     sentry_init(
-        send_default_pii=send_default_pii,
+        trace_lifecycle="stream",
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream"},
+        **kwargs,
     )
     sentry_app = SentryAsgiMiddleware(app)
 
@@ -1063,7 +1510,7 @@ async def test_user_ip_address_on_all_spans(
 
     child_span, server_span = [item.payload for item in items]
 
-    if send_default_pii:
+    if expect_ip:
         assert server_span["attributes"]["user.ip_address"] == "127.0.0.1"
         assert child_span["attributes"]["user.ip_address"] == "127.0.0.1"
     else:

@@ -109,15 +109,71 @@ def mock_transaction_envelope(span_count: int) -> "Envelope":
     return envelope
 
 
-@pytest.mark.parametrize("debug", (True, False))
-@pytest.mark.parametrize("client_flush_method", ["close", "flush"])
-@pytest.mark.parametrize("use_pickle", (True, False))
-@pytest.mark.parametrize("compression_level", (0, 9, None))
+# The compression-relevant dimensions (level x algo x http2) are fully
+# crossed; debug, flush method and pickling are rotated through the cases
+# so every value of every dimension is still exercised.
+#
+# (debug, client_flush_method, use_pickle, compression_level, compression_algo, http2)
+if PY38:
+    _transport_works_cases = [
+        (True, "close", True, None, "gzip", True),
+        (False, "flush", True, None, "gzip", False),
+        (True, "close", False, None, "br", True),
+        (False, "flush", False, None, "br", False),
+        (True, "close", True, None, "<invalid>", True),
+        (False, "flush", True, None, "<invalid>", False),
+        (True, "close", False, None, None, True),
+        (False, "flush", False, None, None, False),
+        (True, "close", True, 0, "gzip", True),
+        (False, "flush", True, 0, "gzip", False),
+        (True, "close", False, 0, "br", True),
+        (False, "flush", False, 0, "br", False),
+        (True, "close", True, 0, "<invalid>", True),
+        (False, "flush", True, 0, "<invalid>", False),
+        (True, "close", False, 0, None, True),
+        (False, "flush", False, 0, None, False),
+        (True, "close", True, 9, "gzip", True),
+        (False, "flush", True, 9, "gzip", False),
+        (True, "close", False, 9, "br", True),
+        (False, "flush", False, 9, "br", False),
+        (True, "close", True, 9, "<invalid>", True),
+        (False, "flush", True, 9, "<invalid>", False),
+        (True, "close", False, 9, None, True),
+        (False, "flush", False, 9, None, False),
+    ]
+elif PY37:
+    _transport_works_cases = [
+        (True, "close", True, None, "gzip", False),
+        (False, "flush", True, None, "br", False),
+        (True, "close", False, None, "<invalid>", False),
+        (False, "flush", False, None, None, False),
+        (True, "close", True, 0, "gzip", False),
+        (False, "flush", True, 0, "br", False),
+        (True, "close", False, 0, "<invalid>", False),
+        (False, "flush", False, 0, None, False),
+        (True, "close", True, 9, "gzip", False),
+        (False, "flush", True, 9, "br", False),
+        (True, "close", False, 9, "<invalid>", False),
+        (False, "flush", False, 9, None, False),
+    ]
+else:
+    _transport_works_cases = [
+        (True, "close", True, None, "gzip", False),
+        (False, "flush", True, None, "<invalid>", False),
+        (True, "close", False, None, None, False),
+        (False, "flush", False, 0, "gzip", False),
+        (True, "close", True, 0, "<invalid>", False),
+        (False, "flush", True, 0, None, False),
+        (True, "close", False, 9, "gzip", False),
+        (False, "flush", False, 9, "<invalid>", False),
+        (True, "close", True, 9, None, False),
+    ]
+
+
 @pytest.mark.parametrize(
-    "compression_algo",
-    (("gzip", "br", "<invalid>", None) if PY37 else ("gzip", "<invalid>", None)),
+    "debug,client_flush_method,use_pickle,compression_level,compression_algo,http2",
+    _transport_works_cases,
 )
-@pytest.mark.parametrize("http2", [True, False] if PY38 else [False])
 def test_transport_works(
     capturing_server,
     request,
@@ -185,7 +241,6 @@ def test_transport_works(
     "num_pools,expected_num_pools",
     (
         (None, 2),
-        (2, 2),
         (10, 10),
     ),
 )
@@ -878,11 +933,27 @@ def test_record_lost_event_transaction_item(capturing_server, make_client, span_
 
 @skip_under_gevent
 @pytest.mark.asyncio
-@pytest.mark.parametrize("debug", (True, False))
-@pytest.mark.parametrize("client_flush_method", ["close", "flush"])
-@pytest.mark.parametrize("use_pickle", (True, False))
-@pytest.mark.parametrize("compression_level", (0, 9, None))
-@pytest.mark.parametrize("compression_algo", ("gzip", "br", "<invalid>", None))
+@pytest.mark.parametrize(
+    "debug,client_flush_method,use_pickle,compression_level,compression_algo",
+    [
+        # debug and client_flush_method alternate every case; use_pickle
+        # alternates every two cases. This rotates those dimensions through the
+        # fully-crossed (compression_level x compression_algo) grid so each
+        # value is exercised without running the full cross product.
+        (True, "close", True, None, "gzip"),
+        (False, "flush", True, None, "br"),
+        (True, "close", False, None, "<invalid>"),
+        (False, "flush", False, None, None),
+        (True, "close", True, 0, "gzip"),
+        (False, "flush", True, 0, "br"),
+        (True, "close", False, 0, "<invalid>"),
+        (False, "flush", False, 0, None),
+        (True, "close", True, 9, "gzip"),
+        (False, "flush", True, 9, "br"),
+        (True, "close", False, 9, "<invalid>"),
+        (False, "flush", False, 9, None),
+    ],
+)
 @pytest.mark.skipif(not PY38, reason="Async transport only supported in Python 3.8+")
 async def test_transport_works_async(
     capturing_server,

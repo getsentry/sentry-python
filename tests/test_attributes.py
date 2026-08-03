@@ -7,8 +7,16 @@ def test_top_level_api(sentry_init, capture_items):
     items = capture_items("trace_metric")
 
     sentry_sdk.set_attribute("set", "value")
+    sentry_sdk.set_attributes(
+        {
+            "set1": "value1",
+            "set2": "value2",
+            "discarded": 47,
+        }
+    )
     sentry_sdk.set_attribute("removed", "value")
     sentry_sdk.remove_attribute("removed")
+    sentry_sdk.remove_attribute("discarded")
     # Attempting to remove a nonexistent attribute should not raise
     sentry_sdk.remove_attribute("nonexistent")
 
@@ -19,7 +27,10 @@ def test_top_level_api(sentry_init, capture_items):
     (metric,) = metrics
 
     assert metric["attributes"]["set"] == "value"
+    assert metric["attributes"]["set1"] == "value1"
+    assert metric["attributes"]["set2"] == "value2"
     assert "removed" not in metric["attributes"]
+    assert "discarded" not in metric["attributes"]
 
 
 def test_scope_precedence(sentry_init, capture_items):
@@ -180,9 +191,7 @@ def test_user_attributes(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=True,
-        _experiments={
-            "trace_lifecycle": "stream",
-        },
+        trace_lifecycle="stream",
     )
 
     items = capture_items("trace_metric", "span")

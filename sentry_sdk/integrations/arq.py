@@ -5,7 +5,7 @@ from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import SegmentSource
+from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.tracing import Transaction, TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -14,6 +14,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    has_data_collection_enabled,
     parse_version,
     reraise,
 )
@@ -79,6 +80,9 @@ def patch_enqueue_job() -> None:
             return await old_enqueue_job(self, function, *args, **kwargs)
 
         if has_span_streaming_enabled(client.options):
+            if sentry_sdk.traces.get_current_span() is None:
+                return await old_enqueue_job(self, function, *args, **kwargs)
+
             with sentry_sdk.traces.start_span(
                 name=function,
                 attributes={
@@ -115,11 +119,15 @@ def patch_run_job() -> None:
                     attributes={
                         "sentry.op": OP.QUEUE_TASK_ARQ,
                         "sentry.origin": ArqIntegration.origin,
-                        "sentry.span.source": SegmentSource.TASK,
+                        "sentry.segment.name.source": SegmentNameSource.TASK,
                         SPANDATA.MESSAGING_MESSAGE_ID: job_id,
                     },
                     parent_span=None,
-                ):
+                ) as span:
+                    if self.queue_name is not None:
+                        span.set_attribute(
+                            SPANDATA.MESSAGING_DESTINATION_NAME, self.queue_name
+                        )
                     return await old_run_job(self, job_id, score)
 
             transaction = Transaction(
@@ -130,7 +138,9 @@ def patch_run_job() -> None:
                 origin=ArqIntegration.origin,
             )
 
-            with sentry_sdk.start_transaction(transaction):
+            with sentry_sdk.start_transaction(transaction) as span:
+                if self.queue_name is not None:
+                    span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, self.queue_name)
                 return await old_run_job(self, job_id, score)
 
     Worker.run_job = _sentry_run_job
@@ -171,16 +181,25 @@ def _make_event_processor(
             tags["arq_task_id"] = ctx["job_id"]
             tags["arq_task_retry"] = ctx["job_try"] > 1
             extra = event.setdefault("extra", {})
-            extra["arq-job"] = {
+
+            arq_job_dict = {
                 "task": ctx["job_name"],
-                "args": (
-                    args if should_send_default_pii() else SENSITIVE_DATA_SUBSTITUTE
-                ),
-                "kwargs": (
-                    kwargs if should_send_default_pii() else SENSITIVE_DATA_SUBSTITUTE
-                ),
                 "retry": ctx["job_try"],
             }
+            client_options = sentry_sdk.get_client().options
+
+            if has_data_collection_enabled(client_options):
+                if client_options["data_collection"]["queues"]:
+                    arq_job_dict["args"] = args
+                    arq_job_dict["kwargs"] = kwargs
+            elif should_send_default_pii():
+                arq_job_dict["args"] = args
+                arq_job_dict["kwargs"] = kwargs
+            else:
+                arq_job_dict["args"] = SENSITIVE_DATA_SUBSTITUTE
+                arq_job_dict["kwargs"] = SENSITIVE_DATA_SUBSTITUTE
+
+            extra["arq-job"] = arq_job_dict
 
         return event
 

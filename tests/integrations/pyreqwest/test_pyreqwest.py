@@ -73,7 +73,7 @@ def test_sync_client_spans(
         integrations=[PyreqwestIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     url = f"http://localhost:{server_port}/hello?q=test#frag"
@@ -142,7 +142,7 @@ async def test_async_client_spans(
         integrations=[PyreqwestIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     url = f"http://localhost:{server_port}/hello"
@@ -201,7 +201,7 @@ def test_sync_simple_request_spans(
         integrations=[PyreqwestIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     url = f"http://localhost:{server_port}/hello-simple"
@@ -259,7 +259,7 @@ async def test_async_simple_request_spans(
         integrations=[PyreqwestIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     url = f"http://localhost:{server_port}/hello-simple-async"
@@ -313,7 +313,7 @@ def test_span_origin(
     sentry_init(
         integrations=[PyreqwestIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     url = f"http://localhost:{server_port}/origin"
@@ -349,7 +349,7 @@ def test_outgoing_trace_headers(
         integrations=[PyreqwestIntegration()],
         traces_sample_rate=1.0,
         trace_propagation_targets=["localhost"],
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     url = f"http://localhost:{server_port}/trace"
@@ -407,7 +407,7 @@ def test_outgoing_trace_headers_append_to_baggage(
         traces_sample_rate=1.0,
         trace_propagation_targets=["localhost"],
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     url = f"http://localhost:{server_port}/baggage"
@@ -490,7 +490,7 @@ def test_trace_propagation_targets(
         integrations=[PyreqwestIntegration()],
         trace_propagation_targets=trace_propagation_targets,
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     url = f"http://localhost:{server_port}/propagation"
@@ -520,7 +520,7 @@ def test_omit_url_data_if_parsing_fails(
     sentry_init(
         integrations=[PyreqwestIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     url = f"http://localhost:{server_port}/parse-fail"
@@ -580,7 +580,7 @@ def test_request_source_disabled(
         traces_sample_rate=1.0,
         enable_http_request_source=False,
         http_request_source_threshold_ms=0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     url = f"http://localhost:{server_port}/hello"
@@ -630,7 +630,7 @@ def test_request_source_enabled(
         "integrations": [PyreqwestIntegration()],
         "traces_sample_rate": 1.0,
         "http_request_source_threshold_ms": 0,
-        "_experiments": {"trace_lifecycle": "stream" if span_streaming else "static"},
+        "trace_lifecycle": "stream" if span_streaming else "static",
     }
     if enable_http_request_source is not None:
         sentry_options["enable_http_request_source"] = enable_http_request_source
@@ -683,7 +683,7 @@ def test_request_source(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     url = f"http://localhost:{server_port}/hello"
@@ -750,7 +750,7 @@ def test_request_source_with_module_in_search_path(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     url = f"http://localhost:{server_port}/hello"
@@ -811,7 +811,7 @@ def test_no_request_source_if_duration_too_short(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=100,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     url = f"http://localhost:{server_port}/hello"
@@ -891,7 +891,7 @@ def test_request_source_if_duration_over_threshold(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=100,
-        _experiments={"trace_lifecycle": "stream" if span_streaming else "static"},
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     url = f"http://localhost:{server_port}/hello"

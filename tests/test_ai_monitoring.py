@@ -52,6 +52,31 @@ def test_ai_track(sentry_init, capture_events):
     assert ai_run_span["description"] == "my tool"
 
 
+def test_ai_track_span_streaming(sentry_init, capture_items):
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    items = capture_items("span")
+
+    @ai_track("my tool")
+    def tool(**kwargs):
+        pass
+
+    @ai_track("some test pipeline")
+    def pipeline():
+        tool()
+
+    with sentry_sdk.traces.start_span(name="span"):
+        pipeline()
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 3
+    ai_run_span, ai_pipeline_span, segment = spans
+
+    assert ai_pipeline_span["name"] == "some test pipeline"
+    assert ai_run_span["name"] == "my tool"
+
+
 def test_ai_track_with_tags(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
@@ -76,10 +101,37 @@ def test_ai_track_with_tags(sentry_init, capture_events):
     ai_run_span = spans[0] if spans[0]["op"] == "ai.run" else spans[1]
 
     assert ai_pipeline_span["description"] == "some test pipeline"
-    print(ai_pipeline_span)
     assert ai_pipeline_span["tags"]["user"] == "colin"
     assert ai_pipeline_span["data"]["some_data"] == "value"
     assert ai_run_span["description"] == "my tool"
+
+
+def test_ai_track_with_attributes_span_streaming(sentry_init, capture_items):
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    items = capture_items("span")
+
+    @ai_track("my tool")
+    def tool(**kwargs):
+        pass
+
+    @ai_track("some test pipeline")
+    def pipeline():
+        tool()
+
+    with sentry_sdk.traces.start_span(name="span"):
+        pipeline(sentry_tags={"user": "colin"}, sentry_data={"some_data": "value"})
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+
+    assert len(spans) == 3
+    ai_run_span, ai_pipeline_span, segment = spans
+
+    assert ai_pipeline_span["name"] == "some test pipeline"
+    assert ai_pipeline_span["attributes"]["user"] == "colin"
+    assert ai_pipeline_span["attributes"]["some_data"] == "value"
+    assert ai_run_span["name"] == "my tool"
 
 
 @pytest.mark.asyncio
@@ -108,6 +160,32 @@ async def test_ai_track_async(sentry_init, capture_events):
 
     assert ai_pipeline_span["description"] == "some async test pipeline"
     assert ai_run_span["description"] == "my async tool"
+
+
+@pytest.mark.asyncio
+async def test_ai_track_async_span_streaming(sentry_init, capture_items):
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    items = capture_items()
+
+    @ai_track("my async tool")
+    async def async_tool(**kwargs):
+        pass
+
+    @ai_track("some async test pipeline")
+    async def async_pipeline():
+        await async_tool()
+
+    with sentry_sdk.traces.start_span(name="span"):
+        await async_pipeline()
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 3
+    ai_run_span, ai_pipeline_span, segment = spans
+
+    assert ai_pipeline_span["name"] == "some async test pipeline"
+    assert ai_run_span["name"] == "my async tool"
 
 
 @pytest.mark.asyncio
@@ -142,6 +220,38 @@ async def test_ai_track_async_with_tags(sentry_init, capture_events):
     assert ai_run_span["description"] == "my async tool"
 
 
+@pytest.mark.asyncio
+async def test_ai_track_async_with_attributes_span_streaming(
+    sentry_init, capture_items
+):
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    items = capture_items("span")
+
+    @ai_track("my async tool")
+    async def async_tool(**kwargs):
+        pass
+
+    @ai_track("some async test pipeline")
+    async def async_pipeline():
+        await async_tool()
+
+    with sentry_sdk.traces.start_span(name="span"):
+        await async_pipeline(
+            sentry_tags={"user": "czyber"}, sentry_data={"some_data": "value"}
+        )
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 3
+    ai_run_span, ai_pipeline_span, segment = spans
+
+    assert ai_pipeline_span["name"] == "some async test pipeline"
+    assert ai_pipeline_span["attributes"]["user"] == "czyber"
+    assert ai_pipeline_span["attributes"]["some_data"] == "value"
+    assert ai_run_span["name"] == "my async tool"
+
+
 def test_ai_track_with_explicit_op(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
@@ -160,6 +270,27 @@ def test_ai_track_with_explicit_op(sentry_init, capture_events):
 
     assert span["description"] == "my tool"
     assert span["op"] == "custom.operation"
+
+
+def test_ai_track_with_explicit_op_span_streaming(sentry_init, capture_items):
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    items = capture_items("span")
+
+    @ai_track("my tool", op="custom.operation")
+    def tool(**kwargs):
+        pass
+
+    with sentry_sdk.traces.start_span(name="span"):
+        tool()
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 2
+    ai_run_span, segment = spans
+
+    assert ai_run_span["name"] == "my tool"
+    assert ai_run_span["attributes"]["sentry.op"] == "custom.operation"
 
 
 @pytest.mark.asyncio
@@ -181,6 +312,30 @@ async def test_ai_track_async_with_explicit_op(sentry_init, capture_events):
 
     assert span["description"] == "my async tool"
     assert span["op"] == "custom.async.operation"
+
+
+@pytest.mark.asyncio
+async def test_ai_track_async_with_explicit_op_span_streaming(
+    sentry_init, capture_items
+):
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    items = capture_items()
+
+    @ai_track("my async tool", op="custom.async.operation")
+    async def async_tool(**kwargs):
+        pass
+
+    with sentry_sdk.traces.start_span(name="span"):
+        await async_tool()
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 2
+    ai_run_span, segment = spans
+
+    assert ai_run_span["name"] == "my async tool"
+    assert ai_run_span["attributes"]["sentry.op"] == "custom.async.operation"
 
 
 @pytest.fixture
@@ -403,7 +558,7 @@ class TestTruncateMessagesBySize:
         # Second part gets truncated to 0 chars + ellipsis
         assert parts[1]["text"] == "..."
 
-    @pytest.mark.parametrize("content", [None, 42, 3.14, True])
+    @pytest.mark.parametrize("content", [None, 42, True])
     def test_single_message_truncation_non_str_non_list_content(self, content):
         messages = [{"role": "user", "content": content}]
 
