@@ -1500,7 +1500,7 @@ def nonstreaming_google_genai_model_response():
 
 
 @pytest.fixture
-def responses_tool_call_model_responses():
+def nonstreaming_responses_tool_call_model_responses():
     def inner(
         tool_name: str,
         arguments: str,
@@ -1554,6 +1554,128 @@ def responses_tool_call_model_responses():
             object="response",
             usage=next(usages),
         )
+
+    return inner
+
+
+@pytest.fixture
+def streaming_responses_tool_call_model_responses():
+    def inner(
+        tool_name: str,
+        arguments: str,
+        response_model: str,
+        response_text: str,
+        response_ids: "Iterator[str]",
+        usages: "Iterator[openai.types.responses.ResponseUsage]",
+    ):
+        first_id = next(response_ids)
+        second_id = next(response_ids)
+        first_usage = next(usages)
+        second_usage = next(usages)
+
+        yield [
+            openai.types.responses.ResponseCreatedEvent(
+                response=openai.types.responses.Response(
+                    id=first_id,
+                    output=[
+                        openai.types.responses.ResponseFunctionToolCall(
+                            id="call_123",
+                            call_id="call_123",
+                            name=tool_name,
+                            type="function_call",
+                            arguments=arguments,
+                        )
+                    ],
+                    parallel_tool_calls=False,
+                    tool_choice="none",
+                    tools=[],
+                    created_at=10000000,
+                    model=response_model,
+                    object="response",
+                    usage=first_usage,
+                ),
+                sequence_number=0,
+                type="response.created",
+            ),
+            openai.types.responses.ResponseCompletedEvent(
+                response=openai.types.responses.Response(
+                    id=first_id,
+                    output=[
+                        openai.types.responses.ResponseFunctionToolCall(
+                            id="call_123",
+                            call_id="call_123",
+                            name=tool_name,
+                            type="function_call",
+                            arguments=arguments,
+                        )
+                    ],
+                    parallel_tool_calls=False,
+                    tool_choice="none",
+                    tools=[],
+                    created_at=10000000,
+                    model=response_model,
+                    object="response",
+                    usage=first_usage,
+                ),
+                sequence_number=5,
+                type="response.completed",
+            ),
+        ]
+
+        yield [
+            openai.types.responses.ResponseCreatedEvent(
+                response=openai.types.responses.Response(
+                    id=second_id,
+                    output=[
+                        openai.types.responses.ResponseOutputMessage(
+                            id="msg_final",
+                            type="message",
+                            status="in_progress",
+                            content=[],
+                            role="assistant",
+                        )
+                    ],
+                    parallel_tool_calls=False,
+                    tool_choice="none",
+                    tools=[],
+                    created_at=10000000,
+                    model=response_model,
+                    object="response",
+                    usage=second_usage,
+                ),
+                sequence_number=0,
+                type="response.created",
+            ),
+            openai.types.responses.ResponseCompletedEvent(
+                response=openai.types.responses.Response(
+                    id=second_id,
+                    output=[
+                        openai.types.responses.ResponseOutputMessage(
+                            id="msg_final",
+                            type="message",
+                            status="completed",
+                            content=[
+                                openai.types.responses.ResponseOutputText(
+                                    text=response_text,
+                                    type="output_text",
+                                    annotations=[],
+                                )
+                            ],
+                            role="assistant",
+                        )
+                    ],
+                    parallel_tool_calls=False,
+                    tool_choice="none",
+                    tools=[],
+                    created_at=10000000,
+                    model=response_model,
+                    object="response",
+                    usage=second_usage,
+                ),
+                sequence_number=7,
+                type="response.completed",
+            ),
+        ]
 
     return inner
 

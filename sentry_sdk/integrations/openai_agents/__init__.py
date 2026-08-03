@@ -57,7 +57,8 @@ def _patch_runner(use_tool_hooks: "bool") -> None:
 
     # Patch streaming runner
     agents.run.DEFAULT_AGENT_RUNNER.run_streamed = _create_run_streamed_wrapper(
-        agents.run.DEFAULT_AGENT_RUNNER.run_streamed
+        agents.run.DEFAULT_AGENT_RUNNER.run_streamed,
+        use_tool_hooks=use_tool_hooks,
     )
 
 
