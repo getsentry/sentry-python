@@ -15,6 +15,14 @@ from sentry_sdk import (
 )
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.utils import parse_version
+
+try:
+    from importlib.metadata import version
+except ImportError:
+    from importlib_metadata import version
+
+QUART_VERSION = parse_version(version("quart").split("."))
 
 
 def quart_app_factory():
@@ -399,16 +407,26 @@ async def test_error_in_errorhandler(sentry_init, capture_events):
 
     client = app.test_client()
 
-    with pytest.raises(ZeroDivisionError):
+    if QUART_VERSION >= (0, 21, 0):
+        # Exception propagation behavior changed in 0.21.0
         await client.get("/")
 
-    event1, event2 = events
+        (event,) = events
 
-    (exception,) = event1["exception"]["values"]
-    assert exception["type"] == "ValueError"
+        (exception,) = event["exception"]["values"]
+        assert exception["type"] == "ValueError"
 
-    exception = event2["exception"]["values"][-1]
-    assert exception["type"] == "ZeroDivisionError"
+    else:
+        with pytest.raises(ZeroDivisionError):
+            await client.get("/")
+
+        event1, event2 = events
+
+        (exception,) = event1["exception"]["values"]
+        assert exception["type"] == "ValueError"
+
+        exception = event2["exception"]["values"][-1]
+        assert exception["type"] == "ZeroDivisionError"
 
 
 @pytest.mark.asyncio
