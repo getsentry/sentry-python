@@ -4,6 +4,7 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.utils import capture_internal_exceptions, reraise
 
@@ -44,9 +45,9 @@ class _SentryRunHooks(RunHooks[TContext]):  # type: ignore[misc]
 
         span = execute_tool_span(tool, agent)
 
-        if isinstance(span, StreamedSpan):
+        if should_send_default_pii() and isinstance(span, StreamedSpan):
             span.set_attribute(SPANDATA.GEN_AI_TOOL_INPUT, context.tool_arguments)
-        else:
+        elif should_send_default_pii():
             span.set_data(SPANDATA.GEN_AI_TOOL_INPUT, context.tool_arguments)
 
         span.__enter__()
@@ -70,10 +71,14 @@ class _SentryRunHooks(RunHooks[TContext]):  # type: ignore[misc]
 
 
 def _patch_run_hooks(hooks: "RunHooks[TContext]") -> None:
+    is_already_patched = getattr(hooks, "_sentry_is_patched", False)
+    if is_already_patched:
+        return
+
     original_on_tool_start = hooks.on_tool_start
     original_on_tool_end = hooks.on_tool_end
 
-    sentry_hooks = _SentryRunHooks()
+    sentry_hooks = _SentryRunHooks()  # type: ignore[var-annotated]
 
     @wraps(original_on_tool_start)
     async def on_tool_start(
@@ -92,6 +97,7 @@ def _patch_run_hooks(hooks: "RunHooks[TContext]") -> None:
         await original_on_tool_end(context, agent, tool, result)
         await sentry_hooks.on_tool_end(context, agent, tool, result)
 
+    hooks._sentry_is_patched = True
     hooks.on_tool_start = on_tool_start
     hooks.on_tool_end = on_tool_end
 
@@ -258,7 +264,7 @@ def _create_run_streamed_wrapper(
             args = (agent, *args[1:])
 
         if use_tool_hooks:
-            sentry_hooks = _SentryRunHooks()
+            sentry_hooks = _SentryRunHooks()  # type: ignore[var-annotated]
             hooks = kwargs.get("hooks")
             if hooks is not None:
                 _patch_run_hooks(hooks=hooks)
