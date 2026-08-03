@@ -129,11 +129,11 @@ async def test_agent_run_async(
                 "content": [
                     {
                         "type": "text",
-                        "content": "Message demonstrating the absence of truncation.",
+                        "text": "Message demonstrating the absence of truncation.",
                     },
                     {
                         "type": "text",
-                        "content": "Test input",
+                        "text": "Test input",
                     },
                 ],
             }
@@ -179,11 +179,11 @@ async def test_agent_run_async(
                 "content": [
                     {
                         "type": "text",
-                        "content": "Message demonstrating the absence of truncation.",
+                        "text": "Message demonstrating the absence of truncation.",
                     },
                     {
                         "type": "text",
-                        "content": "Test input",
+                        "text": "Test input",
                     },
                 ],
             }
@@ -511,11 +511,11 @@ async def test_agent_run_stream(
                     "content": [
                         {
                             "type": "text",
-                            "content": "Message demonstrating the absence of truncation.",
+                            "text": "Message demonstrating the absence of truncation.",
                         },
                         {
                             "type": "text",
-                            "content": "Test input",
+                            "text": "Test input",
                         },
                     ],
                 }
@@ -561,11 +561,11 @@ async def test_agent_run_stream(
                     "content": [
                         {
                             "type": "text",
-                            "content": "Message demonstrating the absence of truncation.",
+                            "text": "Message demonstrating the absence of truncation.",
                         },
                         {
                             "type": "text",
-                            "content": "Test input",
+                            "text": "Test input",
                         },
                     ],
                 }
@@ -3192,13 +3192,13 @@ async def test_input_messages_with_thinking_part(sentry_init):
             "content": [
                 {
                     "type": "reasoning",
-                    "content": "Newtonian approximation first",
+                    "text": "Newtonian approximation first",
                 }
             ],
         } in request_messages
         assert {
             "role": "assistant",
-            "content": [{"type": "text", "content": "Gravity attracts mass."}],
+            "content": [{"type": "text", "text": "Gravity attracts mass."}],
         } in request_messages
 
 

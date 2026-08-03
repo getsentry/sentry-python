@@ -103,7 +103,7 @@ def invoke_agent_span(
         for system_text in system_texts:
             messages.append(
                 {
-                    "content": [{"type": "text", "content": system_text}],
+                    "content": [{"text": system_text, "type": "text"}],
                     "role": "system",
                 }
             )
@@ -113,7 +113,7 @@ def invoke_agent_span(
             if isinstance(user_prompt, str):
                 messages.append(
                     {
-                        "content": [{"type": "text", "content": user_prompt}],
+                        "content": [{"text": user_prompt, "type": "text"}],
                         "role": "user",
                     }
                 )
@@ -122,7 +122,7 @@ def invoke_agent_span(
                 content = []
                 for item in user_prompt:
                     if isinstance(item, str):
-                        content.append({"type": "text", "content": item})
+                        content.append({"text": item, "type": "text"})
                     elif ImageUrl and isinstance(item, ImageUrl):
                         content.append(_serialize_image_url_item(item))
                     elif BinaryContent and isinstance(item, BinaryContent):

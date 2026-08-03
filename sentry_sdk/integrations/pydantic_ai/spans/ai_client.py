@@ -186,20 +186,18 @@ def _set_input_messages(
                         if hasattr(part, "tool_name"):
                             tool_call_id = part.tool_name
                         if hasattr(part, "content"):
-                            content.append(
-                                {"type": "text", "content": str(part.content)}
-                            )
+                            content.append({"type": "text", "text": str(part.content)})
                     elif ThinkingPart and isinstance(part, ThinkingPart):
                         reasoning = _nonempty_content(part.content)
                         if reasoning is not None:
-                            content.append({"type": "reasoning", "content": reasoning})
+                            content.append({"type": "reasoning", "text": reasoning})
                     elif hasattr(part, "content"):
                         if isinstance(part.content, str):
-                            content.append({"type": "text", "content": part.content})
+                            content.append({"type": "text", "text": part.content})
                         elif isinstance(part.content, list):
                             for item in part.content:
                                 if isinstance(item, str):
-                                    content.append({"type": "text", "content": item})
+                                    content.append({"type": "text", "text": item})
                                 elif ImageUrl and isinstance(item, ImageUrl):
                                     content.append(_serialize_image_url_item(item))
                                 elif BinaryContent and isinstance(item, BinaryContent):
@@ -207,9 +205,7 @@ def _set_input_messages(
                                 else:
                                     content.append(safe_serialize(item))
                         else:
-                            content.append(
-                                {"type": "text", "content": str(part.content)}
-                            )
+                            content.append({"type": "text", "text": str(part.content)})
                     # Add message if we have content or tool calls
                     if content or tool_calls:
                         message: "Dict[str, Any]" = {"role": role}
