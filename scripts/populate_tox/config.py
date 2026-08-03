@@ -463,9 +463,6 @@ TEST_SUITE_CONFIG = {
     },
     "sqlalchemy": {
         "package": "sqlalchemy",
-        "python": {
-            "<1.4": "<3.10",
-        },
     },
     "starlette": {
         "package": "starlette",
