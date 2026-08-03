@@ -24,29 +24,14 @@ if TYPE_CHECKING:
 try:
     import falcon  # type: ignore
     from falcon import __version__ as FALCON_VERSION
+    from falcon.request import _UNSET as _FALCON_UNSET
 except ImportError:
     raise DidNotEnable("Falcon not installed")
 
-try:
-    import falcon.app_helpers  # type: ignore
+import falcon.app_helpers  # type: ignore
 
-    falcon_helpers = falcon.app_helpers
-    falcon_app_class = falcon.App
-    FALCON3 = True
-except ImportError:
-    import falcon.api_helpers  # type: ignore
-
-    falcon_helpers = falcon.api_helpers
-    falcon_app_class = falcon.API
-    FALCON3 = False
-
-
-_FALCON_UNSET: "Optional[object]" = None
-if FALCON3:  # falcon.request._UNSET is only available in Falcon 3.0+
-    with capture_internal_exceptions():
-        from falcon.request import (  # type: ignore[import-not-found, no-redef]
-            _UNSET as _FALCON_UNSET,
-        )
+falcon_helpers = falcon.app_helpers
+falcon_app_class = falcon.App
 
 
 class FalconRequestExtractor(RequestExtractor):
@@ -137,15 +122,14 @@ class FalconIntegration(Integration):
     def __init__(self, transaction_style: str = "uri_template") -> None:
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
-                "Invalid value for transaction_style: %s (must be in %s)"
-                % (transaction_style, TRANSACTION_STYLE_VALUES)
+                f"Invalid value for transaction_style: {transaction_style} "
+                f"(must be in {TRANSACTION_STYLE_VALUES})"
             )
         self.transaction_style = transaction_style
 
     @staticmethod
     def setup_once() -> None:
-        version = parse_version(FALCON_VERSION)
-        _check_minimum_version(FalconIntegration, version)
+        _check_minimum_version(FalconIntegration, parse_version(FALCON_VERSION))
 
         _patch_wsgi_app()
         _patch_handle_exception()
@@ -224,9 +208,7 @@ def _patch_prepare_middleware() -> None:
         if integration is not None:
             middleware = [SentryFalconMiddleware()] + (middleware or [])
 
-        # We intentionally omit the asgi argument here, since the default is False anyways,
-        # and this way, we remain backwards-compatible with pre-3.0.0 Falcon versions.
-        return original_prepare_middleware(middleware, independent_middleware)
+        return original_prepare_middleware(middleware, independent_middleware, asgi)
 
     falcon_helpers.prepare_middleware = sentry_patched_prepare_middleware
 
@@ -239,14 +221,7 @@ def _exception_leads_to_http_5xx(ex: Exception, response: "falcon.Response") -> 
         ex, (falcon.HTTPError, falcon.http_status.HTTPStatus)
     )
 
-    # We only check the HTTP status on Falcon 3 because in Falcon 2, the status on the response
-    # at the stage where we capture it is listed as 200, even though we would expect to see a 500
-    # status. Since at the time of this change, Falcon 2 is ca. 4 years old, we have decided to
-    # only perform this check on Falcon 3+, despite the risk that some handled errors might be
-    # reported to Sentry as unhandled on Falcon 2.
-    return (is_server_error or is_unhandled_error) and (
-        not FALCON3 or _has_http_5xx_status(response)
-    )
+    return (is_server_error or is_unhandled_error) and _has_http_5xx_status(response)
 
 
 def _has_http_5xx_status(response: "falcon.Response") -> bool:
