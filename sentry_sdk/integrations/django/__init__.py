@@ -39,7 +39,6 @@ from sentry_sdk.utils import (
 try:
     from django import VERSION as DJANGO_VERSION
     from django.conf import settings
-    from django.conf import settings as django_settings
     from django.core import signals
     from django.urls import Resolver404, resolve
     from django.utils.functional import SimpleLazyObject
@@ -574,8 +573,8 @@ class DjangoRequestExtractor(RequestExtractor):
 
     def cookies(self) -> "Dict[str, Union[str, AnnotatedValue]]":
         privacy_cookies = [
-            django_settings.CSRF_COOKIE_NAME,
-            django_settings.SESSION_COOKIE_NAME,
+            settings.CSRF_COOKIE_NAME,
+            settings.SESSION_COOKIE_NAME,
         ]
 
         clean_cookies: "Dict[str, Union[str, AnnotatedValue]]" = {}
