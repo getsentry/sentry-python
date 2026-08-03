@@ -96,7 +96,7 @@ class OpenAIAgentsIntegration(Integration):
         _patch_error_tracing()
 
         library_version = parse_version(OPENAI_AGENTS_VERSION)
-        use_tool_hooks = library_version >= (0, 3, 2)
+        use_tool_hooks = library_version is not None and library_version >= (0, 3, 2)
 
         _patch_runner(use_tool_hooks=use_tool_hooks)
 

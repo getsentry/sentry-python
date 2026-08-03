@@ -69,7 +69,7 @@ class _SentryRunHooks(RunHooks[TContext]):
             span.__exit__(None, None, None)
 
 
-def _patch_run_hooks(hooks: "RunHooks[TContext]"):
+def _patch_run_hooks(hooks: "RunHooks[TContext]") -> None:
     original_on_tool_start = hooks.on_tool_start
     original_on_tool_end = hooks.on_tool_end
 
