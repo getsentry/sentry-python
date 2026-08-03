@@ -575,14 +575,14 @@ class SentryLangchainCallback(BaseCallbackHandler):
                     if response_model is not None:
                         set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
 
-                    finish_reason = generation.generation_info.get("finish_reason")
-                    if finish_reason is not None:
-                        set_on_span(
-                            SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
-                            [finish_reason],
-                        )
+                    if generation.generation_info is not None:
+                        finish_reason = generation.generation_info.get("finish_reason")
+                        if finish_reason is not None:
+                            set_on_span(
+                                SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
+                                [finish_reason],
+                            )
 
-                try:
                     if should_send_default_pii() and self.include_prompts:
                         tool_calls = getattr(generation.message, "tool_calls", None)
                         if tool_calls is not None and tool_calls != []:
@@ -592,8 +592,6 @@ class SentryLangchainCallback(BaseCallbackHandler):
                                 tool_calls,
                                 unpack=False,
                             )
-                except AttributeError:
-                    pass
 
             if should_send_default_pii() and self.include_prompts:
                 set_data_normalized(
@@ -714,8 +712,8 @@ class SentryLangchainCallback(BaseCallbackHandler):
 
     def on_tool_error(
         self,
-        error: "SentryLangchainCallback",
-        *args: "BaseException",
+        error: "BaseException",
+        *,
         run_id: "UUID",
         **kwargs: "Any",
     ) -> "Any":
