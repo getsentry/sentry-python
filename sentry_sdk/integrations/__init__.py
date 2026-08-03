@@ -132,7 +132,7 @@ _MIN_VERSIONS = {
     "boto3": (1, 16),  # botocore
     "bottle": (0, 12),
     "celery": (4, 4, 7),
-    "chalice": (1, 16, 0),
+    "chalice": (1, 22, 0),
     "clickhouse_driver": (0, 2, 0),
     "cohere": (5, 4, 0),
     "django": (1, 8),
