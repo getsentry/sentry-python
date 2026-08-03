@@ -12,6 +12,7 @@ from agents import (
     Agent,
     ModelResponse,
     ModelSettings,
+    RunHooks,
     Usage,
 )
 from agents.computer import Computer
@@ -2160,6 +2161,7 @@ async def test_max_turns_before_handoff_span(
         assert handoff_span["data"]["gen_ai.operation.name"] == "handoff"
 
 
+@pytest.mark.parametrize("user_hooks", [True, False])
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
@@ -2172,6 +2174,7 @@ async def test_tool_execution_span(
     responses_tool_call_model_responses,
     stream_gen_ai_spans,
     span_streaming,
+    user_hooks,
 ):
     """
     Test tool execution span creation.
@@ -2252,6 +2255,7 @@ async def test_tool_execution_span(
                 agent_with_tool,
                 "Please use the simple test tool",
                 run_config=test_run_config,
+                hooks=RunHooks() if user_hooks else None,
             )
 
         sentry_sdk.flush()

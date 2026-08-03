@@ -46,12 +46,13 @@ if TYPE_CHECKING:
     from agents.run_internal.run_steps import SingleStepResult
 
 
-def _patch_runner() -> None:
+def _patch_runner(use_tool_hooks: "bool") -> None:
     # Create the root span for one full agent run (including eventual handoffs)
     # Note agents.run.DEFAULT_AGENT_RUNNER.run_sync is a wrapper around
     # agents.run.DEFAULT_AGENT_RUNNER.run. It does not need to be wrapped separately.
     agents.run.DEFAULT_AGENT_RUNNER.run = _create_run_wrapper(
-        agents.run.DEFAULT_AGENT_RUNNER.run
+        agents.run.DEFAULT_AGENT_RUNNER.run,
+        use_tool_hooks=use_tool_hooks,
     )
 
     # Patch streaming runner
@@ -92,25 +93,17 @@ class OpenAIAgentsIntegration(Integration):
     @staticmethod
     def setup_once() -> None:
         _patch_error_tracing()
-        _patch_runner()
 
         library_version = parse_version(OPENAI_AGENTS_VERSION)
+        use_tool_hooks = library_version >= (0, 3, 2)
+
+        _patch_runner(use_tool_hooks=use_tool_hooks)
+
         if library_version is not None and library_version >= (
             0,
             8,
         ):
             if run_loop is not None:
-
-                @wraps(run_loop.get_all_tools)
-                async def new_wrapped_get_all_tools(
-                    agent: "agents.Agent",
-                    context_wrapper: "agents.RunContextWrapper",
-                ) -> "list[agents.Tool]":
-                    return await _get_all_tools(
-                        run_loop.get_all_tools, agent, context_wrapper
-                    )
-
-                agents.run.get_all_tools = new_wrapped_get_all_tools
 
                 @wraps(run_loop.run_single_turn)
                 async def new_wrapped_run_single_turn(
@@ -175,17 +168,22 @@ class OpenAIAgentsIntegration(Integration):
 
             return
 
-        original_get_all_tools = AgentRunner._get_all_tools
+        if not use_tool_hooks:
+            original_get_all_tools = AgentRunner._get_all_tools
 
-        @wraps(AgentRunner._get_all_tools.__func__)
-        async def old_wrapped_get_all_tools(
-            cls: "agents.Runner",
-            agent: "agents.Agent",
-            context_wrapper: "agents.RunContextWrapper",
-        ) -> "list[agents.Tool]":
-            return await _get_all_tools(original_get_all_tools, agent, context_wrapper)
+            @wraps(AgentRunner._get_all_tools.__func__)
+            async def old_wrapped_get_all_tools(
+                cls: "agents.Runner",
+                agent: "agents.Agent",
+                context_wrapper: "agents.RunContextWrapper",
+            ) -> "list[agents.Tool]":
+                return await _get_all_tools(
+                    original_get_all_tools, agent, context_wrapper
+                )
 
-        agents.run.AgentRunner._get_all_tools = classmethod(old_wrapped_get_all_tools)
+            agents.run.AgentRunner._get_all_tools = classmethod(
+                old_wrapped_get_all_tools
+            )
 
         original_get_model = AgentRunner._get_model
 

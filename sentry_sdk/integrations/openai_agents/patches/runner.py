@@ -7,21 +7,31 @@ from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.utils import capture_internal_exceptions, reraise
 
-from ..spans import agent_workflow_span, update_invoke_agent_span
+from ..spans import (
+    agent_workflow_span,
+    execute_tool_span,
+    update_execute_tool_span,
+    update_invoke_agent_span,
+)
 from ..utils import _capture_exception
 
 try:
+    from agents import FunctionTool, RunHooks
     from agents.exceptions import AgentsException
 except ImportError:
     raise DidNotEnable("OpenAI Agents not installed")
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:
     from typing import Any, AsyncIterator, Callable
 
+    from agents import Agent, Tool, ToolContext
 
-def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., Any]":
+
+def _create_run_wrapper(
+    original_func: "Callable[..., Any]", use_tool_hooks: "bool"
+) -> "Callable[..., Any]":
     """
     Wraps the agents.Runner.run methods to
     - create and manage a root span for the agent workflow runs.
@@ -30,9 +40,76 @@ def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., A
     Note agents.Runner.run_sync() is a wrapper around agents.Runner.run(),
     so it does not need to be wrapped separately.
     """
+    TContext = TypeVar("TContext")
+
+    class _SentryRunHooks(RunHooks[TContext]):
+        async def on_tool_start(
+            self,
+            context: "ToolContext[TContext]",
+            agent: "Agent[TContext]",
+            tool: "Tool",
+        ) -> "None":
+            if not isinstance(tool, FunctionTool):
+                return
+
+            span = execute_tool_span(tool, agent)
+
+            if isinstance(span, StreamedSpan):
+                span.set_attribute(SPANDATA.GEN_AI_TOOL_INPUT, context.tool_arguments)
+            else:
+                span.set_data(SPANDATA.GEN_AI_TOOL_INPUT, context.tool_arguments)
+
+            span.__enter__()
+            context.sentry_tool_span = span
+
+        async def on_tool_end(
+            self,
+            context: "ToolContext[TContext]",
+            agent: "Agent[TContext]",
+            tool: "Tool",
+            result: "object",
+        ) -> "None":
+            if not isinstance(tool, FunctionTool):
+                return
+
+            span = getattr(context, "sentry_tool_span", None)
+            if span:
+                del context.sentry_tool_span
+                update_execute_tool_span(span, agent, tool, result)
+                span.__exit__(None, None, None)
 
     @wraps(original_func)
     async def wrapper(*args: "Any", **kwargs: "Any") -> "Any":
+        if use_tool_hooks:
+            sentry_hooks = _SentryRunHooks()
+            hooks = kwargs.get("hooks")
+            if hooks is not None:
+                original_on_tool_start = hooks.on_tool_start
+                original_on_tool_end = hooks.on_tool_end
+
+                @wraps(original_on_tool_start)
+                async def on_tool_start(
+                    context: "ToolContext[Any]", agent: "Agent[Any]", tool: "Tool"
+                ) -> "None":
+                    await original_on_tool_start(context, agent, tool)
+                    await sentry_hooks.on_tool_start(context, agent, tool)
+
+                @wraps(original_on_tool_end)
+                async def on_tool_end(
+                    context: "ToolContext[Any]",
+                    agent: "Agent[Any]",
+                    tool: "Tool",
+                    result: "object",
+                ) -> "None":
+                    await original_on_tool_end(context, agent, tool, result)
+                    await sentry_hooks.on_tool_end(context, agent, tool, result)
+
+                hooks.on_tool_start = on_tool_start
+                hooks.on_tool_end = on_tool_end
+                kwargs["hooks"] = hooks
+            else:
+                kwargs["hooks"] = sentry_hooks
+
         # Isolate each workflow so that when agents are run in asyncio tasks they
         # don't touch each other's scopes
         with sentry_sdk.isolation_scope():
