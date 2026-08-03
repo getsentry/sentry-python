@@ -565,7 +565,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
                 span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
             )
 
-            if generation.generation_info is not None:
+            if generation is not None and generation.generation_info is not None:
                 finish_reason = generation.generation_info.get("finish_reason")
                 if finish_reason is not None:
                     set_on_span(
