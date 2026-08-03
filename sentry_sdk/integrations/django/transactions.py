@@ -8,8 +8,13 @@ in use.
 import re
 from typing import TYPE_CHECKING
 
-from django.urls import get_resolver
-from django.urls.resolvers import RoutePattern
+from sentry_sdk.integrations import DidNotEnable
+
+try:
+    from django.urls import get_resolver
+    from django.urls.resolvers import RoutePattern
+except ImportError:
+    raise DidNotEnable("Supported version of Django not installed")
 
 if TYPE_CHECKING:
     from re import Pattern
