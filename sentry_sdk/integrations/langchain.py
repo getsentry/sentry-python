@@ -52,7 +52,7 @@ try:
         manager,
     )
     from langchain_core.messages import BaseMessage
-    from langchain_core.outputs import LLMResult
+    from langchain_core.outputs import ChatGeneration, LLMResult
 
 except ImportError:
     raise DidNotEnable("langchain not installed")
@@ -247,7 +247,7 @@ class LangchainIntegration(Integration):
         _patch_embeddings_provider(OllamaEmbeddings)
 
 
-class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
+class SentryLangchainCallback(BaseCallbackHandler):
     """Callback handler that creates Sentry spans."""
 
     def __init__(
@@ -568,24 +568,19 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
                     else span.set_data
                 )
 
-                try:
+                if isinstance(generation, ChatGeneration):
                     response_model = generation.message.response_metadata.get(
                         "model_name"
                     )
                     if response_model is not None:
                         set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
-                except AttributeError:
-                    pass
 
-                try:
                     finish_reason = generation.generation_info.get("finish_reason")
                     if finish_reason is not None:
                         set_on_span(
                             SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS,
                             [finish_reason],
                         )
-                except AttributeError:
-                    pass
 
                 try:
                     if should_send_default_pii() and self.include_prompts:
@@ -612,7 +607,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
 
     def on_llm_error(
         self: "SentryLangchainCallback",
-        error: "Union[Exception, KeyboardInterrupt]",
+        error: "BaseException",
         *,
         run_id: "UUID",
         **kwargs: "Any",
@@ -720,7 +715,7 @@ class SentryLangchainCallback(BaseCallbackHandler):  # type: ignore[misc]
     def on_tool_error(
         self,
         error: "SentryLangchainCallback",
-        *args: "Union[Exception, KeyboardInterrupt]",
+        *args: "BaseException",
         run_id: "UUID",
         **kwargs: "Any",
     ) -> "Any":
