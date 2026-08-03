@@ -261,9 +261,7 @@ class DjangoIntegration(Integration):
         patch_signals()
         patch_tasks()
         add_template_context_repr_sequence()
-
-        if patch_caching is not None:
-            patch_caching()
+        patch_caching()
 
 
 _DRF_PATCHED = False
