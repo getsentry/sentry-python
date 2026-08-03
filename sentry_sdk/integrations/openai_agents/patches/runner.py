@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 TContext = TypeVar("TContext")
 
 
-class _SentryRunHooks(RunHooks[TContext]):
+class _SentryRunHooks(RunHooks[TContext]):  # type: ignore[misc]
     async def on_tool_start(
         self,
         context: "ToolContext[TContext]",
