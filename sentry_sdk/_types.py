@@ -456,6 +456,12 @@ if TYPE_CHECKING:
         type: Literal["text"]
         content: str
 
+    class ToolDefinition(TypedDict):
+        type: str
+        name: NotRequired[str]
+        description: NotRequired[str]
+        parameters: NotRequired[dict[str, object]]
+
     IgnoreSpansName = Union[str, Pattern[str]]
     IgnoreSpansContext = TypedDict(
         "IgnoreSpansContext",
