@@ -41,17 +41,8 @@ try:
     from django.conf import settings
     from django.conf import settings as django_settings
     from django.core import signals
+    from django.urls import Resolver404, resolve
     from django.utils.functional import SimpleLazyObject
-
-    try:
-        from django.urls import resolve
-    except ImportError:
-        from django.core.urlresolvers import resolve
-
-    try:
-        from django.urls import Resolver404
-    except ImportError:
-        from django.core.urlresolvers import Resolver404
 
     # Only available in Django 3.0+
     try:
