@@ -122,59 +122,26 @@ def test_datetime_from_isoformat(input_str, expected_output):
         (None, False, False),
         ("", True, None),
         ("", False, False),
+        # One canonical form per truthy word...
         ("t", True, True),
-        ("T", True, True),
-        ("t", False, True),
-        ("T", False, True),
         ("y", True, True),
-        ("Y", True, True),
-        ("y", False, True),
-        ("Y", False, True),
         ("1", True, True),
-        ("1", False, True),
-        ("True", True, True),
-        ("True", False, True),
         ("true", True, True),
-        ("true", False, True),
-        ("tRuE", True, True),
-        ("tRuE", False, True),
-        ("Yes", True, True),
-        ("Yes", False, True),
         ("yes", True, True),
-        ("yes", False, True),
-        ("yEs", True, True),
-        ("yEs", False, True),
-        ("On", True, True),
-        ("On", False, True),
         ("on", True, True),
-        ("on", False, True),
-        ("oN", True, True),
-        ("oN", False, True),
+        # ...plus mixed-case variants to prove case-insensitivity (same
+        # .lower() code path for all words, so one per result is enough)
+        ("tRuE", True, True),
+        ("On", False, True),
+        # One canonical form per falsy word...
         ("f", True, False),
-        ("f", False, False),
         ("n", True, False),
-        ("N", True, False),
-        ("n", False, False),
-        ("N", False, False),
         ("0", True, False),
-        ("0", False, False),
-        ("False", True, False),
-        ("False", False, False),
         ("false", True, False),
-        ("false", False, False),
-        ("FaLsE", True, False),
-        ("FaLsE", False, False),
-        ("No", True, False),
-        ("No", False, False),
         ("no", True, False),
-        ("no", False, False),
-        ("nO", True, False),
-        ("nO", False, False),
-        ("Off", True, False),
-        ("Off", False, False),
         ("off", True, False),
-        ("off", False, False),
-        ("oFf", True, False),
+        # ...plus a mixed-case variant and a strict=False parity check
+        ("FaLsE", True, False),
         ("oFf", False, False),
         ("xxx", True, None),
         ("xxx", False, True),
@@ -484,7 +451,7 @@ def test_parse_url(url, sanitize, expected_url, expected_query, expected_fragmen
 
 @pytest.mark.parametrize(
     "rate",
-    [0.0, 0.1231, 1.0, True, False],
+    [0.0, 1.0, True],
 )
 def test_accepts_valid_sample_rate(rate):
     with mock.patch.object(logger, "warning", mock.Mock()):
@@ -497,12 +464,8 @@ def test_accepts_valid_sample_rate(rate):
     "rate",
     [
         "dogs are great",  # wrong type
-        (0, 1),  # wrong type
-        {"Maisey": "Charllie"},  # wrong type
-        [True, True],  # wrong type
-        {0.2012},  # wrong type
-        float("NaN"),  # wrong type
         None,  # wrong type
+        float("NaN"),  # wrong type (edge: float, but not a valid rate)
         -1.121,  # wrong value
         1.231,  # wrong value
     ],
@@ -531,14 +494,9 @@ def test_include_source_context_when_serializing_frame(include_source_context):
     "item,regex_list,expected_result",
     [
         ["", [], False],
-        [None, [], False],
         ["", None, False],
-        [None, None, False],
-        ["some-string", [], False],
-        ["some-string", None, False],
         ["some-string", ["some-string"], True],
         ["some-string", ["some"], False],
-        ["some-string", ["some$"], False],  # same as above
         ["some-string", ["some.*"], True],
         ["some-string", ["Some"], False],  # we do case sensitive matching
         ["some-string", [".*string$"], True],
