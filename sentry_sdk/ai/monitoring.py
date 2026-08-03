@@ -1,5 +1,6 @@
 import inspect
 import sys
+import warnings
 from functools import wraps
 from typing import TYPE_CHECKING
 
@@ -29,6 +30,13 @@ def get_ai_pipeline_name() -> "Optional[str]":
 
 
 def ai_track(description: str, **span_kwargs: "Any") -> "Callable[[F], F]":
+    warnings.warn(
+        "sentry_sdk.ai.ai_track is deprecated and will be removed in version 3.0 of sentry-sdk."
+        "Use the manual span API instead, e.g. sentry_sdk.start_span().",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     def decorator(f: "F") -> "F":
         def sync_wrapped(*args: "Any", **kwargs: "Any") -> "Any":
             client = sentry_sdk.get_client()
