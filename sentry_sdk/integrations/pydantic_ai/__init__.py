@@ -1,6 +1,6 @@
 import functools
 
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.utils import capture_internal_exceptions, parse_version
 
 try:
@@ -166,6 +166,7 @@ class PydanticAIIntegration(Integration):
             return
 
         PYDANTIC_AI_VERSION = parse_version(PYDANTIC_AI_VERSION)
+        _check_minimum_version(PydanticAIIntegration, PYDANTIC_AI_VERSION)
         if PYDANTIC_AI_VERSION is None:
             return
 

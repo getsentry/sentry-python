@@ -4,7 +4,7 @@ from typing import Any, Generator
 import sentry_sdk
 from sentry_sdk import start_span
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
@@ -19,6 +19,7 @@ from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     logger,
+    package_version,
     parse_url,
 )
 
@@ -47,6 +48,9 @@ class PyreqwestIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        version = package_version("pyreqwest")
+        _check_minimum_version(PyreqwestIntegration, version)
+
         _patch_pyreqwest()
 
 

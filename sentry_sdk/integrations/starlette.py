@@ -14,6 +14,7 @@ from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     DidNotEnable,
     Integration,
+    _check_minimum_version,
 )
 from sentry_sdk.integrations._asgi_common import _RootPathInPath
 from sentry_sdk.integrations._wsgi_common import (
@@ -128,11 +129,9 @@ class StarletteIntegration(Integration):
     @staticmethod
     def setup_once() -> None:
         version = parse_version(STARLETTE_VERSION)
-
+        _check_minimum_version(StarletteIntegration, version)
         if version is None:
-            raise DidNotEnable(
-                "Unparsable Starlette version: {}".format(STARLETTE_VERSION)
-            )
+            return
 
         patch_middlewares()
         # Starlette tolerates both starting with:

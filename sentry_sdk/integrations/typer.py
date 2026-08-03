@@ -1,10 +1,11 @@
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
+    package_version,
 )
 
 if TYPE_CHECKING:
@@ -28,6 +29,9 @@ class TyperIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        version = package_version("typer")
+        _check_minimum_version(TyperIntegration, version)
+
         typer.main.except_hook = _make_excepthook(except_hook)  # type: ignore
 
 

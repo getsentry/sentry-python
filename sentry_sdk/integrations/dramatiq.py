@@ -4,7 +4,7 @@ from typing import TypeVar
 import sentry_sdk
 from sentry_sdk.api import continue_trace, get_baggage, get_traceparent
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import request_body_within_bounds
 from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.tracing import (
@@ -17,6 +17,7 @@ from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
     event_from_exception,
+    package_version,
 )
 
 R = TypeVar("R")
@@ -54,6 +55,9 @@ class DramatiqIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        version = package_version("dramatiq")
+        _check_minimum_version(DramatiqIntegration, version)
+
         _patch_dramatiq_broker()
 
 

@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing_utils import (
     add_http_request_source,
@@ -13,6 +13,7 @@ from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     ensure_integration_enabled,
+    package_version,
     parse_url,
 )
 
@@ -40,6 +41,9 @@ class HttpxIntegration(Integration):
         httpx has its own transport layer and can be customized when needed,
         so patch Client.send and AsyncClient.send to support both synchronous and async interfaces.
         """
+        version = package_version("httpx")
+        _check_minimum_version(HttpxIntegration, version)
+
         _install_httpx_client()
         _install_httpx_async_client()
 
