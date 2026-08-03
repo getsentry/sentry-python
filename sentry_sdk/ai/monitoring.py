@@ -31,7 +31,7 @@ def get_ai_pipeline_name() -> "Optional[str]":
 
 def ai_track(description: str, **span_kwargs: "Any") -> "Callable[[F], F]":
     warnings.warn(
-        "sentry_sdk.ai.ai_track is deprecated and will be removed in version 3.0 of sentry-sdk."
+        "sentry_sdk.ai.ai_track is deprecated and will be removed in version 3.0 of sentry-sdk. "
         "Use the manual span API instead, e.g. sentry_sdk.start_span().",
         DeprecationWarning,
         stacklevel=2,
