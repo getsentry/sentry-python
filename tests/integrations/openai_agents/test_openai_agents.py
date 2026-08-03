@@ -4396,7 +4396,7 @@ async def test_tool_execution_error_tracing(
     capture_items,
     test_agent,
     get_model_response,
-    responses_tool_call_model_responses,
+    nonstreaming_responses_tool_call_model_responses,
     stream_gen_ai_spans,
     span_streaming,
 ):
@@ -4421,7 +4421,7 @@ async def test_tool_execution_error_tracing(
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent_with_tool = test_agent.clone(tools=[failing_tool], model=model)
 
-    responses = responses_tool_call_model_responses(
+    responses = nonstreaming_responses_tool_call_model_responses(
         tool_name="failing_tool",
         arguments='{"message": "test"}',
         response_model="gpt-4-0613",
