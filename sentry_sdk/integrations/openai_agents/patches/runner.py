@@ -4,7 +4,6 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.utils import capture_internal_exceptions, reraise
 
@@ -44,14 +43,13 @@ class _SentryRunHooks(RunHooks[TContext]):  # type: ignore[misc]
             return
 
         span = execute_tool_span(tool, agent)
-
-        if should_send_default_pii() and isinstance(span, StreamedSpan):
-            span.set_attribute(SPANDATA.GEN_AI_TOOL_INPUT, context.tool_arguments)
-        elif should_send_default_pii():
-            span.set_data(SPANDATA.GEN_AI_TOOL_INPUT, context.tool_arguments)
-
         span.__enter__()
         context.sentry_tool_span = span
+
+        if isinstance(span, StreamedSpan):
+            span.set_attribute(SPANDATA.GEN_AI_TOOL_INPUT, context.tool_arguments)
+        else:
+            span.set_data(SPANDATA.GEN_AI_TOOL_INPUT, context.tool_arguments)
 
     async def on_tool_end(
         self,
