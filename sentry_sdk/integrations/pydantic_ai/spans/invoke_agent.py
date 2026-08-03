@@ -162,10 +162,17 @@ def update_invoke_agent_span(
     # Extract output from result
     output = getattr(result, "output", None)
 
-    # Set response text if prompts are enabled
     if _should_send_prompts() and output:
         set_data_normalized(
-            span, SPANDATA.GEN_AI_RESPONSE_TEXT, str(output), unpack=False
+            span,
+            SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+            [
+                {
+                    "role": "assistant",
+                    "parts": [{"type": "text", "content": str(output)}],
+                }
+            ],
+            unpack=False,
         )
 
     # Set model name from response if available
