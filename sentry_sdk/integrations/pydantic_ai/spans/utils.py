@@ -10,7 +10,7 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.traces import StreamedSpan
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Union
+    from typing import Any, Dict, Optional, Union
 
     from pydantic_ai.usage import RequestUsage, RunUsage  # type: ignore
 
@@ -85,3 +85,26 @@ def _set_usage_data(
 
     if hasattr(usage, "total_tokens") and usage.total_tokens is not None:
         set_on_span(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage.total_tokens)
+
+    reasoning_tokens = _reasoning_token_count(usage)
+    if reasoning_tokens is not None:
+        set_on_span(SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING, reasoning_tokens)
+
+
+def _reasoning_token_count(usage: "Any") -> "Optional[int]":
+    """Provider-specific reasoning token counts live on usage.details or the object itself."""
+    details = getattr(usage, "details", None)
+    if isinstance(details, dict):
+        for key in (
+            "reasoning_tokens",
+            "thinking_tokens",
+            "thoughts_token_count",
+            "thoughts_tokens",
+            "output_tokens.reasoning",
+        ):
+            value = details.get(key)
+            if isinstance(value, int) and value > 0:
+                return value
+
+    value = getattr(usage, "reasoning_tokens", None)
+    return value if isinstance(value, int) and value > 0 else None

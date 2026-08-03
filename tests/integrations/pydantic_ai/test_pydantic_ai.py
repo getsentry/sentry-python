@@ -129,11 +129,11 @@ async def test_agent_run_async(
                 "content": [
                     {
                         "type": "text",
-                        "text": "Message demonstrating the absence of truncation.",
+                        "content": "Message demonstrating the absence of truncation.",
                     },
                     {
                         "type": "text",
-                        "text": "Test input",
+                        "content": "Test input",
                     },
                 ],
             }
@@ -179,11 +179,11 @@ async def test_agent_run_async(
                 "content": [
                     {
                         "type": "text",
-                        "text": "Message demonstrating the absence of truncation.",
+                        "content": "Message demonstrating the absence of truncation.",
                     },
                     {
                         "type": "text",
-                        "text": "Test input",
+                        "content": "Test input",
                     },
                 ],
             }
@@ -511,11 +511,11 @@ async def test_agent_run_stream(
                     "content": [
                         {
                             "type": "text",
-                            "text": "Message demonstrating the absence of truncation.",
+                            "content": "Message demonstrating the absence of truncation.",
                         },
                         {
                             "type": "text",
-                            "text": "Test input",
+                            "content": "Test input",
                         },
                     ],
                 }
@@ -523,7 +523,7 @@ async def test_agent_run_stream(
             assert "gen_ai.usage.input_tokens" in chat_span["attributes"]
             # Streaming responses should still have output data
             assert (
-                "gen_ai.response.text" in chat_span["attributes"]
+                "gen_ai.output.messages" in chat_span["attributes"]
                 or "gen_ai.response.model" in chat_span["attributes"]
             )
     elif stream_gen_ai_spans:
@@ -561,11 +561,11 @@ async def test_agent_run_stream(
                     "content": [
                         {
                             "type": "text",
-                            "text": "Message demonstrating the absence of truncation.",
+                            "content": "Message demonstrating the absence of truncation.",
                         },
                         {
                             "type": "text",
-                            "text": "Test input",
+                            "content": "Test input",
                         },
                     ],
                 }
@@ -573,7 +573,7 @@ async def test_agent_run_stream(
             assert "gen_ai.usage.input_tokens" in chat_span["attributes"]
             # Streaming responses should still have output data
             assert (
-                "gen_ai.response.text" in chat_span["attributes"]
+                "gen_ai.output.messages" in chat_span["attributes"]
                 or "gen_ai.response.model" in chat_span["attributes"]
             )
     else:
@@ -602,7 +602,7 @@ async def test_agent_run_stream(
             assert "gen_ai.usage.input_tokens" in chat_span["data"]
             # Streaming responses should still have output data
             assert (
-                "gen_ai.response.text" in chat_span["data"]
+                "gen_ai.output.messages" in chat_span["data"]
                 or "gen_ai.response.model" in chat_span["data"]
             )
 
@@ -3114,6 +3114,143 @@ async def test_output_data_with_text_and_tool_calls(sentry_init, capture_items):
 
 
 @pytest.mark.asyncio
+async def test_output_data_with_thinking_part(sentry_init):
+    """ThinkingPart is captured as OTEL reasoning in gen_ai.output.messages."""
+    from pydantic_ai import messages
+
+    import sentry_sdk
+    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_output_data
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    with sentry_sdk.start_transaction(op="test", name="test"):
+        span = sentry_sdk.start_span(op="test_span")
+
+        mock_response = MagicMock()
+        mock_response.model_name = "test-model"
+        mock_response.finish_reason = "stop"
+        mock_response.parts = [
+            messages.ThinkingPart(content="Let me reason step by step"),
+            messages.TextPart(content="Final answer"),
+        ]
+
+        _set_output_data(span, mock_response)
+        span.finish()
+
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span._data
+        output_messages = json.loads(span._data[SPANDATA.GEN_AI_OUTPUT_MESSAGES])
+        assert output_messages == [
+            {
+                "role": "assistant",
+                "parts": [
+                    {"type": "reasoning", "content": "Let me reason step by step"},
+                    {"type": "text", "content": "Final answer"},
+                ],
+                "finish_reason": "stop",
+            }
+        ]
+
+
+@pytest.mark.asyncio
+async def test_input_messages_with_thinking_part(sentry_init):
+    """ThinkingPart in history is serialized as type=reasoning, not plain text."""
+    from pydantic_ai import messages
+
+    import sentry_sdk
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    history = [
+        messages.ModelRequest(
+            parts=[messages.UserPromptPart(content="Explain gravity")]
+        ),
+        messages.ModelResponse(
+            parts=[
+                messages.ThinkingPart(content="Newtonian approximation first"),
+                messages.TextPart(content="Gravity attracts mass."),
+            ],
+            model_name="test",
+        ),
+    ]
+
+    with sentry_sdk.start_transaction(op="test", name="test"):
+        span = sentry_sdk.start_span(op="test_span")
+        _set_input_messages(span, history)
+        span.finish()
+
+        request_messages = json.loads(span._data[SPANDATA.GEN_AI_REQUEST_MESSAGES])
+        assert {
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "reasoning",
+                    "content": "Newtonian approximation first",
+                }
+            ],
+        } in request_messages
+        assert {
+            "role": "assistant",
+            "content": [{"type": "text", "content": "Gravity attracts mass."}],
+        } in request_messages
+
+
+@pytest.mark.asyncio
+async def test_output_data_with_otel_tool_call(sentry_init):
+    """ToolCallPart is captured as OTEL tool_call in gen_ai.output.messages."""
+    from pydantic_ai import messages
+
+    import sentry_sdk
+    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_output_data
+
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+    )
+
+    with sentry_sdk.start_transaction(op="test", name="test"):
+        span = sentry_sdk.start_span(op="test_span")
+
+        mock_response = MagicMock()
+        mock_response.model_name = "test-model"
+        mock_response.finish_reason = "tool_call"
+        mock_response.parts = [
+            messages.ToolCallPart(
+                tool_name="get_weather",
+                args='{"city": "Berlin"}',
+                tool_call_id="call_1",
+            ),
+        ]
+
+        _set_output_data(span, mock_response)
+        span.finish()
+
+        output_messages = json.loads(span._data[SPANDATA.GEN_AI_OUTPUT_MESSAGES])
+        assert output_messages == [
+            {
+                "role": "assistant",
+                "parts": [
+                    {
+                        "type": "tool_call",
+                        "name": "get_weather",
+                        "id": "call_1",
+                        "arguments": {"city": "Berlin"},
+                    }
+                ],
+                "finish_reason": "tool_call",
+            }
+        ]
+
+
+@pytest.mark.asyncio
 async def test_output_data_error_handling(sentry_init, capture_items):
     """
     Test that _set_output_data handles errors in formatting gracefully.
@@ -4285,6 +4422,64 @@ async def test_set_usage_data_with_cache_tokens(
         (span_data,) = event["spans"]
         assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 80
         assert span_data["data"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHE_WRITE] == 20
+
+
+@pytest.mark.parametrize(
+    "details_key",
+    [
+        "reasoning_tokens",
+        "thinking_tokens",
+        "thoughts_token_count",
+        "thoughts_tokens",
+        "output_tokens.reasoning",
+    ],
+)
+def test_set_usage_data_reasoning_token_detail_keys(
+    sentry_init, capture_events, details_key
+):
+    """Provider-specific reasoning counts live under usage.details with different keys."""
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(op="test", name="test"):
+        span = sentry_sdk.start_span(op="test_span")
+        usage = RequestUsage(
+            input_tokens=100,
+            output_tokens=50,
+            details={details_key: 12},
+        )
+        _set_usage_data(span, usage)
+        span.finish()
+
+    (event,) = events
+    (span_data,) = event["spans"]
+    assert span_data["data"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 12
+
+
+def test_set_usage_data_omits_zero_reasoning_tokens(sentry_init, capture_events):
+    """Zero reasoning token counts must not be written (providers often default to 0)."""
+    sentry_init(
+        integrations=[PydanticAIIntegration()],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    with sentry_sdk.start_transaction(op="test", name="test"):
+        span = sentry_sdk.start_span(op="test_span")
+        usage = RequestUsage(
+            input_tokens=100,
+            output_tokens=50,
+            details={"reasoning_tokens": 0},
+        )
+        _set_usage_data(span, usage)
+        span.finish()
+
+    (event,) = events
+    (span_data,) = event["spans"]
+    assert SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING not in span_data["data"]
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])

@@ -32,7 +32,7 @@ from .utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Union
+    from typing import Any, Dict, List, Optional, Union
 
     from pydantic_ai.messages import ModelMessage, SystemPromptPart  # type: ignore
 
@@ -59,6 +59,22 @@ except ImportError:
     ThinkingPart = None
     BinaryContent = None
     ImageUrl = None
+
+
+def _nonempty_content(value: "Any") -> "Optional[str]":
+    if value is None:
+        return None
+    return str(value) or None
+
+
+def _tool_call_arguments(args: "Any") -> "Any":
+    """Prefer structured args for OTEL tool_call parts; keep raw string if not JSON."""
+    if not isinstance(args, str) or not args.strip():
+        return args
+    try:
+        return json.loads(args)
+    except ValueError:
+        return args
 
 
 def _transform_system_instructions(
@@ -170,15 +186,20 @@ def _set_input_messages(
                         if hasattr(part, "tool_name"):
                             tool_call_id = part.tool_name
                         if hasattr(part, "content"):
-                            content.append({"type": "text", "text": str(part.content)})
-                    # Handle regular content
+                            content.append(
+                                {"type": "text", "content": str(part.content)}
+                            )
+                    elif ThinkingPart and isinstance(part, ThinkingPart):
+                        reasoning = _nonempty_content(part.content)
+                        if reasoning is not None:
+                            content.append({"type": "reasoning", "content": reasoning})
                     elif hasattr(part, "content"):
                         if isinstance(part.content, str):
-                            content.append({"type": "text", "text": part.content})
+                            content.append({"type": "text", "content": part.content})
                         elif isinstance(part.content, list):
                             for item in part.content:
                                 if isinstance(item, str):
-                                    content.append({"type": "text", "text": item})
+                                    content.append({"type": "text", "content": item})
                                 elif ImageUrl and isinstance(item, ImageUrl):
                                     content.append(_serialize_image_url_item(item))
                                 elif BinaryContent and isinstance(item, BinaryContent):
@@ -186,7 +207,9 @@ def _set_input_messages(
                                 else:
                                     content.append(safe_serialize(item))
                         else:
-                            content.append({"type": "text", "text": str(part.content)})
+                            content.append(
+                                {"type": "text", "content": str(part.content)}
+                            )
                     # Add message if we have content or tool calls
                     if content or tool_calls:
                         message: "Dict[str, Any]" = {"role": role}
@@ -231,31 +254,72 @@ def _set_output_data(
     set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)
 
     try:
-        # Extract text from ModelResponse
-        if hasattr(response, "parts"):
-            texts = []
-            tool_calls = []
+        # Prefer OTEL gen_ai.output.messages (includes text + reasoning + tool_call);
+        # keep deprecated response.tool_calls for compatibility.
+        if not hasattr(response, "parts"):
+            return
 
-            for part in response.parts:
-                if TextPart and isinstance(part, TextPart) and hasattr(part, "content"):
-                    texts.append(part.content)
-                elif BaseToolCallPart and isinstance(part, BaseToolCallPart):
-                    tool_call_data = {
-                        "type": "function",
-                    }
-                    if hasattr(part, "tool_name"):
-                        tool_call_data["name"] = part.tool_name
-                    if hasattr(part, "args"):
-                        tool_call_data["arguments"] = safe_serialize(part.args)
-                    tool_calls.append(tool_call_data)
+        tool_calls = []
+        message_parts = []  # type: List[Dict[str, Any]]
 
-            if texts:
-                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, texts)
+        for part in response.parts:
+            if ThinkingPart and isinstance(part, ThinkingPart):
+                reasoning = _nonempty_content(getattr(part, "content", None))
+                if reasoning is not None:
+                    message_parts.append({"type": "reasoning", "content": reasoning})
+                continue
 
-            if tool_calls:
-                set_on_span(
-                    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(tool_calls)
-                )
+            if TextPart and isinstance(part, TextPart) and hasattr(part, "content"):
+                text = _nonempty_content(part.content)
+                if text is not None:
+                    message_parts.append({"type": "text", "content": text})
+                continue
+
+            if not (BaseToolCallPart and isinstance(part, BaseToolCallPart)):
+                continue
+
+            name = getattr(part, "tool_name", None)
+            has_args = hasattr(part, "args")
+            args = part.args if has_args else None
+
+            # Deprecated response.tool_calls shape
+            tool_call_data = {"type": "function"}  # type: Dict[str, Any]
+            if name is not None:
+                tool_call_data["name"] = name
+            if has_args:
+                tool_call_data["arguments"] = safe_serialize(args)
+            tool_calls.append(tool_call_data)
+
+            if not name:
+                continue
+
+            otel_tool_call = {"type": "tool_call", "name": name}  # type: Dict[str, Any]
+            tool_call_id = getattr(part, "tool_call_id", None) or getattr(
+                part, "id", None
+            )
+            if tool_call_id:
+                otel_tool_call["id"] = tool_call_id
+            if has_args:
+                otel_tool_call["arguments"] = _tool_call_arguments(args)
+            message_parts.append(otel_tool_call)
+
+        if tool_calls:
+            set_on_span(SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(tool_calls))
+
+        if message_parts:
+            output_message = {
+                "role": "assistant",
+                "parts": message_parts,
+            }  # type: Dict[str, Any]
+            finish_reason = getattr(response, "finish_reason", None)
+            if finish_reason is not None:
+                output_message["finish_reason"] = str(finish_reason)
+            set_data_normalized(
+                span,
+                SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                [output_message],
+                unpack=False,
+            )
 
     except Exception:
         # If we fail to format output, just skip it
