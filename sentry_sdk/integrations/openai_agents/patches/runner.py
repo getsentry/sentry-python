@@ -86,8 +86,9 @@ def _patch_run_hooks(hooks: "RunHooks[TContext]") -> None:
     async def on_tool_start(
         context: "ToolContext[TContext]", agent: "Agent[TContext]", tool: "Tool"
     ) -> "None":
+        with capture_internal_exceptions():
+            await sentry_hooks.on_tool_start(context, agent, tool)
         await original_on_tool_start(context, agent, tool)
-        await sentry_hooks.on_tool_start(context, agent, tool)
 
     @wraps(original_on_tool_end)
     async def on_tool_end(
@@ -96,8 +97,9 @@ def _patch_run_hooks(hooks: "RunHooks[TContext]") -> None:
         tool: "Tool",
         result: "object",
     ) -> "None":
+        with capture_internal_exceptions():
+            await sentry_hooks.on_tool_end(context, agent, tool, result)
         await original_on_tool_end(context, agent, tool, result)
-        await sentry_hooks.on_tool_end(context, agent, tool, result)
 
     hooks._sentry_is_patched = True
     hooks.on_tool_start = on_tool_start
