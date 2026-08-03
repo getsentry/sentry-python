@@ -22,7 +22,7 @@ try:
 except ImportError:
     from importlib_metadata import version
 
-QUART_VERSION = parse_version(version("quart").split("."))
+QUART_VERSION = parse_version(version("quart"))
 
 
 def quart_app_factory():
