@@ -34,7 +34,7 @@ from .utils import (
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Union
 
-    from pydantic_ai.messages import ModelMessage, SystemPromptPart  # type: ignore
+    from pydantic_ai.messages import ModelMessage, SystemPromptPart
 
     from sentry_sdk._types import TextPart as SentryTextPart
 

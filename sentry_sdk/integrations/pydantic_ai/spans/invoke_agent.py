@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from typing import Any, Union
 
 try:
-    from pydantic_ai.messages import BinaryContent, ImageUrl  # type: ignore
+    from pydantic_ai.messages import BinaryContent, ImageUrl
 except ImportError:
     BinaryContent = None
     ImageUrl = None
