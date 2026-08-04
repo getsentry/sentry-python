@@ -97,7 +97,6 @@ class OpenAIAgentsIntegration(Integration):
 
         library_version = parse_version(OPENAI_AGENTS_VERSION)
 
-        use_agent_hooks = library_version is not None and library_version >= (0, 3, 2)
         # ToolContext.tool_arguments added in https://github.com/openai/openai-agents-python/commit/5e1db14da542c77f8fdd5e2e26017977ae415813
         use_run_hooks = library_version is not None and library_version >= (0, 3, 2)
 
@@ -114,7 +113,7 @@ class OpenAIAgentsIntegration(Integration):
                     *args: "Any", **kwargs: "Any"
                 ) -> "SingleStepResult":
                     return await _run_single_turn(
-                        run_loop.run_single_turn, use_agent_hooks, *args, **kwargs
+                        run_loop.run_single_turn, use_run_hooks, *args, **kwargs
                     )
 
                 agents.run.run_single_turn = new_wrapped_run_single_turn
@@ -125,7 +124,7 @@ class OpenAIAgentsIntegration(Integration):
                 ) -> "SingleStepResult":
                     return await _run_single_turn_streamed(
                         run_loop.run_single_turn_streamed,
-                        use_agent_hooks,
+                        use_run_hooks,
                         *args,
                         **kwargs,
                     )

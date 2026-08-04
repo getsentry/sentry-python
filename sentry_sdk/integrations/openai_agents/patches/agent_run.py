@@ -92,7 +92,7 @@ def _maybe_start_agent_span(
 
 async def _run_single_turn(
     original_run_single_turn: "Callable[..., Awaitable[SingleStepResult]]",
-    use_agent_hooks: "bool",
+    use_run_hooks: "bool",
     *args: "Any",
     **kwargs: "Any",
 ) -> "SingleStepResult":
@@ -110,7 +110,7 @@ async def _run_single_turn(
     )
 
     context_wrapper = kwargs.get("context_wrapper")
-    if not use_agent_hooks:
+    if not use_run_hooks:
         should_run_agent_start_hooks = kwargs.get("should_run_agent_start_hooks", False)
 
         span = _maybe_start_agent_span(
@@ -129,7 +129,7 @@ async def _run_single_turn(
     except Exception:
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
-            if use_agent_hooks:
+            if use_run_hooks:
                 run_hooks = kwargs.get("hooks")
                 if run_hooks is not None:
                     span = getattr(run_hooks, "_sentry_invoke_agent_span", None)
@@ -154,7 +154,7 @@ async def _run_single_turn(
 
 async def _run_single_turn_streamed(
     original_run_single_turn_streamed: "Callable[..., Awaitable[SingleStepResult]]",
-    use_agent_hooks: "bool",
+    use_run_hooks: "bool",
     *args: "Any",
     **kwargs: "Any",
 ) -> "SingleStepResult":
@@ -198,7 +198,7 @@ async def _run_single_turn_streamed(
     agent = getattr(agent_or_bindings, "public_agent", agent_or_bindings)
 
     context_wrapper = args[3] if len(args) > 3 else kwargs.get("context_wrapper")
-    if not use_agent_hooks:
+    if not use_run_hooks:
         should_run_agent_start_hooks = bool(
             args[5]
             if len(args) > 5
@@ -229,7 +229,7 @@ async def _run_single_turn_streamed(
     except Exception:
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
-            if use_agent_hooks:
+            if use_run_hooks:
                 run_hooks = kwargs.get("hooks")
                 if run_hooks is not None:
                     span = getattr(context_wrapper, "_sentry_invoke_agent_span", None)
