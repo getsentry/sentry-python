@@ -157,7 +157,7 @@ TEST_SUITE_CONFIG = {
         "package": "flask",
         "deps": {
             "*": ["flask-login", "werkzeug", "blinker"],
-            "<3.0": ["werkzeug<3.0"],
+            "<3.0": ["werkzeug<2.3"],
             "py3.7": ["setuptools<82"],  # Handled by importlib.metadata on Python 3.8+
         },
     },
