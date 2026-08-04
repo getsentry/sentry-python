@@ -108,10 +108,10 @@ async def _run_single_turn(
         if bindings is not None
         else kwargs.get("agent")
     )
-    context_wrapper = kwargs.get("context_wrapper")
-    should_run_agent_start_hooks = kwargs.get("should_run_agent_start_hooks", False)
-
     if not use_agent_hooks:
+        context_wrapper = kwargs.get("context_wrapper")
+        should_run_agent_start_hooks = kwargs.get("should_run_agent_start_hooks", False)
+
         span = _maybe_start_agent_span(
             context_wrapper, agent, should_run_agent_start_hooks, kwargs
         )
@@ -136,6 +136,7 @@ async def _run_single_turn(
                         update_invoke_agent_span(
                             span=span, context=context_wrapper, agent=agent
                         )
+                        del run_hooks._sentry_invoke_agent_span
                         span.__exit__(*exc_info)
             else:
                 span = getattr(context_wrapper, "_sentry_agent_span", None)
@@ -194,16 +195,19 @@ async def _run_single_turn_streamed(
         args[1] if len(args) > 1 else kwargs.get("bindings", kwargs.get("agent"))
     )
     agent = getattr(agent_or_bindings, "public_agent", agent_or_bindings)
-    context_wrapper = args[3] if len(args) > 3 else kwargs.get("context_wrapper")
-    should_run_agent_start_hooks = bool(
-        args[5] if len(args) > 5 else kwargs.get("should_run_agent_start_hooks", False)
-    )
-
-    span_kwargs: "dict[str, Any]" = {}
-    if streamed_result and hasattr(streamed_result, "input"):
-        span_kwargs["original_input"] = streamed_result.input
 
     if not use_agent_hooks:
+        context_wrapper = args[3] if len(args) > 3 else kwargs.get("context_wrapper")
+        should_run_agent_start_hooks = bool(
+            args[5]
+            if len(args) > 5
+            else kwargs.get("should_run_agent_start_hooks", False)
+        )
+
+        span_kwargs: "dict[str, Any]" = {}
+        if streamed_result and hasattr(streamed_result, "input"):
+            span_kwargs["original_input"] = streamed_result.input
+
         span = _maybe_start_agent_span(
             context_wrapper,
             agent,
@@ -227,11 +231,12 @@ async def _run_single_turn_streamed(
             if use_agent_hooks:
                 run_hooks = kwargs.get("hooks")
                 if run_hooks is not None:
-                    span = getattr(context_wrapper, "_sentry_agent_span", None)
+                    span = getattr(context_wrapper, "_sentry_invoke_agent_span", None)
                     if span:
                         update_invoke_agent_span(
                             span=span, context=context_wrapper, agent=agent
                         )
+                        del run_hooks._sentry_invoke_agent_span
                         span.__exit__(*exc_info)
             else:
                 span = getattr(context_wrapper, "_sentry_agent_span", None)

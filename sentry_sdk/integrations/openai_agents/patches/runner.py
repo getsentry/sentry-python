@@ -245,7 +245,7 @@ def _create_run_wrapper(
                                     context=context_wrapper,
                                     agent=agent,
                                 )
-
+                                del hooks._sentry_invoke_agent_span
                                 invoke_agent_span.__exit__(*exc_info)
                         elif context_wrapper is not None:
                             invoke_agent_span = getattr(
