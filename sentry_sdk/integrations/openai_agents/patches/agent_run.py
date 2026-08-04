@@ -253,7 +253,7 @@ async def _run_single_turn_streamed(
                     )
                     span.__exit__(*exc_info)
                     delattr(context_wrapper, "_sentry_agent_span")
-                _close_streaming_workflow_span(agent)
+            _close_streaming_workflow_span(agent)
         reraise(*exc_info)
 
     return result
