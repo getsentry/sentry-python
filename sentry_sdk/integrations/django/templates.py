@@ -1,8 +1,8 @@
 import functools
 from typing import TYPE_CHECKING
 
-from django import VERSION as DJANGO_VERSION
 from django.template import TemplateSyntaxError
+from django.template.base import Origin
 from django.utils.safestring import mark_safe
 
 import sentry_sdk
@@ -12,13 +12,6 @@ from sentry_sdk.utils import ensure_integration_enabled
 
 if TYPE_CHECKING:
     from typing import Any, Dict, Iterator, Optional, Tuple
-
-try:
-    # support Django 1.9
-    from django.template.base import Origin
-except ImportError:
-    # backward compatibility
-    from django.template.loader import LoaderOrigin as Origin
 
 
 def get_template_frame_from_exception(
@@ -85,8 +78,6 @@ def patch_templates() -> None:
 
     SimpleTemplateResponse.rendered_content = rendered_content
 
-    if DJANGO_VERSION < (1, 7):
-        return
     import django.shortcuts
 
     real_render = django.shortcuts.render
