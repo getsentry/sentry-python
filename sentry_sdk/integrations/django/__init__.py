@@ -36,19 +36,9 @@ from sentry_sdk.utils import (
 try:
     from django import VERSION as DJANGO_VERSION
     from django.conf import settings
-    from django.conf import settings as django_settings
     from django.core import signals
+    from django.urls import Resolver404, resolve
     from django.utils.functional import SimpleLazyObject
-
-    try:
-        from django.urls import resolve
-    except ImportError:
-        from django.core.urlresolvers import resolve
-
-    try:
-        from django.urls import Resolver404
-    except ImportError:
-        from django.core.urlresolvers import Resolver404
 
     # Only available in Django 3.0+
     try:
@@ -59,6 +49,9 @@ try:
 except ImportError:
     raise DidNotEnable("Django not installed")
 
+from typing import TYPE_CHECKING
+
+from sentry_sdk.integrations.django.caching import patch_caching
 from sentry_sdk.integrations.django.middleware import patch_django_middlewares
 from sentry_sdk.integrations.django.signals_handlers import patch_signals
 from sentry_sdk.integrations.django.tasks import patch_tasks
@@ -68,13 +61,6 @@ from sentry_sdk.integrations.django.templates import (
 )
 from sentry_sdk.integrations.django.transactions import LEGACY_RESOLVER
 from sentry_sdk.integrations.django.views import patch_views
-
-if DJANGO_VERSION[:2] > (1, 8):
-    from sentry_sdk.integrations.django.caching import patch_caching
-else:
-    patch_caching = None  # type: ignore
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, List, Optional, Union
@@ -88,17 +74,6 @@ if TYPE_CHECKING:
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from sentry_sdk.traces import StreamedSpan
     from sentry_sdk.tracing import Span
-
-
-if DJANGO_VERSION < (1, 10):
-
-    def is_authenticated(request_user: "Any") -> bool:
-        return request_user.is_authenticated()
-
-else:
-
-    def is_authenticated(request_user: "Any") -> bool:
-        return request_user.is_authenticated
 
 
 TRANSACTION_STYLE_VALUES = ("function_name", "url")
@@ -273,9 +248,7 @@ class DjangoIntegration(Integration):
         patch_signals()
         patch_tasks()
         add_template_context_repr_sequence()
-
-        if patch_caching is not None:
-            patch_caching()
+        patch_caching()
 
 
 _DRF_PATCHED = False
@@ -443,7 +416,7 @@ def _get_user_from_request_and_set_on_scope(request: "WSGIRequest") -> None:
     elif is_lazy:
         return
 
-    if user is None or not is_authenticated(user):
+    if user is None or not user.is_authenticated:
         return
 
     user_info = {}
@@ -574,8 +547,8 @@ class DjangoRequestExtractor(RequestExtractor):
 
     def cookies(self) -> "Dict[str, Union[str, AnnotatedValue]]":
         privacy_cookies = [
-            django_settings.CSRF_COOKIE_NAME,
-            django_settings.SESSION_COOKIE_NAME,
+            settings.CSRF_COOKIE_NAME,
+            settings.SESSION_COOKIE_NAME,
         ]
 
         clean_cookies: "Dict[str, Union[str, AnnotatedValue]]" = {}
@@ -611,7 +584,7 @@ def _set_user_info(request: "WSGIRequest", event: "Event") -> None:
 
     user = getattr(request, "user", None)
 
-    if user is None or not is_authenticated(user):
+    if user is None or not user.is_authenticated:
         return
 
     try:
@@ -632,27 +605,14 @@ def _set_user_info(request: "WSGIRequest", event: "Event") -> None:
 
 def install_sql_hook() -> None:
     """If installed this causes Django's queries to be captured."""
-    try:
-        from django.db.backends.utils import CursorWrapper
-    except ImportError:
-        from django.db.backends.util import CursorWrapper
+    from django.db.backends.base.base import BaseDatabaseWrapper
+    from django.db.backends.utils import CursorWrapper
 
-    try:
-        # django 1.6 and 1.7 compatability
-        from django.db.backends import BaseDatabaseWrapper
-    except ImportError:
-        # django 1.8 or later
-        from django.db.backends.base.base import BaseDatabaseWrapper
-
-    try:
-        real_execute = CursorWrapper.execute
-        real_executemany = CursorWrapper.executemany
-        real_connect = BaseDatabaseWrapper.connect
-        real_commit = BaseDatabaseWrapper._commit
-        real_rollback = BaseDatabaseWrapper._rollback
-    except AttributeError:
-        # This won't work on Django versions < 1.6
-        return
+    real_execute = CursorWrapper.execute
+    real_executemany = CursorWrapper.executemany
+    real_connect = BaseDatabaseWrapper.connect
+    real_commit = BaseDatabaseWrapper._commit
+    real_rollback = BaseDatabaseWrapper._rollback
 
     @ensure_integration_enabled(DjangoIntegration, real_execute)
     def execute(
