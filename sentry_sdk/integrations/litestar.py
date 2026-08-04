@@ -8,6 +8,7 @@ from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     DidNotEnable,
     Integration,
+    _check_minimum_version,
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.logging import ignore_logger
@@ -18,6 +19,7 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
     has_data_collection_enabled,
+    package_version,
     transaction_from_function,
 )
 
@@ -68,6 +70,9 @@ class LitestarIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        version = package_version("litestar")
+        _check_minimum_version(LitestarIntegration, version)
+
         patch_app_init()
         patch_middlewares()
         patch_http_route_handle()

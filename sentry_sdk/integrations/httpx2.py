@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing_utils import (
     add_http_request_source,
@@ -14,6 +14,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     parse_url,
+    parse_version,
 )
 
 if TYPE_CHECKING:
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
 
 try:
     from httpx2 import AsyncClient, Client, Request, Response
+    from httpx2 import __version__ as HTTPX2_VERSION
 except ImportError:
     raise DidNotEnable("httpx2 is not installed")
 
@@ -40,6 +42,9 @@ class Httpx2Integration(Integration):
         httpx2 has its own transport layer and can be customized when needed,
         so patch Client.send and AsyncClient.send to support both synchronous and async interfaces.
         """
+        version = parse_version(HTTPX2_VERSION)
+        _check_minimum_version(Httpx2Integration, version)
+
         _install_httpx2_client()
         _install_httpx2_async_client()
 

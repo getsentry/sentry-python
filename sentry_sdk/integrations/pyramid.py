@@ -4,7 +4,7 @@ import sys
 import weakref
 
 import sentry_sdk
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
@@ -16,6 +16,7 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
     has_data_collection_enabled,
+    package_version,
     reraise,
 )
 
@@ -68,6 +69,9 @@ class PyramidIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        version = package_version("pyramid")
+        _check_minimum_version(PyramidIntegration, version)
+
         from pyramid import router
 
         old_call_view = router._call_view

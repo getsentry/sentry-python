@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.ai.utils import _set_span_data_attribute, get_start_span_function
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
@@ -87,6 +87,8 @@ class MCPIntegration(Integration):
         """
         Patches MCP server classes to instrument handler execution.
         """
+        _check_minimum_version(MCPIntegration, MCP_PACKAGE_VERSION)
+
         _patch_lowlevel_server()
         _patch_handle_request()
 
