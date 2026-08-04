@@ -1,3 +1,4 @@
+from contextlib import nullcontext
 from copy import deepcopy
 
 import sentry_sdk
@@ -12,7 +13,6 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
     has_data_collection_enabled,
-    nullcontext,
     package_version,
     transaction_from_function,
 )
@@ -79,7 +79,6 @@ class SentryStarliteASGIMiddleware(SentryAsgiMiddleware):
     ) -> None:
         super().__init__(
             app=app,
-            unsafe_context_data=False,
             transaction_style="endpoint",
             mechanism_type="asgi",
             span_origin=span_origin,

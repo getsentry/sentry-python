@@ -1,5 +1,4 @@
 import concurrent.futures as cf
-import sys
 
 import ldclient
 import pytest
@@ -118,7 +117,6 @@ def test_launchdarkly_integration_threaded(
     }
 
 
-@pytest.mark.skipif(sys.version_info < (3, 7), reason="requires python3.7 or higher")
 def test_launchdarkly_integration_asyncio(
     sentry_init, capture_events, uninstall_integration
 ):

@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.6","3.7","3.8","3.9","3.10","3.11","3.12","3.13","3.14","3.14t"]
+        python-version: ["3.7","3.8","3.9","3.10","3.11","3.12","3.13","3.14","3.14t"]
         os: [ubuntu-22.04]
     services:
       postgres:
@@ -45,14 +45,14 @@ jobs:
         ports:
           - 3306:3306
     env:
-      # 3.6/3.7 run in the python:X.Y container; tell uv to use that system Python.
-      TOX_UV_PYTHON_PREFERENCE: ${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'only-system' || 'managed' }}
-      SENTRY_PYTHON_TEST_POSTGRES_HOST: ${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && 'postgres' || 'localhost' }}
+      # 3.7 runs in the python:X.Y container; tell uv to use that system Python.
+      TOX_UV_PYTHON_PREFERENCE: ${{ (matrix.python-version == '3.7') && 'only-system' || 'managed' }}
+      SENTRY_PYTHON_TEST_POSTGRES_HOST: ${{ (matrix.python-version == '3.7') && 'postgres' || 'localhost' }}
       SENTRY_PYTHON_TEST_POSTGRES_USER: postgres
       SENTRY_PYTHON_TEST_POSTGRES_PASSWORD: sentry
       SENTRY_PYTHON_TEST_MYSQL_USER: root
       SENTRY_PYTHON_TEST_MYSQL_PASSWORD: sentry
-    container: ${{ (matrix.python-version == '3.6' || matrix.python-version == '3.7') && format('python:{0}', matrix.python-version) || null }}
+    container: ${{ (matrix.python-version == '3.7') && format('python:{0}', matrix.python-version) || null }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - name: Install uv
@@ -61,10 +61,10 @@ jobs:
           enable-cache: false
       - name: "Setup ClickHouse Server"
         uses: getsentry/action-clickhouse-in-ci@5dc8a6a50d689bd6051db0241f34849e5a36490b # v1.7
-      - name: Mark workspace safe for git (3.6/3.7 container)
+      - name: Mark workspace safe for git (3.7 container)
         # needed to make git rev-parse work in the containers
         # subprocesses (e.g. sentry_sdk.utils.get_git_revision) can run git.
-        if: ${{ matrix.python-version == '3.6' || matrix.python-version == '3.7' }}
+        if: ${{ matrix.python-version == '3.7' }}
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Setup Test Env
         run: |

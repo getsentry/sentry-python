@@ -2,6 +2,7 @@ import functools
 import json
 import sys
 from collections.abc import Set
+from contextlib import nullcontext
 from copy import deepcopy
 from json import JSONDecodeError
 from typing import TYPE_CHECKING
@@ -36,7 +37,6 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
     has_data_collection_enabled,
-    nullcontext,
     parse_version,
     transaction_from_function,
 )

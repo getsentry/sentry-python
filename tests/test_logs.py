@@ -11,12 +11,7 @@ import sentry_sdk.logger
 from sentry_sdk import get_client
 from sentry_sdk.consts import SPANDATA, VERSION
 
-minimum_python_37 = pytest.mark.skipif(
-    sys.version_info < (3, 7), reason="Asyncio tests need Python >= 3.7"
-)
 
-
-@minimum_python_37
 def test_logs_disabled_by_default(sentry_init, capture_envelopes):
     sentry_init()
 
@@ -35,7 +30,6 @@ def test_logs_disabled_by_default(sentry_init, capture_envelopes):
     assert len(envelopes) == 0
 
 
-@minimum_python_37
 def test_logs_basics(sentry_init, capture_items):
     sentry_init(enable_logs=True)
     items = capture_items("log")
@@ -68,7 +62,6 @@ def test_logs_basics(sentry_init, capture_items):
     assert logs[5]["attributes"]["sentry.severity_number"] == 21
 
 
-@minimum_python_37
 def test_logs_experimental_option_still_works(sentry_init, capture_items):
     sentry_init(_experiments={"enable_logs": True})
     items = capture_items("log")
@@ -84,7 +77,6 @@ def test_logs_experimental_option_still_works(sentry_init, capture_items):
     assert logs[0]["attributes"]["sentry.severity_number"] == 17
 
 
-@minimum_python_37
 def test_logs_before_send_log(sentry_init, capture_items):
     before_log_called = False
 
@@ -132,7 +124,6 @@ def test_logs_before_send_log(sentry_init, capture_items):
     assert before_log_called is True
 
 
-@minimum_python_37
 def test_logs_before_send_log_experimental_option_still_works(
     sentry_init, capture_items
 ):
@@ -162,7 +153,6 @@ def test_logs_before_send_log_experimental_option_still_works(
     assert before_log_called is True
 
 
-@minimum_python_37
 @pytest.mark.tests_internal_exceptions
 def test_logs_before_send_log_raises_does_not_crash_application(
     sentry_init, capture_items
@@ -185,7 +175,6 @@ def test_logs_before_send_log_raises_does_not_crash_application(
     assert not logs
 
 
-@minimum_python_37
 def test_logs_attributes(sentry_init, capture_items):
     """
     Passing arbitrary attributes to log messages.
@@ -219,7 +208,6 @@ def test_logs_attributes(sentry_init, capture_items):
     assert logs[0]["attributes"]["sentry.sdk.version"] == VERSION
 
 
-@minimum_python_37
 def test_logs_message_params(sentry_init, capture_items):
     """
     This is the official way of how to pass vars to log messages.
@@ -286,7 +274,6 @@ def test_logs_message_params(sentry_init, capture_items):
     assert "sentry.message.template" not in logs[5]["attributes"]
 
 
-@minimum_python_37
 def test_logs_tied_to_transactions(sentry_init, capture_items):
     """
     Log messages are also tied to transactions.
@@ -304,7 +291,6 @@ def test_logs_tied_to_transactions(sentry_init, capture_items):
     assert logs[0]["span_id"] == trx.span_id
 
 
-@minimum_python_37
 def test_logs_tied_to_segments(sentry_init, capture_items):
     """
     Log messages are also tied to segments.
@@ -322,7 +308,6 @@ def test_logs_tied_to_segments(sentry_init, capture_items):
     assert logs[0]["span_id"] == sgmt.span_id
 
 
-@minimum_python_37
 def test_logs_no_span_id_without_active_span(sentry_init, capture_items):
     """
     Per the metrics spec, span_id is only attached when a span is active
@@ -340,7 +325,6 @@ def test_logs_no_span_id_without_active_span(sentry_init, capture_items):
     assert "span_id" not in logs[0]
 
 
-@minimum_python_37
 def test_logs_tied_to_spans(sentry_init, capture_items):
     """
     Log messages are also tied to spans.
@@ -357,7 +341,6 @@ def test_logs_tied_to_spans(sentry_init, capture_items):
     assert logs[0]["span_id"] == span.span_id
 
 
-@minimum_python_37
 def test_logs_tied_to_spans_span_streaming(sentry_init, capture_items):
     """
     Log messages are also tied to spans.
@@ -374,7 +357,6 @@ def test_logs_tied_to_spans_span_streaming(sentry_init, capture_items):
     assert logs[0]["span_id"] == span.span_id
 
 
-@minimum_python_37
 def test_auto_flush_logs_after_100(sentry_init, capture_envelopes):
     """
     If you log >100 logs, it should automatically trigger a flush.
@@ -393,7 +375,6 @@ def test_auto_flush_logs_after_100(sentry_init, capture_envelopes):
     raise AssertionError("200 logs were never flushed after five seconds")
 
 
-@minimum_python_37
 def test_log_user_attributes(sentry_init, capture_items):
     """User attributes are sent if enable_logs is True and send_default_pii is True."""
     sentry_init(enable_logs=True, send_default_pii=True)
@@ -416,7 +397,6 @@ def test_log_user_attributes(sentry_init, capture_items):
     }
 
 
-@minimum_python_37
 def test_log_no_user_attributes_if_no_pii(sentry_init, capture_items):
     """User attributes are not if PII sending is off."""
     sentry_init(enable_logs=True, send_default_pii=False)
@@ -436,7 +416,6 @@ def test_log_no_user_attributes_if_no_pii(sentry_init, capture_items):
     assert "user.name" not in log["attributes"]
 
 
-@minimum_python_37
 def test_auto_flush_logs_after_5s(sentry_init, capture_envelopes):
     """
     If you log a single log, it should automatically flush after 5 seconds, at most 10 seconds.
@@ -454,7 +433,6 @@ def test_auto_flush_logs_after_5s(sentry_init, capture_envelopes):
     raise AssertionError("1 logs was never flushed after 10 seconds")
 
 
-@minimum_python_37
 @pytest.mark.parametrize(
     "message,expected_body,params",
     [
@@ -503,7 +481,6 @@ def test_logs_with_literal_braces(
         assert "sentry.message.template" not in logs[0]["attributes"]
 
 
-@minimum_python_37
 def test_transport_format(sentry_init, capture_envelopes):
     sentry_init(enable_logs=True, server_name="test-server", release="1.0.0")
 
@@ -574,7 +551,6 @@ def test_transport_format(sentry_init, capture_envelopes):
     }
 
 
-@minimum_python_37
 def test_batcher_drops_logs(sentry_init, monkeypatch):
     sentry_init(enable_logs=True, server_name="test-server", release="1.0.0")
     client = sentry_sdk.get_client()
@@ -660,7 +636,6 @@ def test_batcher_drops_logs(sentry_init, monkeypatch):
         }
 
 
-@minimum_python_37
 def test_log_gets_attributes_from_scopes(sentry_init, capture_items):
     sentry_init(enable_logs=True)
 
@@ -687,7 +662,6 @@ def test_log_gets_attributes_from_scopes(sentry_init, capture_items):
     assert "current.attribute" not in log2["attributes"]
 
 
-@minimum_python_37
 def test_log_attributes_override_scope_attributes(sentry_init, capture_items):
     sentry_init(enable_logs=True)
 
@@ -709,7 +683,6 @@ def test_log_attributes_override_scope_attributes(sentry_init, capture_items):
     assert log["attributes"]["temp.attribute"] == "value2"
 
 
-@minimum_python_37
 def test_log_array_attributes(sentry_init, capture_envelopes):
     """Test homogeneous list and tuple attributes, and fallback for inhomogeneous collections."""
 
@@ -765,7 +738,6 @@ def test_log_array_attributes(sentry_init, capture_envelopes):
     }
 
 
-@minimum_python_37
 def test_attributes_preserialized_in_before_send(sentry_init, capture_items):
     """We don't surface user-held references to objects in attributes."""
 
@@ -808,7 +780,6 @@ def test_attributes_preserialized_in_before_send(sentry_init, capture_items):
     assert isinstance(log["attributes"]["inhomogeneous_tuple"], str)
 
 
-@minimum_python_37
 def test_array_attributes_deep_copied_in_before_send(sentry_init, capture_envelopes):
     """We don't surface user-held references to objects in attributes."""
 
@@ -834,7 +805,6 @@ def test_array_attributes_deep_copied_in_before_send(sentry_init, capture_envelo
     get_client().flush()
 
 
-@minimum_python_37
 @pytest.mark.timeout(5)
 def test_reentrant_add_does_not_deadlock(sentry_init, capture_envelopes):
     """Adding to the batcher from within a flush must not deadlock.

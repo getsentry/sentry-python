@@ -45,7 +45,7 @@ TEST_SUITE_CONFIG = {
             "*": ["async-timeout", "pytest-asyncio", "fakeredis"],
             "<=0.23": ["pydantic<2"],
             # https://github.com/cunla/fakeredis-py/issues/490
-            "py3.6,py3.7,py3.8": ["fakeredis<2.36.0"],
+            "py3.7,py3.8": ["fakeredis<2.36.0"],
         },
         "num_versions": 2,
     },
@@ -81,7 +81,6 @@ TEST_SUITE_CONFIG = {
         "package": "celery",
         "deps": {
             "*": ["newrelic<10.17.0", "redis", "pytest-forked"],
-            "py3.6": ["newrelic<8"],
             "py3.7": ["importlib-metadata<5.0"],
         },
     },
@@ -152,7 +151,6 @@ TEST_SUITE_CONFIG = {
             # deprecated argument.
             "<0.110.1": ["httpx<0.28.0"],
             "<0.80": ["anyio<4"],
-            "py3.6": ["aiocontextvars"],
         },
     },
     "flask": {
@@ -166,9 +164,7 @@ TEST_SUITE_CONFIG = {
                 "itsdangerous>=0.24,<2.0",
                 "jinja2<3.1.1",
             ],
-            "py3.6,py3.7": [
-                "setuptools<82"
-            ],  # Handled by importlib.metadata on Python 3.8+
+            "py3.7": ["setuptools<82"],  # Handled by importlib.metadata on Python 3.8+
         },
     },
     "gql": {
@@ -189,7 +185,6 @@ TEST_SUITE_CONFIG = {
         "package": "graphene",
         "deps": {
             "*": ["blinker", "fastapi[test]", "flask", "httpx"],
-            "py3.6": ["aiocontextvars", "setuptools<82"],
             "py3.7": ["setuptools<82"],  # Handled by importlib.metadata on Python 3.8+
         },
     },
@@ -379,9 +374,6 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["mockupdb"],
         },
-        "python": {
-            "<3.6": "<3.7",
-        },
     },
     "pyramid": {
         "package": "pyramid",
@@ -403,7 +395,7 @@ TEST_SUITE_CONFIG = {
                 "hypercorn<0.15.0",
             ],
             "py3.8": ["taskgroup==0.0.0a4"],
-            "py3.6,py3.7": ["importlib_metadata"],
+            "py3.7": ["importlib_metadata"],
         },
         "num_versions": 2,
     },
@@ -422,10 +414,9 @@ TEST_SUITE_CONFIG = {
     "redis": {
         "package": "redis",
         "deps": {
-            "*": ["fakeredis!=1.7.4", "pytest<8.0.0"],
+            "*": ["fakeredis!=1.7.4", "pytest<8.0.0", "pytest-asyncio"],
             ">=4.0,<5.0": ["fakeredis<2.31.0"],
-            "py3.6,py3.7,py3.8": ["fakeredis<2.26.0"],
-            "py3.7,py3.8,py3.9,py3.10,py3.11,py3.12,py3.13": ["pytest-asyncio"],
+            "py3.7,py3.8": ["fakeredis<2.26.0"],
         },
     },
     "redis_py_cluster_legacy": {
@@ -449,7 +440,7 @@ TEST_SUITE_CONFIG = {
             ">=1.1.14": ["fakeredis<2.36.0"],
             "<0.9": ["fakeredis<1.0", "redis<3.2.2"],
             ">=0.9,<0.14": ["fakeredis>=1.0,<1.7.4"],
-            "py3.6,py3.7": ["fakeredis!=2.26.0"],
+            "py3.7": ["fakeredis!=2.26.0"],
         },
         "python": {
             "<0.13": "<3.7",
@@ -460,7 +451,6 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["websockets<11.0", "aiohttp"],
             ">=22": ["sanic-testing"],
-            "py3.6": ["aiocontextvars==0.2.1"],
             # tracerite imports pkg_resources before https://github.com/sanic-org/tracerite/commit/2f68543fab726d12d5c5d71fab584eb42140f410
             "py3.8": ["tracerite<1.1.2", "setuptools<82"],
         },
@@ -490,7 +480,6 @@ TEST_SUITE_CONFIG = {
             # See the comment on FastAPI's httpx bound for more info
             "<0.37.2": ["httpx<0.28.0"],
             "<0.15": ["jinja2<3.1"],
-            "py3.6": ["aiocontextvars"],
         },
     },
     "starlite": {
@@ -531,7 +520,6 @@ TEST_SUITE_CONFIG = {
             "<=6.4.1": [
                 "pytest<8.2"
             ],  # https://github.com/tornadoweb/tornado/pull/3382
-            "py3.6": ["aiocontextvars"],
         },
         "num_versions": 2,
     },

@@ -9,7 +9,7 @@ Supports the low-level `mcp.server.lowlevel.Server` API.
 
 import inspect
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from functools import wraps
 from typing import TYPE_CHECKING
 
@@ -20,7 +20,7 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
-from sentry_sdk.utils import nullcontext, package_version, safe_serialize
+from sentry_sdk.utils import package_version, safe_serialize
 
 MCP_PACKAGE_VERSION = package_version("mcp")
 
