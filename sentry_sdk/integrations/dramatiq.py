@@ -17,12 +17,13 @@ from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
     event_from_exception,
-    package_version,
+    parse_version,
 )
 
 R = TypeVar("R")
 
 try:
+    from dramatiq import __version__ as DRAMATIQ_VERSION
     from dramatiq.broker import Broker
     from dramatiq.errors import Retry
     from dramatiq.message import Message
@@ -55,7 +56,7 @@ class DramatiqIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        version = package_version("dramatiq")
+        version = parse_version(DRAMATIQ_VERSION)
         _check_minimum_version(DramatiqIntegration, version)
 
         _patch_dramatiq_broker()

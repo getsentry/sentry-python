@@ -11,10 +11,11 @@ from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     has_data_collection_enabled,
-    package_version,
+    parse_version,
 )
 
 try:
+    from pymongo import __version__ as PYMONGO_VERSION
     from pymongo import monitoring
 except ImportError:
     raise DidNotEnable("Pymongo not installed")
@@ -269,7 +270,7 @@ class PyMongoIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        version = package_version("pymongo")
+        version = parse_version(PYMONGO_VERSION)
         _check_minimum_version(PyMongoIntegration, version)
 
         monitoring.register(CommandTracer())

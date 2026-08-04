@@ -21,7 +21,7 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
     has_data_collection_enabled,
-    package_version,
+    parse_version,
     reraise,
 )
 
@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     F = TypeVar("F", bound=Callable[..., Any])
 
 try:
+    from huey import __version__ as HUEY_VERSION
     from huey.api import Huey, PeriodicTask, Result, ResultGroup, Task
     from huey.exceptions import CancelExecution, RetryTask, TaskLockedException
 except ImportError:
@@ -56,7 +57,7 @@ class HueyIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        version = package_version("huey")
+        version = parse_version(HUEY_VERSION)
         _check_minimum_version(HueyIntegration, version)
 
         patch_enqueue()

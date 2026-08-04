@@ -10,10 +10,11 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
     has_data_collection_enabled,
-    package_version,
+    parse_version,
 )
 
 try:
+    from graphene import __version__ as GRAPHENE_VERSION
     from graphene.types import schema as graphene_schema  # type: ignore
 except ImportError:
     raise DidNotEnable("graphene is not installed")
@@ -36,7 +37,7 @@ class GrapheneIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        version = package_version("graphene")
+        version = parse_version(GRAPHENE_VERSION)
         _check_minimum_version(GrapheneIntegration, version)
 
         _patch_graphql()

@@ -9,7 +9,7 @@ from sentry_sdk.integrations.logging import (
     _BaseHandler,
 )
 from sentry_sdk.logger import _log_level_to_otel
-from sentry_sdk.utils import has_logs_enabled, package_version, safe_repr
+from sentry_sdk.utils import has_logs_enabled, parse_version, safe_repr
 
 if TYPE_CHECKING:
     from logging import LogRecord
@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
 try:
     import loguru
+    from loguru import __version__ as LOGURU_VERSION
     from loguru import logger
     from loguru._defaults import LOGURU_FORMAT as DEFAULT_FORMAT
 
@@ -87,7 +88,7 @@ class LoguruIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        version = package_version("loguru")
+        version = parse_version(LOGURU_VERSION)
         _check_minimum_version(LoguruIntegration, version)
 
         if LoguruIntegration.level is not None:

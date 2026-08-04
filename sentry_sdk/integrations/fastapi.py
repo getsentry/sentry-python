@@ -9,7 +9,7 @@ from sentry_sdk.integrations import DidNotEnable, _check_minimum_version
 from sentry_sdk.traces import StreamedSpan, get_current_span
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
-from sentry_sdk.utils import package_version, transaction_from_function
+from sentry_sdk.utils import parse_version, transaction_from_function
 
 if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable, Dict
@@ -27,6 +27,7 @@ except DidNotEnable:
 
 try:
     import fastapi  # type: ignore
+    from fastapi import __version__ as FASTAPI_VERSION
 except ImportError:
     raise DidNotEnable("FastAPI is not installed")
 
@@ -46,7 +47,7 @@ class FastApiIntegration(StarletteIntegration):
 
     @staticmethod
     def setup_once() -> None:
-        version = package_version("fastapi")
+        version = parse_version(FASTAPI_VERSION)
         _check_minimum_version(FastApiIntegration, version)
 
         patch_get_request_handler()

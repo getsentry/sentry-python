@@ -4,10 +4,11 @@ from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
-    package_version,
+    parse_version,
 )
 
 try:
+    from trytond import __version__ as TRYTOND_VERSION  # type: ignore
     from trytond.exceptions import TrytonException  # type: ignore
     from trytond.wsgi import app  # type: ignore
 except ImportError:
@@ -25,7 +26,7 @@ class TrytondWSGIIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        version = package_version("trytond")
+        version = parse_version(TRYTOND_VERSION)
         _check_minimum_version(TrytondWSGIIntegration, version)
 
         app.wsgi_app = SentryWsgiMiddleware(

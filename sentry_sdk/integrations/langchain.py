@@ -24,7 +24,7 @@ from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
     should_truncate_gen_ai_input,
 )
-from sentry_sdk.utils import capture_internal_exceptions, logger, package_version
+from sentry_sdk.utils import capture_internal_exceptions, logger, parse_version
 
 if TYPE_CHECKING:
     from typing import (
@@ -44,6 +44,7 @@ if TYPE_CHECKING:
 
 
 try:
+    from langchain import __version__ as LANGCHAIN_VERSION
     from langchain_core.agents import AgentFinish
     from langchain_core.callbacks import (
         BaseCallbackHandler,
@@ -230,7 +231,7 @@ class LangchainIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        version = package_version("langchain")
+        version = parse_version(LANGCHAIN_VERSION)
         _check_minimum_version(LangchainIntegration, version)
 
         manager._configure = _wrap_configure(manager._configure)

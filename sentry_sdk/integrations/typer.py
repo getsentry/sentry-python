@@ -5,7 +5,7 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    package_version,
+    parse_version,
 )
 
 if TYPE_CHECKING:
@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
 try:
     import typer
+    from typer import __version__ as TYPER_VERSION
     from typer.main import except_hook
 except ImportError:
     raise DidNotEnable("Typer not installed")
@@ -29,7 +30,7 @@ class TyperIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        version = package_version("typer")
+        version = parse_version(TYPER_VERSION)
         _check_minimum_version(TyperIntegration, version)
 
         typer.main.except_hook = _make_excepthook(except_hook)  # type: ignore

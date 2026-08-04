@@ -14,9 +14,10 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.traces import SpanStatus, StreamedSpan
 from sentry_sdk.tracing import SPANSTATUS
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
-from sentry_sdk.utils import package_version
+from sentry_sdk.utils import parse_version
 
 try:
+    from google.genai import __version__ as GOOGLE_GENAI_VERSION
     from google.genai.models import AsyncModels, Models
 except ImportError:
     raise DidNotEnable("google-genai not installed")
@@ -47,7 +48,7 @@ class GoogleGenAIIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        version = package_version("google-genai")
+        version = parse_version(GOOGLE_GENAI_VERSION)
         _check_minimum_version(GoogleGenAIIntegration, version)
 
         # Patch sync methods

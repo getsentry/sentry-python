@@ -10,7 +10,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    package_version,
+    parse_version,
     reraise,
 )
 
@@ -33,9 +33,10 @@ class BeamIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        from apache_beam import __version__ as BEAM_VERSION
         from apache_beam.transforms.core import DoFn, ParDo  # type: ignore
 
-        version = package_version("apache-beam")
+        version = parse_version(BEAM_VERSION)
         _check_minimum_version(BeamIntegration, version)
 
         ignore_logger("root")

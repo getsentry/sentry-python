@@ -19,11 +19,14 @@ from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     logger,
-    package_version,
     parse_url,
+    parse_version,
 )
 
 try:
+    from pyreqwest import (
+        __version__ as PYREQWEST_VERSION,  # type: ignore[import-not-found]
+    )
     from pyreqwest.client import (  # type: ignore[import-not-found]
         ClientBuilder,
         SyncClientBuilder,
@@ -48,7 +51,7 @@ class PyreqwestIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        version = package_version("pyreqwest")
+        version = parse_version(PYREQWEST_VERSION)
         _check_minimum_version(PyreqwestIntegration, version)
 
         _patch_pyreqwest()

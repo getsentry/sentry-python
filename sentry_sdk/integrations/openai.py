@@ -49,7 +49,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     has_data_collection_enabled,
-    package_version,
+    parse_version,
     reraise,
 )
 
@@ -89,6 +89,7 @@ try:
         Omit = None
 
     from openai import AsyncStream, Stream
+    from openai import __version__ as OPENAI_VERSION
     from openai.resources import AsyncEmbeddings, Embeddings
     from openai.resources.chat.completions import AsyncCompletions, Completions
 
@@ -128,7 +129,7 @@ class OpenAIIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        version = package_version("openai")
+        version = parse_version(OPENAI_VERSION)
         _check_minimum_version(OpenAIIntegration, version)
 
         Completions.create = _wrap_chat_completion_create(Completions.create)

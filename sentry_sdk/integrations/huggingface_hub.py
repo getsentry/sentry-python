@@ -18,7 +18,7 @@ from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    package_version,
+    parse_version,
     reraise,
 )
 
@@ -29,6 +29,7 @@ if TYPE_CHECKING:
 
 try:
     import huggingface_hub.inference._client
+    from huggingface_hub import __version__ as HUGGINGFACE_HUB_VERSION
 except ImportError:
     raise DidNotEnable("Huggingface not installed")
 
@@ -44,7 +45,7 @@ class HuggingfaceHubIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        version = package_version("huggingface_hub")
+        version = parse_version(HUGGINGFACE_HUB_VERSION)
         _check_minimum_version(HuggingfaceHubIntegration, version)
 
         # Other tasks that can be called: https://huggingface.co/docs/huggingface_hub/guides/inference#supported-providers-and-tasks

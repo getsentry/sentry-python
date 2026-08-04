@@ -13,8 +13,8 @@ from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     ensure_integration_enabled,
-    package_version,
     parse_url,
+    parse_version,
 )
 
 if TYPE_CHECKING:
@@ -25,6 +25,7 @@ if TYPE_CHECKING:
 
 try:
     from httpx import AsyncClient, Client, Request, Response
+    from httpx import __version__ as HTTPX_VERSION
 except ImportError:
     raise DidNotEnable("httpx is not installed")
 
@@ -41,7 +42,7 @@ class HttpxIntegration(Integration):
         httpx has its own transport layer and can be customized when needed,
         so patch Client.send and AsyncClient.send to support both synchronous and async interfaces.
         """
-        version = package_version("httpx")
+        version = parse_version(HTTPX_VERSION)
         _check_minimum_version(HttpxIntegration, version)
 
         _install_httpx_client()
