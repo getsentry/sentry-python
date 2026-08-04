@@ -92,6 +92,7 @@ def _maybe_start_agent_span(
 
 async def _run_single_turn(
     original_run_single_turn: "Callable[..., Awaitable[SingleStepResult]]",
+    use_agent_hooks: "bool",
     *args: "Any",
     **kwargs: "Any",
 ) -> "SingleStepResult":
@@ -110,29 +111,40 @@ async def _run_single_turn(
     context_wrapper = kwargs.get("context_wrapper")
     should_run_agent_start_hooks = kwargs.get("should_run_agent_start_hooks", False)
 
-    span = _maybe_start_agent_span(
-        context_wrapper, agent, should_run_agent_start_hooks, kwargs
-    )
+    if not use_agent_hooks:
+        span = _maybe_start_agent_span(
+            context_wrapper, agent, should_run_agent_start_hooks, kwargs
+        )
 
-    if (
-        span is None
-        or (isinstance(span, StreamedSpan) and span.end_timestamp is not None)
-        or (not isinstance(span, StreamedSpan) and span.timestamp is not None)
-    ):
-        return await original_run_single_turn(*args, **kwargs)
+        if (
+            span is None
+            or (isinstance(span, StreamedSpan) and span.end_timestamp is not None)
+            or (not isinstance(span, StreamedSpan) and span.timestamp is not None)
+        ):
+            return await original_run_single_turn(*args, **kwargs)
 
     try:
         result = await original_run_single_turn(*args, **kwargs)
     except Exception:
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
-            span = getattr(context_wrapper, "_sentry_agent_span", None)
-            if span:
-                update_invoke_agent_span(
-                    span=span, context=context_wrapper, agent=agent
-                )
-                span.__exit__(*exc_info)
-                delattr(context_wrapper, "_sentry_agent_span")
+            if use_agent_hooks:
+                run_hooks = kwargs.get("hooks")
+                if run_hooks is not None:
+                    span = getattr(run_hooks, "_sentry_invoke_agent_span", None)
+                    if span:
+                        update_invoke_agent_span(
+                            span=span, context=context_wrapper, agent=agent
+                        )
+                        span.__exit__(*exc_info)
+            else:
+                span = getattr(context_wrapper, "_sentry_agent_span", None)
+                if span:
+                    update_invoke_agent_span(
+                        span=span, context=context_wrapper, agent=agent
+                    )
+                    span.__exit__(*exc_info)
+                    delattr(context_wrapper, "_sentry_agent_span")
         reraise(*exc_info)
 
     return result
@@ -140,6 +152,7 @@ async def _run_single_turn(
 
 async def _run_single_turn_streamed(
     original_run_single_turn_streamed: "Callable[..., Awaitable[SingleStepResult]]",
+    use_agent_hooks: "bool",
     *args: "Any",
     **kwargs: "Any",
 ) -> "SingleStepResult":
@@ -190,34 +203,45 @@ async def _run_single_turn_streamed(
     if streamed_result and hasattr(streamed_result, "input"):
         span_kwargs["original_input"] = streamed_result.input
 
-    span = _maybe_start_agent_span(
-        context_wrapper,
-        agent,
-        should_run_agent_start_hooks,
-        span_kwargs,
-        is_streaming=True,
-    )
+    if not use_agent_hooks:
+        span = _maybe_start_agent_span(
+            context_wrapper,
+            agent,
+            should_run_agent_start_hooks,
+            span_kwargs,
+            is_streaming=True,
+        )
 
-    if (
-        span is None
-        or (isinstance(span, StreamedSpan) and span.end_timestamp is not None)
-        or (not isinstance(span, StreamedSpan) and span.timestamp is not None)
-    ):
-        return await original_run_single_turn_streamed(*args, **kwargs)
+        if (
+            span is None
+            or (isinstance(span, StreamedSpan) and span.end_timestamp is not None)
+            or (not isinstance(span, StreamedSpan) and span.timestamp is not None)
+        ):
+            return await original_run_single_turn_streamed(*args, **kwargs)
 
     try:
         result = await original_run_single_turn_streamed(*args, **kwargs)
     except Exception:
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
-            span = getattr(context_wrapper, "_sentry_agent_span", None)
-            if span:
-                update_invoke_agent_span(
-                    span=span, context=context_wrapper, agent=agent
-                )
-                span.__exit__(*exc_info)
-                delattr(context_wrapper, "_sentry_agent_span")
-            _close_streaming_workflow_span(agent)
+            if use_agent_hooks:
+                run_hooks = kwargs.get("hooks")
+                if run_hooks is not None:
+                    span = getattr(context_wrapper, "_sentry_agent_span", None)
+                    if span:
+                        update_invoke_agent_span(
+                            span=span, context=context_wrapper, agent=agent
+                        )
+                        span.__exit__(*exc_info)
+            else:
+                span = getattr(context_wrapper, "_sentry_agent_span", None)
+                if span:
+                    update_invoke_agent_span(
+                        span=span, context=context_wrapper, agent=agent
+                    )
+                    span.__exit__(*exc_info)
+                    delattr(context_wrapper, "_sentry_agent_span")
+                _close_streaming_workflow_span(agent)
         reraise(*exc_info)
 
     return result
