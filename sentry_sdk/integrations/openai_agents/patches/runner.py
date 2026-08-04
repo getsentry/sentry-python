@@ -79,6 +79,11 @@ class _SentryRunHooks(RunHooks[TContext]):  # type: ignore[misc]
 
 
 def _patch_run_hooks(hooks: "RunHooks[TContext]") -> None:
+    """
+    Patch a RunHooks instance. This is used when the user have themselves provided
+    a RunHooks instance, as only one instance can be passed to `AgentRunner.run()`
+    and `AgentRunner.run_streamed()` functions.
+    """
     is_already_patched = getattr(hooks, "_sentry_is_patched", False)
     if is_already_patched:
         return
