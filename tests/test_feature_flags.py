@@ -1,6 +1,5 @@
 import concurrent.futures as cf
 import copy
-import sys
 import threading
 
 import pytest
@@ -136,7 +135,6 @@ def test_featureflags_integration_threaded(
     }
 
 
-@pytest.mark.skipif(sys.version_info < (3, 7), reason="requires python3.7 or higher")
 def test_featureflags_integration_asyncio(
     sentry_init, capture_events, uninstall_integration
 ):

@@ -1,4 +1,3 @@
-import sys
 from unittest import mock
 
 import pytest
@@ -36,10 +35,6 @@ def test_crumb_capture(sentry_init, capture_events):
     )
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 7),
-    reason="The response status is not set on the span early enough in 3.6",
-)
 @pytest.mark.parametrize(
     "status_code,level",
     [

@@ -26,6 +26,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 ## Removed
 
+- The SDK no longer supports Python 3.6. The oldest supported version is now 3.7.
 - The `enable_tracing` option was removed. Use `traces_sample_rate=1.0` instead.
 - The deprecated `push_scope` and `configure_scope` APIs have been removed. Use `with new_scope():` to push a new scope and `scope = get_current_scope()` to retrieve the current scope instead.
 - Transaction profiling and related code was removed.

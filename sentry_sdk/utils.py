@@ -264,7 +264,8 @@ def datetime_from_isoformat(value: str) -> "datetime":
     try:
         result = datetime.fromisoformat(value)
     except (AttributeError, ValueError):
-        # py 3.6
+        # until 3.11, datetime.fromisoformat didn't support all possible formats,
+        # so we still need this manual fallback
         timestamp_format = (
             "%Y-%m-%dT%H:%M:%S.%f" if "." in value else "%Y-%m-%dT%H:%M:%S"
         )
@@ -2178,9 +2179,3 @@ def serialize_attribute(val: "AttributeValue") -> "SerializedAttributeValue":
     # Coerce to string if we don't know what to do with the value. This should
     # never happen as we pre-format early in format_attribute, but let's be safe.
     return {"value": safe_repr(val), "type": "string"}
-
-
-# This noop context manager can be replaced with "from contextlib import nullcontext" when we drop Python 3.6 support
-@contextmanager
-def nullcontext() -> "Iterator[None]":
-    yield

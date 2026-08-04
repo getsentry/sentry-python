@@ -1,5 +1,4 @@
 import concurrent.futures as cf
-import sys
 from contextlib import contextmanager
 from random import random
 from unittest.mock import Mock
@@ -101,7 +100,6 @@ def test_check_gate_threaded(sentry_init, capture_events, uninstall_integration)
         }
 
 
-@pytest.mark.skipif(sys.version_info < (3, 7), reason="requires python3.7 or higher")
 def test_check_gate_asyncio(sentry_init, capture_events, uninstall_integration):
     asyncio = pytest.importorskip("asyncio")
     uninstall_integration(StatsigIntegration.identifier)
