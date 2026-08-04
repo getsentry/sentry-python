@@ -41,8 +41,6 @@ from sentry_sdk.tracing_utils import (
     should_propagate_trace,
 )
 from sentry_sdk.utils import (
-    CONTEXTVARS_ERROR_MESSAGE,
-    HAS_REAL_CONTEXTVARS,
     SENSITIVE_DATA_SUBSTITUTE,
     AnnotatedValue,
     _register_control_flow_exception,
@@ -107,14 +105,6 @@ class AioHttpIntegration(Integration):
     def setup_once() -> None:
         version = parse_version(AIOHTTP_VERSION)
         _check_minimum_version(AioHttpIntegration, version)
-
-        if not HAS_REAL_CONTEXTVARS:
-            # We better have contextvars or we're going to leak state between
-            # requests.
-            raise DidNotEnable(
-                "The aiohttp integration for Sentry requires Python 3.7+ "
-                " or aiocontextvars package." + CONTEXTVARS_ERROR_MESSAGE
-            )
 
         # In the aiohttp integration, all of their HTTP responses are Exceptions.
         # Because they have to be raised and handled by the framework, we need to

@@ -2,7 +2,8 @@ from functools import wraps
 from typing import Any
 
 from sentry_sdk.feature_flags import add_feature_flag
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
+from sentry_sdk.utils import package_version
 
 try:
     from UnleashClient import UnleashClient
@@ -15,6 +16,9 @@ class UnleashIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        version = package_version("UnleashClient")
+        _check_minimum_version(UnleashIntegration, version)
+
         # Wrap and patch evaluation methods (class methods)
         old_is_enabled = UnleashClient.is_enabled
 

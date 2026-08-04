@@ -1,5 +1,7 @@
 import inspect
 import sys
+import warnings
+from contextvars import ContextVar
 from functools import wraps
 from typing import TYPE_CHECKING
 
@@ -10,14 +12,16 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
-from sentry_sdk.utils import ContextVar, capture_internal_exceptions, reraise
+from sentry_sdk.utils import capture_internal_exceptions, reraise
 
 if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable, Optional, TypeVar, Union
 
     F = TypeVar("F", bound=Union[Callable[..., Any], Callable[..., Awaitable[Any]]])
 
-_ai_pipeline_name = ContextVar("ai_pipeline_name", default=None)
+_ai_pipeline_name: "ContextVar[Optional[str]]" = ContextVar(
+    "ai_pipeline_name", default=None
+)
 
 
 def set_ai_pipeline_name(name: "Optional[str]") -> None:
@@ -29,6 +33,13 @@ def get_ai_pipeline_name() -> "Optional[str]":
 
 
 def ai_track(description: str, **span_kwargs: "Any") -> "Callable[[F], F]":
+    warnings.warn(
+        "sentry_sdk.ai.ai_track is deprecated and will be removed in version 3.0 of sentry-sdk. "
+        "Use the manual span API instead, e.g. sentry_sdk.start_span().",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     def decorator(f: "F") -> "F":
         def sync_wrapped(*args: "Any", **kwargs: "Any") -> "Any":
             client = sentry_sdk.get_client()

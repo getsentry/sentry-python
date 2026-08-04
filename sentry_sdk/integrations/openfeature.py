@@ -1,7 +1,8 @@
 from typing import TYPE_CHECKING, Any
 
 from sentry_sdk.feature_flags import add_feature_flag
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
+from sentry_sdk.utils import package_version
 
 try:
     from openfeature import api
@@ -18,6 +19,9 @@ class OpenFeatureIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        version = package_version("openfeature-sdk")
+        _check_minimum_version(OpenFeatureIntegration, version)
+
         # Register the hook within the global openfeature hooks list.
         api.add_hooks(hooks=[OpenFeatureHook()])
 
