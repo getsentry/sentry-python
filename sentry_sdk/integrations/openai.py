@@ -1036,7 +1036,9 @@ def _wrap_synchronous_completions_chunk_iterator(
             all_responses = ["".join(chunk) for chunk in data_buf]
             if has_data_collection_enabled(client.options):
                 if client.options["data_collection"]["gen_ai"]["outputs"]:
-                    set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
+                    set_data_normalized(
+                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
+                    )
             elif should_send_default_pii() and integration.include_prompts:
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
 
@@ -1105,7 +1107,9 @@ async def _wrap_asynchronous_completions_chunk_iterator(
             all_responses = ["".join(chunk) for chunk in data_buf]
             if has_data_collection_enabled(client.options):
                 if client.options["data_collection"]["gen_ai"]["outputs"]:
-                    set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
+                    set_data_normalized(
+                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
+                    )
             elif should_send_default_pii() and integration.include_prompts:
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
 
@@ -1176,7 +1180,9 @@ def _wrap_synchronous_responses_event_iterator(
             all_responses = ["".join(chunk) for chunk in data_buf]
             if has_data_collection_enabled(client.options):
                 if client.options["data_collection"]["gen_ai"]["outputs"]:
-                    set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
+                    set_data_normalized(
+                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
+                    )
             elif should_send_default_pii() and integration.include_prompts:
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
 
@@ -1248,7 +1254,9 @@ async def _wrap_asynchronous_responses_event_iterator(
 
             if has_data_collection_enabled(client.options):
                 if client.options["data_collection"]["gen_ai"]["outputs"]:
-                    set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
+                    set_data_normalized(
+                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
+                    )
             elif should_send_default_pii() and integration.include_prompts:
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
 
