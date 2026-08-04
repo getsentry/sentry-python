@@ -124,7 +124,7 @@ class OpenAIAgentsIntegration(Integration):
                     *args: "Any", **kwargs: "Any"
                 ) -> "SingleStepResult":
                     return await _run_single_turn_streamed(
-                        run_loop.run_single_turn_streamed,
+                        original_run_single_turn_streamed,
                         use_run_hooks,
                         *args,
                         **kwargs,
