@@ -44,7 +44,7 @@ if TYPE_CHECKING:
 
 
 try:
-    from langchain import __version__ as LANGCHAIN_VERSION
+    from langchain_core import __version__ as LANGCHAIN_VERSION
     from langchain_core.agents import AgentFinish
     from langchain_core.callbacks import (
         BaseCallbackHandler,
