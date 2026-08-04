@@ -96,7 +96,6 @@ class OpenAIAgentsIntegration(Integration):
         _patch_error_tracing()
 
         library_version = parse_version(OPENAI_AGENTS_VERSION)
-
         # ToolContext.tool_arguments added in https://github.com/openai/openai-agents-python/commit/5e1db14da542c77f8fdd5e2e26017977ae415813
         use_run_hooks = library_version is not None and library_version >= (0, 3, 2)
 
