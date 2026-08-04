@@ -425,7 +425,9 @@ TEST_SUITE_CONFIG = {
             "*": ["fakeredis!=1.7.4", "pytest<8.0.0"],
             ">=4.0,<5.0": ["fakeredis<2.31.0"],
             "py3.6,py3.7,py3.8": ["fakeredis<2.26.0"],
-            "py3.7,py3.8,py3.9,py3.10,py3.11,py3.12,py3.13": ["pytest-asyncio"],
+            "py3.7,py3.8,py3.9,py3.10,py3.11,py3.12,py3.13,py3.14,py3.14t": [
+                "pytest-asyncio"
+            ],
         },
     },
     "redis_py_cluster_legacy": {
