@@ -24,8 +24,8 @@ from sentry_sdk.utils import (
 )
 
 try:
-    from pyreqwest import (
-        __version__ as PYREQWEST_VERSION,  # type: ignore[import-not-found]
+    from pyreqwest import (  # type: ignore[import-not-found]
+        __version__ as PYREQWEST_VERSION,
     )
     from pyreqwest.client import (  # type: ignore[import-not-found]
         ClientBuilder,

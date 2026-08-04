@@ -33,7 +33,7 @@ class BeamIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        from apache_beam import __version__ as BEAM_VERSION
+        from apache_beam import __version__ as BEAM_VERSION  # type: ignore
         from apache_beam.transforms.core import DoFn, ParDo  # type: ignore
 
         version = parse_version(BEAM_VERSION)

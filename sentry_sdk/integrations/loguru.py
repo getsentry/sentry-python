@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 try:
     import loguru
-    from loguru import __version__ as LOGURU_VERSION
+    from loguru import __version__ as LOGURU_VERSION  # type: ignore
     from loguru import logger
     from loguru._defaults import LOGURU_FORMAT as DEFAULT_FORMAT
 

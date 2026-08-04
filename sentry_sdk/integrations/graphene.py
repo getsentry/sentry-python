@@ -14,7 +14,7 @@ from sentry_sdk.utils import (
 )
 
 try:
-    from graphene import __version__ as GRAPHENE_VERSION
+    from graphene import __version__ as GRAPHENE_VERSION  # type: ignore
     from graphene.types import schema as graphene_schema  # type: ignore
 except ImportError:
     raise DidNotEnable("graphene is not installed")
