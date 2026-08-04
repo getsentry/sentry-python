@@ -9,7 +9,7 @@ from ..spans import (
 )
 
 try:
-    from pydantic_ai._agent_graph import ModelRequestNode  # type: ignore
+    from pydantic_ai._agent_graph import ModelRequestNode
 except ImportError:
     raise DidNotEnable("pydantic-ai not installed")
 

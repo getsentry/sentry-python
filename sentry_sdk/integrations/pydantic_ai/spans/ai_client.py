@@ -51,14 +51,14 @@ try:
     )
 except ImportError:
     # Fallback if these classes are not available
-    BaseToolCallPart = None
-    BaseToolReturnPart = None
-    SystemPromptPart = None
-    UserPromptPart = None
-    TextPart = None
-    ThinkingPart = None
-    BinaryContent = None
-    ImageUrl = None
+    BaseToolCallPart = None  # type: ignore[misc,assignment]
+    BaseToolReturnPart = None  # type: ignore[misc,assignment]
+    SystemPromptPart = None  # type: ignore[misc,assignment]
+    UserPromptPart = None  # type: ignore[misc,assignment]
+    TextPart = None  # type: ignore[misc,assignment]
+    ThinkingPart = None  # type: ignore[misc,assignment]
+    BinaryContent = None  # type: ignore[misc,assignment]
+    ImageUrl = None  # type: ignore[misc,assignment]
 
 
 def _transform_system_instructions(
