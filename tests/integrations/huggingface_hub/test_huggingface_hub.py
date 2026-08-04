@@ -894,6 +894,114 @@ def test_chat_completion(
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
+def test_chat_completion_openai_compatible_alias(
+    sentry_init: "Any",
+    capture_events: "Any",
+    capture_items: "Any",
+    mock_hf_chat_completion_api: "Any",
+    stream_gen_ai_spans: "Any",
+) -> None:
+    client = get_hf_provider_inference_client()
+    chat = getattr(client, "chat", None)
+    completions = getattr(chat, "completions", None) if chat is not None else None
+    if completions is None or not hasattr(completions, "create"):
+        pytest.skip("OpenAI-compatible chat completion alias is unavailable")
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        integrations=[HuggingfaceHubIntegration()],
+        stream_gen_ai_spans=stream_gen_ai_spans,
+    )
+
+    messages = [{"role": "user", "content": "Hello!"}]
+
+    if stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with sentry_sdk.start_transaction(name="test"):
+            client.chat.completions.create(messages=messages, stream=False)
+
+        spans = [item.payload for item in items if item.type == "span"]
+        span = None
+        for sp in spans:
+            if sp["attributes"]["sentry.op"].startswith("gen_ai"):
+                assert span is None, "there is exactly one gen_ai span"
+                span = sp
+            else:
+                assert sp["attributes"]["sentry.op"] == "http.client"
+
+        assert span is not None
+        assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+        assert span["name"] == "chat test-model"
+        assert span["attributes"]["sentry.origin"] == "auto.ai.huggingface_hub"
+
+        expected_data = {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.messages": safe_serialize(messages),
+            "gen_ai.request.model": "test-model",
+            "gen_ai.response.finish_reasons": "stop",
+            "gen_ai.response.model": "test-model-123",
+            "gen_ai.response.streaming": False,
+            "gen_ai.response.text": "[mocked] Hello! How can I help you today?",
+            "gen_ai.usage.input_tokens": 10,
+            "gen_ai.usage.output_tokens": 8,
+            "gen_ai.usage.total_tokens": 18,
+            "process.runtime.name": mock.ANY,
+            "process.runtime.version": mock.ANY,
+            "sentry.environment": "production",
+            "sentry.op": "gen_ai.chat",
+            "sentry.origin": "auto.ai.huggingface_hub",
+            "sentry.release": mock.ANY,
+            "sentry.sdk.name": "sentry.python",
+            "sentry.sdk.version": mock.ANY,
+            "sentry.segment.id": mock.ANY,
+            "sentry.segment.name": "test",
+            "server.address": mock.ANY,
+            "thread.id": mock.ANY,
+            "thread.name": mock.ANY,
+        }
+        assert span["attributes"] == expected_data
+    else:
+        events = capture_events()
+
+        with sentry_sdk.start_transaction(name="test"):
+            client.chat.completions.create(messages=messages, stream=False)
+
+        (transaction,) = events
+
+        span = None
+        for sp in transaction["spans"]:
+            if sp["op"].startswith("gen_ai"):
+                assert span is None, "there is exactly one gen_ai span"
+                span = sp
+            else:
+                assert sp["op"] == "http.client"
+
+        assert span is not None
+        assert span["op"] == "gen_ai.chat"
+        assert span["description"] == "chat test-model"
+        assert span["origin"] == "auto.ai.huggingface_hub"
+
+        expected_data = {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.messages": safe_serialize(messages),
+            "gen_ai.request.model": "test-model",
+            "gen_ai.response.finish_reasons": "stop",
+            "gen_ai.response.model": "test-model-123",
+            "gen_ai.response.streaming": False,
+            "gen_ai.response.text": "[mocked] Hello! How can I help you today?",
+            "gen_ai.usage.input_tokens": 10,
+            "gen_ai.usage.output_tokens": 8,
+            "gen_ai.usage.total_tokens": 18,
+            "thread.id": mock.ANY,
+            "thread.name": mock.ANY,
+        }
+        assert span["data"] == expected_data
+
+
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize("include_prompts", [True, False])
 def test_chat_completion_streaming(
