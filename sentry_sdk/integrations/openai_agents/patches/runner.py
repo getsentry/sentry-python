@@ -34,6 +34,12 @@ TContext = TypeVar("TContext")
 
 
 class _SentryRunHooks(RunHooks[TContext]):  # type: ignore[misc]
+    """
+    Responsible for creating and managing Execute Tool spans. These spans are
+    stored on the ToolContext reference that is shared between `on_tool_start()`
+    and `on_tool_end()`
+    """
+
     async def on_tool_start(
         self,
         context: "ToolContext[TContext]",
@@ -45,7 +51,7 @@ class _SentryRunHooks(RunHooks[TContext]):  # type: ignore[misc]
 
         span = execute_tool_span(tool, agent)
         span.__enter__()
-        context.sentry_tool_span = span
+        context._sentry_execute_tool_span = span
 
         if not should_send_default_pii():
             return
@@ -65,9 +71,9 @@ class _SentryRunHooks(RunHooks[TContext]):  # type: ignore[misc]
         if not isinstance(tool, FunctionTool):
             return
 
-        span = getattr(context, "sentry_tool_span", None)
+        span = getattr(context, "_sentry_execute_tool_span", None)
         if span is not None:
-            del context.sentry_tool_span
+            del context._sentry_execute_tool_span
             update_execute_tool_span(span, agent, tool, result)
             span.__exit__(None, None, None)
 
@@ -107,7 +113,7 @@ def _patch_run_hooks(hooks: "RunHooks[TContext]") -> None:
 
 
 def _create_run_wrapper(
-    original_func: "Callable[..., Any]", use_tool_hooks: "bool"
+    original_func: "Callable[..., Any]", use_run_hooks: "bool"
 ) -> "Callable[..., Any]":
     """
     Wraps the agents.Runner.run methods to
@@ -120,7 +126,7 @@ def _create_run_wrapper(
 
     @wraps(original_func)
     async def wrapper(*args: "Any", **kwargs: "Any") -> "Any":
-        if use_tool_hooks:
+        if use_run_hooks:
             hooks = kwargs.get("hooks")
             if hooks is not None:
                 _patch_run_hooks(hooks=hooks)
@@ -217,7 +223,7 @@ def _create_run_wrapper(
 
 
 def _create_run_streamed_wrapper(
-    original_func: "Callable[..., Any]", use_tool_hooks: "bool"
+    original_func: "Callable[..., Any]", use_run_hooks: "bool"
 ) -> "Callable[..., Any]":
     """
     Wraps the agents.Runner.run_streamed method to
@@ -267,7 +273,7 @@ def _create_run_streamed_wrapper(
         else:
             args = (agent, *args[1:])
 
-        if use_tool_hooks:
+        if use_run_hooks:
             sentry_hooks = _SentryRunHooks()  # type: ignore[var-annotated]
             hooks = kwargs.get("hooks")
             if hooks is not None:

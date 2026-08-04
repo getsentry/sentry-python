@@ -46,19 +46,19 @@ if TYPE_CHECKING:
     from agents.run_internal.run_steps import SingleStepResult
 
 
-def _patch_runner(use_tool_hooks: "bool") -> None:
+def _patch_runner(use_run_hooks: "bool") -> None:
     # Create the root span for one full agent run (including eventual handoffs)
     # Note agents.run.DEFAULT_AGENT_RUNNER.run_sync is a wrapper around
     # agents.run.DEFAULT_AGENT_RUNNER.run. It does not need to be wrapped separately.
     agents.run.DEFAULT_AGENT_RUNNER.run = _create_run_wrapper(
         agents.run.DEFAULT_AGENT_RUNNER.run,
-        use_tool_hooks=use_tool_hooks,
+        use_run_hooks=use_run_hooks,
     )
 
     # Patch streaming runner
     agents.run.DEFAULT_AGENT_RUNNER.run_streamed = _create_run_streamed_wrapper(
         agents.run.DEFAULT_AGENT_RUNNER.run_streamed,
-        use_tool_hooks=use_tool_hooks,
+        use_run_hooks=use_run_hooks,
     )
 
 
@@ -97,9 +97,9 @@ class OpenAIAgentsIntegration(Integration):
 
         library_version = parse_version(OPENAI_AGENTS_VERSION)
         # ToolContext.tool_arguments added in https://github.com/openai/openai-agents-python/commit/5e1db14da542c77f8fdd5e2e26017977ae415813
-        use_tool_hooks = library_version is not None and library_version >= (0, 3, 2)
+        use_run_hooks = library_version is not None and library_version >= (0, 3, 2)
 
-        _patch_runner(use_tool_hooks=use_tool_hooks)
+        _patch_runner(use_run_hooks=use_run_hooks)
 
         if library_version is not None and library_version >= (
             0,
@@ -170,7 +170,7 @@ class OpenAIAgentsIntegration(Integration):
 
             return
 
-        if not use_tool_hooks:
+        if not use_run_hooks:
             original_get_all_tools = AgentRunner._get_all_tools
 
             @wraps(AgentRunner._get_all_tools.__func__)
