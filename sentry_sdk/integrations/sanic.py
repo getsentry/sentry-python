@@ -19,8 +19,6 @@ from sentry_sdk.traces import SegmentNameSource, StreamedSpan
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
-    CONTEXTVARS_ERROR_MESSAGE,
-    HAS_REAL_CONTEXTVARS,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
@@ -79,14 +77,6 @@ class SanicIntegration(Integration):
     def setup_once() -> None:
         SanicIntegration.version = parse_version(SANIC_VERSION)
         _check_minimum_version(SanicIntegration, SanicIntegration.version)
-
-        if not HAS_REAL_CONTEXTVARS:
-            # We better have contextvars or we're going to leak state between
-            # requests.
-            raise DidNotEnable(
-                "The sanic integration for Sentry requires Python 3.7+ "
-                " or the aiocontextvars package." + CONTEXTVARS_ERROR_MESSAGE
-            )
 
         if SANIC_VERSION.startswith("0.8."):
             # Sanic 0.8 and older creates a logger named "root" and puts a
