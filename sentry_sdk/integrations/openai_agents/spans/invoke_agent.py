@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 
     import agents
     from agents import TResponseInputItem
+    from agents.usage import Usage
 
 
 def invoke_agent_span(
@@ -102,13 +103,11 @@ def invoke_agent_span(
 
 def update_invoke_agent_span(
     span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
-    context: "agents.RunContextWrapper",
+    usage: "Usage",
     agent: "agents.Agent",
     output: "Any" = None,
 ) -> None:
-    # Add aggregated usage data from context_wrapper
-    if hasattr(context, "usage"):
-        _set_usage_data(span, context.usage)
+    _set_usage_data(span, usage)
 
     if should_send_default_pii():
         set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output, unpack=False)

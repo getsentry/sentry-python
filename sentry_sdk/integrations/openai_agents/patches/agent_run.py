@@ -68,7 +68,7 @@ def _maybe_start_agent_span(
             span = getattr(context_wrapper, "_sentry_agent_span", None)
             if span:
                 update_invoke_agent_span(
-                    span=span, context=context_wrapper, agent=agent
+                    span=span, usage=context_wrapper.usage, agent=agent
                 )
                 span.__exit__(None, None, None)
                 delattr(context_wrapper, "_sentry_agent_span")
@@ -135,7 +135,7 @@ async def _run_single_turn(
                     span = getattr(run_hooks, "_sentry_invoke_agent_span", None)
                     if span:
                         update_invoke_agent_span(
-                            span=span, context=context_wrapper, agent=agent
+                            span=span, usage=context_wrapper.usage, agent=agent
                         )
                         del run_hooks._sentry_invoke_agent_span
                         span.__exit__(*exc_info)
@@ -143,7 +143,7 @@ async def _run_single_turn(
                 span = getattr(context_wrapper, "_sentry_agent_span", None)
                 if span:
                     update_invoke_agent_span(
-                        span=span, context=context_wrapper, agent=agent
+                        span=span, usage=context_wrapper.usage, agent=agent
                     )
                     span.__exit__(*exc_info)
                     delattr(context_wrapper, "_sentry_agent_span")
@@ -235,7 +235,7 @@ async def _run_single_turn_streamed(
                     span = getattr(context_wrapper, "_sentry_invoke_agent_span", None)
                     if span:
                         update_invoke_agent_span(
-                            span=span, context=context_wrapper, agent=agent
+                            span=span, usage=context_wrapper.usage, agent=agent
                         )
                         del run_hooks._sentry_invoke_agent_span
                         span.__exit__(*exc_info)
@@ -243,7 +243,7 @@ async def _run_single_turn_streamed(
                 span = getattr(context_wrapper, "_sentry_agent_span", None)
                 if span:
                     update_invoke_agent_span(
-                        span=span, context=context_wrapper, agent=agent
+                        span=span, usage=context_wrapper.usage, agent=agent
                     )
                     span.__exit__(*exc_info)
                     delattr(context_wrapper, "_sentry_agent_span")
@@ -296,7 +296,7 @@ async def _execute_handoffs(
             span = getattr(context_wrapper, "_sentry_agent_span", None)
             if span:
                 update_invoke_agent_span(
-                    span=span, context=context_wrapper, agent=agent
+                    span=span, usage=context_wrapper.usage, agent=agent
                 )
                 span.__exit__(*exc_info)
                 delattr(context_wrapper, "_sentry_agent_span")
@@ -304,7 +304,7 @@ async def _execute_handoffs(
 
     span = getattr(context_wrapper, "_sentry_agent_span", None)
     if span:
-        update_invoke_agent_span(span=span, context=context_wrapper, agent=agent)
+        update_invoke_agent_span(span=span, usage=context_wrapper.usage, agent=agent)
         span.__exit__(None, None, None)
         delattr(context_wrapper, "_sentry_agent_span")
 
@@ -345,7 +345,10 @@ async def _execute_final_output(
             span = getattr(context_wrapper, "_sentry_agent_span", None)
             if span:
                 update_invoke_agent_span(
-                    span=span, context=context_wrapper, agent=agent, output=final_output
+                    span=span,
+                    usage=context_wrapper.usage,
+                    agent=agent,
+                    output=final_output,
                 )
                 span.__exit__(*exc_info)
                 delattr(context_wrapper, "_sentry_agent_span")
@@ -354,7 +357,7 @@ async def _execute_final_output(
     span = getattr(context_wrapper, "_sentry_agent_span", None)
     if span:
         update_invoke_agent_span(
-            span=span, context=context_wrapper, agent=agent, output=final_output
+            span=span, usage=context_wrapper.usage, agent=agent, output=final_output
         )
         span.__exit__(None, None, None)
         delattr(context_wrapper, "_sentry_agent_span")

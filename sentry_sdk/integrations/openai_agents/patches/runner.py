@@ -65,7 +65,7 @@ class _SentryRunHooks(RunHooks[TContext]):  # type: ignore[misc]
         if span is not None:
             update_invoke_agent_span(
                 span=span,
-                context=context,
+                usage=context.usage,
                 agent=agent,
                 output=output,
             )
@@ -242,7 +242,7 @@ def _create_run_wrapper(
                             if invoke_agent_span is not None:
                                 update_invoke_agent_span(
                                     span=invoke_agent_span,
-                                    context=context_wrapper,
+                                    usage=context_wrapper.usage,
                                     agent=agent,
                                 )
                                 del hooks._sentry_invoke_agent_span
@@ -264,7 +264,7 @@ def _create_run_wrapper(
                             ):
                                 update_invoke_agent_span(
                                     span=invoke_agent_span,
-                                    context=context_wrapper,
+                                    usage=context_wrapper.usage,
                                     agent=agent,
                                 )
 
@@ -289,7 +289,7 @@ def _create_run_wrapper(
 
                     update_invoke_agent_span(
                         span=invoke_agent_span,
-                        context=run_result.context_wrapper,
+                        usage=run_result.context_wrapper.usage,
                         agent=agent,
                     )
 
