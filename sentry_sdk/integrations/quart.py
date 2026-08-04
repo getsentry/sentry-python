@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query_string
-from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
+from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
@@ -19,7 +19,6 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
     has_data_collection_enabled,
-    package_version,
     parse_url,
 )
 
@@ -77,9 +76,6 @@ class QuartIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        version = package_version("quart")
-        _check_minimum_version(QuartIntegration, version)
-
         request_started.connect(_request_websocket_started)
         websocket_started.connect(_request_websocket_started)
         got_background_exception.connect(_capture_exception)
