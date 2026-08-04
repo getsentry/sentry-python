@@ -20,7 +20,7 @@ from ..consts import SPAN_ORIGIN
 from ..utils import _set_agent_data, _set_usage_data
 
 if TYPE_CHECKING:
-    from typing import Any, Union
+    from typing import Any, Optional, Union
 
     import agents
     from agents import TResponseInputItem
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 
 def invoke_agent_span(
-    agent: "agents.Agent", turn_input: "list[TResponseInputItem]"
+    agent: "agents.Agent", turn_input: "Optional[list[TResponseInputItem]]"
 ) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
     if span_streaming:
@@ -103,11 +103,12 @@ def invoke_agent_span(
 
 def update_invoke_agent_span(
     span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
-    usage: "Usage",
+    usage: "Optional[Usage]",
     agent: "agents.Agent",
     output: "Any" = None,
 ) -> None:
-    _set_usage_data(span, usage)
+    if usage is not None:
+        _set_usage_data(span, usage)
 
     if should_send_default_pii():
         set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output, unpack=False)

@@ -206,7 +206,9 @@ class OpenAIAgentsIntegration(Integration):
         async def old_wrapped_run_single_turn(
             cls: "agents.Runner", *args: "Any", **kwargs: "Any"
         ) -> "SingleStepResult":
-            return await _run_single_turn(original_run_single_turn, *args, **kwargs)
+            return await _run_single_turn(
+                original_run_single_turn, use_run_hooks, *args, **kwargs
+            )
 
         agents.run.AgentRunner._run_single_turn = classmethod(
             old_wrapped_run_single_turn

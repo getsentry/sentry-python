@@ -15,6 +15,7 @@ from ..spans import (
 if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable, Optional, Union
 
+    from agents import TResponseInputItem
     from agents.run_internal.run_steps import SingleStepResult
 
     from sentry_sdk.tracing import Span
@@ -49,7 +50,7 @@ def _maybe_start_agent_span(
     context_wrapper: "agents.RunContextWrapper",
     agent: "agents.Agent",
     should_run_agent_start_hooks: bool,
-    span_kwargs: "dict[str, Any]",
+    turn_input: "Optional[list[TResponseInputItem]]",
     is_streaming: bool = False,
 ) -> "Optional[Union[Span, StreamedSpan]]":
     """
@@ -75,7 +76,7 @@ def _maybe_start_agent_span(
 
     # Store the agent on the context wrapper so we can access it later
     context_wrapper._sentry_current_agent = agent
-    span = invoke_agent_span(context_wrapper, agent, span_kwargs)
+    span = invoke_agent_span(agent, turn_input)
     context_wrapper._sentry_agent_span = span
     agent._sentry_agent_span = span
 
@@ -114,7 +115,10 @@ async def _run_single_turn(
         should_run_agent_start_hooks = kwargs.get("should_run_agent_start_hooks", False)
 
         span = _maybe_start_agent_span(
-            context_wrapper, agent, should_run_agent_start_hooks, kwargs
+            context_wrapper,
+            agent,
+            should_run_agent_start_hooks,
+            kwargs.get("input"),
         )
 
         if (
@@ -213,7 +217,7 @@ async def _run_single_turn_streamed(
             context_wrapper,
             agent,
             should_run_agent_start_hooks,
-            span_kwargs,
+            getattr(streamed_result, "input", None),
             is_streaming=True,
         )
 
