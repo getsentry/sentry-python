@@ -52,14 +52,13 @@ def patch_views() -> None:
         # efficient way to wrap views (or build a cache?)
 
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
-        if integration is not None and iscoroutinefunction(callback):
-            sentry_wrapped_callback = wrap_async_view(callback)
-        elif integration is not None:
-            sentry_wrapped_callback = _wrap_sync_view(callback)
-        else:
-            sentry_wrapped_callback = callback
+        if integration is None:
+            return callback
 
-        return sentry_wrapped_callback
+        if iscoroutinefunction(callback):
+            return wrap_async_view(callback)
+
+        return _wrap_sync_view(callback)
 
     SimpleTemplateResponse.render = sentry_patched_render
     BaseHandler.make_view_atomic = sentry_patched_make_view_atomic
