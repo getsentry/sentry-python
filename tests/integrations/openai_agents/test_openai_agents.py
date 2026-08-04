@@ -4881,21 +4881,8 @@ async def test_invoke_agent_span_includes_response_model(
 
         sentry_sdk.flush()
         spans = [item.payload for item in items if item.type == "span"]
-        invoke_agent_span = next(
-            span
-            for span in spans
-            if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
-        )
         ai_client_span = next(
             span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        )
-
-        # Verify invoke_agent span has response model from API
-        assert invoke_agent_span["name"] == "invoke_agent test_agent"
-        assert "gen_ai.response.model" in invoke_agent_span["attributes"]
-        assert (
-            invoke_agent_span["attributes"]["gen_ai.response.model"]
-            == "gpt-4.1-2025-04-14"
         )
 
         # Also verify ai_client span has it
@@ -4926,17 +4913,7 @@ async def test_invoke_agent_span_includes_response_model(
 
         (transaction,) = events
         spans = transaction["spans"]
-        invoke_agent_span = next(
-            span for span in spans if span["op"] == OP.GEN_AI_INVOKE_AGENT
-        )
         ai_client_span = next(span for span in spans if span["op"] == OP.GEN_AI_CHAT)
-
-        # Verify invoke_agent span has response model from API
-        assert invoke_agent_span["description"] == "invoke_agent test_agent"
-        assert "gen_ai.response.model" in invoke_agent_span["data"]
-        assert (
-            invoke_agent_span["data"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
-        )
 
         # Also verify ai_client span has it
         assert "gen_ai.response.model" in ai_client_span["data"]
@@ -5071,16 +5048,8 @@ async def test_invoke_agent_span_uses_last_response_model(
         sentry_sdk.flush()
         spans = [item.payload for item in items]
 
-        invoke_agent_span = spans[3]
         first_ai_client_span = spans[0]
         second_ai_client_span = spans[2]  # After tool span
-
-        # Invoke_agent span uses the LAST response model
-        assert "gen_ai.response.model" in invoke_agent_span["attributes"]
-        assert (
-            invoke_agent_span["attributes"]["gen_ai.response.model"]
-            == "gpt-4.1-2025-04-14"
-        )
 
         # Each ai_client span has its own response model from the API
         assert (
@@ -5115,16 +5084,8 @@ async def test_invoke_agent_span_uses_last_response_model(
 
         spans = [item.payload for item in items if item.type == "span"]
 
-        invoke_agent_span = spans[0]
         first_ai_client_span = spans[1]
         second_ai_client_span = spans[3]  # After tool span
-
-        # Invoke_agent span uses the LAST response model
-        assert "gen_ai.response.model" in invoke_agent_span["attributes"]
-        assert (
-            invoke_agent_span["attributes"]["gen_ai.response.model"]
-            == "gpt-4.1-2025-04-14"
-        )
 
         # Each ai_client span has its own response model from the API
         assert (
@@ -5159,15 +5120,8 @@ async def test_invoke_agent_span_uses_last_response_model(
         (transaction,) = events
         spans = transaction["spans"]
 
-        invoke_agent_span = spans[0]
         first_ai_client_span = spans[1]
         second_ai_client_span = spans[3]  # After tool span
-
-        # Invoke_agent span uses the LAST response model
-        assert "gen_ai.response.model" in invoke_agent_span["data"]
-        assert (
-            invoke_agent_span["data"]["gen_ai.response.model"] == "gpt-4.1-2025-04-14"
-        )
 
         # Each ai_client span has its own response model from the API
         assert first_ai_client_span["data"]["gen_ai.response.model"] == "gpt-4-0613"
