@@ -175,7 +175,7 @@ _MIN_VERSIONS = {
     "statsig": (0, 55, 3),
     "strawberry": (0, 209, 5),
     "tornado": (6, 0),
-    "trytond_wsgi": (4, 6),  # trytond
+    "trytond": (4, 6),
     "typer": (0, 15),
     "unleash": (6, 0, 1),
 }

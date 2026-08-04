@@ -14,7 +14,7 @@ try:
 except ImportError:
     raise DidNotEnable("Trytond is not installed.")
 
-# TODO: trytond-worker, trytond-cron and trytond-admin intergations
+# TODO: trytond-worker, trytond-cron and trytond-admin integrations
 
 
 class TrytondWSGIIntegration(Integration):
@@ -27,7 +27,7 @@ class TrytondWSGIIntegration(Integration):
     @staticmethod
     def setup_once() -> None:
         version = parse_version(TRYTOND_VERSION)
-        _check_minimum_version(TrytondWSGIIntegration, version)
+        _check_minimum_version(TrytondWSGIIntegration, version, "trytond")
 
         app.wsgi_app = SentryWsgiMiddleware(
             app.wsgi_app,
