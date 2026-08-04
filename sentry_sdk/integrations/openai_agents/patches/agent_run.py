@@ -137,7 +137,7 @@ async def _run_single_turn(
                 run_hooks = kwargs.get("hooks")
                 if run_hooks is not None:
                     span = getattr(run_hooks, "_sentry_invoke_agent_span", None)
-                    if span:
+                    if span is not None:
                         update_invoke_agent_span(
                             span=span, usage=context_wrapper.usage, agent=agent
                         )
@@ -236,10 +236,10 @@ async def _run_single_turn_streamed(
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
             if use_run_hooks:
-                run_hooks = kwargs.get("hooks")
+                run_hooks = args[2] if len(args) > 2 else kwargs.get("hooks")
                 if run_hooks is not None:
-                    span = getattr(context_wrapper, "_sentry_invoke_agent_span", None)
-                    if span:
+                    span = getattr(run_hooks, "_sentry_invoke_agent_span", None)
+                    if span is not None:
                         update_invoke_agent_span(
                             span=span, usage=context_wrapper.usage, agent=agent
                         )
