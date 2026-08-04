@@ -108,8 +108,9 @@ async def _run_single_turn(
         if bindings is not None
         else kwargs.get("agent")
     )
+
+    context_wrapper = kwargs.get("context_wrapper")
     if not use_agent_hooks:
-        context_wrapper = kwargs.get("context_wrapper")
         should_run_agent_start_hooks = kwargs.get("should_run_agent_start_hooks", False)
 
         span = _maybe_start_agent_span(
@@ -196,8 +197,8 @@ async def _run_single_turn_streamed(
     )
     agent = getattr(agent_or_bindings, "public_agent", agent_or_bindings)
 
+    context_wrapper = args[3] if len(args) > 3 else kwargs.get("context_wrapper")
     if not use_agent_hooks:
-        context_wrapper = args[3] if len(args) > 3 else kwargs.get("context_wrapper")
         should_run_agent_start_hooks = bool(
             args[5]
             if len(args) > 5
