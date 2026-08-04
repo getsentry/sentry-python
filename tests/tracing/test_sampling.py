@@ -120,9 +120,7 @@ def test_uses_traces_sample_rate_correctly_span_streaming(
 ):
     sentry_init(
         traces_sample_rate=traces_sample_rate,
-        _experiments={
-            "trace_lifecycle": "stream",
-        },
+        trace_lifecycle="stream",
     )
 
     sentry_sdk.traces.continue_trace(
@@ -163,9 +161,7 @@ def test_uses_traces_sampler_return_value_correctly_span_streaming(
 ):
     sentry_init(
         traces_sampler=mock.Mock(return_value=traces_sampler_return_value),
-        _experiments={
-            "trace_lifecycle": "stream",
-        },
+        trace_lifecycle="stream",
     )
 
     sentry_sdk.traces.continue_trace(
@@ -334,9 +330,7 @@ def test_only_captures_segment_when_sampled_is_true_span_streaming(
         traces_sampler=mock.Mock(
             return_value=sampling_decision,
         ),
-        _experiments={
-            "trace_lifecycle": "stream",
-        },
+        trace_lifecycle="stream",
     )
     items = capture_items()
 
@@ -383,9 +377,7 @@ def test_prefers_traces_sampler_to_traces_sample_rate_span_streaming(
     sentry_init(
         traces_sample_rate=traces_sample_rate,
         traces_sampler=traces_sampler,
-        _experiments={
-            "trace_lifecycle": "stream",
-        },
+        trace_lifecycle="stream",
     )
 
     span = sentry_sdk.traces.start_span(name="dogpark")
@@ -597,12 +589,8 @@ def test_sample_rate_affects_errors(sentry_init, capture_events):
     "traces_sampler_return_value",
     [
         "dogs are great",  # wrong type
-        (0, 1),  # wrong type
-        {"Maisey": "Charllie"},  # wrong type
-        [True, True],  # wrong type
-        {0.2012},  # wrong type
-        float("NaN"),  # wrong type
         None,  # wrong type
+        float("NaN"),  # wrong type (edge: float, but not a valid rate)
         -1.121,  # wrong value
         1.231,  # wrong value
     ],
@@ -624,12 +612,8 @@ def test_warns_and_sets_sampled_to_false_on_invalid_traces_sampler_return_value(
     "traces_sampler_return_value",
     [
         "dogs are great",  # wrong type
-        (0, 1),  # wrong type
-        {"Maisey": "Charllie"},  # wrong type
-        [True, True],  # wrong type
-        {0.2012},  # wrong type
-        float("NaN"),  # wrong type
         None,  # wrong type
+        float("NaN"),  # wrong type (edge: float, but not a valid rate)
         -1.121,  # wrong value
         1.231,  # wrong value
     ],

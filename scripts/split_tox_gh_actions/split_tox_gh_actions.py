@@ -163,9 +163,7 @@ GROUPS = {
     ],
     "Misc": [
         "loguru",
-        "opentelemetry",
         "otlp",
-        "potel",
         "pure_eval",
         "trytond",
         "typer",

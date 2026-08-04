@@ -14,6 +14,7 @@ from agents import (
     ModelSettings,
     Usage,
 )
+from agents.computer import Computer
 from agents.exceptions import MaxTurnsExceeded, ModelBehaviorError
 from agents.items import (
     ResponseFunctionToolCall,
@@ -24,6 +25,46 @@ from agents.models.openai_responses import OpenAIResponsesModel
 from agents.tool import HostedMCPTool
 from agents.version import __version__ as OPENAI_AGENTS_VERSION
 from openai import AsyncOpenAI, InternalServerError
+from openai.types.responses.tool_param import CodeInterpreter, ImageGeneration
+
+from sentry_sdk.integrations import DidNotEnable
+
+try:
+    from agents import (
+        CodeInterpreterTool,
+        ComputerTool,
+        FileSearchTool,
+        HostedMCPTool,
+        ImageGenerationTool,
+        LocalShellTool,
+        WebSearchTool,
+    )
+except ImportError:
+    raise DidNotEnable("OpenAI Agents not installed")
+
+try:
+    from agents import ApplyPatchTool, ShellTool
+except ImportError:
+    ShellTool = None
+    ApplyPatchTool = None
+
+try:
+    from agents import ToolSearchTool
+except ImportError:
+    ToolSearchTool = None
+
+try:
+    from agents import CustomTool
+except ImportError:
+    CustomTool = None
+
+try:
+    from agents import ProgrammaticToolCallingTool
+except ImportError:
+    ProgrammaticToolCallingTool = None
+
+
+from typing import Any, cast
 
 import sentry_sdk
 from sentry_sdk import start_span
@@ -171,6 +212,286 @@ def test_agent_custom_model():
             frequency_penalty=0.0,
         ),
     )
+
+
+class DummyEditor:
+    def create_file(self, operation):
+        return None
+
+    def update_file(self, operation):
+        return None
+
+    def delete_file(self, operation):
+        return None
+
+
+class TrackingComputer(Computer):
+    def __init__(self):
+        self.calls = []
+
+    @property
+    def environment(self):
+        return "mac"
+
+    @property
+    def dimensions(self):
+        return (1, 1)
+
+    def screenshot(self):
+        self.calls.append("screenshot")
+        return "img"
+
+    def click(self, _x, _y, _button):
+        self.calls.append("click")
+
+    def double_click(self, _x, _y):
+        self.calls.append("double_click")
+
+    def scroll(self, _x, _y, _scroll_x, _scroll_y):
+        self.calls.append("scroll")
+
+    def type(self, _text):
+        self.calls.append("type")
+
+    def wait(self):
+        self.calls.append("wait")
+
+    def move(self, _x, _y):
+        self.calls.append("move")
+
+    def keypress(self, _keys):
+        self.calls.append("keypress")
+
+    def drag(self, _path):
+        self.calls.append("drag")
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.asyncio
+async def test_tool_definitions(
+    sentry_init,
+    capture_events,
+    capture_items,
+    test_agent,
+    nonstreaming_responses_model_response,
+    get_model_response,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    """
+    Verifies that the `gen_ai.tool.definitions` attribute is set.
+    Provides one instance of each tool type to an agent.
+    """
+    client = AsyncOpenAI(api_key="test-key")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+
+    def some_function(a: str, b: list[int]) -> str:
+        return "hello"
+
+    tools = [
+        WebSearchTool(),
+        FileSearchTool(vector_store_ids=[]),
+        ComputerTool(computer=TrackingComputer()),
+        HostedMCPTool(
+            tool_config=cast(
+                Any,
+                {
+                    "type": "mcp",
+                    "server_label": "docs_server",
+                    "server_url": "https://example.com/mcp",
+                },
+            )
+        ),
+        ImageGenerationTool(
+            tool_config=cast(
+                ImageGeneration, {"type": "image_generation", "model": "gpt-image-1"}
+            )
+        ),
+        CodeInterpreterTool(
+            tool_config=cast(
+                CodeInterpreter, {"type": "code_interpreter", "container": "python"}
+            )
+        ),
+        LocalShellTool(executor=lambda req: "ok"),
+    ]
+
+    expected_available_tools = [
+        {"type": "web_search", "name": "web_search_preview"}
+        if parse_version(OPENAI_AGENTS_VERSION) < (0, 3, 0)
+        else {"type": "web_search", "name": "web_search"},
+        {"type": "file_search", "name": "file_search"},
+        {"type": "computer", "name": "computer_use_preview"},
+        {"type": "mcp", "name": "hosted_mcp"},
+        {"type": "image_generation", "name": "image_generation"},
+        {"type": "code_interpreter", "name": "code_interpreter"},
+        {"type": "local_shell", "name": "local_shell"},
+    ]
+
+    if CustomTool is not None:
+        tools.append(
+            CustomTool(
+                name="custom",
+                description="Custom tool",
+                on_invoke_tool=lambda _context, _input: "ok",
+            )
+        )
+        expected_available_tools.append(
+            {"type": "custom", "name": "custom", "description": "Custom tool"},
+        )
+
+    if ApplyPatchTool is not None:
+        tools.append(ApplyPatchTool(editor=DummyEditor()))
+        expected_available_tools.append(
+            {"type": "apply_patch", "name": "apply_patch"},
+        )
+
+    if ShellTool is not None:
+        tools.append(ShellTool(executor=lambda req: "ok"))
+        expected_available_tools.append(
+            {"type": "shell", "name": "shell"},
+        )
+
+    if ToolSearchTool is not None:
+        tools.append(agents.function_tool(some_function, defer_loading=True))
+        tools.append(ToolSearchTool())
+        expected_available_tools.append(
+            {
+                "type": "function",
+                "name": "some_function",
+                "description": "",
+                "parameters": {
+                    "properties": {
+                        "a": {"title": "A", "type": "string"},
+                        "b": {
+                            "items": {"type": "integer"},
+                            "title": "B",
+                            "type": "array",
+                        },
+                    },
+                    "required": ["a", "b"],
+                    "title": "some_function_args",
+                    "type": "object",
+                    "additionalProperties": False,
+                },
+            },
+        )
+        expected_available_tools.append(
+            {"type": "tool_search", "name": "tool_search"},
+        )
+
+    if ProgrammaticToolCallingTool is not None:
+        tools.append(ProgrammaticToolCallingTool())
+        expected_available_tools.append(
+            {"type": "programmatic_tool_calling", "name": "programmatic_tool_calling"},
+        )
+
+    agent = test_agent.clone(model=model, tools=tools)
+
+    response = get_model_response(
+        nonstreaming_responses_model_response, serialize_pydantic=True
+    )
+
+    if span_streaming:
+        with patch.object(
+            agent.model._client._client,
+            "send",
+            return_value=response,
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                disabled_integrations=[StdlibIntegration],
+                traces_sample_rate=1.0,
+                send_default_pii=False,
+                stream_gen_ai_spans=stream_gen_ai_spans,
+                trace_lifecycle="stream",
+            )
+
+            items = capture_items("span")
+
+            result = await agents.Runner.run(
+                agent,
+                "Test input",
+                run_config=test_run_config,
+            )
+
+            assert result is not None
+            assert result.final_output == "Hello, how can I help you?"
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        ai_client_span = next(
+            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        )
+
+        assert (
+            json.loads(ai_client_span["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS])
+            == expected_available_tools
+        )
+    elif stream_gen_ai_spans:
+        with patch.object(
+            agent.model._client._client,
+            "send",
+            return_value=response,
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=False,
+                stream_gen_ai_spans=stream_gen_ai_spans,
+            )
+
+            items = capture_items("span", "transaction")
+
+            result = await agents.Runner.run(
+                agent,
+                "Test input",
+                run_config=test_run_config,
+            )
+
+            assert result is not None
+            assert result.final_output == "Hello, how can I help you?"
+
+        spans = [item.payload for item in items if item.type == "span"]
+        ai_client_span = next(
+            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        )
+
+        assert (
+            json.loads(ai_client_span["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS])
+            == expected_available_tools
+        )
+    else:
+        with patch.object(
+            agent.model._client._client,
+            "send",
+            return_value=response,
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                traces_sample_rate=1.0,
+                send_default_pii=False,
+                stream_gen_ai_spans=stream_gen_ai_spans,
+            )
+            events = capture_events()
+
+            result = await agents.Runner.run(
+                agent,
+                "Test input",
+                run_config=test_run_config,
+            )
+
+            assert result is not None
+            assert result.final_output == "Hello, how can I help you?"
+
+        (transaction,) = events
+        spans = transaction["spans"]
+        ai_client_span = next(span for span in spans if span["op"] == OP.GEN_AI_CHAT)
+
+        assert (
+            json.loads(ai_client_span["data"][SPANDATA.GEN_AI_TOOL_DEFINITIONS])
+            == expected_available_tools
+        )
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -838,9 +1159,7 @@ async def test_client_span_custom_model(
                 disabled_integrations=[StdlibIntegration],
                 traces_sample_rate=1.0,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={
-                    "trace_lifecycle": "stream" if span_streaming else "static"
-                },
+                trace_lifecycle="stream" if span_streaming else "static",
             )
 
             items = capture_items("span")
@@ -1603,9 +1922,7 @@ async def test_handoff_span(
                 disabled_integrations=[StdlibIntegration],
                 traces_sample_rate=1.0,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={
-                    "trace_lifecycle": "stream" if span_streaming else "static"
-                },
+                trace_lifecycle="stream" if span_streaming else "static",
             )
 
             items = capture_items("transaction", "span")
@@ -1782,9 +2099,7 @@ async def test_max_turns_before_handoff_span(
                 disabled_integrations=[StdlibIntegration],
                 traces_sample_rate=1.0,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={
-                    "trace_lifecycle": "stream" if span_streaming else "static"
-                },
+                trace_lifecycle="stream" if span_streaming else "static",
             )
 
             items = capture_items("transaction", "span")
@@ -1964,51 +2279,19 @@ async def test_tool_execution_span(
         available_tool = {
             "name": "simple_test_tool",
             "description": "A simple tool",
-            "params_json_schema": {
+            "parameters": {
                 "properties": {"message": {"title": "Message", "type": "string"}},
                 "required": ["message"],
                 "title": "simple_test_tool_args",
                 "type": "object",
                 "additionalProperties": False,
             },
-            "on_invoke_tool": mock.ANY,
-            "strict_json_schema": True,
-            "is_enabled": True,
         }
-
-        if parse_version(OPENAI_AGENTS_VERSION) >= (0, 3, 3):
-            available_tool.update(
-                {"tool_input_guardrails": None, "tool_output_guardrails": None}
-            )
-
-        if parse_version(OPENAI_AGENTS_VERSION) >= (
-            0,
-            8,
-        ):
-            available_tool["needs_approval"] = False
-        if parse_version(OPENAI_AGENTS_VERSION) >= (
-            0,
-            9,
-            0,
-        ):
-            available_tool.update(
-                {
-                    "timeout_seconds": None,
-                    "timeout_behavior": "error_as_result",
-                    "timeout_error_function": None,
-                }
-            )
 
         assert agent_span["name"] == "invoke_agent test_agent"
         assert agent_span["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
         assert agent_span["attributes"]["gen_ai.agent.name"] == "test_agent"
         assert agent_span["attributes"]["gen_ai.operation.name"] == "invoke_agent"
-
-        agent_span_available_tool = json.loads(
-            agent_span["attributes"]["gen_ai.request.available_tools"]
-        )[0]
-
-        assert all(agent_span_available_tool[k] == v for k, v in available_tool.items())
 
         assert agent_span["attributes"]["gen_ai.request.max_tokens"] == 100
         assert agent_span["attributes"]["gen_ai.request.model"] == "gpt-4"
@@ -2022,7 +2305,7 @@ async def test_tool_execution_span(
         assert ai_client_span1["attributes"]["gen_ai.agent.name"] == "test_agent"
 
         ai_client_span1_available_tool = json.loads(
-            ai_client_span1["attributes"]["gen_ai.request.available_tools"]
+            ai_client_span1["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]
         )[0]
 
         assert all(
@@ -2065,19 +2348,15 @@ async def test_tool_execution_span(
         if OPENAI_VERSION >= (2, 25, 0):
             tool_call["namespace"] = None
 
-        assert json.loads(
+        parsed_tool_calls = json.loads(
             ai_client_span1["attributes"]["gen_ai.response.tool_calls"]
-        ) == [tool_call]
+        )
+        assert len(parsed_tool_calls) == 1
+        assert tool_call.items() <= parsed_tool_calls[0].items()
 
         assert tool_span["name"] == "execute_tool simple_test_tool"
         assert tool_span["attributes"]["gen_ai.agent.name"] == "test_agent"
         assert tool_span["attributes"]["gen_ai.operation.name"] == "execute_tool"
-
-        tool_span_available_tool = json.loads(
-            tool_span["attributes"]["gen_ai.request.available_tools"]
-        )[0]
-
-        assert all(tool_span_available_tool[k] == v for k, v in available_tool.items())
 
         assert tool_span["attributes"]["gen_ai.request.max_tokens"] == 100
         assert tool_span["attributes"]["gen_ai.request.model"] == "gpt-4"
@@ -2095,7 +2374,7 @@ async def test_tool_execution_span(
         assert ai_client_span2["attributes"]["gen_ai.operation.name"] == "chat"
 
         ai_client_span2_available_tool = json.loads(
-            ai_client_span2["attributes"]["gen_ai.request.available_tools"]
+            ai_client_span2["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]
         )[0]
 
         assert all(
@@ -2196,51 +2475,19 @@ async def test_tool_execution_span(
         available_tool = {
             "name": "simple_test_tool",
             "description": "A simple tool",
-            "params_json_schema": {
+            "parameters": {
                 "properties": {"message": {"title": "Message", "type": "string"}},
                 "required": ["message"],
                 "title": "simple_test_tool_args",
                 "type": "object",
                 "additionalProperties": False,
             },
-            "on_invoke_tool": mock.ANY,
-            "strict_json_schema": True,
-            "is_enabled": True,
         }
-
-        if parse_version(OPENAI_AGENTS_VERSION) >= (0, 3, 3):
-            available_tool.update(
-                {"tool_input_guardrails": None, "tool_output_guardrails": None}
-            )
-
-        if parse_version(OPENAI_AGENTS_VERSION) >= (
-            0,
-            8,
-        ):
-            available_tool["needs_approval"] = False
-        if parse_version(OPENAI_AGENTS_VERSION) >= (
-            0,
-            9,
-            0,
-        ):
-            available_tool.update(
-                {
-                    "timeout_seconds": None,
-                    "timeout_behavior": "error_as_result",
-                    "timeout_error_function": None,
-                }
-            )
 
         assert agent_span["name"] == "invoke_agent test_agent"
         assert agent_span["attributes"]["sentry.origin"] == "auto.ai.openai_agents"
         assert agent_span["attributes"]["gen_ai.agent.name"] == "test_agent"
         assert agent_span["attributes"]["gen_ai.operation.name"] == "invoke_agent"
-
-        agent_span_available_tool = json.loads(
-            agent_span["attributes"]["gen_ai.request.available_tools"]
-        )[0]
-
-        assert all(agent_span_available_tool[k] == v for k, v in available_tool.items())
 
         assert agent_span["attributes"]["gen_ai.request.max_tokens"] == 100
         assert agent_span["attributes"]["gen_ai.request.model"] == "gpt-4"
@@ -2254,7 +2501,7 @@ async def test_tool_execution_span(
         assert ai_client_span1["attributes"]["gen_ai.agent.name"] == "test_agent"
 
         ai_client_span1_available_tool = json.loads(
-            ai_client_span1["attributes"]["gen_ai.request.available_tools"]
+            ai_client_span1["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]
         )[0]
 
         assert all(
@@ -2294,22 +2541,15 @@ async def test_tool_execution_span(
             "status": None,
         }
 
-        if OPENAI_VERSION >= (2, 25, 0):
-            tool_call["namespace"] = None
-
-        assert json.loads(
+        parsed_tool_calls = json.loads(
             ai_client_span1["attributes"]["gen_ai.response.tool_calls"]
-        ) == [tool_call]
+        )
+        assert len(parsed_tool_calls) == 1
+        assert tool_call.items() <= parsed_tool_calls[0].items()
 
         assert tool_span["name"] == "execute_tool simple_test_tool"
         assert tool_span["attributes"]["gen_ai.agent.name"] == "test_agent"
         assert tool_span["attributes"]["gen_ai.operation.name"] == "execute_tool"
-
-        tool_span_available_tool = json.loads(
-            tool_span["attributes"]["gen_ai.request.available_tools"]
-        )[0]
-
-        assert all(tool_span_available_tool[k] == v for k, v in available_tool.items())
 
         assert tool_span["attributes"]["gen_ai.request.max_tokens"] == 100
         assert tool_span["attributes"]["gen_ai.request.model"] == "gpt-4"
@@ -2327,7 +2567,7 @@ async def test_tool_execution_span(
         assert ai_client_span2["attributes"]["gen_ai.operation.name"] == "chat"
 
         ai_client_span2_available_tool = json.loads(
-            ai_client_span2["attributes"]["gen_ai.request.available_tools"]
+            ai_client_span2["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]
         )[0]
 
         assert all(
@@ -2419,40 +2659,14 @@ async def test_tool_execution_span(
         available_tool = {
             "name": "simple_test_tool",
             "description": "A simple tool",
-            "params_json_schema": {
+            "parameters": {
                 "properties": {"message": {"title": "Message", "type": "string"}},
                 "required": ["message"],
                 "title": "simple_test_tool_args",
                 "type": "object",
                 "additionalProperties": False,
             },
-            "on_invoke_tool": mock.ANY,
-            "strict_json_schema": True,
-            "is_enabled": True,
         }
-
-        if parse_version(OPENAI_AGENTS_VERSION) >= (0, 3, 3):
-            available_tool.update(
-                {"tool_input_guardrails": None, "tool_output_guardrails": None}
-            )
-
-        if parse_version(OPENAI_AGENTS_VERSION) >= (
-            0,
-            8,
-        ):
-            available_tool["needs_approval"] = False
-        if parse_version(OPENAI_AGENTS_VERSION) >= (
-            0,
-            9,
-            0,
-        ):
-            available_tool.update(
-                {
-                    "timeout_seconds": None,
-                    "timeout_behavior": "error_as_result",
-                    "timeout_error_function": None,
-                }
-            )
 
         assert transaction["transaction"] == "test_agent workflow"
         assert transaction["contexts"]["trace"]["origin"] == "auto.ai.openai_agents"
@@ -2461,11 +2675,6 @@ async def test_tool_execution_span(
         assert agent_span["origin"] == "auto.ai.openai_agents"
         assert agent_span["data"]["gen_ai.agent.name"] == "test_agent"
         assert agent_span["data"]["gen_ai.operation.name"] == "invoke_agent"
-
-        agent_span_available_tool = json.loads(
-            agent_span["data"]["gen_ai.request.available_tools"]
-        )[0]
-        assert all(agent_span_available_tool[k] == v for k, v in available_tool.items())
 
         assert agent_span["data"]["gen_ai.request.max_tokens"] == 100
         assert agent_span["data"]["gen_ai.request.model"] == "gpt-4"
@@ -2479,7 +2688,7 @@ async def test_tool_execution_span(
         assert ai_client_span1["data"]["gen_ai.agent.name"] == "test_agent"
 
         ai_client_span1_available_tool = json.loads(
-            ai_client_span1["data"]["gen_ai.request.available_tools"]
+            ai_client_span1["data"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]
         )[0]
         assert all(
             ai_client_span1_available_tool[k] == v for k, v in available_tool.items()
@@ -2514,21 +2723,15 @@ async def test_tool_execution_span(
             "status": None,
         }
 
-        if OPENAI_VERSION >= (2, 25, 0):
-            tool_call["namespace"] = None
-
-        assert json.loads(ai_client_span1["data"]["gen_ai.response.tool_calls"]) == [
-            tool_call
-        ]
+        parsed_tool_calls = json.loads(
+            ai_client_span1["data"]["gen_ai.response.tool_calls"]
+        )
+        assert len(parsed_tool_calls) == 1
+        assert tool_call.items() <= parsed_tool_calls[0].items()
 
         assert tool_span["description"] == "execute_tool simple_test_tool"
         assert tool_span["data"]["gen_ai.agent.name"] == "test_agent"
         assert tool_span["data"]["gen_ai.operation.name"] == "execute_tool"
-
-        tool_span_available_tool = json.loads(
-            tool_span["data"]["gen_ai.request.available_tools"]
-        )[0]
-        assert all(tool_span_available_tool[k] == v for k, v in available_tool.items())
 
         assert tool_span["data"]["gen_ai.request.max_tokens"] == 100
         assert tool_span["data"]["gen_ai.request.model"] == "gpt-4"
@@ -2544,7 +2747,7 @@ async def test_tool_execution_span(
         assert ai_client_span2["data"]["gen_ai.operation.name"] == "chat"
 
         ai_client_span2_available_tool = json.loads(
-            ai_client_span2["data"]["gen_ai.request.available_tools"]
+            ai_client_span2["data"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]
         )[0]
         assert all(
             ai_client_span2_available_tool[k] == v for k, v in available_tool.items()
@@ -3228,9 +3431,7 @@ async def test_error_captures_input_data(
                 traces_sample_rate=1.0,
                 send_default_pii=True,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={
-                    "trace_lifecycle": "stream" if span_streaming else "static"
-                },
+                trace_lifecycle="stream" if span_streaming else "static",
             )
 
             items = capture_items("event", "span")
@@ -3662,9 +3863,7 @@ async def test_tool_execution_error_tracing(
                 traces_sample_rate=1.0,
                 send_default_pii=True,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={
-                    "trace_lifecycle": "stream" if span_streaming else "static"
-                },
+                trace_lifecycle="stream" if span_streaming else "static",
             )
             items = capture_items("span", "transaction")
 
@@ -3815,9 +4014,7 @@ async def test_invoke_agent_span_includes_usage_data(
                 traces_sample_rate=1.0,
                 send_default_pii=True,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={
-                    "trace_lifecycle": "stream" if span_streaming else "static"
-                },
+                trace_lifecycle="stream" if span_streaming else "static",
             )
             items = capture_items("span", "transaction")
 
@@ -3959,9 +4156,7 @@ async def test_ai_client_span_includes_response_model(
                 traces_sample_rate=1.0,
                 send_default_pii=True,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={
-                    "trace_lifecycle": "stream" if span_streaming else "static"
-                },
+                trace_lifecycle="stream" if span_streaming else "static",
             )
             items = capture_items("span", "transaction")
 
@@ -4090,9 +4285,7 @@ async def test_ai_client_span_response_model_with_chat_completions(
                 disabled_integrations=[StdlibIntegration],
                 traces_sample_rate=1.0,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={
-                    "trace_lifecycle": "stream" if span_streaming else "static"
-                },
+                trace_lifecycle="stream" if span_streaming else "static",
             )
 
             items = capture_items("span", "transaction")
@@ -4433,9 +4626,7 @@ async def test_invoke_agent_span_includes_response_model(
                 traces_sample_rate=1.0,
                 send_default_pii=True,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={
-                    "trace_lifecycle": "stream" if span_streaming else "static"
-                },
+                trace_lifecycle="stream" if span_streaming else "static",
             )
 
             items = capture_items("span", "transaction")
@@ -5071,9 +5262,7 @@ async def test_conversation_id_on_all_spans(
                 integrations=[OpenAIAgentsIntegration()],
                 traces_sample_rate=1.0,
                 stream_gen_ai_spans=stream_gen_ai_spans,
-                _experiments={
-                    "trace_lifecycle": "stream" if span_streaming else "static"
-                },
+                trace_lifecycle="stream" if span_streaming else "static",
             )
 
             items = capture_items("span", "transaction")

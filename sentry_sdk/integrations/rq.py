@@ -15,6 +15,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     format_timestamp,
+    has_data_collection_enabled,
     parse_version,
 )
 
@@ -186,18 +187,20 @@ def _make_event_processor(weak_job: "Callable[[], Job]") -> "EventProcessor":
                 rq_job = {
                     "job_id": job.id,
                     "func": job.func_name,
-                    "args": (
-                        job.args
-                        if should_send_default_pii()
-                        else SENSITIVE_DATA_SUBSTITUTE
-                    ),
-                    "kwargs": (
-                        job.kwargs
-                        if should_send_default_pii()
-                        else SENSITIVE_DATA_SUBSTITUTE
-                    ),
                     "description": job.description,
                 }
+
+                client_options = sentry_sdk.get_client().options
+                if has_data_collection_enabled(client_options):
+                    if client_options["data_collection"]["queues"]:
+                        rq_job["args"] = job.args
+                        rq_job["kwargs"] = job.kwargs
+                elif should_send_default_pii():
+                    rq_job["args"] = job.args
+                    rq_job["kwargs"] = job.kwargs
+                else:
+                    rq_job["args"] = SENSITIVE_DATA_SUBSTITUTE
+                    rq_job["kwargs"] = SENSITIVE_DATA_SUBSTITUTE
 
                 if job.enqueued_at:
                     rq_job["enqueued_at"] = format_timestamp(job.enqueued_at)

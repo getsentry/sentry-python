@@ -1,8 +1,6 @@
 import importlib
-import json
 import sys
 import threading
-from unittest import mock
 
 import pytest
 
@@ -15,6 +13,14 @@ from sentry_sdk import (
 )
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.integrations.logging import LoggingIntegration
+from sentry_sdk.utils import parse_version
+
+try:
+    from importlib.metadata import version
+except ImportError:
+    from importlib_metadata import version
+
+QUART_VERSION = parse_version(version("quart"))
 
 
 def quart_app_factory():
@@ -399,16 +405,26 @@ async def test_error_in_errorhandler(sentry_init, capture_events):
 
     client = app.test_client()
 
-    with pytest.raises(ZeroDivisionError):
+    if QUART_VERSION >= (0, 21, 0):
+        # Exception propagation behavior changed in 0.21.0
         await client.get("/")
 
-    event1, event2 = events
+        (event,) = events
 
-    (exception,) = event1["exception"]["values"]
-    assert exception["type"] == "ValueError"
+        (exception,) = event["exception"]["values"]
+        assert exception["type"] == "ValueError"
 
-    exception = event2["exception"]["values"][-1]
-    assert exception["type"] == "ZeroDivisionError"
+    else:
+        with pytest.raises(ZeroDivisionError):
+            await client.get("/")
+
+        event1, event2 = events
+
+        (exception,) = event1["exception"]["values"]
+        assert exception["type"] == "ValueError"
+
+        exception = event2["exception"]["values"][-1]
+        assert exception["type"] == "ZeroDivisionError"
 
 
 @pytest.mark.asyncio
@@ -587,82 +603,6 @@ async def test_class_based_views(sentry_init, capture_events):
 
     assert event["message"] == "hi"
     assert event["transaction"] == "hello_class"
-
-
-@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
-@pytest.mark.asyncio
-async def test_active_thread_id(
-    sentry_init, capture_envelopes, teardown_profiling, endpoint
-):
-    with mock.patch(
-        "sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0
-    ):
-        sentry_init(
-            traces_sample_rate=1.0,
-            profiles_sample_rate=1.0,
-        )
-        app = quart_app_factory()
-
-        envelopes = capture_envelopes()
-
-        async with app.test_client() as client:
-            response = await client.get(endpoint)
-            assert response.status_code == 200
-
-        data = json.loads(await response.get_data(as_text=True))
-
-        envelopes = [envelope for envelope in envelopes]
-        assert len(envelopes) == 1
-
-        profiles = [item for item in envelopes[0].items if item.type == "profile"]
-        assert len(profiles) == 1, envelopes[0].items
-
-        for item in profiles:
-            transactions = item.payload.json["transactions"]
-            assert len(transactions) == 1
-            assert str(data["active"]) == transactions[0]["active_thread_id"]
-
-        transactions = [
-            item for item in envelopes[0].items if item.type == "transaction"
-        ]
-        assert len(transactions) == 1
-
-        for item in transactions:
-            transaction = item.payload.json
-            trace_context = transaction["contexts"]["trace"]
-            assert str(data["active"]) == trace_context["data"]["thread.id"]
-
-
-@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
-@pytest.mark.asyncio
-async def test_active_thread_id_span_streaming(
-    sentry_init, capture_items, teardown_profiling, endpoint
-):
-    with mock.patch(
-        "sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0
-    ):
-        sentry_init(
-            traces_sample_rate=1.0,
-            profiles_sample_rate=1.0,
-            trace_lifecycle="stream",
-        )
-        app = quart_app_factory()
-
-        items = capture_items("span")
-
-        async with app.test_client() as client:
-            response = await client.get(endpoint)
-            assert response.status_code == 200
-
-        data = json.loads(await response.get_data(as_text=True))
-
-        sentry_sdk.flush()
-
-        spans = [item.payload for item in items]
-        assert len(spans) == 1
-
-        segment = spans[0]
-        assert str(data["active"]) == segment["attributes"]["thread.id"]
 
 
 @pytest.mark.asyncio
@@ -1101,6 +1041,146 @@ async def test_span_streaming_quart_auth_user_id(
         assert "user.id" not in segment.get("attributes", {})
 
 
+QUART_USER_INFO_CASES = [
+    pytest.param(
+        {"_experiments": {"data_collection": {}}},
+        True,
+        id="dc_default_user_info",
+    ),
+    pytest.param(
+        {"_experiments": {"data_collection": {"user_info": True}}},
+        True,
+        id="dc_user_info_true",
+    ),
+    pytest.param(
+        {"_experiments": {"data_collection": {"user_info": False}}},
+        False,
+        id="dc_user_info_false",
+    ),
+    pytest.param(
+        {
+            "send_default_pii": True,
+            "_experiments": {"data_collection": {"user_info": False}},
+        },
+        False,
+        id="dc_wins_over_pii",
+    ),
+]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("init_kwargs, expect_user_info", QUART_USER_INFO_CASES)
+async def test_quart_auth_user_info_data_collection(
+    sentry_init,
+    capture_events,
+    init_kwargs,
+    expect_user_info,
+):
+    from quart_auth import AuthUser, login_user
+
+    kwargs = dict(init_kwargs)
+    sentry_init(integrations=[quart_sentry.QuartIntegration()], **kwargs)
+    app = quart_app_factory()
+
+    @app.route("/login")
+    async def login():
+        login_user(AuthUser("42"))
+        return "ok"
+
+    events = capture_events()
+
+    client = app.test_client()
+    assert (await client.get("/login")).status_code == 200
+    assert not events
+
+    assert (await client.get("/message")).status_code == 200
+
+    (event,) = events
+    if expect_user_info:
+        assert event["user"]["id"] == "42"
+        assert "REMOTE_ADDR" in event["request"]["env"]
+    else:
+        assert event.get("user", {}).get("id") is None
+        assert "env" not in event["request"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("init_kwargs, expect_user_info", QUART_USER_INFO_CASES)
+async def test_span_streaming_quart_auth_user_id_data_collection(
+    sentry_init,
+    capture_items,
+    init_kwargs,
+    expect_user_info,
+):
+    from quart_auth import AuthUser, login_user
+
+    kwargs = dict(init_kwargs)
+    sentry_init(
+        integrations=[quart_sentry.QuartIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        _experiments=kwargs.pop("_experiments", {}),
+        **kwargs,
+    )
+    items = capture_items("span")
+
+    app = quart_app_factory()
+
+    @app.route("/login")
+    async def login():
+        login_user(AuthUser("42"))
+        return "ok"
+
+    client = app.test_client()
+    assert (await client.get("/login")).status_code == 200
+    assert (await client.get("/message")).status_code == 200
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 2
+
+    segment = spans[1]
+    if expect_user_info:
+        assert segment["attributes"]["user.id"] == "42"
+    else:
+        assert "user.id" not in segment.get("attributes", {})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("init_kwargs, expect_user_info", QUART_USER_INFO_CASES)
+async def test_span_streaming_request_attributes_data_collection(
+    sentry_init, capture_items, init_kwargs, expect_user_info
+):
+    kwargs = dict(init_kwargs)
+    sentry_init(
+        integrations=[quart_sentry.QuartIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        _experiments=kwargs.pop("_experiments", {}),
+        **kwargs,
+    )
+    items = capture_items("span")
+
+    app = quart_app_factory()
+    client = app.test_client()
+    response = await client.get("/message")
+    assert response.status_code == 200
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 1
+
+    segment = spans[0]
+    if expect_user_info:
+        assert "client.address" in segment["attributes"]
+        assert "user.ip_address" in segment["attributes"]
+    else:
+        assert "client.address" not in segment["attributes"]
+        assert "user.ip_address" not in segment["attributes"]
+
+
 @pytest.mark.asyncio
 async def test_span_streaming_sensitive_header_passthrough_with_pii_and_no_data_collection(
     sentry_init, capture_items
@@ -1210,14 +1290,14 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
 async def test_span_streaming_url_query_data_collection(
     sentry_init, capture_items, init_kwargs, expected_query
 ):
-    init_kwargs = dict(init_kwargs)
-    experiments = {"trace_lifecycle": "stream"}
-    experiments.update(init_kwargs.pop("_experiments", {}))
+    kwargs = dict(init_kwargs)
+    experiments = kwargs.pop("_experiments", {})
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         _experiments=experiments,
-        **init_kwargs,
+        **kwargs,
     )
     items = capture_items("span")
 
@@ -1260,7 +1340,8 @@ async def test_span_streaming_url_query_multi_and_blank_values(
     sentry_init(
         integrations=[quart_sentry.QuartIntegration()],
         traces_sample_rate=1.0,
-        _experiments={"trace_lifecycle": "stream", "data_collection": {}},
+        trace_lifecycle="stream",
+        _experiments={"data_collection": {}},
     )
     items = capture_items("span")
 

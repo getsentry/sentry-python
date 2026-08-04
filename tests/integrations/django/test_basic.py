@@ -881,9 +881,9 @@ def test_sql_psycopg2_string_composition(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
+        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={
             "record_sql_params": True,
-            "trace_lifecycle": "stream" if span_streaming else "static",
         },
     )
     from django.db import connections
@@ -933,9 +933,9 @@ def test_sql_psycopg2_placeholders(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
+        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={
             "record_sql_params": True,
-            "trace_lifecycle": "stream" if span_streaming else "static",
         },
     )
     from django.db import connections
@@ -2384,61 +2384,6 @@ def test_transaction_http_method_custom(
         (event1, event2) = events
         assert event1["request"]["method"] == "OPTIONS"
         assert event2["request"]["method"] == "HEAD"
-
-
-def test_ensures_spotlight_middleware_when_spotlight_is_enabled(sentry_init, settings):
-    """
-    Test that ensures if Spotlight is enabled, relevant SpotlightMiddleware
-    is added to middleware list in settings.
-    """
-    settings.DEBUG = True
-    original_middleware = frozenset(settings.MIDDLEWARE)
-
-    sentry_init(integrations=[DjangoIntegration()], spotlight=True)
-
-    added = frozenset(settings.MIDDLEWARE) ^ original_middleware
-
-    assert "sentry_sdk.spotlight.SpotlightMiddleware" in added
-
-
-def test_ensures_no_spotlight_middleware_when_env_killswitch_is_false(
-    monkeypatch, sentry_init, settings
-):
-    """
-    Test that ensures if Spotlight is enabled, but is set to a falsy value
-    the relevant SpotlightMiddleware is NOT added to middleware list in settings.
-    """
-    settings.DEBUG = True
-    monkeypatch.setenv("SENTRY_SPOTLIGHT_ON_ERROR", "no")
-
-    original_middleware = frozenset(settings.MIDDLEWARE)
-
-    sentry_init(integrations=[DjangoIntegration()], spotlight=True)
-
-    added = frozenset(settings.MIDDLEWARE) ^ original_middleware
-
-    assert "sentry_sdk.spotlight.SpotlightMiddleware" not in added
-
-
-def test_ensures_no_spotlight_middleware_when_no_spotlight(
-    monkeypatch, sentry_init, settings
-):
-    """
-    Test that ensures if Spotlight is not enabled
-    the relevant SpotlightMiddleware is NOT added to middleware list in settings.
-    """
-    settings.DEBUG = True
-
-    # We should NOT have the middleware even if the env var is truthy if Spotlight is off
-    monkeypatch.setenv("SENTRY_SPOTLIGHT_ON_ERROR", "1")
-
-    original_middleware = frozenset(settings.MIDDLEWARE)
-
-    sentry_init(integrations=[DjangoIntegration()], spotlight=False)
-
-    added = frozenset(settings.MIDDLEWARE) ^ original_middleware
-
-    assert "sentry_sdk.spotlight.SpotlightMiddleware" not in added
 
 
 def test_get_frame_name_when_in_lazy_object():

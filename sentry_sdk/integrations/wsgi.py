@@ -1,4 +1,5 @@
 import sys
+from contextlib import nullcontext
 from contextvars import ContextVar
 from functools import partial
 from typing import TYPE_CHECKING
@@ -21,7 +22,6 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     has_data_collection_enabled,
-    nullcontext,
     reraise,
 )
 

@@ -110,7 +110,6 @@ _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.sqlalchemy.SqlalchemyIntegration",
     "sentry_sdk.integrations.starlette.StarletteIntegration",
     "sentry_sdk.integrations.starlite.StarliteIntegration",
-    "sentry_sdk.integrations.strawberry.StrawberryIntegration",
     "sentry_sdk.integrations.tornado.TornadoIntegration",
 ]
 
@@ -162,7 +161,7 @@ _MIN_VERSIONS = {
     "pyreqwest": (0, 11, 6),
     "quart": (0, 16, 0),
     "ray": (2, 7, 0),
-    "requests": (2, 0, 0),
+    "requests": (2, 30, 0),
     "rq": (0, 6),
     "sanic": (0, 8),
     "sqlalchemy": (1, 2),

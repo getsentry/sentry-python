@@ -4,7 +4,6 @@ import logging
 import os
 import threading
 import warnings
-from unittest import mock
 
 import fastapi
 import pytest
@@ -57,7 +56,6 @@ PARSED_FORM = starlette.datastructures.FormData(
 )
 
 from tests.integrations.conftest import parametrize_test_configurable_status_codes
-from tests.integrations.starlette import test_starlette
 
 
 def fastapi_app_factory():
@@ -134,9 +132,7 @@ async def test_request_info_json_body(
         traces_sample_rate=1.0,
         send_default_pii=True,
         integrations=[StarletteIntegration()],
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     app = fastapi_app_factory()
@@ -205,9 +201,7 @@ async def test_formdata_request_body(
         send_default_pii=True,
         max_request_body_size="always",
         integrations=[StarletteIntegration()],
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     app = fastapi_app_factory()
@@ -285,9 +279,7 @@ async def test_request_body_too_big(
         traces_sample_rate=1.0,
         send_default_pii=True,
         integrations=[StarletteIntegration()],
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     app = fastapi_app_factory()
@@ -465,44 +457,6 @@ def test_legacy_setup(
 
 
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
-@mock.patch("sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0)
-def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, endpoint):
-    sentry_init(
-        traces_sample_rate=1.0,
-        profiles_sample_rate=1.0,
-    )
-    app = fastapi_app_factory()
-    asgi_app = SentryAsgiMiddleware(app)
-
-    envelopes = capture_envelopes()
-
-    client = TestClient(asgi_app)
-    response = client.get(endpoint)
-    assert response.status_code == 200
-
-    data = json.loads(response.content)
-
-    envelopes = [envelope for envelope in envelopes]
-    assert len(envelopes) == 1
-
-    profiles = [item for item in envelopes[0].items if item.type == "profile"]
-    assert len(profiles) == 1
-
-    for item in profiles:
-        transactions = item.payload.json["transactions"]
-        assert len(transactions) == 1
-        assert str(data["active"]) == transactions[0]["active_thread_id"]
-
-    transactions = [item for item in envelopes[0].items if item.type == "transaction"]
-    assert len(transactions) == 1
-
-    for item in transactions:
-        transaction = item.payload.json
-        trace_context = transaction["contexts"]["trace"]
-        assert str(data["active"]) == trace_context["data"]["thread.id"]
-
-
-@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
 def test_active_thread_id_span_streaming(sentry_init, capture_items, endpoint):
     sentry_init(
         auto_enabling_integrations=False,  # Ensure httpx is not auto-enabled; its legacy start_span interferes with streaming mode
@@ -536,9 +490,7 @@ async def test_original_request_not_scrubbed(
         auto_enabling_integrations=False,  # Ensure httpx is not auto-enabled; its legacy start_span interferes with streaming mode
         integrations=[StarletteIntegration(), FastApiIntegration()],
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     app = FastAPI()
@@ -703,9 +655,7 @@ def test_transaction_name(
             FastApiIntegration(transaction_style=transaction_style),
         ],
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -753,9 +703,7 @@ def test_transaction_name_with_prefix(
             FastApiIntegration(transaction_style="url"),
         ],
         traces_sample_rate=1.0,
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     if span_streaming:
@@ -928,48 +876,6 @@ def test_transaction_name_in_middleware(
     )
 
 
-@test_starlette.parametrize_test_configurable_status_codes_deprecated
-def test_configurable_status_codes_deprecated(
-    sentry_init,
-    capture_events,
-    failed_request_status_codes,
-    status_code,
-    expected_error,
-):
-    with pytest.warns(DeprecationWarning):
-        starlette_integration = StarletteIntegration(
-            failed_request_status_codes=failed_request_status_codes
-        )
-
-    with pytest.warns(DeprecationWarning):
-        fast_api_integration = FastApiIntegration(
-            failed_request_status_codes=failed_request_status_codes
-        )
-
-    sentry_init(
-        integrations=[
-            starlette_integration,
-            fast_api_integration,
-        ]
-    )
-
-    events = capture_events()
-
-    app = FastAPI()
-
-    @app.get("/error")
-    async def _error():
-        raise HTTPException(status_code)
-
-    client = TestClient(app)
-    client.get("/error")
-
-    if expected_error:
-        assert len(events) == 1
-    else:
-        assert not events
-
-
 @pytest.mark.skipif(
     FASTAPI_VERSION < (0, 80),
     reason="Requires FastAPI >= 0.80, because earlier versions do not support HTTP 'HEAD' requests",
@@ -1056,9 +962,7 @@ def test_request_url(sentry_init, capture_events, capture_items, span_streaming)
         integrations=[
             StarletteIntegration(),
         ],
-        _experiments={
-            "trace_lifecycle": "stream" if span_streaming else "static",
-        },
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     starlette_app = fastapi_app_factory()

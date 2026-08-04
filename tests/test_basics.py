@@ -19,7 +19,6 @@ from sentry_sdk import (
     isolation_scope,
     last_event_id,
     new_scope,
-    push_scope,
     start_transaction,
 )
 from sentry_sdk.integrations import (
@@ -32,7 +31,6 @@ from sentry_sdk.integrations import (
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.scope import add_global_event_processor
-from sentry_sdk.tracing_utils import has_tracing_enabled
 from sentry_sdk.utils import datetime_from_isoformat, get_sdk_name, reraise
 
 
@@ -249,32 +247,6 @@ def test_option_before_breadcrumb(sentry_init, capture_events, monkeypatch):
     assert crumb["type"] == "default"
 
 
-@pytest.mark.parametrize(
-    "enable_tracing, traces_sample_rate, tracing_enabled, updated_traces_sample_rate",
-    [
-        (None, None, False, None),
-        (False, 0.0, False, 0.0),
-        (False, 1.0, False, 1.0),
-        (None, 1.0, True, 1.0),
-        (True, 1.0, True, 1.0),
-        (None, 0.0, True, 0.0),  # We use this as - it's configured but turned off
-        (True, 0.0, True, 0.0),  # We use this as - it's configured but turned off
-        (True, None, True, 1.0),
-    ],
-)
-def test_option_enable_tracing(
-    sentry_init,
-    enable_tracing,
-    traces_sample_rate,
-    tracing_enabled,
-    updated_traces_sample_rate,
-):
-    sentry_init(enable_tracing=enable_tracing, traces_sample_rate=traces_sample_rate)
-    options = sentry_sdk.get_client().options
-    assert has_tracing_enabled(options) is tracing_enabled
-    assert options["traces_sample_rate"] == updated_traces_sample_rate
-
-
 def test_breadcrumb_arguments(sentry_init, capture_events):
     assert_hint = {"bar": 42}
 
@@ -292,23 +264,6 @@ def test_breadcrumb_arguments(sentry_init, capture_events):
     assert_hint.clear()
     add_breadcrumb(foo=42)
     add_breadcrumb(crumb=dict(foo=42))
-
-
-def test_push_scope(sentry_init, capture_events, suppress_deprecation_warnings):
-    sentry_init()
-    events = capture_events()
-
-    with push_scope() as scope:
-        scope.level = "warning"
-        try:
-            1 / 0
-        except Exception as e:
-            capture_exception(e)
-
-    (event,) = events
-
-    assert event["level"] == "warning"
-    assert "exception" in event
 
 
 def test_breadcrumbs(sentry_init, capture_events):
@@ -799,18 +754,26 @@ def test_functions_to_trace(sentry_init, capture_events):
         {"qualified_name": "time.sleep"},
     ]
 
-    sentry_init(
-        traces_sample_rate=1.0,
-        functions_to_trace=functions_to_trace,
-    )
+    global _hello_world
+    original_hello_world = _hello_world
+    original_sleep = time.sleep
 
-    events = capture_events()
+    try:
+        sentry_init(
+            traces_sample_rate=1.0,
+            functions_to_trace=functions_to_trace,
+        )
 
-    with start_transaction(name="something"):
-        time.sleep(0)
+        events = capture_events()
 
-        for word in ["World", "You"]:
-            _hello_world(word)
+        with start_transaction(name="something"):
+            time.sleep(0)
+
+            for word in ["World", "You"]:
+                _hello_world(word)
+    finally:
+        _hello_world = original_hello_world
+        time.sleep = original_sleep
 
     assert len(events) == 1
 
@@ -835,17 +798,22 @@ def test_functions_to_trace_with_class(sentry_init, capture_events):
         {"qualified_name": "tests.test_basics.WorldGreeter.greet"},
     ]
 
-    sentry_init(
-        traces_sample_rate=1.0,
-        functions_to_trace=functions_to_trace,
-    )
+    original_function = WorldGreeter.greet
 
-    events = capture_events()
+    try:
+        sentry_init(
+            traces_sample_rate=1.0,
+            functions_to_trace=functions_to_trace,
+        )
 
-    with start_transaction(name="something"):
-        wg = WorldGreeter("World")
-        wg.greet()
-        wg.greet("You")
+        events = capture_events()
+
+        with start_transaction(name="something"):
+            wg = WorldGreeter("World")
+            wg.greet()
+            wg.greet("You")
+    finally:
+        WorldGreeter.greet = original_function
 
     assert len(events) == 1
 

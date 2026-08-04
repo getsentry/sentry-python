@@ -11,6 +11,7 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.huey import HueyIntegration
 from sentry_sdk.traces import SegmentNameSource, SpanStatus
 from sentry_sdk.utils import parse_version
+from tests.integrations.utils import DATA_COLLECTION_QUEUES_CASES
 
 HUEY_VERSION = parse_version(HUEY_VERSION)
 
@@ -23,13 +24,15 @@ except ImportError:
 
 @pytest.fixture
 def init_huey(sentry_init):
-    def inner(has_span_streaming=None):
-        sentry_init(
-            integrations=[HueyIntegration()],
-            traces_sample_rate=1.0,
-            send_default_pii=True,
-            trace_lifecycle="stream" if has_span_streaming else "static",
-        )
+    def inner(has_span_streaming=None, init_kwargs=None):
+        sentry_init_kwargs = {
+            "integrations": [HueyIntegration()],
+            "traces_sample_rate": 1.0,
+            "send_default_pii": True,
+            "trace_lifecycle": "stream" if has_span_streaming else "static",
+        }
+        sentry_init_kwargs.update(init_kwargs or {})
+        sentry_init(**sentry_init_kwargs)
 
         return MemoryHuey(name="sentry_sdk")
 
@@ -295,6 +298,49 @@ def test_task_lock(
             else event["contexts"]["trace"]["status"] == "ok"
         )
     assert len(huey) == 0
+
+
+@pytest.mark.parametrize(
+    "init_kwargs,expected_args,expected_kwargs",
+    DATA_COLLECTION_QUEUES_CASES,
+)
+@pytest.mark.parametrize(
+    "has_span_streaming", [True, False], ids=["streaming", "no_streaming"]
+)
+def test_task_args_kwargs_data_collection(
+    capture_events,
+    capture_items,
+    init_huey,
+    has_span_streaming,
+    init_kwargs,
+    expected_args,
+    expected_kwargs,
+):
+    huey = init_huey(has_span_streaming=has_span_streaming, init_kwargs=init_kwargs)
+
+    @huey.task()
+    def division(a, b):
+        return a / b
+
+    if has_span_streaming:
+        items = capture_items("event")
+        execute_huey_task(huey, division, 1, b=0, exceptions=(DivisionByZero,))
+        sentry_sdk.get_client().flush()
+        events = [item.payload for item in items]
+    else:
+        events = capture_events()
+        execute_huey_task(huey, division, 1, b=0, exceptions=(DivisionByZero,))
+
+    (event,) = [event for event in events if "exception" in event]
+
+    huey_job = event["extra"]["huey-job"]
+
+    if expected_args is None:
+        assert "args" not in huey_job
+        assert "kwargs" not in huey_job
+    else:
+        assert huey_job["args"] == expected_args
+        assert huey_job["kwargs"] == expected_kwargs
 
 
 def test_huey_enqueue(init_huey, capture_events):

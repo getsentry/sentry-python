@@ -58,9 +58,7 @@ def test_basic(sentry_init, capture_events, sample_rate):
 
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])
 def test_basic_span_streaming(sentry_init, capture_items, sample_rate):
-    sentry_init(
-        traces_sample_rate=sample_rate, _experiments={"trace_lifecycle": "stream"}
-    )
+    sentry_init(traces_sample_rate=sample_rate, trace_lifecycle="stream")
     items = capture_items()
 
     with sentry_sdk.traces.start_span(name="hi"):
@@ -311,20 +309,6 @@ def test_continue_trace_span_streaming(
         }
 
         assert message_payload["message"] == "hello"
-
-
-@pytest.mark.parametrize("sample_rate", [0.0, 1.0])
-def test_propagate_traces_deprecation_warning(sentry_init, sample_rate):
-    sentry_init(traces_sample_rate=sample_rate, propagate_traces=False)
-
-    with start_transaction(name="hi"):
-        with start_span() as old_span:
-            with pytest.warns(DeprecationWarning):
-                dict(
-                    sentry_sdk.get_current_scope().iter_trace_propagation_headers(
-                        old_span
-                    )
-                )
 
 
 @pytest.mark.parametrize("sample_rate", [0.5, 1.0])

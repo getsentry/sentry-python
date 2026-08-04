@@ -20,6 +20,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    has_data_collection_enabled,
     reraise,
 )
 
@@ -133,20 +134,25 @@ def _make_event_processor(task: "Any") -> "EventProcessor":
             tags["huey_task_id"] = task.id
             tags["huey_task_retry"] = task.default_retries > task.retries
             extra = event.setdefault("extra", {})
-            extra["huey-job"] = {
+
+            huey_job = {
                 "task": task.name,
-                "args": (
-                    task.args
-                    if should_send_default_pii()
-                    else SENSITIVE_DATA_SUBSTITUTE
-                ),
-                "kwargs": (
-                    task.kwargs
-                    if should_send_default_pii()
-                    else SENSITIVE_DATA_SUBSTITUTE
-                ),
                 "retry": (task.default_retries or 0) - task.retries,
             }
+
+            client_options = sentry_sdk.get_client().options
+            if has_data_collection_enabled(client_options):
+                if client_options["data_collection"]["queues"]:
+                    huey_job["args"] = task.args
+                    huey_job["kwargs"] = task.kwargs
+            elif should_send_default_pii():
+                huey_job["args"] = task.args
+                huey_job["kwargs"] = task.kwargs
+            else:
+                huey_job["args"] = SENSITIVE_DATA_SUBSTITUTE
+                huey_job["kwargs"] = SENSITIVE_DATA_SUBSTITUTE
+
+            extra["huey-job"] = huey_job
 
         return event
 

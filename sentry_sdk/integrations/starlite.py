@@ -1,3 +1,4 @@
+from contextlib import nullcontext
 from copy import deepcopy
 
 import sentry_sdk
@@ -12,7 +13,6 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
     has_data_collection_enabled,
-    nullcontext,
     transaction_from_function,
 )
 
