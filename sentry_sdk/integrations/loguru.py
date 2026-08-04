@@ -2,14 +2,14 @@ import enum
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.logging import (
     BreadcrumbHandler,
     EventHandler,
     _BaseHandler,
 )
 from sentry_sdk.logger import _log_level_to_otel
-from sentry_sdk.utils import has_logs_enabled, safe_repr
+from sentry_sdk.utils import has_logs_enabled, parse_version, safe_repr
 
 if TYPE_CHECKING:
     from logging import LogRecord
@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
 try:
     import loguru
+    from loguru import __version__ as LOGURU_VERSION  # type: ignore
     from loguru import logger
     from loguru._defaults import LOGURU_FORMAT as DEFAULT_FORMAT
 
@@ -87,6 +88,9 @@ class LoguruIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        version = parse_version(LOGURU_VERSION)
+        _check_minimum_version(LoguruIntegration, version)
+
         if LoguruIntegration.level is not None:
             logger.add(
                 LoguruBreadcrumbHandler(level=LoguruIntegration.level),
