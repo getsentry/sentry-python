@@ -93,7 +93,7 @@ def _get_system_instructions(
     for msg in messages:
         if hasattr(msg, "parts"):
             for part in msg.parts:
-                if SystemPromptPart and isinstance(part, SystemPromptPart):
+                if SystemPromptPart is not None and isinstance(part, SystemPromptPart):
                     permanent_instructions.append(part)
 
         if hasattr(msg, "instructions") and msg.instructions is not None:
@@ -141,15 +141,22 @@ def _set_input_messages(
                 for part in msg.parts:
                     role = "user"
                     # Use isinstance checks with proper base classes
-                    if SystemPromptPart and isinstance(part, SystemPromptPart):
+                    if SystemPromptPart is not None and isinstance(
+                        part, SystemPromptPart
+                    ):
                         continue
                     elif (
-                        (TextPart and isinstance(part, TextPart))
-                        or (ThinkingPart and isinstance(part, ThinkingPart))
-                        or (BaseToolCallPart and isinstance(part, BaseToolCallPart))
+                        (TextPart is not None and isinstance(part, TextPart))
+                        or (ThinkingPart is not None and isinstance(part, ThinkingPart))
+                        or (
+                            BaseToolCallPart is not None
+                            and isinstance(part, BaseToolCallPart)
+                        )
                     ):
                         role = "assistant"
-                    elif BaseToolReturnPart and isinstance(part, BaseToolReturnPart):
+                    elif BaseToolReturnPart is not None and isinstance(
+                        part, BaseToolReturnPart
+                    ):
                         role = "tool"
 
                     content: "List[Dict[str, Any] | str]" = []
@@ -157,7 +164,9 @@ def _set_input_messages(
                     tool_call_id = None
 
                     # Handle ToolCallPart (assistant requesting tool use)
-                    if BaseToolCallPart and isinstance(part, BaseToolCallPart):
+                    if BaseToolCallPart is not None and isinstance(
+                        part, BaseToolCallPart
+                    ):
                         tool_call_data = {}
                         if hasattr(part, "tool_name"):
                             tool_call_data["name"] = part.tool_name
@@ -166,7 +175,9 @@ def _set_input_messages(
                         if tool_call_data:
                             tool_calls = [tool_call_data]
                     # Handle ToolReturnPart (tool result)
-                    elif BaseToolReturnPart and isinstance(part, BaseToolReturnPart):
+                    elif BaseToolReturnPart is not None and isinstance(
+                        part, BaseToolReturnPart
+                    ):
                         if hasattr(part, "tool_name"):
                             tool_call_id = part.tool_name
                         if hasattr(part, "content"):
@@ -179,9 +190,13 @@ def _set_input_messages(
                             for item in part.content:
                                 if isinstance(item, str):
                                     content.append({"type": "text", "text": item})
-                                elif ImageUrl and isinstance(item, ImageUrl):
+                                elif ImageUrl is not None and isinstance(
+                                    item, ImageUrl
+                                ):
                                     content.append(_serialize_image_url_item(item))
-                                elif BinaryContent and isinstance(item, BinaryContent):
+                                elif BinaryContent is not None and isinstance(
+                                    item, BinaryContent
+                                ):
                                     content.append(_serialize_binary_content_item(item))
                                 else:
                                     content.append(safe_serialize(item))
@@ -237,9 +252,15 @@ def _set_output_data(
             tool_calls = []
 
             for part in response.parts:
-                if TextPart and isinstance(part, TextPart) and hasattr(part, "content"):
+                if (
+                    TextPart is not None
+                    and isinstance(part, TextPart)
+                    and hasattr(part, "content")
+                ):
                     texts.append(part.content)
-                elif BaseToolCallPart and isinstance(part, BaseToolCallPart):
+                elif BaseToolCallPart is not None and isinstance(
+                    part, BaseToolCallPart
+                ):
                     tool_call_data = {
                         "type": "function",
                     }

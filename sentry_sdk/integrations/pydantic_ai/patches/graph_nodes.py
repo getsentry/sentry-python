@@ -70,7 +70,7 @@ def _patch_graph_nodes() -> None:
             update_ai_client_span(span, model_response)
             return result
 
-    ModelRequestNode.run = wrapped_model_request_run
+    ModelRequestNode.run = wrapped_model_request_run  # type: ignore[method-assign]
 
     # Patch ModelRequestNode.stream for streaming requests
     original_model_request_stream = ModelRequestNode.stream
@@ -103,4 +103,4 @@ def _patch_graph_nodes() -> None:
 
         return wrapped_model_request_stream
 
-    ModelRequestNode.stream = create_wrapped_stream(original_model_request_stream)
+    ModelRequestNode.stream = create_wrapped_stream(original_model_request_stream)  # type: ignore[method-assign]

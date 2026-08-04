@@ -108,7 +108,7 @@ def register_hooks(hooks: "Hooks") -> None:
 
         return original_init(self, *args, **kwargs)
 
-    Agent.__init__ = patched_init
+    Agent.__init__ = patched_init  # type: ignore[method-assign]
 
 
 class PydanticAIIntegration(Integration):

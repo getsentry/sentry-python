@@ -32,8 +32,8 @@ if TYPE_CHECKING:
 try:
     from pydantic_ai.messages import BinaryContent, ImageUrl
 except ImportError:
-    BinaryContent = None
-    ImageUrl = None
+    BinaryContent = None  # type: ignore[misc,assignment]
+    ImageUrl = None  # type: ignore[misc,assignment]
 
 
 def invoke_agent_span(
@@ -123,9 +123,9 @@ def invoke_agent_span(
                 for item in user_prompt:
                     if isinstance(item, str):
                         content.append({"text": item, "type": "text"})
-                    elif ImageUrl and isinstance(item, ImageUrl):
+                    elif ImageUrl is not None and isinstance(item, ImageUrl):
                         content.append(_serialize_image_url_item(item))
-                    elif BinaryContent and isinstance(item, BinaryContent):
+                    elif BinaryContent is not None and isinstance(item, BinaryContent):
                         content.append(_serialize_binary_content_item(item))
                 if content:
                     messages.append(
