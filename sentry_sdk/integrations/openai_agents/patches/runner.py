@@ -35,6 +35,19 @@ TContext = TypeVar("TContext")
 
 
 class _SentryRunHooks(RunHooks[TContext]):  # type: ignore[misc]
+    """
+    Responsible for creating Execute Tool and Invoke Agent spans. Both
+    spans can also be closed by hooks, and Execute Tool spans are exclusively
+    closed in the hook.
+
+    Execute Tool spans are stored on the ToolContext reference that is shared
+    between `on_tool_start()` and `on_tool_end()`.
+
+    Invoke Agent spans are stored as an instance variable on the hooks
+    instance. This works because agent invocations in a run are always
+    sequential.
+    """
+
     async def on_agent_start(
         self,
         context: "AgentHookContext[TContext]",
@@ -70,7 +83,7 @@ class _SentryRunHooks(RunHooks[TContext]):  # type: ignore[misc]
 
         span = execute_tool_span(tool, agent)
         span.__enter__()
-        context.sentry_tool_span = span
+        context._sentry_execute_tool_span = span
 
         if not should_send_default_pii():
             return
@@ -90,14 +103,19 @@ class _SentryRunHooks(RunHooks[TContext]):  # type: ignore[misc]
         if not isinstance(tool, FunctionTool):
             return
 
-        span = getattr(context, "sentry_tool_span", None)
+        span = getattr(context, "_sentry_execute_tool_span", None)
         if span is not None:
-            del context.sentry_tool_span
+            del context._sentry_execute_tool_span
             update_execute_tool_span(span, agent, tool, result)
             span.__exit__(None, None, None)
 
 
 def _patch_run_hooks(hooks: "RunHooks[TContext]") -> None:
+    """
+    Patch a RunHooks instance. This is used when the user have themselves provided
+    a RunHooks instance, as only one instance can be passed to `AgentRunner.run()`
+    and `AgentRunner.run_streamed()` functions.
+    """
     is_already_patched = getattr(hooks, "_sentry_is_patched", False)
     if is_already_patched:
         return
@@ -158,7 +176,7 @@ def _patch_run_hooks(hooks: "RunHooks[TContext]") -> None:
 
 
 def _create_run_wrapper(
-    original_func: "Callable[..., Any]", use_agent_hooks: "bool", use_tool_hooks: "bool"
+    original_func: "Callable[..., Any]", use_run_hooks: "bool"
 ) -> "Callable[..., Any]":
     """
     Wraps the agents.Runner.run methods to
@@ -171,7 +189,7 @@ def _create_run_wrapper(
 
     @wraps(original_func)
     async def wrapper(*args: "Any", **kwargs: "Any") -> "Any":
-        if use_tool_hooks:
+        if use_run_hooks:
             hooks = kwargs.get("hooks")
             if hooks is not None:
                 _patch_run_hooks(hooks=hooks)
@@ -216,7 +234,7 @@ def _create_run_wrapper(
                         _capture_exception(exc)
 
                         context_wrapper = getattr(exc.run_data, "context_wrapper", None)
-                        if context_wrapper is not None and use_agent_hooks:
+                        if context_wrapper is not None and use_run_hooks:
                             invoke_agent_span = getattr(
                                 hooks, "_sentry_invoke_agent_span", None
                             )
@@ -262,7 +280,7 @@ def _create_run_wrapper(
                         _capture_exception(exc)
                     reraise(*exc_info)
 
-                if not use_agent_hooks:
+                if not use_run_hooks:
                     invoke_agent_span = getattr(
                         run_result.context_wrapper, "_sentry_agent_span", None
                     )
@@ -283,7 +301,7 @@ def _create_run_wrapper(
 
 
 def _create_run_streamed_wrapper(
-    original_func: "Callable[..., Any]", use_agent_hooks: "bool", use_tool_hooks: "bool"
+    original_func: "Callable[..., Any]", use_run_hooks: "bool"
 ) -> "Callable[..., Any]":
     """
     Wraps the agents.Runner.run_streamed method to
@@ -333,7 +351,7 @@ def _create_run_streamed_wrapper(
         else:
             args = (agent, *args[1:])
 
-        if use_tool_hooks:
+        if use_run_hooks:
             sentry_hooks = _SentryRunHooks()  # type: ignore[var-annotated]
             hooks = kwargs.get("hooks")
             if hooks is not None:
