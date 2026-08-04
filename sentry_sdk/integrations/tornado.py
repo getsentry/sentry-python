@@ -19,8 +19,6 @@ from sentry_sdk.traces import SegmentNameSource, StreamedSpan
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
-    CONTEXTVARS_ERROR_MESSAGE,
-    HAS_REAL_CONTEXTVARS,
     AnnotatedValue,
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -53,14 +51,6 @@ class TornadoIntegration(Integration):
     @staticmethod
     def setup_once() -> None:
         _check_minimum_version(TornadoIntegration, TORNADO_VERSION)
-
-        if not HAS_REAL_CONTEXTVARS:
-            # Tornado is async. We better have contextvars or we're going to leak
-            # state between requests.
-            raise DidNotEnable(
-                "The tornado integration for Sentry requires Python 3.7+ or the aiocontextvars package"
-                + CONTEXTVARS_ERROR_MESSAGE
-            )
 
         ignore_logger("tornado.access")
 
