@@ -33,6 +33,7 @@ except ImportError:
     quart_auth = None
 
 try:
+    from flask.sansio.scaffold import Scaffold  # type: ignore
     from quart import (  # type: ignore
         Quart,
         Request,
@@ -50,12 +51,6 @@ try:
     )
 except ImportError:
     raise DidNotEnable("Quart is not installed")
-else:
-    # Quart 0.19 is based on Flask and hence no longer has a Scaffold
-    try:
-        from quart.scaffold import Scaffold  # type: ignore
-    except ImportError:
-        from flask.sansio.scaffold import Scaffold  # type: ignore
 
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 

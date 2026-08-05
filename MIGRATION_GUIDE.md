@@ -37,6 +37,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - Dropped support for Starlette below 0.20.
 - Dropped support for FastAPI below 0.85.
 - Dropped support for trytond below 5.4.
+- Dropped support for Quart below 0.19.
 - Dropped support for Sanic below 22.0.
 - Removed the possibility to supply a specific client to the LaunchDarklyIntegration.
 - The `enable_tracing` option was removed. Use `traces_sample_rate=1.0` instead.
