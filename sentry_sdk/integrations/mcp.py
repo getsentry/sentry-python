@@ -381,8 +381,6 @@ async def _tool_handler_wrapper(
                     result = await result
 
             except Exception as e:
-                # Set error flag for tools
-                _set_span_data_attribute(span, SPANDATA.MCP_TOOL_RESULT_IS_ERROR, True)
                 sentry_sdk.capture_exception(e)
                 raise
 
@@ -469,8 +467,6 @@ async def _instrument_v2_tool_call(
                 result = await call_next(ctx)
 
             except Exception as e:
-                # Set error flag for tools
-                _set_span_data_attribute(span, SPANDATA.MCP_TOOL_RESULT_IS_ERROR, True)
                 sentry_sdk.capture_exception(e)
                 raise
 
