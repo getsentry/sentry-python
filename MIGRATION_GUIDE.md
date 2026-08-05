@@ -32,6 +32,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - Dropped support for greenlet versions below 0.4.17.
 - Dropped support for Falcon versions below 3.0.
 - Dropped support for Flask below 2.0.
+- Dropped support for Chalice below 1.22.
 - Dropped support for aiohttp below 3.7.
 - Removed the possibility to supply a specific client to the LaunchDarklyIntegration.
 - The `enable_tracing` option was removed. Use `traces_sample_rate=1.0` instead.

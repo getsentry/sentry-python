@@ -21,11 +21,12 @@ from sentry_sdk.utils import (
 
 try:
     import chalice  # type: ignore
-    from chalice import Chalice, ChaliceViewError
+    from chalice import ChaliceViewError
     from chalice import __version__ as CHALICE_VERSION
     from chalice.app import (  # type: ignore
         EventSourceHandler as ChaliceEventSourceHandler,
     )
+    from chalice.app import RestAPIEventHandler
 except ImportError:
     raise DidNotEnable("Chalice is not installed")
 
@@ -160,14 +161,7 @@ class ChaliceIntegration(Integration):
         if version is None:
             return
 
-        if version < (1, 20):
-            old_get_view_function_response = Chalice._get_view_function_response
-        else:
-            from chalice.app import RestAPIEventHandler
-
-            old_get_view_function_response = (
-                RestAPIEventHandler._get_view_function_response
-            )
+        old_get_view_function_response = RestAPIEventHandler._get_view_function_response
 
         def sentry_event_response(
             app: "Any", view_function: "F", function_args: "Dict[str, Any]"
@@ -180,9 +174,7 @@ class ChaliceIntegration(Integration):
                 app, wrapped_view_function, function_args
             )
 
-        if version < (1, 20):
-            Chalice._get_view_function_response = sentry_event_response
-        else:
-            RestAPIEventHandler._get_view_function_response = sentry_event_response
+        RestAPIEventHandler._get_view_function_response = sentry_event_response
+
         # for everything else (like events)
         chalice.app.EventSourceHandler = EventSourceHandler
