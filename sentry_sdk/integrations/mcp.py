@@ -139,7 +139,7 @@ def _active_http_scopes(
 
 
 def _get_request_context_data(
-    ctx: "Optional[Any]" = None,
+    ctx: "Any",
 ) -> "tuple[Optional[str], Optional[str], str]":
     """
     Extract request ID, session ID, and MCP transport type from the request context.
@@ -153,12 +153,6 @@ def _get_request_context_data(
     request_id: "Optional[str]" = None
     session_id: "Optional[str]" = None
     mcp_transport: str = "stdio"
-    if MCP_PACKAGE_VERSION and MCP_PACKAGE_VERSION < (2, 0, 0):
-        if ctx is None:
-            try:
-                ctx = request_ctx.get()
-            except LookupError:
-                return request_id, session_id, mcp_transport
 
     if ctx is not None:
         request_id = ctx.request_id
@@ -343,8 +337,14 @@ async def _tool_handler_wrapper(
         "tool", original_args, original_kwargs
     )
 
+    ctx = None
+    try:
+        ctx = request_ctx.get()
+    except LookupError:
+        pass
+
     # Get request ID, session ID, and transport from context
-    request_id, session_id, mcp_transport = _get_request_context_data()
+    request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
 
@@ -542,8 +542,14 @@ async def _prompt_handler_wrapper(
         "prompt", original_args, original_kwargs
     )
 
+    ctx = None
+    try:
+        ctx = request_ctx.get()
+    except LookupError:
+        pass
+
     # Get request ID, session ID, and transport from context
-    request_id, session_id, mcp_transport = _get_request_context_data()
+    request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
 
@@ -812,8 +818,14 @@ async def _resource_handler_wrapper(
         "resource", original_args, original_kwargs
     )
 
+    ctx = None
+    try:
+        ctx = request_ctx.get()
+    except LookupError:
+        pass
+
     # Get request ID, session ID, and transport from context
-    request_id, session_id, mcp_transport = _get_request_context_data()
+    request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
 
