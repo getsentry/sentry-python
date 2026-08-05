@@ -742,7 +742,7 @@ async def test_job_concurrency(
 
         await worker.close()
 
-        (exception_event,) = (event for event in events if "exception" in "event")
+        (exception_event,) = (event for event in events if "exception" in event)
         assert exception_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
         assert exception_event["transaction"] == "division"
 
