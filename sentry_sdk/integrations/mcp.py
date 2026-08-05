@@ -97,20 +97,12 @@ class MCPIntegration(Integration):
 
 @contextmanager
 def _active_http_scopes(
-    ctx: "Any" = None,
+    ctx: "Any",
 ) -> "Iterator[None]":
     """
     Use isolation and current scopes that were stored before the in-memory MCP request queue.
     This ensures that MCP spans are nested under the HTTP server span when using the Streamable HTTP transport.
     """
-    if MCP_PACKAGE_VERSION and MCP_PACKAGE_VERSION < (2, 0, 0):
-        if ctx is None:
-            try:
-                ctx = request_ctx.get()
-            except LookupError:
-                yield None
-                return
-
     if (
         ctx is None
         or not hasattr(ctx, "request")
@@ -349,7 +341,7 @@ async def _tool_handler_wrapper(
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
 
     # Start span and execute
-    with _active_http_scopes():
+    with _active_http_scopes(ctx=ctx):
         span_mgr: "Union[Span, StreamedSpan]"
         if span_streaming:
             span_mgr = sentry_sdk.traces.start_span(
@@ -554,7 +546,7 @@ async def _prompt_handler_wrapper(
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
 
     # Start span and execute
-    with _active_http_scopes():
+    with _active_http_scopes(ctx=ctx):
         span_mgr: "Union[Span, StreamedSpan]"
         if span_streaming:
             span_mgr = sentry_sdk.traces.start_span(
@@ -830,7 +822,7 @@ async def _resource_handler_wrapper(
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
 
     # Start span and execute
-    with _active_http_scopes():
+    with _active_http_scopes(ctx=ctx):
         span_mgr: "Union[Span, StreamedSpan]"
         if span_streaming:
             span_mgr = sentry_sdk.traces.start_span(
