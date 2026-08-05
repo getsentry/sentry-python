@@ -137,7 +137,7 @@ _MIN_VERSIONS = {
     "cohere": (5, 4, 0),
     "django": (2, 0),
     "dramatiq": (1, 9),
-    "falcon": (1, 4),
+    "falcon": (3, 0),
     "fastapi": (0, 79, 0),
     "flask": (2, 0, 0),
     "gql": (3, 4, 1),
