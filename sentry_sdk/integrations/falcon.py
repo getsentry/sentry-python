@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 try:
     import falcon  # type: ignore
     from falcon import __version__ as FALCON_VERSION
-    from falcon.request import _UNSET as _FALCON_UNSET
+    from falcon.request import _UNSET as _FALCON_UNSET  # type: ignore
 except ImportError:
     raise DidNotEnable("Falcon not installed")
 
