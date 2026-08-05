@@ -87,7 +87,17 @@ def get_client(app):
         yield app.test_client
 
     if ReusableClient is not None:
-        return ReusableClient(app, port=get_free_port())
+
+        @contextlib.contextmanager
+        def reusable_client(app):
+            client = ReusableClient(app, port=get_free_port())
+            client.__enter__()
+            try:
+                yield client
+            finally:
+                client.__exit__(None, None, None)
+
+        return reusable_client(app)
     else:
         return simple_client(app)
 
