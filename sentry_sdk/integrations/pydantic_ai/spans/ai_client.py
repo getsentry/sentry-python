@@ -232,7 +232,8 @@ def _set_input_messages(
 
 
 def _set_output_data(
-    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]", response: "ModelResponse"
+    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
+    response: "Optional[ModelResponse]",
 ) -> None:
     """Set output data on a span."""
     if not _should_send_prompts():

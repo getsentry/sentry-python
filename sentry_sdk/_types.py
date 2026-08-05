@@ -478,8 +478,8 @@ if TYPE_CHECKING:
 
     class ToolCallPart(TypedDict):
         type: Literal["tool_call"]
-        name: str
-        arguments: Any
+        name: NotRequired[str]
+        arguments: NotRequired[Any]
 
     class ToolDefinition(TypedDict):
         type: str
