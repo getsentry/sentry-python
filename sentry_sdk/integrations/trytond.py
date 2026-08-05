@@ -47,14 +47,6 @@ class TrytondWSGIIntegration(Integration):
                 )
                 sentry_sdk.capture_event(event, hint=hint)
 
-        # Expected error handlers signature was changed
-        # when the error_handler decorator was introduced
-        # in Tryton-5.4
-        if hasattr(app, "error_handler"):
-
-            @app.error_handler
-            def _(app, request, e):  # type: ignore
-                error_handler(e)
-
-        else:
-            app.error_handlers.append(error_handler)
+        @app.error_handler
+        def _(app, request, e):  # type: ignore
+            error_handler(e)
