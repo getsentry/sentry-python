@@ -161,8 +161,6 @@ class ChaliceIntegration(Integration):
         if version is None:
             return
 
-        _check_minimum_version(ChaliceIntegration, version)
-
         old_get_view_function_response = RestAPIEventHandler._get_view_function_response
 
         def sentry_event_response(
