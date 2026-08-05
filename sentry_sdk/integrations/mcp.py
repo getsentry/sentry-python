@@ -482,7 +482,7 @@ async def _instrument_v2_tool_call(
                 sentry_sdk.capture_exception(e)
                 raise
 
-            if result is None:
+            if not isinstance(result, dict):
                 return result
 
             # Get integration to check PII settings
@@ -496,9 +496,9 @@ async def _instrument_v2_tool_call(
             )
 
             result_content = result
-            if isinstance(result, dict) and "structuredContent" in result:
+            if "structuredContent" in result:
                 result_content = result["structuredContent"]
-            elif isinstance(result, dict) and isinstance(result.get("content"), list):
+            elif isinstance(result.get("content"), list):
                 result_content = _extract_text_from_content_blocks(result["content"])
 
             if result_content is not None and should_include_data:
@@ -728,7 +728,7 @@ async def _instrument_v2_prompt_get(
                 sentry_sdk.capture_exception(e)
                 raise
 
-            if result is None:
+            if not isinstance(result, dict):
                 return result
 
             # Get integration to check PII settings
@@ -746,12 +746,7 @@ async def _instrument_v2_prompt_get(
                 messages: "Optional[list[str]]" = None
                 message_count = 0
 
-                # Check if result has messages attribute (GetPromptResult)
-                if hasattr(result, "messages") and result.messages:
-                    messages = result.messages
-                    message_count = len(messages)
-                # Also check if result is a dict with messages
-                elif isinstance(result, dict) and result.get("messages"):
+                if result.get("messages"):
                     messages = result["messages"]
                     message_count = len(messages)
 
@@ -766,9 +761,7 @@ async def _instrument_v2_prompt_get(
                     first_message = messages[0]
                     # Extract role
                     role = None
-                    if hasattr(first_message, "role"):
-                        role = first_message.role
-                    elif isinstance(first_message, dict) and "role" in first_message:
+                    if "role" in first_message:
                         role = first_message["role"]
 
                     if role:
@@ -776,23 +769,11 @@ async def _instrument_v2_prompt_get(
                             span, SPANDATA.MCP_PROMPT_RESULT_MESSAGE_ROLE, role
                         )
 
-                    # Extract content text
                     content_text = None
-                    if hasattr(first_message, "content"):
-                        msg_content = first_message.content
-                        # Content can be a TextContent object or similar
-                        if hasattr(msg_content, "text"):
-                            content_text = msg_content.text
-                        elif isinstance(msg_content, dict) and "text" in msg_content:
-                            content_text = msg_content["text"]
-                        elif isinstance(msg_content, str):
-                            content_text = msg_content
-                    elif isinstance(first_message, dict) and "content" in first_message:
+                    if "content" in first_message:
                         msg_content = first_message["content"]
-                        if isinstance(msg_content, dict) and "text" in msg_content:
+                        if "text" in msg_content:
                             content_text = msg_content["text"]
-                        elif isinstance(msg_content, str):
-                            content_text = msg_content
 
                     if content_text:
                         _set_span_data_attribute(
@@ -945,14 +926,8 @@ async def _instrument_v2_resource_read(
                 mcp_transport,
             )
 
-            uri = None
-            if ctx.params is not None:
-                uri = getattr(ctx.params, "uri", None)
-
             protocol = None
-            if uri is not None and hasattr(uri, "scheme"):
-                protocol = uri.scheme
-            elif handler_name and "://" in handler_name:
+            if handler_name and "://" in handler_name:
                 protocol = handler_name.split("://")[0]
             if protocol:
                 _set_span_data_attribute(span, SPANDATA.MCP_RESOURCE_PROTOCOL, protocol)
