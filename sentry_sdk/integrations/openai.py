@@ -371,10 +371,7 @@ def _set_responses_api_input_data(
 
     client_options = sentry_sdk.get_client().options
     if has_data_collection_enabled(client_options):
-        if (
-            integration.include_prompts
-            and client_options["data_collection"]["gen_ai"]["inputs"]
-        ):
+        if client_options["data_collection"]["gen_ai"]["inputs"]:
             tools = kwargs.get("tools")
             if tools is not None and _is_given(tools):
                 set_on_span(
@@ -394,9 +391,6 @@ def _set_responses_api_input_data(
             )
 
     if has_data_collection_enabled(client_options):
-        # This takes precedence over the global data collection settings
-        if not integration.include_prompts:
-            return
         if not client_options["data_collection"]["gen_ai"]["inputs"]:
             return
     elif not should_send_default_pii() or not integration.include_prompts:
@@ -519,10 +513,7 @@ def _set_completions_api_input_data(
 
     client = sentry_sdk.get_client()
     if has_data_collection_enabled(client.options):
-        if (
-            integration.include_prompts
-            and client.options["data_collection"]["gen_ai"]["inputs"]
-        ):
+        if client.options["data_collection"]["gen_ai"]["inputs"]:
             tools = kwargs.get("tools")
             if tools is not None and _is_given(tools):
                 set_on_span(
@@ -546,9 +537,6 @@ def _set_completions_api_input_data(
     )
 
     if has_data_collection_enabled(client.options):
-        # This takes precedence over the global data collection settings
-        if not integration.include_prompts:
-            return
         if not client.options["data_collection"]["gen_ai"]["inputs"]:
             return
     elif not should_send_default_pii() or not integration.include_prompts:
@@ -627,9 +615,6 @@ def _set_embeddings_input_data(
 
     client = sentry_sdk.get_client()
     if has_data_collection_enabled(client.options):
-        # This takes precedence over the global data collection settings
-        if not integration.include_prompts:
-            return
         if not client.options["data_collection"]["gen_ai"]["inputs"]:
             return
     elif not should_send_default_pii() or not integration.include_prompts:
