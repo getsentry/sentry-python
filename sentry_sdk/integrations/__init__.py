@@ -139,7 +139,7 @@ _MIN_VERSIONS = {
     "dramatiq": (1, 9),
     "falcon": (1, 4),
     "fastapi": (0, 79, 0),
-    "flask": (1, 1, 4),
+    "flask": (2, 0, 0),
     "gql": (3, 4, 1),
     "graphene": (3, 3),
     "google_genai": (1, 29, 0),  # google-genai
