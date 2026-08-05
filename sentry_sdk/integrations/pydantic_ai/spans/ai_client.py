@@ -277,10 +277,11 @@ def _set_output_data(
                         tool_part["arguments"] = safe_serialize(part.args)
                     parts.append(tool_part)
 
-            set_on_span(
-                SPANDATA.GEN_AI_OUTPUT_MESSAGES,
-                json.dumps([{"role": "assistant", "parts": parts}]),
-            )
+            if parts:
+                set_on_span(
+                    SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                    json.dumps([{"role": "assistant", "parts": parts}]),
+                )
 
     except Exception:
         # If we fail to format output, just skip it
