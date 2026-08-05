@@ -518,7 +518,6 @@ TEST_SUITE_CONFIG = {
             "*": ["werkzeug"],
             "<=5.0": ["werkzeug<1.0"],
         },
-        "integration_name": "trytondwsgi",
     },
     "typer": {
         "package": "typer",
