@@ -11,14 +11,12 @@ TEST_SUITE_CONFIG = {
             "*": ["pytest-aiohttp"],
             ">=3.8": ["pytest-asyncio"],
         },
-        "python": ">=3.7",
     },
     "aiomysql": {
         "package": "aiomysql",
         "deps": {
             "*": ["pytest-asyncio", "cryptography"],
         },
-        "python": ">=3.7",
     },
     "anthropic": {
         "package": "anthropic",
@@ -54,11 +52,9 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["pytest-asyncio"],
         },
-        "python": ">=3.7",
     },
     "beam": {
         "package": "apache-beam",
-        "python": ">=3.7",
         "num_versions": 2,
         "deps": {
             "*": ["dill"],
@@ -157,14 +153,11 @@ TEST_SUITE_CONFIG = {
         "package": "flask",
         "deps": {
             "*": ["flask-login", "werkzeug", "blinker"],
-            # https://github.com/pallets/flask/issues/4455
-            "<2.0": [
-                "werkzeug<2.1.0",
-                "markupsafe<2.0.0",
-                "itsdangerous>=0.24,<2.0",
-                "jinja2<3.1.1",
-            ],
+            "<2.3": ["werkzeug<2.3"],
             "py3.7": ["setuptools<82"],  # Handled by importlib.metadata on Python 3.8+
+        },
+        "python": {
+            "<2.3": "<3.11",
         },
     },
     "gql": {
@@ -199,7 +192,6 @@ TEST_SUITE_CONFIG = {
                 "pytest-forked",
             ],
         },
-        "python": ">=3.7",
     },
     "httpx": {
         "package": "httpx",
@@ -414,10 +406,9 @@ TEST_SUITE_CONFIG = {
     "redis": {
         "package": "redis",
         "deps": {
-            "*": ["fakeredis!=1.7.4", "pytest<8.0.0"],
+            "*": ["fakeredis!=1.7.4", "pytest<8.0.0", "pytest-asyncio"],
             ">=4.0,<5.0": ["fakeredis<2.31.0"],
             "py3.7,py3.8": ["fakeredis<2.26.0"],
-            "py3.7,py3.8,py3.9,py3.10,py3.11,py3.12,py3.13": ["pytest-asyncio"],
         },
     },
     "redis_py_cluster_legacy": {
@@ -463,9 +454,6 @@ TEST_SUITE_CONFIG = {
     },
     "sqlalchemy": {
         "package": "sqlalchemy",
-        "python": {
-            "<1.4": "<3.10",
-        },
     },
     "starlette": {
         "package": "starlette",

@@ -157,9 +157,9 @@ class ChaliceIntegration(Integration):
     @staticmethod
     def setup_once() -> None:
         version = parse_version(CHALICE_VERSION)
-
+        _check_minimum_version(ChaliceIntegration, version)
         if version is None:
-            raise DidNotEnable("Unparsable Chalice version: {}".format(CHALICE_VERSION))
+            return
 
         _check_minimum_version(ChaliceIntegration, version)
 

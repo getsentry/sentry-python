@@ -1,6 +1,6 @@
 from functools import wraps
 
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.utils import parse_version
 
 from .patches import (
@@ -95,6 +95,7 @@ class OpenAIAgentsIntegration(Integration):
         _patch_runner()
 
         library_version = parse_version(OPENAI_AGENTS_VERSION)
+        _check_minimum_version(OpenAIAgentsIntegration, library_version)
         if library_version is not None and library_version >= (
             0,
             8,
