@@ -149,6 +149,7 @@ def _patch_run_hooks(hooks: "RunHooks[TContext]") -> None:
 
     original_on_agent_start = hooks.on_agent_start
     original_on_agent_end = hooks.on_agent_end
+    original_on_handoff = hooks.on_handoff
 
     original_on_tool_start = hooks.on_tool_start
     original_on_tool_end = hooks.on_tool_end
@@ -174,6 +175,16 @@ def _patch_run_hooks(hooks: "RunHooks[TContext]") -> None:
             await sentry_hooks.on_agent_end(context, agent, output)
         await original_on_agent_end(context, agent, output)
 
+    @wraps(original_on_handoff)
+    async def on_handoff(
+        context: "RunContextWrapper[TContext]",
+        from_agent: "Agent[TContext]",
+        to_agent: "Agent[TContext]",
+    ) -> "None":
+        with capture_internal_exceptions():
+            await sentry_hooks.on_handoff(context, from_agent, to_agent)
+        await original_on_handoff(context, from_agent, to_agent)
+
     @wraps(original_on_tool_start)
     async def on_tool_start(
         context: "ToolContext[TContext]", agent: "Agent[TContext]", tool: "Tool"
@@ -197,6 +208,7 @@ def _patch_run_hooks(hooks: "RunHooks[TContext]") -> None:
 
     hooks.on_agent_start = on_agent_start
     hooks.on_agent_end = on_agent_end
+    hooks.on_handoff = on_handoff
 
     hooks.on_tool_start = on_tool_start
     hooks.on_tool_end = on_tool_end
