@@ -138,7 +138,7 @@ _MIN_VERSIONS = {
     "django": (2, 0),
     "dramatiq": (1, 9),
     "falcon": (3, 0),
-    "fastapi": (0, 79, 0),
+    "fastapi": (0, 85, 0),
     "flask": (2, 0, 0),
     "gql": (3, 4, 1),
     "graphene": (3, 3),
