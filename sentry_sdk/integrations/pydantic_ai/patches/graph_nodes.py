@@ -16,7 +16,9 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable
+    from typing import Any, Callable, Optional
+
+    from pydantic_ai.messages import ModelResponse
 
 
 def _extract_span_data(node: "Any", ctx: "Any") -> "tuple[list[Any], Any, Any]":
@@ -63,7 +65,7 @@ def _patch_graph_nodes() -> None:
             result = await original_model_request_run(self, ctx)
 
             # Extract response from result if available
-            model_response = None
+            model_response: "Optional[ModelResponse]" = None
             if hasattr(result, "model_response"):
                 model_response = result.model_response
 
@@ -93,7 +95,7 @@ def _patch_graph_nodes() -> None:
 
                 # After streaming completes, update span with response data
                 # The ModelRequestNode stores the final response in _result
-                model_response = None
+                model_response: "Optional[ModelResponse]" = None
                 if hasattr(self, "_result") and self._result is not None:
                     # _result is a NextNode containing the model_response
                     if hasattr(self._result, "model_response"):
