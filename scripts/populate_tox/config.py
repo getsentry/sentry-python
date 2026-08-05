@@ -146,6 +146,11 @@ TEST_SUITE_CONFIG = {
             # FastAPI versions we use older httpx which still supports the
             # deprecated argument.
             "<0.110.1": ["httpx<0.28.0"],
+            # Old Starlette (< 0.21, used by FastAPI < 0.95) uses
+            # anyio.start_blocking_portal (removed in anyio 4) and its
+            # TestClient _MockOriginalResponse lacks close() (called by
+            # urllib3 >= 2).
+            "<0.95.0": ["anyio<4", "urllib3<2"],
         },
     },
     "flask": {
