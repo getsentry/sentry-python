@@ -11,14 +11,12 @@ TEST_SUITE_CONFIG = {
             "*": ["pytest-aiohttp"],
             ">=3.8": ["pytest-asyncio"],
         },
-        "python": ">=3.7",
     },
     "aiomysql": {
         "package": "aiomysql",
         "deps": {
             "*": ["pytest-asyncio", "cryptography"],
         },
-        "python": ">=3.7",
     },
     "anthropic": {
         "package": "anthropic",
@@ -54,11 +52,9 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["pytest-asyncio"],
         },
-        "python": ">=3.7",
     },
     "beam": {
         "package": "apache-beam",
-        "python": ">=3.7",
         "num_versions": 2,
         "deps": {
             "*": ["dill"],
@@ -196,7 +192,6 @@ TEST_SUITE_CONFIG = {
                 "pytest-forked",
             ],
         },
-        "python": ">=3.7",
     },
     "httpx": {
         "package": "httpx",
