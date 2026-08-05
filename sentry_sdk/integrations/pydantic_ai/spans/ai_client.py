@@ -257,15 +257,13 @@ def _set_output_data(
                     and isinstance(part, TextPart)
                     and hasattr(part, "content")
                 ):
-                    parts.append(
-                        {"type": "text", "content": safe_serialize(part.content)}
-                    )
+                    parts.append({"type": "text", "content": part.content})
 
                 elif ThinkingPart is not None and isinstance(part, ThinkingPart):
                     parts.append(
                         {
                             "type": "reasoning",
-                            "content": safe_serialize(part.content),
+                            "content": part.content,
                         }
                     )
 
