@@ -32,7 +32,7 @@ from .utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Union
+    from typing import Any, Dict, List, Optional, Union
 
     from pydantic_ai.messages import ModelMessage, ModelResponse, SystemPromptPart
 
@@ -244,7 +244,7 @@ def _set_output_data(
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
     )
-    set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)
+    set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)  # type: ignore[arg-type]
 
     try:
         if hasattr(response, "parts"):
@@ -344,7 +344,7 @@ def ai_client_span(
 
 def update_ai_client_span(
     span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
-    model_response: "ModelResponse",
+    model_response: "Optional[ModelResponse]",
 ) -> None:
     """Update the AI client span with response data."""
     if not span:
