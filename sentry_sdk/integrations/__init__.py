@@ -162,11 +162,11 @@ _MIN_VERSIONS = {
     "pymongo": (3, 5, 0),
     "pyramid": (2, 0),
     "pyreqwest": (0, 11, 6),
-    "quart": (0, 16, 0),
+    "quart": (0, 19, 0),
     "ray": (2, 7, 0),
     "redis": (2, 10, 0),
     "requests": (2, 30, 0),
-    "rq": (0, 6),
+    "rq": (1, 0),
     "sanic": (22, 0),
     "spark": (3, 0),  # pyspark
     "sqlalchemy": (1, 4),
