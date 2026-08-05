@@ -743,7 +743,7 @@ async def _instrument_v2_prompt_get(
 
             # For prompts, count messages and set role/content only for single-message prompts
             try:
-                messages: "list[dict[str, Any]]" = None
+                messages: "Optional[list[dict[str, Any]]]" = None
                 message_count = 0
 
                 if result.get("messages"):
