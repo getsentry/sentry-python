@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock
+
 import pytest
 import redis
 
@@ -14,7 +16,9 @@ def monkeypatch_rediscluster_class(reset_integrations):
     pipeline_cls = redis.cluster.ClusterPipeline
     redis.cluster.NodesManager.initialize = lambda *_, **__: None
     redis.RedisCluster.command = lambda *_: []
-    redis.RedisCluster.pipeline = lambda *_, **__: pipeline_cls(None, None)
+    redis.RedisCluster.pipeline = lambda *_, **__: pipeline_cls(
+        MagicMock(), MagicMock()
+    )
     redis.RedisCluster.get_default_node = lambda *_, **__: redis.cluster.ClusterNode(
         "localhost", 6379
     )

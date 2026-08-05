@@ -2,7 +2,7 @@ import sys
 from functools import wraps
 
 import sentry_sdk
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.aws_lambda import _make_request_event_processor
 from sentry_sdk.traces import (
@@ -156,9 +156,9 @@ class ChaliceIntegration(Integration):
     @staticmethod
     def setup_once() -> None:
         version = parse_version(CHALICE_VERSION)
-
+        _check_minimum_version(ChaliceIntegration, version)
         if version is None:
-            raise DidNotEnable("Unparsable Chalice version: {}".format(CHALICE_VERSION))
+            return
 
         if version < (1, 20):
             old_get_view_function_response = Chalice._get_view_function_response

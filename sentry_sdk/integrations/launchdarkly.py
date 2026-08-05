@@ -1,10 +1,12 @@
 from typing import TYPE_CHECKING
 
 from sentry_sdk.feature_flags import add_feature_flag
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
+from sentry_sdk.utils import parse_version
 
 try:
     import ldclient
+    from ldclient import __version__ as LDCLIENT_VERSION
     from ldclient.hook import Hook, Metadata
 
     if TYPE_CHECKING:
@@ -38,7 +40,8 @@ class LaunchDarklyIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        pass
+        version = parse_version(LDCLIENT_VERSION)
+        _check_minimum_version(LaunchDarklyIntegration, version)
 
 
 class LaunchDarklyHook(Hook):

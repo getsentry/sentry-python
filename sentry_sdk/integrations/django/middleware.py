@@ -2,6 +2,7 @@
 Create spans from Django middleware invocations
 """
 
+from contextvars import ContextVar
 from functools import wraps
 from typing import TYPE_CHECKING
 
@@ -11,7 +12,6 @@ import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
-    ContextVar,
     capture_internal_exceptions,
     transaction_from_function,
 )
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
     F = TypeVar("F", bound=Callable[..., Any])
 
-_import_string_should_wrap_middleware = ContextVar(
+_import_string_should_wrap_middleware: "ContextVar[bool]" = ContextVar(
     "import_string_should_wrap_middleware"
 )
 

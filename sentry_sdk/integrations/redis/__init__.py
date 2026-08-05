@@ -1,13 +1,13 @@
 import warnings
 from typing import TYPE_CHECKING
 
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.redis.consts import _DEFAULT_MAX_DATA_SIZE
 from sentry_sdk.integrations.redis.rb import _patch_rb
 from sentry_sdk.integrations.redis.redis import _patch_redis
 from sentry_sdk.integrations.redis.redis_cluster import _patch_redis_cluster
 from sentry_sdk.integrations.redis.redis_py_cluster_legacy import _patch_rediscluster
-from sentry_sdk.utils import logger
+from sentry_sdk.utils import logger, parse_version
 
 if TYPE_CHECKING:
     from typing import Optional
@@ -36,8 +36,12 @@ class RedisIntegration(Integration):
     def setup_once() -> None:
         try:
             from redis import StrictRedis, client
+            from redis import __version__ as REDIS_VERSION
         except ImportError:
             raise DidNotEnable("Redis client not installed")
+
+        version = parse_version(REDIS_VERSION)
+        _check_minimum_version(RedisIntegration, version)
 
         _patch_redis(StrictRedis, client)
         _patch_redis_cluster()

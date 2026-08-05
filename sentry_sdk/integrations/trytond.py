@@ -1,15 +1,20 @@
 import sentry_sdk
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.utils import ensure_integration_enabled, event_from_exception
+from sentry_sdk.utils import (
+    ensure_integration_enabled,
+    event_from_exception,
+    parse_version,
+)
 
 try:
+    from trytond import __version__ as TRYTOND_VERSION  # type: ignore
     from trytond.exceptions import TrytonException  # type: ignore
     from trytond.wsgi import app  # type: ignore
 except ImportError:
     raise DidNotEnable("Trytond is not installed.")
 
-# TODO: trytond-worker, trytond-cron and trytond-admin intergations
+# TODO: trytond-worker, trytond-cron and trytond-admin integrations
 
 
 class TrytondWSGIIntegration(Integration):
@@ -21,6 +26,9 @@ class TrytondWSGIIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        version = parse_version(TRYTOND_VERSION)
+        _check_minimum_version(TrytondWSGIIntegration, version, "trytond")
+
         app.wsgi_app = SentryWsgiMiddleware(
             app.wsgi_app,
             span_origin=TrytondWSGIIntegration.origin,
