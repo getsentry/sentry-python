@@ -284,7 +284,7 @@ async def _execute_handoffs(
         handoff_span(context_wrapper, agent, handoff_agent_name)
 
     if (
-        not use_run_hooks
+        use_run_hooks
         or not agent
         or not context_wrapper
         or not _has_active_agent_span(context_wrapper)

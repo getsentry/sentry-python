@@ -59,9 +59,7 @@ class _SentryRunHooks(RunHooks[TContext]):  # type: ignore[misc]
         context: "AgentHookContext[TContext]",
         agent: "Agent[TContext]",
     ) -> "None":
-        span = invoke_agent_span(agent, context.turn_input)
-        span.__enter__()
-        self._sentry_invoke_agent_span = span
+        self._sentry_invoke_agent_span = invoke_agent_span(agent, context.turn_input)
 
     async def on_agent_end(
         self,
