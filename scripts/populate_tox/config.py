@@ -160,6 +160,9 @@ TEST_SUITE_CONFIG = {
             "<2.3": ["werkzeug<2.3"],
             "py3.7": ["setuptools<82"],  # Handled by importlib.metadata on Python 3.8+
         },
+        "python": {
+            "<2.3": "<3.11",
+        },
     },
     "gql": {
         "package": "gql[all]",
