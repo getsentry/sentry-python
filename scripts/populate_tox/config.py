@@ -515,7 +515,7 @@ TEST_SUITE_CONFIG = {
         "package": "trytond",
         "deps": {
             "*": ["werkzeug"],
-            "<=5.0": ["werkzeug<1.0"],
+            "<5.5": ["werkzeug<2.0"],
         },
     },
     "typer": {

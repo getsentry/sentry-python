@@ -1,6 +1,5 @@
 import contextlib
 import weakref
-from inspect import iscoroutinefunction
 
 import sentry_sdk
 from sentry_sdk.api import continue_trace
@@ -30,7 +29,6 @@ from sentry_sdk.utils import (
 
 try:
     from tornado import version_info as TORNADO_VERSION
-    from tornado.gen import coroutine
     from tornado.web import HTTPError, RequestHandler
 except ImportError:
     raise DidNotEnable("Tornado not installed")
@@ -56,26 +54,11 @@ class TornadoIntegration(Integration):
 
         old_execute = RequestHandler._execute
 
-        awaitable = iscoroutinefunction(old_execute)
-
-        if awaitable:
-            # Starting Tornado 6 RequestHandler._execute method is a standard Python coroutine (async/await)
-            # In that case our method should be a coroutine function too
-            async def sentry_execute_request_handler(
-                self: "RequestHandler", *args: "Any", **kwargs: "Any"
-            ) -> "Any":
-                with _handle_request_impl(self):
-                    return await old_execute(self, *args, **kwargs)
-
-        else:
-
-            @coroutine  # type: ignore
-            def sentry_execute_request_handler(
-                self: "RequestHandler", *args: "Any", **kwargs: "Any"
-            ) -> "Any":
-                with _handle_request_impl(self):
-                    result = yield from old_execute(self, *args, **kwargs)
-                    return result
+        async def sentry_execute_request_handler(
+            self: "RequestHandler", *args: "Any", **kwargs: "Any"
+        ) -> "Any":
+            with _handle_request_impl(self):
+                return await old_execute(self, *args, **kwargs)
 
         RequestHandler._execute = sentry_execute_request_handler
 
