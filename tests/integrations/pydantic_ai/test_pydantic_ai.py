@@ -3049,18 +3049,19 @@ async def test_message_parts_with_list_content(sentry_init, capture_items):
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_output_data_transformations(
-    sentry_init, capture_items, capture_events, span_streaming
+    sentry_init, capture_items, capture_events, span_streaming, stream_gen_ai_spans
 ):
     """
-    Test transformation of outputs from `Model.get_response()` and `Model.stream_response()`.
+    Test transformation of the model response from `Hooks.on.after_model_request`.
     """
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=False,
+        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
@@ -3082,9 +3083,7 @@ async def test_output_data_transformations(
     if span_streaming:
         items = capture_items("span")
 
-        await agent.run(
-            "What is 5 times 3?",
-        )
+        await agent.run("What is 5 times 3?")
         sentry_sdk.flush()
 
         spans = [item.payload for item in items]
@@ -3116,12 +3115,40 @@ async def test_output_data_transformations(
             chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
             == "The answer is 15."
         )
+    elif stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        await agent.run("What is 5 times 3?")
+
+        (transaction,) = (item.payload for item in items if item.type == "transaction")
+        assert transaction["contexts"]["trace"]["op"] == "gen_ai.invoke_agent"
+        assert transaction["contexts"]["trace"]["data"][
+            SPANDATA.GEN_AI_RESPONSE_TEXT
+        ] == ("The answer is 15.")
+
+        spans = [item.payload for item in items if item.type == "span"]
+        chat_spans = [
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == "gen_ai.chat"
+        ]
+        assert json.loads(
+            chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+        ) == [
+            {
+                "type": "function",
+                "name": "multiply",
+                "arguments": '{"a": 5, "b": 3}',
+            }
+        ]
+        assert (
+            chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            == "The answer is 15."
+        )
     else:
         events = capture_events()
 
-        await agent.run(
-            "What is 5 times 3?",
-        )
+        await agent.run("What is 5 times 3?")
 
         (transaction,) = events
         assert transaction["contexts"]["trace"]["op"] == "gen_ai.invoke_agent"
