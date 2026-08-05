@@ -12,7 +12,6 @@ try:
     if TYPE_CHECKING:
         from typing import Any
 
-        from ldclient import LDClient
         from ldclient.evaluation import EvaluationDetail
         from ldclient.hook import EvaluationSeriesContext
 except ImportError:
@@ -22,13 +21,13 @@ except ImportError:
 class LaunchDarklyIntegration(Integration):
     identifier = "launchdarkly"
 
-    def __init__(self, ld_client: "LDClient | None" = None) -> None:
-        """
-        :param client: An initialized LDClient instance. If a client is not provided, this
-            integration will attempt to use the shared global instance.
-        """
+    @staticmethod
+    def setup_once() -> None:
+        version = parse_version(LDCLIENT_VERSION)
+        _check_minimum_version(LaunchDarklyIntegration, version)
+
         try:
-            client = ld_client or ldclient.get()
+            client = ldclient.get()
         except Exception as exc:
             raise DidNotEnable("Error getting LaunchDarkly client. " + repr(exc))
 
@@ -37,11 +36,6 @@ class LaunchDarklyIntegration(Integration):
 
         # Register the flag collection hook with the LD client.
         client.add_hook(LaunchDarklyHook())
-
-    @staticmethod
-    def setup_once() -> None:
-        version = parse_version(LDCLIENT_VERSION)
-        _check_minimum_version(LaunchDarklyIntegration, version)
 
 
 class LaunchDarklyHook(Hook):
