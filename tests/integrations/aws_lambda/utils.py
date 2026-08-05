@@ -29,6 +29,10 @@ SAM_PORT = 3001
 
 PYTHON_VERSION = f"python{sys.version_info.major}.{sys.version_info.minor}"
 
+# Match the host CPU architecture so local runs on ARM machines (e.g. macOS)
+# don't run the Lambda containers under slow x86_64 emulation.
+ARCHITECTURE = "arm64" if platform.machine() in ("arm64", "aarch64") else "x86_64"
+
 
 def get_host_ip():
     """
@@ -105,6 +109,7 @@ class LocalLambdaStack(Stack):
                     "CodeUri": os.path.join(LAMBDA_FUNCTION_DIR, lambda_dir),
                     "Handler": "sentry_sdk.integrations.init_serverless_sdk.sentry_lambda_handler",
                     "Runtime": PYTHON_VERSION,
+                    "Architectures": [ARCHITECTURE],
                     "Timeout": LAMBDA_FUNCTION_TIMEOUT,
                     "Layers": [
                         {"Ref": self.sentry_layer.logical_id}
@@ -172,6 +177,7 @@ class LocalLambdaStack(Stack):
                     "Handler": "index.handler",
                     "Runtime": PYTHON_VERSION,
                     "Timeout": LAMBDA_FUNCTION_TIMEOUT,
+                    "Architectures": [ARCHITECTURE],
                     "Environment": {
                         "Variables": {
                             "SENTRY_DSN": dsn,
