@@ -152,7 +152,7 @@ class OpenAIAgentsIntegration(Integration):
                     *args: "Any", **kwargs: "Any"
                 ) -> "SingleStepResult":
                     return await _execute_handoffs(
-                        original_execute_handoffs, *args, **kwargs
+                        original_execute_handoffs, use_run_hooks, *args, **kwargs
                     )
 
                 agents.run_internal.turn_resolution.execute_handoffs = (
@@ -236,7 +236,9 @@ class OpenAIAgentsIntegration(Integration):
         async def old_wrapped_execute_handoffs(
             cls: "agents.Runner", *args: "Any", **kwargs: "Any"
         ) -> "SingleStepResult":
-            return await _execute_handoffs(original_execute_handoffs, *args, **kwargs)
+            return await _execute_handoffs(
+                original_execute_handoffs, use_run_hooks, *args, **kwargs
+            )
 
         agents._run_impl.RunImpl.execute_handoffs = classmethod(
             old_wrapped_execute_handoffs

@@ -11,6 +11,7 @@ from sentry_sdk.utils import capture_internal_exceptions, reraise
 from ..spans import (
     agent_workflow_span,
     execute_tool_span,
+    handoff_span,
     invoke_agent_span,
     update_execute_tool_span,
     update_invoke_agent_span,
@@ -18,7 +19,7 @@ from ..spans import (
 from ..utils import _capture_exception
 
 try:
-    from agents import FunctionTool, RunHooks
+    from agents import FunctionTool, RunContextWrapper, RunHooks
     from agents.exceptions import AgentsException
 except ImportError:
     raise DidNotEnable("OpenAI Agents not installed")
@@ -46,6 +47,11 @@ class _SentryRunHooks(RunHooks[TContext]):  # type: ignore[misc]
     Invoke Agent spans are stored as an instance variable on the hooks
     instance. This works because agent invocations in a run are always
     sequential.
+
+    The `on_agent_end()` hook only fires once in a given run.
+    In a handoff, `on_handoff()` and `on_agent_start()` with the new
+    agent are invoked. The `on_handoff()` hook therefore finishes the
+    span corresponding to the `from_agent`.
     """
 
     async def on_agent_start(
@@ -53,7 +59,9 @@ class _SentryRunHooks(RunHooks[TContext]):  # type: ignore[misc]
         context: "AgentHookContext[TContext]",
         agent: "Agent[TContext]",
     ) -> "None":
-        self._sentry_invoke_agent_span = invoke_agent_span(agent, context.turn_input)
+        span = invoke_agent_span(agent, context.turn_input)
+        span.__enter__()
+        self._sentry_invoke_agent_span = span
 
     async def on_agent_end(
         self,
@@ -71,6 +79,25 @@ class _SentryRunHooks(RunHooks[TContext]):  # type: ignore[misc]
             )
             del self._sentry_invoke_agent_span
             span.__exit__(None, None, None)
+
+    async def on_handoff(
+        self,
+        context: "RunContextWrapper[TContext]",
+        from_agent: "Agent[TContext]",
+        to_agent: "Agent[TContext]",
+    ) -> "None":
+        span = getattr(self, "_sentry_invoke_agent_span", None)
+        if span is not None:
+            update_invoke_agent_span(
+                span=span,
+                usage=context.usage,
+                agent=from_agent,
+                output=None,
+            )
+            del self._sentry_invoke_agent_span
+            span.__exit__(None, None, None)
+
+        handoff_span(context, from_agent, to_agent.name)
 
     async def on_tool_start(
         self,

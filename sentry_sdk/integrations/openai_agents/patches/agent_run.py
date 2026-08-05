@@ -261,6 +261,7 @@ async def _run_single_turn_streamed(
 
 async def _execute_handoffs(
     original_execute_handoffs: "Callable[..., SingleStepResult]",
+    use_run_hooks: "bool",
     *args: "Any",
     **kwargs: "Any",
 ) -> "SingleStepResult":
@@ -277,12 +278,17 @@ async def _execute_handoffs(
     agent = kwargs.get("public_agent", kwargs.get("agent"))
 
     # Create Sentry handoff span for the first handoff (agents library only processes the first one)
-    if run_handoffs:
+    if not use_run_hooks and run_handoffs:
         first_handoff = run_handoffs[0]
         handoff_agent_name = first_handoff.handoff.agent_name
         handoff_span(context_wrapper, agent, handoff_agent_name)
 
-    if not agent or not context_wrapper or not _has_active_agent_span(context_wrapper):
+    if (
+        not use_run_hooks
+        or not agent
+        or not context_wrapper
+        or not _has_active_agent_span(context_wrapper)
+    ):
         # Call original method with all parameters
         try:
             return await original_execute_handoffs(*args, **kwargs)
