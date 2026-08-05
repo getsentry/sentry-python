@@ -666,11 +666,10 @@ def test_nonstreaming_chat_completion(
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
-    "data_collection,include_prompts,expected_present,expected_absent",
+    "data_collection,expected_present,expected_absent",
     [
         pytest.param(
             {"gen_ai": {"inputs": True}},
-            True,
             {
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: json.dumps(
                     [{"type": "text", "content": "You are a helpful assistant."}]
@@ -681,22 +680,20 @@ def test_nonstreaming_chat_completion(
                 SPANDATA.GEN_AI_TOOL_DEFINITIONS: safe_serialize(EXAMPLE_TOOLS),
             },
             [],
-            id="inputs-enabled",
+            id="gen-ai-inputs-enabled",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False}},
-            True,
             {},
             [
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
                 SPANDATA.GEN_AI_TOOL_DEFINITIONS,
             ],
-            id="inputs-disabled",
+            id="gen-ai-inputs-disabled",
         ),
         pytest.param(
             {},
-            True,
             {
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: json.dumps(
                     [{"type": "text", "content": "You are a helpful assistant."}]
@@ -709,17 +706,6 @@ def test_nonstreaming_chat_completion(
             [],
             id="gen-ai-omitted-defaults-to-enabled",
         ),
-        pytest.param(
-            {"gen_ai": {"inputs": True}},
-            False,
-            {},
-            [
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
-            ],
-            id="include-prompts-disabled-overrides-inputs-enabled",
-        ),
     ],
 )
 def test_completions_api_data_collection(
@@ -727,7 +713,6 @@ def test_completions_api_data_collection(
     capture_events,
     capture_items,
     data_collection,
-    include_prompts,
     expected_present,
     expected_absent,
     nonstreaming_chat_completions_model_response,
@@ -735,7 +720,7 @@ def test_completions_api_data_collection(
     span_streaming,
 ):
     sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=include_prompts)],
+        integrations=[OpenAIIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         _experiments={"data_collection": data_collection},
@@ -3013,49 +2998,37 @@ def _collect_embeddings_span_data(
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,expect_input",
+    "data_collection,send_default_pii,expect_input",
     [
         pytest.param(
             {"gen_ai": {"inputs": True}},
             False,
             True,
-            True,
-            id="inputs-enabled-overrides-pii-disabled",
+            id="gen-ai-inputs-enabled-overrides-pii-disabled",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False}},
             True,
-            True,
             False,
-            id="inputs-disabled-overrides-pii-enabled",
+            id="gen-ai-inputs-disabled-overrides-pii-enabled",
         ),
         pytest.param(
             {},
             False,
-            True,
             True,
             id="gen-ai-omitted-defaults-to-enabled",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False}},
             False,
-            True,
             False,
-            id="inputs-disabled-and-pii-disabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": True}},
-            True,
-            False,
-            False,
-            id="include-prompts-disabled-overrides-inputs-enabled",
+            id="gen-ai-inputs-disabled-and-pii-disabled",
         ),
         pytest.param(
             None,
             False,
-            True,
             False,
-            id="no-experiment-falls-back-to-pii",
+            id="no-gen-ai-data-collection-falls-back-to-send-default-pii",
         ),
     ],
 )
@@ -3065,13 +3038,12 @@ def test_embeddings_create_data_collection(
     capture_items,
     data_collection,
     send_default_pii,
-    include_prompts,
     expect_input,
     stream_gen_ai_spans,
     span_streaming,
 ):
     init_kwargs = {
-        "integrations": [OpenAIIntegration(include_prompts=include_prompts)],
+        "integrations": [OpenAIIntegration()],
         "disabled_integrations": [StdlibIntegration],
         "traces_sample_rate": 1.0,
         "send_default_pii": send_default_pii,
@@ -3429,40 +3401,29 @@ async def test_embeddings_create_async(
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,expect_input",
+    "data_collection,send_default_pii,expect_input",
     [
         pytest.param(
             {"gen_ai": {"inputs": True}},
             False,
             True,
-            True,
-            id="inputs-enabled-overrides-pii-disabled",
+            id="gen-ai-inputs-enabled-overrides-pii-disabled",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False}},
             True,
-            True,
             False,
-            id="inputs-disabled-overrides-pii-enabled",
+            id="gen-ai-inputs-disabled-overrides-pii-enabled",
         ),
         pytest.param(
             {},
             False,
             True,
-            True,
             id="gen-ai-omitted-defaults-to-enabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": True}},
-            True,
-            False,
-            False,
-            id="include-prompts-disabled-overrides-inputs-enabled",
         ),
         pytest.param(
             None,
             False,
-            True,
             False,
             id="no-experiment-falls-back-to-pii",
         ),
@@ -3474,13 +3435,12 @@ async def test_embeddings_create_async_data_collection(
     capture_items,
     data_collection,
     send_default_pii,
-    include_prompts,
     expect_input,
     stream_gen_ai_spans,
     span_streaming,
 ):
     init_kwargs = {
-        "integrations": [OpenAIIntegration(include_prompts=include_prompts)],
+        "integrations": [OpenAIIntegration()],
         "disabled_integrations": [StdlibIntegration],
         "traces_sample_rate": 1.0,
         "send_default_pii": send_default_pii,
@@ -5235,7 +5195,7 @@ def test_ai_client_span_responses_api(
             },
             [],
             True,
-            id="inputs-enabled-string-input",
+            id="gen-ai-inputs-enabled-string-input",
         ),
         pytest.param(
             {"gen_ai": {"inputs": True}},
@@ -5257,7 +5217,7 @@ def test_ai_client_span_responses_api(
                 SPANDATA.GEN_AI_TOOL_DEFINITIONS,
             ],
             True,
-            id="inputs-enabled-instructions-only",
+            id="gen-ai-inputs-enabled-instructions-only",
         ),
         pytest.param(
             {"gen_ai": {"inputs": True}},
@@ -5284,7 +5244,7 @@ def test_ai_client_span_responses_api(
             },
             [SPANDATA.GEN_AI_TOOL_DEFINITIONS],
             True,
-            id="inputs-enabled-list-input-with-system-message",
+            id="gen-ai-inputs-enabled-list-input-with-system-message",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False}},
@@ -5300,7 +5260,7 @@ def test_ai_client_span_responses_api(
                 SPANDATA.GEN_AI_TOOL_DEFINITIONS,
             ],
             True,
-            id="inputs-disabled",
+            id="gen-ai-inputs-disabled",
         ),
         pytest.param(
             {},
@@ -5328,23 +5288,7 @@ def test_ai_client_span_responses_api(
                 SPANDATA.GEN_AI_TOOL_DEFINITIONS,
             ],
             True,
-            id="inputs-enabled-no-input-provided",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": True}},
-            {
-                "instructions": "You are a coding assistant that talks like a pirate.",
-                "input": "How do I check if a Python object is an instance of a class?",
-                "tools": EXAMPLE_TOOLS,
-            },
-            {},
-            [
-                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
-            ],
-            False,
-            id="include-prompts-disabled-overrides-inputs-enabled",
+            id="gen-ai-inputs-enabled-no-input-provided",
         ),
     ],
 )

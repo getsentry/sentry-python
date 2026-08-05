@@ -4,7 +4,7 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.utils import capture_internal_exceptions, parse_version
 
 try:
-    import pydantic_ai  # type: ignore # noqa: F401
+    import pydantic_ai  # noqa: F401
     from pydantic_ai import Agent
 except ImportError:
     raise DidNotEnable("pydantic-ai not installed")
@@ -24,8 +24,8 @@ if TYPE_CHECKING:
     from typing import Any
 
     from pydantic_ai import ModelRequestContext, RunContext
-    from pydantic_ai.capabilities import Hooks  # type: ignore
-    from pydantic_ai.messages import ModelResponse  # type: ignore
+    from pydantic_ai.capabilities import Hooks
+    from pydantic_ai.messages import ModelResponse
 
 
 def register_hooks(hooks: "Hooks") -> None:
@@ -33,7 +33,7 @@ def register_hooks(hooks: "Hooks") -> None:
     Creates hooks for chat model calls and register the hooks by adding the hooks to the `capabilities` argument passed to `Agent.__init__()`.
     """
 
-    @hooks.on.before_model_request  # type: ignore
+    @hooks.on.before_model_request
     async def on_request(
         ctx: "RunContext[None]", request_context: "ModelRequestContext"
     ) -> "ModelRequestContext":
@@ -53,7 +53,7 @@ def register_hooks(hooks: "Hooks") -> None:
 
         return request_context
 
-    @hooks.on.after_model_request  # type: ignore
+    @hooks.on.after_model_request
     async def on_response(
         ctx: "RunContext[None]",
         *,
@@ -73,7 +73,7 @@ def register_hooks(hooks: "Hooks") -> None:
 
         return response
 
-    @hooks.on.model_request_error  # type: ignore
+    @hooks.on.model_request_error
     async def on_error(
         ctx: "RunContext[None]",
         *,
@@ -108,7 +108,7 @@ def register_hooks(hooks: "Hooks") -> None:
 
         return original_init(self, *args, **kwargs)
 
-    Agent.__init__ = patched_init
+    Agent.__init__ = patched_init  # type: ignore[method-assign]
 
 
 class PydanticAIIntegration(Integration):
