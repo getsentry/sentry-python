@@ -166,7 +166,7 @@ _MIN_VERSIONS = {
     "ray": (2, 7, 0),
     "redis": (2, 10, 0),
     "requests": (2, 30, 0),
-    "rq": (0, 6),
+    "rq": (1, 0),
     "sanic": (22, 0),
     "spark": (3, 0),  # pyspark
     "sqlalchemy": (1, 4),
