@@ -138,7 +138,7 @@ _MIN_VERSIONS = {
     "django": (2, 0),
     "dramatiq": (1, 9),
     "falcon": (3, 0),
-    "fastapi": (0, 79, 0),
+    "fastapi": (0, 85, 0),
     "flask": (2, 0, 0),
     "gql": (3, 4, 1),
     "graphene": (3, 3),
@@ -170,7 +170,7 @@ _MIN_VERSIONS = {
     "sanic": (0, 8),
     "spark": (3, 0),  # pyspark
     "sqlalchemy": (1, 4),
-    "starlette": (0, 16),
+    "starlette": (0, 20),
     "starlite": (1, 48),
     "statsig": (0, 55, 3),
     "strawberry": (0, 209, 5),

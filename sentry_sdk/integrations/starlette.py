@@ -64,19 +64,13 @@ try:
     from starlette.middleware.authentication import (
         AuthenticationMiddleware,
     )
+    from starlette.middleware.exceptions import ExceptionMiddleware
     from starlette.requests import Request
     from starlette.routing import Match
     from starlette.types import ASGIApp, Receive, Send
     from starlette.types import Scope as StarletteScope
 except ImportError:
     raise DidNotEnable("Starlette is not installed")
-
-try:
-    # Starlette 0.20
-    from starlette.middleware.exceptions import ExceptionMiddleware
-except ImportError:
-    # Startlette 0.19.1
-    from starlette.exceptions import ExceptionMiddleware  # type: ignore
 
 try:
     # Optional dependency of Starlette to parse form data.
