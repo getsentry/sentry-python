@@ -3110,25 +3110,29 @@ async def test_output_data_transformations(
         ]
         assert json.loads(
             chat_spans[0]["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]
-        ) == {
-            "role": "assistant",
-            "parts": [
-                {
-                    "type": "tool_call",
-                    "name": "multiply",
-                    "arguments": '{"a": 5, "b": 3}',
-                }
-            ],
-        }
+        ) == [
+            {
+                "role": "assistant",
+                "parts": [
+                    {
+                        "type": "tool_call",
+                        "name": "multiply",
+                        "arguments": '{"a": 5, "b": 3}',
+                    }
+                ],
+            }
+        ]
         assert json.loads(
             chat_spans[1]["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]
-        ) == {
-            "role": "assistant",
-            "parts": [
-                {"type": "reasoning", "content": "5 times 3 is 15."},
-                {"type": "text", "content": "The answer is 15."},
-            ],
-        }
+        ) == [
+            {
+                "role": "assistant",
+                "parts": [
+                    {"type": "reasoning", "content": "5 times 3 is 15."},
+                    {"type": "text", "content": "The answer is 15."},
+                ],
+            }
+        ]
     elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
@@ -3148,25 +3152,29 @@ async def test_output_data_transformations(
         ]
         assert json.loads(
             chat_spans[0]["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]
-        ) == {
-            "role": "assistant",
-            "parts": [
-                {
-                    "type": "tool_call",
-                    "name": "multiply",
-                    "arguments": '{"a": 5, "b": 3}',
-                }
-            ],
-        }
+        ) == [
+            {
+                "role": "assistant",
+                "parts": [
+                    {
+                        "type": "tool_call",
+                        "name": "multiply",
+                        "arguments": '{"a": 5, "b": 3}',
+                    }
+                ],
+            }
+        ]
         assert json.loads(
             chat_spans[1]["attributes"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]
-        ) == {
-            "role": "assistant",
-            "parts": [
-                {"type": "reasoning", "content": "5 times 3 is 15."},
-                {"type": "text", "content": "The answer is 15."},
-            ],
-        }
+        ) == [
+            {
+                "role": "assistant",
+                "parts": [
+                    {"type": "reasoning", "content": "5 times 3 is 15."},
+                    {"type": "text", "content": "The answer is 15."},
+                ],
+            }
+        ]
     else:
         events = capture_events()
 
@@ -3181,23 +3189,27 @@ async def test_output_data_transformations(
         chat_spans = [
             span for span in transaction["spans"] if span["op"] == "gen_ai.chat"
         ]
-        assert json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == {
-            "role": "assistant",
-            "parts": [
-                {
-                    "type": "tool_call",
-                    "name": "multiply",
-                    "arguments": '{"a": 5, "b": 3}',
-                }
-            ],
-        }
-        assert json.loads(chat_spans[1]["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == {
-            "role": "assistant",
-            "parts": [
-                {"type": "reasoning", "content": "5 times 3 is 15."},
-                {"type": "text", "content": "The answer is 15."},
-            ],
-        }
+        assert json.loads(chat_spans[0]["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {
+                "role": "assistant",
+                "parts": [
+                    {
+                        "type": "tool_call",
+                        "name": "multiply",
+                        "arguments": '{"a": 5, "b": 3}',
+                    }
+                ],
+            }
+        ]
+        assert json.loads(chat_spans[1]["data"][SPANDATA.GEN_AI_OUTPUT_MESSAGES]) == [
+            {
+                "role": "assistant",
+                "parts": [
+                    {"type": "reasoning", "content": "5 times 3 is 15."},
+                    {"type": "text", "content": "The answer is 15."},
+                ],
+            }
+        ]
 
 
 @pytest.mark.asyncio

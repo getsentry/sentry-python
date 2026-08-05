@@ -281,7 +281,7 @@ def _set_output_data(
 
             set_on_span(
                 SPANDATA.GEN_AI_OUTPUT_MESSAGES,
-                json.dumps({"role": "assistant", "parts": parts}),
+                json.dumps([{"role": "assistant", "parts": parts}]),
             )
 
     except Exception:
