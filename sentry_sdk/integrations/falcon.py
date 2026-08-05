@@ -23,15 +23,11 @@ if TYPE_CHECKING:
 
 try:
     import falcon  # type: ignore
+    from falcon import App, app_helpers
     from falcon import __version__ as FALCON_VERSION
     from falcon.request import _UNSET as _FALCON_UNSET  # type: ignore
 except ImportError:
     raise DidNotEnable("Falcon not installed")
-
-import falcon.app_helpers  # type: ignore
-
-falcon_helpers = falcon.app_helpers
-falcon_app_class = falcon.App
 
 
 class FalconRequestExtractor(RequestExtractor):
@@ -137,7 +133,7 @@ class FalconIntegration(Integration):
 
 
 def _patch_wsgi_app() -> None:
-    original_wsgi_app = falcon_app_class.__call__
+    original_wsgi_app = App.__call__
 
     def sentry_patched_wsgi_app(
         self: "falcon.API", env: "Any", start_response: "Any"
@@ -153,11 +149,11 @@ def _patch_wsgi_app() -> None:
 
         return sentry_wrapped(env, start_response)
 
-    falcon_app_class.__call__ = sentry_patched_wsgi_app
+    App.__call__ = sentry_patched_wsgi_app
 
 
 def _patch_handle_exception() -> None:
-    original_handle_exception = falcon_app_class._handle_exception
+    original_handle_exception = App._handle_exception
 
     @ensure_integration_enabled(FalconIntegration, original_handle_exception)
     def sentry_patched_handle_exception(self: "falcon.API", *args: "Any") -> "Any":
@@ -189,11 +185,11 @@ def _patch_handle_exception() -> None:
 
         return was_handled
 
-    falcon_app_class._handle_exception = sentry_patched_handle_exception
+    App._handle_exception = sentry_patched_handle_exception
 
 
 def _patch_prepare_middleware() -> None:
-    original_prepare_middleware = falcon_helpers.prepare_middleware
+    original_prepare_middleware = app_helpers.prepare_middleware
 
     def sentry_patched_prepare_middleware(
         middleware: "Any" = None,
@@ -210,7 +206,7 @@ def _patch_prepare_middleware() -> None:
 
         return original_prepare_middleware(middleware, independent_middleware, asgi)
 
-    falcon_helpers.prepare_middleware = sentry_patched_prepare_middleware
+    app_helpers.prepare_middleware = sentry_patched_prepare_middleware
 
 
 def _exception_leads_to_http_5xx(ex: Exception, response: "falcon.Response") -> bool:
