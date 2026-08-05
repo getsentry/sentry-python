@@ -27,6 +27,10 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 ## Removed
 
 - The SDK no longer supports Python 3.6. The oldest supported version is now 3.7.
+- Dropped support for Django versions below 2.0.
+- Dropped support for gevent versions below 20.9.
+- Dropped support for greenlet versions below 0.4.17.
+- Dropped support for Falcon versions below 1.4.
 - The `enable_tracing` option was removed. Use `traces_sample_rate=1.0` instead.
 - The deprecated `push_scope` and `configure_scope` APIs have been removed. Use `with new_scope():` to push a new scope and `scope = get_current_scope()` to retrieve the current scope instead.
 - Transaction profiling and related code was removed.

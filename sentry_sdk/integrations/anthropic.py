@@ -26,7 +26,7 @@ from sentry_sdk.tracing_utils import (
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
-    package_version,
+    parse_version,
     reraise,
     safe_serialize,
 )
@@ -43,6 +43,7 @@ try:
         Omit = None
 
     from anthropic import AsyncStream, Stream
+    from anthropic import __version__ as ANTHROPIC_VERSION
     from anthropic.lib.streaming import (
         AsyncMessageStream,
         AsyncMessageStreamManager,
@@ -151,7 +152,7 @@ class AnthropicIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        version = package_version("anthropic")
+        version = parse_version(ANTHROPIC_VERSION)
         _check_minimum_version(AnthropicIntegration, version)
 
         """

@@ -9,7 +9,7 @@ from sentry_sdk.ai.utils import (
     truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 
 # This is fine because langgraph depends on langchain-base, and LangchainIntegration only imports from langchain-base.
 from sentry_sdk.integrations.langchain import LangchainIntegration
@@ -19,7 +19,7 @@ from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
     should_truncate_gen_ai_input,
 )
-from sentry_sdk.utils import safe_serialize
+from sentry_sdk.utils import package_version, safe_serialize
 
 try:
     from langgraph.errors import GraphBubbleUp
@@ -38,6 +38,9 @@ class LanggraphIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        version = package_version("langgraph")
+        _check_minimum_version(LanggraphIntegration, version)
+
         LangchainIntegration._ignored_exceptions.add(GraphBubbleUp)
         # LangGraph lets users create agents using a StateGraph or the Functional API.
         # StateGraphs are then compiled to a CompiledStateGraph. Both CompiledStateGraph and

@@ -4,7 +4,7 @@ from copy import deepcopy
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.data_collection import _apply_key_value_collection_filtering
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
@@ -13,6 +13,7 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
     has_data_collection_enabled,
+    package_version,
     transaction_from_function,
 )
 
@@ -64,6 +65,9 @@ class StarliteIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        version = package_version("starlite")
+        _check_minimum_version(StarliteIntegration, version)
+
         patch_app_init()
         patch_middlewares()
         patch_http_route_handle()
@@ -75,7 +79,6 @@ class SentryStarliteASGIMiddleware(SentryAsgiMiddleware):
     ) -> None:
         super().__init__(
             app=app,
-            unsafe_context_data=False,
             transaction_style="endpoint",
             mechanism_type="asgi",
             span_origin=span_origin,
