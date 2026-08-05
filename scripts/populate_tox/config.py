@@ -445,8 +445,8 @@ TEST_SUITE_CONFIG = {
     "sanic": {
         "package": "sanic",
         "deps": {
-            "*": ["websockets<11.0", "aiohttp"],
-            ">=22": ["sanic-testing"],
+            "*": ["websockets<11.0", "aiohttp", "sanic-testing"],
+            "<22.9": ["sanic-testing<22.9", "httpx<0.24"],
             # tracerite imports pkg_resources before https://github.com/sanic-org/tracerite/commit/2f68543fab726d12d5c5d71fab584eb42140f410
             "py3.8": ["tracerite<1.1.2", "setuptools<82"],
         },
