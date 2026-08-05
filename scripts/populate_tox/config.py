@@ -468,7 +468,6 @@ TEST_SUITE_CONFIG = {
             ],
             # See the comment on FastAPI's httpx bound for more info
             "<0.37.2": ["httpx<0.28.0"],
-            "<0.15": ["jinja2<3.1"],
         },
     },
     "starlite": {

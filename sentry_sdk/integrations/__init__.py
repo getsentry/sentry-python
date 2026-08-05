@@ -170,7 +170,7 @@ _MIN_VERSIONS = {
     "sanic": (0, 8),
     "spark": (3, 0),  # pyspark
     "sqlalchemy": (1, 4),
-    "starlette": (0, 16),
+    "starlette": (0, 20),
     "starlite": (1, 48),
     "statsig": (0, 55, 3),
     "strawberry": (0, 209, 5),
