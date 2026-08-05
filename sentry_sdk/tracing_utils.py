@@ -21,6 +21,7 @@ from sentry_sdk.utils import (
     _module_in_list,
     capture_internal_exceptions,
     filename_for_module,
+    has_data_collection_enabled,
     is_sentry_url,
     is_valid_sample_rate,
     logger,
@@ -136,15 +137,27 @@ def record_sql_queries(
 ) -> "Generator[Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan], None, None]":
     # TODO: Bring back capturing of params by default
     client = sentry_sdk.get_client()
-    if client.options["_experiments"].get("record_sql_params", False):
-        if not params_list or params_list == [None]:
-            params_list = None
+    if has_data_collection_enabled(client.options):
+        if client.options["data_collection"]["database_query_data"]:
+            if not params_list or params_list == [None]:
+                params_list = None
 
-        if paramstyle == "pyformat":
-            paramstyle = "format"
+            if paramstyle == "pyformat":
+                paramstyle = "format"
+        else:
+            params_list = None
+            paramstyle = None
     else:
-        params_list = None
-        paramstyle = None
+        # TODO: remove this else block once data collection is released
+        if client.options["_experiments"].get("record_sql_params", False):
+            if not params_list or params_list == [None]:
+                params_list = None
+
+            if paramstyle == "pyformat":
+                paramstyle = "format"
+        else:
+            params_list = None
+            paramstyle = None
 
     query = _format_sql(cursor, query)
 

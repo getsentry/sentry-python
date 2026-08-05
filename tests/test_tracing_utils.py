@@ -1,12 +1,15 @@
 from dataclasses import asdict, dataclass
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
+from unittest import mock
 
 import pytest
 
+import sentry_sdk
 from sentry_sdk.tracing_utils import (
     Baggage,
     _should_be_included,
     _should_continue_trace,
+    record_sql_queries,
 )
 from tests.conftest import TestTransportWithOptions
 
@@ -286,3 +289,128 @@ def test_baggage_from_incoming_header_value_with_equals_sign():
     header = "sentry-release=v1.0==1,sentry-trace_id=abc123"
     baggage = Baggage.from_incoming_header(header)
     assert baggage.sentry_items == {"release": "v1.0==1", "trace_id": "abc123"}
+
+
+def _get_query_breadcrumb_data(
+    sentry_init,
+    capture_events,
+    sentry_options: "Dict[str, Any]",
+    params_list: "Any" = [1, 2],
+    paramstyle: "Optional[str]" = "pyformat",
+) -> "Dict[str, Any]":
+    sentry_init(**sentry_options)
+    events = capture_events()
+
+    with record_sql_queries(
+        cursor=mock.MagicMock(),
+        query="SELECT * FROM users WHERE id IN (%s, %s)",
+        params_list=params_list,
+        paramstyle=paramstyle,
+        executemany=False,
+    ):
+        pass
+
+    sentry_sdk.capture_message("hi")
+    (event,) = events
+    (crumb,) = event["breadcrumbs"]["values"]
+    assert crumb["category"] == "query"
+    return crumb["data"]
+
+
+@pytest.mark.parametrize(
+    "sentry_options, expected_data",
+    (
+        pytest.param(
+            {"_experiments": {"data_collection": {"database_query_data": True}}},
+            {"db.params": [1, 2], "db.paramstyle": "format"},
+            id="data_collection_on_records_params",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"database_query_data": False}}},
+            {},
+            id="data_collection_off_strips_params",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            {"db.params": [1, 2], "db.paramstyle": "format"},
+            id="data_collection_default_records_params",
+        ),
+        pytest.param(
+            {"_experiments": {"record_sql_params": True}},
+            {"db.params": [1, 2], "db.paramstyle": "format"},
+            id="legacy_record_sql_params_on_records_params",
+        ),
+        pytest.param(
+            {"_experiments": {"record_sql_params": False}},
+            {},
+            id="legacy_record_sql_params_off_strips_params",
+        ),
+        pytest.param(
+            {},
+            {},
+            id="no_options_strips_params",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "record_sql_params": True,
+                    "data_collection": {"database_query_data": False},
+                }
+            },
+            {},
+            id="data_collection_off_takes_precedence_over_legacy_on",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "record_sql_params": False,
+                    "data_collection": {"database_query_data": True},
+                }
+            },
+            {"db.params": [1, 2], "db.paramstyle": "format"},
+            id="data_collection_on_takes_precedence_over_legacy_off",
+        ),
+    ),
+)
+def test_record_sql_queries_data_collection(
+    sentry_init, capture_events, sentry_options, expected_data
+):
+    assert (
+        _get_query_breadcrumb_data(sentry_init, capture_events, sentry_options)
+        == expected_data
+    )
+
+
+@pytest.mark.parametrize("params_list", (None, [], [None]))
+def test_record_sql_queries_empty_params_not_recorded(
+    sentry_init, capture_events, params_list
+):
+    data = _get_query_breadcrumb_data(
+        sentry_init,
+        capture_events,
+        {"_experiments": {"data_collection": {"database_query_data": True}}},
+        params_list=params_list,
+    )
+    assert "db.params" not in data
+
+
+def test_record_sql_queries_paramstyle_passthrough(sentry_init, capture_events):
+    data = _get_query_breadcrumb_data(
+        sentry_init,
+        capture_events,
+        {"_experiments": {"data_collection": {"database_query_data": True}}},
+        paramstyle="qmark",
+    )
+    assert data["db.paramstyle"] == "qmark"
+
+
+def test_record_sql_queries_paramstyle_dropped_when_collection_off(
+    sentry_init, capture_events
+):
+    data = _get_query_breadcrumb_data(
+        sentry_init,
+        capture_events,
+        {"_experiments": {"data_collection": {"database_query_data": False}}},
+        paramstyle="qmark",
+    )
+    assert "db.paramstyle" not in data
