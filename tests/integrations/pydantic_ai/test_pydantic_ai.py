@@ -7,7 +7,15 @@ import pytest
 from pydantic import Field
 from pydantic_ai import Agent
 from pydantic_ai.exceptions import ModelRetry, UnexpectedModelBehavior
-from pydantic_ai.messages import BinaryContent, ImageUrl, UserPromptPart
+from pydantic_ai.messages import (
+    BinaryContent,
+    ImageUrl,
+    ModelResponse,
+    TextPart,
+    ToolCallPart,
+    ToolReturnPart,
+    UserPromptPart,
+)
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RequestUsage
 
@@ -2828,39 +2836,6 @@ async def test_agent_without_name(
 
 
 @pytest.mark.asyncio
-async def test_model_response_without_parts(sentry_init, capture_items):
-    """
-    Test handling of model response without parts attribute.
-    """
-    from unittest.mock import MagicMock
-
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_output_data
-
-    sentry_init(
-        integrations=[PydanticAIIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
-
-        # Create mock response without parts
-        mock_response = MagicMock()
-        mock_response.model_name = "test-model"
-        del mock_response.parts  # Remove parts attribute
-
-        # Should not raise, just skip formatting
-        _set_output_data(span, mock_response)
-
-        span.finish()
-
-    # Should not crash
-    assert transaction is not None
-
-
-@pytest.mark.asyncio
 async def test_input_messages_error_handling(sentry_init, capture_items):
     """
     Test that _set_input_messages handles errors gracefully.
@@ -3073,44 +3048,102 @@ async def test_message_parts_with_list_content(sentry_init, capture_items):
     assert transaction is not None
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.asyncio
-async def test_output_data_with_text_and_tool_calls(sentry_init, capture_items):
+async def test_output_data_transformations(
+    sentry_init, capture_items, capture_events, span_streaming
+):
     """
-    Test that _set_output_data handles both text and tool calls in response.
+    Test transformation of outputs from `Model.get_response()` and `Model.stream_response()`.
     """
-    from unittest.mock import MagicMock
-
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_output_data
-
     sentry_init(
         integrations=[PydanticAIIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=False,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
+    def response_model(messages, info):
+        if isinstance(messages[-1].parts[-1], ToolReturnPart):
+            return ModelResponse(parts=[TextPart(content="The answer is 15.")])
 
-        # Create mock response with both TextPart and ToolCallPart
-        from pydantic_ai import messages
+        return ModelResponse(
+            parts=[ToolCallPart(tool_name="multiply", args={"a": 5, "b": 3})]
+        )
 
-        text_part = messages.TextPart(content="Here's the result")
-        tool_call_part = MagicMock()
-        tool_call_part.tool_name = "test_tool"
-        tool_call_part.args = {"x": 5}
+    agent = Agent(FunctionModel(response_model), name="test_agent")
 
-        mock_response = MagicMock()
-        mock_response.model_name = "test-model"
-        mock_response.parts = [text_part, tool_call_part]
+    @agent.tool_plain
+    def multiply(a: int, b: int) -> int:
+        """Multiply two numbers."""
+        return a * b
 
-        # Should handle both text and tool calls
-        _set_output_data(span, mock_response)
+    if span_streaming:
+        items = capture_items("span")
 
-        span.finish()
+        await agent.run(
+            "What is 5 times 3?",
+        )
+        sentry_sdk.flush()
 
-    # Should not crash
-    assert transaction is not None
+        spans = [item.payload for item in items]
+
+        invoke_agent_span = next(
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == "gen_ai.invoke_agent"
+        )
+        assert invoke_agent_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == (
+            "The answer is 15."
+        )
+
+        chat_spans = [
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == "gen_ai.chat"
+        ]
+        assert json.loads(
+            chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+        ) == [
+            {
+                "type": "function",
+                "name": "multiply",
+                "arguments": '{"a": 5, "b": 3}',
+            }
+        ]
+        assert (
+            chat_spans[1]["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+            == "The answer is 15."
+        )
+    else:
+        events = capture_events()
+
+        await agent.run(
+            "What is 5 times 3?",
+        )
+
+        (transaction,) = events
+        assert transaction["contexts"]["trace"]["op"] == "gen_ai.invoke_agent"
+        assert transaction["contexts"]["trace"]["data"][
+            SPANDATA.GEN_AI_RESPONSE_TEXT
+        ] == ("The answer is 15.")
+
+        chat_spans = [
+            span for span in transaction["spans"] if span["op"] == "gen_ai.chat"
+        ]
+        assert json.loads(
+            chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+        ) == [
+            {
+                "type": "function",
+                "name": "multiply",
+                "arguments": '{"a": 5, "b": 3}',
+            }
+        ]
+        assert (
+            chat_spans[1]["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "The answer is 15."
+        )
 
 
 @pytest.mark.asyncio
@@ -3243,36 +3276,6 @@ async def test_set_input_messages_without_prompts(sentry_init, capture_items):
         span.finish()
 
     # Should not crash and should not set messages
-    assert transaction is not None
-
-
-@pytest.mark.asyncio
-async def test_set_output_data_without_prompts(sentry_init, capture_items):
-    """
-    Test that _set_output_data respects _should_send_prompts().
-    """
-    from unittest.mock import MagicMock
-
-    import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_output_data
-
-    sentry_init(
-        integrations=[PydanticAIIntegration(include_prompts=False)],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-
-    with sentry_sdk.start_transaction(op="test", name="test") as transaction:
-        span = sentry_sdk.start_span(op="test_span")
-
-        # Even with response, should not set output data
-        mock_response = MagicMock()
-        mock_response.model_name = "test"
-        _set_output_data(span, mock_response)
-
-        span.finish()
-
-    # Should not crash and should not set output
     assert transaction is not None
 
 
