@@ -48,7 +48,7 @@ mock_sdk_info = {
 def test_continuous_profiler_invalid_mode(mode, teardown_profiling):
     with pytest.raises(ValueError):
         setup_continuous_profiler(
-            make_options(),
+            make_options(mode="foo"),
             mock_sdk_info,
             lambda envelope: None,
         )
