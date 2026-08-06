@@ -119,11 +119,6 @@ DATA_COLLECTION_EXPECTED_TOOL_CALLS = [
 
 
 def data_collection_tool_use_message():
-    """
-    A response containing both a text block and a tool use block.
-
-    Built lazily because ToolUseBlock is only importable on anthropic 0.27+.
-    """
     return Message(
         id="msg_01XFDUDYJgAACzvnptvVoYEL",
         model="model",
