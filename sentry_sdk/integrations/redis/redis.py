@@ -24,7 +24,7 @@ def _get_redis_command_args(command: "Any") -> "Sequence[Any]":
     return command[0]
 
 
-def _patch_redis(client: "Any") -> None:
+def _patch_redis() -> None:
     import redis.asyncio
     from redis import Redis, client
 
