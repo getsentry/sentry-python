@@ -76,6 +76,43 @@ def create_chunked_server():
 CHUNKED_PORT = create_chunked_server()
 
 
+@pytest.fixture
+def local_http_server():
+    requests = []
+
+    class TraceHeaderHandler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            requests.append(self.headers)
+            self.send_response(200)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+    server = HTTPServer(("127.0.0.1", 0), TraceHeaderHandler)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        yield server, requests
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()
+
+
+def _request(server, headers):
+    connection = HTTPConnection("127.0.0.1", server.server_port)
+    connection.putrequest("POST", "/")
+
+    for key, value in headers:
+        connection.putheader(key, value)
+
+    connection.endheaders()
+
+    response = connection.getresponse()
+    response.read()
+    connection.close()
+
+
 def test_crumb_capture(sentry_init, capture_events):
     sentry_init(integrations=[StdlibIntegration()], send_default_pii=True)
     events = capture_events()
@@ -524,6 +561,87 @@ def test_outgoing_trace_headers_span_streaming_no_current_span(sentry_init):
         "sentry-sampled=true"
     )
     assert request_headers["baggage"] == expected_outgoing_baggage
+
+
+@pytest.mark.parametrize("span_streaming", [False, True])
+def test_outgoing_trace_headers_append_to_unsigned_baggage(
+    sentry_init, local_http_server, span_streaming
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+        default_integrations=False,
+        integrations=[StdlibIntegration()],
+    )
+    server, requests = local_http_server
+
+    with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=500000):
+        if span_streaming:
+            with sentry_sdk.traces.start_span(name="test"):  # type: ignore[attr-defined]
+                _request(server, [("baggage", "vendor=value")])
+        else:
+            with sentry_sdk.start_transaction(name="test", sampled=True):
+                _request(server, [("baggage", "vendor=value")])
+
+    headers = requests[0]
+
+    baggage_headers = headers.get_all("baggage")
+    assert baggage_headers is not None
+    # preserve existing unsigned baggage
+    assert len(baggage_headers) == 2
+    assert baggage_headers[0] == "vendor=value"
+    assert baggage_headers[1].count("sentry-trace_id=") == 1
+    assert "sentry-sample_rand=0.500000" in baggage_headers[1]
+    assert len(headers.get_all("sentry-trace")) == 1
+
+
+@pytest.mark.parametrize("span_streaming", [False, True])
+def test_outgoing_trace_headers_skip_signed_baggage(
+    sentry_init, local_http_server, span_streaming
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+        default_integrations=False,
+        integrations=[StdlibIntegration()],
+    )
+    server, requests = local_http_server
+
+    # simulate AWS SigV4 request that is already signed.
+    authorization = (
+        "AWS4-HMAC-SHA256 "
+        "Credential=test/20260804/eu-west-1/secretsmanager/aws4_request, "
+        "SignedHeaders=baggage;host;sentry-trace, "
+        "Signature=sixtyseven"
+    )
+
+    if span_streaming:
+        with sentry_sdk.traces.start_span(name="test"):  # type: ignore[attr-defined]
+            _request(
+                server,
+                [
+                    ("baggage", "vendor=value"),
+                    ("sentry-trace", "existing-trace"),
+                    ("Authorization", authorization),
+                ],
+            )
+    else:
+        with sentry_sdk.start_transaction(name="test", sampled=True):
+            _request(
+                server,
+                [
+                    ("baggage", "vendor=value"),
+                    ("sentry-trace", "existing-trace"),
+                    ("Authorization", authorization),
+                ],
+            )
+
+    headers = requests[0]
+
+    # do not append baggage after SigV4 signs it.
+    assert headers.get_all("baggage") == ["vendor=value"]
+    # preserves existing `sentry-trace` header.
+    assert headers.get_all("sentry-trace") == ["existing-trace"]
 
 
 @pytest.mark.parametrize(
