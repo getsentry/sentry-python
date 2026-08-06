@@ -102,7 +102,6 @@ DATA_COLLECTION_EXPECTED_INPUT_DATA = {
         {"type": "text", "content": "You are a helpful assistant."}
     ],
     SPANDATA.GEN_AI_REQUEST_MESSAGES: [{"role": "user", "content": "Hello, Claude"}],
-    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS: DATA_COLLECTION_EXAMPLE_TOOLS,
 }
 
 DATA_COLLECTION_INPUT_DATA_KEYS = list(DATA_COLLECTION_EXPECTED_INPUT_DATA.keys())
@@ -350,17 +349,6 @@ def test_nonstreaming_create_message(
             [],
             id="legacy-pii-and-include-prompts-enabled",
         ),
-        pytest.param(
-            None,
-            False,
-            True,
-            {SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS: DATA_COLLECTION_EXAMPLE_TOOLS},
-            [
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-            ],
-            id="legacy-pii-disabled-tools-still-collected",
-        ),
     ],
 )
 def test_nonstreaming_create_message_data_collection(
@@ -395,7 +383,6 @@ def test_nonstreaming_create_message_data_collection(
         model="model",
         system="You are a helpful assistant.",
         messages=[{"role": "user", "content": "Hello, Claude"}],
-        tools=DATA_COLLECTION_EXAMPLE_TOOLS,
     )
 
     if span_streaming or stream_gen_ai_spans:
@@ -430,38 +417,38 @@ def test_nonstreaming_create_message_data_collection(
         assert key not in span_data
 
 
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 27),
+    reason="Tools are not supported in this version of the anthropic package",
+)
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
-    "data_collection,expected_present,expected_absent",
+    "data_collection,tools_collected",
     [
         pytest.param(
             {"gen_ai": {"inputs": True}},
-            {SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS: DATA_COLLECTION_EXAMPLE_TOOLS},
-            [
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-            ],
-            id="gen-ai-inputs-enabled-tools-collected-without-messages",
+            True,
+            id="gen-ai-inputs-enabled-tools-collected",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            False,
+            id="gen-ai-inputs-disabled-tools-not-collected",
         ),
         pytest.param(
             None,
-            {SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS: DATA_COLLECTION_EXAMPLE_TOOLS},
-            [
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-            ],
-            id="legacy-tools-collected-without-messages",
+            True,
+            id="legacy-pii-disabled-tools-still-collected",
         ),
     ],
 )
-def test_nonstreaming_create_message_data_collection_tools_without_messages(
+def test_nonstreaming_create_message_data_collection_tools(
     sentry_init,
     capture_events,
     capture_items,
     data_collection,
-    expected_present,
-    expected_absent,
+    tools_collected,
     stream_gen_ai_spans,
     span_streaming,
 ):
@@ -507,11 +494,13 @@ def test_nonstreaming_create_message_data_collection_tools_without_messages(
         (span,) = event["spans"]
         span_data = span["data"]
 
-    for key, expected_value in expected_present.items():
-        assert json.loads(span_data[key]) == expected_value
-
-    for key in expected_absent:
-        assert key not in span_data
+    if tools_collected:
+        assert (
+            json.loads(span_data[SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS])
+            == DATA_COLLECTION_EXAMPLE_TOOLS
+        )
+    else:
+        assert SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS not in span_data
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -543,17 +532,6 @@ def test_nonstreaming_create_message_data_collection_tools_without_messages(
             DATA_COLLECTION_EXPECTED_INPUT_DATA,
             [],
             id="legacy-pii-and-include-prompts-enabled",
-        ),
-        pytest.param(
-            None,
-            False,
-            True,
-            {SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS: DATA_COLLECTION_EXAMPLE_TOOLS},
-            [
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-            ],
-            id="legacy-pii-disabled-tools-still-collected",
         ),
     ],
 )
@@ -589,7 +567,6 @@ async def test_nonstreaming_create_message_data_collection_async(
         model="model",
         system="You are a helpful assistant.",
         messages=[{"role": "user", "content": "Hello, Claude"}],
-        tools=DATA_COLLECTION_EXAMPLE_TOOLS,
     )
 
     if span_streaming or stream_gen_ai_spans:
@@ -1164,7 +1141,6 @@ def test_streaming_create_message_data_collection(
         model="model",
         system="You are a helpful assistant.",
         messages=[{"role": "user", "content": "Hello, Claude"}],
-        tools=DATA_COLLECTION_EXAMPLE_TOOLS,
         stream=True,
     )
 
