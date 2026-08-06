@@ -2978,8 +2978,6 @@ async def test_message_parts_with_tool_return(
         sentry_sdk.flush()
         spans = [item.payload for item in items]
 
-        print("DEBUG spans: ", [s["attributes"].get("sentry.op", "") for s in spans])
-
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
