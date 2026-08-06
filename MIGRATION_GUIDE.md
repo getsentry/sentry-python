@@ -41,6 +41,8 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - Dropped support for rq below 1.0.
 - Dropped support for Quart below 0.19.
 - Dropped support for Sanic below 22.0.
+- Dropped support for redis-py below 4.2.
+- Removed the RedisIntegration `max_data_size` option.
 - Removed the possibility to supply a specific client to the LaunchDarklyIntegration.
 - The `enable_tracing` option was removed. Use `traces_sample_rate=1.0` instead.
 - The deprecated `@ai_track` decorator was removed.
