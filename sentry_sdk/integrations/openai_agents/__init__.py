@@ -91,11 +91,12 @@ class OpenAIAgentsIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        library_version = parse_version(OPENAI_AGENTS_VERSION)
+        _check_minimum_version(OpenAIAgentsIntegration, library_version)
+
         _patch_error_tracing()
         _patch_runner()
 
-        library_version = parse_version(OPENAI_AGENTS_VERSION)
-        _check_minimum_version(OpenAIAgentsIntegration, library_version)
         if library_version is not None and library_version >= (
             0,
             8,

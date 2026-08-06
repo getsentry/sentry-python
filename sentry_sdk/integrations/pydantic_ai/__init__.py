@@ -156,10 +156,6 @@ class PydanticAIIntegration(Integration):
         - Model requests (AI client calls)
         - Tool executions
         """
-        _patch_agent_run()
-        _patch_tool_execution()
-
-        PydanticAIIntegration.using_request_hooks = False
         try:
             PYDANTIC_AI_VERSION = version("pydantic-ai-slim")
         except PackageNotFoundError:
@@ -170,11 +166,13 @@ class PydanticAIIntegration(Integration):
         if PYDANTIC_AI_VERSION is None:
             return
 
+        _patch_agent_run()
+        _patch_tool_execution()
+
+        PydanticAIIntegration.using_request_hooks = False
+
         # ModelRequestContext.model added in https://github.com/pydantic/pydantic-ai/commit/f1260dfe09907f17688eee1646daf898fc428d4c
-        if PYDANTIC_AI_VERSION < (
-            1,
-            73,
-        ):
+        if PYDANTIC_AI_VERSION < (1, 73):
             _patch_graph_nodes()
             return
 
