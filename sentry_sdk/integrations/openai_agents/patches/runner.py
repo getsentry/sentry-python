@@ -231,7 +231,8 @@ def _create_run_wrapper(
             if hooks is not None:
                 _patch_run_hooks(hooks=hooks)
             else:
-                kwargs["hooks"] = _SentryRunHooks()
+                hooks = _SentryRunHooks()
+                kwargs["hooks"] = hooks
 
         # Isolate each workflow so that when agents are run in asyncio tasks they
         # don't touch each other's scopes
