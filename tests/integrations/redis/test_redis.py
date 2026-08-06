@@ -1,7 +1,7 @@
 from unittest import mock
 
 import pytest
-from fakeredis import FakeStrictRedis
+from fakeredis import FakeRedis
 
 import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
@@ -20,7 +20,7 @@ def test_basic(sentry_init, capture_events):
     sentry_init(integrations=[RedisIntegration()])
     events = capture_events()
 
-    connection = FakeStrictRedis()
+    connection = FakeRedis()
 
     connection.get("foobar")
     capture_message("hi")
@@ -66,7 +66,7 @@ def test_redis_pipeline(
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    connection = FakeStrictRedis()
+    connection = FakeRedis()
 
     if span_streaming:
         items = capture_items("span")
@@ -141,7 +141,7 @@ def test_redis_pipeline_data_collection(
         _experiments={"data_collection": data_collection},
     )
 
-    connection = FakeStrictRedis()
+    connection = FakeRedis()
 
     if span_streaming:
         items = capture_items("span")
@@ -192,7 +192,7 @@ def test_sensitive_data(sentry_init, capture_events, capture_items, span_streami
             trace_lifecycle="stream" if span_streaming else "static",
         )
 
-        connection = FakeStrictRedis()
+        connection = FakeRedis()
 
         if span_streaming:
             items = capture_items("span")
@@ -228,7 +228,7 @@ def test_pii_data_redacted(sentry_init, capture_events, capture_items, span_stre
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    connection = FakeStrictRedis()
+    connection = FakeRedis()
 
     if span_streaming:
         items = capture_items("span")
@@ -296,7 +296,7 @@ def test_data_collection_database_query_data(
         _experiments={"data_collection": data_collection},
     )
 
-    connection = FakeStrictRedis()
+    connection = FakeRedis()
 
     if span_streaming:
         items = capture_items("span")
@@ -352,7 +352,7 @@ def test_database_query_data_takes_precedence_over_send_default_pii(
         _experiments={"data_collection": data_collection},
     )
 
-    connection = FakeStrictRedis()
+    connection = FakeRedis()
 
     if span_streaming:
         items = capture_items("span")
@@ -387,7 +387,7 @@ def test_pii_data_sent(sentry_init, capture_events, capture_items, span_streamin
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    connection = FakeStrictRedis()
+    connection = FakeRedis()
 
     if span_streaming:
         items = capture_items("span")
@@ -443,7 +443,7 @@ def test_no_data_truncation_by_default(
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    connection = FakeStrictRedis()
+    connection = FakeRedis()
     long_string = "a" * 100000
     short_string = "b" * 10
 
@@ -489,7 +489,7 @@ def test_breadcrumbs(sentry_init, capture_events):
     )
     events = capture_events()
 
-    connection = FakeStrictRedis()
+    connection = FakeRedis()
 
     long_string = "a" * 30
     connection.set("somekey1", long_string)
@@ -540,7 +540,7 @@ def test_db_connection_attributes_client(
     if span_streaming:
         items = capture_items("span")
         with sentry_sdk.traces.start_span(name="custom parent"):
-            connection = FakeStrictRedis(connection_pool=MOCK_CONNECTION_POOL)
+            connection = FakeRedis(connection_pool=MOCK_CONNECTION_POOL)
             connection.get("foobar")
         sentry_sdk.flush()
 
@@ -560,7 +560,7 @@ def test_db_connection_attributes_client(
     else:
         events = capture_events()
         with start_transaction():
-            connection = FakeStrictRedis(connection_pool=MOCK_CONNECTION_POOL)
+            connection = FakeRedis(connection_pool=MOCK_CONNECTION_POOL)
             connection.get("foobar")
 
         (event,) = events
@@ -588,7 +588,7 @@ def test_db_connection_attributes_pipeline(
     if span_streaming:
         items = capture_items("span")
         with sentry_sdk.traces.start_span(name="custom parent"):
-            connection = FakeStrictRedis(connection_pool=MOCK_CONNECTION_POOL)
+            connection = FakeRedis(connection_pool=MOCK_CONNECTION_POOL)
             pipeline = connection.pipeline(transaction=False)
             pipeline.get("foo")
             pipeline.set("bar", 1)
@@ -611,7 +611,7 @@ def test_db_connection_attributes_pipeline(
     else:
         events = capture_events()
         with start_transaction():
-            connection = FakeStrictRedis(connection_pool=MOCK_CONNECTION_POOL)
+            connection = FakeRedis(connection_pool=MOCK_CONNECTION_POOL)
             pipeline = connection.pipeline(transaction=False)
             pipeline.get("foo")
             pipeline.set("bar", 1)
@@ -638,7 +638,7 @@ def test_span_origin(sentry_init, capture_events, capture_items, span_streaming)
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    connection = FakeStrictRedis()
+    connection = FakeRedis()
 
     if span_streaming:
         items = capture_items("span")

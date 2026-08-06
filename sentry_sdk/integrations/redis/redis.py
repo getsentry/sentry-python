@@ -24,11 +24,12 @@ def _get_redis_command_args(command: "Any") -> "Sequence[Any]":
     return command[0]
 
 
-def _patch_redis(StrictRedis: "Any", client: "Any") -> None:  # noqa: N803
+def _patch_redis(client: "Any") -> None:
     import redis.asyncio
+    from redis import Redis, client
 
     patch_redis_client(
-        StrictRedis,
+        Redis,
         is_cluster=False,
         set_db_data_fn=_set_db_data,
     )
@@ -40,7 +41,7 @@ def _patch_redis(StrictRedis: "Any", client: "Any") -> None:  # noqa: N803
     )
 
     patch_redis_async_client(
-        redis.asyncio.client.StrictRedis,
+        redis.asyncio.client.Redis,
         is_cluster=False,
         set_db_data_fn=_set_db_data,
     )

@@ -22,7 +22,6 @@ class RedisIntegration(Integration):
     @staticmethod
     def setup_once() -> None:
         try:
-            from redis import StrictRedis, client
             from redis import __version__ as REDIS_VERSION
         except ImportError:
             raise DidNotEnable("Redis client not installed")
@@ -30,6 +29,6 @@ class RedisIntegration(Integration):
         version = parse_version(REDIS_VERSION)
         _check_minimum_version(RedisIntegration, version)
 
-        _patch_redis(StrictRedis, client)
+        _patch_redis()
         _patch_redis_cluster()
         _patch_rb()
