@@ -38,7 +38,6 @@ def test_handles_exceptions(sentry_init, capture_events, integrations):
         assert not events
 
 
-@pytest.mark.skip(reason="Temporarily disable to release SDK 2.0a1.")
 def test_circular_references(sentry_init, request):
     sentry_init(default_integrations=False, integrations=[ThreadingIntegration()])
 
