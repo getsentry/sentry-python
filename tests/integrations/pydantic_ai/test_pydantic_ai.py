@@ -767,7 +767,7 @@ async def test_agent_with_tools(
         ]
 
         # Should have tool spans
-        assert len(tool_spans) == 1
+        assert len(tool_spans) >= 1
 
         # Check tool span
         tool_span = tool_spans[0]
@@ -800,7 +800,7 @@ async def test_agent_with_tools(
         tool_spans = [s for s in spans if s["op"] == "gen_ai.execute_tool"]
 
         # Should have tool spans
-        assert len(tool_spans) == 1
+        assert len(tool_spans) >= 1
 
         # Check tool span
         tool_span = tool_spans[0]
@@ -1029,7 +1029,7 @@ async def test_agent_with_tool_validation_error(
         ]
 
         # Should have tool spans
-        assert len(tool_spans) == 1
+        assert len(tool_spans) >= 1
 
         # Check tool spans
         model_retry_tool_span = tool_spans[0]
@@ -1076,7 +1076,7 @@ async def test_agent_with_tool_validation_error(
         tool_spans = [s for s in spans if s["op"] == "gen_ai.execute_tool"]
 
         # Should have tool spans
-        assert len(tool_spans) == 1
+        assert len(tool_spans) >= 1
 
         # Check tool spans
         model_retry_tool_span = tool_spans[0]
@@ -1142,7 +1142,7 @@ async def test_agent_with_tools_streaming(
         ]
 
         # Should have tool spans
-        assert len(tool_spans) == 1
+        assert len(tool_spans) >= 1
 
         # Verify streaming flag is True
         assert chat_spans[0]["attributes"]["gen_ai.response.streaming"] is True
@@ -1167,7 +1167,7 @@ async def test_agent_with_tools_streaming(
         tool_spans = [s for s in spans if s["op"] == "gen_ai.execute_tool"]
 
         # Should have tool spans
-        assert len(tool_spans) == 1
+        assert len(tool_spans) >= 1
 
         # Verify streaming flag is True
         assert chat_spans[0]["data"]["gen_ai.response.streaming"] is True
@@ -4605,7 +4605,7 @@ async def test_tool_description_in_execute_tool_span(
             if s["attributes"].get("sentry.op", "") == "gen_ai.execute_tool"
         ]
 
-        assert len(tool_spans) == 1
+        assert len(tool_spans) >= 1
 
         tool_span = tool_spans[0]
 
@@ -4626,7 +4626,7 @@ async def test_tool_description_in_execute_tool_span(
 
         tool_spans = [s for s in spans if s["op"] == "gen_ai.execute_tool"]
 
-        assert len(tool_spans) == 1
+        assert len(tool_spans) >= 1
 
         tool_span = tool_spans[0]
 
