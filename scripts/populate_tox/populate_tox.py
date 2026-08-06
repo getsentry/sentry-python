@@ -1210,10 +1210,16 @@ def get_releases_to_test(integration, package) -> list[Version] | None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--skip-version-update",
+        "--skip",
         nargs="*",
         default=[],
         help="Integrations to skip version updates for.",
+    )
+    parser.add_argument(
+        "--only",
+        nargs="*",
+        default=[],
+        help="Only update versions for these integrations (all others will be skipped).",
     )
     return parser.parse_args()
 
@@ -1277,7 +1283,17 @@ def main() -> dict[str, list]:
             }
 
     args = parse_args()
-    skip_version_updates = set(args.skip_version_update)
+    if args.skip and args.only:
+        print("--skip and --only are mutually exclusive.")
+        sys.exit(1)
+
+    only_update = set(args.only)
+    if only_update:
+        print(f"Only updating {' '.join(only_update)}.")
+
+    skip_update = set(args.skip)
+    if skip_update:
+        print(f"Skipping updates for {' '.join(skip_update)}.")
 
     # Process packages
     packages = defaultdict(list)
@@ -1292,7 +1308,10 @@ def main() -> dict[str, list]:
             package, extra = _get_package_name(integration)
 
             test_releases = None
-            if integration in skip_version_updates:
+            skip = integration in skip_update or (
+                only_update and integration not in only_update
+            )
+            if skip:
                 test_releases = get_existing_releases_to_test(integration)
             else:
                 test_releases = get_releases_to_test(integration, package)
