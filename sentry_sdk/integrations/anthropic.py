@@ -417,79 +417,11 @@ def _set_common_input_data(
         if tools is not None and _is_given(tools) and len(tools) > 0:  # type: ignore
             set_on_span(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools))
 
-    if messages is not None and len(messages) > 0:  # type: ignore
-        if has_data_collection_enabled(client.options):
-            if client.options["data_collection"]["gen_ai"]["inputs"]:
-                if isinstance(system, str) or isinstance(system, Iterable):
-                    set_on_span(
-                        SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                        json.dumps(_transform_system_instructions(system)),
-                    )
+    if messages is None or len(messages) == 0:  # type: ignore
+        return
 
-                normalized_messages = []
-                for message in messages:
-                    if (
-                        message.get("role") == GEN_AI_ALLOWED_MESSAGE_ROLES.USER
-                        and "content" in message
-                        and isinstance(message["content"], (list, tuple))
-                    ):
-                        transformed_content = []
-                        for item in message["content"]:
-                            # Skip tool_result items - they can contain images/documents
-                            # with nested structures that are difficult to redact properly
-                            if (
-                                isinstance(item, dict)
-                                and item.get("type") == "tool_result"
-                            ):
-                                continue
-
-                            # Transform content blocks (images, documents, etc.)
-                            transformed_content.append(
-                                _transform_anthropic_content_block(item)
-                                if isinstance(item, dict)
-                                else item
-                            )
-
-                        # If there are non-tool-result items, add them as a message
-                        if transformed_content:
-                            normalized_messages.append(
-                                {
-                                    "role": message.get("role"),
-                                    "content": transformed_content,
-                                }
-                            )
-                    else:
-                        # Transform content for non-list messages or assistant messages
-                        transformed_message = message.copy()
-                        if "content" in transformed_message:
-                            content = transformed_message["content"]
-                            if isinstance(content, (list, tuple)):
-                                transformed_message["content"] = [
-                                    _transform_anthropic_content_block(item)
-                                    if isinstance(item, dict)
-                                    else item
-                                    for item in content
-                                ]
-                        normalized_messages.append(transformed_message)
-
-                role_normalized_messages = normalize_message_roles(normalized_messages)
-
-                scope = sentry_sdk.get_current_scope()
-                messages_data = (
-                    truncate_and_annotate_messages(
-                        role_normalized_messages, span, scope
-                    )
-                    if should_truncate_gen_ai_input(client.options)
-                    else role_normalized_messages
-                )
-                if messages_data is not None:
-                    set_data_normalized(
-                        span,
-                        SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                        messages_data,
-                        unpack=False,
-                    )
-        elif should_send_default_pii() and integration.include_prompts:
+    if has_data_collection_enabled(client.options):
+        if client.options["data_collection"]["gen_ai"]["inputs"]:
             if isinstance(system, str) or isinstance(system, Iterable):
                 set_on_span(
                     SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
@@ -549,8 +481,73 @@ def _set_common_input_data(
             )
             if messages_data is not None:
                 set_data_normalized(
-                    span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
+                    span,
+                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                    messages_data,
+                    unpack=False,
                 )
+    elif should_send_default_pii() and integration.include_prompts:
+        if isinstance(system, str) or isinstance(system, Iterable):
+            set_on_span(
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                json.dumps(_transform_system_instructions(system)),
+            )
+
+        normalized_messages = []
+        for message in messages:
+            if (
+                message.get("role") == GEN_AI_ALLOWED_MESSAGE_ROLES.USER
+                and "content" in message
+                and isinstance(message["content"], (list, tuple))
+            ):
+                transformed_content = []
+                for item in message["content"]:
+                    # Skip tool_result items - they can contain images/documents
+                    # with nested structures that are difficult to redact properly
+                    if isinstance(item, dict) and item.get("type") == "tool_result":
+                        continue
+
+                    # Transform content blocks (images, documents, etc.)
+                    transformed_content.append(
+                        _transform_anthropic_content_block(item)
+                        if isinstance(item, dict)
+                        else item
+                    )
+
+                # If there are non-tool-result items, add them as a message
+                if transformed_content:
+                    normalized_messages.append(
+                        {
+                            "role": message.get("role"),
+                            "content": transformed_content,
+                        }
+                    )
+            else:
+                # Transform content for non-list messages or assistant messages
+                transformed_message = message.copy()
+                if "content" in transformed_message:
+                    content = transformed_message["content"]
+                    if isinstance(content, (list, tuple)):
+                        transformed_message["content"] = [
+                            _transform_anthropic_content_block(item)
+                            if isinstance(item, dict)
+                            else item
+                            for item in content
+                        ]
+                normalized_messages.append(transformed_message)
+
+        role_normalized_messages = normalize_message_roles(normalized_messages)
+
+        scope = sentry_sdk.get_current_scope()
+        messages_data = (
+            truncate_and_annotate_messages(role_normalized_messages, span, scope)
+            if should_truncate_gen_ai_input(client.options)
+            else role_normalized_messages
+        )
+        if messages_data is not None:
+            set_data_normalized(
+                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
+            )
 
 
 def _set_create_input_data(
