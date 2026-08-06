@@ -225,7 +225,7 @@ def _install_httplib() -> None:
 
                 for header_name, header_value in trace_headers:
                     normalized_header = header_name.lower()
-                    # do not mutate headers already signed by SigV4.
+                    # preserve signed headers and avoid duplicate `sentry-trace`.
                     if normalized_header in existing_headers and (
                         normalized_header != BAGGAGE_HEADER_NAME
                         or normalized_header in signed_headers
