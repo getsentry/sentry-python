@@ -73,7 +73,6 @@ typing = [
     "pydantic>=2.13.4",
     "pydantic-ai-slim>=2.23.0",
     "langchain-core>=1.5.3",
-    "huggingface-hub>=1.26.1",
 ]
 test = [
     "dataclasses ; python_full_version < '3.7'",
