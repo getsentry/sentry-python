@@ -1040,6 +1040,303 @@ async def test_invoke_agent_span_data_collection_outputs(
 
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,expect_input",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            False,
+            True,
+            id="gen-ai-inputs-enabled-overrides-pii-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            True,
+            False,
+            id="gen-ai-inputs-disabled-overrides-pii-enabled",
+        ),
+        pytest.param(
+            {},
+            False,
+            True,
+            id="gen-ai-omitted-defaults-to-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            False,
+            False,
+            id="gen-ai-inputs-disabled-and-pii-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            False,
+            True,
+            id="gen-ai-outputs-disabled-does-not-affect-inputs",
+        ),
+        pytest.param(
+            None,
+            False,
+            False,
+            id="no-data-collection-falls-back-to-send-default-pii",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            id="no-data-collection-pii-enabled-collects",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_data_collection_inputs(
+    sentry_init,
+    capture_events,
+    capture_items,
+    test_agent,
+    nonstreaming_responses_model_response,
+    get_model_response,
+    data_collection,
+    send_default_pii,
+    expect_input,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    client = AsyncOpenAI(api_key="test-key")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent = test_agent.clone(model=model)
+
+    response = get_model_response(
+        nonstreaming_responses_model_response, serialize_pydantic=True
+    )
+
+    init_kwargs = {
+        "integrations": [OpenAIAgentsIntegration()],
+        "traces_sample_rate": 1.0,
+        "send_default_pii": send_default_pii,
+        "stream_gen_ai_spans": stream_gen_ai_spans,
+    }
+    if span_streaming:
+        init_kwargs["disabled_integrations"] = [StdlibIntegration]
+        init_kwargs["trace_lifecycle"] = "stream"
+    if data_collection is not None:
+        init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    with patch.object(
+        agent.model._client._client,
+        "send",
+        return_value=response,
+    ) as _:
+        sentry_init(**init_kwargs)
+
+        if span_streaming:
+            items = capture_items("span")
+        elif stream_gen_ai_spans:
+            items = capture_items("span", "transaction")
+        else:
+            events = capture_events()
+
+        result = await agents.Runner.run(
+            agent, "Test input", run_config=test_run_config
+        )
+
+        assert result is not None
+
+    if span_streaming or stream_gen_ai_spans:
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        ai_client_span = next(
+            span for span in spans if span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
+        )
+        span_data = ai_client_span["attributes"]
+    else:
+        (transaction,) = events
+        ai_client_span = next(
+            span for span in transaction["spans"] if span["op"] == OP.GEN_AI_CHAT
+        )
+        span_data = ai_client_span["data"]
+
+    if expect_input:
+        assert "Test input" in span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert (
+            "helpful test assistant" in span_data[SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
+        )
+    else:
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span_data
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span_data
+
+    # Non-PII data is unaffected by the gate
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-4"
+    assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,expect_output",
+    [
+        pytest.param(
+            {"gen_ai": {"outputs": True}},
+            False,
+            True,
+            id="gen-ai-outputs-enabled-overrides-pii-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            True,
+            False,
+            id="gen-ai-outputs-disabled-overrides-pii-enabled",
+        ),
+        pytest.param(
+            {},
+            False,
+            True,
+            id="gen-ai-omitted-defaults-to-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            False,
+            False,
+            id="gen-ai-outputs-disabled-and-pii-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            False,
+            True,
+            id="gen-ai-inputs-disabled-does-not-affect-outputs",
+        ),
+        pytest.param(
+            None,
+            False,
+            False,
+            id="no-data-collection-falls-back-to-send-default-pii",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            id="no-data-collection-pii-enabled-collects",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_data_collection_outputs(
+    sentry_init,
+    capture_events,
+    capture_items,
+    test_agent,
+    get_model_response,
+    nonstreaming_responses_tool_call_model_responses,
+    data_collection,
+    send_default_pii,
+    expect_output,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    @agents.function_tool
+    def simple_test_tool(message: str) -> str:
+        """A simple tool"""
+        return f"Tool executed with: {message}"
+
+    client = AsyncOpenAI(api_key="test-key")
+    model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+    agent_with_tool = test_agent.clone(tools=[simple_test_tool], model=model)
+
+    usage = ResponseUsage(
+        input_tokens=10,
+        input_tokens_details=InputTokensDetails(
+            cached_tokens=0,
+            cache_write_tokens=0,
+        ),
+        output_tokens=5,
+        output_tokens_details=OutputTokensDetails(
+            reasoning_tokens=0,
+        ),
+        total_tokens=15,
+    )
+    responses = nonstreaming_responses_tool_call_model_responses(
+        tool_name="simple_test_tool",
+        arguments='{"message": "hello"}',
+        response_model="gpt-4",
+        response_text="Task completed using the tool",
+        response_ids=iter(["resp_tool_123", "resp_final_123"]),
+        usages=iter([usage, usage]),
+    )
+    tool_response = get_model_response(next(responses), serialize_pydantic=True)
+    final_response = get_model_response(next(responses), serialize_pydantic=True)
+
+    init_kwargs = {
+        "integrations": [OpenAIAgentsIntegration()],
+        "traces_sample_rate": 1.0,
+        "send_default_pii": send_default_pii,
+        "stream_gen_ai_spans": stream_gen_ai_spans,
+    }
+    if span_streaming:
+        init_kwargs["disabled_integrations"] = [StdlibIntegration]
+        init_kwargs["trace_lifecycle"] = "stream"
+    if data_collection is not None:
+        init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    with patch.object(
+        agent_with_tool.model._client._client,
+        "send",
+        side_effect=[tool_response, final_response],
+    ) as _:
+        sentry_init(**init_kwargs)
+
+        if span_streaming:
+            items = capture_items("span")
+        elif stream_gen_ai_spans:
+            items = capture_items("span", "transaction")
+        else:
+            events = capture_events()
+
+        await agents.Runner.run(
+            agent_with_tool,
+            "Please use the simple test tool",
+            run_config=test_run_config,
+        )
+
+    if span_streaming or stream_gen_ai_spans:
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        chat_span_data = [
+            span["attributes"]
+            for span in spans
+            if span["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        ]
+    else:
+        (transaction,) = events
+        chat_span_data = [
+            span["data"]
+            for span in transaction["spans"]
+            if span["op"] == OP.GEN_AI_CHAT
+        ]
+
+    assert len(chat_span_data) == 2
+
+    if expect_output:
+        assert any(
+            "simple_test_tool" in data.get(SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, "")
+            for data in chat_span_data
+        )
+        assert any(
+            "Task completed using the tool"
+            in str(data.get(SPANDATA.GEN_AI_RESPONSE_TEXT, ""))
+            for data in chat_span_data
+        )
+    else:
+        for data in chat_span_data:
+            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in data
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in data
+
+    # Non-PII data is unaffected by the gate
+    for data in chat_span_data:
+        assert data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-4"
+        assert data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 5
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "instructions,input,expected_system_instructions,expected_request_messages",
