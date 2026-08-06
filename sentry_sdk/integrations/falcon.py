@@ -27,7 +27,7 @@ try:
     from falcon import __version__ as FALCON_VERSION
     from falcon.request import _UNSET as _FALCON_UNSET  # type: ignore
 except ImportError:
-    raise DidNotEnable("Falcon not installed")
+    raise DidNotEnable("Falcon not installed or incompatible")
 
 
 class FalconRequestExtractor(RequestExtractor):

@@ -26,7 +26,7 @@ try:
     from rq.version import VERSION as RQ_VERSION
     from rq.worker import Worker
 except ImportError:
-    raise DidNotEnable("RQ not installed")
+    raise DidNotEnable("RQ not installed or incompatible")
 
 try:
     from rq.worker import BaseWorker

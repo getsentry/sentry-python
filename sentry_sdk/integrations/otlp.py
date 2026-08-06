@@ -48,7 +48,7 @@ try:
         set_tracer_provider,
     )
 except ImportError:
-    raise DidNotEnable("opentelemetry-distro[otlp] is not installed")
+    raise DidNotEnable("opentelemetry-distro[otlp] is not installed or incompatible")
 
 
 from typing import TYPE_CHECKING

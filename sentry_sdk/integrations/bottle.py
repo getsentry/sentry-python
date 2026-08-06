@@ -43,7 +43,7 @@ try:
         request as bottle_request,
     )
 except ImportError:
-    raise DidNotEnable("Bottle not installed")
+    raise DidNotEnable("Bottle not installed or incompatible")
 
 
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")

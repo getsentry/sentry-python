@@ -28,7 +28,7 @@ try:
     import litellm  # type: ignore[import-not-found]
     from litellm import failure_callback, input_callback, success_callback
 except ImportError:
-    raise DidNotEnable("LiteLLM not installed")
+    raise DidNotEnable("LiteLLM not installed or incompatible")
 
 
 # Stash the span on a top-level key of the per-request kwargs dict litellm passes

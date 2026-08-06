@@ -24,7 +24,7 @@ try:
     from pyramid.httpexceptions import HTTPException
     from pyramid.request import Request
 except ImportError:
-    raise DidNotEnable("Pyramid not installed")
+    raise DidNotEnable("Pyramid not installed or incompatible")
 
 from typing import TYPE_CHECKING
 

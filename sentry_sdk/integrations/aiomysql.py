@@ -14,6 +14,7 @@ from sentry_sdk.tracing_utils import (
 )
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    has_data_collection_enabled,
     parse_version,
 )
 
@@ -22,7 +23,7 @@ try:
     from aiomysql.connection import Connection  # type: ignore[import-not-found]
     from aiomysql.cursors import Cursor  # type: ignore[import-not-found]
 except ImportError:
-    raise DidNotEnable("aiomysql not installed.")
+    raise DidNotEnable("aiomysql not installed or incompatible")
 
 
 class AioMySQLIntegration(Integration):
@@ -82,7 +83,16 @@ def _wrap_execute(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]
         conn = _get_connection(cursor)
 
         integration = sentry_sdk.get_client().get_integration(AioMySQLIntegration)
-        params_list = params if integration and integration._record_params else None
+
+        client = sentry_sdk.get_client()
+        should_record_params = False
+        if has_data_collection_enabled(client.options):
+            if client.options["data_collection"]["database_query_data"]:
+                should_record_params = True
+        else:
+            should_record_params = integration._record_params if integration else False
+
+        params_list = params if integration and should_record_params else None
         param_style = "pyformat" if params_list else None
 
         with record_sql_queries(
@@ -124,9 +134,15 @@ def _wrap_executemany(f: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable
         conn = _get_connection(cursor)
 
         integration = sentry_sdk.get_client().get_integration(AioMySQLIntegration)
-        params_list = (
-            seq_of_params if integration and integration._record_params else None
-        )
+        client = sentry_sdk.get_client()
+        should_record_params = False
+        if has_data_collection_enabled(client.options):
+            if client.options["data_collection"]["database_query_data"]:
+                should_record_params = True
+        else:
+            should_record_params = integration._record_params if integration else False
+
+        params_list = seq_of_params if integration and should_record_params else None
         param_style = "pyformat" if params_list else None
 
         # Prevent double-recording: _do_execute_many calls self.execute internally

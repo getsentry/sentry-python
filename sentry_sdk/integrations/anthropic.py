@@ -63,7 +63,7 @@ try:
     if TYPE_CHECKING:
         from anthropic.types import MessageStreamEvent, TextBlockParam
 except ImportError:
-    raise DidNotEnable("Anthropic not installed")
+    raise DidNotEnable("Anthropic not installed or incompatible")
 
 if TYPE_CHECKING:
     from typing import (

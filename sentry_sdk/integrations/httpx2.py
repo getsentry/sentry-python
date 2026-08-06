@@ -27,7 +27,7 @@ try:
     from httpx2 import AsyncClient, Client, Request, Response
     from httpx2 import __version__ as HTTPX2_VERSION
 except ImportError:
-    raise DidNotEnable("httpx2 is not installed")
+    raise DidNotEnable("httpx2 is not installed or incompatible")
 
 __all__ = ["Httpx2Integration"]
 

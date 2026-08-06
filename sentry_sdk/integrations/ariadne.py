@@ -19,7 +19,7 @@ try:
     # (ariadne.graphql is also a function)
     ariadne_graphql = import_module("ariadne.graphql")
 except ImportError:
-    raise DidNotEnable("ariadne is not installed")
+    raise DidNotEnable("ariadne is not installed or incompatible")
 
 from typing import TYPE_CHECKING
 

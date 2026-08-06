@@ -25,7 +25,7 @@ try:
     from botocore.client import BaseClient
     from botocore.response import StreamingBody
 except ImportError:
-    raise DidNotEnable("botocore is not installed")
+    raise DidNotEnable("botocore is not installed or incompatible")
 
 
 class Boto3Integration(Integration):

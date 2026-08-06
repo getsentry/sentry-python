@@ -9,7 +9,7 @@ try:
     from statsig import statsig as statsig_module
     from statsig.version import __version__ as STATSIG_VERSION
 except ImportError:
-    raise DidNotEnable("statsig is not installed")
+    raise DidNotEnable("statsig is not installed or incompatible")
 
 if TYPE_CHECKING:
     from statsig.statsig_user import StatsigUser

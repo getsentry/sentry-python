@@ -11,7 +11,7 @@ try:
     if TYPE_CHECKING:
         from openfeature.hook import HookContext, HookHints
 except ImportError:
-    raise DidNotEnable("OpenFeature is not installed")
+    raise DidNotEnable("OpenFeature is not installed or incompatible")
 
 
 class OpenFeatureIntegration(Integration):

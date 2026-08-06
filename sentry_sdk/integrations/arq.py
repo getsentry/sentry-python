@@ -25,7 +25,7 @@ try:
     from arq.version import VERSION as ARQ_VERSION
     from arq.worker import JobExecutionFailed, Retry, RetryJob, Worker
 except ImportError:
-    raise DidNotEnable("Arq is not installed")
+    raise DidNotEnable("Arq is not installed or incompatible")
 
 from typing import TYPE_CHECKING
 

@@ -8,7 +8,7 @@ from sentry_sdk.utils import package_version
 try:
     from UnleashClient import UnleashClient
 except ImportError:
-    raise DidNotEnable("UnleashClient is not installed")
+    raise DidNotEnable("UnleashClient is not installed or incompatible")
 
 
 class UnleashIntegration(Integration):
