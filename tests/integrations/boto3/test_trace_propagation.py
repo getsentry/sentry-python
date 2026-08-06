@@ -120,6 +120,7 @@ def test_botocore_merges_propagation_before_sigv4_signing(sentry_init, span_stre
         assert "sentry-trace" in signed_headers.split(";")
     finally:
         server.shutdown()
+        server.server_close()
         thread.join()
 
 
@@ -173,6 +174,7 @@ def test_botocore_without_boto3_integration_preserves_signed_baggage(
         assert len(headers.get_all("sentry-trace")) == 1
     finally:
         server.shutdown()
+        server.server_close()
         thread.join()
 
 
