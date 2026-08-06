@@ -24,7 +24,11 @@ from sentry_sdk.utils import (
 if TYPE_CHECKING:
     from typing import Any, Callable, Iterable, Union
 
-    from huggingface_hub import ChatCompletionStreamOutput
+    from huggingface_hub import (
+        ChatCompletionOutput,
+        ChatCompletionStreamOutput,
+        TextGenerationStreamOutput,
+    )
 
     from sentry_sdk.tracing import Span
 
@@ -142,7 +146,9 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
 
         # LLM Execution
         try:
-            res = f(*args, **kwargs)
+            res: "Union[Iterable[TextGenerationStreamOutput], ChatCompletionOutput, Iterable[ChatCompletionStreamOutput]]" = f(
+                *args, **kwargs
+            )
         except Exception as e:
             exc_info = sys.exc_info()
             with capture_internal_exceptions():
