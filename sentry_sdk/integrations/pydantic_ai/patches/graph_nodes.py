@@ -61,7 +61,7 @@ def _patch_graph_nodes() -> None:
     async def wrapped_model_request_run(self: "Any", ctx: "Any") -> "Any":
         # Avoid creating a duplicate span if run() is invoked after stream().
         # This fails here: https://github.com/pydantic/pydantic-ai/blob/916fc83e8929470679db5ac1b3065bda5d5f4253/pydantic_ai_slim/pydantic_ai/_agent_graph.py#L1119
-        did_stream = getattr(self, "_did_stream", None)
+        did_stream = getattr(self, "_did_stream", False)
         # Do not create a duplicate span when a cached result is served.
         cached_result = getattr(self, "_result", None)
         if did_stream or cached_result is not None:
@@ -95,7 +95,7 @@ def _patch_graph_nodes() -> None:
         async def wrapped_model_request_stream(self: "Any", ctx: "Any") -> "Any":
             # Avoid creating a duplicate span if the function is invoked twice.
             # This fails here: https://github.com/pydantic/pydantic-ai/blob/916fc83e8929470679db5ac1b3065bda5d5f4253/pydantic_ai_slim/pydantic_ai/_agent_graph.py#L1128
-            did_stream = getattr(self, "_did_stream", None)
+            did_stream = getattr(self, "_did_stream", False)
             if did_stream:
                 async with original_stream_method(self, ctx) as stream:
                     yield stream
