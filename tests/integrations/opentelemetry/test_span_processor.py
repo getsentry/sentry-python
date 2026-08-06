@@ -4,16 +4,17 @@ from unittest import mock
 from unittest.mock import MagicMock
 
 import pytest
-from opentelemetry.trace import SpanKind, SpanContext, Status, StatusCode
+from opentelemetry.trace import SpanContext, SpanKind, Status, StatusCode
 
 import sentry_sdk
 from sentry_sdk.integrations.opentelemetry.span_processor import (
     SentrySpanProcessor,
     link_trace_context_to_error_event,
 )
-from sentry_sdk.utils import Dsn
+from sentry_sdk.scope import global_event_processors
 from sentry_sdk.tracing import Span, Transaction
 from sentry_sdk.tracing_utils import extract_sentrytrace_data
+from sentry_sdk.utils import Dsn
 
 
 def test_is_sentry_span():
@@ -68,7 +69,9 @@ def test_get_trace_data_with_span_and_trace():
     parent_context = {}
 
     span_processor = SentrySpanProcessor()
-    sentry_trace_data = span_processor._get_trace_data(otel_span, parent_context)
+    sentry_trace_data = span_processor._get_trace_data(
+        otel_span.get_span_context(), otel_span.parent, parent_context
+    )
     assert sentry_trace_data["trace_id"] == "1234567890abcdef1234567890abcdef"
     assert sentry_trace_data["span_id"] == "1234567890abcdef"
     assert sentry_trace_data["parent_span_id"] is None
@@ -90,7 +93,9 @@ def test_get_trace_data_with_span_and_trace_and_parent():
     parent_context = {}
 
     span_processor = SentrySpanProcessor()
-    sentry_trace_data = span_processor._get_trace_data(otel_span, parent_context)
+    sentry_trace_data = span_processor._get_trace_data(
+        otel_span.get_span_context(), otel_span.parent, parent_context
+    )
     assert sentry_trace_data["trace_id"] == "1234567890abcdef1234567890abcdef"
     assert sentry_trace_data["span_id"] == "1234567890abcdef"
     assert sentry_trace_data["parent_span_id"] == "abcdef1234567890"
@@ -121,7 +126,9 @@ def test_get_trace_data_with_sentry_trace():
         ],
     ):
         span_processor = SentrySpanProcessor()
-        sentry_trace_data = span_processor._get_trace_data(otel_span, parent_context)
+        sentry_trace_data = span_processor._get_trace_data(
+            otel_span.get_span_context(), otel_span.parent, parent_context
+        )
         assert sentry_trace_data["trace_id"] == "1234567890abcdef1234567890abcdef"
         assert sentry_trace_data["span_id"] == "1234567890abcdef"
         assert sentry_trace_data["parent_span_id"] == "abcdef1234567890"
@@ -138,7 +145,9 @@ def test_get_trace_data_with_sentry_trace():
         ],
     ):
         span_processor = SentrySpanProcessor()
-        sentry_trace_data = span_processor._get_trace_data(otel_span, parent_context)
+        sentry_trace_data = span_processor._get_trace_data(
+            otel_span.get_span_context(), otel_span.parent, parent_context
+        )
         assert sentry_trace_data["trace_id"] == "1234567890abcdef1234567890abcdef"
         assert sentry_trace_data["span_id"] == "1234567890abcdef"
         assert sentry_trace_data["parent_span_id"] == "abcdef1234567890"
@@ -175,7 +184,9 @@ def test_get_trace_data_with_sentry_trace_and_baggage():
         ],
     ):
         span_processor = SentrySpanProcessor()
-        sentry_trace_data = span_processor._get_trace_data(otel_span, parent_context)
+        sentry_trace_data = span_processor._get_trace_data(
+            otel_span.get_span_context(), otel_span.parent, parent_context
+        )
         assert sentry_trace_data["trace_id"] == "1234567890abcdef1234567890abcdef"
         assert sentry_trace_data["span_id"] == "1234567890abcdef"
         assert sentry_trace_data["parent_span_id"] == "abcdef1234567890"
@@ -611,3 +622,14 @@ def test_pruning_old_spans_on_end():
     span_processor.on_end(otel_span)
     assert sorted(list(span_processor.otel_span_map.keys())) == ["111111111abcdef"]
     assert sorted(list(span_processor.open_spans.values())) == [{"111111111abcdef"}]
+
+
+def test_no_memory_leak():
+    span_processor_1 = SentrySpanProcessor()
+    cnt_before = len(global_event_processors)
+
+    span_processor_2 = SentrySpanProcessor()
+
+    cnt_after = len(global_event_processors)
+    assert span_processor_1 is span_processor_2
+    assert cnt_before == cnt_after

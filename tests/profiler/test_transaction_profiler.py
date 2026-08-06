@@ -1,6 +1,5 @@
 import inspect
 import os
-import sentry_sdk
 import sys
 import threading
 import time
@@ -10,7 +9,9 @@ from unittest import mock
 
 import pytest
 
+import sentry_sdk
 from sentry_sdk import start_transaction
+from sentry_sdk._lru_cache import LRUCache
 from sentry_sdk.profiler.transaction_profiler import (
     GeventScheduler,
     Profile,
@@ -24,7 +25,6 @@ from sentry_sdk.profiler.utils import (
     frame_id,
     get_frame_name,
 )
-from sentry_sdk._lru_cache import LRUCache
 
 try:
     import gevent
@@ -608,7 +608,7 @@ def test_thread_scheduler_no_thread_on_shutdown(scheduler_class):
     # setup but no profiles started so still no threads
     assert len(get_scheduler_threads(scheduler)) == 0
 
-    # mock RuntimeError as if the 3.12 intepreter was shutting down
+    # mock RuntimeError as if the 3.12 interpreter was shutting down
     with mock.patch(
         "threading.Thread.start",
         side_effect=RuntimeError("can't create new thread at interpreter shutdown"),

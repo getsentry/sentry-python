@@ -1,11 +1,12 @@
 from typing import TYPE_CHECKING
 
 from sentry_sdk._batcher import Batcher
-from sentry_sdk.utils import serialize_attribute
 from sentry_sdk.envelope import Item, PayloadRef
+from sentry_sdk.utils import serialize_attribute
 
 if TYPE_CHECKING:
     from typing import Any
+
     from sentry_sdk._types import Log
 
 
@@ -26,14 +27,18 @@ class LogBatcher(Batcher["Log"]):
 
         res = {
             "timestamp": int(item["time_unix_nano"]) / 1.0e9,
-            "trace_id": item.get("trace_id", "00000000-0000-0000-0000-000000000000"),
-            "span_id": item.get("span_id"),
             "level": str(item["severity_text"]),
             "body": str(item["body"]),
             "attributes": {
                 k: serialize_attribute(v) for (k, v) in item["attributes"].items()
             },
         }
+
+        if item.get("trace_id") is not None:
+            res["trace_id"] = item["trace_id"]
+
+        if item.get("span_id") is not None:
+            res["span_id"] = item["span_id"]
 
         return res
 
@@ -45,7 +50,12 @@ class LogBatcher(Batcher["Log"]):
             headers={
                 "item_count": 1,
             },
-            payload=PayloadRef(json={"items": [self._to_transport_format(item)]}),
+            payload=PayloadRef(
+                json={
+                    "version": 2,
+                    "items": [self._to_transport_format(item)],
+                }
+            ),
         )
 
         self._record_lost_func(

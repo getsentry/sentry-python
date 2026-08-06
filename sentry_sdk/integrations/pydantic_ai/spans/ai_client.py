@@ -1,4 +1,5 @@
 import json
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.ai.utils import (
@@ -7,15 +8,20 @@ from sentry_sdk.ai.utils import (
     truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.tracing_utils import (
+    has_span_streaming_enabled,
+    should_truncate_gen_ai_input,
+)
 from sentry_sdk.utils import safe_serialize
 
 from ..consts import SPAN_ORIGIN
 from ..utils import (
+    _get_model_name,
     _set_agent_data,
     _set_available_tools,
     _set_model_data,
     _should_send_prompts,
-    _get_model_name,
     get_current_agent,
 )
 from .utils import (
@@ -24,41 +30,42 @@ from .utils import (
     _set_usage_data,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any, List, Dict
-    from pydantic_ai.messages import ModelMessage, SystemPromptPart  # type: ignore
-    from sentry_sdk._types import TextPart as SentryTextPart
+    from typing import Any, Dict, List, Optional, Union
+
+    from pydantic_ai.messages import ModelMessage, ModelResponse, SystemPromptPart
+
+    from sentry_sdk import _types
 
 try:
     from pydantic_ai.messages import (
         BaseToolCallPart,
         BaseToolReturnPart,
-        SystemPromptPart,
-        UserPromptPart,
-        TextPart,
-        ThinkingPart,
         BinaryContent,
         ImageUrl,
+        SystemPromptPart,
+        TextPart,
+        ThinkingPart,
+        UserPromptPart,
     )
 except ImportError:
     # Fallback if these classes are not available
-    BaseToolCallPart = None
-    BaseToolReturnPart = None
-    SystemPromptPart = None
-    UserPromptPart = None
-    TextPart = None
-    ThinkingPart = None
-    BinaryContent = None
-    ImageUrl = None
+    BaseToolCallPart = None  # type: ignore[misc,assignment]
+    BaseToolReturnPart = None  # type: ignore[misc,assignment]
+    SystemPromptPart = None  # type: ignore[misc,assignment]
+    UserPromptPart = None  # type: ignore[misc,assignment]
+    TextPart = None  # type: ignore[misc,assignment]
+    ThinkingPart = None  # type: ignore[misc,assignment]
+    BinaryContent = None  # type: ignore[misc,assignment]
+    ImageUrl = None  # type: ignore[misc,assignment]
+    ThinkingPart = None  # type: ignore[misc,assignment]
 
 
 def _transform_system_instructions(
     permanent_instructions: "list[SystemPromptPart]",
     current_instructions: "list[str]",
-) -> "list[SentryTextPart]":
-    text_parts: "list[SentryTextPart]" = [
+) -> "list[_types.TextPart]":
+    text_parts: "list[_types.TextPart]" = [
         {
             "type": "text",
             "content": instruction.content,
@@ -86,7 +93,7 @@ def _get_system_instructions(
     for msg in messages:
         if hasattr(msg, "parts"):
             for part in msg.parts:
-                if SystemPromptPart and isinstance(part, SystemPromptPart):
+                if SystemPromptPart is not None and isinstance(part, SystemPromptPart):
                     permanent_instructions.append(part)
 
         if hasattr(msg, "instructions") and msg.instructions is not None:
@@ -95,7 +102,9 @@ def _get_system_instructions(
     return permanent_instructions, current_instructions
 
 
-def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> None:
+def _set_input_messages(
+    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]", messages: "Any"
+) -> None:
     """Set input messages data on a span."""
     if not _should_send_prompts():
         return
@@ -105,14 +114,24 @@ def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> Non
 
     permanent_instructions, current_instructions = _get_system_instructions(messages)
     if len(permanent_instructions) > 0 or len(current_instructions) > 0:
-        span.set_data(
-            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-            json.dumps(
-                _transform_system_instructions(
-                    permanent_instructions, current_instructions
-                )
-            ),
-        )
+        if isinstance(span, StreamedSpan):
+            span.set_attribute(
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                json.dumps(
+                    _transform_system_instructions(
+                        permanent_instructions, current_instructions
+                    )
+                ),
+            )
+        else:
+            span.set_data(
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                json.dumps(
+                    _transform_system_instructions(
+                        permanent_instructions, current_instructions
+                    )
+                ),
+            )
 
     try:
         formatted_messages = []
@@ -122,15 +141,22 @@ def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> Non
                 for part in msg.parts:
                     role = "user"
                     # Use isinstance checks with proper base classes
-                    if SystemPromptPart and isinstance(part, SystemPromptPart):
+                    if SystemPromptPart is not None and isinstance(
+                        part, SystemPromptPart
+                    ):
                         continue
                     elif (
-                        (TextPart and isinstance(part, TextPart))
-                        or (ThinkingPart and isinstance(part, ThinkingPart))
-                        or (BaseToolCallPart and isinstance(part, BaseToolCallPart))
+                        (TextPart is not None and isinstance(part, TextPart))
+                        or (ThinkingPart is not None and isinstance(part, ThinkingPart))
+                        or (
+                            BaseToolCallPart is not None
+                            and isinstance(part, BaseToolCallPart)
+                        )
                     ):
                         role = "assistant"
-                    elif BaseToolReturnPart and isinstance(part, BaseToolReturnPart):
+                    elif BaseToolReturnPart is not None and isinstance(
+                        part, BaseToolReturnPart
+                    ):
                         role = "tool"
 
                     content: "List[Dict[str, Any] | str]" = []
@@ -138,7 +164,9 @@ def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> Non
                     tool_call_id = None
 
                     # Handle ToolCallPart (assistant requesting tool use)
-                    if BaseToolCallPart and isinstance(part, BaseToolCallPart):
+                    if BaseToolCallPart is not None and isinstance(
+                        part, BaseToolCallPart
+                    ):
                         tool_call_data = {}
                         if hasattr(part, "tool_name"):
                             tool_call_data["name"] = part.tool_name
@@ -147,7 +175,9 @@ def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> Non
                         if tool_call_data:
                             tool_calls = [tool_call_data]
                     # Handle ToolReturnPart (tool result)
-                    elif BaseToolReturnPart and isinstance(part, BaseToolReturnPart):
+                    elif BaseToolReturnPart is not None and isinstance(
+                        part, BaseToolReturnPart
+                    ):
                         if hasattr(part, "tool_name"):
                             tool_call_id = part.tool_name
                         if hasattr(part, "content"):
@@ -160,9 +190,13 @@ def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> Non
                             for item in part.content:
                                 if isinstance(item, str):
                                     content.append({"type": "text", "text": item})
-                                elif ImageUrl and isinstance(item, ImageUrl):
+                                elif ImageUrl is not None and isinstance(
+                                    item, ImageUrl
+                                ):
                                     content.append(_serialize_image_url_item(item))
-                                elif BinaryContent and isinstance(item, BinaryContent):
+                                elif BinaryContent is not None and isinstance(
+                                    item, BinaryContent
+                                ):
                                     content.append(_serialize_binary_content_item(item))
                                 else:
                                     content.append(safe_serialize(item))
@@ -181,9 +215,12 @@ def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> Non
 
         if formatted_messages:
             normalized_messages = normalize_message_roles(formatted_messages)
+            client = sentry_sdk.get_client()
             scope = sentry_sdk.get_current_scope()
-            messages_data = truncate_and_annotate_messages(
-                normalized_messages, span, scope
+            messages_data = (
+                truncate_and_annotate_messages(normalized_messages, span, scope)
+                if should_truncate_gen_ai_input(client.options)
+                else normalized_messages
             )
             set_data_normalized(
                 span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
@@ -193,7 +230,10 @@ def _set_input_messages(span: "sentry_sdk.tracing.Span", messages: "Any") -> Non
         pass
 
 
-def _set_output_data(span: "sentry_sdk.tracing.Span", response: "Any") -> None:
+def _set_output_data(
+    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
+    response: "Optional[ModelResponse]",
+) -> None:
     """Set output data on a span."""
     if not _should_send_prompts():
         return
@@ -201,32 +241,45 @@ def _set_output_data(span: "sentry_sdk.tracing.Span", response: "Any") -> None:
     if not response:
         return
 
-    span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)
+    set_on_span = (
+        span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
+    )
+    set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)  # type: ignore[arg-type]
+
     try:
-        # Extract text from ModelResponse
         if hasattr(response, "parts"):
-            texts = []
-            tool_calls = []
+            parts: "list[Union[_types.TextPart, _types.ReasoningPart, _types.ToolCallPart]]" = []
 
             for part in response.parts:
-                if TextPart and isinstance(part, TextPart) and hasattr(part, "content"):
-                    texts.append(part.content)
-                elif BaseToolCallPart and isinstance(part, BaseToolCallPart):
-                    tool_call_data = {
-                        "type": "function",
-                    }
+                if (
+                    TextPart is not None
+                    and isinstance(part, TextPart)
+                    and hasattr(part, "content")
+                ):
+                    parts.append({"type": "text", "content": part.content})
+
+                elif ThinkingPart is not None and isinstance(part, ThinkingPart):
+                    parts.append(
+                        {
+                            "type": "reasoning",
+                            "content": part.content,
+                        }
+                    )
+
+                elif BaseToolCallPart is not None and isinstance(
+                    part, BaseToolCallPart
+                ):
+                    tool_part: "_types.ToolCallPart" = {"type": "tool_call"}
                     if hasattr(part, "tool_name"):
-                        tool_call_data["name"] = part.tool_name
+                        tool_part["name"] = part.tool_name
                     if hasattr(part, "args"):
-                        tool_call_data["arguments"] = safe_serialize(part.args)
-                    tool_calls.append(tool_call_data)
+                        tool_part["arguments"] = safe_serialize(part.args)
+                    parts.append(tool_part)
 
-            if texts:
-                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, texts)
-
-            if tool_calls:
-                span.set_data(
-                    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(tool_calls)
+            if parts:
+                set_on_span(
+                    SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                    json.dumps([{"role": "assistant", "parts": parts}]),
                 )
 
     except Exception:
@@ -236,7 +289,7 @@ def _set_output_data(span: "sentry_sdk.tracing.Span", response: "Any") -> None:
 
 def ai_client_span(
     messages: "Any", agent: "Any", model: "Any", model_settings: "Any"
-) -> "sentry_sdk.tracing.Span":
+) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
     """Create a span for an AI client call (model request).
 
     Args:
@@ -252,13 +305,24 @@ def ai_client_span(
 
     model_name = _get_model_name(model_obj) or "unknown"
 
-    span = sentry_sdk.start_span(
-        op=OP.GEN_AI_CHAT,
-        name=f"chat {model_name}",
-        origin=SPAN_ORIGIN,
-    )
+    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+    if span_streaming:
+        span = sentry_sdk.traces.start_span(
+            name=f"chat {model_name}",
+            attributes={
+                "sentry.op": OP.GEN_AI_CHAT,
+                "sentry.origin": SPAN_ORIGIN,
+                SPANDATA.GEN_AI_OPERATION_NAME: "chat",
+            },
+        )
+    else:
+        span = sentry_sdk.start_span(
+            op=OP.GEN_AI_CHAT,
+            name=f"chat {model_name}",
+            origin=SPAN_ORIGIN,
+        )
 
-    span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
+        span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
 
     _set_agent_data(span, agent)
     _set_model_data(span, model, model_settings)
@@ -275,7 +339,8 @@ def ai_client_span(
 
 
 def update_ai_client_span(
-    span: "sentry_sdk.tracing.Span", model_response: "Any"
+    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
+    model_response: "Optional[ModelResponse]",
 ) -> None:
     """Update the AI client span with response data."""
     if not span:

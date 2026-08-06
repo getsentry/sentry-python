@@ -81,6 +81,19 @@ Used to make malicious instructions look like normal text while bypassing keywor
 ### RTL Override
 Unicode bidirectional override characters (`U+202E`) can reverse displayed text direction, hiding the true content from visual review.
 
+### Unicode Tag Characters (U+E0000 block)
+The Tags Unicode block (U+E0001–U+E007F) provides invisible representations of every ASCII character. These are:
+- Invisible in all text editors, GitHub, and terminal output
+- Processed normally by LLM tokenizers
+- Mapping: `ASCII code point + 0xE0000 = invisible tag character`
+
+Detection: `cat -v` shows escape sequences, or check file size vs visible content (large discrepancy = suspicious). The scanner decodes these automatically.
+
+### PNG/Image Metadata Injection
+Hidden instructions embedded in PNG metadata chunks (tEXt, iTXt, Description, Comment fields). The image renders normally but metadata contains prompt injection text. Multimodal LLMs that inspect image files can read and follow these instructions.
+
+Detection: `exiftool <image>` or check for tEXt/iTXt chunks in PNG binary data.
+
 ### Whitespace and Formatting
 - Injection patterns hidden in trailing whitespace
 - Instructions placed in markdown that renders as invisible (e.g., empty links, reference-style links that aren't displayed)

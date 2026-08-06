@@ -146,7 +146,7 @@ class Hub(with_metaclass(HubMeta)):  # type: ignore
                 scope = get_isolation_scope().fork()
                 current_scope = get_current_scope().fork()
         else:
-            client = client_or_hub  # type: ignore
+            client = client_or_hub
             get_global_scope().set_client(client)
 
         if scope is None:  # so there is no Hub cloning going on

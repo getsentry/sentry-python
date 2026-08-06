@@ -2,11 +2,7 @@ import itertools
 from enum import Enum
 from typing import TYPE_CHECKING
 
-# up top to prevent circular import due to integration import
-# This is more or less an arbitrary large-ish value for now, so that we allow
-# pretty long strings (like LLM prompts), but still have *some* upper limit
-# until we verify that removing the trimming completely is safe.
-DEFAULT_MAX_VALUE_LENGTH = 100_000
+DEFAULT_MAX_VALUE_LENGTH = None
 
 DEFAULT_MAX_STACK_FRAMES = 100
 DEFAULT_ADD_FULL_STACK = False
@@ -49,6 +45,7 @@ if TYPE_CHECKING:
     from sentry_sdk._types import (
         BreadcrumbProcessor,
         ContinuousProfilerMode,
+        DataCollectionUserOptions,
         Event,
         EventProcessor,
         Hint,
@@ -56,6 +53,7 @@ if TYPE_CHECKING:
         Log,
         Metric,
         ProfilerMode,
+        SpanJSON,
         TracesSampler,
         TransactionProcessor,
     )
@@ -85,7 +83,11 @@ if TYPE_CHECKING:
             "before_send_metric": Optional[Callable[[Metric, Hint], Optional[Metric]]],
             "trace_lifecycle": Optional[Literal["static", "stream"]],
             "ignore_spans": Optional[IgnoreSpansConfig],
+            "before_send_span": Optional[
+                Callable[[SpanJSON, Hint], Optional[SpanJSON]]
+            ],
             "suppress_asgi_chained_exceptions": Optional[bool],
+            "data_collection": Optional[DataCollectionUserOptions],
         },
         total=False,
     )
@@ -404,7 +406,22 @@ class SPANDATA:
     Example: template.cache.some_item.867da7e2af8e6b2f3aa7213a4080edb3
     """
 
+    CLIENT_ADDRESS = "client.address"
+    """
+    Client address of the network connection - IP address or Unix domain socket name.
+    Example: "10.1.2.80"
+    """
+
     CODE_FILEPATH = "code.filepath"
+    """
+    .. deprecated::
+        This attribute is deprecated. Use CODE_FILE_PATH instead.
+
+    The source code file name that identifies the code unit as uniquely as possible (preferably an absolute file path).
+    Example: "/app/myapplication/http/handler/server.py"
+    """
+
+    CODE_FILE_PATH = "code.file.path"
     """
     The source code file name that identifies the code unit as uniquely as possible (preferably an absolute file path).
     Example: "/app/myapplication/http/handler/server.py"
@@ -412,18 +429,39 @@ class SPANDATA:
 
     CODE_FUNCTION = "code.function"
     """
+    .. deprecated::
+        This attribute is deprecated. Use CODE_FUNCTION_NAME instead.
+
+    The method or function name, or equivalent (usually rightmost part of the code unit's name).
+    Example: "server_request"
+    """
+
+    CODE_FUNCTION_NAME = "code.function.name"
+    """
     The method or function name, or equivalent (usually rightmost part of the code unit's name).
     Example: "server_request"
     """
 
     CODE_LINENO = "code.lineno"
     """
+    .. deprecated::
+        This attribute is deprecated. Use CODE_LINE_NUMBER instead.
+
     The line number in `code.filepath` best representing the operation. It SHOULD point within the code unit named in `code.function`.
+    Example: 42
+    """
+
+    CODE_LINE_NUMBER = "code.line.number"
+    """
+    The line number in `code.file.path` best representing the operation. It SHOULD point within the code unit named in `code.function.name`.
     Example: 42
     """
 
     CODE_NAMESPACE = "code.namespace"
     """
+    .. deprecated::
+        This attribute is deprecated. Use CODE_FUNCTION_NAME instead; the namespace should be included within the function name.
+
     The "namespace" within which `code.function` is defined. Usually the qualified class or module name, such that `code.namespace` + some separator + `code.function` form a unique identifier for the code unit.
     Example: "http.handler"
     """
@@ -437,22 +475,61 @@ class SPANDATA:
 
     DB_NAME = "db.name"
     """
+    .. deprecated::
+        This attribute is deprecated. Use DB_NAMESPACE instead.
+
     The name of the database being accessed. For commands that switch the database, this should be set to the target database (even if the command fails).
     Example: myDatabase
     """
 
+    DB_NAMESPACE = "db.namespace"
+    """
+    The name of the database being accessed.
+    Example: "customers"
+    """
+
+    DB_DRIVER_NAME = "db.driver.name"
+    """
+    The name of the database driver being used for the connection.
+    Example: "psycopg2"
+    """
+
     DB_OPERATION = "db.operation"
     """
+    .. deprecated::
+        This attribute is deprecated. Use DB_OPERATION_NAME instead.
+
     The name of the operation being executed, e.g. the MongoDB command name such as findAndModify, or the SQL keyword.
     See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md
     Example: findAndModify, HMSET, SELECT
     """
 
+    DB_OPERATION_NAME = "db.operation.name"
+    """
+    The name of the operation being executed.
+    Example: "SELECT"
+    """
+
     DB_SYSTEM = "db.system"
     """
+    .. deprecated::
+        This attribute is deprecated. Use DB_SYSTEM_NAME instead.
+
     An identifier for the database management system (DBMS) product being used.
     See: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/database.md
     Example: postgresql
+    """
+
+    DB_QUERY_TEXT = "db.query.text"
+    """
+    The database query being executed.
+    Example: "SELECT * FROM users WHERE id = $1"
+    """
+
+    DB_SYSTEM_NAME = "db.system.name"
+    """
+    An identifier for the database management system (DBMS) product being used. See OpenTelemetry's list of well-known DBMS identifiers.
+    Example: "postgresql"
     """
 
     DB_USER = "db.user"
@@ -484,6 +561,12 @@ class SPANDATA:
     """
     The input to the embeddings operation.
     Example: "Hello!"
+    """
+
+    GEN_AI_FUNCTION_ID = "gen_ai.function_id"
+    """
+    Framework-specific tracing label for the execution of a function or other unit of execution in a generative AI system.
+    Example: "my-awesome-function"
     """
 
     GEN_AI_OPERATION_NAME = "gen_ai.operation.name"
@@ -524,8 +607,17 @@ class SPANDATA:
 
     GEN_AI_RESPONSE_TEXT = "gen_ai.response.text"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_OUTPUT_MESSAGES instead.
+
     The model's response text messages.
     Example: ["The weather in Paris is rainy and overcast, with temperatures around 57°F", "The weather in London is sunny and warm, with temperatures around 65°F"]
+    """
+
+    GEN_AI_OUTPUT_MESSAGES = "gen_ai.output.messages"
+    """
+    The model's response messages. It has to be a stringified version of an array of message objects, which can include text responses and tool calls.
+    Example: [{"role": "assistant", "parts": [{"type": "text", "content": "The weather in Paris is currently rainy with a temperature of 57°F."}], "finish_reason": "stop"}]
     """
 
     GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN = "gen_ai.response.time_to_first_token"
@@ -536,14 +628,26 @@ class SPANDATA:
 
     GEN_AI_RESPONSE_TOOL_CALLS = "gen_ai.response.tool_calls"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_OUTPUT_MESSAGES instead.
+
     The tool calls in the model's response.
     Example: [{"name": "get_weather", "arguments": {"location": "Paris"}}]
     """
 
     GEN_AI_REQUEST_AVAILABLE_TOOLS = "gen_ai.request.available_tools"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_TOOL_DEFINITIONS instead.
+
     The available tools for the model.
     Example: [{"name": "get_weather", "description": "Get the weather for a given location"}, {"name": "get_news", "description": "Get the news for a given topic"}]
+    """
+
+    GEN_AI_TOOL_DEFINITIONS = "gen_ai.tool.definitions"
+    """
+    The list of source system tool definitions available to the GenAI agent or model.
+    Example: [{"type": "function", "name": "get_current_weather", "description": "Get the current weather in a given location", "parameters": {"type": "object", "properties": {"location": {"type": "string", "description": "The city and state, e.g. San Francisco, CA"}, "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]}}, "required": ["location", "unit"]}}]
     """
 
     GEN_AI_REQUEST_FREQUENCY_PENALTY = "gen_ai.request.frequency_penalty"
@@ -566,8 +670,17 @@ class SPANDATA:
 
     GEN_AI_REQUEST_MESSAGES = "gen_ai.request.messages"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_INPUT_MESSAGES instead.
+
     The messages passed to the model. The "content" can be a string or an array of objects.
     Example: [{role: "system", "content: "Generate a random number."}, {"role": "user", "content": [{"text": "Generate a random number between 0 and 10.", "type": "text"}]}]
+    """
+
+    GEN_AI_INPUT_MESSAGES = "gen_ai.input.messages"
+    """
+    The messages passed to the model. It has to be a stringified version of an array of objects. Role values must be "user", "assistant", "tool", or "system".
+    Example: [{"role": "user", "parts": [{"type": "text", "content": "Weather in Paris?"}]}, {"role": "assistant", "parts": [{"type": "tool_call", "id": "call_VSPygqKTWdrhaFErNvMV18Yl", "name": "get_weather", "arguments": {"location": "Paris"}}]}, {"role": "tool", "parts": [{"type": "tool_call_response", "id": "call_VSPygqKTWdrhaFErNvMV18Yl", "result": "rainy, 57°F"}]}]
     """
 
     GEN_AI_REQUEST_MODEL = "gen_ai.request.model"
@@ -580,6 +693,12 @@ class SPANDATA:
     """
     The presence penalty parameter used to reduce repetitiveness of generated tokens.
     Example: 0.1
+    """
+
+    GEN_AI_REQUEST_REASONING_LEVEL = "gen_ai.request.reasoning.level"
+    """
+    The reasoning or thinking effort level requested for a GenAI model.
+    Example: "high"
     """
 
     GEN_AI_REQUEST_SEED = "gen_ai.request.seed"
@@ -608,7 +727,16 @@ class SPANDATA:
 
     GEN_AI_SYSTEM = "gen_ai.system"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_PROVIDER_NAME instead.
+
     The name of the AI system being used.
+    Example: "openai"
+    """
+
+    GEN_AI_PROVIDER_NAME = "gen_ai.provider.name"
+    """
+    The Generative AI provider as identified by the client or server instrumentation.
     Example: "openai"
     """
 
@@ -620,7 +748,16 @@ class SPANDATA:
 
     GEN_AI_TOOL_INPUT = "gen_ai.tool.input"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_TOOL_CALL_ARGUMENTS instead.
+
     The input of the tool being used.
+    Example: {"location": "Paris"}
+    """
+
+    GEN_AI_TOOL_CALL_ARGUMENTS = "gen_ai.tool.call.arguments"
+    """
+    The arguments of the tool call. It has to be a stringified version of the arguments to the tool.
     Example: {"location": "Paris"}
     """
 
@@ -632,14 +769,17 @@ class SPANDATA:
 
     GEN_AI_TOOL_OUTPUT = "gen_ai.tool.output"
     """
+    .. deprecated::
+        This attribute is deprecated. Use GEN_AI_TOOL_CALL_RESULT instead.
+
     The output of the tool being used.
     Example: "rainy, 57°F"
     """
 
-    GEN_AI_TOOL_TYPE = "gen_ai.tool.type"
+    GEN_AI_TOOL_CALL_RESULT = "gen_ai.tool.call.result"
     """
-    The type of tool being used.
-    Example: "function"
+    The result of the tool call. It has to be a stringified version of the result of the tool.
+    Example: "rainy, 57°F"
     """
 
     GEN_AI_USAGE_INPUT_TOKENS = "gen_ai.usage.input_tokens"
@@ -692,6 +832,28 @@ class SPANDATA:
 
     HTTP_METHOD = "http.method"
     """
+    .. deprecated::
+        This attribute is deprecated. Use HTTP_REQUEST_METHOD instead.
+
+    The HTTP method used.
+    Example: GET
+    """
+
+    HTTP_REQUEST_BODY_DATA = "http.request.body.data"
+    """
+    HTTP request body data. Can be given as string or structural data of any format.
+    Example: "[{\"role\": \"user\", \"message\": \"hello\"}]"
+    """
+
+    HTTP_REQUEST_HEADER = "http.request.header"
+    """
+    Prefix for HTTP request header attributes. The header name (lowercased) is
+    appended to form the full attribute key.
+    Example: "http.request.header.content-type"
+    """
+
+    HTTP_REQUEST_METHOD = "http.request.method"
+    """
     The HTTP method used.
     Example: GET
     """
@@ -734,6 +896,17 @@ class SPANDATA:
     The messaging system's name, e.g. `kafka`, `aws_sqs`
     """
 
+    MIDDLEWARE_NAME = "middleware.name"
+    """
+    The middleware's name, e.g. `AuthenticationMiddleware`
+    """
+
+    NETWORK_PROTOCOL_NAME = "network.protocol.name"
+    """
+    The application layer protocol name used for the network connection.
+    Example: "http", "https"
+    """
+
     NETWORK_PEER_ADDRESS = "network.peer.address"
     """
     Peer address of the network connection - IP address or Unix domain socket name.
@@ -752,10 +925,34 @@ class SPANDATA:
     Example: "tcp", "udp", "unix"
     """
 
+    PROCESS_PID = "process.pid"
+    """
+    The process ID of the running process.
+    Example: 12345
+    """
+
+    PROCESS_COMMAND_ARGS = "process.command_args"
+    """
+    All the command arguments (including the command/executable itself) as received by the process.
+    Example: ["cmd/otecol","--config=config.yaml"]
+    """
+
     PROFILER_ID = "profiler_id"
     """
     Label identifying the profiler id that the span occurred in. This should be a string.
     Example: "5249fbada8d5416482c2f6e47e337372"
+    """
+
+    RPC_METHOD = "rpc.method"
+    """
+    The fully-qualified logical name of the method from the RPC interface perspective.
+    Example: "com.example.ExampleService/exampleMethod"
+    """
+
+    RPC_RESPONSE_STATUS_CODE = "rpc.response.status_code"
+    """
+    Status code of the RPC returned by the RPC server or generated by the client.
+    Example: "DEADLINE_EXCEEDED"
     """
 
     SERVER_ADDRESS = "server.address"
@@ -793,6 +990,54 @@ class SPANDATA:
     """
     Label identifying a thread from where the span originated. This should be a string.
     Example: "MainThread"
+    """
+
+    USER_EMAIL = "user.email"
+    """
+    User email address.
+    Example: "test@example.com"
+    """
+
+    USER_ID = "user.id"
+    """
+    Unique identifier of the user.
+    Example: "S-1-5-21-202424912787-2692429404-2351956786-1000"
+    """
+
+    USER_IP_ADDRESS = "user.ip_address"
+    """
+    The IP address of the user that triggered the request.
+    Example: "10.1.2.80"
+    """
+
+    USER_NAME = "user.name"
+    """
+    Short name or login/username of the user.
+    Example: "j.smith"
+    """
+
+    URL_FULL = "url.full"
+    """
+    The URL of the resource that was fetched.
+    Example: "https://example.com/test?foo=bar#buzz"
+    """
+
+    URL_FRAGMENT = "url.fragment"
+    """
+    The fragments present in the URI. Note that this does not contain the leading # character, while the `http.fragment` attribute does.
+    Example: "details"
+    """
+
+    URL_PATH = "url.path"
+    """
+    The URI path component.
+    Example: "/foo"
+    """
+
+    URL_QUERY = "url.query"
+    """
+    The query string present in the URL. Note that this does not contain the leading ? character, while the `http.query` attribute does.
+    Example: "foo=bar&bar=baz"
     """
 
     MCP_TOOL_NAME = "mcp.tool.name"
@@ -879,6 +1124,48 @@ class SPANDATA:
     Example: "a1b2c3d4e5f6"
     """
 
+    SENTRY_DIST = "sentry.dist"
+    """
+    The Sentry dist.
+    Example: "1.0"
+    """
+
+    SENTRY_ENVIRONMENT = "sentry.environment"
+    """
+    The Sentry environment.
+    Example: "prod"
+    """
+
+    SENTRY_RELEASE = "sentry.release"
+    """
+    The Sentry release.
+    Example: "1.2.3"
+    """
+
+    SENTRY_PLATFORM = "sentry.platform"
+    """
+    The sdk platform that generated the event.
+    Example: "python"
+    """
+
+    SENTRY_SDK_NAME = "sentry.sdk.name"
+    """
+    The name of the SDK.
+    Example: "python"
+    """
+
+    SENTRY_SDK_VERSION = "sentry.sdk.version"
+    """
+    The SDK version.
+    Example: "1.2.3"
+    """
+
+    SENTRY_SDK_INTEGRATIONS = "sentry.sdk.integrations"
+    """
+    A list of names identifying enabled integrations.
+    Example: ["AtexitIntegration", "StdlibIntegration"]
+    """
+
 
 class SPANSTATUS:
     """
@@ -913,6 +1200,8 @@ class OP:
     COHERE_CHAT_COMPLETIONS_CREATE = "ai.chat_completions.create.cohere"
     COHERE_EMBEDDINGS_CREATE = "ai.embeddings.create.cohere"
     DB = "db"
+    DB_CURSOR_ITERATOR = "db.cursor.iter"
+    DB_CURSOR_FETCH = "db.cursor.fetch"
     DB_REDIS = "db.redis"
     EVENT_DJANGO = "event.django"
     FUNCTION = "function"
@@ -989,6 +1278,7 @@ class ClientConstructor:
         server_name: "Optional[str]" = None,
         shutdown_timeout: float = 2,
         integrations: "Sequence[sentry_sdk.integrations.Integration]" = [],  # noqa: B006
+        ignore_spans: "Optional[IgnoreSpansConfig]" = None,
         in_app_include: "List[str]" = [],  # noqa: B006
         in_app_exclude: "List[str]" = [],  # noqa: B006
         default_integrations: bool = True,
@@ -1010,6 +1300,7 @@ class ClientConstructor:
         ca_certs: "Optional[str]" = None,
         propagate_traces: bool = True,
         traces_sample_rate: "Optional[float]" = None,
+        trace_lifecycle: "Optional[Literal['static', 'stream']]" = None,
         traces_sampler: "Optional[TracesSampler]" = None,
         profiles_sample_rate: "Optional[float]" = None,
         profiles_sampler: "Optional[TracesSampler]" = None,
@@ -1033,7 +1324,7 @@ class ClientConstructor:
         ],
         functions_to_trace: "Sequence[Dict[str, str]]" = [],  # noqa: B006
         event_scrubber: "Optional[sentry_sdk.scrubber.EventScrubber]" = None,
-        max_value_length: int = DEFAULT_MAX_VALUE_LENGTH,
+        max_value_length: "Optional[int]" = DEFAULT_MAX_VALUE_LENGTH,
         enable_backpressure_handling: bool = True,
         error_sampler: "Optional[Callable[[Event, Hint], Union[float, bool]]]" = None,
         enable_db_query_source: bool = True,
@@ -1051,8 +1342,10 @@ class ClientConstructor:
         trace_ignore_status_codes: "AbstractSet[int]" = frozenset(),
         enable_metrics: bool = True,
         before_send_metric: "Optional[Callable[[Metric, Hint], Optional[Metric]]]" = None,
+        before_send_span: "Optional[Callable[[SpanJSON, Hint], Optional[SpanJSON]]]" = None,
         org_id: "Optional[str]" = None,
         strict_trace_continuation: bool = False,
+        stream_gen_ai_spans: bool = True,
     ) -> None:
         """Initialize the Sentry SDK with the given parameters. All parameters described here can be used in a call to `sentry_sdk.init()`.
 
@@ -1455,6 +1748,8 @@ class ClientConstructor:
             If `trace_ignore_status_codes` is not provided, requests with any status code
             may be traced.
 
+            This option has no effect in span streaming mode (`trace_lifecycle="stream"`).
+
         :param strict_trace_continuation: If set to `True`, the SDK will only continue a trace if the `org_id` of the incoming trace found in the
            `baggage` header matches the `org_id` of the current Sentry client and only if BOTH are present.
 
@@ -1468,7 +1763,39 @@ class ClientConstructor:
             but you can provide it explicitly for self-hosted and Relay setups. This value is used for
             trace propagation and for features like `strict_trace_continuation`.
 
-        :param _experiments:
+        :param before_send_span: An optional function to modify spans before they're sent to Sentry.
+            Modifications to the span's attributes and name will be retained. Unlike ``before_send_log``
+            and ``before_send_metric``, spans cannot be dropped by returning None. Only works when
+            ``trace_lifecycle="stream"`` is enabled.
+
+        :param stream_gen_ai_spans: When set, generative AI spans are sent in a new transport format to
+            reduce downstream data loss.
+
+        :param trace_lifecycle: Controls how traces are sent. Set to `"stream"` to send spans as they
+            finish, or `"static"` to send a completed trace as a transaction event.
+
+        :param ignore_spans: A sequence of span-matching rules. Matching spans are ignored when
+            `trace_lifecycle="stream"` is enabled.
+
+        :param _experiments: Dictionary of experimental, opt-in features that are not yet stable.
+
+            ``data_collection`` (EXPERIMENTAL): structured configuration controlling what data integrations
+            collect automatically, superseding `send_default_pii`. Passing a dict under
+            `_experiments={"data_collection": {...}}` opts into the feature; omitted fields use their
+            defaults (most categories are collected, with the sensitive denylist scrubbing values).
+            When it is not set, the SDK derives behaviour from `send_default_pii` so that upgrading
+            changes nothing. Restrict collection per category (user identity, cookies, HTTP
+            headers/bodies, query params, generative AI inputs/outputs, stack frame variables, source
+            context). If `send_default_pii` is also set, `data_collection` takes precedence.
+
+            Example::
+
+                sentry_sdk.init(
+                    dsn="...",
+                    _experiments={"data_collection": {"user_info": False, "http_bodies": []}},
+                )
+
+            See https://docs.sentry.io/platforms/python/configuration/options/#data_collection for more details.
         """
         pass
 
@@ -1492,4 +1819,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.57.0"
+VERSION = "2.66.1"

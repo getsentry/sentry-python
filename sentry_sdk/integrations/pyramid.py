@@ -4,15 +4,18 @@ import sys
 import weakref
 
 import sentry_sdk
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import SOURCE_FOR_STYLE
+from sentry_sdk.traces import SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE
+from sentry_sdk.tracing import SOURCE_FOR_STYLE as TRANSACTION_SOURCE_FOR_STYLE
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    has_data_collection_enabled,
     reraise,
 )
 
@@ -25,17 +28,15 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from typing import Any, Callable, Dict, Optional
+
     from pyramid.response import Response
-    from typing import Any
-    from sentry_sdk.integrations.wsgi import _ScopedResponse
-    from typing import Callable
-    from typing import Dict
-    from typing import Optional
     from webob.cookies import RequestCookies
     from webob.request import _FieldStorageWithFile
 
-    from sentry_sdk.utils import ExcInfo
     from sentry_sdk._types import Event, EventProcessor
+    from sentry_sdk.integrations.wsgi import _ScopedResponse
+    from sentry_sdk.utils import ExcInfo
 
 
 if getattr(Request, "authenticated_userid", None):
@@ -75,14 +76,28 @@ class PyramidIntegration(Integration):
         def sentry_patched_call_view(
             registry: "Any", request: "Request", *args: "Any", **kwargs: "Any"
         ) -> "Response":
-            integration = sentry_sdk.get_client().get_integration(PyramidIntegration)
+            client = sentry_sdk.get_client()
+            integration = client.get_integration(PyramidIntegration)
             if integration is None:
                 return old_call_view(registry, request, *args, **kwargs)
 
             _set_transaction_name_and_source(
                 sentry_sdk.get_current_scope(), integration.transaction_style, request
             )
+
             scope = sentry_sdk.get_isolation_scope()
+
+            if has_span_streaming_enabled(client.options):
+                if has_data_collection_enabled(client.options):
+                    if client.options["data_collection"]["user_info"]:
+                        user_id = authenticated_userid(request)
+                        if user_id:
+                            scope.set_user({"id": user_id})
+                elif should_send_default_pii():
+                    user_id = authenticated_userid(request)
+                    if user_id:
+                        scope.set_user({"id": user_id})
+
             scope.add_event_processor(
                 _make_event_processor(weakref.ref(request), integration)
             )
@@ -159,9 +174,17 @@ def _set_transaction_name_and_source(
             "route_name": request.matched_route.name,
             "route_pattern": request.matched_route.pattern,
         }
+        is_span_streaming_enabled = has_span_streaming_enabled(
+            sentry_sdk.get_client().options
+        )
+        source = (
+            SEGMENT_SOURCE_FOR_STYLE[transaction_style]
+            if is_span_streaming_enabled
+            else TRANSACTION_SOURCE_FOR_STYLE[transaction_style]
+        )
         scope.set_transaction_name(
             name_for_style[transaction_style],
-            source=SOURCE_FOR_STYLE[transaction_style],
+            source=source,
         )
     except Exception:
         pass
@@ -213,7 +236,13 @@ def _make_event_processor(
         with capture_internal_exceptions():
             PyramidRequestExtractor(request).extract_into_event(event)
 
-        if should_send_default_pii():
+        client_options = sentry_sdk.get_client().options
+        if has_data_collection_enabled(client_options):
+            if client_options["data_collection"]["user_info"]:
+                with capture_internal_exceptions():
+                    user_info = event.setdefault("user", {})
+                    user_info.setdefault("id", authenticated_userid(request))
+        elif should_send_default_pii():
             with capture_internal_exceptions():
                 user_info = event.setdefault("user", {})
                 user_info.setdefault("id", authenticated_userid(request))

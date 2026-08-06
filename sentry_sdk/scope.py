@@ -1,13 +1,15 @@
 import os
+import platform
 import sys
 import warnings
-from copy import copy, deepcopy
 from collections import deque
 from contextlib import contextmanager
-from enum import Enum
+from copy import copy, deepcopy
 from datetime import datetime, timezone
+from enum import Enum
 from functools import wraps
 from itertools import chain
+from typing import TYPE_CHECKING, cast
 
 import sentry_sdk
 from sentry_sdk._types import AnnotatedValue
@@ -18,7 +20,7 @@ from sentry_sdk.consts import (
     INSTRUMENTER,
     SPANDATA,
 )
-from sentry_sdk.feature_flags import FlagBuffer, DEFAULT_FLAG_CAPACITY
+from sentry_sdk.feature_flags import DEFAULT_FLAG_CAPACITY, FlagBuffer
 from sentry_sdk.profiler.continuous_profiler import (
     get_profiler_id,
     try_autostart_continuous_profiler,
@@ -26,15 +28,11 @@ from sentry_sdk.profiler.continuous_profiler import (
 )
 from sentry_sdk.profiler.transaction_profiler import Profile
 from sentry_sdk.session import Session
-from sentry_sdk.tracing_utils import (
-    Baggage,
-    has_tracing_enabled,
-    has_span_streaming_enabled,
-    is_ignored_span,
-    _make_sampling_decision,
-    PropagationContext,
+from sentry_sdk.traces import (
+    _DEFAULT_PARENT_SPAN,
+    NoOpStreamedSpan,
+    StreamedSpan,
 )
-from sentry_sdk.traces import _DEFAULT_PARENT_SPAN, StreamedSpan, NoOpStreamedSpan
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
@@ -42,40 +40,49 @@ from sentry_sdk.tracing import (
     Span,
     Transaction,
 )
+from sentry_sdk.tracing_utils import (
+    Baggage,
+    PropagationContext,
+    _make_sampling_decision,
+    has_span_streaming_enabled,
+    has_tracing_enabled,
+    is_ignored_span,
+)
 from sentry_sdk.utils import (
+    ContextVar,
     capture_internal_exception,
     capture_internal_exceptions,
-    ContextVar,
     datetime_from_isoformat,
     disable_capture_event,
     event_from_exception,
     exc_info_from_error,
     format_attribute,
-    logger,
+    has_data_collection_enabled,
     has_logs_enabled,
     has_metrics_enabled,
+    logger,
 )
-
-from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
-
-    from typing import Any
-    from typing import Callable
-    from typing import Deque
-    from typing import Dict
-    from typing import Generator
-    from typing import Iterator
-    from typing import List
-    from typing import Optional
-    from typing import ParamSpec
-    from typing import Tuple
-    from typing import TypeVar
-    from typing import Union
+    from typing import (
+        Any,
+        Callable,
+        Deque,
+        Dict,
+        Generator,
+        Iterator,
+        List,
+        Optional,
+        ParamSpec,
+        Tuple,
+        TypeVar,
+        Union,
+    )
 
     from typing_extensions import Unpack
 
+    import sentry_sdk
     from sentry_sdk._types import (
         Attributes,
         AttributeValue,
@@ -92,10 +99,7 @@ if TYPE_CHECKING:
         SamplingContext,
         Type,
     )
-
     from sentry_sdk.tracing import TransactionKwargs
-
-    import sentry_sdk
 
     P = ParamSpec("P")
     R = TypeVar("R")
@@ -374,8 +378,17 @@ class Scope:
     def set_global_attributes(self) -> None:
         from sentry_sdk.client import SDK_INFO
 
-        self.set_attribute("sentry.sdk.name", SDK_INFO["name"])
-        self.set_attribute("sentry.sdk.version", SDK_INFO["version"])
+        self.set_attribute(SPANDATA.SENTRY_SDK_NAME, SDK_INFO["name"])
+        self.set_attribute(SPANDATA.SENTRY_SDK_VERSION, SDK_INFO["version"])
+
+        self.set_attribute(
+            "process.runtime.name",
+            platform.python_implementation(),
+        )
+        self.set_attribute(
+            "process.runtime.version",
+            f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+        )
 
         options = sentry_sdk.get_client().options
 
@@ -385,11 +398,11 @@ class Scope:
 
         environment = options.get("environment")
         if environment:
-            self.set_attribute("sentry.environment", environment)
+            self.set_attribute(SPANDATA.SENTRY_ENVIRONMENT, environment)
 
         release = options.get("release")
         if release:
-            self.set_attribute("sentry.release", release)
+            self.set_attribute(SPANDATA.SENTRY_RELEASE, release)
 
     @classmethod
     def last_event_id(cls) -> "Optional[str]":
@@ -516,7 +529,7 @@ class Scope:
         Load Sentry trace id and baggage from environment variables.
         Can be disabled by setting SENTRY_USE_ENVIRONMENT to "false".
         """
-        incoming_trace_information = None
+        incoming_trace_information: "Optional[Dict[str, str]]" = None
 
         sentry_use_environment = (
             os.environ.get("SENTRY_USE_ENVIRONMENT") or ""
@@ -580,12 +593,14 @@ class Scope:
         """
         client = self.get_client()
 
+        if not has_tracing_enabled(client.options):
+            return self.get_active_propagation_context().to_traceparent()
+
+        span_streaming = has_span_streaming_enabled(client.options)
         # If we have an active span, return traceparent from there
-        if (
-            has_tracing_enabled(client.options)
-            and self.span is not None
-            and not isinstance(self.span, NoOpStreamedSpan)
-        ):
+        if span_streaming and self.streamed_span is not None:
+            return self.streamed_span._to_traceparent()
+        elif not span_streaming and self.span is not None:
             return self.span._to_traceparent()
 
         # else return traceparent from the propagation context
@@ -598,12 +613,14 @@ class Scope:
         """
         client = self.get_client()
 
+        if not has_tracing_enabled(client.options):
+            return self.get_active_propagation_context().get_baggage()
+
+        span_streaming = has_span_streaming_enabled(client.options)
         # If we have an active span, return baggage from there
-        if (
-            has_tracing_enabled(client.options)
-            and self.span is not None
-            and not isinstance(self.span, NoOpStreamedSpan)
-        ):
+        if span_streaming and self.streamed_span is not None:
+            return self.streamed_span._to_baggage()
+        elif not span_streaming and self.span is not None:
             return self.span._to_baggage()
 
         # else return baggage from the propagation context
@@ -616,7 +633,7 @@ class Scope:
         if (
             has_tracing_enabled(self.get_client().options)
             and self._span is not None
-            and not isinstance(self._span, NoOpStreamedSpan)
+            and not isinstance(self._span, NoOpSpan)
         ):
             return self._span._get_trace_context()
 
@@ -680,12 +697,14 @@ class Scope:
             return
 
         span = kwargs.pop("span", None)
-        span = span or self.span
+        if not span:
+            span_streaming = has_span_streaming_enabled(client.options)
+            span = self.streamed_span if span_streaming else self.span
 
         if (
             has_tracing_enabled(client.options)
             and span is not None
-            and not isinstance(span, NoOpStreamedSpan)
+            and not isinstance(span, NoOpSpan)
         ):
             for header in span._iter_headers():
                 yield header
@@ -711,10 +730,11 @@ class Scope:
             isolation_scope._propagation_context = PropagationContext()
         return isolation_scope._propagation_context
 
+    @classmethod
     def set_custom_sampling_context(
-        self, custom_sampling_context: "dict[str, Any]"
+        cls, custom_sampling_context: "dict[str, Any]"
     ) -> None:
-        self.get_active_propagation_context()._set_custom_sampling_context(
+        cls.get_current_scope().get_active_propagation_context()._set_custom_sampling_context(
             custom_sampling_context
         )
 
@@ -848,7 +868,7 @@ class Scope:
                 self._span._segment.name = name
                 if source:
                     self._span._segment.set_attribute(
-                        "sentry.span.source", getattr(source, "value", source)
+                        "sentry.segment.name.source", getattr(source, "value", source)
                     )
 
             elif self._span.containing_transaction:
@@ -872,17 +892,18 @@ class Scope:
     def set_user(self, value: "Optional[Dict[str, Any]]") -> None:
         """Sets a user for the scope."""
         self._user = value
+
         session = self.get_isolation_scope()._session
         if session is not None:
             session.update(user=value)
 
     @property
-    def span(self) -> "Optional[Union[Span, StreamedSpan]]":
+    def span(self) -> "Optional[Span]":
         """Get/set current tracing span or transaction."""
-        return self._span
+        return self._span if isinstance(self._span, Span) else None
 
     @span.setter
-    def span(self, span: "Optional[Union[Span, StreamedSpan]]") -> None:
+    def span(self, span: "Optional[Span]") -> None:
         self._span = span
         # XXX: this differs from the implementation in JS, there Scope.setSpan
         # does not set Scope._transactionName.
@@ -892,6 +913,24 @@ class Scope:
                 self._transaction = transaction.name
                 if transaction.source:
                     self._transaction_info["source"] = transaction.source
+
+    @property
+    def streamed_span(self) -> "Optional[StreamedSpan]":
+        """Get/set current tracing span."""
+        return self._span if isinstance(self._span, StreamedSpan) else None
+
+    @streamed_span.setter
+    def streamed_span(self, span: "Optional[StreamedSpan]") -> None:
+        self._span = span
+
+        # Also set _transaction and _transaction_info in streaming mode as this
+        # is used for populating events and linking them to segments
+        if type(span) is StreamedSpan and span._is_segment():
+            self._transaction = span.name
+            if span._attributes.get("sentry.segment.name.source"):
+                self._transaction_info["source"] = str(
+                    span._attributes["sentry.segment.name.source"]
+                )
 
     @property
     def profile(self) -> "Optional[Profile]":
@@ -1039,12 +1078,12 @@ class Scope:
         before_breadcrumb = client.options.get("before_breadcrumb")
         max_breadcrumbs = client.options.get("max_breadcrumbs", DEFAULT_MAX_BREADCRUMBS)
 
-        crumb: "Breadcrumb" = dict(crumb or ())
+        crumb = dict(crumb or ())
         crumb.update(kwargs)
         if not crumb:
             return
 
-        hint: "Hint" = dict(hint or ())
+        hint = dict(hint or ())
 
         if crumb.get("timestamp") is None:
             crumb["timestamp"] = datetime.now(timezone.utc)
@@ -1103,9 +1142,16 @@ class Scope:
             constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
             available arguments.
         """
-        kwargs.setdefault("scope", self)
-
         client = self.get_client()
+        if has_span_streaming_enabled(client.options):
+            warnings.warn(
+                "Scope.start_transaction is not available in streaming mode.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return NoOpSpan()
+
+        kwargs.setdefault("scope", self)
 
         configuration_instrumenter = client.options["instrumenter"]
 
@@ -1254,16 +1300,21 @@ class Scope:
         if parent_span is _DEFAULT_PARENT_SPAN or isinstance(
             parent_span, NoOpStreamedSpan
         ):
-            parent_span = self.span  # type: ignore
+            parent_span = self.streamed_span
 
         # If no eligible parent_span was provided and there is no currently
-        # active span, this is a segment
+        # active span, this is a new segment
         if parent_span is None:
             propagation_context = self.get_active_propagation_context()
 
             if is_ignored_span(name, attributes):
                 return NoOpStreamedSpan(
                     scope=self,
+                    segment=None,
+                    trace_id=propagation_context.trace_id,
+                    parent_span_id=propagation_context.parent_span_id,
+                    parent_sampled=propagation_context.parent_sampled,
+                    baggage=propagation_context.baggage,
                     unsampled_reason="ignored",
                 )
 
@@ -1276,10 +1327,18 @@ class Scope:
             if sample_rate is not None:
                 self._update_sample_rate(sample_rate)
 
-            if sampled is False:
+            if sampled is False or sampled is None:
                 return NoOpStreamedSpan(
                     scope=self,
+                    segment=None,
+                    trace_id=propagation_context.trace_id,
+                    parent_span_id=propagation_context.parent_span_id,
+                    parent_sampled=propagation_context.parent_sampled,
+                    baggage=propagation_context.baggage,
+                    sampled=sampled,
                     unsampled_reason=outcome,
+                    sample_rand=sample_rand,
+                    sample_rate=sample_rate,
                 )
 
             return StreamedSpan(
@@ -1300,11 +1359,21 @@ class Scope:
         with new_scope():
             if is_ignored_span(name, attributes):
                 return NoOpStreamedSpan(
+                    segment=parent_span._segment,
+                    trace_id=parent_span.trace_id,
+                    parent_span_id=parent_span.span_id,
+                    parent_sampled=parent_span.sampled,
                     unsampled_reason="ignored",
                 )
 
             if isinstance(parent_span, NoOpStreamedSpan):
-                return NoOpStreamedSpan(unsampled_reason=parent_span._unsampled_reason)
+                return NoOpStreamedSpan(
+                    segment=parent_span._segment,
+                    trace_id=parent_span.trace_id,
+                    parent_span_id=parent_span.span_id,
+                    parent_sampled=parent_span.sampled,
+                    unsampled_reason=parent_span._unsampled_reason,
+                )
 
             return StreamedSpan(
                 name=name,
@@ -1323,7 +1392,7 @@ class Scope:
         propagation_context = self.get_active_propagation_context()
         baggage = propagation_context.baggage
 
-        if baggage is not None:
+        if baggage is not None and baggage.sentry_items.get("sample_rate"):
             baggage.sentry_items["sample_rate"] = str(sample_rate)
 
     def continue_trace(
@@ -1707,15 +1776,24 @@ class Scope:
         else:
             attributes = telemetry._attributes
 
-        if not should_send_default_pii() or self._user is None:
+        client_options = sentry_sdk.get_client().options
+        if has_data_collection_enabled(client_options):
+            if not client_options["data_collection"]["user_info"] or self._user is None:
+                return
+        elif not should_send_default_pii() or self._user is None:
             return
 
         for attribute_name, user_attribute in (
             ("user.id", "id"),
             ("user.name", "username"),
             ("user.email", "email"),
+            ("user.ip_address", "ip_address"),
         ):
-            if user_attribute in self._user and attribute_name not in attributes:
+            if (
+                user_attribute in self._user
+                and attribute_name not in attributes
+                and self._user[user_attribute] is not None
+            ):
                 attributes[attribute_name] = self._user[user_attribute]
 
     def _drop(self, cause: "Any", ty: str) -> "Optional[Any]":
@@ -1831,13 +1909,23 @@ class Scope:
         if not isinstance(telemetry, StreamedSpan):
             trace_context = self.get_trace_context()
             trace_id = trace_context.get("trace_id")
-            if telemetry.get("trace_id") is None:
-                telemetry["trace_id"] = (
-                    trace_id or "00000000-0000-0000-0000-000000000000"
-                )
-            span_id = trace_context.get("span_id")
-            if telemetry.get("span_id") is None and span_id:
-                telemetry["span_id"] = span_id
+            if telemetry.get("trace_id") is None and trace_id is not None:
+                telemetry["trace_id"] = trace_id
+
+            # span_id should only be populated if there's an active span. We can't
+            # use the trace_context here because it synthesizes a span_id if there
+            # isn't one
+            if telemetry.get("span_id") is None:
+                if self._span is not None and not isinstance(
+                    self._span, (NoOpStreamedSpan, NoOpSpan)
+                ):
+                    telemetry["span_id"] = self._span.span_id
+                else:
+                    external_propagation_context = get_external_propagation_context()
+                    if external_propagation_context:
+                        _, span_id = external_propagation_context
+                        if span_id is not None:
+                            telemetry["span_id"] = span_id
 
         self._apply_scope_attributes_to_telemetry(telemetry)
         self._apply_user_attributes_to_telemetry(telemetry)
@@ -1939,10 +2027,20 @@ class Scope:
         """
         Set an attribute on the scope.
 
-        Any attributes-based telemetry (logs, metrics) captured while this scope
-        is active will inherit attributes set on the scope.
+        Any attributes-based telemetry (logs, metrics, streamed spans) captured
+        while this scope is active will inherit attributes set on the scope.
         """
         self._attributes[attribute] = format_attribute(value)
+
+    def set_attributes(self, attributes: "dict[str, AttributeValue]") -> None:
+        """
+        Set multiple attributes on the scope.
+
+        Any attributes-based telemetry (logs, metrics, streamed spans) captured
+        while this scope is active will inherit attributes set on the scope.
+        """
+        for attribute, value in attributes.items():
+            self.set_attribute(attribute, value)
 
     def remove_attribute(self, attribute: str) -> None:
         """Remove an attribute if set on the scope. No-op if there is no such attribute."""

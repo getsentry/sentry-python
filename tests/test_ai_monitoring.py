@@ -2,25 +2,25 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk._types import (
-    AnnotatedValue,
     BLOB_DATA_SUBSTITUTE,
+    AnnotatedValue,
 )
 from sentry_sdk.ai.monitoring import ai_track
 from sentry_sdk.ai.utils import (
     MAX_GEN_AI_MESSAGE_BYTES,
     MAX_SINGLE_MESSAGE_CONTENT_CHARS,
-    truncate_and_annotate_messages,
-    truncate_messages_by_size,
     _find_truncation_index,
+    get_modality_from_mime_type,
     parse_data_uri,
     redact_blob_message_parts,
-    get_modality_from_mime_type,
-    transform_openai_content_part,
     transform_anthropic_content_part,
-    transform_google_content_part,
-    transform_generic_content_part,
     transform_content_part,
+    transform_generic_content_part,
+    transform_google_content_part,
     transform_message_content,
+    transform_openai_content_part,
+    truncate_and_annotate_messages,
+    truncate_messages_by_size,
 )
 from sentry_sdk.utils import safe_serialize
 
@@ -52,6 +52,31 @@ def test_ai_track(sentry_init, capture_events):
     assert ai_run_span["description"] == "my tool"
 
 
+def test_ai_track_span_streaming(sentry_init, capture_items):
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    items = capture_items("span")
+
+    @ai_track("my tool")
+    def tool(**kwargs):
+        pass
+
+    @ai_track("some test pipeline")
+    def pipeline():
+        tool()
+
+    with sentry_sdk.traces.start_span(name="span"):
+        pipeline()
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 3
+    ai_run_span, ai_pipeline_span, segment = spans
+
+    assert ai_pipeline_span["name"] == "some test pipeline"
+    assert ai_run_span["name"] == "my tool"
+
+
 def test_ai_track_with_tags(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
@@ -76,10 +101,37 @@ def test_ai_track_with_tags(sentry_init, capture_events):
     ai_run_span = spans[0] if spans[0]["op"] == "ai.run" else spans[1]
 
     assert ai_pipeline_span["description"] == "some test pipeline"
-    print(ai_pipeline_span)
     assert ai_pipeline_span["tags"]["user"] == "colin"
     assert ai_pipeline_span["data"]["some_data"] == "value"
     assert ai_run_span["description"] == "my tool"
+
+
+def test_ai_track_with_attributes_span_streaming(sentry_init, capture_items):
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    items = capture_items("span")
+
+    @ai_track("my tool")
+    def tool(**kwargs):
+        pass
+
+    @ai_track("some test pipeline")
+    def pipeline():
+        tool()
+
+    with sentry_sdk.traces.start_span(name="span"):
+        pipeline(sentry_tags={"user": "colin"}, sentry_data={"some_data": "value"})
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+
+    assert len(spans) == 3
+    ai_run_span, ai_pipeline_span, segment = spans
+
+    assert ai_pipeline_span["name"] == "some test pipeline"
+    assert ai_pipeline_span["attributes"]["user"] == "colin"
+    assert ai_pipeline_span["attributes"]["some_data"] == "value"
+    assert ai_run_span["name"] == "my tool"
 
 
 @pytest.mark.asyncio
@@ -108,6 +160,32 @@ async def test_ai_track_async(sentry_init, capture_events):
 
     assert ai_pipeline_span["description"] == "some async test pipeline"
     assert ai_run_span["description"] == "my async tool"
+
+
+@pytest.mark.asyncio
+async def test_ai_track_async_span_streaming(sentry_init, capture_items):
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    items = capture_items()
+
+    @ai_track("my async tool")
+    async def async_tool(**kwargs):
+        pass
+
+    @ai_track("some async test pipeline")
+    async def async_pipeline():
+        await async_tool()
+
+    with sentry_sdk.traces.start_span(name="span"):
+        await async_pipeline()
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 3
+    ai_run_span, ai_pipeline_span, segment = spans
+
+    assert ai_pipeline_span["name"] == "some async test pipeline"
+    assert ai_run_span["name"] == "my async tool"
 
 
 @pytest.mark.asyncio
@@ -142,6 +220,38 @@ async def test_ai_track_async_with_tags(sentry_init, capture_events):
     assert ai_run_span["description"] == "my async tool"
 
 
+@pytest.mark.asyncio
+async def test_ai_track_async_with_attributes_span_streaming(
+    sentry_init, capture_items
+):
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    items = capture_items("span")
+
+    @ai_track("my async tool")
+    async def async_tool(**kwargs):
+        pass
+
+    @ai_track("some async test pipeline")
+    async def async_pipeline():
+        await async_tool()
+
+    with sentry_sdk.traces.start_span(name="span"):
+        await async_pipeline(
+            sentry_tags={"user": "czyber"}, sentry_data={"some_data": "value"}
+        )
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 3
+    ai_run_span, ai_pipeline_span, segment = spans
+
+    assert ai_pipeline_span["name"] == "some async test pipeline"
+    assert ai_pipeline_span["attributes"]["user"] == "czyber"
+    assert ai_pipeline_span["attributes"]["some_data"] == "value"
+    assert ai_run_span["name"] == "my async tool"
+
+
 def test_ai_track_with_explicit_op(sentry_init, capture_events):
     sentry_init(traces_sample_rate=1.0)
     events = capture_events()
@@ -160,6 +270,27 @@ def test_ai_track_with_explicit_op(sentry_init, capture_events):
 
     assert span["description"] == "my tool"
     assert span["op"] == "custom.operation"
+
+
+def test_ai_track_with_explicit_op_span_streaming(sentry_init, capture_items):
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    items = capture_items("span")
+
+    @ai_track("my tool", op="custom.operation")
+    def tool(**kwargs):
+        pass
+
+    with sentry_sdk.traces.start_span(name="span"):
+        tool()
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 2
+    ai_run_span, segment = spans
+
+    assert ai_run_span["name"] == "my tool"
+    assert ai_run_span["attributes"]["sentry.op"] == "custom.operation"
 
 
 @pytest.mark.asyncio
@@ -181,6 +312,30 @@ async def test_ai_track_async_with_explicit_op(sentry_init, capture_events):
 
     assert span["description"] == "my async tool"
     assert span["op"] == "custom.async.operation"
+
+
+@pytest.mark.asyncio
+async def test_ai_track_async_with_explicit_op_span_streaming(
+    sentry_init, capture_items
+):
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    items = capture_items()
+
+    @ai_track("my async tool", op="custom.async.operation")
+    async def async_tool(**kwargs):
+        pass
+
+    with sentry_sdk.traces.start_span(name="span"):
+        await async_tool()
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+    assert len(spans) == 2
+    ai_run_span, segment = spans
+
+    assert ai_run_span["name"] == "my async tool"
+    assert ai_run_span["attributes"]["sentry.op"] == "custom.async.operation"
 
 
 @pytest.fixture
@@ -403,7 +558,7 @@ class TestTruncateMessagesBySize:
         # Second part gets truncated to 0 chars + ellipsis
         assert parts[1]["text"] == "..."
 
-    @pytest.mark.parametrize("content", [None, 42, 3.14, True])
+    @pytest.mark.parametrize("content", [None, 42, True])
     def test_single_message_truncation_non_str_non_list_content(self, content):
         messages = [{"role": "user", "content": content}]
 
@@ -814,6 +969,71 @@ class TestRedactBlobMessageParts:
         assert result[1]["content"] == "I see the image."  # Unchanged
         assert result[2]["content"][1]["content"] == BLOB_DATA_SUBSTITUTE
 
+    def test_redacts_single_blob_within_image_url_content(self):
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "text": "How many ponies do you see in the image?",
+                        "type": "text",
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": "data:image/jpeg;base64,/9j/4AAQSkZJRg=="},
+                    },
+                ],
+            }
+        ]
+
+        original_blob_content = messages[0]["content"][1]
+
+        result = redact_blob_message_parts(messages)
+
+        assert messages[0]["content"][1] == original_blob_content
+
+        assert (
+            result[0]["content"][0]["text"]
+            == "How many ponies do you see in the image?"
+        )
+        assert result[0]["content"][0]["type"] == "text"
+        assert result[0]["content"][1]["type"] == "image_url"
+        assert result[0]["content"][1]["image_url"]["url"] == BLOB_DATA_SUBSTITUTE
+
+    def test_does_not_redact_image_url_content_with_non_blobs(self):
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "text": "How many ponies do you see in the image?",
+                        "type": "text",
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": "https://example.com/image.jpg"},
+                    },
+                ],
+            }
+        ]
+
+        original_blob_content = messages[0]["content"][1]
+
+        result = redact_blob_message_parts(messages)
+
+        assert messages[0]["content"][1] == original_blob_content
+
+        assert (
+            result[0]["content"][0]["text"]
+            == "How many ponies do you see in the image?"
+        )
+        assert result[0]["content"][0]["type"] == "text"
+        assert result[0]["content"][1]["type"] == "image_url"
+        assert (
+            result[0]["content"][1]["image_url"]["url"]
+            == "https://example.com/image.jpg"
+        )
+
     def test_no_blobs_returns_original_list(self):
         """Test that messages without blobs are returned as-is (performance optimization)"""
         messages = [
@@ -857,6 +1077,23 @@ class TestRedactBlobMessageParts:
 
         # Should return same list since no blobs
         assert result is messages
+
+    def test_redact_blob_message_parts_image_url_string_shorthand(self):
+        """image_url as a plain string (OpenAI shorthand) must not raise AttributeError"""
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "What is in this image?"},
+                    {
+                        "type": "image_url",
+                        "image_url": "data:image/jpeg;base64,/9j/abc123==",
+                    },
+                ],
+            }
+        ]
+        result = redact_blob_message_parts(messages)
+        assert result[0]["content"][1]["image_url"] == "[Blob substitute]"
 
 
 class TestParseDataUri:

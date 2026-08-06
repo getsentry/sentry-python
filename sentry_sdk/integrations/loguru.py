@@ -1,7 +1,8 @@
 import enum
+from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations.logging import (
     BreadcrumbHandler,
     EventHandler,
@@ -9,8 +10,6 @@ from sentry_sdk.integrations.logging import (
 )
 from sentry_sdk.logger import _log_level_to_otel
 from sentry_sdk.utils import has_logs_enabled, safe_repr
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from logging import LogRecord

@@ -1,19 +1,21 @@
-import os
 import datetime
+import os
+import socket
+import time
 from http.client import HTTPConnection, HTTPSConnection
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socket import SocketIO
 from threading import Thread
+from unittest import mock
 from urllib.error import HTTPError
 from urllib.request import urlopen
-from unittest import mock
 
 import pytest
 
-from sentry_sdk import capture_message, start_transaction, continue_trace
+import sentry_sdk
+from sentry_sdk import capture_message, continue_trace, start_transaction
 from sentry_sdk.consts import MATCH_ALL, SPANDATA
 from sentry_sdk.integrations.stdlib import StdlibIntegration
-
 from tests.conftest import ApproxDict, create_mock_http_server, get_free_port
 
 PORT = create_mock_http_server()
@@ -42,9 +44,40 @@ def create_mock_proxy_server():
 
 PROXY_PORT = create_mock_proxy_server()
 
+CHUNK_DELAY = 0.1
+NUM_CHUNKS = 3
+
+
+class ChunkedResponseHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Transfer-Encoding", "chunked")
+        self.end_headers()
+        for _ in range(NUM_CHUNKS):
+            chunk = b"x" * 100
+            self.wfile.write(f"{len(chunk):x}\r\n".encode() + chunk + b"\r\n")
+            self.wfile.flush()
+            time.sleep(CHUNK_DELAY)
+        self.wfile.write(b"0\r\n\r\n")
+
+    def log_message(self, *args):
+        pass
+
+
+def create_chunked_server():
+    port = get_free_port()
+    server = HTTPServer(("localhost", port), ChunkedResponseHandler)
+    thread = Thread(target=server.serve_forever)
+    thread.daemon = True
+    thread.start()
+    return port
+
+
+CHUNKED_PORT = create_chunked_server()
+
 
 def test_crumb_capture(sentry_init, capture_events):
-    sentry_init(integrations=[StdlibIntegration()])
+    sentry_init(integrations=[StdlibIntegration()], send_default_pii=True)
     events = capture_events()
 
     url = "http://localhost:{}/some/random/url".format(PORT)
@@ -80,7 +113,7 @@ def test_crumb_capture(sentry_init, capture_events):
     ],
 )
 def test_crumb_capture_client_error(sentry_init, capture_events, status_code, level):
-    sentry_init(integrations=[StdlibIntegration()])
+    sentry_init(integrations=[StdlibIntegration()], send_default_pii=True)
     events = capture_events()
 
     url = f"http://localhost:{PORT}/status/{status_code}"  # noqa:E231
@@ -118,7 +151,11 @@ def test_crumb_capture_hint(sentry_init, capture_events):
         crumb["data"]["extra"] = "foo"
         return crumb
 
-    sentry_init(integrations=[StdlibIntegration()], before_breadcrumb=before_breadcrumb)
+    sentry_init(
+        integrations=[StdlibIntegration()],
+        before_breadcrumb=before_breadcrumb,
+        send_default_pii=True,
+    )
     events = capture_events()
 
     url = "http://localhost:{}/some/random/url".format(PORT)
@@ -143,13 +180,20 @@ def test_crumb_capture_hint(sentry_init, capture_events):
     )
 
 
-def test_empty_realurl(sentry_init):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_empty_realurl(
+    sentry_init,
+    span_streaming,
+):
     """
     Ensure that after using sentry_sdk.init you can putrequest a
     None url.
     """
 
-    sentry_init(dsn="")
+    sentry_init(
+        dsn="",
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
     HTTPConnection("localhost", port=PORT).putrequest("POST", None)
 
 
@@ -163,7 +207,7 @@ def test_httplib_misuse(sentry_init, capture_events, request):
     wrongly.
     """
 
-    sentry_init()
+    sentry_init(send_default_pii=True)
     events = capture_events()
 
     conn = HTTPConnection("localhost", PORT)
@@ -202,88 +246,204 @@ def test_httplib_misuse(sentry_init, capture_events, request):
     )
 
 
-def test_outgoing_trace_headers(sentry_init, monkeypatch):
-    # HTTPSConnection.send is passed a string containing (among other things)
-    # the headers on the request. Mock it so we can check the headers, and also
-    # so it doesn't try to actually talk to the internet.
-    mock_send = mock.Mock()
-    monkeypatch.setattr(HTTPSConnection, "send", mock_send)
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_outgoing_trace_headers(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
 
-    sentry_init(traces_sample_rate=1.0)
+    already_patched_getresponse = HTTPSConnection.getresponse
+    request_headers = {}
+
+    class HTTPSConnectionRecordingRequestHeaders(HTTPSConnection):
+        def send(self, *args, **kwargs) -> None:
+            request_str = args[0]
+            for line in request_str.decode("utf-8").split("\r\n")[1:]:
+                if line:
+                    key, val = line.split(": ")
+                    request_headers[key] = val
+
+            server_sock, client_sock = socket.socketpair()
+            server_sock.sendall(b"HTTP/1.1 200 OK\r\n\r\n")
+            server_sock.close()
+            self.sock = client_sock
+
+        def getresponse(self, *args, **kwargs):
+            return already_patched_getresponse(self, *args, **kwargs)
+
+    events = capture_events()
 
     headers = {
         "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-1",
         "baggage": (
-            "other-vendor-value-1=foo;bar;baz, sentry-trace_id=771a43a4192642f0b136d5159a501700, "
-            "sentry-public_key=49d0f7386ad645858ae85020e393bef3, sentry-sample_rate=0.01337, "
-            "sentry-user_id=Am%C3%A9lie, sentry-sample_rand=0.132521102938283, other-vendor-value-2=foo;bar;"
+            "other-vendor-value-1=foo;bar;baz,"
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
+            "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
+            "sentry-sample_rate=0.01337,"
+            "sentry-user_id=Am%C3%A9lie,"
+            "sentry-sample_rand=0.000005,"
+            "sentry-sampled=true,"
+            "other-vendor-value-2=foo;bar;"
         ),
     }
 
-    transaction = continue_trace(headers)
+    if span_streaming:
+        items = capture_items("span")
+        sentry_sdk.traces.continue_trace(headers)
 
-    with start_transaction(
-        transaction=transaction,
-        name="/interactions/other-dogs/new-dog",
-        op="greeting.sniff",
-        trace_id="12312012123120121231201212312012",
-    ) as transaction:
-        HTTPSConnection("www.squirrelchasers.com").request("GET", "/top-chasers")
+        with sentry_sdk.traces.start_span(
+            name="/interactions/other-dogs/new-dog",
+            attributes={
+                "sentry.op": "greeting.sniff",
+            },
+        ):
+            connection = HTTPSConnectionRecordingRequestHeaders("localhost", port=PORT)
+            connection.request("GET", "/top-chasers")
+            connection.getresponse()
 
-        (request_str,) = mock_send.call_args[0]
-        request_headers = {}
-        for line in request_str.decode("utf-8").split("\r\n")[1:]:
-            if line:
-                key, val = line.split(": ")
-                request_headers[key] = val
-
-        request_span = transaction._span_recorder.spans[-1]
+        sentry_sdk.flush()
+        request_span = next(item.payload for item in items)
         expected_sentry_trace = "{trace_id}-{parent_span_id}-{sampled}".format(
-            trace_id=transaction.trace_id,
-            parent_span_id=request_span.span_id,
+            trace_id=request_span["trace_id"],
+            parent_span_id=request_span["span_id"],
             sampled=1,
         )
-        assert request_headers["sentry-trace"] == expected_sentry_trace
 
         expected_outgoing_baggage = (
             "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
             "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
             "sentry-sample_rate=1.0,"
             "sentry-user_id=Am%C3%A9lie,"
-            "sentry-sample_rand=0.132521102938283"
+            "sentry-sample_rand=0.000005,"
+            "sentry-sampled=true"
         )
+    else:
+        events = capture_events()
+        transaction = continue_trace(headers)
 
-        assert request_headers["baggage"] == expected_outgoing_baggage
+        with start_transaction(
+            transaction=transaction,
+            name="/interactions/other-dogs/new-dog",
+            op="greeting.sniff",
+            trace_id="12312012123120121231201212312012",
+        ) as transaction:
+            connection = HTTPSConnectionRecordingRequestHeaders("localhost", port=PORT)
+            connection.request("GET", "/top-chasers")
+            connection.getresponse()
 
-
-def test_outgoing_trace_headers_head_sdk(sentry_init, monkeypatch):
-    # HTTPSConnection.send is passed a string containing (among other things)
-    # the headers on the request. Mock it so we can check the headers, and also
-    # so it doesn't try to actually talk to the internet.
-    mock_send = mock.Mock()
-    monkeypatch.setattr(HTTPSConnection, "send", mock_send)
-
-    sentry_init(traces_sample_rate=0.5, release="foo")
-    with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=250000):
-        transaction = continue_trace({})
-
-    with start_transaction(transaction=transaction, name="Head SDK tx") as transaction:
-        HTTPSConnection("www.squirrelchasers.com").request("GET", "/top-chasers")
-
-        (request_str,) = mock_send.call_args[0]
-        request_headers = {}
-        for line in request_str.decode("utf-8").split("\r\n")[1:]:
-            if line:
-                key, val = line.split(": ")
-                request_headers[key] = val
-
-        request_span = transaction._span_recorder.spans[-1]
+        (event,) = events
+        request_span = event["spans"][-1]
         expected_sentry_trace = "{trace_id}-{parent_span_id}-{sampled}".format(
-            trace_id=transaction.trace_id,
-            parent_span_id=request_span.span_id,
+            trace_id=event["contexts"]["trace"]["trace_id"],
+            parent_span_id=request_span["span_id"],
             sampled=1,
         )
-        assert request_headers["sentry-trace"] == expected_sentry_trace
+
+        expected_outgoing_baggage = (
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
+            "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
+            "sentry-sample_rate=1.0,"
+            "sentry-user_id=Am%C3%A9lie,"
+            "sentry-sample_rand=0.000005,"
+            "sentry-sampled=true"
+        )
+
+    assert request_headers["sentry-trace"] == expected_sentry_trace
+    assert request_headers["baggage"] == expected_outgoing_baggage
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_outgoing_trace_headers_head_sdk(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
+    sentry_init(
+        traces_sample_rate=0.5,
+        release="foo",
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    already_patched_getresponse = HTTPSConnection.getresponse
+    request_headers = {}
+
+    class HTTPSConnectionRecordingRequestHeaders(HTTPSConnection):
+        def send(self, *args, **kwargs) -> None:
+            request_str = args[0]
+            for line in request_str.decode("utf-8").split("\r\n")[1:]:
+                if line:
+                    key, val = line.split(": ")
+                    request_headers[key] = val
+
+            server_sock, client_sock = socket.socketpair()
+            server_sock.sendall(b"HTTP/1.1 200 OK\r\n\r\n")
+            server_sock.close()
+            self.sock = client_sock
+
+        def getresponse(self, *args, **kwargs):
+            return already_patched_getresponse(self, *args, **kwargs)
+
+    if span_streaming:
+        items = capture_items("span")
+
+        sentry_sdk.traces.continue_trace({})
+
+        with mock.patch(
+            "sentry_sdk.tracing_utils.Random.randrange", return_value=250000
+        ):
+            with sentry_sdk.traces.start_span(name="Head SDK tx"):
+                connection = HTTPSConnectionRecordingRequestHeaders(
+                    "localhost", port=PORT
+                )
+                connection.request("GET", "/top-chasers")
+                connection.getresponse()
+
+        sentry_sdk.flush()
+        request_span = next(item.payload for item in items)
+        expected_sentry_trace = "{trace_id}-{parent_span_id}-{sampled}".format(
+            trace_id=request_span["trace_id"],
+            parent_span_id=request_span["span_id"],
+            sampled=1,
+        )
+
+        expected_outgoing_baggage = (
+            "sentry-trace_id=%s,"
+            "sentry-sample_rand=0.250000,"
+            "sentry-environment=production,"
+            "sentry-release=foo,"
+            "sentry-transaction=Head%%20SDK%%20tx,"
+            "sentry-sample_rate=0.5,"
+            "sentry-sampled=true"
+        ) % request_span["trace_id"]
+    else:
+        events = capture_events()
+
+        with mock.patch(
+            "sentry_sdk.tracing_utils.Random.randrange", return_value=250000
+        ):
+            transaction = continue_trace({})
+
+        with start_transaction(
+            transaction=transaction, name="Head SDK tx"
+        ) as transaction:
+            connection = HTTPSConnectionRecordingRequestHeaders("localhost", port=PORT)
+            connection.request("GET", "/top-chasers")
+            connection.getresponse()
+
+        (event,) = events
+        request_span = event["spans"][-1]
+        expected_sentry_trace = "{trace_id}-{parent_span_id}-{sampled}".format(
+            trace_id=event["contexts"]["trace"]["trace_id"],
+            parent_span_id=request_span["span_id"],
+            sampled=1,
+        )
 
         expected_outgoing_baggage = (
             "sentry-trace_id=%s,"
@@ -294,7 +454,76 @@ def test_outgoing_trace_headers_head_sdk(sentry_init, monkeypatch):
             "sentry-sampled=%s"
         ) % (transaction.trace_id, "true" if transaction.sampled else "false")
 
-        assert request_headers["baggage"] == expected_outgoing_baggage
+    assert request_headers["sentry-trace"] == expected_sentry_trace
+    assert request_headers["baggage"] == expected_outgoing_baggage
+
+
+def test_outgoing_trace_headers_span_streaming_no_current_span(sentry_init):
+    """
+    With span streaming enabled and no active span, trace propagation headers
+    should still be attached to outgoing requests, propagated from the scope's
+    propagation context.
+    """
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    already_patched_getresponse = HTTPSConnection.getresponse
+    request_headers = {}
+
+    class HTTPSConnectionRecordingRequestHeaders(HTTPSConnection):
+        def send(self, *args, **kwargs) -> None:
+            request_str = args[0]
+            for line in request_str.decode("utf-8").split("\r\n")[1:]:
+                if line:
+                    key, val = line.split(": ")
+                    request_headers[key] = val
+
+            server_sock, client_sock = socket.socketpair()
+            server_sock.sendall(b"HTTP/1.1 200 OK\r\n\r\n")
+            server_sock.close()
+            self.sock = client_sock
+
+        def getresponse(self, *args, **kwargs):
+            return already_patched_getresponse(self, *args, **kwargs)
+
+    headers = {
+        "sentry-trace": "771a43a4192642f0b136d5159a501700-1234567890abcdef-1",
+        "baggage": (
+            "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
+            "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
+            "sentry-sample_rate=0.01337,"
+            "sentry-sample_rand=0.000005,"
+            "sentry-sampled=true"
+        ),
+    }
+
+    # Seed the scope's propagation context, but do NOT start a span.
+    sentry_sdk.traces.continue_trace(headers)
+    assert sentry_sdk.traces.get_current_span() is None
+
+    connection = HTTPSConnectionRecordingRequestHeaders("localhost", port=PORT)
+    connection.request("GET", "/top-chasers")
+    connection.getresponse()
+
+    # Trace is still propagated, carrying the trace_id from the propagation
+    # context. The span id segment is generated for the propagation context
+    # (there is no active span), so we assert the stable trace_id prefix.
+    assert request_headers["sentry-trace"].startswith(
+        "771a43a4192642f0b136d5159a501700-"
+    )
+
+    # The outgoing baggage is fully deterministic: it is the frozen incoming
+    # baggage from the propagation context.
+    expected_outgoing_baggage = (
+        "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
+        "sentry-public_key=49d0f7386ad645858ae85020e393bef3,"
+        "sentry-sample_rate=0.01337,"
+        "sentry-sample_rand=0.000005,"
+        "sentry-sampled=true"
+    )
+    assert request_headers["baggage"] == expected_outgoing_baggage
 
 
 @pytest.mark.parametrize(
@@ -356,19 +585,40 @@ def test_outgoing_trace_headers_head_sdk(sentry_init, monkeypatch):
         ],
     ],
 )
+@pytest.mark.parametrize("span_streaming", [True, False])
 def test_option_trace_propagation_targets(
-    sentry_init, monkeypatch, trace_propagation_targets, host, path, trace_propagated
+    sentry_init,
+    trace_propagation_targets,
+    host,
+    path,
+    trace_propagated,
+    span_streaming,
 ):
-    # HTTPSConnection.send is passed a string containing (among other things)
-    # the headers on the request. Mock it so we can check the headers, and also
-    # so it doesn't try to actually talk to the internet.
-    mock_send = mock.Mock()
-    monkeypatch.setattr(HTTPSConnection, "send", mock_send)
-
     sentry_init(
         trace_propagation_targets=trace_propagation_targets,
         traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
+
+    already_patched_getresponse = HTTPSConnection.getresponse
+
+    request_headers = {}
+
+    class HTTPSConnectionRecordingRequestHeaders(HTTPSConnection):
+        def send(self, *args, **kwargs) -> None:
+            request_str = args[0]
+            for line in request_str.decode("utf-8").split("\r\n")[1:]:
+                if line:
+                    key, val = line.split(": ")
+                    request_headers[key] = val
+
+            server_sock, client_sock = socket.socketpair()
+            server_sock.sendall(b"HTTP/1.1 200 OK\r\n\r\n")
+            server_sock.close()
+            self.sock = client_sock
+
+        def getresponse(self, *args, **kwargs):
+            return already_patched_getresponse(self, *args, **kwargs)
 
     headers = {
         "baggage": (
@@ -377,133 +627,248 @@ def test_option_trace_propagation_targets(
         )
     }
 
-    transaction = continue_trace(headers)
+    if span_streaming:
+        sentry_sdk.traces.continue_trace(headers)
 
-    with start_transaction(
-        transaction=transaction,
-        name="/interactions/other-dogs/new-dog",
-        op="greeting.sniff",
-        trace_id="12312012123120121231201212312012",
-    ) as transaction:
-        HTTPSConnection(host).request("GET", path)
+        with sentry_sdk.traces.start_span(
+            name="/interactions/other-dogs/new-dog",
+            attributes={
+                "sentry.op": "greeting.sniff",
+            },
+        ):
+            connection = HTTPSConnectionRecordingRequestHeaders(host)
+            connection.request("GET", path)
+            connection.getresponse()
+    else:
+        transaction = continue_trace(headers)
 
-        (request_str,) = mock_send.call_args[0]
-        request_headers = {}
-        for line in request_str.decode("utf-8").split("\r\n")[1:]:
-            if line:
-                key, val = line.split(": ")
-                request_headers[key] = val
+        with start_transaction(
+            transaction=transaction,
+            name="/interactions/other-dogs/new-dog",
+            op="greeting.sniff",
+            trace_id="12312012123120121231201212312012",
+        ) as transaction:
+            connection = HTTPSConnectionRecordingRequestHeaders(host)
+            connection.request("GET", path)
+            connection.getresponse()
 
-        if trace_propagated:
-            assert "sentry-trace" in request_headers
-            assert "baggage" in request_headers
-        else:
-            assert "sentry-trace" not in request_headers
-            assert "baggage" not in request_headers
+    if trace_propagated:
+        assert "sentry-trace" in request_headers
+        assert "baggage" in request_headers
+    else:
+        assert "sentry-trace" not in request_headers
+        assert "baggage" not in request_headers
 
 
-def test_request_source_disabled(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_request_source_disabled(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
     sentry_options = {
         "traces_sample_rate": 1.0,
         "enable_http_request_source": False,
         "http_request_source_threshold_ms": 0,
     }
 
-    sentry_init(**sentry_options)
+    sentry_init(
+        **sentry_options,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
 
-    events = capture_events()
+    if span_streaming:
+        items = capture_items("span")
 
-    with start_transaction(name="foo"):
-        conn = HTTPConnection("localhost", port=PORT)
-        conn.request("GET", "/foo")
-        conn.getresponse()
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            conn = HTTPConnection("localhost", port=PORT)
+            conn.request("GET", "/foo")
+            conn.getresponse()
 
-    (event,) = events
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["name"].startswith("GET")
 
-    span = event["spans"][-1]
-    assert span["description"].startswith("GET")
+        attributes = span["attributes"]
 
-    data = span.get("data", {})
+        assert SPANDATA.CODE_LINE_NUMBER not in attributes
+        assert SPANDATA.CODE_NAMESPACE not in attributes
+        assert SPANDATA.CODE_FILE_PATH not in attributes
+        assert SPANDATA.CODE_FUNCTION not in attributes
+    else:
+        events = capture_events()
 
-    assert SPANDATA.CODE_LINENO not in data
-    assert SPANDATA.CODE_NAMESPACE not in data
-    assert SPANDATA.CODE_FILEPATH not in data
-    assert SPANDATA.CODE_FUNCTION not in data
+        with start_transaction(name="foo"):
+            conn = HTTPConnection("localhost", port=PORT)
+            conn.request("GET", "/foo")
+            conn.getresponse()
+
+        (event,) = events
+
+        span = event["spans"][-1]
+        assert span["description"].startswith("GET")
+
+        data = span.get("data", {})
+
+        assert SPANDATA.CODE_LINENO not in data
+        assert SPANDATA.CODE_NAMESPACE not in data
+        assert SPANDATA.CODE_FILEPATH not in data
+        assert SPANDATA.CODE_FUNCTION not in data
 
 
 @pytest.mark.parametrize("enable_http_request_source", [None, True])
+@pytest.mark.parametrize("span_streaming", [True, False])
 def test_request_source_enabled(
-    sentry_init, capture_events, enable_http_request_source
+    sentry_init,
+    capture_events,
+    capture_items,
+    enable_http_request_source,
+    span_streaming,
 ):
     sentry_options = {
         "traces_sample_rate": 1.0,
         "http_request_source_threshold_ms": 0,
+        "trace_lifecycle": "stream" if span_streaming else "static",
     }
+
     if enable_http_request_source is not None:
         sentry_options["enable_http_request_source"] = enable_http_request_source
 
-    sentry_init(**sentry_options)
+    if span_streaming:
+        sentry_init(
+            **sentry_options,
+        )
 
-    events = capture_events()
+        items = capture_items("span")
 
-    with start_transaction(name="foo"):
-        conn = HTTPConnection("localhost", port=PORT)
-        conn.request("GET", "/foo")
-        conn.getresponse()
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            conn = HTTPConnection("localhost", port=PORT)
+            conn.request("GET", "/foo")
+            conn.getresponse()
 
-    (event,) = events
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["name"].startswith("GET")
 
-    span = event["spans"][-1]
-    assert span["description"].startswith("GET")
+        attributes = span["attributes"]
 
-    data = span.get("data", {})
+        assert SPANDATA.CODE_LINE_NUMBER in attributes
+        assert SPANDATA.CODE_NAMESPACE in attributes
+        assert SPANDATA.CODE_FILE_PATH in attributes
+        assert SPANDATA.CODE_FUNCTION in attributes
+    else:
+        sentry_init(**sentry_options)
 
-    assert SPANDATA.CODE_LINENO in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FILEPATH in data
-    assert SPANDATA.CODE_FUNCTION in data
+        events = capture_events()
+
+        with start_transaction(name="foo"):
+            conn = HTTPConnection("localhost", port=PORT)
+            conn.request("GET", "/foo")
+            conn.getresponse()
+
+        (event,) = events
+
+        span = event["spans"][-1]
+        assert span["description"].startswith("GET")
+
+        data = span.get("data", {})
+
+        assert SPANDATA.CODE_LINENO in data
+        assert SPANDATA.CODE_NAMESPACE in data
+        assert SPANDATA.CODE_FILEPATH in data
+        assert SPANDATA.CODE_FUNCTION in data
 
 
-def test_request_source(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_request_source(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
     sentry_init(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
+    if span_streaming:
+        items = capture_items("span")
 
-    events = capture_events()
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            conn = HTTPConnection("localhost", port=PORT)
+            conn.request("GET", "/foo")
+            conn.getresponse()
 
-    with start_transaction(name="foo"):
-        conn = HTTPConnection("localhost", port=PORT)
-        conn.request("GET", "/foo")
-        conn.getresponse()
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["name"].startswith("GET")
 
-    (event,) = events
+        attributes = span["attributes"]
 
-    span = event["spans"][-1]
-    assert span["description"].startswith("GET")
+        assert SPANDATA.CODE_LINE_NUMBER in attributes
+        assert SPANDATA.CODE_NAMESPACE in attributes
+        assert SPANDATA.CODE_FILE_PATH in attributes
+        assert SPANDATA.CODE_FUNCTION in attributes
 
-    data = span.get("data", {})
+        assert type(attributes.get(SPANDATA.CODE_LINE_NUMBER)) == int
+        assert attributes.get(SPANDATA.CODE_LINE_NUMBER) > 0
+        assert (
+            attributes.get(SPANDATA.CODE_NAMESPACE)
+            == "tests.integrations.stdlib.test_httplib"
+        )
+        assert attributes.get(SPANDATA.CODE_FILE_PATH).endswith(
+            "tests/integrations/stdlib/test_httplib.py"
+        )
 
-    assert SPANDATA.CODE_LINENO in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FILEPATH in data
-    assert SPANDATA.CODE_FUNCTION in data
+        is_relative_path = attributes.get(SPANDATA.CODE_FILE_PATH)[0] != os.sep
+        assert is_relative_path
 
-    assert type(data.get(SPANDATA.CODE_LINENO)) == int
-    assert data.get(SPANDATA.CODE_LINENO) > 0
-    assert data.get(SPANDATA.CODE_NAMESPACE) == "tests.integrations.stdlib.test_httplib"
-    assert data.get(SPANDATA.CODE_FILEPATH).endswith(
-        "tests/integrations/stdlib/test_httplib.py"
-    )
+        assert attributes.get(SPANDATA.CODE_FUNCTION) == "test_request_source"
+    else:
+        events = capture_events()
 
-    is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
-    assert is_relative_path
+        with start_transaction(name="foo"):
+            conn = HTTPConnection("localhost", port=PORT)
+            conn.request("GET", "/foo")
+            conn.getresponse()
 
-    assert data.get(SPANDATA.CODE_FUNCTION) == "test_request_source"
+        (event,) = events
+
+        span = event["spans"][-1]
+        assert span["description"].startswith("GET")
+
+        data = span.get("data", {})
+
+        assert SPANDATA.CODE_LINENO in data
+        assert SPANDATA.CODE_NAMESPACE in data
+        assert SPANDATA.CODE_FILEPATH in data
+        assert SPANDATA.CODE_FUNCTION in data
+
+        assert type(data.get(SPANDATA.CODE_LINENO)) == int
+        assert data.get(SPANDATA.CODE_LINENO) > 0
+        assert (
+            data.get(SPANDATA.CODE_NAMESPACE)
+            == "tests.integrations.stdlib.test_httplib"
+        )
+        assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+            "tests/integrations/stdlib/test_httplib.py"
+        )
+
+        is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+        assert is_relative_path
+
+        assert data.get(SPANDATA.CODE_FUNCTION) == "test_request_source"
 
 
-def test_request_source_with_module_in_search_path(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_request_source_with_module_in_search_path(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
     """
     Test that request source is relative to the path of the module it ran in
     """
@@ -511,182 +876,462 @@ def test_request_source_with_module_in_search_path(sentry_init, capture_events):
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
+    if span_streaming:
+        items = capture_items("span")
 
-    events = capture_events()
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            from httplib_helpers.helpers import get_request_with_connection
 
-    with start_transaction(name="foo"):
-        from httplib_helpers.helpers import get_request_with_connection
+            conn = HTTPConnection("localhost", port=PORT)
+            get_request_with_connection(conn, "/foo")
 
-        conn = HTTPConnection("localhost", port=PORT)
-        get_request_with_connection(conn, "/foo")
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["name"].startswith("GET")
 
-    (event,) = events
+        attributes = span["attributes"]
 
-    span = event["spans"][-1]
-    assert span["description"].startswith("GET")
+        assert SPANDATA.CODE_LINE_NUMBER in attributes
+        assert SPANDATA.CODE_NAMESPACE in attributes
+        assert SPANDATA.CODE_FILE_PATH in attributes
+        assert SPANDATA.CODE_FUNCTION in attributes
 
-    data = span.get("data", {})
+        assert type(attributes.get(SPANDATA.CODE_LINE_NUMBER)) == int
+        assert attributes.get(SPANDATA.CODE_LINE_NUMBER) > 0
+        assert attributes.get(SPANDATA.CODE_NAMESPACE) == "httplib_helpers.helpers"
+        assert attributes.get(SPANDATA.CODE_FILE_PATH) == "httplib_helpers/helpers.py"
 
-    assert SPANDATA.CODE_LINENO in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FILEPATH in data
-    assert SPANDATA.CODE_FUNCTION in data
+        is_relative_path = attributes.get(SPANDATA.CODE_FILE_PATH)[0] != os.sep
+        assert is_relative_path
 
-    assert type(data.get(SPANDATA.CODE_LINENO)) == int
-    assert data.get(SPANDATA.CODE_LINENO) > 0
-    assert data.get(SPANDATA.CODE_NAMESPACE) == "httplib_helpers.helpers"
-    assert data.get(SPANDATA.CODE_FILEPATH) == "httplib_helpers/helpers.py"
+        assert attributes.get(SPANDATA.CODE_FUNCTION) == "get_request_with_connection"
+    else:
+        events = capture_events()
 
-    is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
-    assert is_relative_path
+        with start_transaction(name="foo"):
+            from httplib_helpers.helpers import get_request_with_connection
 
-    assert data.get(SPANDATA.CODE_FUNCTION) == "get_request_with_connection"
+            conn = HTTPConnection("localhost", port=PORT)
+            get_request_with_connection(conn, "/foo")
+
+        (event,) = events
+
+        span = event["spans"][-1]
+        assert span["description"].startswith("GET")
+
+        data = span.get("data", {})
+
+        assert SPANDATA.CODE_LINENO in data
+        assert SPANDATA.CODE_NAMESPACE in data
+        assert SPANDATA.CODE_FILEPATH in data
+        assert SPANDATA.CODE_FUNCTION in data
+
+        assert type(data.get(SPANDATA.CODE_LINENO)) == int
+        assert data.get(SPANDATA.CODE_LINENO) > 0
+        assert data.get(SPANDATA.CODE_NAMESPACE) == "httplib_helpers.helpers"
+        assert data.get(SPANDATA.CODE_FILEPATH) == "httplib_helpers/helpers.py"
+
+        is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+        assert is_relative_path
+
+        assert data.get(SPANDATA.CODE_FUNCTION) == "get_request_with_connection"
 
 
-def test_no_request_source_if_duration_too_short(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_no_request_source_if_duration_too_short(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
     sentry_init(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=100,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    already_patched_putrequest = HTTPConnection.putrequest
+    add_http_request_source = sentry_sdk.tracing_utils.add_http_request_source
 
-    class HttpConnectionWithPatchedSpan(HTTPConnection):
-        def putrequest(self, *args, **kwargs) -> None:
-            already_patched_putrequest(self, *args, **kwargs)
-            span = self._sentrysdk_span  # type: ignore
+    def add_http_request_source_with_pinned_timestamps(span):
+        if span_streaming:
+            span._start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
+            span._end_timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
+            result = add_http_request_source(span)
+            span._end_timestamp = None
+            return result
+        else:
             span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
             span.timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
+            return add_http_request_source(span)
 
-    events = capture_events()
+    if span_streaming:
+        items = capture_items("span")
+        with mock.patch(
+            "sentry_sdk.integrations.stdlib.add_http_request_source",
+            add_http_request_source_with_pinned_timestamps,
+        ):
+            with sentry_sdk.traces.start_span(name="foo"):
+                conn = HTTPConnection("localhost", port=PORT)
+                conn.request("GET", "/foo")
+                conn.getresponse()
 
-    with start_transaction(name="foo"):
-        conn = HttpConnectionWithPatchedSpan("localhost", port=PORT)
-        conn.request("GET", "/foo")
-        conn.getresponse()
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["name"].startswith("GET")
 
-    (event,) = events
+        attributes = span["attributes"]
 
-    span = event["spans"][-1]
-    assert span["description"].startswith("GET")
+        assert SPANDATA.CODE_LINE_NUMBER not in attributes
+        assert SPANDATA.CODE_NAMESPACE not in attributes
+        assert SPANDATA.CODE_FILE_PATH not in attributes
+        assert SPANDATA.CODE_FUNCTION not in attributes
+    else:
+        events = capture_events()
 
-    data = span.get("data", {})
+        with mock.patch(
+            "sentry_sdk.integrations.stdlib.add_http_request_source",
+            add_http_request_source_with_pinned_timestamps,
+        ):
+            with start_transaction(name="foo"):
+                conn = HTTPConnection("localhost", port=PORT)
+                conn.request("GET", "/foo")
+                conn.getresponse()
 
-    assert SPANDATA.CODE_LINENO not in data
-    assert SPANDATA.CODE_NAMESPACE not in data
-    assert SPANDATA.CODE_FILEPATH not in data
-    assert SPANDATA.CODE_FUNCTION not in data
+        (event,) = events
+
+        span = event["spans"][-1]
+        assert span["description"].startswith("GET")
+
+        data = span.get("data", {})
+
+        assert SPANDATA.CODE_LINENO not in data
+        assert SPANDATA.CODE_NAMESPACE not in data
+        assert SPANDATA.CODE_FILEPATH not in data
+        assert SPANDATA.CODE_FUNCTION not in data
 
 
-def test_request_source_if_duration_over_threshold(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_request_source_if_duration_over_threshold(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
     sentry_init(
         traces_sample_rate=1.0,
         enable_http_request_source=True,
         http_request_source_threshold_ms=100,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    already_patched_putrequest = HTTPConnection.putrequest
+    add_http_request_source = sentry_sdk.tracing_utils.add_http_request_source
 
-    class HttpConnectionWithPatchedSpan(HTTPConnection):
-        def putrequest(self, *args, **kwargs) -> None:
-            already_patched_putrequest(self, *args, **kwargs)
-            span = self._sentrysdk_span  # type: ignore
+    def add_http_request_source_with_pinned_timestamps(span):
+        if span_streaming:
+            span._start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
+            span._end_timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
+            result = add_http_request_source(span)
+            span._end_timestamp = None
+            return result
+        else:
             span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
             span.timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
+            return add_http_request_source(span)
 
-    events = capture_events()
+    if span_streaming:
+        items = capture_items("span")
 
-    with start_transaction(name="foo"):
-        conn = HttpConnectionWithPatchedSpan("localhost", port=PORT)
-        conn.request("GET", "/foo")
-        conn.getresponse()
+        with mock.patch(
+            "sentry_sdk.integrations.stdlib.add_http_request_source",
+            add_http_request_source_with_pinned_timestamps,
+        ):
+            with sentry_sdk.traces.start_span(name="foo"):
+                conn = HTTPConnection("localhost", port=PORT)
+                conn.request("GET", "/foo")
+                conn.getresponse()
 
-    (event,) = events
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["name"].startswith("GET")
 
-    span = event["spans"][-1]
-    assert span["description"].startswith("GET")
+        attributes = span["attributes"]
 
-    data = span.get("data", {})
+        assert SPANDATA.CODE_LINE_NUMBER in attributes
+        assert SPANDATA.CODE_NAMESPACE in attributes
+        assert SPANDATA.CODE_FILE_PATH in attributes
+        assert SPANDATA.CODE_FUNCTION in attributes
 
-    assert SPANDATA.CODE_LINENO in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FILEPATH in data
-    assert SPANDATA.CODE_FUNCTION in data
+        assert type(attributes.get(SPANDATA.CODE_LINE_NUMBER)) == int
+        assert attributes.get(SPANDATA.CODE_LINE_NUMBER) > 0
+        assert (
+            attributes.get(SPANDATA.CODE_NAMESPACE)
+            == "tests.integrations.stdlib.test_httplib"
+        )
+        assert attributes.get(SPANDATA.CODE_FILE_PATH).endswith(
+            "tests/integrations/stdlib/test_httplib.py"
+        )
 
-    assert type(data.get(SPANDATA.CODE_LINENO)) == int
-    assert data.get(SPANDATA.CODE_LINENO) > 0
-    assert data.get(SPANDATA.CODE_NAMESPACE) == "tests.integrations.stdlib.test_httplib"
-    assert data.get(SPANDATA.CODE_FILEPATH).endswith(
-        "tests/integrations/stdlib/test_httplib.py"
+        is_relative_path = attributes.get(SPANDATA.CODE_FILE_PATH)[0] != os.sep
+        assert is_relative_path
+
+        assert (
+            attributes.get(SPANDATA.CODE_FUNCTION)
+            == "add_http_request_source_with_pinned_timestamps"
+        )
+    else:
+        events = capture_events()
+
+        with mock.patch(
+            "sentry_sdk.integrations.stdlib.add_http_request_source",
+            add_http_request_source_with_pinned_timestamps,
+        ):
+            with start_transaction(name="foo"):
+                conn = HTTPConnection("localhost", port=PORT)
+                conn.request("GET", "/foo")
+                conn.getresponse()
+
+        (event,) = events
+
+        span = event["spans"][-1]
+        assert span["description"].startswith("GET")
+
+        data = span.get("data", {})
+
+        assert SPANDATA.CODE_LINENO in data
+        assert SPANDATA.CODE_NAMESPACE in data
+        assert SPANDATA.CODE_FILEPATH in data
+        assert SPANDATA.CODE_FUNCTION in data
+
+        assert type(data.get(SPANDATA.CODE_LINENO)) == int
+        assert data.get(SPANDATA.CODE_LINENO) > 0
+        assert (
+            data.get(SPANDATA.CODE_NAMESPACE)
+            == "tests.integrations.stdlib.test_httplib"
+        )
+        assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+            "tests/integrations/stdlib/test_httplib.py"
+        )
+
+        is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+        assert is_relative_path
+
+        assert (
+            data.get(SPANDATA.CODE_FUNCTION)
+            == "add_http_request_source_with_pinned_timestamps"
+        )
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_span_origin(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        debug=True,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
-    assert is_relative_path
+    if span_streaming:
+        items = capture_items("span")
 
-    assert (
-        data.get(SPANDATA.CODE_FUNCTION)
-        == "test_request_source_if_duration_over_threshold"
-    )
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            conn = HTTPConnection("localhost", port=PORT)
+            conn.request("GET", "/foo")
+            conn.getresponse()
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        assert spans[1]["attributes"]["sentry.origin"] == "manual"
+
+        assert spans[0]["attributes"]["sentry.op"] == "http.client"
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.http.stdlib.httplib"
+    else:
+        events = capture_events()
+
+        with start_transaction(name="foo"):
+            conn = HTTPConnection("localhost", port=PORT)
+            conn.request("GET", "/foo")
+            conn.getresponse()
+
+        (event,) = events
+        assert event["contexts"]["trace"]["origin"] == "manual"
+
+        assert event["spans"][0]["op"] == "http.client"
+        assert event["spans"][0]["origin"] == "auto.http.stdlib.httplib"
 
 
-def test_span_origin(sentry_init, capture_events):
-    sentry_init(traces_sample_rate=1.0, debug=True)
-    events = capture_events()
-
-    with start_transaction(name="foo"):
-        conn = HTTPConnection("localhost", port=PORT)
-        conn.request("GET", "/foo")
-        conn.getresponse()
-
-    (event,) = events
-    assert event["contexts"]["trace"]["origin"] == "manual"
-
-    assert event["spans"][0]["op"] == "http.client"
-    assert event["spans"][0]["origin"] == "auto.http.stdlib.httplib"
-
-
-def test_http_timeout(monkeypatch, sentry_init, capture_envelopes):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_http_timeout(
+    monkeypatch,
+    sentry_init,
+    capture_envelopes,
+    capture_items,
+    span_streaming,
+):
     mock_readinto = mock.Mock(side_effect=TimeoutError)
     monkeypatch.setattr(SocketIO, "readinto", mock_readinto)
 
-    sentry_init(traces_sample_rate=1.0)
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
 
-    envelopes = capture_envelopes()
+    if span_streaming:
+        items = capture_items("span")
 
-    with pytest.raises(TimeoutError):
-        with start_transaction(op="op", name="name"):
-            conn = HTTPConnection("localhost", port=PORT)
-            conn.request("GET", "/bla")
-            conn.getresponse()
+        with pytest.raises(TimeoutError):
+            with sentry_sdk.traces.start_span(
+                name="name",
+                attributes={
+                    "sentry.op": "op",
+                },
+            ):
+                conn = HTTPConnection("localhost", port=PORT)
+                conn.request("GET", "/bla")
+                conn.getresponse()
 
-    (transaction_envelope,) = envelopes
-    transaction = transaction_envelope.get_transaction_event()
-    assert len(transaction["spans"]) == 1
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        assert len(spans) == 2
+        span = spans[0]
+        assert span["attributes"]["sentry.op"] == "http.client"
+        assert span["name"] == f"GET http://localhost:{PORT}/bla"  # noqa: E231
+    else:
+        envelopes = capture_envelopes()
 
-    span = transaction["spans"][0]
-    assert span["op"] == "http.client"
-    assert span["description"] == f"GET http://localhost:{PORT}/bla"  # noqa: E231
+        with pytest.raises(TimeoutError):
+            with start_transaction(op="op", name="name"):
+                conn = HTTPConnection("localhost", port=PORT)
+                conn.request("GET", "/bla")
+                conn.getresponse()
+
+        (transaction_envelope,) = envelopes
+        transaction = transaction_envelope.get_transaction_event()
+        assert len(transaction["spans"]) == 1
+
+        span = transaction["spans"][0]
+        assert span["op"] == "http.client"
+        assert span["description"] == f"GET http://localhost:{PORT}/bla"  # noqa: E231
 
 
 @pytest.mark.parametrize("tunnel_port", [8080, None])
-def test_proxy_http_tunnel(sentry_init, capture_events, tunnel_port):
-    sentry_init(traces_sample_rate=1.0)
-    events = capture_events()
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("send_default_pii", [True, False])
+def test_proxy_http_tunnel(
+    sentry_init,
+    capture_events,
+    capture_items,
+    tunnel_port,
+    span_streaming,
+    send_default_pii,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
 
-    with start_transaction(name="test_transaction"):
-        conn = HTTPConnection("localhost", PROXY_PORT)
-        conn.set_tunnel("api.example.com", tunnel_port)
-        conn.request("GET", "/foo")
-        conn.getresponse()
+    if span_streaming:
+        items = capture_items("span")
 
-    (event,) = events
-    (span,) = event["spans"]
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            conn = HTTPConnection("localhost", PROXY_PORT)
+            conn.set_tunnel("api.example.com", tunnel_port)
+            conn.request("GET", "/foo?bar=1")
+            conn.getresponse()
 
-    port_modifier = f":{tunnel_port}" if tunnel_port else ""
-    assert span["description"] == f"GET http://api.example.com{port_modifier}/foo"
-    assert span["data"]["url"] == f"http://api.example.com{port_modifier}/foo"
-    assert span["data"][SPANDATA.HTTP_METHOD] == "GET"
-    assert span["data"][SPANDATA.NETWORK_PEER_ADDRESS] == "localhost"
-    assert span["data"][SPANDATA.NETWORK_PEER_PORT] == PROXY_PORT
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        (span,) = (
+            span
+            for span in spans
+            if span["attributes"].get("sentry.origin") == "auto.http.stdlib.httplib"
+        )
+
+        port_modifier = f":{tunnel_port}" if tunnel_port else ""
+        assert span["name"] == f"GET http://api.example.com{port_modifier}/foo"
+        assert span["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "GET"
+        assert span["attributes"][SPANDATA.NETWORK_PEER_ADDRESS] == "localhost"
+        assert span["attributes"][SPANDATA.NETWORK_PEER_PORT] == PROXY_PORT
+
+        if send_default_pii:
+            assert (
+                span["attributes"][SPANDATA.URL_FULL]
+                == f"http://api.example.com{port_modifier}/foo"
+            )
+            assert span["attributes"][SPANDATA.URL_QUERY] == "bar=1"
+        else:
+            assert SPANDATA.URL_FULL not in span["attributes"]
+            assert SPANDATA.URL_QUERY not in span["attributes"]
+    else:
+        events = capture_events()
+
+        with start_transaction(name="test_transaction"):
+            conn = HTTPConnection("localhost", PROXY_PORT)
+            conn.set_tunnel("api.example.com", tunnel_port)
+            conn.request("GET", "/foo?bar=1")
+            conn.getresponse()
+
+        (event,) = events
+        (span,) = event["spans"]
+
+        port_modifier = f":{tunnel_port}" if tunnel_port else ""
+        assert span["description"] == f"GET http://api.example.com{port_modifier}/foo"
+        assert span["data"][SPANDATA.HTTP_METHOD] == "GET"
+        assert span["data"][SPANDATA.NETWORK_PEER_ADDRESS] == "localhost"
+        assert span["data"][SPANDATA.NETWORK_PEER_PORT] == PROXY_PORT
+        assert span["data"]["url"] == f"http://api.example.com{port_modifier}/foo"
+        assert span["data"][SPANDATA.HTTP_QUERY] == "bar=1"
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_chunked_response_span_covers_body_read(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    min_expected_duration = CHUNK_DELAY * NUM_CHUNKS
+
+    if span_streaming:
+        items = capture_items("span")
+
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            conn = HTTPConnection("localhost", CHUNKED_PORT)
+            conn.request("GET", "/chunked")
+            response = conn.getresponse()
+            response.read()
+
+        sentry_sdk.flush()
+        http_span, parent_span = [item.payload for item in items]
+
+        duration = http_span["end_timestamp"] - http_span["start_timestamp"]
+        assert duration >= min_expected_duration
+    else:
+        events = capture_events()
+
+        with start_transaction(name="test_chunked"):
+            conn = HTTPConnection("localhost", CHUNKED_PORT)
+            conn.request("GET", "/chunked")
+            response = conn.getresponse()
+            response.read()
+
+        (event,) = events
+        (span,) = event["spans"]
+
+        fmt = "%Y-%m-%dT%H:%M:%S.%fZ"
+        start = datetime.datetime.strptime(span["start_timestamp"], fmt)
+        end = datetime.datetime.strptime(span["timestamp"], fmt)
+        duration = (end - start).total_seconds()
+        assert duration >= min_expected_duration

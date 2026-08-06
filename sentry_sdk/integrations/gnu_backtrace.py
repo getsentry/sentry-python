@@ -1,14 +1,14 @@
 import re
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.utils import capture_internal_exceptions
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from typing import Any
+
     from sentry_sdk._types import Event
 
 # function is everything between index at @
@@ -16,14 +16,14 @@ if TYPE_CHECKING:
 FUNCTION_RE = r"[^@]+?"
 HEX_ADDRESS = r"\s+@\s+0x[0-9a-fA-F]+"
 
-FRAME_RE = r"""
+_FRAME_RE_PATTERN = r"""
 ^(?P<index>\d+)\.\s+(?P<function>{FUNCTION_RE}){HEX_ADDRESS}(?:\s+in\s+(?P<package>.+))?$
 """.format(
     FUNCTION_RE=FUNCTION_RE,
     HEX_ADDRESS=HEX_ADDRESS,
 )
 
-FRAME_RE = re.compile(FRAME_RE, re.MULTILINE | re.VERBOSE)
+FRAME_RE = re.compile(_FRAME_RE_PATTERN, re.MULTILINE | re.VERBOSE)
 
 
 class GnuBacktraceIntegration(Integration):

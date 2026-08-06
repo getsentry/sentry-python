@@ -36,6 +36,7 @@ import uuid
 import warnings
 from abc import ABC, abstractmethod
 from collections import deque
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk._lru_cache import LRUCache
@@ -54,29 +55,21 @@ from sentry_sdk.utils import (
     set_in_app_in_frames,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import Deque
-    from typing import Dict
-    from typing import List
-    from typing import Optional
-    from typing import Set
-    from typing import Type
+    from typing import Any, Callable, Deque, Dict, List, Optional, Set, Type
+
     from typing_extensions import TypedDict
 
+    from sentry_sdk._types import Event, ProfilerMode, SamplingContext
     from sentry_sdk.profiler.utils import (
-        ProcessedStack,
-        ProcessedFrame,
-        ProcessedThreadMetadata,
+        ExtractedSample,
         FrameId,
+        ProcessedFrame,
+        ProcessedStack,
+        ProcessedThreadMetadata,
         StackId,
         ThreadId,
-        ExtractedSample,
     )
-    from sentry_sdk._types import Event, SamplingContext, ProfilerMode
 
     ProcessedSample = TypedDict(
         "ProcessedSample",

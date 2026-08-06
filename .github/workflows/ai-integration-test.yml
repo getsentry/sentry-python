@@ -24,22 +24,22 @@ jobs:
           python-version: 3.14t
 
       - name: Setup Node.js
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: '20'
 
       - name: Checkout repo
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Python SDK Tests
-        uses: getsentry/testing-ai-sdk-integrations@6b1f51ec8af03e19087df452b426aa7e46d2b20a
+        uses: getsentry/testing-ai-sdk-integrations@318143d106d4a847dfac3804bb2663d1b852cf28
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           platform: python
           sentry-python-path: ${{ github.workspace }}
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          openrouter-api-key: ${{ secrets.OPENROUTER_API_KEY }}
           google-api-key:  ${{ secrets.GOOGLE_API_KEY }}

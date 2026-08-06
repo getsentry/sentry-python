@@ -1,17 +1,17 @@
 import concurrent.futures as cf
 import sys
 from contextlib import contextmanager
-from statsig import statsig
-from statsig.statsig_user import StatsigUser
 from random import random
 from unittest.mock import Mock
-from sentry_sdk import start_span, start_transaction
-from tests.conftest import ApproxDict
 
 import pytest
+from statsig import statsig
+from statsig.statsig_user import StatsigUser
 
 import sentry_sdk
+from sentry_sdk import start_span, start_transaction
 from sentry_sdk.integrations.statsig import StatsigIntegration
+from tests.conftest import ApproxDict
 
 
 @contextmanager
@@ -185,19 +185,44 @@ def test_wrapper_attributes(sentry_init, uninstall_integration):
     statsig.check_gate = original_check_gate
 
 
-def test_statsig_span_integration(sentry_init, capture_events, uninstall_integration):
+@pytest.mark.parametrize(
+    "span_streaming",
+    [True, False],
+)
+def test_statsig_span_integration(
+    sentry_init, capture_events, capture_items, uninstall_integration, span_streaming
+):
     uninstall_integration(StatsigIntegration.identifier)
 
     with mock_statsig({"hello": True}):
-        sentry_init(traces_sample_rate=1.0, integrations=[StatsigIntegration()])
-        events = capture_events()
+        sentry_init(
+            traces_sample_rate=1.0,
+            integrations=[StatsigIntegration()],
+            trace_lifecycle="stream" if span_streaming else "static",
+        )
         user = StatsigUser(user_id="user-id")
-        with start_transaction(name="hi"):
-            with start_span(op="foo", name="bar"):
+
+        if span_streaming:
+            items = capture_items("span")
+            with sentry_sdk.traces.start_span(name="hi"):
                 statsig.check_gate(user, "hello")
                 statsig.check_gate(user, "world")
 
-    (event,) = events
-    assert event["spans"][0]["data"] == ApproxDict(
-        {"flag.evaluation.hello": True, "flag.evaluation.world": False}
-    )
+            sentry_sdk.flush()
+
+            assert len(items) == 1
+            span = items[0].payload
+            assert span["attributes"]["flag.evaluation.hello"] is True
+            assert span["attributes"]["flag.evaluation.world"] is False
+
+        else:
+            events = capture_events()
+            with start_transaction(name="hi"):
+                with start_span(op="foo", name="bar"):
+                    statsig.check_gate(user, "hello")
+                    statsig.check_gate(user, "world")
+
+            (event,) = events
+            assert event["spans"][0]["data"] == ApproxDict(
+                {"flag.evaluation.hello": True, "flag.evaluation.world": False}
+            )

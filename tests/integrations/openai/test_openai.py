@@ -1,6 +1,8 @@
 import json
+
 import pytest
 
+import sentry_sdk
 from sentry_sdk.utils import package_version
 
 try:
@@ -8,22 +10,47 @@ try:
 except ImportError:
     NOT_GIVEN = None
 try:
-    from openai import omit
-    from openai import Omit
+    from openai import Omit, omit
 except ImportError:
     omit = None
     Omit = None
 
-from openai import AsyncOpenAI, OpenAI, AsyncStream, Stream, OpenAIError
+from openai import AsyncOpenAI, AsyncStream, OpenAI, OpenAIError, Stream
 from openai.types import CompletionUsage, CreateEmbeddingResponse, Embedding
-from openai.types.chat import ChatCompletion, ChatCompletionMessage, ChatCompletionChunk
+from openai.types.chat import (
+    ChatCompletion,
+    ChatCompletionChunk,
+    ChatCompletionMessage,
+)
 from openai.types.chat.chat_completion import Choice
-from openai.types.chat.chat_completion_chunk import ChoiceDelta, Choice as DeltaChoice
+from openai.types.chat.chat_completion_chunk import Choice as DeltaChoice
+from openai.types.chat.chat_completion_chunk import ChoiceDelta
 from openai.types.create_embedding_response import Usage as EmbeddingTokenUsage
+
+try:
+    from openai.types.chat import (
+        ChatCompletionCustomToolParam,
+        ChatCompletionFunctionToolParam,
+    )
+    from openai.types.chat.chat_completion_custom_tool_param import Custom
+    from openai.types.shared_params import FunctionDefinition
+except ImportError:
+    pass
 
 SKIP_RESPONSES_TESTS = False
 
 try:
+    from openai.types.responses import (
+        CustomToolParam,
+        FunctionToolParam,
+        Response,
+        ResponseFunctionToolCall,
+        ResponseOutputMessage,
+        ResponseOutputRefusal,
+        ResponseOutputText,
+        ResponseUsage,
+        WebSearchToolParam,
+    )
     from openai.types.responses.response_completed_event import ResponseCompletedEvent
     from openai.types.responses.response_created_event import ResponseCreatedEvent
     from openai.types.responses.response_text_delta_event import ResponseTextDeltaEvent
@@ -31,25 +58,20 @@ try:
         InputTokensDetails,
         OutputTokensDetails,
     )
-    from openai.types.responses import (
-        Response,
-        ResponseUsage,
-        ResponseOutputMessage,
-        ResponseOutputText,
-    )
 except ImportError:
     SKIP_RESPONSES_TESTS = True
 
+from unittest import mock  # python 3.3 and above
+
 from sentry_sdk import start_transaction
-from sentry_sdk.consts import SPANDATA, OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.openai import (
     OpenAIIntegration,
     _calculate_completions_token_usage,
     _calculate_responses_token_usage,
 )
+from sentry_sdk.integrations.stdlib import StdlibIntegration
 from sentry_sdk.utils import safe_serialize
-
-from unittest import mock  # python 3.3 and above
 
 try:
     from unittest.mock import AsyncMock
@@ -61,26 +83,6 @@ except ImportError:
 
 
 OPENAI_VERSION = package_version("openai")
-EXAMPLE_CHAT_COMPLETION = ChatCompletion(
-    id="chat-id",
-    choices=[
-        Choice(
-            index=0,
-            finish_reason="stop",
-            message=ChatCompletionMessage(
-                role="assistant", content="the model response"
-            ),
-        )
-    ],
-    created=10000000,
-    model="response-model-id",
-    object="chat.completion",
-    usage=CompletionUsage(
-        completion_tokens=10,
-        prompt_tokens=20,
-        total_tokens=30,
-    ),
-)
 
 
 if SKIP_RESPONSES_TESTS:
@@ -113,6 +115,7 @@ else:
             input_tokens=20,
             input_tokens_details=InputTokensDetails(
                 cached_tokens=5,
+                cache_write_tokens=0,
             ),
             output_tokens=10,
             output_tokens_details=OutputTokensDetails(
@@ -122,7 +125,210 @@ else:
         ),
     )
 
+EXAMPLE_TOOLS = [
+    {
+        "type": "function",
+        "name": "get_current_weather",
+        "description": "Get the current weather in a given location",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "location": {
+                    "type": "string",
+                    "description": "The city and state, e.g. San Francisco, CA",
+                },
+            },
+            "required": ["location"],
+        },
+    }
+]
 
+EXAMPLE_COMPLETIONS_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_current_weather",
+            "description": "Get the current weather in a given location",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "location": {
+                        "type": "string",
+                        "description": "The city and state, e.g. San Francisco, CA",
+                    },
+                },
+                "required": ["location"],
+            },
+        },
+    }
+]
+
+
+@pytest.mark.skipif(
+    OPENAI_VERSION <= (2, 10, 0),
+    reason="ChatCompletionCustomToolParam is unavailable before.",
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_chat_completion_tool_definitions(
+    sentry_init,
+    capture_events,
+    capture_items,
+    nonstreaming_chat_completions_model_response,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
+        )
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            client.chat.completions.create(
+                model="some-model",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": "hello"},
+                ],
+                tools=[
+                    ChatCompletionFunctionToolParam(
+                        type="function",
+                        function=FunctionDefinition(
+                            name="name",
+                            description="description",
+                            parameters={
+                                "type": "object",
+                                "properties": {
+                                    "city": {"type": "string"},
+                                    "state": {"type": "string"},
+                                },
+                                "required": ["city", "state"],
+                                "additionalProperties": False,
+                            },
+                            strict=True,
+                        ),
+                    ),
+                    ChatCompletionCustomToolParam(
+                        type="custom",
+                        custom=Custom(
+                            name="name",
+                            description="description",
+                        ),
+                    ),
+                ],
+            )
+
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+
+        assert json.loads(span["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]) == [
+            {
+                "type": "function",
+                "name": "name",
+                "description": "description",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "city": {"type": "string"},
+                        "state": {"type": "string"},
+                    },
+                    "required": ["city", "state"],
+                    "additionalProperties": False,
+                },
+            },
+            {
+                "type": "custom",
+                "name": "name",
+                "description": "description",
+            },
+        ]
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            client.chat.completions.create(
+                model="some-model",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": "hello"},
+                ],
+                tools=[
+                    ChatCompletionFunctionToolParam(
+                        type="function",
+                        function=FunctionDefinition(
+                            name="name",
+                            description="description",
+                            parameters={
+                                "type": "object",
+                                "properties": {
+                                    "city": {"type": "string"},
+                                    "state": {"type": "string"},
+                                },
+                                "required": ["city", "state"],
+                                "additionalProperties": False,
+                            },
+                            strict=True,
+                        ),
+                    ),
+                    ChatCompletionCustomToolParam(
+                        type="custom",
+                        custom=Custom(
+                            name="name",
+                            description="description",
+                        ),
+                    ),
+                ],
+            )
+
+        tx = events[0]
+        assert tx["type"] == "transaction"
+
+        assert json.loads(tx["spans"][0]["data"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]) == [
+            {
+                "type": "function",
+                "name": "name",
+                "description": "description",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "city": {"type": "string"},
+                        "state": {"type": "string"},
+                    },
+                    "required": ["city", "state"],
+                    "additionalProperties": False,
+                },
+            },
+            {
+                "type": "custom",
+                "name": "name",
+                "description": "description",
+            },
+        ]
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -132,21 +338,1042 @@ else:
     ],
 )
 def test_nonstreaming_chat_completion_no_prompts(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    capture_items,
+    send_default_pii,
+    include_prompts,
+    nonstreaming_chat_completions_model_response,
+    stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=include_prompts)],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = OpenAI(api_key="z")
-    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
+        )
+    )
 
-    with start_transaction(name="openai tx"):
-        response = (
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            response = (
+                client.chat.completions.create(
+                    model="some-model",
+                    messages=[
+                        {"role": "system", "content": "You are a helpful assistant."},
+                        {"role": "user", "content": "hello"},
+                    ],
+                    max_tokens=100,
+                    presence_penalty=0.1,
+                    frequency_penalty=0.2,
+                    temperature=0.7,
+                    top_p=0.9,
+                )
+                .choices[0]
+                .message.content
+            )
+
+        assert response == "the model response"
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+
+        assert span["attributes"]["gen_ai.usage.output_tokens"] == 10
+        assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
+        assert span["attributes"]["gen_ai.usage.total_tokens"] == 30
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            response = (
+                client.chat.completions.create(
+                    model="some-model",
+                    messages=[
+                        {"role": "system", "content": "You are a helpful assistant."},
+                        {"role": "user", "content": "hello"},
+                    ],
+                    max_tokens=100,
+                    presence_penalty=0.1,
+                    frequency_penalty=0.2,
+                    temperature=0.7,
+                    top_p=0.9,
+                )
+                .choices[0]
+                .message.content
+            )
+
+        assert response == "the model response"
+        tx = events[0]
+        assert tx["type"] == "transaction"
+        span = tx["spans"][0]
+        assert span["op"] == "gen_ai.chat"
+        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+
+        assert span["data"]["gen_ai.usage.output_tokens"] == 10
+        assert span["data"]["gen_ai.usage.input_tokens"] == 20
+        assert span["data"]["gen_ai.usage.total_tokens"] == 30
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "get_messages,expected_system_instructions",
+    [
+        (
+            lambda: [
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {"role": "user", "content": "hello"},
+            ],
+            [
+                {
+                    "type": "text",
+                    "content": "You are a helpful assistant.",
+                }
+            ],
+        ),
+        (
+            lambda: [
+                {
+                    "role": "system",
+                    "content": [
+                        {"type": "text", "text": "You are a helpful assistant."},
+                        {"type": "text", "text": "Be concise and clear."},
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {"role": "user", "content": "hello"},
+            ],
+            [
+                {
+                    "type": "text",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "text",
+                    "content": "Be concise and clear.",
+                },
+            ],
+        ),
+        (
+            lambda: iter(
+                [
+                    {
+                        "role": "system",
+                        "content": [
+                            {"type": "text", "text": "You are a helpful assistant."},
+                            {"type": "text", "text": "Be concise and clear."},
+                        ],
+                    },
+                    {
+                        "role": "user",
+                        "content": "Message demonstrating the absence of truncation.",
+                    },
+                    {"role": "user", "content": "hello"},
+                ]
+            ),
+            [
+                {
+                    "type": "text",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "text",
+                    "content": "Be concise and clear.",
+                },
+            ],
+        ),
+    ],
+)
+def test_nonstreaming_chat_completion(
+    sentry_init,
+    capture_events,
+    capture_items,
+    get_messages,
+    expected_system_instructions,
+    nonstreaming_chat_completions_model_response,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
+        )
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            response = (
+                client.chat.completions.create(
+                    model="some-model",
+                    messages=get_messages(),
+                    max_tokens=100,
+                    presence_penalty=0.1,
+                    frequency_penalty=0.2,
+                    temperature=0.7,
+                    top_p=0.9,
+                )
+                .choices[0]
+                .message.content
+            )
+
+        assert response == "the model response"
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+
+        assert (
+            json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+            == expected_system_instructions
+        )
+
+        assert "hello" in span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert (
+            "Message demonstrating the absence of truncation."
+            in span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        )
+        assert "the model response" in span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+        assert span["attributes"]["gen_ai.usage.output_tokens"] == 10
+        assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
+        assert span["attributes"]["gen_ai.usage.total_tokens"] == 30
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            response = (
+                client.chat.completions.create(
+                    model="some-model",
+                    messages=get_messages(),
+                    max_tokens=100,
+                    presence_penalty=0.1,
+                    frequency_penalty=0.2,
+                    temperature=0.7,
+                    top_p=0.9,
+                )
+                .choices[0]
+                .message.content
+            )
+
+        assert response == "the model response"
+        tx = events[0]
+        assert tx["type"] == "transaction"
+        span = tx["spans"][0]
+        assert span["op"] == "gen_ai.chat"
+        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+
+        assert (
+            json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+            == expected_system_instructions
+        )
+
+        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert "the model response" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+        assert span["data"]["gen_ai.usage.output_tokens"] == 10
+        assert span["data"]["gen_ai.usage.input_tokens"] == 20
+        assert span["data"]["gen_ai.usage.total_tokens"] == 30
+
+
+@pytest.mark.skipif(
+    OPENAI_VERSION <= (1, 1, 0),
+    reason="OpenAI versions <=1.1.0 do not support the tools parameter.",
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,expected_present,expected_absent",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            {
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: json.dumps(
+                    [{"type": "text", "content": "You are a helpful assistant."}]
+                ),
+                SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
+                    [{"role": "user", "content": "hello"}]
+                ),
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS: safe_serialize(EXAMPLE_TOOLS),
+            },
+            [],
+            id="gen-ai-inputs-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            {},
+            [
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+            ],
+            id="gen-ai-inputs-disabled",
+        ),
+        pytest.param(
+            {},
+            {
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: json.dumps(
+                    [{"type": "text", "content": "You are a helpful assistant."}]
+                ),
+                SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
+                    [{"role": "user", "content": "hello"}]
+                ),
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS: safe_serialize(EXAMPLE_TOOLS),
+            },
+            [],
+            id="gen-ai-omitted-defaults-to-enabled",
+        ),
+    ],
+)
+def test_completions_api_data_collection(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    expected_present,
+    expected_absent,
+    nonstreaming_chat_completions_model_response,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        _experiments={"data_collection": data_collection},
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
+        )
+    )
+
+    create_kwargs = {
+        "model": "some-model",
+        "messages": [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "hello"},
+        ],
+        "max_tokens": 100,
+        "presence_penalty": 0.1,
+        "frequency_penalty": 0.2,
+        "temperature": 0.7,
+        "top_p": 0.9,
+        "tools": EXAMPLE_COMPLETIONS_TOOLS,
+    }
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            client.chat.completions.create(**create_kwargs)
+
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items)
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            client.chat.completions.create(**create_kwargs)
+
+        (transaction,) = events
+        (span,) = transaction["spans"]
+        span_data = span["data"]
+
+    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span_data[SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+    assert span_data[SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+    assert span_data[SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span_data[SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+    assert span_data[SPANDATA.GEN_AI_SYSTEM] == "openai"
+
+    for key, value in expected_present.items():
+        assert span_data[key] == value
+
+    for key in expected_absent:
+        assert key not in span_data
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,expect_output",
+    [
+        pytest.param(
+            {"gen_ai": {"outputs": True}},
+            False,
+            True,
+            id="gen-ai-outputs-enabled-overrides-pii-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            True,
+            False,
+            id="gen-ai-outputs-disabled-overrides-pii-enabled",
+        ),
+        pytest.param(
+            {},
+            False,
+            True,
+            id="gen-ai-omitted-defaults-to-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            False,
+            False,
+            id="gen-ai-outputs-disabled-and-pii-disabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            False,
+            id="no-gen-ai-data-collection-falls-back-to-send-default-pii",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            id="no-gen-ai-data-collection-pii-enabled-collects",
+        ),
+    ],
+)
+def test_completions_api_data_collection_outputs(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    send_default_pii,
+    expect_output,
+    nonstreaming_chat_completions_model_response,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    init_kwargs = {
+        "integrations": [OpenAIIntegration()],
+        "disabled_integrations": [StdlibIntegration],
+        "traces_sample_rate": 1.0,
+        "send_default_pii": send_default_pii,
+        "stream_gen_ai_spans": stream_gen_ai_spans,
+        "trace_lifecycle": "stream" if span_streaming else "static",
+    }
+    if data_collection is not None:
+        init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    sentry_init(**init_kwargs)
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
+        )
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
             client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "hello"}],
+            )
+
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items)
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "hello"}],
+            )
+
+        (transaction,) = events
+        (span,) = transaction["spans"]
+        span_data = span["data"]
+
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+
+    if expect_output:
+        assert "the model response" in span_data[SPANDATA.GEN_AI_RESPONSE_TEXT]
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,expect_output",
+    [
+        pytest.param(
+            {"gen_ai": {"outputs": True}},
+            False,
+            True,
+            id="gen-ai-outputs-enabled-overrides-pii-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            True,
+            False,
+            id="gen-ai-outputs-disabled-overrides-pii-enabled",
+        ),
+        pytest.param(
+            {},
+            False,
+            True,
+            id="gen-ai-omitted-defaults-to-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            False,
+            False,
+            id="gen-ai-outputs-disabled-and-pii-disabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            False,
+            id="no-gen-ai-data-collection-falls-back-to-send-default-pii",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            id="no-gen-ai-data-collection-pii-enabled-collects",
+        ),
+    ],
+)
+async def test_completions_api_data_collection_outputs_async(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    send_default_pii,
+    expect_output,
+    nonstreaming_chat_completions_model_response,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    init_kwargs = {
+        "integrations": [OpenAIIntegration()],
+        "disabled_integrations": [StdlibIntegration],
+        "traces_sample_rate": 1.0,
+        "send_default_pii": send_default_pii,
+        "stream_gen_ai_spans": stream_gen_ai_spans,
+        "trace_lifecycle": "stream" if span_streaming else "static",
+    }
+    if data_collection is not None:
+        init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    sentry_init(**init_kwargs)
+
+    client = AsyncOpenAI(api_key="z")
+    client.chat.completions._post = AsyncMock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
+        )
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            await client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "hello"}],
+            )
+
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items)
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            await client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "hello"}],
+            )
+
+        (transaction,) = events
+        (span,) = transaction["spans"]
+        span_data = span["data"]
+
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+
+    if expect_output:
+        assert "the model response" in span_data[SPANDATA.GEN_AI_RESPONSE_TEXT]
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_completions_api_data_collection_outputs_empty_choices(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        _experiments={"data_collection": {"gen_ai": {"outputs": True}}},
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(
+        return_value=ChatCompletion(
+            id="chat-id",
+            choices=[],
+            created=10000000,
+            model="gpt-3.5-turbo",
+            object="chat.completion",
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
+        )
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "hello"}],
+            )
+
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items)
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "hello"}],
+            )
+
+        (transaction,) = events
+        (span,) = transaction["spans"]
+        span_data = span["data"]
+
+    # No choices means no output data, even with outputs collection enabled
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,expect_output",
+    [
+        pytest.param(
+            {"gen_ai": {"outputs": True}},
+            True,
+            id="gen-ai-outputs-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            False,
+            id="gen-ai-outputs-disabled",
+        ),
+        pytest.param(
+            {},
+            True,
+            id="gen-ai-omitted-defaults-to-enabled",
+        ),
+    ],
+)
+def test_streaming_chat_completion_data_collection_outputs(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    expect_output,
+    get_model_response,
+    server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=False,
+        _experiments={"data_collection": data_collection},
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = OpenAI(api_key="z")
+    returned_stream = get_model_response(
+        server_side_event_chunks(
+            [
+                ChatCompletionChunk(
+                    id="1",
+                    choices=[
+                        DeltaChoice(
+                            index=0,
+                            delta=ChoiceDelta(content="hello"),
+                            finish_reason="stop",
+                        )
+                    ],
+                    created=100000,
+                    model="model-id",
+                    object="chat.completion.chunk",
+                ),
+            ],
+            include_event_type=False,
+        )
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            response_stream = client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "hello"}],
+                stream=True,
+            )
+            response_string = "".join(
+                map(lambda x: x.choices[0].delta.content, response_stream)
+            )
+
+        assert response_string == "hello"
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items)
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            response_stream = client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "hello"}],
+                stream=True,
+            )
+            response_string = "".join(
+                map(lambda x: x.choices[0].delta.content, response_stream)
+            )
+
+        assert response_string == "hello"
+        (transaction,) = events
+        (span,) = transaction["spans"]
+        span_data = span["data"]
+
+    if expect_output:
+        assert "hello" in span_data[SPANDATA.GEN_AI_RESPONSE_TEXT]
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "data_collection,expect_output",
+    [
+        pytest.param(
+            {"gen_ai": {"outputs": True}},
+            True,
+            id="gen-ai-outputs-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            False,
+            id="gen-ai-outputs-disabled",
+        ),
+        pytest.param(
+            {},
+            True,
+            id="gen-ai-omitted-defaults-to-enabled",
+        ),
+    ],
+)
+async def test_streaming_chat_completion_data_collection_outputs_async(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    expect_output,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=False,
+        _experiments={"data_collection": data_collection},
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = AsyncOpenAI(api_key="z")
+    returned_stream = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    ChatCompletionChunk(
+                        id="1",
+                        choices=[
+                            DeltaChoice(
+                                index=0,
+                                delta=ChoiceDelta(content="hello"),
+                                finish_reason="stop",
+                            )
+                        ],
+                        created=100000,
+                        model="model-id",
+                        object="chat.completion.chunk",
+                    ),
+                ],
+                include_event_type=False,
+            )
+        )
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            response_stream = await client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "hello"}],
+                stream=True,
+            )
+            response_string = ""
+            async for x in response_stream:
+                response_string += x.choices[0].delta.content
+
+        assert response_string == "hello"
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items)
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            response_stream = await client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "hello"}],
+                stream=True,
+            )
+            response_string = ""
+            async for x in response_stream:
+                response_string += x.choices[0].delta.content
+
+        assert response_string == "hello"
+        (transaction,) = events
+        (span,) = transaction["spans"]
+        span_data = span["data"]
+
+    if expect_output:
+        assert "hello" in span_data[SPANDATA.GEN_AI_RESPONSE_TEXT]
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "send_default_pii, include_prompts",
+    [
+        (True, False),
+        (False, True),
+        (False, False),
+    ],
+)
+async def test_nonstreaming_chat_completion_async_no_prompts(
+    sentry_init,
+    capture_events,
+    capture_items,
+    send_default_pii,
+    include_prompts,
+    nonstreaming_chat_completions_model_response,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=include_prompts)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = AsyncOpenAI(api_key="z")
+    client.chat.completions._post = mock.AsyncMock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
+        )
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            response = await client.chat.completions.create(
                 model="some-model",
                 messages=[
                     {"role": "system", "content": "You are a helpful assistant."},
@@ -158,223 +1385,98 @@ def test_nonstreaming_chat_completion_no_prompts(
                 temperature=0.7,
                 top_p=0.9,
             )
-            .choices[0]
-            .message.content
-        )
+            response = response.choices[0].message.content
 
-    assert response == "the model response"
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    span = tx["spans"][0]
-    assert span["op"] == "gen_ai.chat"
-    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+        assert response == "the model response"
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
 
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
-    assert span["data"]["gen_ai.usage.output_tokens"] == 10
-    assert span["data"]["gen_ai.usage.input_tokens"] == 20
-    assert span["data"]["gen_ai.usage.total_tokens"] == 30
+        assert span["attributes"]["gen_ai.usage.output_tokens"] == 10
+        assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
+        assert span["attributes"]["gen_ai.usage.total_tokens"] == 30
+    else:
+        events = capture_events()
 
-
-@pytest.mark.parametrize(
-    "messages",
-    [
-        pytest.param(
-            [
-                {
-                    "role": "system",
-                    "content": "You are a helpful assistant.",
-                },
-                {"role": "user", "content": "hello"},
-            ],
-            id="blocks",
-        ),
-        pytest.param(
-            [
-                {
-                    "role": "system",
-                    "content": [
-                        {"type": "text", "text": "You are a helpful assistant."},
-                        {"type": "text", "text": "Be concise and clear."},
-                    ],
-                },
-                {"role": "user", "content": "hello"},
-            ],
-            id="parts",
-        ),
-        pytest.param(
-            iter(
-                [
-                    {
-                        "role": "system",
-                        "content": [
-                            {"type": "text", "text": "You are a helpful assistant."},
-                            {"type": "text", "text": "Be concise and clear."},
-                        ],
-                    },
-                    {"role": "user", "content": "hello"},
-                ]
-            ),
-            id="iterator",
-        ),
-    ],
-)
-def test_nonstreaming_chat_completion(sentry_init, capture_events, messages, request):
-    sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=True)],
-        traces_sample_rate=1.0,
-        send_default_pii=True,
-    )
-    events = capture_events()
-
-    client = OpenAI(api_key="z")
-    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
-
-    with start_transaction(name="openai tx"):
-        response = (
-            client.chat.completions.create(
+        with start_transaction(name="openai tx"):
+            response = await client.chat.completions.create(
                 model="some-model",
-                messages=messages,
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": "hello"},
+                ],
                 max_tokens=100,
                 presence_penalty=0.1,
                 frequency_penalty=0.2,
                 temperature=0.7,
                 top_p=0.9,
             )
-            .choices[0]
-            .message.content
-        )
+            response = response.choices[0].message.content
 
-    assert response == "the model response"
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    span = tx["spans"][0]
-    assert span["op"] == "gen_ai.chat"
-    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+        assert response == "the model response"
+        tx = events[0]
+        assert tx["type"] == "transaction"
+        span = tx["spans"][0]
+        assert span["op"] == "gen_ai.chat"
+        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
 
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
-    param_id = request.node.callspec.id
-    if "blocks" in param_id:
-        assert json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
-            {
-                "type": "text",
-                "content": "You are a helpful assistant.",
-            }
-        ]
-    else:
-        assert json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
-            {
-                "type": "text",
-                "content": "You are a helpful assistant.",
-            },
-            {
-                "type": "text",
-                "content": "Be concise and clear.",
-            },
-        ]
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
 
-    assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-    assert "the model response" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-
-    assert span["data"]["gen_ai.usage.output_tokens"] == 10
-    assert span["data"]["gen_ai.usage.input_tokens"] == 20
-    assert span["data"]["gen_ai.usage.total_tokens"] == 30
+        assert span["data"]["gen_ai.usage.output_tokens"] == 10
+        assert span["data"]["gen_ai.usage.input_tokens"] == 20
+        assert span["data"]["gen_ai.usage.total_tokens"] == 30
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "send_default_pii, include_prompts",
+    "get_messages,expected_system_instructions",
     [
-        (True, False),
-        (False, True),
-        (False, False),
-    ],
-)
-async def test_nonstreaming_chat_completion_async_no_prompts(
-    sentry_init, capture_events, send_default_pii, include_prompts
-):
-    sentry_init(
-        integrations=[OpenAIIntegration(include_prompts=include_prompts)],
-        traces_sample_rate=1.0,
-        send_default_pii=send_default_pii,
-    )
-    events = capture_events()
-
-    client = AsyncOpenAI(api_key="z")
-    client.chat.completions._post = mock.AsyncMock(return_value=EXAMPLE_CHAT_COMPLETION)
-
-    with start_transaction(name="openai tx"):
-        response = await client.chat.completions.create(
-            model="some-model",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": "hello"},
-            ],
-            max_tokens=100,
-            presence_penalty=0.1,
-            frequency_penalty=0.2,
-            temperature=0.7,
-            top_p=0.9,
-        )
-        response = response.choices[0].message.content
-
-    assert response == "the model response"
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    span = tx["spans"][0]
-    assert span["op"] == "gen_ai.chat"
-    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
-
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
-
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
-
-    assert span["data"]["gen_ai.usage.output_tokens"] == 10
-    assert span["data"]["gen_ai.usage.input_tokens"] == 20
-    assert span["data"]["gen_ai.usage.total_tokens"] == 30
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "messages",
-    [
-        pytest.param(
-            [
+        (
+            lambda: [
                 {
                     "role": "system",
                     "content": "You are a helpful assistant.",
                 },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"role": "user", "content": "hello"},
             ],
-            id="blocks",
-        ),
-        pytest.param(
             [
+                {
+                    "type": "text",
+                    "content": "You are a helpful assistant.",
+                }
+            ],
+        ),
+        (
+            lambda: [
                 {
                     "role": "system",
                     "content": [
@@ -382,12 +1484,25 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
                         {"type": "text", "text": "Be concise and clear."},
                     ],
                 },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"role": "user", "content": "hello"},
             ],
-            id="parts",
+            [
+                {
+                    "type": "text",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "text",
+                    "content": "Be concise and clear.",
+                },
+            ],
         ),
-        pytest.param(
-            iter(
+        (
+            lambda: iter(
                 [
                     {
                         "role": "system",
@@ -396,79 +1511,145 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
                             {"type": "text", "text": "Be concise and clear."},
                         ],
                     },
+                    {
+                        "role": "user",
+                        "content": "Message demonstrating the absence of truncation.",
+                    },
                     {"role": "user", "content": "hello"},
                 ]
             ),
-            id="iterator",
+            [
+                {
+                    "type": "text",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "text",
+                    "content": "Be concise and clear.",
+                },
+            ],
         ),
     ],
 )
 async def test_nonstreaming_chat_completion_async(
-    sentry_init, capture_events, messages, request
+    sentry_init,
+    capture_events,
+    capture_items,
+    get_messages,
+    expected_system_instructions,
+    nonstreaming_chat_completions_model_response,
+    stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
-    client.chat.completions._post = AsyncMock(return_value=EXAMPLE_CHAT_COMPLETION)
-
-    with start_transaction(name="openai tx"):
-        response = await client.chat.completions.create(
-            model="some-model",
-            messages=messages,
-            max_tokens=100,
-            presence_penalty=0.1,
-            frequency_penalty=0.2,
-            temperature=0.7,
-            top_p=0.9,
+    client.chat.completions._post = AsyncMock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
         )
-        response = response.choices[0].message.content
+    )
 
-    assert response == "the model response"
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    span = tx["spans"][0]
-    assert span["op"] == "gen_ai.chat"
-    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
 
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        with start_transaction(name="openai tx"):
+            response = await client.chat.completions.create(
+                model="some-model",
+                messages=get_messages(),
+                max_tokens=100,
+                presence_penalty=0.1,
+                frequency_penalty=0.2,
+                temperature=0.7,
+                top_p=0.9,
+            )
+            response = response.choices[0].message.content
 
-    param_id = request.node.callspec.id
-    if "blocks" in param_id:
-        assert json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
-            {
-                "type": "text",
-                "content": "You are a helpful assistant.",
-            }
-        ]
+        assert response == "the model response"
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+
+        assert (
+            json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+            == expected_system_instructions
+        )
+
+        assert "hello" in span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert (
+            "Message demonstrating the absence of truncation."
+            in span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        )
+        assert "the model response" in span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+        assert span["attributes"]["gen_ai.usage.output_tokens"] == 10
+        assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
+        assert span["attributes"]["gen_ai.usage.total_tokens"] == 30
     else:
-        assert json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
-            {
-                "type": "text",
-                "content": "You are a helpful assistant.",
-            },
-            {
-                "type": "text",
-                "content": "Be concise and clear.",
-            },
-        ]
+        events = capture_events()
 
-    assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-    assert "the model response" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        with start_transaction(name="openai tx"):
+            response = await client.chat.completions.create(
+                model="some-model",
+                messages=get_messages(),
+                max_tokens=100,
+                presence_penalty=0.1,
+                frequency_penalty=0.2,
+                temperature=0.7,
+                top_p=0.9,
+            )
+            response = response.choices[0].message.content
 
-    assert span["data"]["gen_ai.usage.output_tokens"] == 10
-    assert span["data"]["gen_ai.usage.input_tokens"] == 20
-    assert span["data"]["gen_ai.usage.total_tokens"] == 30
+        assert response == "the model response"
+        tx = events[0]
+        assert tx["type"] == "transaction"
+        span = tx["spans"][0]
+        assert span["op"] == "gen_ai.chat"
+        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is False
+
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+
+        assert (
+            json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+            == expected_system_instructions
+        )
+
+        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert "the model response" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+        assert span["data"]["gen_ai.usage.output_tokens"] == 10
+        assert span["data"]["gen_ai.usage.input_tokens"] == 20
+        assert span["data"]["gen_ai.usage.total_tokens"] == 30
 
 
 def tiktoken_encoding_if_installed():
@@ -481,6 +1662,8 @@ def tiktoken_encoding_if_installed():
 
 
 # noinspection PyTypeChecker
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -492,10 +1675,13 @@ def tiktoken_encoding_if_installed():
 def test_streaming_chat_completion_no_prompts(
     sentry_init,
     capture_events,
+    capture_items,
     send_default_pii,
     include_prompts,
     get_model_response,
     server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[
@@ -504,10 +1690,12 @@ def test_streaming_chat_completion_no_prompts(
                 tiktoken_encoding_name=tiktoken_encoding_if_installed(),
             )
         ],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = OpenAI(api_key="z")
     returned_stream = get_model_response(
@@ -557,12 +1745,14 @@ def test_streaming_chat_completion_no_prompts(
         )
     )
 
-    with mock.patch.object(
-        client.chat._client._client,
-        "send",
-        return_value=returned_stream,
-    ):
-        with start_transaction(name="openai tx"):
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
             response_stream = client.chat.completions.create(
                 model="some-model",
                 messages=[
@@ -580,37 +1770,92 @@ def test_streaming_chat_completion_no_prompts(
                 map(lambda x: x.choices[0].delta.content, response_stream)
             )
 
-    assert response_string == "hello world"
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    span = tx["spans"][0]
-    assert span["op"] == "gen_ai.chat"
-    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+        assert response_string == "hello world"
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
-    try:
-        import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
+        try:
+            import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
 
-        assert span["data"]["gen_ai.usage.output_tokens"] == 2
-        assert span["data"]["gen_ai.usage.input_tokens"] == 7
-        assert span["data"]["gen_ai.usage.total_tokens"] == 9
-    except ImportError:
-        pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
+            assert span["attributes"]["gen_ai.usage.output_tokens"] == 2
+            assert span["attributes"]["gen_ai.usage.input_tokens"] == 7
+            assert span["attributes"]["gen_ai.usage.total_tokens"] == 9
+        except ImportError:
+            pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            response_stream = client.chat.completions.create(
+                model="some-model",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": "hello"},
+                ],
+                stream=True,
+                max_tokens=100,
+                presence_penalty=0.1,
+                frequency_penalty=0.2,
+                temperature=0.7,
+                top_p=0.9,
+            )
+            response_string = "".join(
+                map(lambda x: x.choices[0].delta.content, response_stream)
+            )
+
+        assert response_string == "hello world"
+        tx = events[0]
+        assert tx["type"] == "transaction"
+        span = tx["spans"][0]
+        assert span["op"] == "gen_ai.chat"
+        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
+
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+
+        try:
+            import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
+
+            assert span["data"]["gen_ai.usage.output_tokens"] == 2
+            assert span["data"]["gen_ai.usage.input_tokens"] == 7
+            assert span["data"]["gen_ai.usage.total_tokens"] == 9
+        except ImportError:
+            pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.skipif(
     OPENAI_VERSION <= (1, 1, 0),
     reason="OpenAI versions <=1.1.0 do not support the stream_options parameter.",
@@ -618,16 +1863,21 @@ def test_streaming_chat_completion_no_prompts(
 def test_streaming_chat_completion_with_usage_in_stream(
     sentry_init,
     capture_events,
+    capture_items,
     get_model_response,
     server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
 ):
     """When stream_options=include_usage is set, token usage comes from the final chunk's usage field."""
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=False)],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = OpenAI(api_key="z")
     returned_stream = get_model_response(
@@ -669,12 +1919,14 @@ def test_streaming_chat_completion_with_usage_in_stream(
         )
     )
 
-    with mock.patch.object(
-        client.chat._client._client,
-        "send",
-        return_value=returned_stream,
-    ):
-        with start_transaction(name="openai tx"):
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
             response_stream = client.chat.completions.create(
                 model="some-model",
                 messages=[{"role": "user", "content": "hello"}],
@@ -684,15 +1936,40 @@ def test_streaming_chat_completion_with_usage_in_stream(
             for _ in response_stream:
                 pass
 
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    span = tx["spans"][0]
-    assert span["op"] == "gen_ai.chat"
-    assert span["data"]["gen_ai.usage.input_tokens"] == 20
-    assert span["data"]["gen_ai.usage.output_tokens"] == 10
-    assert span["data"]["gen_ai.usage.total_tokens"] == 30
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+        assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
+        assert span["attributes"]["gen_ai.usage.output_tokens"] == 10
+        assert span["attributes"]["gen_ai.usage.total_tokens"] == 30
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            response_stream = client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "hello"}],
+                stream=True,
+                stream_options={"include_usage": True},
+            )
+            for _ in response_stream:
+                pass
+
+        tx = events[0]
+        assert tx["type"] == "transaction"
+        span = tx["spans"][0]
+        assert span["op"] == "gen_ai.chat"
+        assert span["data"]["gen_ai.usage.input_tokens"] == 20
+        assert span["data"]["gen_ai.usage.output_tokens"] == 10
+        assert span["data"]["gen_ai.usage.total_tokens"] == 30
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.skipif(
     OPENAI_VERSION <= (1, 1, 0),
     reason="OpenAI versions <=1.1.0 do not support the stream_options parameter.",
@@ -700,16 +1977,21 @@ def test_streaming_chat_completion_with_usage_in_stream(
 def test_streaming_chat_completion_empty_content_preserves_token_usage(
     sentry_init,
     capture_events,
+    capture_items,
     get_model_response,
     server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
 ):
     """Token usage from the stream is recorded even when no content is produced (e.g. content filter)."""
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=False)],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = OpenAI(api_key="z")
     returned_stream = get_model_response(
@@ -732,12 +2014,14 @@ def test_streaming_chat_completion_empty_content_preserves_token_usage(
         )
     )
 
-    with mock.patch.object(
-        client.chat._client._client,
-        "send",
-        return_value=returned_stream,
-    ):
-        with start_transaction(name="openai tx"):
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
             response_stream = client.chat.completions.create(
                 model="some-model",
                 messages=[{"role": "user", "content": "hello"}],
@@ -747,15 +2031,40 @@ def test_streaming_chat_completion_empty_content_preserves_token_usage(
             for _ in response_stream:
                 pass
 
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    span = tx["spans"][0]
-    assert span["op"] == "gen_ai.chat"
-    assert span["data"]["gen_ai.usage.input_tokens"] == 20
-    assert "gen_ai.usage.output_tokens" not in span["data"]
-    assert span["data"]["gen_ai.usage.total_tokens"] == 20
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+        assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
+        assert "gen_ai.usage.output_tokens" not in span["attributes"]
+        assert span["attributes"]["gen_ai.usage.total_tokens"] == 20
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            response_stream = client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "hello"}],
+                stream=True,
+                stream_options={"include_usage": True},
+            )
+            for _ in response_stream:
+                pass
+
+        tx = events[0]
+        assert tx["type"] == "transaction"
+        span = tx["spans"][0]
+        assert span["op"] == "gen_ai.chat"
+        assert span["data"]["gen_ai.usage.input_tokens"] == 20
+        assert "gen_ai.usage.output_tokens" not in span["data"]
+        assert span["data"]["gen_ai.usage.total_tokens"] == 20
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.skipif(
     OPENAI_VERSION <= (1, 1, 0),
     reason="OpenAI versions <=1.1.0 do not support the stream_options parameter.",
@@ -764,17 +2073,22 @@ def test_streaming_chat_completion_empty_content_preserves_token_usage(
 async def test_streaming_chat_completion_empty_content_preserves_token_usage_async(
     sentry_init,
     capture_events,
+    capture_items,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
 ):
     """Token usage from the stream is recorded even when no content is produced - async variant."""
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=False)],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
     returned_stream = get_model_response(
@@ -799,12 +2113,14 @@ async def test_streaming_chat_completion_empty_content_preserves_token_usage_asy
         )
     )
 
-    with mock.patch.object(
-        client.chat._client._client,
-        "send",
-        return_value=returned_stream,
-    ):
-        with start_transaction(name="openai tx"):
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
             response_stream = await client.chat.completions.create(
                 model="some-model",
                 messages=[{"role": "user", "content": "hello"}],
@@ -814,15 +2130,40 @@ async def test_streaming_chat_completion_empty_content_preserves_token_usage_asy
             async for _ in response_stream:
                 pass
 
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    span = tx["spans"][0]
-    assert span["op"] == "gen_ai.chat"
-    assert span["data"]["gen_ai.usage.input_tokens"] == 20
-    assert "gen_ai.usage.output_tokens" not in span["data"]
-    assert span["data"]["gen_ai.usage.total_tokens"] == 20
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+        assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
+        assert "gen_ai.usage.output_tokens" not in span["attributes"]
+        assert span["attributes"]["gen_ai.usage.total_tokens"] == 20
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            response_stream = await client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "hello"}],
+                stream=True,
+                stream_options={"include_usage": True},
+            )
+            async for _ in response_stream:
+                pass
+
+        tx = events[0]
+        assert tx["type"] == "transaction"
+        span = tx["spans"][0]
+        assert span["op"] == "gen_ai.chat"
+        assert span["data"]["gen_ai.usage.input_tokens"] == 20
+        assert "gen_ai.usage.output_tokens" not in span["data"]
+        assert span["data"]["gen_ai.usage.total_tokens"] == 20
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.skipif(
     OPENAI_VERSION <= (1, 1, 0),
     reason="OpenAI versions <=1.1.0 do not support the stream_options parameter.",
@@ -831,17 +2172,22 @@ async def test_streaming_chat_completion_empty_content_preserves_token_usage_asy
 async def test_streaming_chat_completion_async_with_usage_in_stream(
     sentry_init,
     capture_events,
+    capture_items,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
 ):
     """When stream_options=include_usage is set, token usage comes from the final chunk's usage field (async)."""
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=False)],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
     returned_stream = get_model_response(
@@ -885,12 +2231,14 @@ async def test_streaming_chat_completion_async_with_usage_in_stream(
         )
     )
 
-    with mock.patch.object(
-        client.chat._client._client,
-        "send",
-        return_value=returned_stream,
-    ):
-        with start_transaction(name="openai tx"):
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
             response_stream = await client.chat.completions.create(
                 model="some-model",
                 messages=[{"role": "user", "content": "hello"}],
@@ -900,31 +2248,67 @@ async def test_streaming_chat_completion_async_with_usage_in_stream(
             async for _ in response_stream:
                 pass
 
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    span = tx["spans"][0]
-    assert span["op"] == "gen_ai.chat"
-    assert span["data"]["gen_ai.usage.input_tokens"] == 20
-    assert span["data"]["gen_ai.usage.output_tokens"] == 10
-    assert span["data"]["gen_ai.usage.total_tokens"] == 30
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+        assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
+        assert span["attributes"]["gen_ai.usage.output_tokens"] == 10
+        assert span["attributes"]["gen_ai.usage.total_tokens"] == 30
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            response_stream = await client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "hello"}],
+                stream=True,
+                stream_options={"include_usage": True},
+            )
+            async for _ in response_stream:
+                pass
+
+        tx = events[0]
+        assert tx["type"] == "transaction"
+        span = tx["spans"][0]
+        assert span["op"] == "gen_ai.chat"
+        assert span["data"]["gen_ai.usage.input_tokens"] == 20
+        assert span["data"]["gen_ai.usage.output_tokens"] == 10
+        assert span["data"]["gen_ai.usage.total_tokens"] == 30
 
 
 # noinspection PyTypeChecker
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
-    "messages",
+    "get_messages,expected_system_instructions,expected_output_tokens,expected_input_tokens",
     [
-        pytest.param(
-            [
+        (
+            lambda: [
                 {
                     "role": "system",
                     "content": "You are a helpful assistant.",
                 },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"role": "user", "content": "hello"},
             ],
-            id="blocks",
-        ),
-        pytest.param(
             [
+                {
+                    "type": "text",
+                    "content": "You are a helpful assistant.",
+                }
+            ],
+            2,
+            15,
+        ),
+        (
+            lambda: [
                 {
                     "role": "system",
                     "content": [
@@ -932,12 +2316,27 @@ async def test_streaming_chat_completion_async_with_usage_in_stream(
                         {"type": "text", "text": "Be concise and clear."},
                     ],
                 },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"role": "user", "content": "hello"},
             ],
-            id="parts",
+            [
+                {
+                    "type": "text",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "text",
+                    "content": "Be concise and clear.",
+                },
+            ],
+            2,
+            20,
         ),
-        pytest.param(
-            iter(
+        (
+            lambda: iter(
                 [
                     {
                         "role": "system",
@@ -946,20 +2345,40 @@ async def test_streaming_chat_completion_async_with_usage_in_stream(
                             {"type": "text", "text": "Be concise and clear."},
                         ],
                     },
+                    {
+                        "role": "user",
+                        "content": "Message demonstrating the absence of truncation.",
+                    },
                     {"role": "user", "content": "hello"},
                 ]
             ),
-            id="iterator",
+            [
+                {
+                    "type": "text",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "text",
+                    "content": "Be concise and clear.",
+                },
+            ],
+            2,
+            20,
         ),
     ],
 )
 def test_streaming_chat_completion(
     sentry_init,
     capture_events,
-    messages,
-    request,
+    capture_items,
+    get_messages,
+    expected_system_instructions,
+    expected_output_tokens,
+    expected_input_tokens,
     get_model_response,
     server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[
@@ -968,10 +2387,12 @@ def test_streaming_chat_completion(
                 tiktoken_encoding_name=tiktoken_encoding_if_installed(),
             )
         ],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = OpenAI(api_key="z")
     returned_stream = get_model_response(
@@ -1021,15 +2442,17 @@ def test_streaming_chat_completion(
         )
     )
 
-    with mock.patch.object(
-        client.chat._client._client,
-        "send",
-        return_value=returned_stream,
-    ):
-        with start_transaction(name="openai tx"):
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
             response_stream = client.chat.completions.create(
                 model="some-model",
-                messages=messages,
+                messages=get_messages(),
                 stream=True,
                 max_tokens=100,
                 presence_penalty=0.1,
@@ -1040,62 +2463,114 @@ def test_streaming_chat_completion(
             response_string = "".join(
                 map(lambda x: x.choices[0].delta.content, response_stream)
             )
-    assert response_string == "hello world"
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    span = tx["spans"][0]
-    assert span["op"] == "gen_ai.chat"
-    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+        assert response_string == "hello world"
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
-    param_id = request.node.callspec.id
-    if "blocks" in param_id:
-        assert json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
-            {
-                "type": "text",
-                "content": "You are a helpful assistant.",
-            }
-        ]
+        assert (
+            json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+            == expected_system_instructions
+        )
+
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
+
+        assert (
+            "Message demonstrating the absence of truncation."
+            in span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        )
+        assert "hello" in span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert "hello world" in span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+        try:
+            import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
+
+            assert (
+                span["attributes"]["gen_ai.usage.output_tokens"]
+                == expected_output_tokens
+            )
+            assert (
+                span["attributes"]["gen_ai.usage.input_tokens"] == expected_input_tokens
+            )
+            assert (
+                span["attributes"]["gen_ai.usage.total_tokens"]
+                == expected_output_tokens + expected_input_tokens
+            )
+
+        except ImportError:
+            pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
     else:
-        assert json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
-            {
-                "type": "text",
-                "content": "You are a helpful assistant.",
-            },
-            {
-                "type": "text",
-                "content": "Be concise and clear.",
-            },
-        ]
+        events = capture_events()
 
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            response_stream = client.chat.completions.create(
+                model="some-model",
+                messages=get_messages(),
+                stream=True,
+                max_tokens=100,
+                presence_penalty=0.1,
+                frequency_penalty=0.2,
+                temperature=0.7,
+                top_p=0.9,
+            )
+            response_string = "".join(
+                map(lambda x: x.choices[0].delta.content, response_stream)
+            )
+        assert response_string == "hello world"
+        tx = events[0]
+        assert tx["type"] == "transaction"
+        span = tx["spans"][0]
+        assert span["op"] == "gen_ai.chat"
+        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
-    assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-    assert "hello world" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
-    try:
-        import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
+        assert (
+            json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+            == expected_system_instructions
+        )
 
-        if "blocks" in param_id:
-            assert span["data"]["gen_ai.usage.output_tokens"] == 2
-            assert span["data"]["gen_ai.usage.input_tokens"] == 7
-            assert span["data"]["gen_ai.usage.total_tokens"] == 9
-        else:
-            assert span["data"]["gen_ai.usage.output_tokens"] == 2
-            assert span["data"]["gen_ai.usage.input_tokens"] == 12
-            assert span["data"]["gen_ai.usage.total_tokens"] == 14
-    except ImportError:
-        pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
+
+        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert "hello world" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+        try:
+            import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
+
+            assert span["data"]["gen_ai.usage.output_tokens"] == expected_output_tokens
+            assert span["data"]["gen_ai.usage.input_tokens"] == expected_input_tokens
+            assert (
+                span["data"]["gen_ai.usage.total_tokens"]
+                == expected_output_tokens + expected_input_tokens
+            )
+
+        except ImportError:
+            pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
 
 
 # noinspection PyTypeChecker
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
@@ -1108,11 +2583,14 @@ def test_streaming_chat_completion(
 async def test_streaming_chat_completion_async_no_prompts(
     sentry_init,
     capture_events,
+    capture_items,
     send_default_pii,
     include_prompts,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[
@@ -1121,10 +2599,12 @@ async def test_streaming_chat_completion_async_no_prompts(
                 tiktoken_encoding_name=tiktoken_encoding_if_installed(),
             )
         ],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
     returned_stream = get_model_response(
@@ -1176,12 +2656,14 @@ async def test_streaming_chat_completion_async_no_prompts(
         )
     )
 
-    with mock.patch.object(
-        client.chat._client._client,
-        "send",
-        return_value=returned_stream,
-    ):
-        with start_transaction(name="openai tx"):
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
             response_stream = await client.chat.completions.create(
                 model="some-model",
                 messages=[
@@ -1200,55 +2682,123 @@ async def test_streaming_chat_completion_async_no_prompts(
             async for x in response_stream:
                 response_string += x.choices[0].delta.content
 
-    assert response_string == "hello world"
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    span = tx["spans"][0]
-    assert span["op"] == "gen_ai.chat"
-    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+        assert response_string == "hello world"
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
-    assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["attributes"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
 
-    try:
-        import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
+        try:
+            import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
 
-        assert span["data"]["gen_ai.usage.output_tokens"] == 2
-        assert span["data"]["gen_ai.usage.input_tokens"] == 7
-        assert span["data"]["gen_ai.usage.total_tokens"] == 9
+            assert span["attributes"]["gen_ai.usage.output_tokens"] == 2
+            assert span["attributes"]["gen_ai.usage.input_tokens"] == 7
+            assert span["attributes"]["gen_ai.usage.total_tokens"] == 9
 
-    except ImportError:
-        pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
+        except ImportError:
+            pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            response_stream = await client.chat.completions.create(
+                model="some-model",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": "hello"},
+                ],
+                stream=True,
+                max_tokens=100,
+                presence_penalty=0.1,
+                frequency_penalty=0.2,
+                temperature=0.7,
+                top_p=0.9,
+            )
+
+            response_string = ""
+            async for x in response_stream:
+                response_string += x.choices[0].delta.content
+
+        assert response_string == "hello world"
+        tx = events[0]
+        assert tx["type"] == "transaction"
+        span = tx["spans"][0]
+        assert span["op"] == "gen_ai.chat"
+        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
+
+        assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span["data"]
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+
+        try:
+            import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
+
+            assert span["data"]["gen_ai.usage.output_tokens"] == 2
+            assert span["data"]["gen_ai.usage.input_tokens"] == 7
+            assert span["data"]["gen_ai.usage.total_tokens"] == 9
+
+        except ImportError:
+            pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
 
 
 # noinspection PyTypeChecker
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "messages",
+    "get_messages,expected_system_instructions,expected_output_tokens,expected_input_tokens",
     [
-        pytest.param(
-            [
+        (
+            lambda: [
                 {
                     "role": "system",
                     "content": "You are a helpful assistant.",
                 },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"role": "user", "content": "hello"},
             ],
-            id="blocks",
-        ),
-        pytest.param(
             [
+                {
+                    "type": "text",
+                    "content": "You are a helpful assistant.",
+                }
+            ],
+            2,
+            15,
+        ),
+        (
+            lambda: [
                 {
                     "role": "system",
                     "content": [
@@ -1256,12 +2806,27 @@ async def test_streaming_chat_completion_async_no_prompts(
                         {"type": "text", "text": "Be concise and clear."},
                     ],
                 },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"role": "user", "content": "hello"},
             ],
-            id="parts",
+            [
+                {
+                    "type": "text",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "text",
+                    "content": "Be concise and clear.",
+                },
+            ],
+            2,
+            20,
         ),
-        pytest.param(
-            iter(
+        (
+            lambda: iter(
                 [
                     {
                         "role": "system",
@@ -1270,21 +2835,41 @@ async def test_streaming_chat_completion_async_no_prompts(
                             {"type": "text", "text": "Be concise and clear."},
                         ],
                     },
+                    {
+                        "role": "user",
+                        "content": "Message demonstrating the absence of truncation.",
+                    },
                     {"role": "user", "content": "hello"},
                 ]
             ),
-            id="iterator",
+            [
+                {
+                    "type": "text",
+                    "content": "You are a helpful assistant.",
+                },
+                {
+                    "type": "text",
+                    "content": "Be concise and clear.",
+                },
+            ],
+            2,
+            20,
         ),
     ],
 )
 async def test_streaming_chat_completion_async(
     sentry_init,
     capture_events,
-    messages,
-    request,
+    capture_items,
+    get_messages,
+    expected_system_instructions,
+    expected_output_tokens,
+    expected_input_tokens,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[
@@ -1293,10 +2878,12 @@ async def test_streaming_chat_completion_async(
                 tiktoken_encoding_name=tiktoken_encoding_if_installed(),
             )
         ],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
 
@@ -1349,15 +2936,17 @@ async def test_streaming_chat_completion_async(
         )
     )
 
-    with mock.patch.object(
-        client.chat._client._client,
-        "send",
-        return_value=returned_stream,
-    ):
-        with start_transaction(name="openai tx"):
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
             response_stream = await client.chat.completions.create(
                 model="some-model",
-                messages=messages,
+                messages=get_messages(),
                 stream=True,
                 max_tokens=100,
                 presence_penalty=0.1,
@@ -1370,119 +2959,303 @@ async def test_streaming_chat_completion_async(
             async for x in response_stream:
                 response_string += x.choices[0].delta.content
 
-    assert response_string == "hello world"
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    span = tx["spans"][0]
-    assert span["op"] == "gen_ai.chat"
-    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+        assert response_string == "hello world"
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
 
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
 
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
 
-    param_id = request.node.callspec.id
-    if "blocks" in param_id:
-        assert json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
-            {
-                "type": "text",
-                "content": "You are a helpful assistant.",
-            }
-        ]
-    else:
-        assert json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]) == [
-            {
-                "type": "text",
-                "content": "You are a helpful assistant.",
-            },
-            {
-                "type": "text",
-                "content": "Be concise and clear.",
-            },
-        ]
-
-    assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-    assert "hello world" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-
-    try:
-        import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
-
-        if "blocks" in param_id:
-            assert span["data"]["gen_ai.usage.output_tokens"] == 2
-            assert span["data"]["gen_ai.usage.input_tokens"] == 7
-            assert span["data"]["gen_ai.usage.total_tokens"] == 9
-        else:
-            assert span["data"]["gen_ai.usage.output_tokens"] == 2
-            assert span["data"]["gen_ai.usage.input_tokens"] == 12
-            assert span["data"]["gen_ai.usage.total_tokens"] == 14
-
-    except ImportError:
-        pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
-
-
-def test_bad_chat_completion(sentry_init, capture_events):
-    sentry_init(integrations=[OpenAIIntegration()], traces_sample_rate=1.0)
-    events = capture_events()
-
-    client = OpenAI(api_key="z")
-    client.chat.completions._post = mock.Mock(
-        side_effect=OpenAIError("API rate limit reached")
-    )
-    with pytest.raises(OpenAIError):
-        client.chat.completions.create(
-            model="some-model",
-            messages=[{"role": "system", "content": "hello"}],
+        assert (
+            json.loads(span["attributes"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+            == expected_system_instructions
         )
 
-    (event,) = events
-    assert event["level"] == "error"
+        assert (
+            "Message demonstrating the absence of truncation."
+            in span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        )
+        assert "hello" in span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert "hello world" in span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+        try:
+            import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
+
+            assert (
+                span["attributes"]["gen_ai.usage.output_tokens"]
+                == expected_output_tokens
+            )
+            assert (
+                span["attributes"]["gen_ai.usage.input_tokens"] == expected_input_tokens
+            )
+            assert (
+                span["attributes"]["gen_ai.usage.total_tokens"]
+                == expected_output_tokens + expected_input_tokens
+            )
+
+        except ImportError:
+            pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            response_stream = await client.chat.completions.create(
+                model="some-model",
+                messages=get_messages(),
+                stream=True,
+                max_tokens=100,
+                presence_penalty=0.1,
+                frequency_penalty=0.2,
+                temperature=0.7,
+                top_p=0.9,
+            )
+
+            response_string = ""
+            async for x in response_stream:
+                response_string += x.choices[0].delta.content
+
+        assert response_string == "hello world"
+        tx = events[0]
+        assert tx["type"] == "transaction"
+        span = tx["spans"][0]
+        assert span["op"] == "gen_ai.chat"
+        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "some-model"
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY] == 0.1
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY] == 0.2
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "model-id"
+
+        assert (
+            json.loads(span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS])
+            == expected_system_instructions
+        )
+
+        assert "hello" in span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        assert "hello world" in span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT]
+
+        try:
+            import tiktoken  # type: ignore # noqa # pylint: disable=unused-import
+
+            assert span["data"]["gen_ai.usage.output_tokens"] == expected_output_tokens
+            assert span["data"]["gen_ai.usage.input_tokens"] == expected_input_tokens
+            assert (
+                span["data"]["gen_ai.usage.total_tokens"]
+                == expected_output_tokens + expected_input_tokens
+            )
+
+        except ImportError:
+            pass  # if tiktoken is not installed, we can't guarantee token usage will be calculated properly
 
 
-def test_span_status_error(sentry_init, capture_events):
-    sentry_init(integrations=[OpenAIIntegration()], traces_sample_rate=1.0)
-    events = capture_events()
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_bad_chat_completion(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
 
-    with start_transaction(name="test"):
+    if span_streaming:
+        items = capture_items("event", "span")
+
         client = OpenAI(api_key="z")
         client.chat.completions._post = mock.Mock(
             side_effect=OpenAIError("API rate limit reached")
         )
         with pytest.raises(OpenAIError):
             client.chat.completions.create(
-                model="some-model", messages=[{"role": "system", "content": "hello"}]
+                model="some-model",
+                messages=[{"role": "system", "content": "hello"}],
             )
 
-    (error, transaction) = events
-    assert error["level"] == "error"
-    assert transaction["spans"][0]["status"] == "internal_error"
-    assert transaction["spans"][0]["tags"]["status"] == "internal_error"
-    assert transaction["contexts"]["trace"]["status"] == "internal_error"
+        (event,) = (item.payload for item in items if item.type == "event")
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items if item.type == "span")
+        assert event["level"] == "error"
+        assert span["status"] == "error"
+    elif stream_gen_ai_spans:
+        items = capture_items("event", "transaction")
+
+        client = OpenAI(api_key="z")
+        client.chat.completions._post = mock.Mock(
+            side_effect=OpenAIError("API rate limit reached")
+        )
+        with pytest.raises(OpenAIError):
+            client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "system", "content": "hello"}],
+            )
+
+        (event,) = (item.payload for item in items if item.type == "event")
+        (transaction,) = (item.payload for item in items if item.type == "transaction")
+        assert event["level"] == "error"
+        assert transaction["contexts"]["trace"]["status"] == "internal_error"
+    else:
+        events = capture_events()
+
+        client = OpenAI(api_key="z")
+        client.chat.completions._post = mock.Mock(
+            side_effect=OpenAIError("API rate limit reached")
+        )
+        with pytest.raises(OpenAIError):
+            client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "system", "content": "hello"}],
+            )
+
+        (event, transaction) = events
+        assert event["level"] == "error"
+        assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_span_status_error(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("event", "span")
+
+        with start_transaction(name="test"):
+            client = OpenAI(api_key="z")
+            client.chat.completions._post = mock.Mock(
+                side_effect=OpenAIError("API rate limit reached")
+            )
+            with pytest.raises(OpenAIError):
+                client.chat.completions.create(
+                    model="some-model",
+                    messages=[{"role": "system", "content": "hello"}],
+                )
+
+        (error,) = (item.payload for item in items if item.type == "event")
+        assert error["level"] == "error"
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[0]["status"] == "error"
+    else:
+        events = capture_events()
+
+        with start_transaction(name="test"):
+            client = OpenAI(api_key="z")
+            client.chat.completions._post = mock.Mock(
+                side_effect=OpenAIError("API rate limit reached")
+            )
+            with pytest.raises(OpenAIError):
+                client.chat.completions.create(
+                    model="some-model",
+                    messages=[{"role": "system", "content": "hello"}],
+                )
+
+        (error, transaction) = events
+        assert error["level"] == "error"
+        assert transaction["spans"][0]["status"] == "internal_error"
+        assert transaction["spans"][0]["tags"]["status"] == "internal_error"
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
-async def test_bad_chat_completion_async(sentry_init, capture_events):
-    sentry_init(integrations=[OpenAIIntegration()], traces_sample_rate=1.0)
-    events = capture_events()
+async def test_bad_chat_completion_async(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
 
     client = AsyncOpenAI(api_key="z")
     client.chat.completions._post = AsyncMock(
         side_effect=OpenAIError("API rate limit reached")
     )
-    with pytest.raises(OpenAIError):
-        await client.chat.completions.create(
-            model="some-model", messages=[{"role": "system", "content": "hello"}]
-        )
 
-    (event,) = events
-    assert event["level"] == "error"
+    if span_streaming:
+        items = capture_items("event", "span")
+
+        with pytest.raises(OpenAIError):
+            await client.chat.completions.create(
+                model="some-model", messages=[{"role": "system", "content": "hello"}]
+            )
+
+        (event,) = (item.payload for item in items if item.type == "event")
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items if item.type == "span")
+        assert event["level"] == "error"
+        assert span["status"] == "error"
+    elif stream_gen_ai_spans:
+        items = capture_items("event", "transaction")
+
+        with pytest.raises(OpenAIError):
+            await client.chat.completions.create(
+                model="some-model", messages=[{"role": "system", "content": "hello"}]
+            )
+
+        (event,) = (item.payload for item in items if item.type == "event")
+        (transaction,) = (item.payload for item in items if item.type == "transaction")
+        assert event["level"] == "error"
+        assert transaction["contexts"]["trace"]["status"] == "internal_error"
+    else:
+        events = capture_events()
+
+        with pytest.raises(OpenAIError):
+            await client.chat.completions.create(
+                model="some-model", messages=[{"role": "system", "content": "hello"}]
+            )
+
+        (event, transaction) = events
+        assert event["level"] == "error"
+        assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -1492,14 +3265,22 @@ async def test_bad_chat_completion_async(sentry_init, capture_events):
     ],
 )
 def test_embeddings_create_no_pii(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    capture_items,
+    send_default_pii,
+    include_prompts,
+    stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=include_prompts)],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = OpenAI(api_key="z")
 
@@ -1514,76 +3295,141 @@ def test_embeddings_create_no_pii(
     )
 
     client.embeddings._post = mock.Mock(return_value=returned_embedding)
-    with start_transaction(name="openai tx"):
-        response = client.embeddings.create(
-            input="hello", model="text-embedding-3-large"
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            response = client.embeddings.create(
+                input="hello", model="text-embedding-3-large"
+            )
+
+        assert len(response.data[0].embedding) == 3
+
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.embeddings"
+        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert (
+            span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
+            == "text-embedding-3-large"
         )
 
-    assert len(response.data[0].embedding) == 3
+        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["attributes"]
 
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    span = tx["spans"][0]
-    assert span["op"] == "gen_ai.embeddings"
-    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
+        assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
+        assert span["attributes"]["gen_ai.usage.total_tokens"] == 30
+    else:
+        events = capture_events()
 
-    assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["data"]
+        with start_transaction(name="openai tx"):
+            response = client.embeddings.create(
+                input="hello", model="text-embedding-3-large"
+            )
 
-    assert span["data"]["gen_ai.usage.input_tokens"] == 20
-    assert span["data"]["gen_ai.usage.total_tokens"] == 30
+        assert len(response.data[0].embedding) == 3
+
+        tx = events[0]
+        assert tx["type"] == "transaction"
+        span = tx["spans"][0]
+        assert span["op"] == "gen_ai.embeddings"
+        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
+
+        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["data"]
+
+        assert span["data"]["gen_ai.usage.input_tokens"] == 20
+        assert span["data"]["gen_ai.usage.total_tokens"] == 30
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
-    "input",
+    "get_input,expected_embeddings_input",
     [
-        pytest.param(
-            "hello",
-            id="string",
+        (
+            lambda: "hello",
+            ["hello"],
         ),
-        pytest.param(
-            ["First text", "Second text", "Third text"],
-            id="string_sequence",
+        (
+            lambda: ["First text", "Second text", "Third text"],
+            [
+                "First text",
+                "Second text",
+                "Third text",
+            ],
         ),
-        pytest.param(
-            iter(["First text", "Second text", "Third text"]),
-            id="string_iterable",
+        (
+            lambda: iter(["First text", "Second text", "Third text"]),
+            [
+                "First text",
+                "Second text",
+                "Third text",
+            ],
         ),
-        pytest.param(
-            [5, 8, 13, 21, 34],
-            id="tokens",
+        (
+            lambda: [5, 8, 13, 21, 34],
+            [
+                5,
+                8,
+                13,
+                21,
+                34,
+            ],
         ),
-        pytest.param(
-            iter(
+        (
+            lambda: iter(
                 [5, 8, 13, 21, 34],
             ),
-            id="token_iterable",
+            [
+                5,
+                8,
+                13,
+                21,
+                34,
+            ],
         ),
-        pytest.param(
+        (
+            lambda: [
+                [5, 8, 13, 21, 34],
+                [8, 13, 21, 34, 55],
+            ],
             [
                 [5, 8, 13, 21, 34],
                 [8, 13, 21, 34, 55],
             ],
-            id="tokens_sequence",
         ),
-        pytest.param(
-            iter(
+        (
+            lambda: iter(
                 [
                     [5, 8, 13, 21, 34],
                     [8, 13, 21, 34, 55],
                 ]
             ),
-            id="tokens_sequence_iterable",
+            [
+                [5, 8, 13, 21, 34],
+                [8, 13, 21, 34, 55],
+            ],
         ),
     ],
 )
-def test_embeddings_create(sentry_init, capture_events, input, request):
+def test_embeddings_create(
+    sentry_init,
+    capture_events,
+    capture_items,
+    get_input,
+    expected_embeddings_input,
+    stream_gen_ai_spans,
+    span_streaming,
+):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = OpenAI(api_key="z")
 
@@ -1598,8 +3444,79 @@ def test_embeddings_create(sentry_init, capture_events, input, request):
     )
 
     client.embeddings._post = mock.Mock(return_value=returned_embedding)
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            response = client.embeddings.create(
+                input=get_input(), model="text-embedding-3-large"
+            )
+
+        assert len(response.data[0].embedding) == 3
+
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.embeddings"
+        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert (
+            span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
+            == "text-embedding-3-large"
+        )
+
+        assert (
+            json.loads(span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT])
+            == expected_embeddings_input
+        )
+
+        assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
+        assert span["attributes"]["gen_ai.usage.total_tokens"] == 30
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            response = client.embeddings.create(
+                input=get_input(), model="text-embedding-3-large"
+            )
+
+        assert len(response.data[0].embedding) == 3
+
+        tx = events[0]
+        assert tx["type"] == "transaction"
+        span = tx["spans"][0]
+        assert span["op"] == "gen_ai.embeddings"
+        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
+
+        assert (
+            json.loads(span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT])
+            == expected_embeddings_input
+        )
+
+        assert span["data"]["gen_ai.usage.input_tokens"] == 20
+        assert span["data"]["gen_ai.usage.total_tokens"] == 30
+
+
+def _collect_embeddings_span_data(
+    capture_events, capture_items, span_streaming, stream_gen_ai_spans, create
+):
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            response = create()
+
+        assert len(response.data[0].embedding) == 3
+
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.embeddings"
+        return span["attributes"]
+
+    events = capture_events()
+
     with start_transaction(name="openai tx"):
-        response = client.embeddings.create(input=input, model="text-embedding-3-large")
+        response = create()
 
     assert len(response.data[0].embedding) == 3
 
@@ -1607,36 +3524,168 @@ def test_embeddings_create(sentry_init, capture_events, input, request):
     assert tx["type"] == "transaction"
     span = tx["spans"][0]
     assert span["op"] == "gen_ai.embeddings"
-    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
+    return span["data"]
 
-    param_id = request.node.callspec.id
-    if param_id == "string":
-        assert json.loads(span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]) == ["hello"]
-    elif param_id == "string_sequence" or param_id == "string_iterable":
-        assert json.loads(span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]) == [
-            "First text",
-            "Second text",
-            "Third text",
-        ]
-    elif param_id == "tokens" or param_id == "token_iterable":
-        assert json.loads(span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]) == [
-            5,
-            8,
-            13,
-            21,
-            34,
-        ]
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,expect_input",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            False,
+            True,
+            id="gen-ai-inputs-enabled-overrides-pii-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            True,
+            False,
+            id="gen-ai-inputs-disabled-overrides-pii-enabled",
+        ),
+        pytest.param(
+            {},
+            False,
+            True,
+            id="gen-ai-omitted-defaults-to-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            False,
+            False,
+            id="gen-ai-inputs-disabled-and-pii-disabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            False,
+            id="no-gen-ai-data-collection-falls-back-to-send-default-pii",
+        ),
+    ],
+)
+def test_embeddings_create_data_collection(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    send_default_pii,
+    expect_input,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    init_kwargs = {
+        "integrations": [OpenAIIntegration()],
+        "disabled_integrations": [StdlibIntegration],
+        "traces_sample_rate": 1.0,
+        "send_default_pii": send_default_pii,
+        "stream_gen_ai_spans": stream_gen_ai_spans,
+        "trace_lifecycle": "stream" if span_streaming else "static",
+    }
+
+    sentry_init_kwargs = dict(init_kwargs)
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    sentry_init(**sentry_init_kwargs)
+
+    client = OpenAI(api_key="z")
+
+    returned_embedding = CreateEmbeddingResponse(
+        data=[Embedding(object="embedding", index=0, embedding=[1.0, 2.0, 3.0])],
+        model="some-model",
+        object="list",
+        usage=EmbeddingTokenUsage(
+            prompt_tokens=20,
+            total_tokens=30,
+        ),
+    )
+
+    client.embeddings._post = mock.Mock(return_value=returned_embedding)
+
+    span_data = _collect_embeddings_span_data(
+        capture_events,
+        capture_items,
+        span_streaming,
+        stream_gen_ai_spans,
+        lambda: client.embeddings.create(input="hello", model="text-embedding-3-large"),
+    )
+
+    assert span_data[SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
+
+    if expect_input:
+        assert json.loads(span_data[SPANDATA.GEN_AI_EMBEDDINGS_INPUT]) == ["hello"]
     else:
-        assert json.loads(span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]) == [
-            [5, 8, 13, 21, 34],
-            [8, 13, 21, 34, 55],
-        ]
+        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span_data
 
-    assert span["data"]["gen_ai.usage.input_tokens"] == 20
-    assert span["data"]["gen_ai.usage.total_tokens"] == 30
+    assert span_data["gen_ai.usage.input_tokens"] == 20
+    assert span_data["gen_ai.usage.total_tokens"] == 30
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "get_input",
+    [
+        lambda: "hello",
+        lambda: ["First text", "Second text"],
+        lambda: iter(["First text", "Second text"]),
+        lambda: [5, 8, 13, 21, 34],
+        lambda: [[5, 8, 13], [8, 13, 21]],
+        lambda: {"text": "hello"},
+    ],
+)
+def test_embeddings_create_data_collection_inputs_disabled_input_shapes(
+    sentry_init,
+    capture_events,
+    capture_items,
+    get_input,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+        _experiments={"data_collection": {"gen_ai": {"inputs": False}}},
+    )
+
+    client = OpenAI(api_key="z")
+
+    returned_embedding = CreateEmbeddingResponse(
+        data=[Embedding(object="embedding", index=0, embedding=[1.0, 2.0, 3.0])],
+        model="some-model",
+        object="list",
+        usage=EmbeddingTokenUsage(
+            prompt_tokens=20,
+            total_tokens=30,
+        ),
+    )
+
+    client.embeddings._post = mock.Mock(return_value=returned_embedding)
+
+    span_data = _collect_embeddings_span_data(
+        capture_events,
+        capture_items,
+        span_streaming,
+        stream_gen_ai_spans,
+        lambda: client.embeddings.create(
+            input=get_input(), model="text-embedding-3-large"
+        ),
+    )
+
+    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
+    assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span_data
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
@@ -1647,14 +3696,22 @@ def test_embeddings_create(sentry_init, capture_events, input, request):
     ],
 )
 async def test_embeddings_create_async_no_pii(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    capture_items,
+    send_default_pii,
+    include_prompts,
+    stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=include_prompts)],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
 
@@ -1669,77 +3726,142 @@ async def test_embeddings_create_async_no_pii(
     )
 
     client.embeddings._post = AsyncMock(return_value=returned_embedding)
-    with start_transaction(name="openai tx"):
-        response = await client.embeddings.create(
-            input="hello", model="text-embedding-3-large"
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            response = await client.embeddings.create(
+                input="hello", model="text-embedding-3-large"
+            )
+
+        assert len(response.data[0].embedding) == 3
+
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.embeddings"
+        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert (
+            span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
+            == "text-embedding-3-large"
         )
 
-    assert len(response.data[0].embedding) == 3
+        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["attributes"]
 
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    span = tx["spans"][0]
-    assert span["op"] == "gen_ai.embeddings"
-    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
+        assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
+        assert span["attributes"]["gen_ai.usage.total_tokens"] == 30
+    else:
+        events = capture_events()
 
-    assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["data"]
+        with start_transaction(name="openai tx"):
+            response = await client.embeddings.create(
+                input="hello", model="text-embedding-3-large"
+            )
 
-    assert span["data"]["gen_ai.usage.input_tokens"] == 20
-    assert span["data"]["gen_ai.usage.total_tokens"] == 30
+        assert len(response.data[0].embedding) == 3
+
+        tx = events[0]
+        assert tx["type"] == "transaction"
+        span = tx["spans"][0]
+        assert span["op"] == "gen_ai.embeddings"
+        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
+
+        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span["data"]
+
+        assert span["data"]["gen_ai.usage.input_tokens"] == 20
+        assert span["data"]["gen_ai.usage.total_tokens"] == 30
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "input",
+    "get_input,expected_embeddings_input",
     [
-        pytest.param(
-            "hello",
-            id="string",
+        (
+            lambda: "hello",
+            ["hello"],
         ),
-        pytest.param(
-            ["First text", "Second text", "Third text"],
-            id="string_sequence",
+        (
+            lambda: ["First text", "Second text", "Third text"],
+            [
+                "First text",
+                "Second text",
+                "Third text",
+            ],
         ),
-        pytest.param(
-            iter(["First text", "Second text", "Third text"]),
-            id="string_iterable",
+        (
+            lambda: iter(["First text", "Second text", "Third text"]),
+            [
+                "First text",
+                "Second text",
+                "Third text",
+            ],
         ),
-        pytest.param(
-            [5, 8, 13, 21, 34],
-            id="tokens",
+        (
+            lambda: [5, 8, 13, 21, 34],
+            [
+                5,
+                8,
+                13,
+                21,
+                34,
+            ],
         ),
-        pytest.param(
-            iter(
+        (
+            lambda: iter(
                 [5, 8, 13, 21, 34],
             ),
-            id="token_iterable",
+            [
+                5,
+                8,
+                13,
+                21,
+                34,
+            ],
         ),
-        pytest.param(
+        (
+            lambda: [
+                [5, 8, 13, 21, 34],
+                [8, 13, 21, 34, 55],
+            ],
             [
                 [5, 8, 13, 21, 34],
                 [8, 13, 21, 34, 55],
             ],
-            id="tokens_sequence",
         ),
-        pytest.param(
-            iter(
+        (
+            lambda: iter(
                 [
                     [5, 8, 13, 21, 34],
                     [8, 13, 21, 34, 55],
                 ]
             ),
-            id="tokens_sequence_iterable",
+            [
+                [5, 8, 13, 21, 34],
+                [8, 13, 21, 34, 55],
+            ],
         ),
     ],
 )
-async def test_embeddings_create_async(sentry_init, capture_events, input, request):
+async def test_embeddings_create_async(
+    sentry_init,
+    capture_events,
+    capture_items,
+    get_input,
+    expected_embeddings_input,
+    stream_gen_ai_spans,
+    span_streaming,
+):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
 
@@ -1754,60 +3876,196 @@ async def test_embeddings_create_async(sentry_init, capture_events, input, reque
     )
 
     client.embeddings._post = AsyncMock(return_value=returned_embedding)
-    with start_transaction(name="openai tx"):
-        response = await client.embeddings.create(
-            input=input, model="text-embedding-3-large"
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            response = await client.embeddings.create(
+                input=get_input(), model="text-embedding-3-large"
+            )
+
+        assert len(response.data[0].embedding) == 3
+
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.embeddings"
+        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert (
+            span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
+            == "text-embedding-3-large"
         )
 
-    assert len(response.data[0].embedding) == 3
+        assert (
+            json.loads(span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT])
+            == expected_embeddings_input
+        )
 
-    tx = events[0]
-    assert tx["type"] == "transaction"
-    span = tx["spans"][0]
-    assert span["op"] == "gen_ai.embeddings"
-    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
-
-    param_id = request.node.callspec.id
-    if param_id == "string":
-        assert json.loads(span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]) == ["hello"]
-    elif param_id == "string_sequence" or param_id == "string_iterable":
-        assert json.loads(span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]) == [
-            "First text",
-            "Second text",
-            "Third text",
-        ]
-    elif param_id == "tokens" or param_id == "token_iterable":
-        assert json.loads(span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]) == [
-            5,
-            8,
-            13,
-            21,
-            34,
-        ]
+        assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
+        assert span["attributes"]["gen_ai.usage.total_tokens"] == 30
     else:
-        assert json.loads(span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]) == [
-            [5, 8, 13, 21, 34],
-            [8, 13, 21, 34, 55],
-        ]
+        events = capture_events()
 
-    assert span["data"]["gen_ai.usage.input_tokens"] == 20
-    assert span["data"]["gen_ai.usage.total_tokens"] == 30
+        with start_transaction(name="openai tx"):
+            response = await client.embeddings.create(
+                input=get_input(), model="text-embedding-3-large"
+            )
+
+        assert len(response.data[0].embedding) == 3
+
+        tx = events[0]
+        assert tx["type"] == "transaction"
+        span = tx["spans"][0]
+        assert span["op"] == "gen_ai.embeddings"
+        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
+
+        assert (
+            json.loads(span["data"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT])
+            == expected_embeddings_input
+        )
+
+        assert span["data"]["gen_ai.usage.input_tokens"] == 20
+        assert span["data"]["gen_ai.usage.total_tokens"] == 30
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,expect_input",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            False,
+            True,
+            id="gen-ai-inputs-enabled-overrides-pii-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            True,
+            False,
+            id="gen-ai-inputs-disabled-overrides-pii-enabled",
+        ),
+        pytest.param(
+            {},
+            False,
+            True,
+            id="gen-ai-omitted-defaults-to-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            False,
+            id="no-experiment-falls-back-to-pii",
+        ),
+    ],
+)
+async def test_embeddings_create_async_data_collection(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    send_default_pii,
+    expect_input,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    init_kwargs = {
+        "integrations": [OpenAIIntegration()],
+        "disabled_integrations": [StdlibIntegration],
+        "traces_sample_rate": 1.0,
+        "send_default_pii": send_default_pii,
+        "stream_gen_ai_spans": stream_gen_ai_spans,
+        "trace_lifecycle": "stream" if span_streaming else "static",
+    }
+
+    sentry_init_kwargs = dict(init_kwargs)
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    sentry_init(**sentry_init_kwargs)
+
+    client = AsyncOpenAI(api_key="z")
+
+    returned_embedding = CreateEmbeddingResponse(
+        data=[Embedding(object="embedding", index=0, embedding=[1.0, 2.0, 3.0])],
+        model="some-model",
+        object="list",
+        usage=EmbeddingTokenUsage(
+            prompt_tokens=20,
+            total_tokens=30,
+        ),
+    )
+
+    client.embeddings._post = AsyncMock(return_value=returned_embedding)
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            response = await client.embeddings.create(
+                input="hello", model="text-embedding-3-large"
+            )
+
+        assert len(response.data[0].embedding) == 3
+
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.embeddings"
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            response = await client.embeddings.create(
+                input="hello", model="text-embedding-3-large"
+            )
+
+        assert len(response.data[0].embedding) == 3
+
+        tx = events[0]
+        assert tx["type"] == "transaction"
+        span = tx["spans"][0]
+        assert span["op"] == "gen_ai.embeddings"
+        span_data = span["data"]
+
+    assert span_data[SPANDATA.GEN_AI_SYSTEM] == "openai"
+    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-3-large"
+
+    if expect_input:
+        assert json.loads(span_data[SPANDATA.GEN_AI_EMBEDDINGS_INPUT]) == ["hello"]
+    else:
+        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span_data
+
+    assert span_data["gen_ai.usage.input_tokens"] == 20
+    assert span_data["gen_ai.usage.total_tokens"] == 30
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [(True, True), (True, False), (False, True), (False, False)],
 )
 def test_embeddings_create_raises_error(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    capture_items,
+    send_default_pii,
+    include_prompts,
+    stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=include_prompts)],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = OpenAI(api_key="z")
 
@@ -1815,27 +4073,62 @@ def test_embeddings_create_raises_error(
         side_effect=OpenAIError("API rate limit reached")
     )
 
-    with pytest.raises(OpenAIError):
-        client.embeddings.create(input="hello", model="text-embedding-3-large")
+    if span_streaming:
+        items = capture_items("event", "span")
 
-    (event,) = events
-    assert event["level"] == "error"
+        with pytest.raises(OpenAIError):
+            client.embeddings.create(input="hello", model="text-embedding-3-large")
+
+        (event,) = (item.payload for item in items if item.type == "event")
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items if item.type == "span")
+        assert event["level"] == "error"
+        assert span["status"] == "error"
+    elif stream_gen_ai_spans:
+        items = capture_items("event", "transaction")
+
+        with pytest.raises(OpenAIError):
+            client.embeddings.create(input="hello", model="text-embedding-3-large")
+
+        (event,) = (item.payload for item in items if item.type == "event")
+        (transaction,) = (item.payload for item in items if item.type == "transaction")
+        assert event["level"] == "error"
+        assert transaction["contexts"]["trace"]["status"] == "internal_error"
+    else:
+        events = capture_events()
+
+        with pytest.raises(OpenAIError):
+            client.embeddings.create(input="hello", model="text-embedding-3-large")
+
+        (event, transaction) = events
+        assert event["level"] == "error"
+        assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [(True, True), (True, False), (False, True), (False, False)],
 )
 async def test_embeddings_create_raises_error_async(
-    sentry_init, capture_events, send_default_pii, include_prompts
+    sentry_init,
+    capture_events,
+    capture_items,
+    send_default_pii,
+    include_prompts,
+    stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=include_prompts)],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
 
@@ -1843,62 +4136,206 @@ async def test_embeddings_create_raises_error_async(
         side_effect=OpenAIError("API rate limit reached")
     )
 
-    with pytest.raises(OpenAIError):
-        await client.embeddings.create(input="hello", model="text-embedding-3-large")
+    if span_streaming:
+        items = capture_items("event", "span")
 
-    (event,) = events
-    assert event["level"] == "error"
+        with pytest.raises(OpenAIError):
+            await client.embeddings.create(
+                input="hello", model="text-embedding-3-large"
+            )
+
+        (event,) = (item.payload for item in items if item.type == "event")
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items if item.type == "span")
+        assert event["level"] == "error"
+        assert span["status"] == "error"
+    elif stream_gen_ai_spans:
+        items = capture_items("event", "transaction")
+
+        with pytest.raises(OpenAIError):
+            await client.embeddings.create(
+                input="hello", model="text-embedding-3-large"
+            )
+
+        (event,) = (item.payload for item in items if item.type == "event")
+        (transaction,) = (item.payload for item in items if item.type == "transaction")
+        assert event["level"] == "error"
+        assert transaction["contexts"]["trace"]["status"] == "internal_error"
+    else:
+        events = capture_events()
+
+        with pytest.raises(OpenAIError):
+            await client.embeddings.create(
+                input="hello", model="text-embedding-3-large"
+            )
+
+        (event, transaction) = events
+        assert event["level"] == "error"
+        assert transaction["contexts"]["trace"]["status"] == "internal_error"
 
 
-def test_span_origin_nonstreaming_chat(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_span_origin_nonstreaming_chat(
+    sentry_init,
+    capture_events,
+    capture_items,
+    nonstreaming_chat_completions_model_response,
+    stream_gen_ai_spans,
+    span_streaming,
+):
     sentry_init(
         integrations=[OpenAIIntegration()],
         traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = OpenAI(api_key="z")
-    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
-
-    with start_transaction(name="openai tx"):
-        client.chat.completions.create(
-            model="some-model", messages=[{"role": "system", "content": "hello"}]
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
         )
+    )
 
-    (event,) = events
+    if span_streaming:
+        items = capture_items("transaction", "span")
 
-    assert event["contexts"]["trace"]["origin"] == "manual"
-    assert event["spans"][0]["origin"] == "auto.ai.openai"
+        with sentry_sdk.traces.start_span(name="openai tx"):
+            client.chat.completions.create(
+                model="some-model", messages=[{"role": "system", "content": "hello"}]
+            )
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[1]["attributes"]["sentry.origin"] == "manual"
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
+    elif stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with start_transaction(name="openai tx"):
+            client.chat.completions.create(
+                model="some-model", messages=[{"role": "system", "content": "hello"}]
+            )
+
+        (event,) = (item.payload for item in items if item.type == "transaction")
+        assert event["contexts"]["trace"]["origin"] == "manual"
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            client.chat.completions.create(
+                model="some-model", messages=[{"role": "system", "content": "hello"}]
+            )
+
+        (event,) = events
+
+        assert event["contexts"]["trace"]["origin"] == "manual"
+        assert event["spans"][0]["origin"] == "auto.ai.openai"
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
-async def test_span_origin_nonstreaming_chat_async(sentry_init, capture_events):
+async def test_span_origin_nonstreaming_chat_async(
+    sentry_init,
+    capture_events,
+    capture_items,
+    nonstreaming_chat_completions_model_response,
+    stream_gen_ai_spans,
+    span_streaming,
+):
     sentry_init(
         integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
-    client.chat.completions._post = AsyncMock(return_value=EXAMPLE_CHAT_COMPLETION)
-
-    with start_transaction(name="openai tx"):
-        await client.chat.completions.create(
-            model="some-model", messages=[{"role": "system", "content": "hello"}]
+    client.chat.completions._post = AsyncMock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
         )
+    )
 
-    (event,) = events
+    if span_streaming:
+        items = capture_items("transaction", "span")
 
-    assert event["contexts"]["trace"]["origin"] == "manual"
-    assert event["spans"][0]["origin"] == "auto.ai.openai"
+        with sentry_sdk.traces.start_span(name="openai tx"):
+            await client.chat.completions.create(
+                model="some-model", messages=[{"role": "system", "content": "hello"}]
+            )
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[1]["attributes"]["sentry.origin"] == "manual"
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
+    elif stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with start_transaction(name="openai tx"):
+            await client.chat.completions.create(
+                model="some-model", messages=[{"role": "system", "content": "hello"}]
+            )
+
+        (event,) = (item.payload for item in items if item.type == "transaction")
+        assert event["contexts"]["trace"]["origin"] == "manual"
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            await client.chat.completions.create(
+                model="some-model", messages=[{"role": "system", "content": "hello"}]
+            )
+
+        (event,) = events
+
+        assert event["contexts"]["trace"]["origin"] == "manual"
+        assert event["spans"][0]["origin"] == "auto.ai.openai"
 
 
-def test_span_origin_streaming_chat(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_span_origin_streaming_chat(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+    span_streaming,
+):
     sentry_init(
         integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = OpenAI(api_key="z")
     returned_stream = Stream(cast_to=None, response=None, client=client)
@@ -1938,29 +4375,73 @@ def test_span_origin_streaming_chat(sentry_init, capture_events):
         ),
     ]
 
-    client.chat.completions._post = mock.Mock(return_value=returned_stream)
-    with start_transaction(name="openai tx"):
-        response_stream = client.chat.completions.create(
-            model="some-model", messages=[{"role": "system", "content": "hello"}]
-        )
+    if span_streaming:
+        items = capture_items("transaction", "span")
 
-        "".join(map(lambda x: x.choices[0].delta.content, response_stream))
+        client.chat.completions._post = mock.Mock(return_value=returned_stream)
+        with sentry_sdk.traces.start_span(name="openai tx"):
+            response_stream = client.chat.completions.create(
+                model="some-model", messages=[{"role": "system", "content": "hello"}]
+            )
 
-    (event,) = events
+            "".join(map(lambda x: x.choices[0].delta.content, response_stream))
 
-    assert event["contexts"]["trace"]["origin"] == "manual"
-    assert event["spans"][0]["origin"] == "auto.ai.openai"
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[1]["attributes"]["sentry.origin"] == "manual"
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
+    elif stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        client.chat.completions._post = mock.Mock(return_value=returned_stream)
+        with start_transaction(name="openai tx"):
+            response_stream = client.chat.completions.create(
+                model="some-model", messages=[{"role": "system", "content": "hello"}]
+            )
+
+            "".join(map(lambda x: x.choices[0].delta.content, response_stream))
+
+        (event,) = (item.payload for item in items if item.type == "transaction")
+        assert event["contexts"]["trace"]["origin"] == "manual"
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
+    else:
+        events = capture_events()
+
+        client.chat.completions._post = mock.Mock(return_value=returned_stream)
+        with start_transaction(name="openai tx"):
+            response_stream = client.chat.completions.create(
+                model="some-model", messages=[{"role": "system", "content": "hello"}]
+            )
+
+            "".join(map(lambda x: x.choices[0].delta.content, response_stream))
+
+        (event,) = events
+
+        assert event["contexts"]["trace"]["origin"] == "manual"
+        assert event["spans"][0]["origin"] == "auto.ai.openai"
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_span_origin_streaming_chat_async(
-    sentry_init, capture_events, async_iterator
+    sentry_init,
+    capture_events,
+    capture_items,
+    async_iterator,
+    stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
     returned_stream = AsyncStream(cast_to=None, response=None, client=client)
@@ -2005,27 +4486,75 @@ async def test_span_origin_streaming_chat_async(
     )
 
     client.chat.completions._post = AsyncMock(return_value=returned_stream)
-    with start_transaction(name="openai tx"):
-        response_stream = await client.chat.completions.create(
-            model="some-model", messages=[{"role": "system", "content": "hello"}]
-        )
-        async for _ in response_stream:
-            pass
 
-        # "".join(map(lambda x: x.choices[0].delta.content, response_stream))
+    if span_streaming:
+        items = capture_items("transaction", "span")
 
-    (event,) = events
+        with sentry_sdk.traces.start_span(name="openai tx"):
+            response_stream = await client.chat.completions.create(
+                model="some-model", messages=[{"role": "system", "content": "hello"}]
+            )
+            async for _ in response_stream:
+                pass
 
-    assert event["contexts"]["trace"]["origin"] == "manual"
-    assert event["spans"][0]["origin"] == "auto.ai.openai"
+            # "".join(map(lambda x: x.choices[0].delta.content, response_stream))
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[1]["attributes"]["sentry.origin"] == "manual"
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
+    elif stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with start_transaction(name="openai tx"):
+            response_stream = await client.chat.completions.create(
+                model="some-model", messages=[{"role": "system", "content": "hello"}]
+            )
+            async for _ in response_stream:
+                pass
+
+            # "".join(map(lambda x: x.choices[0].delta.content, response_stream))
+
+        (event,) = (item.payload for item in items if item.type == "transaction")
+        assert event["contexts"]["trace"]["origin"] == "manual"
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            response_stream = await client.chat.completions.create(
+                model="some-model", messages=[{"role": "system", "content": "hello"}]
+            )
+            async for _ in response_stream:
+                pass
+
+            # "".join(map(lambda x: x.choices[0].delta.content, response_stream))
+
+        (event,) = events
+
+        assert event["contexts"]["trace"]["origin"] == "manual"
+        assert event["spans"][0]["origin"] == "auto.ai.openai"
 
 
-def test_span_origin_embeddings(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_span_origin_embeddings(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+    span_streaming,
+):
     sentry_init(
         integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = OpenAI(api_key="z")
 
@@ -2040,22 +4569,58 @@ def test_span_origin_embeddings(sentry_init, capture_events):
     )
 
     client.embeddings._post = mock.Mock(return_value=returned_embedding)
-    with start_transaction(name="openai tx"):
-        client.embeddings.create(input="hello", model="text-embedding-3-large")
 
-    (event,) = events
+    if span_streaming:
+        items = capture_items("transaction", "span")
 
-    assert event["contexts"]["trace"]["origin"] == "manual"
-    assert event["spans"][0]["origin"] == "auto.ai.openai"
+        with sentry_sdk.traces.start_span(name="openai tx"):
+            client.embeddings.create(input="hello", model="text-embedding-3-large")
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[1]["attributes"]["sentry.origin"] == "manual"
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
+    elif stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with start_transaction(name="openai tx"):
+            client.embeddings.create(input="hello", model="text-embedding-3-large")
+
+        (event,) = [item.payload for item in items if item.type == "transaction"]
+        assert event["contexts"]["trace"]["origin"] == "manual"
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            client.embeddings.create(input="hello", model="text-embedding-3-large")
+
+        (event,) = events
+
+        assert event["contexts"]["trace"]["origin"] == "manual"
+        assert event["spans"][0]["origin"] == "auto.ai.openai"
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
-async def test_span_origin_embeddings_async(sentry_init, capture_events):
+async def test_span_origin_embeddings_async(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+    span_streaming,
+):
     sentry_init(
         integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
 
@@ -2070,13 +4635,45 @@ async def test_span_origin_embeddings_async(sentry_init, capture_events):
     )
 
     client.embeddings._post = AsyncMock(return_value=returned_embedding)
-    with start_transaction(name="openai tx"):
-        await client.embeddings.create(input="hello", model="text-embedding-3-large")
 
-    (event,) = events
+    if span_streaming:
+        items = capture_items("transaction", "span")
 
-    assert event["contexts"]["trace"]["origin"] == "manual"
-    assert event["spans"][0]["origin"] == "auto.ai.openai"
+        with sentry_sdk.traces.start_span(name="openai tx"):
+            await client.embeddings.create(
+                input="hello", model="text-embedding-3-large"
+            )
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[1]["attributes"]["sentry.origin"] == "manual"
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
+    elif stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with start_transaction(name="openai tx"):
+            await client.embeddings.create(
+                input="hello", model="text-embedding-3-large"
+            )
+
+        (event,) = [item.payload for item in items if item.type == "transaction"]
+        assert event["contexts"]["trace"]["origin"] == "manual"
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            await client.embeddings.create(
+                input="hello", model="text-embedding-3-large"
+            )
+
+        (event,) = events
+
+        assert event["contexts"]["trace"]["origin"] == "manual"
+        assert event["spans"][0]["origin"] == "auto.ai.openai"
 
 
 def test_completions_token_usage_from_response():
@@ -2441,92 +5038,430 @@ def test_responses_token_usage_manual_output_counting_response_output():
         )
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
-def test_ai_client_span_responses_api_no_pii(sentry_init, capture_events):
+def test_ai_client_span_responses_api_no_pii(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+    span_streaming,
+):
     sentry_init(
         integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = OpenAI(api_key="z")
     client.responses._post = mock.Mock(return_value=EXAMPLE_RESPONSE)
 
-    with start_transaction(name="openai tx"):
-        client.responses.create(
-            model="gpt-4o",
-            instructions="You are a coding assistant that talks like a pirate.",
-            input="How do I check if a Python object is an instance of a class?",
-            max_output_tokens=100,
-            temperature=0.7,
-            top_p=0.9,
-        )
+    if span_streaming:
+        items = capture_items("span")
 
-    (transaction,) = events
-    spans = transaction["spans"]
+        with sentry_sdk.traces.start_span(name="openai tx"):
+            client.responses.create(
+                model="gpt-4o",
+                instructions="You are a coding assistant that talks like a pirate.",
+                input="How do I check if a Python object is an instance of a class?",
+                max_output_tokens=100,
+                temperature=0.7,
+                top_p=0.9,
+                reasoning={"effort": "high"},
+            )
 
-    assert len(spans) == 1
-    assert spans[0]["op"] == "gen_ai.responses"
-    assert spans[0]["origin"] == "auto.ai.openai"
-    assert spans[0]["data"] == {
-        "gen_ai.operation.name": "responses",
-        "gen_ai.request.max_tokens": 100,
-        "gen_ai.request.temperature": 0.7,
-        "gen_ai.request.top_p": 0.9,
-        "gen_ai.request.model": "gpt-4o",
-        "gen_ai.response.model": "response-model-id",
-        "gen_ai.response.streaming": False,
-        "gen_ai.system": "openai",
-        "gen_ai.usage.input_tokens": 20,
-        "gen_ai.usage.input_tokens.cached": 5,
-        "gen_ai.usage.output_tokens": 10,
-        "gen_ai.usage.output_tokens.reasoning": 8,
-        "gen_ai.usage.total_tokens": 30,
-        "thread.id": mock.ANY,
-        "thread.name": mock.ANY,
-    }
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
 
-    assert "gen_ai.system_instructions" not in spans[0]["data"]
-    assert "gen_ai.request.messages" not in spans[0]["data"]
-    assert "gen_ai.response.text" not in spans[0]["data"]
+        assert len(spans) == 2
+        expected_attributes = {
+            "gen_ai.operation.name": "responses",
+            "gen_ai.request.max_tokens": 100,
+            "gen_ai.request.temperature": 0.7,
+            "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
+            "gen_ai.request.model": "gpt-4o",
+            "gen_ai.response.model": "response-model-id",
+            "gen_ai.response.streaming": False,
+            "gen_ai.system": "openai",
+            "gen_ai.usage.input_tokens": 20,
+            "gen_ai.usage.input_tokens.cached": 5,
+            "gen_ai.usage.output_tokens": 10,
+            "gen_ai.usage.output_tokens.reasoning": 8,
+            "gen_ai.usage.total_tokens": 30,
+            "sentry.op": "gen_ai.responses",
+            "sentry.origin": "auto.ai.openai",
+            "sentry.segment.name": "openai tx",
+        }
+
+        for attr, value in expected_attributes.items():
+            assert spans[0]["attributes"][attr] == value
+
+        assert "gen_ai.system_instructions" not in spans[0]["attributes"]
+        assert "gen_ai.request.messages" not in spans[0]["attributes"]
+        assert "gen_ai.response.text" not in spans[0]["attributes"]
+
+    elif stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            client.responses.create(
+                model="gpt-4o",
+                instructions="You are a coding assistant that talks like a pirate.",
+                input="How do I check if a Python object is an instance of a class?",
+                max_output_tokens=100,
+                temperature=0.7,
+                top_p=0.9,
+                reasoning={"effort": "high"},
+                tools=EXAMPLE_TOOLS,
+            )
+
+        spans = [item.payload for item in items]
+
+        assert len(spans) == 1
+        expected_attributes = {
+            "gen_ai.operation.name": "responses",
+            "gen_ai.request.max_tokens": 100,
+            "gen_ai.request.temperature": 0.7,
+            "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
+            "gen_ai.request.model": "gpt-4o",
+            "gen_ai.response.model": "response-model-id",
+            "gen_ai.response.streaming": False,
+            "gen_ai.system": "openai",
+            "gen_ai.usage.input_tokens": 20,
+            "gen_ai.usage.input_tokens.cached": 5,
+            "gen_ai.usage.output_tokens": 10,
+            "gen_ai.usage.output_tokens.reasoning": 8,
+            "gen_ai.usage.total_tokens": 30,
+            "sentry.op": "gen_ai.responses",
+            "sentry.origin": "auto.ai.openai",
+            "sentry.segment.name": "openai tx",
+        }
+
+        for attr, value in expected_attributes.items():
+            assert spans[0]["attributes"][attr] == value
+
+        assert "gen_ai.system_instructions" not in spans[0]["attributes"]
+        assert "gen_ai.request.messages" not in spans[0]["attributes"]
+        assert "gen_ai.response.text" not in spans[0]["attributes"]
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            client.responses.create(
+                model="gpt-4o",
+                instructions="You are a coding assistant that talks like a pirate.",
+                input="How do I check if a Python object is an instance of a class?",
+                max_output_tokens=100,
+                temperature=0.7,
+                top_p=0.9,
+                reasoning={"effort": "high"},
+            )
+
+        (transaction,) = events
+        spans = transaction["spans"]
+
+        assert len(spans) == 1
+        assert spans[0]["op"] == "gen_ai.responses"
+        assert spans[0]["origin"] == "auto.ai.openai"
+        expected_data = {
+            "gen_ai.operation.name": "responses",
+            "gen_ai.request.max_tokens": 100,
+            "gen_ai.request.temperature": 0.7,
+            "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
+            "gen_ai.request.model": "gpt-4o",
+            "gen_ai.response.model": "response-model-id",
+            "gen_ai.response.streaming": False,
+            "gen_ai.system": "openai",
+            "gen_ai.usage.input_tokens": 20,
+            "gen_ai.usage.input_tokens.cached": 5,
+            "gen_ai.usage.output_tokens": 10,
+            "gen_ai.usage.output_tokens.reasoning": 8,
+            "gen_ai.usage.total_tokens": 30,
+        }
+
+        for key, value in expected_data.items():
+            assert spans[0]["data"][key] == value
+
+        assert "gen_ai.system_instructions" not in spans[0]["data"]
+        assert "gen_ai.request.messages" not in spans[0]["data"]
+        assert "gen_ai.response.text" not in spans[0]["data"]
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_ai_client_span_responses_tool_definitions(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = OpenAI(api_key="z")
+    client.responses._post = mock.Mock(return_value=EXAMPLE_RESPONSE)
+
+    if span_streaming:
+        items = capture_items("span")
+
+        with sentry_sdk.traces.start_span(name="openai tx"):
+            client.responses.create(
+                model="gpt-4o",
+                input="How do I check if a Python object is an instance of a class?",
+                tools=[
+                    FunctionToolParam(
+                        type="function",
+                        name="name",
+                        description="description",
+                        parameters={
+                            "type": "object",
+                            "properties": {
+                                "city": {"type": "string"},
+                                "state": {"type": "string"},
+                            },
+                            "required": ["city", "state"],
+                            "additionalProperties": False,
+                        },
+                        strict=True,
+                    ),
+                    CustomToolParam(
+                        type="custom", name="name", description="description"
+                    ),
+                    WebSearchToolParam(type="web_search"),
+                ],
+            )
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        assert json.loads(spans[0]["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]) == [
+            {
+                "type": "function",
+                "name": "name",
+                "description": "description",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "city": {"type": "string"},
+                        "state": {"type": "string"},
+                    },
+                    "required": ["city", "state"],
+                    "additionalProperties": False,
+                },
+            },
+            {
+                "type": "custom",
+                "name": "name",
+                "description": "description",
+            },
+            {
+                "type": "web_search",
+            },
+        ]
+    elif stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            client.responses.create(
+                model="gpt-4o",
+                input="How do I check if a Python object is an instance of a class?",
+                tools=[
+                    FunctionToolParam(
+                        type="function",
+                        name="name",
+                        description="description",
+                        parameters={
+                            "type": "object",
+                            "properties": {
+                                "city": {"type": "string"},
+                                "state": {"type": "string"},
+                            },
+                            "required": ["city", "state"],
+                            "additionalProperties": False,
+                        },
+                        strict=True,
+                    ),
+                    CustomToolParam(
+                        type="custom", name="name", description="description"
+                    ),
+                    WebSearchToolParam(type="web_search"),
+                ],
+            )
+
+        spans = [item.payload for item in items]
+        assert json.loads(spans[0]["attributes"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]) == [
+            {
+                "type": "function",
+                "name": "name",
+                "description": "description",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "city": {"type": "string"},
+                        "state": {"type": "string"},
+                    },
+                    "required": ["city", "state"],
+                    "additionalProperties": False,
+                },
+            },
+            {
+                "type": "custom",
+                "name": "name",
+                "description": "description",
+            },
+            {
+                "type": "web_search",
+            },
+        ]
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            client.responses.create(
+                model="gpt-4o",
+                input="How do I check if a Python object is an instance of a class?",
+                tools=[
+                    FunctionToolParam(
+                        type="function",
+                        name="name",
+                        description="description",
+                        parameters={
+                            "type": "object",
+                            "properties": {
+                                "city": {"type": "string"},
+                                "state": {"type": "string"},
+                            },
+                            "required": ["city", "state"],
+                            "additionalProperties": False,
+                        },
+                        strict=True,
+                    ),
+                    CustomToolParam(
+                        type="custom", name="name", description="description"
+                    ),
+                    WebSearchToolParam(type="web_search"),
+                ],
+            )
+
+        (transaction,) = events
+        spans = transaction["spans"]
+
+        assert json.loads(spans[0]["data"][SPANDATA.GEN_AI_TOOL_DEFINITIONS]) == [
+            {
+                "type": "function",
+                "name": "name",
+                "description": "description",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "city": {"type": "string"},
+                        "state": {"type": "string"},
+                    },
+                    "required": ["city", "state"],
+                    "additionalProperties": False,
+                },
+            },
+            {
+                "type": "custom",
+                "name": "name",
+                "description": "description",
+            },
+            {
+                "type": "web_search",
+            },
+        ]
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
-    "instructions",
-    (
-        omit,
-        None,
-        "You are a coding assistant that talks like a pirate.",
-    ),
-)
-@pytest.mark.parametrize(
-    "input",
+    "instructions,input,expected_system_instructions,expected_request_messages",
     [
-        pytest.param(
-            "How do I check if a Python object is an instance of a class?", id="string"
+        (
+            omit,
+            "How do I check if a Python object is an instance of a class?",
+            None,
+            ["How do I check if a Python object is an instance of a class?"],
         ),
-        pytest.param(
+        (
+            None,
+            "How do I check if a Python object is an instance of a class?",
+            None,
+            ["How do I check if a Python object is an instance of a class?"],
+        ),
+        (
+            "You are a coding assistant that talks like a pirate.",
             [
                 {
                     "role": "system",
                     "content": "You are a helpful assistant.",
                 },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"role": "user", "content": "hello"},
             ],
-            id="blocks_no_type",
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+            ],
+            [
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {"role": "user", "content": "hello"},
+            ],
         ),
-        pytest.param(
+        (
+            "You are a coding assistant that talks like a pirate.",
             [
                 {
                     "type": "message",
                     "role": "system",
                     "content": "You are a helpful assistant.",
                 },
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"type": "message", "role": "user", "content": "hello"},
             ],
-            id="blocks",
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+            ],
+            [
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {"type": "message", "role": "user", "content": "hello"},
+            ],
         ),
-        pytest.param(
+        (
+            "You are a coding assistant that talks like a pirate.",
             [
                 {
                     "role": "system",
@@ -2535,11 +5470,30 @@ def test_ai_client_span_responses_api_no_pii(sentry_init, capture_events):
                         {"type": "text", "text": "Be concise and clear."},
                     ],
                 },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"role": "user", "content": "hello"},
             ],
-            id="parts_no_type",
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ],
+            [
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {"role": "user", "content": "hello"},
+            ],
         ),
-        pytest.param(
+        (
+            "You are a coding assistant that talks like a pirate.",
             [
                 {
                     "type": "message",
@@ -2549,77 +5503,219 @@ def test_ai_client_span_responses_api_no_pii(sentry_init, capture_events):
                         {"type": "text", "text": "Be concise and clear."},
                     ],
                 },
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"type": "message", "role": "user", "content": "hello"},
             ],
-            id="parts",
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ],
+            [
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {"type": "message", "role": "user", "content": "hello"},
+            ],
         ),
     ],
 )
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 def test_ai_client_span_responses_api(
-    sentry_init, capture_events, instructions, input, request
+    sentry_init,
+    capture_events,
+    capture_items,
+    instructions,
+    input,
+    expected_system_instructions,
+    expected_request_messages,
+    stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = OpenAI(api_key="z")
     client.responses._post = mock.Mock(return_value=EXAMPLE_RESPONSE)
 
-    with start_transaction(name="openai tx"):
-        client.responses.create(
-            model="gpt-4o",
-            instructions=instructions,
-            input=input,
-            max_output_tokens=100,
-            temperature=0.7,
-            top_p=0.9,
-        )
+    if span_streaming:
+        items = capture_items("span")
 
-    (transaction,) = events
-    spans = transaction["spans"]
+        with sentry_sdk.traces.start_span(name="openai tx"):
+            client.responses.create(
+                model="gpt-4o",
+                instructions=instructions,
+                input=input,
+                max_output_tokens=100,
+                temperature=0.7,
+                top_p=0.9,
+                reasoning={"effort": "high"},
+            )
 
-    assert len(spans) == 1
-    assert spans[0]["op"] == "gen_ai.responses"
-    assert spans[0]["origin"] == "auto.ai.openai"
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
 
-    expected_data = {
-        "gen_ai.operation.name": "responses",
-        "gen_ai.request.max_tokens": 100,
-        "gen_ai.request.temperature": 0.7,
-        "gen_ai.request.top_p": 0.9,
-        "gen_ai.system": "openai",
-        "gen_ai.response.model": "response-model-id",
-        "gen_ai.response.streaming": False,
-        "gen_ai.usage.input_tokens": 20,
-        "gen_ai.usage.input_tokens.cached": 5,
-        "gen_ai.usage.output_tokens": 10,
-        "gen_ai.usage.output_tokens.reasoning": 8,
-        "gen_ai.usage.total_tokens": 30,
-        "gen_ai.request.model": "gpt-4o",
-        "gen_ai.response.text": "the model response",
-        "thread.id": mock.ANY,
-        "thread.name": mock.ANY,
-    }
+        assert len(spans) == 2
 
-    param_id = request.node.callspec.id
-    if "string" in param_id and (
-        instructions is None or isinstance(instructions, Omit)
-    ):  # type: ignore
-        expected_data.update(
+        expected_data = {
+            "gen_ai.operation.name": "responses",
+            "gen_ai.request.max_tokens": 100,
+            "gen_ai.request.temperature": 0.7,
+            "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
+            "gen_ai.system": "openai",
+            "gen_ai.response.model": "response-model-id",
+            "gen_ai.response.streaming": False,
+            "gen_ai.usage.input_tokens": 20,
+            "gen_ai.usage.input_tokens.cached": 5,
+            "gen_ai.usage.output_tokens": 10,
+            "gen_ai.usage.output_tokens.reasoning": 8,
+            "gen_ai.usage.total_tokens": 30,
+            "gen_ai.request.messages": safe_serialize(expected_request_messages),
+            "gen_ai.request.model": "gpt-4o",
+            "gen_ai.response.text": "the model response",
+            "sentry.op": "gen_ai.responses",
+            "sentry.origin": "auto.ai.openai",
+            "sentry.segment.name": "openai tx",
+        }
+
+        if expected_system_instructions is not None:
+            expected_data["gen_ai.system_instructions"] = safe_serialize(
+                expected_system_instructions
+            )
+
+        for attr, value in expected_data.items():
+            assert spans[0]["attributes"][attr] == value
+
+    elif stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            client.responses.create(
+                model="gpt-4o",
+                instructions=instructions,
+                input=input,
+                max_output_tokens=100,
+                temperature=0.7,
+                top_p=0.9,
+                reasoning={"effort": "high"},
+            )
+
+        spans = [item.payload for item in items]
+
+        assert len(spans) == 1
+
+        expected_data = {
+            "gen_ai.operation.name": "responses",
+            "gen_ai.request.max_tokens": 100,
+            "gen_ai.request.temperature": 0.7,
+            "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
+            "gen_ai.system": "openai",
+            "gen_ai.response.model": "response-model-id",
+            "gen_ai.response.streaming": False,
+            "gen_ai.usage.input_tokens": 20,
+            "gen_ai.usage.input_tokens.cached": 5,
+            "gen_ai.usage.output_tokens": 10,
+            "gen_ai.usage.output_tokens.reasoning": 8,
+            "gen_ai.usage.total_tokens": 30,
+            "gen_ai.request.messages": safe_serialize(expected_request_messages),
+            "gen_ai.request.model": "gpt-4o",
+            "gen_ai.response.text": "the model response",
+            "sentry.op": "gen_ai.responses",
+            "sentry.origin": "auto.ai.openai",
+            "sentry.segment.name": "openai tx",
+        }
+
+        if expected_system_instructions is not None:
+            expected_data["gen_ai.system_instructions"] = safe_serialize(
+                expected_system_instructions
+            )
+
+        for attr, value in expected_data.items():
+            assert spans[0]["attributes"][attr] == value
+
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            client.responses.create(
+                model="gpt-4o",
+                instructions=instructions,
+                input=input,
+                max_output_tokens=100,
+                temperature=0.7,
+                top_p=0.9,
+                reasoning={"effort": "high"},
+            )
+
+        (transaction,) = events
+        spans = transaction["spans"]
+
+        assert len(spans) == 1
+        assert spans[0]["op"] == "gen_ai.responses"
+        assert spans[0]["origin"] == "auto.ai.openai"
+
+        expected_data = {
+            "gen_ai.operation.name": "responses",
+            "gen_ai.request.max_tokens": 100,
+            "gen_ai.request.temperature": 0.7,
+            "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
+            "gen_ai.system": "openai",
+            "gen_ai.response.model": "response-model-id",
+            "gen_ai.response.streaming": False,
+            "gen_ai.usage.input_tokens": 20,
+            "gen_ai.usage.input_tokens.cached": 5,
+            "gen_ai.usage.output_tokens": 10,
+            "gen_ai.usage.output_tokens.reasoning": 8,
+            "gen_ai.usage.total_tokens": 30,
+            "gen_ai.request.messages": safe_serialize(expected_request_messages[-1:]),
+            "gen_ai.request.model": "gpt-4o",
+            "gen_ai.response.text": "the model response",
+        }
+
+        if expected_system_instructions is not None:
+            expected_data["gen_ai.system_instructions"] = safe_serialize(
+                expected_system_instructions
+            )
+
+        for attr, value in expected_data.items():
+            assert spans[0]["data"][attr] == value
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,extra_kwargs,expected_present,expected_absent,include_prompts",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
             {
-                "gen_ai.request.messages": safe_serialize(
+                "instructions": "You are a coding assistant that talks like a pirate.",
+                "input": "How do I check if a Python object is an instance of a class?",
+                "tools": EXAMPLE_TOOLS,
+            },
+            {
+                SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
                     ["How do I check if a Python object is an instance of a class?"]
                 ),
-            }
-        )
-    elif "string" in param_id:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: safe_serialize(
                     [
                         {
                             "type": "text",
@@ -2627,216 +5723,871 @@ def test_ai_client_span_responses_api(
                         }
                     ]
                 ),
-                "gen_ai.request.messages": safe_serialize(
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS: safe_serialize(EXAMPLE_TOOLS),
+            },
+            [],
+            True,
+            id="gen-ai-inputs-enabled-string-input",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            {
+                "instructions": "You are a coding assistant that talks like a pirate.",
+            },
+            {
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: safe_serialize(
+                    [
+                        {
+                            "type": "text",
+                            "content": "You are a coding assistant that talks like a pirate.",
+                        }
+                    ]
+                ),
+            },
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+            ],
+            True,
+            id="gen-ai-inputs-enabled-instructions-only",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            {
+                "instructions": "You are a coding assistant that talks like a pirate.",
+                "input": [
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": "hello"},
+                ],
+            },
+            {
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: safe_serialize(
+                    [
+                        {
+                            "type": "text",
+                            "content": "You are a coding assistant that talks like a pirate.",
+                        },
+                        {"type": "text", "content": "You are a helpful assistant."},
+                    ]
+                ),
+                SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
+                    [{"role": "user", "content": "hello"}]
+                ),
+            },
+            [SPANDATA.GEN_AI_TOOL_DEFINITIONS],
+            True,
+            id="gen-ai-inputs-enabled-list-input-with-system-message",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            {
+                "instructions": "You are a coding assistant that talks like a pirate.",
+                "input": "How do I check if a Python object is an instance of a class?",
+                "tools": EXAMPLE_TOOLS,
+            },
+            {},
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+            ],
+            True,
+            id="gen-ai-inputs-disabled",
+        ),
+        pytest.param(
+            {},
+            {
+                "input": "How do I check if a Python object is an instance of a class?",
+                "tools": EXAMPLE_TOOLS,
+            },
+            {
+                SPANDATA.GEN_AI_REQUEST_MESSAGES: safe_serialize(
                     ["How do I check if a Python object is an instance of a class?"]
                 ),
-            }
-        )
-    elif "blocks_no_type" in param_id and (
-        instructions is None or isinstance(instructions, Omit)
-    ):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [{"type": "text", "content": "You are a helpful assistant."}]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "blocks_no_type" in param_id:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        },
-                        {"type": "text", "content": "You are a helpful assistant."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "blocks" in param_id and (
-        instructions is None or isinstance(instructions, Omit)
-    ):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [{"type": "text", "content": "You are a helpful assistant."}]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"type": "message", "role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "blocks" in param_id:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        },
-                        {"type": "text", "content": "You are a helpful assistant."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"type": "message", "role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "parts_no_type" in param_id and (
-        instructions is None or isinstance(instructions, Omit)
-    ):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {"type": "text", "content": "You are a helpful assistant."},
-                        {"type": "text", "content": "Be concise and clear."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "parts_no_type" in param_id:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        },
-                        {"type": "text", "content": "You are a helpful assistant."},
-                        {"type": "text", "content": "Be concise and clear."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif instructions is None or isinstance(instructions, Omit):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {"type": "text", "content": "You are a helpful assistant."},
-                        {"type": "text", "content": "Be concise and clear."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"type": "message", "role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    else:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        },
-                        {"type": "text", "content": "You are a helpful assistant."},
-                        {"type": "text", "content": "Be concise and clear."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"type": "message", "role": "user", "content": "hello"}]
-                ),
-            }
-        )
-
-    assert spans[0]["data"] == expected_data
-
-
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS: safe_serialize(EXAMPLE_TOOLS),
+            },
+            [SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS],
+            True,
+            id="gen-ai-omitted-defaults-to-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            {},
+            {},
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+            ],
+            True,
+            id="gen-ai-inputs-enabled-no-input-provided",
+        ),
+    ],
+)
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
-def test_error_in_responses_api(sentry_init, capture_events):
+def test_responses_api_data_collection(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    extra_kwargs,
+    expected_present,
+    expected_absent,
+    include_prompts,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=include_prompts)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        _experiments={"data_collection": data_collection},
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = OpenAI(api_key="z")
+    client.responses._post = mock.Mock(return_value=EXAMPLE_RESPONSE)
+
+    create_kwargs = {
+        "model": "gpt-4o",
+        "max_output_tokens": 100,
+        "temperature": 0.7,
+        "top_p": 0.9,
+        "reasoning": {"effort": "high"},
+    }
+    create_kwargs.update(extra_kwargs)
+
+    if span_streaming:
+        items = capture_items("span")
+
+        with sentry_sdk.traces.start_span(name="openai tx"):
+            client.responses.create(**create_kwargs)
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+
+        assert len(spans) == 2
+        span_data = spans[0]["attributes"]
+    elif stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            client.responses.create(**create_kwargs)
+
+        spans = [item.payload for item in items]
+
+        assert len(spans) == 1
+        span_data = spans[0]["attributes"]
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            client.responses.create(**create_kwargs)
+
+        (transaction,) = events
+        spans = transaction["spans"]
+
+        assert len(spans) == 1
+        assert spans[0]["op"] == "gen_ai.responses"
+        span_data = spans[0]["data"]
+
+    # Non-input data is always collected, regardless of data collection config
+    assert span_data["gen_ai.operation.name"] == "responses"
+    assert span_data["gen_ai.request.model"] == "gpt-4o"
+    assert span_data["gen_ai.request.max_tokens"] == 100
+    assert span_data["gen_ai.request.temperature"] == 0.7
+    assert span_data["gen_ai.request.top_p"] == 0.9
+    assert span_data["gen_ai.request.reasoning.level"] == "high"
+    assert span_data["gen_ai.system"] == "openai"
+
+    for key, value in expected_present.items():
+        assert span_data[key] == value
+
+    for key in expected_absent:
+        assert key not in span_data
+
+
+def _make_responses_api_output_message(content):
+    return ResponseOutputMessage(
+        id="message-id",
+        content=content,
+        role="assistant",
+        status="completed",
+        type="message",
+    )
+
+
+def _make_responses_api_function_call():
+    return ResponseFunctionToolCall(
+        id="fc-id",
+        call_id="call_123",
+        name="get_current_weather",
+        arguments='{"location": "San Francisco, CA"}',
+        type="function_call",
+    )
+
+
+def _make_responses_api_response(output):
+    return Response(
+        id="chat-id",
+        output=output,
+        parallel_tool_calls=False,
+        tool_choice="none",
+        tools=[],
+        created_at=10000000,
+        model="response-model-id",
+        object="response",
+        usage=ResponseUsage(
+            input_tokens=20,
+            input_tokens_details=InputTokensDetails(
+                cached_tokens=5,
+                cache_write_tokens=0,
+            ),
+            output_tokens=10,
+            output_tokens_details=OutputTokensDetails(
+                reasoning_tokens=8,
+            ),
+            total_tokens=30,
+        ),
+    )
+
+
+def _collect_responses_span_data(
+    capture_events, capture_items, span_streaming, stream_gen_ai_spans, create
+):
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            create()
+
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items)
+        return span["attributes"]
+
+    events = capture_events()
+
+    with start_transaction(name="openai tx"):
+        create()
+
+    (transaction,) = events
+    (span,) = transaction["spans"]
+    assert span["op"] == "gen_ai.responses"
+    return span["data"]
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,expect_output",
+    [
+        pytest.param(
+            {"gen_ai": {"outputs": True}},
+            False,
+            True,
+            id="gen-ai-outputs-enabled-overrides-pii-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            True,
+            False,
+            id="gen-ai-outputs-disabled-overrides-pii-enabled",
+        ),
+        pytest.param(
+            {},
+            False,
+            True,
+            id="gen-ai-omitted-defaults-to-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            False,
+            False,
+            id="gen-ai-outputs-disabled-and-pii-disabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            False,
+            id="no-gen-ai-data-collection-falls-back-to-send-default-pii",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            id="no-gen-ai-data-collection-pii-enabled-collects",
+        ),
+    ],
+)
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_responses_api_data_collection_outputs(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    send_default_pii,
+    expect_output,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    init_kwargs = {
+        "integrations": [OpenAIIntegration()],
+        "disabled_integrations": [StdlibIntegration],
+        "traces_sample_rate": 1.0,
+        "send_default_pii": send_default_pii,
+        "stream_gen_ai_spans": stream_gen_ai_spans,
+        "trace_lifecycle": "stream" if span_streaming else "static",
+    }
+    if data_collection is not None:
+        init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    sentry_init(**init_kwargs)
+
+    client = OpenAI(api_key="z")
+    client.responses._post = mock.Mock(
+        return_value=_make_responses_api_response(
+            output=[
+                _make_responses_api_output_message(
+                    content=[
+                        ResponseOutputText(
+                            annotations=[],
+                            text="the model response",
+                            type="output_text",
+                        ),
+                    ]
+                ),
+                _make_responses_api_function_call(),
+            ]
+        )
+    )
+
+    span_data = _collect_responses_span_data(
+        capture_events,
+        capture_items,
+        span_streaming,
+        stream_gen_ai_spans,
+        lambda: client.responses.create(model="gpt-4o", input="hello"),
+    )
+
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
+
+    if expect_output:
+        assert "the model response" in span_data[SPANDATA.GEN_AI_RESPONSE_TEXT]
+        assert "get_current_weather" in span_data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span_data
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "get_output,expect_text,expect_tool_calls",
+    [
+        pytest.param(
+            lambda: [
+                _make_responses_api_output_message(
+                    content=[
+                        ResponseOutputText(
+                            annotations=[],
+                            text="the model response",
+                            type="output_text",
+                        ),
+                    ]
+                ),
+            ],
+            True,
+            False,
+            id="message-only",
+        ),
+        pytest.param(
+            lambda: [_make_responses_api_function_call()],
+            False,
+            True,
+            id="function-call-only",
+        ),
+        pytest.param(
+            lambda: [
+                _make_responses_api_output_message(
+                    content=[
+                        ResponseOutputRefusal(
+                            refusal="I cannot help with that.",
+                            type="refusal",
+                        ),
+                    ]
+                ),
+            ],
+            True,
+            False,
+            id="non-text-content-falls-back-to-dict",
+        ),
+    ],
+)
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_responses_api_data_collection_outputs_shapes(
+    sentry_init,
+    capture_events,
+    capture_items,
+    get_output,
+    expect_text,
+    expect_tool_calls,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        _experiments={"data_collection": {"gen_ai": {"outputs": True}}},
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = OpenAI(api_key="z")
+    client.responses._post = mock.Mock(
+        return_value=_make_responses_api_response(output=get_output())
+    )
+
+    span_data = _collect_responses_span_data(
+        capture_events,
+        capture_items,
+        span_streaming,
+        stream_gen_ai_spans,
+        lambda: client.responses.create(model="gpt-4o", input="hello"),
+    )
+
+    if expect_text:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT in span_data
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+
+    if expect_tool_calls:
+        assert "get_current_weather" in span_data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span_data
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,expect_output",
+    [
+        pytest.param(
+            {"gen_ai": {"outputs": True}},
+            True,
+            id="gen-ai-outputs-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            False,
+            id="gen-ai-outputs-disabled",
+        ),
+        pytest.param(
+            {},
+            True,
+            id="gen-ai-omitted-defaults-to-enabled",
+        ),
+    ],
+)
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_streaming_responses_api_data_collection_outputs(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    expect_output,
+    get_model_response,
+    server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=False,
+        _experiments={"data_collection": data_collection},
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = OpenAI(api_key="z")
+    returned_stream = get_model_response(
+        server_side_event_chunks(
+            EXAMPLE_RESPONSES_STREAM,
+        )
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with mock.patch.object(
+            client.responses._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            response_stream = client.responses.create(
+                model="some-model",
+                input="hello",
+                stream=True,
+            )
+            response_string = ""
+            for item in response_stream:
+                if hasattr(item, "delta"):
+                    response_string += item.delta
+
+        assert response_string == "hello world"
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items)
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            client.responses._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            response_stream = client.responses.create(
+                model="some-model",
+                input="hello",
+                stream=True,
+            )
+            response_string = ""
+            for item in response_stream:
+                if hasattr(item, "delta"):
+                    response_string += item.delta
+
+        assert response_string == "hello world"
+        (transaction,) = events
+        (span,) = transaction["spans"]
+        span_data = span["data"]
+
+    if expect_output:
+        assert "hello world" in span_data[SPANDATA.GEN_AI_RESPONSE_TEXT]
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "conversation, expected_id",
+    [
+        pytest.param(omit, None, id="omit"),
+        pytest.param(None, None, id="none"),
+        pytest.param("conv_abc123", "conv_abc123", id="string"),
+        pytest.param({"id": "conv_abc123"}, "conv_abc123", id="dict"),
+    ],
+)
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_responses_api_conversation_id(
+    sentry_init,
+    capture_events,
+    capture_items,
+    conversation,
+    expected_id,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = OpenAI(api_key="z")
+    client.responses._post = mock.Mock(return_value=EXAMPLE_RESPONSE)
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            client.responses.create(
+                model="gpt-4o",
+                input="hello",
+                conversation=conversation,
+            )
+
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items)
+
+        if expected_id is None:
+            assert "gen_ai.conversation.id" not in span["attributes"]
+        else:
+            assert span["attributes"]["gen_ai.conversation.id"] == expected_id
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            client.responses.create(
+                model="gpt-4o",
+                input="hello",
+                conversation=conversation,
+            )
+
+        (transaction,) = events
+        (span,) = transaction["spans"]
+
+        if expected_id is None:
+            assert "gen_ai.conversation.id" not in span["data"]
+        else:
+            assert span["data"]["gen_ai.conversation.id"] == expected_id
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "reasoning, expected_level",
+    [
+        pytest.param(omit, None, id="omit"),
+        pytest.param(None, None, id="none"),
+        pytest.param({"summary": "auto"}, None, id="dict_without_effort"),
+        pytest.param({"effort": "high"}, "high", id="dict"),
+    ],
+)
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_responses_api_reasoning_level(
+    sentry_init,
+    capture_events,
+    capture_items,
+    reasoning,
+    expected_level,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = OpenAI(api_key="z")
+    client.responses._post = mock.Mock(return_value=EXAMPLE_RESPONSE)
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            client.responses.create(
+                model="gpt-4o",
+                input="hello",
+                reasoning=reasoning,
+            )
+
+        sentry_sdk.flush()
+        span = next(item.payload for item in items if item.type == "span")
+
+        if expected_level is None:
+            assert SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL not in span["attributes"]
+        else:
+            assert (
+                span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL]
+                == expected_level
+            )
+
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            client.responses.create(
+                model="gpt-4o",
+                input="hello",
+                reasoning=reasoning,
+            )
+
+        (transaction,) = events
+        span = transaction["spans"][0]
+
+        if expected_level is None:
+            assert SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL not in span["data"]
+        else:
+            assert (
+                span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == expected_level
+            )
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_error_in_responses_api(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+    span_streaming,
+):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = OpenAI(api_key="z")
     client.responses._post = mock.Mock(
         side_effect=OpenAIError("API rate limit reached")
     )
 
-    with start_transaction(name="openai tx"):
-        with pytest.raises(OpenAIError):
+    if span_streaming:
+        items = capture_items("event", "span")
+
+        with sentry_sdk.traces.start_span(name="openai tx"), pytest.raises(OpenAIError):
             client.responses.create(
                 model="gpt-4o",
                 instructions="You are a coding assistant that talks like a pirate.",
                 input="How do I check if a Python object is an instance of a class?",
             )
 
-    (error_event, transaction_event) = events
+        # make sure the span where the error occurred is captured
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[0]["attributes"]["sentry.op"] == "gen_ai.responses"
 
-    assert transaction_event["type"] == "transaction"
-    # make sure the span where the error occurred is captured
-    assert transaction_event["spans"][0]["op"] == "gen_ai.responses"
+        (error_event,) = (item.payload for item in items if item.type == "event")
 
-    assert error_event["level"] == "error"
-    assert error_event["exception"]["values"][0]["type"] == "OpenAIError"
+        assert error_event["level"] == "error"
+        assert error_event["exception"]["values"][0]["type"] == "OpenAIError"
 
-    assert (
-        error_event["contexts"]["trace"]["trace_id"]
-        == transaction_event["contexts"]["trace"]["trace_id"]
-    )
+        assert spans[1]["is_segment"] is True
+        assert error_event["contexts"]["trace"]["trace_id"] == spans[1]["trace_id"]
+    elif stream_gen_ai_spans:
+        items = capture_items("event", "transaction", "span")
+
+        with start_transaction(name="openai tx"), pytest.raises(OpenAIError):
+            client.responses.create(
+                model="gpt-4o",
+                instructions="You are a coding assistant that talks like a pirate.",
+                input="How do I check if a Python object is an instance of a class?",
+            )
+
+        # make sure the span where the error occurred is captured
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[0]["attributes"]["sentry.op"] == "gen_ai.responses"
+
+        (error_event,) = (item.payload for item in items if item.type == "event")
+
+        assert error_event["level"] == "error"
+        assert error_event["exception"]["values"][0]["type"] == "OpenAIError"
+
+        (transaction_event,) = (
+            item.payload for item in items if item.type == "transaction"
+        )
+        assert (
+            error_event["contexts"]["trace"]["trace_id"]
+            == transaction_event["contexts"]["trace"]["trace_id"]
+        )
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"), pytest.raises(OpenAIError):
+            client.responses.create(
+                model="gpt-4o",
+                instructions="You are a coding assistant that talks like a pirate.",
+                input="How do I check if a Python object is an instance of a class?",
+            )
+
+        (error_event, transaction_event) = events
+
+        assert transaction_event["type"] == "transaction"
+        # make sure the span where the error occurred is captured
+        assert transaction_event["spans"][0]["op"] == "gen_ai.responses"
+
+        assert error_event["level"] == "error"
+        assert error_event["exception"]["values"][0]["type"] == "OpenAIError"
+        assert (
+            error_event["contexts"]["trace"]["trace_id"]
+            == transaction_event["contexts"]["trace"]["trace_id"]
+        )
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 @pytest.mark.parametrize(
-    "instructions",
-    (
-        omit,
-        None,
-        "You are a coding assistant that talks like a pirate.",
-    ),
-)
-@pytest.mark.parametrize(
-    "input",
+    "instructions,input,expected_system_instructions,expected_request_messages",
     [
-        pytest.param(
-            "How do I check if a Python object is an instance of a class?", id="string"
+        (
+            omit,
+            "How do I check if a Python object is an instance of a class?",
+            None,
+            ["How do I check if a Python object is an instance of a class?"],
         ),
-        pytest.param(
+        (
+            None,
+            "How do I check if a Python object is an instance of a class?",
+            None,
+            ["How do I check if a Python object is an instance of a class?"],
+        ),
+        (
+            "You are a coding assistant that talks like a pirate.",
             [
                 {
                     "role": "system",
                     "content": "You are a helpful assistant.",
                 },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"role": "user", "content": "hello"},
             ],
-            id="blocks_no_type",
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+            ],
+            [
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {"role": "user", "content": "hello"},
+            ],
         ),
-        pytest.param(
+        (
+            "You are a coding assistant that talks like a pirate.",
             [
                 {
                     "type": "message",
                     "role": "system",
                     "content": "You are a helpful assistant.",
                 },
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"type": "message", "role": "user", "content": "hello"},
             ],
-            id="blocks",
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+            ],
+            [
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {"type": "message", "role": "user", "content": "hello"},
+            ],
         ),
-        pytest.param(
+        (
+            "You are a coding assistant that talks like a pirate.",
             [
                 {
                     "role": "system",
@@ -2845,11 +6596,30 @@ def test_error_in_responses_api(sentry_init, capture_events):
                         {"type": "text", "text": "Be concise and clear."},
                     ],
                 },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"role": "user", "content": "hello"},
             ],
-            id="parts_no_type",
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ],
+            [
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {"role": "user", "content": "hello"},
+            ],
         ),
-        pytest.param(
+        (
+            "You are a coding assistant that talks like a pirate.",
             [
                 {
                     "type": "message",
@@ -2859,256 +6629,280 @@ def test_error_in_responses_api(sentry_init, capture_events):
                         {"type": "text", "text": "Be concise and clear."},
                     ],
                 },
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"type": "message", "role": "user", "content": "hello"},
             ],
-            id="parts",
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ],
+            [
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {"type": "message", "role": "user", "content": "hello"},
+            ],
         ),
     ],
 )
 async def test_ai_client_span_responses_async_api(
-    sentry_init, capture_events, instructions, input, request
+    sentry_init,
+    capture_events,
+    capture_items,
+    instructions,
+    input,
+    expected_system_instructions,
+    expected_request_messages,
+    stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
     client.responses._post = AsyncMock(return_value=EXAMPLE_RESPONSE)
 
-    with start_transaction(name="openai tx"):
-        await client.responses.create(
-            model="gpt-4o",
-            instructions=instructions,
-            input=input,
-            max_output_tokens=100,
-            temperature=0.7,
-            top_p=0.9,
-        )
+    if span_streaming:
+        items = capture_items("span")
 
-    (transaction,) = events
-    spans = transaction["spans"]
+        with sentry_sdk.traces.start_span(name="openai tx"):
+            await client.responses.create(
+                model="gpt-4o",
+                instructions=instructions,
+                input=input,
+                max_output_tokens=100,
+                temperature=0.7,
+                top_p=0.9,
+                reasoning={"effort": "high"},
+            )
 
-    assert len(spans) == 1
-    assert spans[0]["op"] == "gen_ai.responses"
-    assert spans[0]["origin"] == "auto.ai.openai"
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
 
-    expected_data = {
-        "gen_ai.operation.name": "responses",
-        "gen_ai.request.max_tokens": 100,
-        "gen_ai.request.temperature": 0.7,
-        "gen_ai.request.top_p": 0.9,
-        "gen_ai.request.messages": '["How do I check if a Python object is an instance of a class?"]',
-        "gen_ai.request.model": "gpt-4o",
-        "gen_ai.response.model": "response-model-id",
-        "gen_ai.response.streaming": False,
-        "gen_ai.system": "openai",
-        "gen_ai.usage.input_tokens": 20,
-        "gen_ai.usage.input_tokens.cached": 5,
-        "gen_ai.usage.output_tokens": 10,
-        "gen_ai.usage.output_tokens.reasoning": 8,
-        "gen_ai.usage.total_tokens": 30,
-        "gen_ai.response.text": "the model response",
-        "thread.id": mock.ANY,
-        "thread.name": mock.ANY,
-    }
+        assert len(spans) == 2
 
-    param_id = request.node.callspec.id
-    if "string" in param_id and (
-        instructions is None or isinstance(instructions, Omit)
-    ):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.request.messages": safe_serialize(
-                    ["How do I check if a Python object is an instance of a class?"]
-                ),
-            }
-        )
-    elif "string" in param_id:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        }
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    ["How do I check if a Python object is an instance of a class?"]
-                ),
-            }
-        )
-    elif "blocks_no_type" in param_id and (
-        instructions is None or isinstance(instructions, Omit)
-    ):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [{"type": "text", "content": "You are a helpful assistant."}]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "blocks_no_type" in param_id:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        },
-                        {"type": "text", "content": "You are a helpful assistant."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "blocks" in param_id and (
-        instructions is None or isinstance(instructions, Omit)
-    ):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [{"type": "text", "content": "You are a helpful assistant."}]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"type": "message", "role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "blocks" in param_id:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        },
-                        {"type": "text", "content": "You are a helpful assistant."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"type": "message", "role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "parts_no_type" in param_id and (
-        instructions is None or isinstance(instructions, Omit)
-    ):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {"type": "text", "content": "You are a helpful assistant."},
-                        {"type": "text", "content": "Be concise and clear."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "parts_no_type" in param_id:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        },
-                        {"type": "text", "content": "You are a helpful assistant."},
-                        {"type": "text", "content": "Be concise and clear."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif instructions is None or isinstance(instructions, Omit):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {"type": "text", "content": "You are a helpful assistant."},
-                        {"type": "text", "content": "Be concise and clear."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"type": "message", "role": "user", "content": "hello"}]
-                ),
-            }
-        )
+        expected_data = {
+            "gen_ai.operation.name": "responses",
+            "gen_ai.request.max_tokens": 100,
+            "gen_ai.request.temperature": 0.7,
+            "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
+            "gen_ai.request.messages": safe_serialize(expected_request_messages),
+            "gen_ai.request.model": "gpt-4o",
+            "gen_ai.response.model": "response-model-id",
+            "gen_ai.response.streaming": False,
+            "gen_ai.system": "openai",
+            "gen_ai.usage.input_tokens": 20,
+            "gen_ai.usage.input_tokens.cached": 5,
+            "gen_ai.usage.output_tokens": 10,
+            "gen_ai.usage.output_tokens.reasoning": 8,
+            "gen_ai.usage.total_tokens": 30,
+            "gen_ai.response.text": "the model response",
+            "sentry.op": "gen_ai.responses",
+            "sentry.origin": "auto.ai.openai",
+            "sentry.segment.name": "openai tx",
+        }
+
+        if expected_system_instructions is not None:
+            expected_data["gen_ai.system_instructions"] = safe_serialize(
+                expected_system_instructions
+            )
+
+        for attr, value in expected_data.items():
+            assert spans[0]["attributes"][attr] == value
+
+    elif stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with start_transaction(name="openai tx"):
+            await client.responses.create(
+                model="gpt-4o",
+                instructions=instructions,
+                input=input,
+                max_output_tokens=100,
+                temperature=0.7,
+                top_p=0.9,
+                reasoning={"effort": "high"},
+            )
+
+        spans = [item.payload for item in items]
+
+        assert len(spans) == 1
+
+        expected_data = {
+            "gen_ai.operation.name": "responses",
+            "gen_ai.request.max_tokens": 100,
+            "gen_ai.request.temperature": 0.7,
+            "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
+            "gen_ai.request.messages": safe_serialize(expected_request_messages),
+            "gen_ai.request.model": "gpt-4o",
+            "gen_ai.response.model": "response-model-id",
+            "gen_ai.response.streaming": False,
+            "gen_ai.system": "openai",
+            "gen_ai.usage.input_tokens": 20,
+            "gen_ai.usage.input_tokens.cached": 5,
+            "gen_ai.usage.output_tokens": 10,
+            "gen_ai.usage.output_tokens.reasoning": 8,
+            "gen_ai.usage.total_tokens": 30,
+            "gen_ai.response.text": "the model response",
+            "sentry.op": "gen_ai.responses",
+            "sentry.origin": "auto.ai.openai",
+            "sentry.segment.name": "openai tx",
+        }
+
+        if expected_system_instructions is not None:
+            expected_data["gen_ai.system_instructions"] = safe_serialize(
+                expected_system_instructions
+            )
+
+        for attr, value in expected_data.items():
+            assert spans[0]["attributes"][attr] == value
+
     else:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        },
-                        {"type": "text", "content": "You are a helpful assistant."},
-                        {"type": "text", "content": "Be concise and clear."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"type": "message", "role": "user", "content": "hello"}]
-                ),
-            }
-        )
+        events = capture_events()
 
-    assert spans[0]["data"] == expected_data
+        with start_transaction(name="openai tx"):
+            await client.responses.create(
+                model="gpt-4o",
+                instructions=instructions,
+                input=input,
+                max_output_tokens=100,
+                temperature=0.7,
+                top_p=0.9,
+                reasoning={"effort": "high"},
+            )
+
+        (transaction,) = events
+        spans = transaction["spans"]
+
+        assert len(spans) == 1
+        assert spans[0]["op"] == "gen_ai.responses"
+        assert spans[0]["origin"] == "auto.ai.openai"
+
+        expected_data = {
+            "gen_ai.operation.name": "responses",
+            "gen_ai.request.max_tokens": 100,
+            "gen_ai.request.temperature": 0.7,
+            "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
+            "gen_ai.request.messages": safe_serialize(expected_request_messages[-1:]),
+            "gen_ai.request.model": "gpt-4o",
+            "gen_ai.response.model": "response-model-id",
+            "gen_ai.response.streaming": False,
+            "gen_ai.system": "openai",
+            "gen_ai.usage.input_tokens": 20,
+            "gen_ai.usage.input_tokens.cached": 5,
+            "gen_ai.usage.output_tokens": 10,
+            "gen_ai.usage.output_tokens.reasoning": 8,
+            "gen_ai.usage.total_tokens": 30,
+            "gen_ai.response.text": "the model response",
+        }
+
+        if expected_system_instructions is not None:
+            expected_data["gen_ai.system_instructions"] = safe_serialize(
+                expected_system_instructions
+            )
+
+        for attr, value in expected_data.items():
+            assert spans[0]["data"][attr] == value
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "instructions",
-    (
-        omit,
-        None,
-        "You are a coding assistant that talks like a pirate.",
-    ),
-)
-@pytest.mark.parametrize(
-    "input",
+    "instructions,input,expected_system_instructions,expected_request_messages",
     [
-        pytest.param(
-            "How do I check if a Python object is an instance of a class?", id="string"
+        (
+            omit,
+            "How do I check if a Python object is an instance of a class?",
+            None,
+            ["How do I check if a Python object is an instance of a class?"],
         ),
-        pytest.param(
+        (
+            None,
+            "How do I check if a Python object is an instance of a class?",
+            None,
+            ["How do I check if a Python object is an instance of a class?"],
+        ),
+        (
+            "You are a coding assistant that talks like a pirate.",
             [
                 {
                     "role": "system",
                     "content": "You are a helpful assistant.",
                 },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"role": "user", "content": "hello"},
             ],
-            id="blocks_no_type",
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+            ],
+            [
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {"role": "user", "content": "hello"},
+            ],
         ),
-        pytest.param(
+        (
+            "You are a coding assistant that talks like a pirate.",
             [
                 {
                     "type": "message",
                     "role": "system",
                     "content": "You are a helpful assistant.",
                 },
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"type": "message", "role": "user", "content": "hello"},
             ],
-            id="blocks",
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+            ],
+            [
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {"type": "message", "role": "user", "content": "hello"},
+            ],
         ),
-        pytest.param(
+        (
+            "You are a coding assistant that talks like a pirate.",
             [
                 {
                     "role": "system",
@@ -3117,11 +6911,30 @@ async def test_ai_client_span_responses_async_api(
                         {"type": "text", "text": "Be concise and clear."},
                     ],
                 },
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"role": "user", "content": "hello"},
             ],
-            id="parts_no_type",
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ],
+            [
+                {
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {"role": "user", "content": "hello"},
+            ],
         ),
-        pytest.param(
+        (
+            "You are a coding assistant that talks like a pirate.",
             [
                 {
                     "type": "message",
@@ -3131,9 +6944,29 @@ async def test_ai_client_span_responses_async_api(
                         {"type": "text", "text": "Be concise and clear."},
                     ],
                 },
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
                 {"type": "message", "role": "user", "content": "hello"},
             ],
-            id="parts",
+            [
+                {
+                    "type": "text",
+                    "content": "You are a coding assistant that talks like a pirate.",
+                },
+                {"type": "text", "content": "You are a helpful assistant."},
+                {"type": "text", "content": "Be concise and clear."},
+            ],
+            [
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": "Message demonstrating the absence of truncation.",
+                },
+                {"type": "message", "role": "user", "content": "hello"},
+            ],
         ),
     ],
 )
@@ -3141,31 +6974,44 @@ async def test_ai_client_span_responses_async_api(
 async def test_ai_client_span_streaming_responses_async_api(
     sentry_init,
     capture_events,
+    capture_items,
     instructions,
     input,
-    request,
+    expected_system_instructions,
+    expected_request_messages,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
     returned_stream = get_model_response(
         async_iterator(server_side_event_chunks(EXAMPLE_RESPONSES_STREAM))
     )
 
-    with mock.patch.object(
-        client.responses._client._client,
-        "send",
-        return_value=returned_stream,
-    ):
-        with start_transaction(name="openai tx"):
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        ctx = (
+            sentry_sdk.traces.start_span(name="openai tx")
+            if span_streaming
+            else start_transaction(name="openai tx")
+        )
+        with mock.patch.object(
+            client.responses._client._client,
+            "send",
+            return_value=returned_stream,
+        ), ctx:
             result = await client.responses.create(
                 model="gpt-4o",
                 instructions=instructions,
@@ -3174,229 +7020,206 @@ async def test_ai_client_span_streaming_responses_async_api(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
             async for _ in result:
                 pass
 
-    (transaction,) = events
-    spans = [span for span in transaction["spans"] if span["op"] == OP.GEN_AI_RESPONSES]
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        spans = [
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == OP.GEN_AI_RESPONSES
+        ]
 
-    assert len(spans) == 1
-    assert spans[0]["origin"] == "auto.ai.openai"
+        assert len(spans) == 1
 
-    expected_data = {
-        "gen_ai.operation.name": "responses",
-        "gen_ai.request.max_tokens": 100,
-        "gen_ai.request.temperature": 0.7,
-        "gen_ai.request.top_p": 0.9,
-        "gen_ai.response.model": "response-model-id",
-        "gen_ai.response.streaming": True,
-        "gen_ai.system": "openai",
-        "gen_ai.response.time_to_first_token": mock.ANY,
-        "gen_ai.usage.input_tokens": 20,
-        "gen_ai.usage.input_tokens.cached": 5,
-        "gen_ai.usage.output_tokens": 10,
-        "gen_ai.usage.output_tokens.reasoning": 8,
-        "gen_ai.usage.total_tokens": 30,
-        "gen_ai.request.model": "gpt-4o",
-        "gen_ai.response.text": "hello world",
-        "thread.id": mock.ANY,
-        "thread.name": mock.ANY,
-    }
+        expected_data = {
+            "gen_ai.operation.name": "responses",
+            "gen_ai.request.max_tokens": 100,
+            "gen_ai.request.messages": safe_serialize(expected_request_messages),
+            "gen_ai.request.temperature": 0.7,
+            "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
+            "gen_ai.response.model": "response-model-id",
+            "gen_ai.response.streaming": True,
+            "gen_ai.system": "openai",
+            "gen_ai.response.time_to_first_token": mock.ANY,
+            "gen_ai.usage.input_tokens": 20,
+            "gen_ai.usage.input_tokens.cached": 5,
+            "gen_ai.usage.output_tokens": 10,
+            "gen_ai.usage.output_tokens.reasoning": 8,
+            "gen_ai.usage.total_tokens": 30,
+            "gen_ai.request.model": "gpt-4o",
+            "gen_ai.response.text": "hello world",
+            "sentry.environment": "production",
+            "sentry.op": "gen_ai.responses",
+            "sentry.origin": "auto.ai.openai",
+            "sentry.segment.name": "openai tx",
+        }
 
-    param_id = request.node.callspec.id
-    if "string" in param_id and (
-        instructions is None or isinstance(instructions, Omit)
-    ):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.request.messages": safe_serialize(
-                    ["How do I check if a Python object is an instance of a class?"]
-                ),
-            }
-        )
-    elif "string" in param_id:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        }
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    ["How do I check if a Python object is an instance of a class?"]
-                ),
-            }
-        )
-    elif "blocks_no_type" in param_id and (
-        instructions is None or isinstance(instructions, Omit)
-    ):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [{"type": "text", "content": "You are a helpful assistant."}]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "blocks_no_type" in param_id:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        },
-                        {"type": "text", "content": "You are a helpful assistant."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "blocks" in param_id and (
-        instructions is None or isinstance(instructions, Omit)
-    ):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [{"type": "text", "content": "You are a helpful assistant."}]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"type": "message", "role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "blocks" in param_id:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        },
-                        {"type": "text", "content": "You are a helpful assistant."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"type": "message", "role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "parts_no_type" in param_id and (
-        instructions is None or isinstance(instructions, Omit)
-    ):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {"type": "text", "content": "You are a helpful assistant."},
-                        {"type": "text", "content": "Be concise and clear."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif "parts_no_type" in param_id:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        },
-                        {"type": "text", "content": "You are a helpful assistant."},
-                        {"type": "text", "content": "Be concise and clear."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"role": "user", "content": "hello"}]
-                ),
-            }
-        )
-    elif instructions is None or isinstance(instructions, Omit):  # type: ignore
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {"type": "text", "content": "You are a helpful assistant."},
-                        {"type": "text", "content": "Be concise and clear."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"type": "message", "role": "user", "content": "hello"}]
-                ),
-            }
-        )
+        if expected_system_instructions is not None:
+            expected_data["gen_ai.system_instructions"] = safe_serialize(
+                expected_system_instructions
+            )
+
+        for attr, value in expected_data.items():
+            assert spans[0]["attributes"][attr] == value
+
     else:
-        expected_data.update(
-            {
-                "gen_ai.system_instructions": safe_serialize(
-                    [
-                        {
-                            "type": "text",
-                            "content": "You are a coding assistant that talks like a pirate.",
-                        },
-                        {"type": "text", "content": "You are a helpful assistant."},
-                        {"type": "text", "content": "Be concise and clear."},
-                    ]
-                ),
-                "gen_ai.request.messages": safe_serialize(
-                    [{"type": "message", "role": "user", "content": "hello"}]
-                ),
-            }
-        )
+        events = capture_events()
 
-    assert spans[0]["data"] == expected_data
+        with mock.patch.object(
+            client.responses._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            result = await client.responses.create(
+                model="gpt-4o",
+                instructions=instructions,
+                input=input,
+                stream=True,
+                max_output_tokens=100,
+                temperature=0.7,
+                top_p=0.9,
+                reasoning={"effort": "high"},
+            )
+            async for _ in result:
+                pass
+
+        (transaction,) = events
+        spans = [
+            span for span in transaction["spans"] if span["op"] == OP.GEN_AI_RESPONSES
+        ]
+
+        assert len(spans) == 1
+        assert spans[0]["origin"] == "auto.ai.openai"
+
+        expected_data = {
+            "gen_ai.operation.name": "responses",
+            "gen_ai.request.max_tokens": 100,
+            "gen_ai.request.messages": safe_serialize(expected_request_messages[-1:]),
+            "gen_ai.request.temperature": 0.7,
+            "gen_ai.request.top_p": 0.9,
+            "gen_ai.request.reasoning.level": "high",
+            "gen_ai.response.model": "response-model-id",
+            "gen_ai.response.streaming": True,
+            "gen_ai.system": "openai",
+            "gen_ai.response.time_to_first_token": mock.ANY,
+            "gen_ai.usage.input_tokens": 20,
+            "gen_ai.usage.input_tokens.cached": 5,
+            "gen_ai.usage.output_tokens": 10,
+            "gen_ai.usage.output_tokens.reasoning": 8,
+            "gen_ai.usage.total_tokens": 30,
+            "gen_ai.request.model": "gpt-4o",
+            "gen_ai.response.text": "hello world",
+        }
+
+        if expected_system_instructions is not None:
+            expected_data["gen_ai.system_instructions"] = safe_serialize(
+                expected_system_instructions
+            )
+
+        for attr, value in expected_data.items():
+            assert spans[0]["data"][attr] == value
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
-async def test_error_in_responses_async_api(sentry_init, capture_events):
+async def test_error_in_responses_async_api(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+    span_streaming,
+):
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
     client.responses._post = AsyncMock(
         side_effect=OpenAIError("API rate limit reached")
     )
 
-    with start_transaction(name="openai tx"):
-        with pytest.raises(OpenAIError):
+    if span_streaming:
+        items = capture_items("event", "span")
+
+        with sentry_sdk.traces.start_span(name="openai tx"), pytest.raises(OpenAIError):
             await client.responses.create(
                 model="gpt-4o",
                 instructions="You are a coding assistant that talks like a pirate.",
                 input="How do I check if a Python object is an instance of a class?",
             )
 
-    (error_event, transaction_event) = events
+        # make sure the span where the error occurred is captured
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[0]["attributes"]["sentry.op"] == "gen_ai.responses"
 
-    assert transaction_event["type"] == "transaction"
-    # make sure the span where the error occurred is captured
-    assert transaction_event["spans"][0]["op"] == "gen_ai.responses"
+        (error_event,) = (item.payload for item in items if item.type == "event")
 
-    assert error_event["level"] == "error"
-    assert error_event["exception"]["values"][0]["type"] == "OpenAIError"
+        assert error_event["level"] == "error"
+        assert error_event["exception"]["values"][0]["type"] == "OpenAIError"
 
-    assert (
-        error_event["contexts"]["trace"]["trace_id"]
-        == transaction_event["contexts"]["trace"]["trace_id"]
-    )
+        assert spans[1]["is_segment"] is True
+        assert error_event["contexts"]["trace"]["trace_id"] == spans[1]["trace_id"]
+    elif stream_gen_ai_spans:
+        items = capture_items("event", "transaction", "span")
+
+        with start_transaction(name="openai tx"), pytest.raises(OpenAIError):
+            await client.responses.create(
+                model="gpt-4o",
+                instructions="You are a coding assistant that talks like a pirate.",
+                input="How do I check if a Python object is an instance of a class?",
+            )
+
+        # make sure the span where the error occurred is captured
+        spans = [item.payload for item in items if item.type == "span"]
+        assert spans[0]["attributes"]["sentry.op"] == "gen_ai.responses"
+
+        (error_event,) = (item.payload for item in items if item.type == "event")
+
+        assert error_event["level"] == "error"
+        assert error_event["exception"]["values"][0]["type"] == "OpenAIError"
+
+        (transaction_event,) = (
+            item.payload for item in items if item.type == "transaction"
+        )
+        assert (
+            error_event["contexts"]["trace"]["trace_id"]
+            == transaction_event["contexts"]["trace"]["trace_id"]
+        )
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"), pytest.raises(OpenAIError):
+            await client.responses.create(
+                model="gpt-4o",
+                instructions="You are a coding assistant that talks like a pirate.",
+                input="How do I check if a Python object is an instance of a class?",
+            )
+
+        (error_event, transaction_event) = events
+
+        assert transaction_event["type"] == "transaction"
+        # make sure the span where the error occurred is captured
+        assert transaction_event["spans"][0]["op"] == "gen_ai.responses"
+
+        assert error_event["level"] == "error"
+        assert error_event["exception"]["values"][0]["type"] == "OpenAIError"
+        assert (
+            error_event["contexts"]["trace"]["trace_id"]
+            == transaction_event["contexts"]["trace"]["trace_id"]
+        )
 
 
 if SKIP_RESPONSES_TESTS:
@@ -3460,6 +7283,7 @@ else:
                     input_tokens=20,
                     input_tokens_details=InputTokensDetails(
                         cached_tokens=5,
+                        cache_write_tokens=0,
                     ),
                     output_tokens=10,
                     output_tokens_details=OutputTokensDetails(
@@ -3472,6 +7296,8 @@ else:
     ]
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [(True, True), (True, False), (False, True), (False, False)],
@@ -3480,10 +7306,13 @@ else:
 def test_streaming_responses_api(
     sentry_init,
     capture_events,
+    capture_items,
     send_default_pii,
     include_prompts,
     get_model_response,
     server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[
@@ -3491,10 +7320,12 @@ def test_streaming_responses_api(
                 include_prompts=include_prompts,
             )
         ],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = OpenAI(api_key="z")
     returned_stream = get_model_response(
@@ -3503,12 +7334,14 @@ def test_streaming_responses_api(
         )
     )
 
-    with mock.patch.object(
-        client.responses._client._client,
-        "send",
-        return_value=returned_stream,
-    ):
-        with start_transaction(name="openai tx"):
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with mock.patch.object(
+            client.responses._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
             response_stream = client.responses.create(
                 model="some-model",
                 input="hello",
@@ -3516,6 +7349,7 @@ def test_streaming_responses_api(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
             response_string = ""
@@ -3523,30 +7357,79 @@ def test_streaming_responses_api(
                 if hasattr(item, "delta"):
                     response_string += item.delta
 
-    assert response_string == "hello world"
+        assert response_string == "hello world"
 
-    (transaction,) = events
-    (span,) = transaction["spans"]
-    assert span["op"] == "gen_ai.responses"
-    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.responses"
+        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
 
-    if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "hello world"
+        if send_default_pii and include_prompts:
+            assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
+            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "hello world"
+        else:
+            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+
+        assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
+        assert span["attributes"]["gen_ai.usage.output_tokens"] == 10
+        assert span["attributes"]["gen_ai.usage.total_tokens"] == 30
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+        events = capture_events()
 
-    assert span["data"]["gen_ai.usage.input_tokens"] == 20
-    assert span["data"]["gen_ai.usage.output_tokens"] == 10
-    assert span["data"]["gen_ai.usage.total_tokens"] == 30
+        with mock.patch.object(
+            client.responses._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            response_stream = client.responses.create(
+                model="some-model",
+                input="hello",
+                stream=True,
+                max_output_tokens=100,
+                temperature=0.7,
+                top_p=0.9,
+                reasoning={"effort": "high"},
+            )
+
+            response_string = ""
+            for item in response_stream:
+                if hasattr(item, "delta"):
+                    response_string += item.delta
+
+        assert response_string == "hello world"
+
+        (transaction,) = events
+        (span,) = transaction["spans"]
+        assert span["op"] == "gen_ai.responses"
+        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
+
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
+
+        if send_default_pii and include_prompts:
+            assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
+            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "hello world"
+        else:
+            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+
+        assert span["data"]["gen_ai.usage.input_tokens"] == 20
+        assert span["data"]["gen_ai.usage.output_tokens"] == 10
+        assert span["data"]["gen_ai.usage.total_tokens"] == 30
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
@@ -3556,11 +7439,14 @@ def test_streaming_responses_api(
 async def test_streaming_responses_api_async(
     sentry_init,
     capture_events,
+    capture_items,
     send_default_pii,
     include_prompts,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
 ):
     sentry_init(
         integrations=[
@@ -3568,22 +7454,26 @@ async def test_streaming_responses_api_async(
                 include_prompts=include_prompts,
             )
         ],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
     returned_stream = get_model_response(
         async_iterator(server_side_event_chunks(EXAMPLE_RESPONSES_STREAM))
     )
 
-    with mock.patch.object(
-        client.responses._client._client,
-        "send",
-        return_value=returned_stream,
-    ):
-        with start_transaction(name="openai tx"):
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with mock.patch.object(
+            client.responses._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
             response_stream = await client.responses.create(
                 model="some-model",
                 input="hello",
@@ -3591,6 +7481,7 @@ async def test_streaming_responses_api_async(
                 max_output_tokens=100,
                 temperature=0.7,
                 top_p=0.9,
+                reasoning={"effort": "high"},
             )
 
             response_string = ""
@@ -3598,62 +7489,170 @@ async def test_streaming_responses_api_async(
                 if hasattr(item, "delta"):
                     response_string += item.delta
 
-    assert response_string == "hello world"
+        assert response_string == "hello world"
 
-    (transaction,) = events
-    (span,) = transaction["spans"]
-    assert span["op"] == "gen_ai.responses"
-    assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
-    assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        sentry_sdk.flush()
+        (span,) = (item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.responses"
+        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
 
-    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
+        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
 
-    if send_default_pii and include_prompts:
-        assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
-        assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "hello world"
+        if send_default_pii and include_prompts:
+            assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
+            assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "hello world"
+        else:
+            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
+
+        assert span["attributes"]["gen_ai.usage.input_tokens"] == 20
+        assert span["attributes"]["gen_ai.usage.output_tokens"] == 10
+        assert span["attributes"]["gen_ai.usage.total_tokens"] == 30
     else:
-        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+        events = capture_events()
 
-    assert span["data"]["gen_ai.usage.input_tokens"] == 20
-    assert span["data"]["gen_ai.usage.output_tokens"] == 10
-    assert span["data"]["gen_ai.usage.total_tokens"] == 30
+        with mock.patch.object(
+            client.responses._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            response_stream = await client.responses.create(
+                model="some-model",
+                input="hello",
+                stream=True,
+                max_output_tokens=100,
+                temperature=0.7,
+                top_p=0.9,
+                reasoning={"effort": "high"},
+            )
+
+            response_string = ""
+            async for item in response_stream:
+                if hasattr(item, "delta"):
+                    response_string += item.delta
+
+        assert response_string == "hello world"
+
+        (transaction,) = events
+        (span,) = transaction["spans"]
+        assert span["op"] == "gen_ai.responses"
+        assert span["data"][SPANDATA.GEN_AI_SYSTEM] == "openai"
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_TOP_P] == 0.9
+        assert span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == "high"
+
+        assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
+
+        if send_default_pii and include_prompts:
+            assert span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES] == '["hello"]'
+            assert span["data"][SPANDATA.GEN_AI_RESPONSE_TEXT] == "hello world"
+        else:
+            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["data"]
+            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+
+        assert span["data"]["gen_ai.usage.input_tokens"] == 20
+        assert span["data"]["gen_ai.usage.output_tokens"] == 10
+        assert span["data"]["gen_ai.usage.total_tokens"] == 30
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+# Feature added in https://github.com/openai/openai-python/pull/1952
 @pytest.mark.skipif(
-    OPENAI_VERSION <= (1, 1, 0),
-    reason="OpenAI versions <=1.1.0 do not support the tools parameter.",
+    OPENAI_VERSION is None or OPENAI_VERSION < (1, 58, 0),
+    reason="OpenAI versions <1.58.0 do not support the reasoning_effort parameter.",
 )
 @pytest.mark.parametrize(
-    "tools",
-    [[], None, NOT_GIVEN, omit],
+    "reasoning_effort,expected_level",
+    [
+        pytest.param(omit, None, id="omit"),
+        pytest.param(None, None, id="none"),
+        pytest.param("high", "high", id="high"),
+        pytest.param("minimal", "minimal", id="minimal"),
+    ],
 )
-def test_empty_tools_in_chat_completion(sentry_init, capture_events, tools):
+def test_chat_completion_reasoning_level(
+    sentry_init,
+    capture_events,
+    capture_items,
+    reasoning_effort,
+    expected_level,
+    nonstreaming_chat_completions_model_response,
+    stream_gen_ai_spans,
+    span_streaming,
+):
     sentry_init(
         integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = OpenAI(api_key="z")
-    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
-
-    with start_transaction(name="openai tx"):
-        client.chat.completions.create(
-            model="some-model",
-            messages=[{"role": "system", "content": "hello"}],
-            tools=tools,
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
         )
+    )
 
-    (event,) = events
-    span = event["spans"][0]
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
 
-    assert "gen_ai.request.available_tools" not in span["data"]
+        with start_transaction(name="openai tx"):
+            client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "system", "content": "hello"}],
+                reasoning_effort=reasoning_effort,
+            )
+
+        sentry_sdk.flush()
+        span = next(item.payload for item in items if item.type == "span")
+
+        if expected_level is None:
+            assert SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL not in span["attributes"]
+        else:
+            assert (
+                span["attributes"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL]
+                == expected_level
+            )
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "system", "content": "hello"}],
+                reasoning_effort=reasoning_effort,
+            )
+
+        (event,) = events
+        span = event["spans"][0]
+
+        if expected_level is None:
+            assert SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL not in span["data"]
+        else:
+            assert (
+                span["data"][SPANDATA.GEN_AI_REQUEST_REASONING_LEVEL] == expected_level
+            )
 
 
 # Test messages with mixed roles including "ai" that should be mapped to "assistant"
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "test_message,expected_role",
     [
@@ -3669,50 +7668,103 @@ def test_empty_tools_in_chat_completion(sentry_init, capture_events, tools):
     ],
 )
 def test_openai_message_role_mapping(
-    sentry_init, capture_events, test_message, expected_role
+    sentry_init,
+    capture_events,
+    capture_items,
+    test_message,
+    expected_role,
+    nonstreaming_chat_completions_model_response,
+    stream_gen_ai_spans,
+    span_streaming,
 ):
     """Test that OpenAI integration properly maps message roles like 'ai' to 'assistant'"""
 
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = OpenAI(api_key="z")
-    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
+        )
+    )
 
     test_messages = [test_message]
 
-    with start_transaction(name="openai tx"):
-        client.chat.completions.create(model="test-model", messages=test_messages)
-    # Verify that the span was created correctly
-    (event,) = events
-    span = event["spans"][0]
-    assert span["op"] == "gen_ai.chat"
-    assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
 
-    # Parse the stored messages
-    import json
+        with start_transaction(name="openai tx"):
+            client.chat.completions.create(model="test-model", messages=test_messages)
 
-    stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
+        # Verify that the span was created correctly
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.chat"
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]
+
+        stored_messages = json.loads(
+            span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        )
+    else:
+        events = capture_events()
+
+        with start_transaction(name="openai tx"):
+            client.chat.completions.create(model="test-model", messages=test_messages)
+
+        # Verify that the span was created correctly
+        (event,) = events
+        span = event["spans"][0]
+        assert span["op"] == "gen_ai.chat"
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]
+
+        stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     assert len(stored_messages) == 1
     assert stored_messages[0]["role"] == expected_role
 
 
-def test_openai_message_truncation(sentry_init, capture_events):
+def test_openai_message_truncation(
+    sentry_init,
+    capture_events,
+    nonstreaming_chat_completions_model_response,
+):
     """Test that large messages are truncated properly in OpenAI integration."""
     sentry_init(
         integrations=[OpenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        stream_gen_ai_spans=False,
     )
-    events = capture_events()
 
     client = OpenAI(api_key="z")
-    client.chat.completions._post = mock.Mock(return_value=EXAMPLE_CHAT_COMPLETION)
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
+        )
+    )
 
     large_content = (
         "This is a very long message that will exceed our size limits. " * 1000
@@ -3723,6 +7775,8 @@ def test_openai_message_truncation(sentry_init, capture_events):
         {"role": "assistant", "content": large_content},
         {"role": "user", "content": large_content},
     ]
+
+    events = capture_events()
 
     with start_transaction(name="openai tx"):
         client.chat.completions.create(
@@ -3748,17 +7802,27 @@ def test_openai_message_truncation(sentry_init, capture_events):
 
 
 # noinspection PyTypeChecker
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_streaming_chat_completion_ttft(
-    sentry_init, capture_events, get_model_response, server_side_event_chunks
+    sentry_init,
+    capture_events,
+    capture_items,
+    get_model_response,
+    server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that streaming chat completions capture time-to-first-token (TTFT).
     """
     sentry_init(
         integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = OpenAI(api_key="z")
     returned_stream = get_model_response(
@@ -3795,12 +7859,14 @@ def test_streaming_chat_completion_ttft(
         ),
     )
 
-    with mock.patch.object(
-        client.chat._client._client,
-        "send",
-        return_value=returned_stream,
-    ):
-        with start_transaction(name="openai tx"):
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
             response_stream = client.chat.completions.create(
                 model="some-model",
                 messages=[{"role": "user", "content": "Say hello"}],
@@ -3810,34 +7876,66 @@ def test_streaming_chat_completion_ttft(
             for _ in response_stream:
                 pass
 
-    (tx,) = events
-    span = tx["spans"][0]
-    assert span["op"] == "gen_ai.chat"
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.chat"
 
-    # Verify TTFT is captured
-    assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in span["data"]
-    ttft = span["data"][SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN]
+        # Verify TTFT is captured
+        assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in span["attributes"]
+        ttft = span["attributes"][SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN]
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            response_stream = client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "Say hello"}],
+                stream=True,
+            )
+            # Consume the stream
+            for _ in response_stream:
+                pass
+
+        (tx,) = events
+        span = tx["spans"][0]
+        assert span["op"] == "gen_ai.chat"
+
+        # Verify TTFT is captured
+        assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in span["data"]
+        ttft = span["data"][SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN]
+
     assert isinstance(ttft, float)
     assert ttft > 0
 
 
 # noinspection PyTypeChecker
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_streaming_chat_completion_ttft_async(
     sentry_init,
     capture_events,
+    capture_items,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that async streaming chat completions capture time-to-first-token (TTFT).
     """
     sentry_init(
         integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
     returned_stream = get_model_response(
@@ -3876,12 +7974,14 @@ async def test_streaming_chat_completion_ttft_async(
         )
     )
 
-    with mock.patch.object(
-        client.chat._client._client,
-        "send",
-        return_value=returned_stream,
-    ):
-        with start_transaction(name="openai tx"):
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
             response_stream = await client.chat.completions.create(
                 model="some-model",
                 messages=[{"role": "user", "content": "Say hello"}],
@@ -3891,42 +7991,79 @@ async def test_streaming_chat_completion_ttft_async(
             async for _ in response_stream:
                 pass
 
-    (tx,) = events
-    span = tx["spans"][0]
-    assert span["op"] == "gen_ai.chat"
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.chat"
 
-    # Verify TTFT is captured
-    assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in span["data"]
-    ttft = span["data"][SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN]
+        # Verify TTFT is captured
+        assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in span["attributes"]
+        ttft = span["attributes"][SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN]
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            client.chat._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            response_stream = await client.chat.completions.create(
+                model="some-model",
+                messages=[{"role": "user", "content": "Say hello"}],
+                stream=True,
+            )
+            # Consume the stream
+            async for _ in response_stream:
+                pass
+
+        (tx,) = events
+        span = tx["spans"][0]
+        assert span["op"] == "gen_ai.chat"
+
+        # Verify TTFT is captured
+        assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in span["data"]
+        ttft = span["data"][SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN]
+
     assert isinstance(ttft, float)
     assert ttft > 0
 
 
 # noinspection PyTypeChecker
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 def test_streaming_responses_api_ttft(
-    sentry_init, capture_events, get_model_response, server_side_event_chunks
+    sentry_init,
+    capture_events,
+    capture_items,
+    get_model_response,
+    server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that streaming responses API captures time-to-first-token (TTFT).
     """
     sentry_init(
         integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = OpenAI(api_key="z")
     returned_stream = get_model_response(
         server_side_event_chunks(EXAMPLE_RESPONSES_STREAM)
     )
 
-    with mock.patch.object(
-        client.responses._client._client,
-        "send",
-        return_value=returned_stream,
-    ):
-        with start_transaction(name="openai tx"):
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with mock.patch.object(
+            client.responses._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
             response_stream = client.responses.create(
                 model="some-model",
                 input="hello",
@@ -3936,47 +8073,81 @@ def test_streaming_responses_api_ttft(
             for _ in response_stream:
                 pass
 
-    (tx,) = events
-    span = tx["spans"][0]
-    assert span["op"] == "gen_ai.responses"
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.responses"
 
-    # Verify TTFT is captured
-    assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in span["data"]
-    ttft = span["data"][SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN]
+        # Verify TTFT is captured
+        assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in span["attributes"]
+        ttft = span["attributes"][SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN]
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            client.responses._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            response_stream = client.responses.create(
+                model="some-model",
+                input="hello",
+                stream=True,
+            )
+            # Consume the stream
+            for _ in response_stream:
+                pass
+
+        (tx,) = events
+        span = tx["spans"][0]
+        assert span["op"] == "gen_ai.responses"
+
+        # Verify TTFT is captured
+        assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in span["data"]
+        ttft = span["data"][SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN]
+
     assert isinstance(ttft, float)
     assert ttft > 0
 
 
 # noinspection PyTypeChecker
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
 async def test_streaming_responses_api_ttft_async(
     sentry_init,
     capture_events,
+    capture_items,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
 ):
     """
     Test that async streaming responses API captures time-to-first-token (TTFT).
     """
     sentry_init(
         integrations=[OpenAIIntegration()],
+        disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
 
     client = AsyncOpenAI(api_key="z")
     returned_stream = get_model_response(
         async_iterator(server_side_event_chunks(EXAMPLE_RESPONSES_STREAM))
     )
 
-    with mock.patch.object(
-        client.responses._client._client,
-        "send",
-        return_value=returned_stream,
-    ):
-        with start_transaction(name="openai tx"):
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with mock.patch.object(
+            client.responses._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
             response_stream = await client.responses.create(
                 model="some-model",
                 input="hello",
@@ -3986,12 +8157,37 @@ async def test_streaming_responses_api_ttft_async(
             async for _ in response_stream:
                 pass
 
-    (tx,) = events
-    span = tx["spans"][0]
-    assert span["op"] == "gen_ai.responses"
+        sentry_sdk.flush()
+        span = next(item.payload for item in items)
+        assert span["attributes"]["sentry.op"] == "gen_ai.responses"
 
-    # Verify TTFT is captured
-    assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in span["data"]
-    ttft = span["data"][SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN]
+        # Verify TTFT is captured
+        assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in span["attributes"]
+        ttft = span["attributes"][SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN]
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            client.responses._client._client,
+            "send",
+            return_value=returned_stream,
+        ), start_transaction(name="openai tx"):
+            response_stream = await client.responses.create(
+                model="some-model",
+                input="hello",
+                stream=True,
+            )
+            # Consume the stream
+            async for _ in response_stream:
+                pass
+
+        (tx,) = events
+        span = tx["spans"][0]
+        assert span["op"] == "gen_ai.responses"
+
+        # Verify TTFT is captured
+        assert SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN in span["data"]
+        ttft = span["data"][SPANDATA.GEN_AI_RESPONSE_TIME_TO_FIRST_TOKEN]
+
     assert isinstance(ttft, float)
     assert ttft > 0

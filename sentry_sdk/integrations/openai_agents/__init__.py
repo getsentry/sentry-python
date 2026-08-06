@@ -1,18 +1,18 @@
+from functools import wraps
+
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.utils import parse_version
 
-from functools import wraps
-
 from .patches import (
-    _get_model,
+    _create_run_streamed_wrapper,
+    _create_run_wrapper,
+    _execute_final_output,
+    _execute_handoffs,
     _get_all_tools,
+    _get_model,
+    _patch_error_tracing,
     _run_single_turn,
     _run_single_turn_streamed,
-    _execute_handoffs,
-    _create_run_wrapper,
-    _create_run_streamed_wrapper,
-    _execute_final_output,
-    _patch_error_tracing,
 )
 
 try:
@@ -46,17 +46,19 @@ if TYPE_CHECKING:
     from agents.run_internal.run_steps import SingleStepResult
 
 
-def _patch_runner() -> None:
+def _patch_runner(use_run_hooks: "bool") -> None:
     # Create the root span for one full agent run (including eventual handoffs)
     # Note agents.run.DEFAULT_AGENT_RUNNER.run_sync is a wrapper around
     # agents.run.DEFAULT_AGENT_RUNNER.run. It does not need to be wrapped separately.
     agents.run.DEFAULT_AGENT_RUNNER.run = _create_run_wrapper(
-        agents.run.DEFAULT_AGENT_RUNNER.run
+        agents.run.DEFAULT_AGENT_RUNNER.run,
+        use_run_hooks=use_run_hooks,
     )
 
     # Patch streaming runner
     agents.run.DEFAULT_AGENT_RUNNER.run_streamed = _create_run_streamed_wrapper(
-        agents.run.DEFAULT_AGENT_RUNNER.run_streamed
+        agents.run.DEFAULT_AGENT_RUNNER.run_streamed,
+        use_run_hooks=use_run_hooks,
     )
 
 
@@ -92,92 +94,98 @@ class OpenAIAgentsIntegration(Integration):
     @staticmethod
     def setup_once() -> None:
         _patch_error_tracing()
-        _patch_runner()
 
         library_version = parse_version(OPENAI_AGENTS_VERSION)
+        # ToolContext.tool_arguments added in https://github.com/openai/openai-agents-python/commit/5e1db14da542c77f8fdd5e2e26017977ae415813
+        use_run_hooks = library_version is not None and library_version >= (0, 3, 2)
+
+        _patch_runner(use_run_hooks=use_run_hooks)
+
         if library_version is not None and library_version >= (
             0,
             8,
         ):
+            if run_loop is not None:
 
-            @wraps(run_loop.get_all_tools)
-            async def new_wrapped_get_all_tools(
+                @wraps(run_loop.run_single_turn)
+                async def new_wrapped_run_single_turn(
+                    *args: "Any", **kwargs: "Any"
+                ) -> "SingleStepResult":
+                    return await _run_single_turn(
+                        run_loop.run_single_turn, *args, **kwargs
+                    )
+
+                agents.run.run_single_turn = new_wrapped_run_single_turn
+
+                @wraps(run_loop.run_single_turn_streamed)
+                async def new_wrapped_run_single_turn_streamed(
+                    *args: "Any", **kwargs: "Any"
+                ) -> "SingleStepResult":
+                    return await _run_single_turn_streamed(
+                        run_loop.run_single_turn_streamed, *args, **kwargs
+                    )
+
+                agents.run.run_single_turn_streamed = (
+                    new_wrapped_run_single_turn_streamed
+                )
+
+            if turn_preparation is not None:
+
+                @wraps(turn_preparation.get_model)
+                def new_wrapped_get_model(
+                    agent: "agents.Agent", run_config: "agents.RunConfig"
+                ) -> "agents.Model":
+                    return _get_model(turn_preparation.get_model, agent, run_config)
+
+                agents.run_internal.run_loop.get_model = new_wrapped_get_model
+
+            if turn_resolution is not None:
+                original_execute_handoffs = turn_resolution.execute_handoffs
+
+                @wraps(original_execute_handoffs)
+                async def new_wrapped_execute_handoffs(
+                    *args: "Any", **kwargs: "Any"
+                ) -> "SingleStepResult":
+                    return await _execute_handoffs(
+                        original_execute_handoffs, *args, **kwargs
+                    )
+
+                agents.run_internal.turn_resolution.execute_handoffs = (
+                    new_wrapped_execute_handoffs
+                )
+
+                original_execute_final_output = turn_resolution.execute_final_output
+
+                @wraps(turn_resolution.execute_final_output)
+                async def new_wrapped_final_output(
+                    *args: "Any", **kwargs: "Any"
+                ) -> "SingleStepResult":
+                    return await _execute_final_output(
+                        original_execute_final_output, *args, **kwargs
+                    )
+
+                agents.run_internal.turn_resolution.execute_final_output = (
+                    new_wrapped_final_output
+                )
+
+            return
+
+        if not use_run_hooks:
+            original_get_all_tools = AgentRunner._get_all_tools
+
+            @wraps(AgentRunner._get_all_tools.__func__)
+            async def old_wrapped_get_all_tools(
+                cls: "agents.Runner",
                 agent: "agents.Agent",
                 context_wrapper: "agents.RunContextWrapper",
             ) -> "list[agents.Tool]":
                 return await _get_all_tools(
-                    run_loop.get_all_tools, agent, context_wrapper
+                    original_get_all_tools, agent, context_wrapper
                 )
 
-            agents.run.get_all_tools = new_wrapped_get_all_tools
-
-            @wraps(turn_preparation.get_model)
-            def new_wrapped_get_model(
-                agent: "agents.Agent", run_config: "agents.RunConfig"
-            ) -> "agents.Model":
-                return _get_model(turn_preparation.get_model, agent, run_config)
-
-            agents.run_internal.run_loop.get_model = new_wrapped_get_model
-
-            @wraps(run_loop.run_single_turn)
-            async def new_wrapped_run_single_turn(
-                *args: "Any", **kwargs: "Any"
-            ) -> "SingleStepResult":
-                return await _run_single_turn(run_loop.run_single_turn, *args, **kwargs)
-
-            agents.run.run_single_turn = new_wrapped_run_single_turn
-
-            @wraps(run_loop.run_single_turn_streamed)
-            async def new_wrapped_run_single_turn_streamed(
-                *args: "Any", **kwargs: "Any"
-            ) -> "SingleStepResult":
-                return await _run_single_turn_streamed(
-                    run_loop.run_single_turn_streamed, *args, **kwargs
-                )
-
-            agents.run.run_single_turn_streamed = new_wrapped_run_single_turn_streamed
-
-            original_execute_handoffs = turn_resolution.execute_handoffs
-
-            @wraps(original_execute_handoffs)
-            async def new_wrapped_execute_handoffs(
-                *args: "Any", **kwargs: "Any"
-            ) -> "SingleStepResult":
-                return await _execute_handoffs(
-                    original_execute_handoffs, *args, **kwargs
-                )
-
-            agents.run_internal.turn_resolution.execute_handoffs = (
-                new_wrapped_execute_handoffs
+            agents.run.AgentRunner._get_all_tools = classmethod(
+                old_wrapped_get_all_tools
             )
-
-            original_execute_final_output = turn_resolution.execute_final_output
-
-            @wraps(turn_resolution.execute_final_output)
-            async def new_wrapped_final_output(
-                *args: "Any", **kwargs: "Any"
-            ) -> "SingleStepResult":
-                return await _execute_final_output(
-                    original_execute_final_output, *args, **kwargs
-                )
-
-            agents.run_internal.turn_resolution.execute_final_output = (
-                new_wrapped_final_output
-            )
-
-            return
-
-        original_get_all_tools = AgentRunner._get_all_tools
-
-        @wraps(AgentRunner._get_all_tools.__func__)
-        async def old_wrapped_get_all_tools(
-            cls: "agents.Runner",
-            agent: "agents.Agent",
-            context_wrapper: "agents.RunContextWrapper",
-        ) -> "list[agents.Tool]":
-            return await _get_all_tools(original_get_all_tools, agent, context_wrapper)
-
-        agents.run.AgentRunner._get_all_tools = classmethod(old_wrapped_get_all_tools)
 
         original_get_model = AgentRunner._get_model
 

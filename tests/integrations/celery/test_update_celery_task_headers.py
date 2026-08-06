@@ -1,13 +1,12 @@
-from copy import copy
 import itertools
-import pytest
-
+from copy import copy
 from unittest import mock
 
-from sentry_sdk.integrations.celery import _update_celery_task_headers
-import sentry_sdk
-from sentry_sdk.tracing_utils import Baggage
+import pytest
 
+import sentry_sdk
+from sentry_sdk.integrations.celery import _update_celery_task_headers
+from sentry_sdk.tracing_utils import Baggage
 
 BAGGAGE_VALUE = (
     "sentry-trace_id=771a43a4192642f0b136d5159a501700,"
@@ -71,7 +70,7 @@ def test_monitor_beat_tasks_with_headers(monitor_beat_tasks):
 
 
 def test_span_with_transaction(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
     headers = {}
     monitor_beat_tasks = False
 
@@ -91,7 +90,7 @@ def test_span_with_transaction(sentry_init):
 
 
 def test_span_with_transaction_custom_headers(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
     headers = {
         "baggage": BAGGAGE_VALUE,
         "sentry-trace": SENTRY_TRACE_VALUE,

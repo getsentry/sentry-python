@@ -1,13 +1,15 @@
 from functools import wraps
+from typing import TYPE_CHECKING
 
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
+from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import StreamedSpan
 
 from ..spans import execute_tool_span, update_execute_tool_span
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any, Callable, Awaitable
+    from typing import Any, Awaitable, Callable
 
 try:
     import agents
@@ -54,18 +56,19 @@ async def _get_all_tools(
                     result = await current_on_invoke(*args, **kwargs)
                     update_execute_tool_span(span, agent, current_tool, result)
 
+                    if not should_send_default_pii():
+                        return result
+
+                    if isinstance(span, StreamedSpan):
+                        span.set_attribute(SPANDATA.GEN_AI_TOOL_INPUT, args[1])
+                    else:
+                        span.set_data(SPANDATA.GEN_AI_TOOL_INPUT, args[1])
+
                 return result
 
             return sentry_wrapped_on_invoke_tool
 
-        wrapped_tool = agents.FunctionTool(
-            name=tool.name,
-            description=tool.description,
-            params_json_schema=tool.params_json_schema,
-            on_invoke_tool=create_wrapped_invoke(tool, original_on_invoke),
-            strict_json_schema=tool.strict_json_schema,
-            is_enabled=tool.is_enabled,
-        )
-        wrapped_tools.append(wrapped_tool)
+        tool.on_invoke_tool = create_wrapped_invoke(tool, original_on_invoke)
+        wrapped_tools.append(tool)
 
     return wrapped_tools

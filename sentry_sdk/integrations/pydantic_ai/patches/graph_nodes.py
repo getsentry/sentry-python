@@ -1,8 +1,8 @@
 from contextlib import asynccontextmanager
 from functools import wraps
 
-from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.consts import SPANDATA
+from sentry_sdk.integrations import DidNotEnable
 
 from ..spans import (
     ai_client_span,
@@ -10,14 +10,16 @@ from ..spans import (
 )
 
 try:
-    from pydantic_ai._agent_graph import ModelRequestNode  # type: ignore
+    from pydantic_ai._agent_graph import ModelRequestNode
 except ImportError:
     raise DidNotEnable("pydantic-ai not installed")
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable
+    from typing import Any, Callable, Optional
+
+    from pydantic_ai.messages import ModelResponse
 
 
 def _extract_span_data(node: "Any", ctx: "Any") -> "tuple[list[Any], Any, Any]":
@@ -71,14 +73,14 @@ def _patch_graph_nodes() -> None:
             result = await original_model_request_run(self, ctx)
 
             # Extract response from result if available
-            model_response = None
+            model_response: "Optional[ModelResponse]" = None
             if hasattr(result, "model_response"):
                 model_response = result.model_response
 
             update_ai_client_span(span, model_response)
             return result
 
-    ModelRequestNode.run = wrapped_model_request_run
+    ModelRequestNode.run = wrapped_model_request_run  # type: ignore[method-assign]
 
     # Patch ModelRequestNode.stream for streaming requests
     original_model_request_stream = ModelRequestNode.stream
@@ -108,7 +110,7 @@ def _patch_graph_nodes() -> None:
 
                 # After streaming completes, update span with response data
                 # The ModelRequestNode stores the final response in _result
-                model_response = None
+                model_response: "Optional[ModelResponse]" = None
                 if hasattr(self, "_result") and self._result is not None:
                     # _result is a NextNode containing the model_response
                     if hasattr(self._result, "model_response"):
@@ -118,4 +120,4 @@ def _patch_graph_nodes() -> None:
 
         return wrapped_model_request_stream
 
-    ModelRequestNode.stream = create_wrapped_stream(original_model_request_stream)
+    ModelRequestNode.stream = create_wrapped_stream(original_model_request_stream)  # type: ignore[method-assign]

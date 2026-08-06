@@ -1,7 +1,7 @@
 import logging
 import os
-import sentry_sdk
 
+import sentry_sdk
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 

@@ -4,17 +4,18 @@ from io import BytesIO
 
 import pyramid.testing
 import pytest
+from packaging.version import Version
 from pyramid.authorization import ACLAuthorizationPolicy
 from pyramid.response import Response
-from packaging.version import Version
 from werkzeug.test import Client
 
-from sentry_sdk import capture_message, add_breadcrumb
-from sentry_sdk.consts import DEFAULT_MAX_VALUE_LENGTH
+import sentry_sdk
+from sentry_sdk import add_breadcrumb, capture_message
 from sentry_sdk.integrations.pyramid import PyramidIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
+from sentry_sdk.traces import SpanStatus
 from tests.conftest import unpack_werkzeug_response
-
+from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
 
 try:
     from importlib.metadata import version
@@ -128,6 +129,7 @@ def test_has_context(route, get_client, sentry_init, capture_events):
     assert event["transaction"] == "hi2"
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize(
     "url,transaction_style,expected_transaction,expected_source",
     [
@@ -141,26 +143,51 @@ def test_transaction_style(
     sentry_init,
     get_client,
     capture_events,
+    capture_items,
     url,
     transaction_style,
     expected_transaction,
     expected_source,
+    span_streaming,
 ):
-    sentry_init(integrations=[PyramidIntegration(transaction_style=transaction_style)])
+    sentry_init(
+        integrations=[PyramidIntegration(transaction_style=transaction_style)],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
 
-    events = capture_events()
+    if span_streaming:
+        items = capture_items("event", "span")
+    else:
+        events = capture_events()
+
     client = get_client()
     client.get(url)
 
-    (event,) = events
-    assert event["transaction"] == expected_transaction
-    assert event["transaction_info"] == {"source": expected_source}
+    if span_streaming:
+        sentry_sdk.flush()
+        spans = [i.payload for i in items if i.type == "span"]
+        assert len(spans) == 1
+        (segment,) = spans
+        assert segment["name"] == expected_transaction
+        assert segment["attributes"]["sentry.segment.name.source"] == expected_source
+    else:
+        (_, transaction_event) = events
+        assert transaction_event["transaction"] == expected_transaction
+        assert transaction_event["transaction_info"] == {"source": expected_source}
 
 
-def test_large_json_request(sentry_init, capture_events, route, get_client):
-    sentry_init(integrations=[PyramidIntegration()], max_request_body_size="always")
+@pytest.mark.parametrize("max_value_length", [1024, None])
+def test_large_json_request(
+    sentry_init, capture_events, route, get_client, max_value_length
+):
+    sentry_init(
+        integrations=[PyramidIntegration()],
+        max_request_body_size="always",
+        max_value_length=max_value_length,
+    )
 
-    data = {"foo": {"bar": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10)}}
+    data = {"foo": {"bar": "a" * (1034)}}
 
     @route("/")
     def index(request):
@@ -176,15 +203,17 @@ def test_large_json_request(sentry_init, capture_events, route, get_client):
     client.post("/", content_type="application/json", data=json.dumps(data))
 
     (event,) = events
-    assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
-        "": {
-            "len": DEFAULT_MAX_VALUE_LENGTH + 10,
-            "rem": [
-                ["!limit", "x", DEFAULT_MAX_VALUE_LENGTH - 3, DEFAULT_MAX_VALUE_LENGTH]
-            ],
+
+    if max_value_length:
+        assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
+            "": {
+                "len": 1034,
+                "rem": [["!limit", "x", 1021, 1024]],
+            }
         }
-    }
-    assert len(event["request"]["data"]["foo"]["bar"]) == DEFAULT_MAX_VALUE_LENGTH
+        assert len(event["request"]["data"]["foo"]["bar"]) == 1024
+    else:
+        assert len(event["request"]["data"]["foo"]["bar"]) == 1034
 
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
@@ -234,11 +263,18 @@ def test_json_not_truncated_if_max_request_body_size_is_always(
     assert event["request"]["data"] == data
 
 
-def test_files_and_form(sentry_init, capture_events, route, get_client):
-    sentry_init(integrations=[PyramidIntegration()], max_request_body_size="always")
+@pytest.mark.parametrize("max_value_length", [1024, None])
+def test_files_and_form(
+    sentry_init, capture_events, route, get_client, max_value_length
+):
+    sentry_init(
+        integrations=[PyramidIntegration()],
+        max_request_body_size="always",
+        max_value_length=max_value_length,
+    )
 
     data = {
-        "foo": "a" * (DEFAULT_MAX_VALUE_LENGTH + 10),
+        "foo": "a" * (1034),
         "file": (BytesIO(b"hello"), "hello.txt"),
     }
 
@@ -253,15 +289,16 @@ def test_files_and_form(sentry_init, capture_events, route, get_client):
     client.post("/", data=data)
 
     (event,) = events
-    assert event["_meta"]["request"]["data"]["foo"] == {
-        "": {
-            "len": DEFAULT_MAX_VALUE_LENGTH + 10,
-            "rem": [
-                ["!limit", "x", DEFAULT_MAX_VALUE_LENGTH - 3, DEFAULT_MAX_VALUE_LENGTH]
-            ],
+    if max_value_length:
+        assert event["_meta"]["request"]["data"]["foo"] == {
+            "": {
+                "len": 1034,
+                "rem": [["!limit", "x", 1021, 1024]],
+            }
         }
-    }
-    assert len(event["request"]["data"]["foo"]) == DEFAULT_MAX_VALUE_LENGTH
+        assert len(event["request"]["data"]["foo"]) == 1024
+    else:
+        assert len(event["request"]["data"]["foo"]) == 1034
 
     assert event["_meta"]["request"]["data"]["file"] == {"": {"rem": [["!raw", "x"]]}}
     assert not event["request"]["data"]["file"]
@@ -438,16 +475,162 @@ def test_tween_ok(sentry_init, pyramid_config, capture_exceptions, route, get_cl
     assert not errors
 
 
-def test_span_origin(sentry_init, capture_events, get_client):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_tracing_error(
+    sentry_init, capture_events, capture_items, route, get_client, span_streaming
+):
     sentry_init(
         integrations=[PyramidIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    events = capture_events()
+
+    if span_streaming:
+        items = capture_items("event", "span")
+    else:
+        events = capture_events()
+
+    @route("/tracing-error")
+    def tracing_error(request):
+        1 / 0
+
+    client = get_client()
+    with pytest.raises(ZeroDivisionError):
+        client.get("/tracing-error")
+
+    if span_streaming:
+        sentry_sdk.flush()
+        spans = [i.payload for i in items if i.type == "span"]
+        error_events = [i.payload for i in items if i.type == "event"]
+
+        assert len(spans) == 1
+        assert len(error_events) == 1
+
+        (segment,) = spans
+        (error_event,) = error_events
+
+        assert segment["name"] == "tracing_error"
+        assert segment["status"] == SpanStatus.ERROR
+        assert segment["attributes"]["sentry.origin"] == "auto.http.pyramid"
+
+        assert error_event["exception"]["values"][-1]["type"] == "ZeroDivisionError"
+        assert error_event["exception"]["values"][-1]["mechanism"]["type"] == "pyramid"
+    else:
+        error_event, transaction_event = events
+
+        assert transaction_event["type"] == "transaction"
+        assert transaction_event["transaction"] == "tracing_error"
+        assert transaction_event["contexts"]["trace"]["status"] == "internal_error"
+
+        assert error_event["exception"]["values"][-1]["type"] == "ZeroDivisionError"
+        assert error_event["exception"]["values"][-1]["mechanism"]["type"] == "pyramid"
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_span_origin(
+    sentry_init,
+    pyramid_config,
+    capture_events,
+    capture_items,
+    get_client,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[PyramidIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    if span_streaming:
+        items = capture_items("event", "span")
+    else:
+        events = capture_events()
 
     client = get_client()
     client.get("/message")
 
-    (_, event) = events
+    if span_streaming:
+        sentry_sdk.flush()
+        spans = [i.payload for i in items if i.type == "span"]
+        assert len(spans) == 1
+        (segment,) = spans
+        assert segment["attributes"]["sentry.origin"] == "auto.http.pyramid"
+    else:
+        (_, event) = events
+        assert event["contexts"]["trace"]["origin"] == "auto.http.pyramid"
 
-    assert event["contexts"]["trace"]["origin"] == "auto.http.pyramid"
+
+@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
+def test_span_sets_user_id_on_segment(
+    sentry_init,
+    pyramid_config,
+    capture_items,
+    get_client,
+    init_kwargs,
+    expect_user,
+):
+    sentry_init(
+        integrations=[PyramidIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+
+    class AuthenticationPolicy:
+        def authenticated_userid(self, request):
+            return "123-abc"
+
+    pyramid_config.set_authorization_policy(ACLAuthorizationPolicy())
+    pyramid_config.set_authentication_policy(AuthenticationPolicy())
+
+    items = capture_items("span")
+
+    client = get_client()
+    client.get("/message")
+
+    sentry_sdk.flush()
+    spans = [i.payload for i in items]
+
+    assert len(spans) == 1
+    (segment,) = spans
+
+    if expect_user:
+        assert segment["attributes"]["user.id"] == "123-abc"
+    else:
+        assert "user.id" not in segment["attributes"]
+
+
+@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
+def test_user_id_error_event_data_collection(
+    sentry_init,
+    pyramid_config,
+    capture_events,
+    route,
+    get_client,
+    init_kwargs,
+    expect_user,
+):
+    sentry_init(integrations=[PyramidIntegration()], **init_kwargs)
+    events = capture_events()
+
+    class AuthenticationPolicy:
+        def authenticated_userid(self, request):
+            return "123-abc"
+
+    pyramid_config.set_authorization_policy(ACLAuthorizationPolicy())
+    pyramid_config.set_authentication_policy(AuthenticationPolicy())
+
+    @route("/crash")
+    def crash(request):
+        1 / 0
+
+    client = get_client()
+    with pytest.raises(ZeroDivisionError):
+        client.get("/crash")
+
+    (event,) = events
+
+    if expect_user:
+        assert event["user"]["id"] == "123-abc"
+    else:
+        assert "id" not in event.get("user", {})

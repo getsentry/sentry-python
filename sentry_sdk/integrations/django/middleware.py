@@ -3,25 +3,23 @@ Create spans from Django middleware invocations
 """
 
 from functools import wraps
+from typing import TYPE_CHECKING
 
 from django import VERSION as DJANGO_VERSION
 
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     ContextVar,
-    transaction_from_function,
     capture_internal_exceptions,
+    transaction_from_function,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import Optional
-    from typing import TypeVar
+    from typing import Any, Callable, Optional, TypeVar, Union
 
+    from sentry_sdk.traces import StreamedSpan
     from sentry_sdk.tracing import Span
 
     F = TypeVar("F", bound=Callable[..., Any])
@@ -34,8 +32,9 @@ DJANGO_SUPPORTS_ASYNC_MIDDLEWARE = DJANGO_VERSION >= (3, 1)
 
 if not DJANGO_SUPPORTS_ASYNC_MIDDLEWARE:
     _asgi_middleware_mixin_factory = lambda _: object
+    iscoroutinefunction = lambda _: False
 else:
-    from .asgi import _asgi_middleware_mixin_factory
+    from .asgi import _asgi_middleware_mixin_factory, iscoroutinefunction
 
 
 def patch_django_middlewares() -> None:
@@ -68,7 +67,9 @@ def patch_django_middlewares() -> None:
 def _wrap_middleware(middleware: "Any", middleware_name: str) -> "Any":
     from sentry_sdk.integrations.django import DjangoIntegration
 
-    def _check_middleware_span(old_method: "Callable[..., Any]") -> "Optional[Span]":
+    def _check_middleware_span(
+        old_method: "Callable[..., Any]",
+    ) -> "Optional[Union[Span, StreamedSpan]]":
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
         if integration is None or not integration.middleware_spans:
             return None
@@ -80,27 +81,65 @@ def _wrap_middleware(middleware: "Any", middleware_name: str) -> "Any":
         if function_basename:
             description = "{}.{}".format(description, function_basename)
 
-        middleware_span = sentry_sdk.start_span(
-            op=OP.MIDDLEWARE_DJANGO,
-            name=description,
-            origin=DjangoIntegration.origin,
-        )
-        middleware_span.set_tag("django.function_name", function_name)
-        middleware_span.set_tag("django.middleware_name", middleware_name)
+        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+        middleware_span: "Union[Span, StreamedSpan]"
+        if span_streaming:
+            if sentry_sdk.traces.get_current_span() is None:
+                return None
+            middleware_span = sentry_sdk.traces.start_span(
+                name=description,
+                attributes={
+                    "sentry.op": OP.MIDDLEWARE_DJANGO,
+                    "sentry.origin": DjangoIntegration.origin,
+                    SPANDATA.MIDDLEWARE_NAME: middleware_name,
+                },
+            )
+        else:
+            middleware_span = sentry_sdk.start_span(
+                op=OP.MIDDLEWARE_DJANGO,
+                name=description,
+                origin=DjangoIntegration.origin,
+            )
+            middleware_span.set_tag("django.function_name", function_name)
+            middleware_span.set_tag("django.middleware_name", middleware_name)
 
         return middleware_span
 
     def _get_wrapped_method(old_method: "F") -> "F":
         with capture_internal_exceptions():
+            # Middleware hooks (e.g. `process_view`, `process_exception`) may be
+            # `async def` when the middleware is async. A synchronous wrapper
+            # would hide the coroutine from Django's `iscoroutinefunction` check,
+            # causing Django to call the hook synchronously and never await the
+            # returned coroutine. Wrap async hooks with an async wrapper so the
+            # wrapped method continues to report as a coroutine function.
+            if iscoroutinefunction is not None and iscoroutinefunction(old_method):
 
-            def sentry_wrapped_method(*args: "Any", **kwargs: "Any") -> "Any":
-                middleware_span = _check_middleware_span(old_method)
+                async def async_sentry_wrapped_method(
+                    *args: "Any", **kwargs: "Any"
+                ) -> "Any":
+                    middleware_span = _check_middleware_span(old_method)
 
-                if middleware_span is None:
-                    return old_method(*args, **kwargs)
+                    if middleware_span is None:
+                        return await old_method(*args, **kwargs)
 
-                with middleware_span:
-                    return old_method(*args, **kwargs)
+                    with middleware_span:
+                        return await old_method(*args, **kwargs)
+
+                sentry_wrapped_method = async_sentry_wrapped_method
+
+            else:
+
+                def sync_sentry_wrapped_method(*args: "Any", **kwargs: "Any") -> "Any":
+                    middleware_span = _check_middleware_span(old_method)
+
+                    if middleware_span is None:
+                        return old_method(*args, **kwargs)
+
+                    with middleware_span:
+                        return old_method(*args, **kwargs)
+
+                sentry_wrapped_method = sync_sentry_wrapped_method
 
             try:
                 # fails for __call__ of function on Python 2 (see py2.7-django-1.11)

@@ -1,25 +1,23 @@
 import pytest
 import responses
-
 from opentelemetry import trace
+from opentelemetry.context import attach, detach
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.propagate import get_global_textmap, set_global_textmap
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.trace import (
-    get_tracer_provider,
-    set_tracer_provider,
     ProxyTracerProvider,
     format_span_id,
     format_trace_id,
     get_current_span,
+    get_tracer_provider,
+    set_tracer_provider,
 )
-from opentelemetry.context import attach, detach
-from opentelemetry.propagate import get_global_textmap, set_global_textmap
 from opentelemetry.util._once import Once
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 
 from sentry_sdk.integrations.otlp import OTLPIntegration, SentryOTLPPropagator
 from sentry_sdk.scope import get_external_propagation_context
-
 
 original_propagator = get_global_textmap()
 

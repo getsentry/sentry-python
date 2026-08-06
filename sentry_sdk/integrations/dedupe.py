@@ -1,11 +1,10 @@
 import weakref
+from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.utils import ContextVar, logger
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor
-
-from typing import TYPE_CHECKING
+from sentry_sdk.utils import ContextVar, logger
 
 if TYPE_CHECKING:
     from typing import Optional

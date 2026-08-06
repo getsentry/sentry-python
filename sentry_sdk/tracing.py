@@ -2,7 +2,7 @@ import uuid
 import warnings
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import sentry_sdk
 from sentry_sdk.consts import INSTRUMENTER, SPANDATA, SPANSTATUS, SPANTEMPLATE
@@ -386,6 +386,10 @@ class Span:
         )
 
     def __enter__(self) -> "Span":
+        if has_span_streaming_enabled(sentry_sdk.get_client().options):
+            self._context_manager_state = None  # early return sentinel
+            return self
+
         scope = self.scope or sentry_sdk.get_current_scope()
         old_span = scope.span
         scope.span = self
@@ -395,11 +399,21 @@ class Span:
     def __exit__(
         self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
     ) -> None:
+        if (
+            hasattr(self, "_context_manager_state")
+            and self._context_manager_state is None
+        ):
+            del self._context_manager_state
+            return
+
         if value is not None and should_be_treated_as_error(ty, value):
             self.set_status(SPANSTATUS.INTERNAL_ERROR)
 
         with capture_internal_exceptions():
-            scope, old_span = self._context_manager_state
+            scope, old_span = cast(
+                "Tuple[sentry_sdk.Scope, Optional[Span]]",
+                self._context_manager_state,
+            )
             del self._context_manager_state
             self.finish(scope)
             scope.span = old_span
@@ -965,9 +979,7 @@ class Transaction(Span):
 
         # For backwards compatibility, we must handle the case where `scope`
         # or `hub` could both either be a `Scope` or a `Hub`.
-        scope: "Optional[sentry_sdk.Scope]" = self._get_scope_from_finish_args(
-            scope, hub
-        )
+        scope = self._get_scope_from_finish_args(scope, hub)
 
         scope = scope or self.scope or sentry_sdk.get_current_scope()
         client = sentry_sdk.get_client()
@@ -1042,11 +1054,23 @@ class Transaction(Span):
 
             return None
 
-        finished_spans = [
-            span.to_json()
-            for span in self._span_recorder.spans
-            if span.timestamp is not None
-        ]
+        finished_spans = []
+        has_gen_ai_span = False
+        if client.options.get("stream_gen_ai_spans", True):
+            for span in self._span_recorder.spans:
+                if span.timestamp is None:
+                    continue
+
+                if isinstance(span.op, str) and span.op.startswith("gen_ai."):
+                    has_gen_ai_span = True
+
+                finished_spans.append(span.to_json())
+        else:
+            finished_spans = [
+                span.to_json()
+                for span in self._span_recorder.spans
+                if span.timestamp is not None
+            ]
 
         len_diff = len(self._span_recorder.spans) - len(finished_spans)
         dropped_spans = len_diff + self._span_recorder.dropped_spans
@@ -1077,6 +1101,9 @@ class Transaction(Span):
 
         if dropped_spans > 0:
             event["_dropped_spans"] = dropped_spans
+
+        if has_gen_ai_span:
+            event["_has_gen_ai_span"] = True
 
         if self._profile is not None and self._profile.valid():
             event["profile"] = self._profile
@@ -1187,16 +1214,25 @@ class Transaction(Span):
         # we would have bailed already if neither `traces_sampler` nor
         # `traces_sample_rate` were defined, so one of these should work; prefer
         # the hook if so
-        sample_rate = (
-            client.options["traces_sampler"](sampling_context)
-            if callable(client.options.get("traces_sampler"))
-            # default inheritance behavior
-            else (
+        if callable(client.options.get("traces_sampler")):
+            try:
+                sample_rate = client.options["traces_sampler"](sampling_context)
+            except Exception:
+                logger.warning(
+                    "[Tracing] traces_sampler raised; falling back to parent sample rate or traces_sample_rate",
+                    exc_info=True,
+                )
+                sample_rate = (
+                    sampling_context["parent_sampled"]
+                    if sampling_context["parent_sampled"] is not None
+                    else client.options["traces_sample_rate"]
+                )
+        else:
+            sample_rate = (
                 sampling_context["parent_sampled"]
                 if sampling_context["parent_sampled"] is not None
                 else client.options["traces_sample_rate"]
             )
-        )
 
         # Since this is coming from the user (or from a function provided by the
         # user), who knows what we might get. (The only valid values are
@@ -1222,7 +1258,7 @@ class Transaction(Span):
                 "[Tracing] Discarding {transaction_description} because {reason}".format(
                     transaction_description=transaction_description,
                     reason=(
-                        "traces_sampler returned 0 or False"
+                        "traces_sampler returned 0 or False, or is using a fallback sample rate that is 0 or False"
                         if callable(client.options.get("traces_sampler"))
                         else "traces_sample_rate is set to 0"
                     ),
@@ -1457,6 +1493,7 @@ from sentry_sdk.tracing_utils import (
     EnvironHeaders,
     _generate_sample_rand,
     extract_sentrytrace_data,
+    has_span_streaming_enabled,
     has_tracing_enabled,
     maybe_create_breadcrumbs_from_span,
 )

@@ -13,18 +13,28 @@ TEST_SUITE_CONFIG = {
         },
         "python": ">=3.7",
     },
+    "aiomysql": {
+        "package": "aiomysql",
+        "deps": {
+            "*": ["pytest-asyncio", "cryptography"],
+        },
+        "python": ">=3.7",
+    },
     "anthropic": {
         "package": "anthropic",
         "deps": {
             "*": ["pytest-asyncio"],
             "<0.50": ["httpx<0.28.0"],
+            # tokenizers dropped Python 3.8 support, but didn't update package metadata.
+            # https://github.com/huggingface/tokenizers/commit/f4c9fd7f402fc794df8f1b547a95ee5305f9fe62
+            "py3.8": ["tokenizers<0.20.4"],
         },
         "python": ">=3.8",
     },
     "ariadne": {
         "package": "ariadne",
         "deps": {
-            "*": ["fastapi", "flask", "httpx"],
+            "*": ["fastapi", "flask", "httpx<0.28.0"],
         },
         "python": ">=3.8",
         "num_versions": 2,
@@ -32,8 +42,10 @@ TEST_SUITE_CONFIG = {
     "arq": {
         "package": "arq",
         "deps": {
-            "*": ["async-timeout", "pytest-asyncio", "fakeredis>=2.2.0,<2.8"],
+            "*": ["async-timeout", "pytest-asyncio", "fakeredis"],
             "<=0.23": ["pydantic<2"],
+            # https://github.com/cunla/fakeredis-py/issues/490
+            "py3.6,py3.7,py3.8": ["fakeredis<2.36.0"],
         },
         "num_versions": 2,
     },
@@ -50,6 +62,7 @@ TEST_SUITE_CONFIG = {
         "num_versions": 2,
         "deps": {
             "*": ["dill"],
+            ">=2.73": ["betterproto==2.0.0b6"],
         },
     },
     "boto3": {
@@ -67,7 +80,8 @@ TEST_SUITE_CONFIG = {
     "celery": {
         "package": "celery",
         "deps": {
-            "*": ["newrelic<10.17.0", "redis"],
+            "*": ["newrelic<10.17.0", "redis", "pytest-forked"],
+            "py3.6": ["newrelic<8"],
             "py3.7": ["importlib-metadata<5.0"],
         },
     },
@@ -93,18 +107,22 @@ TEST_SUITE_CONFIG = {
                 "psycopg2-binary",
                 "djangorestframework",
                 "pytest-django",
+                "pytest-forked",
                 "Werkzeug",
+                "channels[daphne]",
+                "executing",
             ],
-            ">=2.0": ["channels[daphne]"],
-            ">=2.2,<3.1": ["six"],
             ">=3.0": ["pytest-asyncio"],
             "<3.3": [
                 "djangorestframework>=3.0,<4.0",
                 "Werkzeug<2.1.0",
             ],
-            "<3.1": ["pytest-django<4.0"],
+            # Import six when pytest-django<4.0 as six was moved out of install_requires in
+            # https://github.com/pytest-dev/pytest-django/commit/f2ea236a70873fe763a5b6d50678743e2238b297
+            "<3.1": ["pytest-django<4.0", "six"],
             "py3.14,py3.14t": ["coverage==7.11.0"],
         },
+        "include": "<6.1b1",
     },
     "dramatiq": {
         "package": "dramatiq",
@@ -140,12 +158,24 @@ TEST_SUITE_CONFIG = {
     "flask": {
         "package": "flask",
         "deps": {
-            "*": ["flask-login", "werkzeug"],
-            "<2.0": ["werkzeug<2.1.0", "markupsafe<2.1.0"],
+            "*": ["flask-login", "werkzeug", "blinker"],
+            # https://github.com/pallets/flask/issues/4455
+            "<2.0": [
+                "werkzeug<2.1.0",
+                "markupsafe<2.0.0",
+                "itsdangerous>=0.24,<2.0",
+                "jinja2<3.1.1",
+            ],
+            "py3.6,py3.7": [
+                "setuptools<82"
+            ],  # Handled by importlib.metadata on Python 3.8+
         },
     },
     "gql": {
         "package": "gql[all]",
+        "deps": {
+            "*": ["responses"],
+        },
         "num_versions": 2,
     },
     "google_genai": {
@@ -158,14 +188,21 @@ TEST_SUITE_CONFIG = {
     "graphene": {
         "package": "graphene",
         "deps": {
-            "*": ["blinker", "fastapi", "flask", "httpx"],
-            "py3.6": ["aiocontextvars"],
+            "*": ["blinker", "fastapi[test]", "flask", "httpx"],
+            "py3.6": ["aiocontextvars", "setuptools<82"],
+            "py3.7": ["setuptools<82"],  # Handled by importlib.metadata on Python 3.8+
         },
     },
     "grpc": {
         "package": "grpcio",
         "deps": {
-            "*": ["protobuf", "mypy-protobuf", "types-protobuf", "pytest-asyncio"],
+            "*": [
+                "protobuf",
+                "mypy-protobuf",
+                "types-protobuf",
+                "pytest-asyncio",
+                "pytest-forked",
+            ],
         },
         "python": ">=3.7",
     },
@@ -189,9 +226,19 @@ TEST_SUITE_CONFIG = {
             ">=0.28": ">=3.9",
         },
     },
+    "httpx2": {
+        "package": "httpx2",
+        "deps": {
+            "*": ["anyio>=3,<5", "httpx2-pytest==1.0.1"],
+        },
+        "python": ">=3.10",
+    },
     "huey": {
         "package": "huey",
         "num_versions": 2,
+        "python": {
+            ">=3.3.0": ">3.7",
+        },
     },
     "huggingface_hub": {
         "package": "huggingface_hub",
@@ -234,6 +281,9 @@ TEST_SUITE_CONFIG = {
     },
     "litellm": {
         "package": "litellm",
+        "deps": {
+            "*": ["anthropic", "google-genai", "pytest-asyncio"],
+        },
     },
     "litestar": {
         "package": "litestar",
@@ -255,13 +305,16 @@ TEST_SUITE_CONFIG = {
     "mcp": {
         "package": "mcp",
         "deps": {
-            "*": ["pytest-asyncio"],
+            "*": ["pytest-asyncio", "httpx"],
         },
     },
     "fastmcp": {
         "package": "fastmcp",
         "deps": {
-            "*": ["pytest-asyncio"],
+            "*": ["pytest-asyncio", "httpx"],
+            "<0.3.0": [
+                "mcp<2"
+            ],  # Pin added to package in https://github.com/PrefectHQ/fastmcp/commit/5f58621f8b7c7ba257c9837333b09b391f868456#diff-50c86b7ed8ac2cf95bd48334961bf0530cdc77b5a56f852c5c61b89d735fd711
         },
     },
     "openai-base": {
@@ -301,12 +354,16 @@ TEST_SUITE_CONFIG = {
     },
     "pure_eval": {
         "package": "pure_eval",
+        "deps": {
+            "*": ["asttokens", "executing"],
+        },
         "num_versions": 2,
     },
     "pydantic_ai": {
         "package": "pydantic-ai",
         "deps": {
             "*": ["pytest-asyncio"],
+            "==2.0.0b3": ["pydantic<2.14"],
         },
         "python": ">=3.10",
     },
@@ -330,12 +387,14 @@ TEST_SUITE_CONFIG = {
         "package": "pyramid",
         "deps": {
             "*": ["werkzeug<2.1.0"],
+            # Pinned by library in https://github.com/Pylons/pyramid/commit/e239cb693b06e8d01c02dacd2a7b93e5d0a4d5ae
+            "<2.1": ["setuptools<82"],
         },
     },
     "quart": {
         "package": "quart",
         "deps": {
-            "*": ["quart-auth", "pytest-asyncio", "Werkzeug"],
+            "*": ["quart-auth", "pytest-asyncio", "pytest-forked", "Werkzeug"],
             ">=0.19": ["quart-flask-patch"],
             "<0.19": [
                 "blinker<1.6",
@@ -344,11 +403,16 @@ TEST_SUITE_CONFIG = {
                 "hypercorn<0.15.0",
             ],
             "py3.8": ["taskgroup==0.0.0a4"],
+            "py3.6,py3.7": ["importlib_metadata"],
         },
         "num_versions": 2,
     },
     "ray": {
         "package": "ray",
+        "deps": {
+            # Required for pkg_resources import prior to https://github.com/ray-project/ray/commit/7e9043c38d76412c310fcf6e3fff79cb55d481da
+            "<2.10": ["setuptools<82"],
+        },
         "python": {
             ">0.0,<2.52.0": ">=3.9",
             ">=2.52.0": ">=3.10",
@@ -361,7 +425,9 @@ TEST_SUITE_CONFIG = {
             "*": ["fakeredis!=1.7.4", "pytest<8.0.0"],
             ">=4.0,<5.0": ["fakeredis<2.31.0"],
             "py3.6,py3.7,py3.8": ["fakeredis<2.26.0"],
-            "py3.7,py3.8,py3.9,py3.10,py3.11,py3.12,py3.13": ["pytest-asyncio"],
+            "py3.7,py3.8,py3.9,py3.10,py3.11,py3.12,py3.13,py3.14,py3.14t": [
+                "pytest-asyncio"
+            ],
         },
     },
     "redis_py_cluster_legacy": {
@@ -377,7 +443,12 @@ TEST_SUITE_CONFIG = {
         "deps": {
             # https://github.com/jamesls/fakeredis/issues/245
             # https://github.com/cunla/fakeredis-py/issues/341
-            "*": ["fakeredis<2.28.0"],
+            "*": ["fakeredis"],
+            # RQ commit https://github.com/rq/rq/commit/64cb1a27b9d1f2fd52bbbb5c1e4518c024f74685
+            # introduced unguarded access to "addr" from the CLIENT LIST command.
+            # The default "addr" value was removed in https://github.com/cunla/fakeredis-py/commit/0441288fb22c8c191fc716b561e0001cf512abe5.
+            # from fakeredis.
+            ">=1.1.14": ["fakeredis<2.36.0"],
             "<0.9": ["fakeredis<1.0", "redis<3.2.2"],
             ">=0.9,<0.14": ["fakeredis>=1.0,<1.7.4"],
             "py3.6,py3.7": ["fakeredis!=2.26.0"],
@@ -392,7 +463,8 @@ TEST_SUITE_CONFIG = {
             "*": ["websockets<11.0", "aiohttp"],
             ">=22": ["sanic-testing"],
             "py3.6": ["aiocontextvars==0.2.1"],
-            "py3.8": ["tracerite<1.1.2"],
+            # tracerite imports pkg_resources before https://github.com/sanic-org/tracerite/commit/2f68543fab726d12d5c5d71fab584eb42140f410
+            "py3.8": ["tracerite<1.1.2", "setuptools<82"],
         },
         "num_versions": 4,
     },

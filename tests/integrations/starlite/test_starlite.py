@@ -1,17 +1,19 @@
 from __future__ import annotations
+
 import functools
-
-import pytest
-
-from sentry_sdk import capture_message
-from sentry_sdk.integrations.starlite import StarliteIntegration
-
 from typing import Any, Dict
 
-from starlite import AbstractMiddleware, LoggingConfig, Starlite, get, Controller
+import pytest
+from starlite import AbstractMiddleware, Controller, LoggingConfig, Starlite, get
 from starlite.middleware import LoggingMiddlewareConfig, RateLimitConfig
 from starlite.middleware.session.memory_backend import MemoryBackendConfig
 from starlite.testing import TestClient
+
+import sentry_sdk
+from sentry_sdk import capture_message
+from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
+from sentry_sdk.integrations.starlite import StarliteIntegration
+from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
 
 
 def starlite_app_factory(middleware=None, debug=True, exception_handlers=None):
@@ -112,10 +114,72 @@ def test_catch_exceptions(
     assert event["exception"]["values"][0]["mechanism"]["type"] == "starlite"
 
 
-def test_middleware_spans(sentry_init, capture_events):
+@pytest.mark.parametrize(
+    "test_url,expected_tx_name",
+    [
+        (
+            "/some_url",
+            "tests.integrations.starlite.test_starlite.starlite_app_factory.<locals>.homepage_handler",
+        ),
+        (
+            "/custom_error",
+            "custom_name",
+        ),
+        (
+            "/controller/error",
+            "partial(<function tests.integrations.starlite.test_starlite.starlite_app_factory.<locals>.MyController.controller_error>)",
+        ),
+    ],
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_transaction_name_and_source(
+    sentry_init,
+    capture_events,
+    test_url,
+    expected_tx_name,
+    capture_items,
+    span_streaming,
+):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarliteIntegration()],
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    starlite_app = starlite_app_factory()
+    client = TestClient(starlite_app)
+
+    if span_streaming:
+        items = capture_items("span")
+
+        try:
+            client.get(test_url)
+        except Exception:
+            pass
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        spans = [span for span in spans if expected_tx_name in span["name"]]
+        assert len(spans) == 1
+        assert spans[0]["attributes"]["sentry.segment.name.source"] == "component"
+    else:
+        events = capture_events()
+
+        try:
+            client.get(test_url)
+        except Exception:
+            pass
+
+        (_, transaction) = events
+        assert expected_tx_name in transaction["transaction"]
+        assert transaction["transaction_info"] == {"source": "component"}
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_middleware_spans(sentry_init, capture_events, capture_items, span_streaming):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarliteIntegration()],
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     logging_config = LoggingMiddlewareConfig()
@@ -129,32 +193,58 @@ def test_middleware_spans(sentry_init, capture_events):
             rate_limit_config.middleware,
         ]
     )
-    events = capture_events()
+
+    if span_streaming:
+        items = capture_items("span")
+    else:
+        events = capture_events()
 
     client = TestClient(
         starlite_app, raise_server_exceptions=False, base_url="http://testserver.local"
     )
     client.get("/message")
 
-    (_, transaction_event) = events
-
     expected = {"SessionMiddleware", "LoggingMiddleware", "RateLimitMiddleware"}
-    found = set()
 
-    starlite_spans = (
-        span
-        for span in transaction_event["spans"]
-        if span["op"] == "middleware.starlite"
-    )
+    if span_streaming:
+        sentry_sdk.flush()
 
-    for span in starlite_spans:
-        assert span["description"] in expected
-        assert span["description"] not in found
-        found.add(span["description"])
-        assert span["description"] == span["tags"]["starlite.middleware_name"]
+        middleware_spans = [
+            item.payload
+            for item in items
+            if item.payload.get("attributes", {}).get("sentry.op")
+            == "middleware.starlite"
+        ]
+        assert len(middleware_spans) == 3
+
+        found = set()
+        for span in middleware_spans:
+            assert span["name"] in expected
+            assert span["name"] not in found
+            found.add(span["name"])
+            assert span["name"] == span["attributes"]["middleware.name"]
+    else:
+        (_, transaction_event) = events
+
+        found = set()
+        middleware_spans = [
+            span
+            for span in transaction_event["spans"]
+            if span["op"] == "middleware.starlite"
+        ]
+        assert len(middleware_spans) == 3
+
+        for span in middleware_spans:
+            assert span["description"] in expected
+            assert span["description"] not in found
+            found.add(span["description"])
+            assert span["description"] == span["tags"]["starlite.middleware_name"]
 
 
-def test_middleware_callback_spans(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_middleware_callback_spans(
+    sentry_init, capture_events, capture_items, span_streaming
+):
     class SampleMiddleware(AbstractMiddleware):
         async def __call__(self, scope, receive, send) -> None:
             async def do_stuff(message):
@@ -168,14 +258,17 @@ def test_middleware_callback_spans(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarliteIntegration()],
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     starlite_app = starlite_app_factory(middleware=[SampleMiddleware])
-    events = capture_events()
+
+    if span_streaming:
+        items = capture_items("span")
+    else:
+        events = capture_events()
 
     client = TestClient(starlite_app, raise_server_exceptions=False)
     client.get("/message")
-
-    (_, transaction_events) = events
 
     expected_starlite_spans = [
         {
@@ -195,25 +288,52 @@ def test_middleware_callback_spans(sentry_init, capture_events):
         },
     ]
 
-    def is_matching_span(expected_span, actual_span):
-        return (
-            expected_span["op"] == actual_span["op"]
-            and expected_span["description"] == actual_span["description"]
-            and expected_span["tags"] == actual_span["tags"]
-        )
+    if span_streaming:
+        sentry_sdk.flush()
 
-    actual_starlite_spans = list(
-        span
-        for span in transaction_events["spans"]
-        if "middleware.starlite" in span["op"]
-    )
-    assert len(actual_starlite_spans) == 3
+        actual_starlite_spans = [
+            item.payload
+            for item in items
+            if "middleware.starlite"
+            in item.payload.get("attributes", {}).get("sentry.op", "")
+        ]
+        assert len(actual_starlite_spans) == 3
 
-    for expected_span in expected_starlite_spans:
-        assert any(
-            is_matching_span(expected_span, actual_span)
-            for actual_span in actual_starlite_spans
+        def is_matching_span_streaming(expected_span, actual_span):
+            return (
+                expected_span["op"] == actual_span["attributes"]["sentry.op"]
+                and expected_span["description"] == actual_span["name"]
+                and expected_span["tags"]["starlite.middleware_name"]
+                == actual_span["attributes"]["middleware.name"]
+            )
+
+        for expected_span in expected_starlite_spans:
+            assert any(
+                is_matching_span_streaming(expected_span, actual_span)
+                for actual_span in actual_starlite_spans
+            )
+    else:
+        (_, transaction_events) = events
+
+        def is_matching_span(expected_span, actual_span):
+            return (
+                expected_span["op"] == actual_span["op"]
+                and expected_span["description"] == actual_span["description"]
+                and expected_span["tags"] == actual_span["tags"]
+            )
+
+        actual_starlite_spans = list(
+            span
+            for span in transaction_events["spans"]
+            if "middleware.starlite" in span["op"]
         )
+        assert len(actual_starlite_spans) == 3
+
+        for expected_span in expected_starlite_spans:
+            assert any(
+                is_matching_span(expected_span, actual_span)
+                for actual_span in actual_starlite_spans
+            )
 
 
 def test_middleware_receive_send(sentry_init, capture_events):
@@ -239,7 +359,10 @@ def test_middleware_receive_send(sentry_init, capture_events):
     client.get("/message")
 
 
-def test_middleware_partial_receive_send(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_middleware_partial_receive_send(
+    sentry_init, capture_events, capture_items, span_streaming
+):
     class SamplePartialReceiveSendMiddleware(AbstractMiddleware):
         async def __call__(self, scope, receive, send):
             message = await receive()
@@ -263,15 +386,18 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarliteIntegration()],
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     starlite_app = starlite_app_factory(middleware=[SamplePartialReceiveSendMiddleware])
-    events = capture_events()
+
+    if span_streaming:
+        items = capture_items("span")
+    else:
+        events = capture_events()
 
     client = TestClient(starlite_app, raise_server_exceptions=False)
     # See SamplePartialReceiveSendMiddleware.__call__ above for assertions of correct behavior
     client.get("/message")
-
-    (_, transaction_events) = events
 
     expected_starlite_spans = [
         {
@@ -291,31 +417,60 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
         },
     ]
 
-    def is_matching_span(expected_span, actual_span):
-        return (
-            expected_span["op"] == actual_span["op"]
-            and actual_span["description"].startswith(expected_span["description"])
-            and expected_span["tags"] == actual_span["tags"]
+    if span_streaming:
+        sentry_sdk.flush()
+
+        actual_starlite_spans = [
+            item.payload
+            for item in items
+            if "middleware.starlite"
+            in item.payload.get("attributes", {}).get("sentry.op", "")
+        ]
+        assert len(actual_starlite_spans) == 3
+
+        def is_matching_span_streaming(expected_span, actual_span):
+            return (
+                expected_span["op"] == actual_span["attributes"]["sentry.op"]
+                and actual_span["name"].startswith(expected_span["description"])
+                and expected_span["tags"]["starlite.middleware_name"]
+                == actual_span["attributes"]["middleware.name"]
+            )
+
+        for expected_span in expected_starlite_spans:
+            assert any(
+                is_matching_span_streaming(expected_span, actual_span)
+                for actual_span in actual_starlite_spans
+            )
+    else:
+        (_, transaction_events) = events
+
+        def is_matching_span(expected_span, actual_span):
+            return (
+                expected_span["op"] == actual_span["op"]
+                and actual_span["description"].startswith(expected_span["description"])
+                and expected_span["tags"] == actual_span["tags"]
+            )
+
+        actual_starlite_spans = list(
+            span
+            for span in transaction_events["spans"]
+            if "middleware.starlite" in span["op"]
         )
+        assert len(actual_starlite_spans) == 3
 
-    actual_starlite_spans = list(
-        span
-        for span in transaction_events["spans"]
-        if "middleware.starlite" in span["op"]
-    )
-    assert len(actual_starlite_spans) == 3
-
-    for expected_span in expected_starlite_spans:
-        assert any(
-            is_matching_span(expected_span, actual_span)
-            for actual_span in actual_starlite_spans
-        )
+        for expected_span in expected_starlite_spans:
+            assert any(
+                is_matching_span(expected_span, actual_span)
+                for actual_span in actual_starlite_spans
+            )
 
 
-def test_span_origin(sentry_init, capture_events):
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_span_origin(sentry_init, capture_events, capture_items, span_streaming):
     sentry_init(
         integrations=[StarliteIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     logging_config = LoggingMiddlewareConfig()
@@ -329,33 +484,41 @@ def test_span_origin(sentry_init, capture_events):
             rate_limit_config.middleware,
         ]
     )
-    events = capture_events()
+
+    if span_streaming:
+        items = capture_items("span")
+    else:
+        events = capture_events()
 
     client = TestClient(
         starlite_app, raise_server_exceptions=False, base_url="http://testserver.local"
     )
     client.get("/message")
 
-    (_, event) = events
+    if span_streaming:
+        sentry_sdk.flush()
 
-    assert event["contexts"]["trace"]["origin"] == "auto.http.starlite"
-    for span in event["spans"]:
-        assert span["origin"] == "auto.http.starlite"
+        starlite_items = [
+            item
+            for item in items
+            if "starlite" in item.payload.get("attributes", {}).get("sentry.op", "")
+        ]
+        assert len(starlite_items) > 0
+        for item in starlite_items:
+            assert item.payload["attributes"]["sentry.origin"] == "auto.http.starlite"
+    else:
+        (_, event) = events
+
+        assert event["contexts"]["trace"]["origin"] == "auto.http.starlite"
+        starlite_spans = [span for span in event["spans"] if "starlite" in span["op"]]
+        assert len(starlite_spans) > 0
+        for span in starlite_spans:
+            assert span["origin"] == "auto.http.starlite"
 
 
-@pytest.mark.parametrize(
-    "is_send_default_pii",
-    [
-        True,
-        False,
-    ],
-    ids=[
-        "send_default_pii=True",
-        "send_default_pii=False",
-    ],
-)
+@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
 def test_starlite_scope_user_on_exception_event(
-    sentry_init, capture_exceptions, capture_events, is_send_default_pii
+    sentry_init, capture_exceptions, capture_events, init_kwargs, expect_user
 ):
     class TestUserMiddleware(AbstractMiddleware):
         async def __call__(self, scope, receive, send):
@@ -366,9 +529,7 @@ def test_starlite_scope_user_on_exception_event(
             }
             await self.app(scope, receive, send)
 
-    sentry_init(
-        integrations=[StarliteIntegration()], send_default_pii=is_send_default_pii
-    )
+    sentry_init(integrations=[StarliteIntegration()], **init_kwargs)
     starlite_app = starlite_app_factory(middleware=[TestUserMiddleware])
     exceptions = capture_exceptions()
     events = capture_events()
@@ -384,7 +545,7 @@ def test_starlite_scope_user_on_exception_event(
     assert len(events) == 1
     (event,) = events
 
-    if is_send_default_pii:
+    if expect_user:
         assert "user" in event
         assert event["user"] == {
             "email": "lennon@thebeatles.com",
@@ -393,3 +554,132 @@ def test_starlite_scope_user_on_exception_event(
         }
     else:
         assert "user" not in event
+
+
+COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_cookies",
+    [
+        pytest.param(
+            {"send_default_pii": True},
+            {
+                "jwt": "tokenval",
+                "theme": "dark",
+                "lang": "en",
+                "identity": "alice",
+            },
+            id="send_default_pii_true",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            None,
+            id="send_default_pii_false",
+        ),
+        pytest.param(
+            {},
+            None,
+            id="defaults",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"cookies": {"mode": "off"}}}},
+            None,
+            id="data_collection_off",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"cookies": {"mode": "denylist"}}}},
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": "dark",
+                "lang": "en",
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "cookies": {"mode": "denylist", "terms": ["theme"]}
+                    }
+                }
+            },
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": SENSITIVE_DATA_SUBSTITUTE,
+                "lang": "en",
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_denylist_custom_terms",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "cookies": {"mode": "allowlist", "terms": ["theme"]}
+                    }
+                }
+            },
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": "dark",
+                "lang": SENSITIVE_DATA_SUBSTITUTE,
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "cookies": {"mode": "allowlist", "terms": ["identity"]}
+                    }
+                }
+            },
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": SENSITIVE_DATA_SUBSTITUTE,
+                "lang": SENSITIVE_DATA_SUBSTITUTE,
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_allowlist_sensitive_term",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": False,
+                "_experiments": {"data_collection": {"cookies": {"mode": "denylist"}}},
+            },
+            {
+                "jwt": SENSITIVE_DATA_SUBSTITUTE,
+                "theme": "dark",
+                "lang": "en",
+                "identity": SENSITIVE_DATA_SUBSTITUTE,
+            },
+            id="data_collection_wins_over_send_default_pii",
+        ),
+    ],
+)
+def test_cookie_data_collection(
+    sentry_init, capture_events, init_kwargs, expected_cookies
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarliteIntegration()],
+        **init_kwargs,
+    )
+
+    starlite_app = starlite_app_factory()
+    events = capture_events()
+
+    client = TestClient(starlite_app)
+    client.get("/message", headers={"cookie": COOKIE_HEADER})
+
+    (event, transaction_event) = events
+
+    if expected_cookies is None:
+        assert "cookies" not in event["request"]
+        assert "cookies" not in transaction_event["request"]
+    else:
+        assert event["request"]["cookies"] == expected_cookies
+        assert transaction_event["request"]["cookies"] == expected_cookies

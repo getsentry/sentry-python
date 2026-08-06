@@ -46,6 +46,10 @@ FRAMEWORKS_NEEDING_POSTGRES = {
     "asyncpg",
 }
 
+FRAMEWORKS_NEEDING_MYSQL = {
+    "aiomysql",
+}
+
 FRAMEWORKS_NEEDING_REDIS = {
     "celery",
 }
@@ -99,6 +103,7 @@ GROUPS = {
         "gcp",
     ],
     "DBs": [
+        "aiomysql",
         "asyncpg",
         "clickhouse_driver",
         "pymongo",
@@ -124,6 +129,7 @@ GROUPS = {
     "Network": [
         "grpc",
         "httpx",
+        "httpx2",
         "pyreqwest",
         "requests",
     ],
@@ -197,6 +203,10 @@ def main(fail_on_changes):
         contents = render_template(group, frameworks, py_versions)
         filename = write_file(contents, group)
         print(f"Created {filename}")
+
+    orchestrator = render_orchestrator()
+    orchestrator_file = write_orchestrator(orchestrator)
+    print(f"Created {orchestrator_file}")
 
     if fail_on_changes:
         new_hash = get_files_hash()
@@ -299,8 +309,9 @@ def _normalize_py_versions(py_versions):
 def get_files_hash():
     """Calculate a hash of all the yaml configuration files"""
     hasher = hashlib.md5()
-    path_pattern = (OUT_DIR / "test-integrations-*.yml").as_posix()
-    for file in glob(path_pattern):
+    files = sorted(glob((OUT_DIR / "test-integrations-*.yml").as_posix()))
+    files.append((OUT_DIR / "test.yml").as_posix())
+    for file in files:
         with open(file, "rb") as f:
             buf = f.read()
             hasher.update(buf)
@@ -324,6 +335,7 @@ def render_template(group, frameworks, py_versions):
         "frameworks": frameworks,
         "needs_clickhouse": bool(set(frameworks) & FRAMEWORKS_NEEDING_CLICKHOUSE),
         "needs_docker": bool(set(frameworks) & FRAMEWORKS_NEEDING_DOCKER),
+        "needs_mysql": bool(set(frameworks) & FRAMEWORKS_NEEDING_MYSQL),
         "needs_postgres": bool(set(frameworks) & FRAMEWORKS_NEEDING_POSTGRES),
         "needs_redis": bool(set(frameworks) & FRAMEWORKS_NEEDING_REDIS),
         "needs_java": bool(set(frameworks) & FRAMEWORKS_NEEDING_JAVA),
@@ -337,6 +349,23 @@ def render_template(group, frameworks, py_versions):
     return rendered
 
 
+def render_orchestrator():
+    template = ENV.get_template("test_orchestrator.jinja")
+    context = {
+        "orchestrated_groups": [
+            {
+                "id": group.lower().replace(" ", "_"),
+                "name": group,
+                "slug": group.lower().replace(" ", "-"),
+            }
+            for group in GROUPS
+        ],
+    }
+    rendered = template.render(context)
+    rendered = postprocess_template(rendered)
+    return rendered
+
+
 def postprocess_template(rendered):
     return "\n".join([line for line in rendered.split("\n") if line.strip()]) + "\n"
 
@@ -344,6 +373,15 @@ def postprocess_template(rendered):
 def write_file(contents, group):
     group = group.lower().replace(" ", "-")
     outfile = OUT_DIR / f"test-integrations-{group}.yml"
+
+    with open(outfile, "w") as file:
+        file.write(contents)
+
+    return outfile
+
+
+def write_orchestrator(contents):
+    outfile = OUT_DIR / "test.yml"
 
     with open(outfile, "w") as file:
         file.write(contents)

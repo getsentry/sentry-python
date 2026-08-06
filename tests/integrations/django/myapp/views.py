@@ -2,10 +2,10 @@ import asyncio
 import json
 import threading
 
-from django.db import transaction
 from django.contrib.auth import login
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.dispatch import Signal
 from django.http import HttpResponse, HttpResponseNotFound, HttpResponseServerError
 from django.shortcuts import render
@@ -15,7 +15,6 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import ListView
-
 
 from tests.integrations.django.myapp.signals import (
     myapp_custom_signal,
@@ -134,6 +133,16 @@ def mylogin(request):
     user.backend = "django.contrib.auth.backends.ModelBackend"
     login(request, user)
     return HttpResponse("ok")
+
+
+@csrf_exempt
+def mylogin_with_exception(request):
+    user, _ = User.objects.get_or_create(
+        username="john", defaults={"email": "lennon@thebeatles.com"}
+    )
+    user.backend = "django.contrib.auth.backends.ModelBackend"
+    login(request, user)
+    1 / 0
 
 
 @csrf_exempt

@@ -1,9 +1,10 @@
-import sentry_sdk
 import pytest
+
+import sentry_sdk
 
 
 def test_standalone_span_iter_headers(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     with sentry_sdk.start_span(op="test") as span:
         with pytest.raises(StopIteration):
@@ -12,7 +13,7 @@ def test_standalone_span_iter_headers(sentry_init):
 
 
 def test_span_in_span_iter_headers(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     with sentry_sdk.start_span(op="test"):
         with sentry_sdk.start_span(op="test2") as span_inner:
@@ -22,7 +23,7 @@ def test_span_in_span_iter_headers(sentry_init):
 
 
 def test_span_in_transaction(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     with sentry_sdk.start_transaction(op="test"):
         with sentry_sdk.start_span(op="test2") as span:
@@ -30,11 +31,30 @@ def test_span_in_transaction(sentry_init):
             next(span.iter_headers())
 
 
+def test_span_in_transaction_span_streaming(sentry_init):
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+
+    with sentry_sdk.traces.start_span(name="test"):
+        with sentry_sdk.traces.start_span(name="test2") as span:
+            # Ensure the headers are there
+            next(span._iter_headers())
+
+
 def test_span_in_span_in_transaction(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     with sentry_sdk.start_transaction(op="test"):
         with sentry_sdk.start_span(op="test2"):
             with sentry_sdk.start_span(op="test3") as span_inner:
                 # Ensure the headers are there
                 next(span_inner.iter_headers())
+
+
+def test_span_in_span_in_transaction_span_streaming(sentry_init):
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+
+    with sentry_sdk.traces.start_span(name="test"):
+        with sentry_sdk.traces.start_span(name="test2"):
+            with sentry_sdk.traces.start_span(name="test3") as span_inner:
+                # Ensure the headers are there
+                next(span_inner._iter_headers())

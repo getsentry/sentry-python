@@ -9,23 +9,28 @@ on:
 jobs:
   update-tox:
     name: Update test matrix
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
 
     permissions:
       contents: write
       pull-requests: write
 
     steps:
-      - name: Setup Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
-        with:
-          python-version: 3.14t
-
       - name: Checkout repo
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          cache-python: true
+
+      - name: Pre-install Python interpreters
+        run: |
+          uv python install 3.8 3.9 3.10 3.11 3.12 3.13 3.14 3.14t
 
       - name: Configure git
         run: |
@@ -33,6 +38,8 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
       - name: Run generate-test-files.sh
+        env:
+          PYTHONUNBUFFERED: "1"
         run: |
           set -e
           sh scripts/generate-test-files.sh
@@ -54,12 +61,16 @@ jobs:
           echo "date=$DATE" >> $GITHUB_OUTPUT
 
       - name: Create pull request
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          BRANCH_NAME: ${{ steps.create-branch.outputs.branch_name }}
+          COMMIT_TITLE: ${{ steps.create-branch.outputs.commit_title }}
+          DATE: ${{ steps.create-branch.outputs.date }}
         with:
           script: |
-            const branchName = '${{ steps.create-branch.outputs.branch_name }}';
-            const commitTitle = '${{ steps.create-branch.outputs.commit_title }}';
-            const date = '${{ steps.create-branch.outputs.date }}';
+            const branchName = process.env.BRANCH_NAME;
+            const commitTitle = process.env.COMMIT_TITLE;
+            const date = process.env.DATE;
             const prBody = `Update our test matrix with new releases of integrated frameworks and libraries.
 
             ## How it works
@@ -100,7 +111,7 @@ jobs:
                 repo: context.repo.repo,
                 title: commitTitle + ' (' + date + ')',
                 head: branchName,
-                base: '${{ github.ref_name }}',
+                base: 'master',
                 body: prBody,
             });
 

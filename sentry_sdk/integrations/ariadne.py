@@ -1,15 +1,16 @@
 from importlib import import_module
 
 import sentry_sdk
-from sentry_sdk import get_client, capture_event
-from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
-from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk import capture_event, get_client
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import request_body_within_bounds
+from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    has_data_collection_enabled,
     package_version,
 )
 
@@ -24,8 +25,15 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional
-    from ariadne.types import GraphQLError, GraphQLResult, GraphQLSchema, QueryParser  # type: ignore
+
+    from ariadne.types import (  # type: ignore
+        GraphQLError,
+        GraphQLResult,
+        GraphQLSchema,
+        QueryParser,
+    )
     from graphql.language.ast import DocumentNode
+
     from sentry_sdk._types import Event, EventProcessor
 
 
@@ -128,8 +136,28 @@ def _make_request_event_processor(data: "GraphQLSchema") -> "EventProcessor":
                 )
             except (TypeError, ValueError):
                 return event
+            client_options = sentry_sdk.get_client().options
 
-            if should_send_default_pii() and request_body_within_bounds(
+            if has_data_collection_enabled(client_options):
+                dc_graphql = client_options["data_collection"]["graphql"]
+                collect_variables = dc_graphql["variables"]
+                collect_document = dc_graphql[
+                    "document"
+                ] and request_body_within_bounds(get_client(), content_length)
+
+                if collect_document or collect_variables:
+                    request_info = event.setdefault("request", {})
+                    request_info["api_target"] = "graphql"
+                    request_info["data"] = {
+                        key: value
+                        for key, value in data.items()
+                        if (key != "query" or collect_document)
+                        and (key != "variables" or collect_variables)
+                    }
+                elif event.get("request", {}).get("data"):
+                    del event["request"]["data"]
+
+            elif should_send_default_pii() and request_body_within_bounds(
                 get_client(), content_length
             ):
                 request_info = event.setdefault("request", {})

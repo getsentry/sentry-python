@@ -1,0 +1,66 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "enabledManagers": ["custom.regex", "github-actions", "pep621"],
+  "includePaths": [
+    "pyproject.toml",
+    "uv.lock",
+    "scripts/split_tox_gh_actions/templates/test_group.jinja",
+    "scripts/split_tox_gh_actions/templates/test_orchestrator.jinja",
+    ".github/workflows/*.yml"
+  ],
+  "lockFileMaintenance": {
+    "enabled": true
+  },
+  "packageRules": [
+    {
+      "description": "Disable pyproject.toml version updates.",
+      "matchManagers": ["pep621"],
+      "matchUpdateTypes": ["major", "minor", "patch", "pin"],
+      "enabled": false
+    },
+    {
+      "description": "Disable Ubuntu image updates.",
+      "matchManagers": ["github-actions"],
+      "matchDatasources": ["github-runners"],
+      "enabled": false
+    },
+    {
+      "description": "Group GitHub workflow updates.",
+      "matchManagers": ["custom.regex", "github-actions"],
+      "groupName": "GitHub Workflows",
+      "groupSlug": "github-workflows",
+      "separateMajorMinor": false,
+      "separateMinorPatch": false,
+      "separateMultipleMajor": false
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update GitHub Actions in templates.",
+      "managerFilePatterns": [
+        "/^scripts\\/split_tox_gh_actions\\/templates\\/(test_group|test_orchestrator)\\.jinja$/"
+      ],
+      "matchStrings": [
+        "(?<depName>[A-Za-z0-9-]+\\/[A-Za-z0-9_.-]+(?:\\/[A-Za-z0-9_.-]+)*)@(?<currentDigest>[a-f0-9]{40})[ \\t]+#[ \\t]+(?<currentValue>v?\\d+(?:\\.\\d+){0,2})"
+      ],
+      "datasourceTemplate": "github-tags",
+      "versioningTemplate": "github-actions",
+      "autoReplaceStringTemplate": "{{{depName}}}@{{{newDigest}}} # {{{newValue}}}"
+    },
+    {
+      "customType": "regex",
+      "description": "Update (some) Docker images in templates.",
+      "managerFilePatterns": [
+        "/^scripts\\/split_tox_gh_actions\\/templates\\/test_group\\.jinja$/"
+      ],
+      "matchStrings": [
+        "(?<depName>ghcr\\.io\\/getsentry\\/image-mirror-library-[a-z0-9_.-]+):(?<currentValue>[A-Za-z0-9_.-]+)"
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker",
+      "autoReplaceStringTemplate": "{{{depName}}}:{{{newValue}}}"
+    }
+  ]
+}

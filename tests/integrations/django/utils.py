@@ -3,7 +3,6 @@ from functools import partial
 import pytest
 import pytest_django
 
-
 # Hack to prevent from experimental feature introduced in version `4.3.0` in `pytest-django` that
 # requires explicit database allow from failing the test
 pytest_mark_django_db_decorator = partial(pytest.mark.django_db)

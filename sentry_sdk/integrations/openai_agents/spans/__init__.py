@@ -5,5 +5,4 @@ from .handoff import handoff_span  # noqa: F401
 from .invoke_agent import (
     invoke_agent_span,  # noqa: F401
     update_invoke_agent_span,  # noqa: F401
-    end_invoke_agent_span,  # noqa: F401
 )

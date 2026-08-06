@@ -1,18 +1,19 @@
 import asyncio
 from datetime import timedelta
 
-import pytest
-
-from sentry_sdk import get_client, start_transaction
-from sentry_sdk.integrations.arq import ArqIntegration
-
 import arq.worker
+import pytest
 from arq import cron
 from arq.connections import ArqRedis
 from arq.jobs import Job
 from arq.utils import timestamp_ms
-
 from fakeredis.aioredis import FakeRedis
+
+import sentry_sdk
+from sentry_sdk import get_client, start_transaction
+from sentry_sdk.consts import SPANDATA
+from sentry_sdk.integrations.arq import ArqIntegration
+from tests.integrations.utils import DATA_COLLECTION_QUEUES_CASES
 
 
 def async_partial(async_fn, *args, **kwargs):
@@ -43,11 +44,13 @@ def patch_fakeredis_info_command():
 @pytest.fixture
 def init_arq(sentry_init):
     def inner(
+        span_streaming,
         cls_functions=None,
         cls_cron_jobs=None,
         kw_functions=None,
         kw_cron_jobs=None,
         allow_abort_jobs_=False,
+        init_kwargs=None,
     ):
         cls_functions = cls_functions or []
         cls_cron_jobs = cls_cron_jobs or []
@@ -58,11 +61,14 @@ def init_arq(sentry_init):
         if kw_cron_jobs is not None:
             kwargs["cron_jobs"] = kw_cron_jobs
 
-        sentry_init(
-            integrations=[ArqIntegration()],
-            traces_sample_rate=1.0,
-            send_default_pii=True,
-        )
+        sentry_init_kwargs = {
+            "integrations": [ArqIntegration()],
+            "traces_sample_rate": 1.0,
+            "send_default_pii": True,
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        }
+        sentry_init_kwargs.update(init_kwargs or {})
+        sentry_init(**sentry_init_kwargs)
 
         server = FakeRedis()
         pool = ArqRedis(pool_or_conn=server.connection_pool)
@@ -88,11 +94,13 @@ def init_arq(sentry_init):
 @pytest.fixture
 def init_arq_with_dict_settings(sentry_init):
     def inner(
+        span_streaming,
         cls_functions=None,
         cls_cron_jobs=None,
         kw_functions=None,
         kw_cron_jobs=None,
         allow_abort_jobs_=False,
+        init_kwargs=None,
     ):
         cls_functions = cls_functions or []
         cls_cron_jobs = cls_cron_jobs or []
@@ -103,11 +111,14 @@ def init_arq_with_dict_settings(sentry_init):
         if kw_cron_jobs is not None:
             kwargs["cron_jobs"] = kw_cron_jobs
 
-        sentry_init(
-            integrations=[ArqIntegration()],
-            traces_sample_rate=1.0,
-            send_default_pii=True,
-        )
+        sentry_init_kwargs = {
+            "integrations": [ArqIntegration()],
+            "traces_sample_rate": 1.0,
+            "send_default_pii": True,
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        }
+        sentry_init_kwargs.update(init_kwargs or {})
+        sentry_init(**sentry_init_kwargs)
 
         server = FakeRedis()
         pool = ArqRedis(pool_or_conn=server.connection_pool)
@@ -136,11 +147,13 @@ def init_arq_with_kwarg_settings(sentry_init):
     """Test fixture that passes settings_cls as keyword argument only."""
 
     def inner(
+        span_streaming,
         cls_functions=None,
         cls_cron_jobs=None,
         kw_functions=None,
         kw_cron_jobs=None,
         allow_abort_jobs_=False,
+        init_kwargs=None,
     ):
         cls_functions = cls_functions or []
         cls_cron_jobs = cls_cron_jobs or []
@@ -151,11 +164,14 @@ def init_arq_with_kwarg_settings(sentry_init):
         if kw_cron_jobs is not None:
             kwargs["cron_jobs"] = kw_cron_jobs
 
-        sentry_init(
-            integrations=[ArqIntegration()],
-            traces_sample_rate=1.0,
-            send_default_pii=True,
-        )
+        sentry_init_kwargs = {
+            "integrations": [ArqIntegration()],
+            "traces_sample_rate": 1.0,
+            "send_default_pii": True,
+            "trace_lifecycle": "stream" if span_streaming else "static",
+        }
+        sentry_init_kwargs.update(init_kwargs or {})
+        sentry_init(**sentry_init_kwargs)
 
         server = FakeRedis()
         pool = ArqRedis(pool_or_conn=server.connection_pool)
@@ -184,7 +200,8 @@ def init_arq_with_kwarg_settings(sentry_init):
     "init_arq_settings",
     ["init_arq", "init_arq_with_dict_settings", "init_arq_with_kwarg_settings"],
 )
-async def test_job_result(init_arq_settings, request):
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_job_result(init_arq_settings, request, span_streaming):
     async def increase(ctx, num):
         return num + 1
 
@@ -192,7 +209,7 @@ async def test_job_result(init_arq_settings, request):
 
     increase.__qualname__ = increase.__name__
 
-    pool, worker = init_fixture_method([increase])
+    pool, worker = init_fixture_method(span_streaming, [increase])
 
     job = await pool.enqueue_job("increase", 3)
 
@@ -210,7 +227,14 @@ async def test_job_result(init_arq_settings, request):
 @pytest.mark.parametrize(
     "init_arq_settings", ["init_arq", "init_arq_with_dict_settings"]
 )
-async def test_job_retry(capture_events, init_arq_settings, request):
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_job_retry(
+    capture_events,
+    capture_items,
+    init_arq_settings,
+    request,
+    span_streaming,
+):
     async def retry_job(ctx):
         if ctx["job_try"] < 2:
             raise arq.worker.Retry
@@ -219,27 +243,52 @@ async def test_job_retry(capture_events, init_arq_settings, request):
 
     retry_job.__qualname__ = retry_job.__name__
 
-    pool, worker = init_fixture_method([retry_job])
+    pool, worker = init_fixture_method(span_streaming, [retry_job])
 
     job = await pool.enqueue_job("retry_job")
 
-    events = capture_events()
+    if span_streaming:
+        items = capture_items("span")
 
-    await worker.run_job(job.job_id, timestamp_ms())
+        await worker.run_job(job.job_id, timestamp_ms())
 
-    event = events.pop(0)
-    assert event["contexts"]["trace"]["status"] == "aborted"
-    assert event["transaction"] == "retry_job"
-    assert event["tags"]["arq_task_id"] == job.job_id
-    assert event["extra"]["arq-job"]["retry"] == 1
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
 
-    await worker.run_job(job.job_id, timestamp_ms())
+        # The retry re-enqueue happens without an active span, so no producer
+        # (queue.submit.arq) span is created for it; only the consumer segment
+        # is emitted. The consumer segment is preceded by the redis spans for
+        # the re-enqueue, so it lands at index 2.
+        assert spans[2]["attributes"]["sentry.op"] == "queue.task.arq"
+        assert spans[2]["status"] == "ok"
+        assert spans[2]["name"] == "retry_job"
 
-    event = events.pop(0)
-    assert event["contexts"]["trace"]["status"] == "ok"
-    assert event["transaction"] == "retry_job"
-    assert event["tags"]["arq_task_id"] == job.job_id
-    assert event["extra"]["arq-job"]["retry"] == 2
+        await worker.run_job(job.job_id, timestamp_ms())
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+
+        assert spans[5]["attributes"]["sentry.op"] == "queue.task.arq"
+        assert spans[5]["status"] == "ok"
+        assert spans[5]["name"] == "retry_job"
+    else:
+        events = capture_events()
+
+        await worker.run_job(job.job_id, timestamp_ms())
+
+        event = events.pop(0)
+        assert event["contexts"]["trace"]["status"] == "aborted"
+        assert event["transaction"] == "retry_job"
+        assert event["tags"]["arq_task_id"] == job.job_id
+        assert event["extra"]["arq-job"]["retry"] == 1
+
+        await worker.run_job(job.job_id, timestamp_ms())
+
+        event = events.pop(0)
+        assert event["contexts"]["trace"]["status"] == "ok"
+        assert event["transaction"] == "retry_job"
+        assert event["tags"]["arq_task_id"] == job.job_id
+        assert event["extra"]["arq-job"]["retry"] == 2
 
 
 @pytest.mark.parametrize(
@@ -250,8 +299,15 @@ async def test_job_retry(capture_events, init_arq_settings, request):
     "init_arq_settings", ["init_arq", "init_arq_with_dict_settings"]
 )
 @pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [True, False])
 async def test_job_transaction(
-    capture_events, init_arq_settings, source, job_fails, request
+    capture_events,
+    capture_items,
+    init_arq_settings,
+    source,
+    job_fails,
+    request,
+    span_streaming,
 ):
     async def division(_, a, b=0):
         return a / b
@@ -267,65 +323,190 @@ async def test_job_transaction(
 
     functions_key, cron_jobs_key = source
     pool, worker = init_fixture_method(
-        **{functions_key: [division], cron_jobs_key: [cron_job]}
+        span_streaming, **{functions_key: [division], cron_jobs_key: [cron_job]}
     )
 
-    events = capture_events()
-
     job = await pool.enqueue_job("division", 1, b=int(not job_fails))
+
+    if span_streaming:
+        items = capture_items("event", "span")
+
+        await worker.run_job(job.job_id, timestamp_ms())
+
+        loop = asyncio.get_event_loop()
+        task = loop.create_task(worker.async_run())
+        await asyncio.sleep(1)
+
+        task.cancel()
+
+        await worker.close()
+
+        events = [item.payload for item in items if item.type == "event"]
+        if job_fails:
+            error_func_event = events.pop(0)
+            error_cron_event = events.pop(0)
+
+            assert (
+                error_func_event["exception"]["values"][0]["type"]
+                == "ZeroDivisionError"
+            )
+            assert (
+                error_func_event["exception"]["values"][0]["mechanism"]["type"] == "arq"
+            )
+
+            func_extra = error_func_event["extra"]["arq-job"]
+            assert func_extra["task"] == "division"
+
+            assert (
+                error_cron_event["exception"]["values"][0]["type"]
+                == "ZeroDivisionError"
+            )
+            assert (
+                error_cron_event["exception"]["values"][0]["mechanism"]["type"] == "arq"
+            )
+
+            cron_extra = error_cron_event["extra"]["arq-job"]
+            assert cron_extra["task"] == "cron:division"
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+
+        task_spans = [
+            span
+            for span in spans
+            if span["attributes"].get("sentry.op") == "queue.task.arq"
+        ]
+
+        division_span = next(span for span in task_spans if span["name"] == "division")
+        assert division_span["attributes"]["sentry.segment.name.source"] == "task"
+        assert (
+            division_span["attributes"][SPANDATA.MESSAGING_DESTINATION_NAME]
+            == worker.queue_name
+        )
+
+        assert any(span["name"] == "cron:division" for span in task_spans)
+    else:
+        events = capture_events()
+
+        await worker.run_job(job.job_id, timestamp_ms())
+
+        loop = asyncio.get_event_loop()
+        task = loop.create_task(worker.async_run())
+        await asyncio.sleep(1)
+
+        task.cancel()
+
+        await worker.close()
+
+        if job_fails:
+            error_func_event = events.pop(0)
+            error_cron_event = events.pop(1)
+
+            assert (
+                error_func_event["exception"]["values"][0]["type"]
+                == "ZeroDivisionError"
+            )
+            assert (
+                error_func_event["exception"]["values"][0]["mechanism"]["type"] == "arq"
+            )
+
+            func_extra = error_func_event["extra"]["arq-job"]
+            assert func_extra["task"] == "division"
+
+            assert (
+                error_cron_event["exception"]["values"][0]["type"]
+                == "ZeroDivisionError"
+            )
+            assert (
+                error_cron_event["exception"]["values"][0]["mechanism"]["type"] == "arq"
+            )
+
+            cron_extra = error_cron_event["extra"]["arq-job"]
+            assert cron_extra["task"] == "cron:division"
+
+        [func_event, cron_event] = events
+
+        assert func_event["type"] == "transaction"
+        assert func_event["transaction"] == "division"
+        assert func_event["transaction_info"] == {"source": "task"}
+        assert (
+            func_event["contexts"]["trace"]["data"][SPANDATA.MESSAGING_DESTINATION_NAME]
+            == worker.queue_name
+        )
+
+        assert "arq_task_id" in func_event["tags"]
+        assert "arq_task_retry" in func_event["tags"]
+
+        func_extra = func_event["extra"]["arq-job"]
+
+        assert func_extra["task"] == "division"
+        assert func_extra["kwargs"] == {"b": int(not job_fails)}
+        assert func_extra["retry"] == 1
+
+        assert cron_event["type"] == "transaction"
+        assert cron_event["transaction"] == "cron:division"
+        assert cron_event["transaction_info"] == {"source": "task"}
+
+        assert "arq_task_id" in cron_event["tags"]
+        assert "arq_task_retry" in cron_event["tags"]
+
+        cron_extra = cron_event["extra"]["arq-job"]
+
+        assert cron_extra["task"] == "cron:division"
+        assert cron_extra["kwargs"] == {}
+        assert cron_extra["retry"] == 1
+
+
+@pytest.mark.parametrize(
+    "init_kwargs,expected_args,expected_kwargs",
+    DATA_COLLECTION_QUEUES_CASES,
+)
+@pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_job_args_kwargs_data_collection(
+    capture_events,
+    capture_items,
+    init_arq,
+    span_streaming,
+    init_kwargs,
+    expected_args,
+    expected_kwargs,
+):
+    async def division(_, a, b=1):
+        return a / b
+
+    division.__qualname__ = division.__name__
+
+    pool, worker = init_arq(
+        span_streaming,
+        cls_functions=[division],
+        init_kwargs=init_kwargs,
+    )
+
+    job = await pool.enqueue_job("division", 1, b=0)
+
+    if span_streaming:
+        items = capture_items("event")
+    else:
+        events = capture_events()
+
     await worker.run_job(job.job_id, timestamp_ms())
 
-    loop = asyncio.get_event_loop()
-    task = loop.create_task(worker.async_run())
-    await asyncio.sleep(1)
+    if span_streaming:
+        events = [item.payload for item in items]
 
-    task.cancel()
+    (event,) = [event for event in events if "exception" in event]
 
-    await worker.close()
+    arq_job = event["extra"]["arq-job"]
+    assert arq_job["task"] == "division"
+    assert arq_job["retry"] == 1
 
-    if job_fails:
-        error_func_event = events.pop(0)
-        error_cron_event = events.pop(1)
-
-        assert error_func_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
-        assert error_func_event["exception"]["values"][0]["mechanism"]["type"] == "arq"
-
-        func_extra = error_func_event["extra"]["arq-job"]
-        assert func_extra["task"] == "division"
-
-        assert error_cron_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
-        assert error_cron_event["exception"]["values"][0]["mechanism"]["type"] == "arq"
-
-        cron_extra = error_cron_event["extra"]["arq-job"]
-        assert cron_extra["task"] == "cron:division"
-
-    [func_event, cron_event] = events
-
-    assert func_event["type"] == "transaction"
-    assert func_event["transaction"] == "division"
-    assert func_event["transaction_info"] == {"source": "task"}
-
-    assert "arq_task_id" in func_event["tags"]
-    assert "arq_task_retry" in func_event["tags"]
-
-    func_extra = func_event["extra"]["arq-job"]
-
-    assert func_extra["task"] == "division"
-    assert func_extra["kwargs"] == {"b": int(not job_fails)}
-    assert func_extra["retry"] == 1
-
-    assert cron_event["type"] == "transaction"
-    assert cron_event["transaction"] == "cron:division"
-    assert cron_event["transaction_info"] == {"source": "task"}
-
-    assert "arq_task_id" in cron_event["tags"]
-    assert "arq_task_retry" in cron_event["tags"]
-
-    cron_extra = cron_event["extra"]["arq-job"]
-
-    assert cron_extra["task"] == "cron:division"
-    assert cron_extra["kwargs"] == {}
-    assert cron_extra["retry"] == 1
+    if expected_args is None:
+        assert "args" not in arq_job
+        assert "kwargs" not in arq_job
+    else:
+        assert arq_job["args"] == expected_args
+        assert arq_job["kwargs"] == expected_kwargs
 
 
 @pytest.mark.parametrize("source", ["cls_functions", "kw_functions"])
@@ -333,34 +514,61 @@ async def test_job_transaction(
     "init_arq_settings", ["init_arq", "init_arq_with_dict_settings"]
 )
 @pytest.mark.asyncio
-async def test_enqueue_job(capture_events, init_arq_settings, source, request):
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_enqueue_job(
+    capture_events,
+    capture_items,
+    init_arq_settings,
+    source,
+    request,
+    span_streaming,
+):
     async def dummy_job(_):
         pass
 
     init_fixture_method = request.getfixturevalue(init_arq_settings)
 
-    pool, _ = init_fixture_method(**{source: [dummy_job]})
+    pool, _ = init_fixture_method(span_streaming, **{source: [dummy_job]})
 
-    events = capture_events()
+    if span_streaming:
+        items = capture_items("span")
 
-    with start_transaction() as transaction:
-        await pool.enqueue_job("dummy_job")
+        with sentry_sdk.traces.start_span(name="custom parent") as span:
+            await pool.enqueue_job("dummy_job")
 
-    (event,) = events
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
 
-    assert event["contexts"]["trace"]["trace_id"] == transaction.trace_id
-    assert event["contexts"]["trace"]["span_id"] == transaction.span_id
+        assert spans[2]["is_segment"] is True
+        assert spans[2]["trace_id"] == span.trace_id
+        assert spans[2]["span_id"] == span.span_id
 
-    assert len(event["spans"])
-    assert event["spans"][0]["op"] == "queue.submit.arq"
-    assert event["spans"][0]["description"] == "dummy_job"
+        assert spans[1]["attributes"]["sentry.op"] == "queue.submit.arq"
+        assert spans[1]["name"] == "dummy_job"
+    else:
+        events = capture_events()
+
+        with start_transaction() as transaction:
+            await pool.enqueue_job("dummy_job")
+
+        (event,) = events
+
+        assert event["contexts"]["trace"]["trace_id"] == transaction.trace_id
+        assert event["contexts"]["trace"]["span_id"] == transaction.span_id
+
+        assert len(event["spans"])
+        assert event["spans"][0]["op"] == "queue.submit.arq"
+        assert event["spans"][0]["description"] == "dummy_job"
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "init_arq_settings", ["init_arq", "init_arq_with_dict_settings"]
 )
-async def test_execute_job_without_integration(init_arq_settings, request):
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_execute_job_without_integration(
+    init_arq_settings, request, span_streaming
+):
     async def dummy_job(_ctx):
         pass
 
@@ -368,7 +576,7 @@ async def test_execute_job_without_integration(init_arq_settings, request):
 
     dummy_job.__qualname__ = dummy_job.__name__
 
-    pool, worker = init_fixture_method([dummy_job])
+    pool, worker = init_fixture_method(span_streaming, [dummy_job])
     # remove the integration to trigger the edge case
     get_client().integrations.pop("arq")
 
@@ -384,29 +592,55 @@ async def test_execute_job_without_integration(init_arq_settings, request):
     "init_arq_settings", ["init_arq", "init_arq_with_dict_settings"]
 )
 @pytest.mark.asyncio
-async def test_span_origin_producer(capture_events, init_arq_settings, source, request):
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_span_origin_producer(
+    capture_events,
+    capture_items,
+    init_arq_settings,
+    source,
+    request,
+    span_streaming,
+):
     async def dummy_job(_):
         pass
 
     init_fixture_method = request.getfixturevalue(init_arq_settings)
 
-    pool, _ = init_fixture_method(**{source: [dummy_job]})
+    pool, _ = init_fixture_method(span_streaming, **{source: [dummy_job]})
 
-    events = capture_events()
+    if span_streaming:
+        items = capture_items("span")
 
-    with start_transaction():
-        await pool.enqueue_job("dummy_job")
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            await pool.enqueue_job("dummy_job")
 
-    (event,) = events
-    assert event["contexts"]["trace"]["origin"] == "manual"
-    assert event["spans"][0]["origin"] == "auto.queue.arq"
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        assert spans[2]["attributes"]["sentry.origin"] == "manual"
+        assert spans[1]["attributes"]["sentry.origin"] == "auto.queue.arq"
+    else:
+        events = capture_events()
+
+        with start_transaction():
+            await pool.enqueue_job("dummy_job")
+
+        (event,) = events
+        assert event["contexts"]["trace"]["origin"] == "manual"
+        assert event["spans"][0]["origin"] == "auto.queue.arq"
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "init_arq_settings", ["init_arq", "init_arq_with_dict_settings"]
 )
-async def test_span_origin_consumer(capture_events, init_arq_settings, request):
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_span_origin_consumer(
+    capture_events,
+    capture_items,
+    init_arq_settings,
+    request,
+    span_streaming,
+):
     async def job(ctx):
         pass
 
@@ -414,23 +648,47 @@ async def test_span_origin_consumer(capture_events, init_arq_settings, request):
 
     job.__qualname__ = job.__name__
 
-    pool, worker = init_fixture_method([job])
+    pool, worker = init_fixture_method(span_streaming, [job])
 
-    job = await pool.enqueue_job("retry_job")
+    if span_streaming:
+        job = await pool.enqueue_job("job")
 
-    events = capture_events()
+        items = capture_items("span")
 
-    await worker.run_job(job.job_id, timestamp_ms())
+        await worker.run_job(job.job_id, timestamp_ms())
 
-    (event,) = events
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
 
-    assert event["contexts"]["trace"]["origin"] == "auto.queue.arq"
-    assert event["spans"][0]["origin"] == "auto.db.redis"
-    assert event["spans"][1]["origin"] == "auto.db.redis"
+        # No producer (queue.submit.arq) span is created for the re-enqueue
+        # triggered by the retry, since it happens without an active span, so
+        # the consumer segment lands at index 2.
+        assert spans[2]["attributes"]["sentry.op"] == "queue.task.arq"
+        assert spans[2]["attributes"]["sentry.origin"] == "auto.queue.arq"
+        assert spans[1]["attributes"]["sentry.origin"] == "auto.db.redis"
+        assert spans[0]["attributes"]["sentry.origin"] == "auto.db.redis"
+    else:
+        job = await pool.enqueue_job("job")
+
+        events = capture_events()
+
+        await worker.run_job(job.job_id, timestamp_ms())
+
+        (event,) = events
+
+        assert event["contexts"]["trace"]["origin"] == "auto.queue.arq"
+        assert event["spans"][0]["origin"] == "auto.db.redis"
+        assert event["spans"][1]["origin"] == "auto.db.redis"
 
 
 @pytest.mark.asyncio
-async def test_job_concurrency(capture_events, init_arq):
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_job_concurrency(
+    capture_events,
+    capture_items,
+    init_arq,
+    span_streaming,
+):
     """
     10 - division starts
     70 - sleepy starts
@@ -449,9 +707,7 @@ async def test_job_concurrency(capture_events, init_arq):
     sleepy.__qualname__ = sleepy.__name__
     division.__qualname__ = division.__name__
 
-    pool, worker = init_arq([sleepy, division])
-
-    events = capture_events()
+    pool, worker = init_arq(span_streaming, [sleepy, division])
 
     await pool.enqueue_job(
         "division", _job_id="123", _defer_by=timedelta(milliseconds=10)
@@ -460,15 +716,34 @@ async def test_job_concurrency(capture_events, init_arq):
         "sleepy", _job_id="456", _defer_by=timedelta(milliseconds=70)
     )
 
-    loop = asyncio.get_event_loop()
-    task = loop.create_task(worker.async_run())
-    await asyncio.sleep(1)
+    if span_streaming:
+        items = capture_items("event")
 
-    task.cancel()
+        loop = asyncio.get_event_loop()
+        task = loop.create_task(worker.async_run())
+        await asyncio.sleep(1)
 
-    await worker.close()
+        task.cancel()
 
-    exception_event = events[1]
-    assert exception_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
-    assert exception_event["transaction"] == "division"
+        await worker.close()
+
+        events = [item.payload for item in items]
+        exception_event = events[0]
+        assert exception_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
+        assert exception_event["transaction"] == "division"
+    else:
+        events = capture_events()
+
+        loop = asyncio.get_event_loop()
+        task = loop.create_task(worker.async_run())
+        await asyncio.sleep(1)
+
+        task.cancel()
+
+        await worker.close()
+
+        (exception_event,) = (event for event in events if "exception" in event)
+        assert exception_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
+        assert exception_event["transaction"] == "division"
+
     assert exception_event["extra"]["arq-job"]["task"] == "division"

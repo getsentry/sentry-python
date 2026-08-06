@@ -1,28 +1,24 @@
 import sys
 from functools import wraps
+from typing import TYPE_CHECKING
 
-from sentry_sdk.integrations import DidNotEnable
 import sentry_sdk
+from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.utils import capture_internal_exceptions, reraise
 
 from ..spans import execute_tool_span, update_execute_tool_span
 from ..utils import _capture_exception, get_current_agent
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from typing import Any
 
 try:
-    from pydantic_ai.mcp import MCPServer  # type: ignore
+    try:
+        from pydantic_ai.tool_manager import ToolManager
+    except ImportError:
+        from pydantic_ai._tool_manager import ToolManager  # type: ignore
 
-    HAS_MCP = True
-except ImportError:
-    HAS_MCP = False
-
-try:
-    from pydantic_ai._tool_manager import ToolManager  # type: ignore
-    from pydantic_ai.exceptions import ToolRetryError  # type: ignore
+    from pydantic_ai.exceptions import ToolRetryError
 except ImportError:
     raise DidNotEnable("pydantic-ai not installed")
 
@@ -52,11 +48,6 @@ def _patch_execute_tool_call() -> None:
         tool = self.tools.get(name) if self.tools else None
         selected_tool_definition = getattr(tool, "tool_def", None)
 
-        # Determine tool type by checking tool.toolset
-        tool_type = "function"
-        if tool and HAS_MCP and isinstance(tool.toolset, MCPServer):
-            tool_type = "mcp"
-
         # Get agent from contextvar
         agent = get_current_agent()
 
@@ -73,7 +64,6 @@ def _patch_execute_tool_call() -> None:
                     name,
                     args_dict,
                     agent,
-                    tool_type=tool_type,
                     tool_definition=selected_tool_definition,
                 ) as span:
                     try:
@@ -105,7 +95,7 @@ def _patch_execute_tool_call() -> None:
 
         return await original_execute_tool_call(self, validated, *args, **kwargs)
 
-    ToolManager.execute_tool_call = wrapped_execute_tool_call
+    ToolManager.execute_tool_call = wrapped_execute_tool_call  # type: ignore[method-assign]
 
 
 def _patch_call_tool() -> None:
@@ -120,7 +110,7 @@ def _patch_call_tool() -> None:
     - Dealing with signature mismatches from instrumented MCP servers
     - Complex nested toolset handling
     """
-    original_call_tool = ToolManager._call_tool
+    original_call_tool = ToolManager._call_tool  # type: ignore[attr-defined]
 
     @wraps(original_call_tool)
     async def wrapped_call_tool(
@@ -130,11 +120,6 @@ def _patch_call_tool() -> None:
         name = call.tool_name
         tool = self.tools.get(name) if self.tools else None
         selected_tool_definition = getattr(tool, "tool_def", None)
-
-        # Determine tool type by checking tool.toolset
-        tool_type = "function"  # default
-        if tool and HAS_MCP and isinstance(tool.toolset, MCPServer):
-            tool_type = "mcp"
 
         # Get agent from contextvar
         agent = get_current_agent()
@@ -152,7 +137,6 @@ def _patch_call_tool() -> None:
                     name,
                     args_dict,
                     agent,
-                    tool_type=tool_type,
                     tool_definition=selected_tool_definition,
                 ) as span:
                     try:
@@ -190,4 +174,4 @@ def _patch_call_tool() -> None:
             **kwargs,
         )
 
-    ToolManager._call_tool = wrapped_call_tool
+    ToolManager._call_tool = wrapped_call_tool  # type: ignore[attr-defined]

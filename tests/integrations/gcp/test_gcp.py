@@ -4,15 +4,16 @@
 """
 
 import json
-from textwrap import dedent
-import tempfile
-import sys
+import os
+import os.path
 import subprocess
+import sys
+import tempfile
+from textwrap import dedent
 
 import pytest
-import os.path
-import os
 
+from sentry_sdk.traces import SpanStatus
 
 FUNCTIONS_PRELUDE = """
 from unittest.mock import Mock
@@ -54,14 +55,19 @@ def event_processor(event):
     time.sleep(1)
     return event
 
-def envelope_processor(envelope):
-    (item,) = envelope.items
-    return item.get_bytes()
-
 class TestTransport(HttpTransport):
     def capture_envelope(self, envelope):
-        envelope_item = envelope_processor(envelope)
-        print("\\nENVELOPE: {}\\n".format(envelope_item.decode(\"utf-8\")))
+        for item in envelope.items:
+            if item.headers.get("type") == "span":
+                payload = item.payload.json
+                for span_item in payload.get("items", []):
+                    attrs = {k: v["value"] for k, v in span_item.get("attributes", {}).items()}
+                    span_data = {k: v for k, v in span_item.items() if k != "attributes"}
+                    span_data["attributes"] = attrs
+                    print("\\nSPAN: {}\\n".format(json.dumps(span_data)))
+            else:
+                envelope_bytes = item.get_bytes()
+                print("\\nENVELOPE: {}\\n".format(envelope_bytes.decode(\"utf-8\")))
 
 
 def init_sdk(timeout_warning=False, **extra_init_args):
@@ -83,6 +89,7 @@ def init_sdk(timeout_warning=False, **extra_init_args):
 def run_cloud_function():
     def inner(code, subprocess_kwargs=()):
         envelope_items = []
+        span_items = []
         return_value = None
 
         # STEP : Create a zip of cloud function
@@ -100,12 +107,20 @@ def run_cloud_function():
                 f.write("[install]\nprefix=")
 
             subprocess.check_call(
-                [sys.executable, "setup.py", "sdist", "-d", os.path.join(tmpdir, "..")],
+                [
+                    "uv",
+                    "build",
+                    "--sdist",
+                    "-p",
+                    sys.executable,
+                    "-o",
+                    os.path.join(tmpdir, ".."),
+                ],
                 **subprocess_kwargs,
             )
 
             subprocess.check_call(
-                "pip install ../*.tar.gz -t .",
+                "uv pip install -p {} ../*.tar.gz --target .".format(sys.executable),
                 cwd=tmpdir,
                 shell=True,
                 **subprocess_kwargs,
@@ -121,6 +136,9 @@ def run_cloud_function():
                 if line.startswith("ENVELOPE: "):
                     line = line[len("ENVELOPE: ") :]
                     envelope_items.append(json.loads(line))
+                elif line.startswith("SPAN: "):
+                    line = line[len("SPAN: ") :]
+                    span_items.append(json.loads(line))
                 elif line.startswith("RETURN VALUE: "):
                     line = line[len("RETURN VALUE: ") :]
                     return_value = json.loads(line)
@@ -129,13 +147,13 @@ def run_cloud_function():
 
             stream.close()
 
-        return envelope_items, return_value
+        return envelope_items, return_value, span_items
 
     return inner
 
 
 def test_handled_exception(run_cloud_function):
-    envelope_items, return_value = run_cloud_function(
+    envelope_items, return_value, _ = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -162,7 +180,7 @@ def test_handled_exception(run_cloud_function):
 
 
 def test_unhandled_exception(run_cloud_function):
-    envelope_items, _ = run_cloud_function(
+    envelope_items, _, _ = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -190,7 +208,7 @@ def test_unhandled_exception(run_cloud_function):
 
 
 def test_timeout_error(run_cloud_function):
-    envelope_items, _ = run_cloud_function(
+    envelope_items, _, _ = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -224,7 +242,7 @@ def test_timeout_error(run_cloud_function):
 
 
 def test_performance_no_error(run_cloud_function):
-    envelope_items, _ = run_cloud_function(
+    envelope_items, _, _ = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -250,7 +268,7 @@ def test_performance_no_error(run_cloud_function):
 
 
 def test_performance_error(run_cloud_function):
-    envelope_items, _ = run_cloud_function(
+    envelope_items, _, _ = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -293,7 +311,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
 
     import inspect
 
-    _, return_value = run_cloud_function(
+    _, return_value, _ = run_cloud_function(
         dedent(
             """
             functionhandler = None
@@ -366,7 +384,7 @@ def test_error_has_new_trace_context_performance_enabled(run_cloud_function):
     """
     Check if an 'trace' context is added to errros and transactions when performance monitoring is enabled.
     """
-    envelope_items, _ = run_cloud_function(
+    envelope_items, _, _ = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -407,7 +425,7 @@ def test_error_has_new_trace_context_performance_disabled(run_cloud_function):
     """
     Check if an 'trace' context is added to errros and transactions when performance monitoring is disabled.
     """
-    envelope_items, _ = run_cloud_function(
+    envelope_items, _, _ = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -451,7 +469,7 @@ def test_error_has_existing_trace_context_performance_enabled(run_cloud_function
     parent_sampled = 1
     sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
 
-    envelope_items, _ = run_cloud_function(
+    envelope_items, _, _ = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -504,7 +522,7 @@ def test_error_has_existing_trace_context_performance_disabled(run_cloud_functio
     parent_sampled = 1
     sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
 
-    envelope_items, _ = run_cloud_function(
+    envelope_items, _, _ = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -544,7 +562,7 @@ def test_error_has_existing_trace_context_performance_disabled(run_cloud_functio
 
 
 def test_span_origin(run_cloud_function):
-    events, _ = run_cloud_function(
+    events, _, _ = run_cloud_function(
         dedent(
             """
         functionhandler = None
@@ -565,3 +583,373 @@ def test_span_origin(run_cloud_function):
     (event,) = events
 
     assert event["contexts"]["trace"]["origin"] == "auto.function.gcp"
+
+
+def test_span_streaming_no_error(run_cloud_function):
+    _, _, span_items = run_cloud_function(
+        dedent(
+            """
+        functionhandler = None
+        event = {}
+        def cloud_function(functionhandler, event):
+            return "test_string"
+        """
+        )
+        + FUNCTIONS_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=1.0, trace_lifecycle="stream")
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
+        """
+        )
+    )
+
+    assert len(span_items) == 1
+    segment_span = span_items[0]
+
+    assert segment_span["is_segment"] is True
+    assert segment_span["name"] == "Google Cloud function"
+    assert segment_span["attributes"]["sentry.op"] == "function.gcp"
+    assert segment_span["attributes"]["sentry.origin"] == "auto.function.gcp"
+    assert segment_span["attributes"]["sentry.segment.name.source"] == "component"
+    assert segment_span["attributes"]["cloud.provider"] == "gcp"
+    assert segment_span["attributes"]["faas.name"] == "Google Cloud function"
+    assert segment_span["attributes"]["gcp.project.id"] == "serverless_project"
+    assert segment_span["attributes"]["faas.identity"] == "func_ID"
+    assert segment_span["attributes"]["faas.entry_point"] == "cloud_function"
+
+
+def test_span_streaming_error(run_cloud_function):
+    envelope_items, _, span_items = run_cloud_function(
+        dedent(
+            """
+        functionhandler = None
+        event = {}
+        def cloud_function(functionhandler, event):
+            raise Exception("something went wrong")
+        """
+        )
+        + FUNCTIONS_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=1.0, trace_lifecycle="stream")
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
+        """
+        )
+    )
+
+    assert envelope_items[0]["level"] == "error"
+    (exception,) = envelope_items[0]["exception"]["values"]
+    assert exception["type"] == "Exception"
+    assert exception["value"] == "something went wrong"
+    assert exception["mechanism"]["type"] == "gcp"
+    assert not exception["mechanism"]["handled"]
+
+    assert len(span_items) == 1
+    segment_span = span_items[0]
+    assert segment_span["is_segment"] is True
+    assert segment_span["name"] == "Google Cloud function"
+    assert segment_span["attributes"]["sentry.op"] == "function.gcp"
+    assert segment_span["attributes"]["sentry.origin"] == "auto.function.gcp"
+    assert segment_span["attributes"]["sentry.segment.name.source"] == "component"
+    assert segment_span["attributes"]["cloud.provider"] == "gcp"
+    assert segment_span["attributes"]["faas.name"] == "Google Cloud function"
+    assert segment_span["attributes"]["gcp.project.id"] == "serverless_project"
+    assert segment_span["attributes"]["faas.identity"] == "func_ID"
+    assert segment_span["attributes"]["faas.entry_point"] == "cloud_function"
+    assert segment_span["status"] == SpanStatus.ERROR
+
+
+def test_span_streaming_existing_trace_context(run_cloud_function):
+    trace_id = "471a43a4192642f0b136d5159a501701"
+    parent_span_id = "6e8f22c393e68f19"
+    parent_sampled = 1
+    sentry_trace_header = "{}-{}-{}".format(trace_id, parent_span_id, parent_sampled)
+
+    envelope_items, _, span_items = run_cloud_function(
+        dedent(
+            """
+        functionhandler = None
+
+        from collections import namedtuple
+        GCPEvent = namedtuple("GCPEvent", ["headers"])
+        event = GCPEvent(headers={"sentry-trace": "%s"})
+
+        def cloud_function(functionhandler, event):
+            sentry_sdk.capture_message("hi")
+            return "ok"
+        """
+            % sentry_trace_header
+        )
+        + FUNCTIONS_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=1.0, trace_lifecycle="stream")
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
+        """
+        )
+    )
+
+    (msg_event,) = envelope_items
+    assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
+
+    assert len(span_items) == 1
+    segment_span = span_items[0]
+    assert segment_span["is_segment"] is True
+    assert segment_span["trace_id"] == trace_id
+    assert segment_span["name"] == "Google Cloud function"
+    assert segment_span["attributes"]["sentry.op"] == "function.gcp"
+    assert segment_span["attributes"]["sentry.origin"] == "auto.function.gcp"
+    assert segment_span["attributes"]["sentry.segment.name.source"] == "component"
+    assert segment_span["attributes"]["cloud.provider"] == "gcp"
+    assert segment_span["attributes"]["faas.name"] == "Google Cloud function"
+    assert segment_span["attributes"]["gcp.project.id"] == "serverless_project"
+    assert segment_span["attributes"]["faas.identity"] == "func_ID"
+    assert segment_span["attributes"]["faas.entry_point"] == "cloud_function"
+
+
+def test_span_streaming_request_attributes(run_cloud_function):
+    _, _, span_items = run_cloud_function(
+        dedent(
+            """
+        functionhandler = None
+
+        from collections import namedtuple
+        GCPEvent = namedtuple("GCPEvent", ["headers", "method", "query_string"])
+        event = GCPEvent(
+            headers={"content-type": "application/json", "accept": "text/html"},
+            method="POST",
+            query_string=b"foo=bar",
+        )
+
+        def cloud_function(functionhandler, event):
+            return "ok"
+        """
+        )
+        + FUNCTIONS_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=1.0, send_default_pii=True, trace_lifecycle="stream")
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
+        """
+        )
+    )
+
+    assert len(span_items) == 1
+    segment_span = span_items[0]
+    attrs = segment_span["attributes"]
+
+    assert attrs["http.request.method"] == "POST"
+    assert attrs["url.query"] == "foo=bar"
+    assert attrs["http.request.header.content-type"] == "application/json"
+    assert attrs["http.request.header.accept"] == "text/html"
+    assert attrs["faas.name"] == "Google Cloud function"
+    assert attrs["gcp.project.id"] == "serverless_project"
+    assert attrs["faas.identity"] == "func_ID"
+    assert attrs["faas.entry_point"] == "cloud_function"
+
+
+def test_span_streaming_no_query_string_without_pii(run_cloud_function):
+    _, _, span_items = run_cloud_function(
+        dedent(
+            """
+        functionhandler = None
+
+        from collections import namedtuple
+        GCPEvent = namedtuple("GCPEvent", ["headers", "method", "query_string"])
+        event = GCPEvent(
+            headers={},
+            method="GET",
+            query_string=b"secret=hunter2",
+        )
+
+        def cloud_function(functionhandler, event):
+            return "ok"
+        """
+        )
+        + FUNCTIONS_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=1.0, send_default_pii=False, trace_lifecycle="stream")
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
+        """
+        )
+    )
+
+    assert len(span_items) == 1
+    segment_span = span_items[0]
+    attrs = segment_span["attributes"]
+
+    assert "url.query" not in attrs
+    assert attrs["http.request.method"] == "GET"
+    assert attrs["faas.name"] == "Google Cloud function"
+    assert attrs["gcp.project.id"] == "serverless_project"
+    assert attrs["faas.identity"] == "func_ID"
+    assert attrs["faas.entry_point"] == "cloud_function"
+
+
+# Each case is (send_default_pii, data_collection, expected_event, expected_span).
+# ``send_default_pii`` / ``data_collection`` of None means the option is omitted.
+# The two paths only diverge for the legacy (no ``data_collection``) rows: the
+# event processor always records the raw query string, while the span-streaming
+# path gates the ``url.query`` attribute on ``send_default_pii``.
+_QUERY_STRING_DATA_COLLECTION_CASES = [
+    pytest.param(
+        True,
+        None,
+        "toy=tennisball&color=red&auth=secret",
+        "toy=tennisball&color=red&auth=secret",
+        id="send_default_pii_true",
+    ),
+    pytest.param(
+        False,
+        None,
+        "toy=tennisball&color=red&auth=secret",
+        None,
+        id="send_default_pii_false",
+    ),
+    pytest.param(
+        None,
+        None,
+        "toy=tennisball&color=red&auth=secret",
+        None,
+        id="defaults",
+    ),
+    # data_collection configured: query string is routed through filtering.
+    # Spec defaults -> denylist: only the sensitive ``auth`` is redacted.
+    pytest.param(
+        None,
+        {},
+        "toy=tennisball&color=red&auth=%5BFiltered%5D",
+        "toy=tennisball&color=red&auth=%5BFiltered%5D",
+        id="data_collection_denylist_default",
+    ),
+    pytest.param(
+        None,
+        {"url_query_params": {"mode": "denylist", "terms": ["toy"]}},
+        "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
+        "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
+        id="data_collection_denylist_custom_terms",
+    ),
+    # allowlist with only ``toy`` allowed: ``color`` is redacted even though it
+    # is not sensitive, proving the redaction comes from the allowlist.
+    pytest.param(
+        None,
+        {"url_query_params": {"mode": "allowlist", "terms": ["toy"]}},
+        "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+        "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+        id="data_collection_allowlist",
+    ),
+    pytest.param(
+        None,
+        {"url_query_params": {"mode": "off"}},
+        None,
+        None,
+        id="data_collection_off",
+    ),
+]
+
+
+def _build_init_kwargs(send_default_pii, data_collection):
+    """Render the keyword-argument string passed to ``init_sdk`` in the
+    subprocess."""
+    kwargs = []
+    if send_default_pii is not None:
+        kwargs.append("send_default_pii=%r" % send_default_pii)
+    if data_collection is not None:
+        kwargs.append("_experiments=%r" % {"data_collection": data_collection})
+
+    return ", ".join(kwargs)
+
+
+@pytest.mark.parametrize(
+    "send_default_pii, data_collection, expected_event, expected_span",
+    _QUERY_STRING_DATA_COLLECTION_CASES,
+)
+def test_query_string_data_collection_event_processor(
+    run_cloud_function,
+    send_default_pii,
+    data_collection,
+    expected_event,
+    expected_span,
+):
+    init_kwargs = _build_init_kwargs(send_default_pii, data_collection)
+    envelope_items, _, _ = run_cloud_function(
+        dedent(
+            """
+        functionhandler = None
+
+        from collections import namedtuple
+        GCPEvent = namedtuple("GCPEvent", ["headers", "method", "query_string"])
+        event = GCPEvent(
+            headers={},
+            method="GET",
+            query_string=b"toy=tennisball&color=red&auth=secret",
+        )
+
+        def cloud_function(functionhandler, event):
+            raise Exception("something went wrong")
+        """
+        )
+        + FUNCTIONS_PRELUDE
+        + dedent(
+            """
+        init_sdk(%s)
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
+        """
+            % init_kwargs
+        )
+    )
+
+    request = envelope_items[0]["request"]
+    if expected_event is None:
+        assert "query_string" not in request
+    else:
+        assert request["query_string"] == expected_event
+
+
+@pytest.mark.parametrize(
+    "send_default_pii, data_collection, expected_event, expected_span",
+    _QUERY_STRING_DATA_COLLECTION_CASES,
+)
+def test_query_string_data_collection_span_streaming(
+    run_cloud_function,
+    send_default_pii,
+    data_collection,
+    expected_event,
+    expected_span,
+):
+    init_kwargs = _build_init_kwargs(send_default_pii, data_collection)
+    _, _, span_items = run_cloud_function(
+        dedent(
+            """
+        functionhandler = None
+
+        from collections import namedtuple
+        GCPEvent = namedtuple("GCPEvent", ["headers", "method", "query_string"])
+        event = GCPEvent(
+            headers={},
+            method="GET",
+            query_string=b"toy=tennisball&color=red&auth=secret",
+        )
+
+        def cloud_function(functionhandler, event):
+            return "ok"
+        """
+        )
+        + FUNCTIONS_PRELUDE
+        + dedent(
+            """
+        init_sdk(traces_sample_rate=1.0, trace_lifecycle="stream", %s)
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
+        """
+            % init_kwargs
+        )
+    )
+
+    assert len(span_items) == 1
+    attrs = span_items[0]["attributes"]
+    if expected_span is None:
+        assert "url.query" not in attrs
+    else:
+        assert attrs["url.query"] == expected_span

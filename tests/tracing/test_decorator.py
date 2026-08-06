@@ -5,7 +5,6 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk.consts import SPANTEMPLATE
-from sentry_sdk.tracing import trace
 from sentry_sdk.tracing_utils import create_span_decorator
 from sentry_sdk.utils import logger
 from tests.conftest import patch_start_tracing_child
@@ -78,12 +77,252 @@ async def test_trace_decorator_async_no_trx():
 
             start_child_span_decorator = create_span_decorator()
             result2 = await start_child_span_decorator(my_async_example_function)()
-            fake_debug.assert_called_once_with(
+            fake_debug.assert_any_call(
                 "Cannot create a child span for %s. "
                 "Please start a Sentry transaction before calling this function.",
                 "test_decorator.my_async_example_function",
             )
             assert result2 == "return_of_async_function"
+
+
+def test_trace_decorator_span_streaming(sentry_init, capture_items):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    items = capture_items("span")
+
+    @sentry_sdk.traces.trace
+    def traced_function():
+        return "ok"
+
+    result = traced_function()
+    assert result == "ok"
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    assert len(spans) == 1
+    (span,) = spans
+
+    assert (
+        span["name"]
+        == "test_decorator.test_trace_decorator_span_streaming.<locals>.traced_function"
+    )
+    assert span["attributes"]["sentry.op"] == "function"
+    assert span["status"] == "ok"
+
+
+def test_trace_decorator_arguments_span_streaming(sentry_init, capture_items):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    items = capture_items("span")
+
+    @sentry_sdk.traces.trace(name="traced", attributes={"traced.attribute": 123})
+    def traced_function():
+        return "ok"
+
+    result = traced_function()
+    assert result == "ok"
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    assert len(spans) == 1
+    (span,) = spans
+
+    assert span["name"] == "traced"
+    assert span["attributes"]["traced.attribute"] == 123
+    assert span["attributes"]["sentry.op"] == "function"
+    assert span["status"] == "ok"
+
+
+def test_trace_decorator_inactive_span_streaming(sentry_init, capture_items):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    items = capture_items("span")
+
+    @sentry_sdk.traces.trace(name="outer", active=False)
+    def traced_function():
+        with sentry_sdk.traces.start_span(name="inner"):
+            return "ok"
+
+    result = traced_function()
+    assert result == "ok"
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    assert len(spans) == 2
+    (span1, span2) = spans
+
+    assert span1["name"] == "inner"
+    assert span1.get("parent_span_id") != span2["span_id"]
+
+    assert span2["name"] == "outer"
+
+
+@pytest.mark.asyncio
+async def test_trace_decorator_async_span_streaming(sentry_init, capture_items):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    items = capture_items("span")
+
+    @sentry_sdk.traces.trace
+    async def traced_function():
+        return "ok"
+
+    result = await traced_function()
+    assert result == "ok"
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    assert len(spans) == 1
+    (span,) = spans
+
+    assert (
+        span["name"]
+        == "test_decorator.test_trace_decorator_async_span_streaming.<locals>.traced_function"
+    )
+    assert span["attributes"]["sentry.op"] == "function"
+    assert span["status"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_trace_decorator_async_arguments_span_streaming(
+    sentry_init, capture_items
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    items = capture_items("span")
+
+    @sentry_sdk.traces.trace(name="traced", attributes={"traced.attribute": 123})
+    async def traced_function():
+        return "ok"
+
+    result = await traced_function()
+    assert result == "ok"
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    assert len(spans) == 1
+    (span,) = spans
+
+    assert span["name"] == "traced"
+    assert span["attributes"]["traced.attribute"] == 123
+    assert span["attributes"]["sentry.op"] == "function"
+    assert span["status"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_trace_decorator_async_inactive_span_streaming(
+    sentry_init, capture_items
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    items = capture_items("span")
+
+    @sentry_sdk.traces.trace(name="outer", active=False)
+    async def traced_function():
+        with sentry_sdk.traces.start_span(name="inner"):
+            return "ok"
+
+    result = await traced_function()
+    assert result == "ok"
+
+    sentry_sdk.get_client().flush()
+    spans = [item.payload for item in items]
+
+    assert len(spans) == 2
+    (span1, span2) = spans
+
+    assert span1["name"] == "inner"
+    assert span1.get("parent_span_id") != span2["span_id"]
+
+    assert span2["name"] == "outer"
+
+
+def test_trace_decorator_child_span_streaming(sentry_init, capture_items):
+    """Spans created with @trace show up as children if a span is active."""
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    items = capture_items("span")
+
+    @sentry_sdk.traces.trace
+    def _some_function_traced_stream(a, b, c):
+        return True
+
+    with sentry_sdk.traces.start_span(name="segment") as segment:
+        result = _some_function_traced_stream(1, 2, 3)
+
+    assert result is True
+
+    sentry_sdk.flush()
+
+    assert len(items) == 2
+    child_span, segment_span = items[0].payload, items[1].payload
+
+    assert (
+        child_span["name"]
+        == "test_decorator.test_trace_decorator_child_span_streaming.<locals>._some_function_traced_stream"
+    )
+    assert child_span["parent_span_id"] == segment.span_id
+    assert segment_span["name"] == "segment"
+    assert "parent_span_id" not in segment_span
+
+
+@pytest.mark.asyncio
+async def test_trace_decorator_async_child_span_streaming(sentry_init, capture_items):
+    """Spans created with @trace show up as children if a span is active."""
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    items = capture_items("span")
+
+    @sentry_sdk.traces.trace
+    async def _some_function_traced_stream(a, b, c):
+        return True
+
+    with sentry_sdk.traces.start_span(name="segment") as segment:
+        result = await _some_function_traced_stream(1, 2, 3)
+
+    assert result is True
+
+    sentry_sdk.flush()
+
+    assert len(items) == 2
+    child_span, segment_span = items[0].payload, items[1].payload
+
+    assert (
+        child_span["name"]
+        == "test_decorator.test_trace_decorator_async_child_span_streaming.<locals>._some_function_traced_stream"
+    )
+    assert child_span["parent_span_id"] == segment.span_id
+    assert segment_span["name"] == "segment"
+    assert "parent_span_id" not in segment_span
 
 
 def test_functions_to_trace_signature_unchanged_sync(sentry_init):
@@ -94,12 +333,20 @@ def test_functions_to_trace_signature_unchanged_sync(sentry_init):
     def _some_function(a, b, c):
         pass
 
-    @trace
+    @sentry_sdk.trace
     def _some_function_traced(a, b, c):
+        pass
+
+    @sentry_sdk.traces.trace
+    def _some_function_traced_stream(a, b, c):
         pass
 
     assert inspect.getcallargs(_some_function, 1, 2, 3) == inspect.getcallargs(
         _some_function_traced, 1, 2, 3
+    )
+
+    assert inspect.getcallargs(_some_function, 1, 2, 3) == inspect.getcallargs(
+        _some_function_traced_stream, 1, 2, 3
     )
 
 
@@ -112,19 +359,29 @@ async def test_functions_to_trace_signature_unchanged_async(sentry_init):
     async def _some_function(a, b, c):
         pass
 
-    @trace
+    @sentry_sdk.trace
     async def _some_function_traced(a, b, c):
+        pass
+
+    @sentry_sdk.traces.trace
+    async def _some_function_traced_stream(a, b, c):
         pass
 
     assert inspect.getcallargs(_some_function, 1, 2, 3) == inspect.getcallargs(
         _some_function_traced, 1, 2, 3
     )
+    assert inspect.getcallargs(_some_function, 1, 2, 3) == inspect.getcallargs(
+        _some_function_traced_stream, 1, 2, 3
+    )
 
 
-def test_span_templates_ai_dicts(sentry_init, capture_events):
-    sentry_init(traces_sample_rate=1.0)
-    events = capture_events()
-
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_span_templates_ai_dicts(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+):
     @sentry_sdk.trace(template=SPANTEMPLATE.AI_TOOL)
     def my_tool(arg1, arg2):
         return {
@@ -163,65 +420,164 @@ def test_span_templates_ai_dicts(sentry_init, capture_events):
             presence_penalty=2.0,
         )
 
-    with sentry_sdk.start_transaction(name="test-transaction"):
-        my_agent()
+    if stream_gen_ai_spans:
+        sentry_init(
+            traces_sample_rate=1.0,
+            stream_gen_ai_spans=stream_gen_ai_spans,
+        )
+        items = capture_items("span")
 
-    (event,) = events
-    (agent_span, tool_span, chat_span) = event["spans"]
+        with sentry_sdk.start_transaction(name="test-transaction"):
+            my_agent()
 
-    assert agent_span["op"] == "gen_ai.invoke_agent"
-    assert (
-        agent_span["description"]
-        == "invoke_agent test_decorator.test_span_templates_ai_dicts.<locals>.my_agent"
-    )
-    assert agent_span["data"] == {
-        "gen_ai.agent.name": "test_decorator.test_span_templates_ai_dicts.<locals>.my_agent",
-        "gen_ai.operation.name": "invoke_agent",
-        "thread.id": mock.ANY,
-        "thread.name": mock.ANY,
-    }
+        (agent_span, tool_span, chat_span) = (item.payload for item in items)
 
-    assert tool_span["op"] == "gen_ai.execute_tool"
-    assert (
-        tool_span["description"]
-        == "execute_tool test_decorator.test_span_templates_ai_dicts.<locals>.my_tool"
-    )
-    assert tool_span["data"] == {
-        "gen_ai.tool.name": "test_decorator.test_span_templates_ai_dicts.<locals>.my_tool",
-        "gen_ai.operation.name": "execute_tool",
-        "gen_ai.usage.input_tokens": 10,
-        "gen_ai.usage.output_tokens": 20,
-        "gen_ai.usage.total_tokens": 30,
-        "thread.id": mock.ANY,
-        "thread.name": mock.ANY,
-    }
-    assert "gen_ai.tool.description" not in tool_span["data"]
+        assert (
+            agent_span["name"]
+            == "invoke_agent test_decorator.test_span_templates_ai_dicts.<locals>.my_agent"
+        )
+        assert agent_span["attributes"] == {
+            "gen_ai.agent.name": "test_decorator.test_span_templates_ai_dicts.<locals>.my_agent",
+            "gen_ai.operation.name": "invoke_agent",
+            "process.runtime.name": mock.ANY,
+            "process.runtime.version": mock.ANY,
+            "sentry.environment": "production",
+            "sentry.op": "gen_ai.invoke_agent",
+            "sentry.origin": "manual",
+            "sentry.release": mock.ANY,
+            "sentry.sdk.name": "sentry.python",
+            "sentry.sdk.version": mock.ANY,
+            "sentry.segment.id": mock.ANY,
+            "sentry.segment.name": "test-transaction",
+            "server.address": mock.ANY,
+            "thread.id": mock.ANY,
+            "thread.name": mock.ANY,
+        }
 
-    assert chat_span["op"] == "gen_ai.chat"
-    assert chat_span["description"] == "chat my-gpt-4o-mini"
-    assert chat_span["data"] == {
-        "gen_ai.operation.name": "chat",
-        "gen_ai.request.frequency_penalty": 1.0,
-        "gen_ai.request.max_tokens": 100,
-        "gen_ai.request.messages": "[{'role': 'user', 'content': 'What is the weather in Tokyo?'}, {'role': 'system', 'content': 'You are a helpful assistant that can answer questions about the weather.'}]",
-        "gen_ai.request.model": "my-gpt-4o-mini",
-        "gen_ai.request.presence_penalty": 2.0,
-        "gen_ai.request.temperature": 0.5,
-        "gen_ai.request.top_k": 40,
-        "gen_ai.request.top_p": 0.9,
-        "gen_ai.response.model": "my-gpt-4o-mini-v123",
-        "gen_ai.usage.input_tokens": 11,
-        "gen_ai.usage.output_tokens": 22,
-        "gen_ai.usage.total_tokens": 33,
-        "thread.id": mock.ANY,
-        "thread.name": mock.ANY,
-    }
+        assert (
+            tool_span["name"]
+            == "execute_tool test_decorator.test_span_templates_ai_dicts.<locals>.my_tool"
+        )
+        assert tool_span["attributes"] == {
+            "gen_ai.tool.name": "test_decorator.test_span_templates_ai_dicts.<locals>.my_tool",
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.usage.input_tokens": 10,
+            "gen_ai.usage.output_tokens": 20,
+            "gen_ai.usage.total_tokens": 30,
+            "process.runtime.name": mock.ANY,
+            "process.runtime.version": mock.ANY,
+            "sentry.environment": "production",
+            "sentry.op": "gen_ai.execute_tool",
+            "sentry.origin": "manual",
+            "sentry.release": mock.ANY,
+            "sentry.sdk.name": "sentry.python",
+            "sentry.sdk.version": mock.ANY,
+            "sentry.segment.id": mock.ANY,
+            "sentry.segment.name": "test-transaction",
+            "server.address": mock.ANY,
+            "thread.id": mock.ANY,
+            "thread.name": mock.ANY,
+        }
+        assert "gen_ai.tool.description" not in tool_span["attributes"]
+
+        assert chat_span["name"] == "chat my-gpt-4o-mini"
+        assert chat_span["attributes"] == {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.frequency_penalty": 1.0,
+            "gen_ai.request.max_tokens": 100,
+            "gen_ai.request.messages": "[{'role': 'user', 'content': 'What is the weather in Tokyo?'}, {'role': 'system', 'content': 'You are a helpful assistant that can answer questions about the weather.'}]",
+            "gen_ai.request.model": "my-gpt-4o-mini",
+            "gen_ai.request.presence_penalty": 2.0,
+            "gen_ai.request.temperature": 0.5,
+            "gen_ai.request.top_k": 40,
+            "gen_ai.request.top_p": 0.9,
+            "gen_ai.response.model": "my-gpt-4o-mini-v123",
+            "gen_ai.usage.input_tokens": 11,
+            "gen_ai.usage.output_tokens": 22,
+            "gen_ai.usage.total_tokens": 33,
+            "process.runtime.name": mock.ANY,
+            "process.runtime.version": mock.ANY,
+            "sentry.environment": "production",
+            "sentry.op": "gen_ai.chat",
+            "sentry.origin": "manual",
+            "sentry.release": mock.ANY,
+            "sentry.sdk.name": "sentry.python",
+            "sentry.sdk.version": mock.ANY,
+            "sentry.segment.id": mock.ANY,
+            "sentry.segment.name": "test-transaction",
+            "server.address": mock.ANY,
+            "thread.id": mock.ANY,
+            "thread.name": mock.ANY,
+        }
+    else:
+        sentry_init(
+            traces_sample_rate=1.0,
+            stream_gen_ai_spans=stream_gen_ai_spans,
+        )
+        events = capture_events()
+
+        with sentry_sdk.start_transaction(name="test-transaction"):
+            my_agent()
+
+        (event,) = events
+        (agent_span, tool_span, chat_span) = event["spans"]
+
+        assert agent_span["op"] == "gen_ai.invoke_agent"
+        assert (
+            agent_span["description"]
+            == "invoke_agent test_decorator.test_span_templates_ai_dicts.<locals>.my_agent"
+        )
+        assert agent_span["data"] == {
+            "gen_ai.agent.name": "test_decorator.test_span_templates_ai_dicts.<locals>.my_agent",
+            "gen_ai.operation.name": "invoke_agent",
+            "thread.id": mock.ANY,
+            "thread.name": mock.ANY,
+        }
+
+        assert tool_span["op"] == "gen_ai.execute_tool"
+        assert (
+            tool_span["description"]
+            == "execute_tool test_decorator.test_span_templates_ai_dicts.<locals>.my_tool"
+        )
+        assert tool_span["data"] == {
+            "gen_ai.tool.name": "test_decorator.test_span_templates_ai_dicts.<locals>.my_tool",
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.usage.input_tokens": 10,
+            "gen_ai.usage.output_tokens": 20,
+            "gen_ai.usage.total_tokens": 30,
+            "thread.id": mock.ANY,
+            "thread.name": mock.ANY,
+        }
+        assert "gen_ai.tool.description" not in tool_span["data"]
+
+        assert chat_span["op"] == "gen_ai.chat"
+        assert chat_span["description"] == "chat my-gpt-4o-mini"
+        assert chat_span["data"] == {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.frequency_penalty": 1.0,
+            "gen_ai.request.max_tokens": 100,
+            "gen_ai.request.messages": "[{'role': 'user', 'content': 'What is the weather in Tokyo?'}, {'role': 'system', 'content': 'You are a helpful assistant that can answer questions about the weather.'}]",
+            "gen_ai.request.model": "my-gpt-4o-mini",
+            "gen_ai.request.presence_penalty": 2.0,
+            "gen_ai.request.temperature": 0.5,
+            "gen_ai.request.top_k": 40,
+            "gen_ai.request.top_p": 0.9,
+            "gen_ai.response.model": "my-gpt-4o-mini-v123",
+            "gen_ai.usage.input_tokens": 11,
+            "gen_ai.usage.output_tokens": 22,
+            "gen_ai.usage.total_tokens": 33,
+            "thread.id": mock.ANY,
+            "thread.name": mock.ANY,
+        }
 
 
-def test_span_templates_ai_objects(sentry_init, capture_events):
-    sentry_init(traces_sample_rate=1.0)
-    events = capture_events()
-
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_span_templates_ai_objects(
+    sentry_init,
+    capture_events,
+    capture_items,
+    stream_gen_ai_spans,
+):
     @sentry_sdk.trace(template=SPANTEMPLATE.AI_TOOL)
     def my_tool(arg1, arg2):
         """This is a tool function."""
@@ -264,66 +620,163 @@ def test_span_templates_ai_objects(sentry_init, capture_events):
             presence_penalty=2.0,
         )
 
-    with sentry_sdk.start_transaction(name="test-transaction"):
-        my_agent()
-
-    (event,) = events
-    (agent_span, tool_span, chat_span) = event["spans"]
-
-    assert agent_span["op"] == "gen_ai.invoke_agent"
-    assert (
-        agent_span["description"]
-        == "invoke_agent test_decorator.test_span_templates_ai_objects.<locals>.my_agent"
+    sentry_init(
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
     )
-    assert agent_span["data"] == {
-        "gen_ai.agent.name": "test_decorator.test_span_templates_ai_objects.<locals>.my_agent",
-        "gen_ai.operation.name": "invoke_agent",
-        "thread.id": mock.ANY,
-        "thread.name": mock.ANY,
-    }
 
-    assert tool_span["op"] == "gen_ai.execute_tool"
-    assert (
-        tool_span["description"]
-        == "execute_tool test_decorator.test_span_templates_ai_objects.<locals>.my_tool"
-    )
-    assert tool_span["data"] == {
-        "gen_ai.tool.name": "test_decorator.test_span_templates_ai_objects.<locals>.my_tool",
-        "gen_ai.tool.description": "This is a tool function.",
-        "gen_ai.operation.name": "execute_tool",
-        "gen_ai.usage.input_tokens": 10,
-        "gen_ai.usage.output_tokens": 20,
-        "gen_ai.usage.total_tokens": 30,
-        "thread.id": mock.ANY,
-        "thread.name": mock.ANY,
-    }
+    if stream_gen_ai_spans:
+        items = capture_items("span")
 
-    assert chat_span["op"] == "gen_ai.chat"
-    assert chat_span["description"] == "chat my-gpt-4o-mini"
-    assert chat_span["data"] == {
-        "gen_ai.operation.name": "chat",
-        "gen_ai.request.frequency_penalty": 1.0,
-        "gen_ai.request.max_tokens": 100,
-        "gen_ai.request.messages": "[{'role': 'user', 'content': 'What is the weather in Tokyo?'}, {'role': 'system', 'content': 'You are a helpful assistant that can answer questions about the weather.'}]",
-        "gen_ai.request.model": "my-gpt-4o-mini",
-        "gen_ai.request.presence_penalty": 2.0,
-        "gen_ai.request.temperature": 0.5,
-        "gen_ai.request.top_k": 40,
-        "gen_ai.request.top_p": 0.9,
-        "gen_ai.response.model": "my-gpt-4o-mini-v123",
-        "gen_ai.usage.input_tokens": 11,
-        "gen_ai.usage.output_tokens": 22,
-        "gen_ai.usage.total_tokens": 33,
-        "thread.id": mock.ANY,
-        "thread.name": mock.ANY,
-    }
+        with sentry_sdk.start_transaction(name="test-transaction"):
+            my_agent()
+
+        (agent_span, tool_span, chat_span) = (item.payload for item in items)
+
+        assert (
+            agent_span["name"]
+            == "invoke_agent test_decorator.test_span_templates_ai_objects.<locals>.my_agent"
+        )
+        assert agent_span["attributes"] == {
+            "gen_ai.agent.name": "test_decorator.test_span_templates_ai_objects.<locals>.my_agent",
+            "gen_ai.operation.name": "invoke_agent",
+            "process.runtime.name": mock.ANY,
+            "process.runtime.version": mock.ANY,
+            "sentry.environment": "production",
+            "sentry.op": "gen_ai.invoke_agent",
+            "sentry.origin": "manual",
+            "sentry.release": mock.ANY,
+            "sentry.sdk.name": "sentry.python",
+            "sentry.sdk.version": mock.ANY,
+            "sentry.segment.id": mock.ANY,
+            "sentry.segment.name": "test-transaction",
+            "server.address": mock.ANY,
+            "thread.id": mock.ANY,
+            "thread.name": mock.ANY,
+        }
+
+        assert (
+            tool_span["name"]
+            == "execute_tool test_decorator.test_span_templates_ai_objects.<locals>.my_tool"
+        )
+        assert tool_span["attributes"] == {
+            "gen_ai.tool.name": "test_decorator.test_span_templates_ai_objects.<locals>.my_tool",
+            "gen_ai.tool.description": "This is a tool function.",
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.usage.input_tokens": 10,
+            "gen_ai.usage.output_tokens": 20,
+            "gen_ai.usage.total_tokens": 30,
+            "process.runtime.name": mock.ANY,
+            "process.runtime.version": mock.ANY,
+            "sentry.environment": "production",
+            "sentry.op": "gen_ai.execute_tool",
+            "sentry.origin": "manual",
+            "sentry.release": mock.ANY,
+            "sentry.sdk.name": "sentry.python",
+            "sentry.sdk.version": mock.ANY,
+            "sentry.segment.id": mock.ANY,
+            "sentry.segment.name": "test-transaction",
+            "server.address": mock.ANY,
+            "thread.id": mock.ANY,
+            "thread.name": mock.ANY,
+        }
+
+        assert chat_span["name"] == "chat my-gpt-4o-mini"
+        assert chat_span["attributes"] == {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.frequency_penalty": 1.0,
+            "gen_ai.request.max_tokens": 100,
+            "gen_ai.request.messages": "[{'role': 'user', 'content': 'What is the weather in Tokyo?'}, {'role': 'system', 'content': 'You are a helpful assistant that can answer questions about the weather.'}]",
+            "gen_ai.request.model": "my-gpt-4o-mini",
+            "gen_ai.request.presence_penalty": 2.0,
+            "gen_ai.request.temperature": 0.5,
+            "gen_ai.request.top_k": 40,
+            "gen_ai.request.top_p": 0.9,
+            "gen_ai.response.model": "my-gpt-4o-mini-v123",
+            "gen_ai.usage.input_tokens": 11,
+            "gen_ai.usage.output_tokens": 22,
+            "gen_ai.usage.total_tokens": 33,
+            "process.runtime.name": mock.ANY,
+            "process.runtime.version": mock.ANY,
+            "sentry.environment": "production",
+            "sentry.op": "gen_ai.chat",
+            "sentry.origin": "manual",
+            "sentry.release": mock.ANY,
+            "sentry.sdk.name": "sentry.python",
+            "sentry.sdk.version": mock.ANY,
+            "sentry.segment.id": mock.ANY,
+            "sentry.segment.name": "test-transaction",
+            "server.address": mock.ANY,
+            "thread.id": mock.ANY,
+            "thread.name": mock.ANY,
+        }
+    else:
+        events = capture_events()
+
+        with sentry_sdk.start_transaction(name="test-transaction"):
+            my_agent()
+
+        (event,) = events
+        (agent_span, tool_span, chat_span) = event["spans"]
+
+        assert agent_span["op"] == "gen_ai.invoke_agent"
+        assert (
+            agent_span["description"]
+            == "invoke_agent test_decorator.test_span_templates_ai_objects.<locals>.my_agent"
+        )
+        assert agent_span["data"] == {
+            "gen_ai.agent.name": "test_decorator.test_span_templates_ai_objects.<locals>.my_agent",
+            "gen_ai.operation.name": "invoke_agent",
+            "thread.id": mock.ANY,
+            "thread.name": mock.ANY,
+        }
+
+        assert tool_span["op"] == "gen_ai.execute_tool"
+        assert (
+            tool_span["description"]
+            == "execute_tool test_decorator.test_span_templates_ai_objects.<locals>.my_tool"
+        )
+        assert tool_span["data"] == {
+            "gen_ai.tool.name": "test_decorator.test_span_templates_ai_objects.<locals>.my_tool",
+            "gen_ai.tool.description": "This is a tool function.",
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.usage.input_tokens": 10,
+            "gen_ai.usage.output_tokens": 20,
+            "gen_ai.usage.total_tokens": 30,
+            "thread.id": mock.ANY,
+            "thread.name": mock.ANY,
+        }
+
+        assert chat_span["op"] == "gen_ai.chat"
+        assert chat_span["description"] == "chat my-gpt-4o-mini"
+        assert chat_span["data"] == {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.frequency_penalty": 1.0,
+            "gen_ai.request.max_tokens": 100,
+            "gen_ai.request.messages": "[{'role': 'user', 'content': 'What is the weather in Tokyo?'}, {'role': 'system', 'content': 'You are a helpful assistant that can answer questions about the weather.'}]",
+            "gen_ai.request.model": "my-gpt-4o-mini",
+            "gen_ai.request.presence_penalty": 2.0,
+            "gen_ai.request.temperature": 0.5,
+            "gen_ai.request.top_k": 40,
+            "gen_ai.request.top_p": 0.9,
+            "gen_ai.response.model": "my-gpt-4o-mini-v123",
+            "gen_ai.usage.input_tokens": 11,
+            "gen_ai.usage.output_tokens": 22,
+            "gen_ai.usage.total_tokens": 33,
+            "thread.id": mock.ANY,
+            "thread.name": mock.ANY,
+        }
 
 
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize("send_default_pii", [True, False])
-def test_span_templates_ai_pii(sentry_init, capture_events, send_default_pii):
-    sentry_init(traces_sample_rate=1.0, send_default_pii=send_default_pii)
-    events = capture_events()
-
+def test_span_templates_ai_pii(
+    sentry_init,
+    capture_events,
+    capture_items,
+    send_default_pii,
+    stream_gen_ai_spans,
+):
     @sentry_sdk.trace(template=SPANTEMPLATE.AI_TOOL)
     def my_tool(arg1, arg2, **kwargs):
         """This is a tool function."""
@@ -349,18 +802,44 @@ def test_span_templates_ai_pii(sentry_init, capture_events, send_default_pii):
         )
         return "agent_output"
 
-    with sentry_sdk.start_transaction(name="test-transaction"):
-        my_agent(22, 33, arg1=44, arg2=55)
+    sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+    )
 
-    (event,) = events
-    (_, tool_span, _) = event["spans"]
+    if stream_gen_ai_spans:
+        items = capture_items("span")
 
-    if send_default_pii:
-        assert (
-            tool_span["data"]["gen_ai.tool.input"]
-            == "{'args': (1, 2), 'kwargs': {'tool_arg1': '3', 'tool_arg2': '4'}}"
-        )
-        assert tool_span["data"]["gen_ai.tool.output"] == "'tool_output'"
+        with sentry_sdk.start_transaction(name="test-transaction"):
+            my_agent(22, 33, arg1=44, arg2=55)
+
+        (_, tool_span, _) = (item.payload for item in items)
+
+        if send_default_pii:
+            assert (
+                tool_span["attributes"]["gen_ai.tool.input"]
+                == "{'args': (1, 2), 'kwargs': {'tool_arg1': '3', 'tool_arg2': '4'}}"
+            )
+            assert tool_span["attributes"]["gen_ai.tool.output"] == "'tool_output'"
+        else:
+            assert "gen_ai.tool.input" not in tool_span["attributes"]
+            assert "gen_ai.tool.output" not in tool_span["attributes"]
     else:
-        assert "gen_ai.tool.input" not in tool_span["data"]
-        assert "gen_ai.tool.output" not in tool_span["data"]
+        events = capture_events()
+
+        with sentry_sdk.start_transaction(name="test-transaction"):
+            my_agent(22, 33, arg1=44, arg2=55)
+
+        (event,) = events
+        (_, tool_span, _) = event["spans"]
+
+        if send_default_pii:
+            assert (
+                tool_span["data"]["gen_ai.tool.input"]
+                == "{'args': (1, 2), 'kwargs': {'tool_arg1': '3', 'tool_arg2': '4'}}"
+            )
+            assert tool_span["data"]["gen_ai.tool.output"] == "'tool_output'"
+        else:
+            assert "gen_ai.tool.input" not in tool_span["data"]
+            assert "gen_ai.tool.output" not in tool_span["data"]

@@ -1,11 +1,9 @@
 import pytest
-
 import responses
-from gql import gql
-from gql import Client
-from gql import __version__
+from gql import Client, __version__, gql
 from gql.transport.exceptions import TransportQueryError
 from gql.transport.requests import RequestsHTTPTransport
+
 from sentry_sdk.integrations.gql import GQLIntegration
 from sentry_sdk.utils import parse_version
 
@@ -58,6 +56,30 @@ def _execute_mock_query_with_keyword_document(response_json):
     query = gql(query_string)
 
     return client.execute(document=query)
+
+
+@responses.activate
+def _execute_mock_query_with_variables(response_json):
+    url = "http://example.com/graphql"
+    query_string = """
+        query Example($id: ID!) {
+            example(id: $id)
+        }
+    """
+
+    # Mock the GraphQL server response
+    responses.add(
+        method=responses.POST,
+        url=url,
+        json=response_json,
+        status=200,
+    )
+
+    transport = RequestsHTTPTransport(url=url)
+    client = Client(transport=transport)
+    query = gql(query_string)
+
+    return client.execute(query, variable_values={"id": "1"})
 
 
 _execute_query_funcs = [_execute_mock_query]
@@ -149,3 +171,105 @@ def test_real_gql_request_with_error_with_pii(
 
     assert "data" in event["request"]
     assert "response" in event["contexts"]
+
+
+@pytest.mark.parametrize("execute_query", _execute_query_funcs)
+@pytest.mark.parametrize(
+    "init_kwargs,expect_data",
+    [
+        pytest.param({}, False, id="no_pii_no_data_collection"),
+        pytest.param({"send_default_pii": True}, True, id="legacy_pii_on"),
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            True,
+            id="data_collection_defaults",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"graphql": {"document": True}}}},
+            True,
+            id="data_collection_document_on",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"graphql": {"document": False}}}},
+            False,
+            id="data_collection_document_off",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": True,
+                "_experiments": {"data_collection": {"graphql": {"document": False}}},
+            },
+            False,
+            id="data_collection_takes_precedence_over_send_default_pii_on",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": False,
+                "_experiments": {"data_collection": {"graphql": {"document": True}}},
+            },
+            True,
+            id="data_collection_takes_precedence_over_send_default_pii_off",
+        ),
+    ],
+)
+def test_real_gql_request_with_error_data_collection(
+    sentry_init, capture_events, execute_query, init_kwargs, expect_data
+):
+    """
+    Integration test verifying that the GQLIntegration honours the
+    ``data_collection`` configuration when deciding whether to attach the
+    GraphQL document to the event.
+    """
+    sentry_init(integrations=[GQLIntegration()], **init_kwargs)
+
+    event = _make_erroneous_query(capture_events, execute_query)
+
+    if expect_data:
+        assert "data" in event["request"]
+        assert "query" in event["request"]["data"]
+        assert "response" in event["contexts"]
+    else:
+        assert "data" not in event["request"]
+        assert "response" not in event["contexts"]
+
+
+@pytest.mark.parametrize(
+    "init_kwargs,expect_variables",
+    [
+        pytest.param({"send_default_pii": True}, True, id="legacy_pii_on"),
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            True,
+            id="data_collection_defaults",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"graphql": {"variables": True}}}},
+            True,
+            id="data_collection_variables_on",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"graphql": {"variables": False}}}},
+            False,
+            id="data_collection_variables_off",
+        ),
+    ],
+)
+def test_real_gql_request_with_error_data_collection_variables(
+    sentry_init, capture_events, init_kwargs, expect_variables
+):
+    """
+    Integration test verifying that the GQLIntegration honours the
+    ``data_collection`` ``graphql.variables`` toggle for queries that
+    define variables.
+    """
+    sentry_init(integrations=[GQLIntegration()], **init_kwargs)
+
+    event = _make_erroneous_query(capture_events, _execute_mock_query_with_variables)
+
+    assert "data" in event["request"]
+    assert "query" in event["request"]["data"]
+
+    if expect_variables:
+        assert event["request"]["data"].get("variables")
+    else:
+        assert not event["request"]["data"].get("variables")

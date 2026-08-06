@@ -1,8 +1,8 @@
-import pytest
-
 from unittest import mock
 from unittest.mock import MagicMock
 
+import pytest
+from opentelemetry import trace
 from opentelemetry.context import get_current
 from opentelemetry.trace import (
     SpanContext,
@@ -15,8 +15,12 @@ from sentry_sdk.integrations.opentelemetry.consts import (
     SENTRY_BAGGAGE_KEY,
     SENTRY_TRACE_KEY,
 )
+from sentry_sdk.integrations.opentelemetry.integration import (
+    OpenTelemetryIntegration,
+)
 from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
 from sentry_sdk.integrations.opentelemetry.span_processor import SentrySpanProcessor
+from sentry_sdk.scope import global_event_processors
 from sentry_sdk.tracing_utils import Baggage
 
 
@@ -298,3 +302,21 @@ def test_inject_sentry_span_baggage():
             "baggage",
             baggage.serialize(),
         )
+
+
+def test_inject_no_memory_leak():
+
+    OpenTelemetryIntegration.setup_once()
+
+    tracer = trace.get_tracer(__name__)
+    propagator = SentryPropagator()
+
+    cnt_before = len(global_event_processors)
+
+    with tracer.start_as_current_span("bar") as new_span:
+        context = set_span_in_context(new_span)
+        carrier = "any_carrier"
+        propagator.inject(carrier, context)
+
+    cnt_after = len(global_event_processors)
+    assert cnt_after == cnt_before

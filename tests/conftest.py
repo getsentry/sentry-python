@@ -1,22 +1,40 @@
-import json
-import os
 import asyncio
-from urllib.parse import urlparse, parse_qs
-import socket
-import warnings
-import brotli
 import gzip
 import io
-from threading import Thread
-from contextlib import contextmanager
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from unittest import mock
+import json
+import os
+import socket
+import warnings
 from collections import namedtuple
+from contextlib import contextmanager
+from dataclasses import dataclass
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from threading import Thread
+from unittest import mock
+from urllib.parse import parse_qs, urlparse
+
+try:
+    import brotli
+except ImportError:
+    brotli = None
+
+try:
+    import jsonschema
+except ImportError:
+    jsonschema = None
 
 import pytest
-from pytest_localserver.http import WSGIServer
-from werkzeug.wrappers import Request, Response
-import jsonschema
+
+try:
+    from pytest_localserver.http import WSGIServer
+except ImportError:
+    WSGIServer = None
+
+try:
+    from werkzeug.wrappers import Request, Response
+except ImportError:
+    Request = None
+    Response = None
 
 try:
     from starlette.testclient import TestClient
@@ -46,7 +64,7 @@ from sentry_sdk.integrations import (  # noqa: F401
 from sentry_sdk.profiler import teardown_profiler
 from sentry_sdk.profiler.continuous_profiler import teardown_continuous_profiler
 from sentry_sdk.transport import Transport
-from sentry_sdk.utils import reraise
+from sentry_sdk.utils import package_version, reraise
 
 try:
     import openai
@@ -54,21 +72,37 @@ except ImportError:
     openai = None
 
 
-from tests import _warning_recorder, _warning_recorder_mgr
+try:
+    import anthropic
+except ImportError:
+    anthropic = None
+
+
+try:
+    import google
+except ImportError:
+    google = None
+
 
 from typing import TYPE_CHECKING
 
+from tests import _warning_recorder, _warning_recorder_mgr
+
 if TYPE_CHECKING:
-    from typing import Any, Callable, MutableMapping, Optional
     from collections.abc import Iterator
+    from typing import Any, Callable, MutableMapping, Optional
 
 try:
     from httpx import (
         ASGITransport,
-        Request as HttpxRequest,
-        Response as HttpxResponse,
         AsyncByteStream,
         AsyncClient,
+    )
+    from httpx import (
+        Request as HttpxRequest,
+    )
+    from httpx import (
+        Response as HttpxResponse,
     )
 except ImportError:
     ASGITransport = None
@@ -79,13 +113,24 @@ except ImportError:
 
 
 try:
-    from anyio import create_memory_object_stream, create_task_group, EndOfStream
-    from mcp.types import (
-        JSONRPCMessage,
-        JSONRPCNotification,
-        JSONRPCRequest,
-    )
+    from anyio import EndOfStream, create_memory_object_stream, create_task_group
     from mcp.shared.message import SessionMessage
+
+    _MCP_VERSION = package_version("mcp")
+    _IS_MCP_V2 = _MCP_VERSION is not None and _MCP_VERSION >= (2, 0, 0)
+
+    if _IS_MCP_V2:
+        from mcp_types import (
+            JSONRPCMessage,
+            JSONRPCNotification,
+            JSONRPCRequest,
+        )
+    else:
+        from mcp.types import (
+            JSONRPCMessage,
+            JSONRPCNotification,
+            JSONRPCRequest,
+        )
 except ImportError:
     create_memory_object_stream = None
     create_task_group = None
@@ -95,6 +140,7 @@ except ImportError:
     JSONRPCNotification = None
     JSONRPCRequest = None
     SessionMessage = None
+    _IS_MCP_V2 = False
 
 
 SENTRY_EVENT_SCHEMA = "./checkouts/data-schemas/relay/event.schema.json"
@@ -198,12 +244,20 @@ def _capture_internal_warnings():
         if "dns.hash" in str(warning.message) or "dns/namedict" in warning.filename:
             continue
 
+        # On Python < 3.8 we fall back to importing `pkg_resources` to
+        # enumerate installed modules, which emits a DeprecationWarning.
+        if "pkg_resources is deprecated as an API" in str(
+            warning.message
+        ) and warning.filename.endswith("sentry_sdk/utils.py"):
+            continue
+
         raise AssertionError(warning)
 
 
 @pytest.fixture
 def validate_event_schema(tmpdir):
     def inner(event):
+        assert jsonschema is not None
         if SENTRY_EVENT_SCHEMA:
             jsonschema.validate(instance=event, schema=SENTRY_EVENT_SCHEMA)
 
@@ -320,6 +374,52 @@ def capture_envelopes(monkeypatch):
     return inner
 
 
+@dataclass
+class UnwrappedItem:
+    type: str
+    payload: dict
+
+
+@pytest.fixture
+def capture_items(monkeypatch):
+    """
+    Capture envelope payload, unfurling individual items.
+
+    Makes it easier to work with both events and attribute-based telemetry in
+    one test.
+    """
+
+    def inner(*types):
+        telemetry = []
+        test_client = sentry_sdk.get_client()
+        old_capture_envelope = test_client.transport.capture_envelope
+
+        def append_envelope(envelope):
+            for item in envelope:
+                if types and item.type not in types:
+                    continue
+
+                if item.type in ("trace_metric", "log", "span"):
+                    for i in item.payload.json["items"]:
+                        t = {k: v for k, v in i.items() if k != "attributes"}
+                        t["attributes"] = {
+                            k: v["value"] for k, v in i["attributes"].items()
+                        }
+                        telemetry.append(UnwrappedItem(type=item.type, payload=t))
+                else:
+                    telemetry.append(
+                        UnwrappedItem(type=item.type, payload=item.payload.json)
+                    )
+
+            return old_capture_envelope(envelope)
+
+        monkeypatch.setattr(test_client.transport, "capture_envelope", append_envelope)
+
+        return telemetry
+
+    return inner
+
+
 @pytest.fixture
 def capture_record_lost_event_calls(monkeypatch):
     def inner():
@@ -364,6 +464,52 @@ def capture_events_forksafe(monkeypatch, capture_events, request):
         monkeypatch.setattr(test_client, "flush", flush)
 
         return EventStreamReader(events_r, events_w)
+
+    return inner
+
+
+@pytest.fixture
+def capture_items_forksafe(monkeypatch, capture_items, request):
+    def inner(*types):
+        capture_items(*types)
+
+        items_r, items_w = os.pipe()
+        items_r = os.fdopen(items_r, "rb", 0)
+        items_w = os.fdopen(items_w, "wb", 0)
+
+        test_client = sentry_sdk.get_client()
+        old_capture_envelope = test_client.transport.capture_envelope
+
+        telemetry = []
+
+        def append(envelope):
+            for item in envelope:
+                if types and item.type not in types:
+                    continue
+
+                if item.type in ("metric", "log", "span"):
+                    for i in item.payload.json["items"]:
+                        t = {k: v for k, v in i.items() if k != "attributes"}
+                        t["attributes"] = {
+                            k: v["value"] for k, v in i["attributes"].items()
+                        }
+                        telemetry.append({"type": item.type, "payload": t})
+                else:
+                    telemetry.append({"type": item.type, "payload": item.payload.json})
+
+            return old_capture_envelope(envelope)
+
+        real_flush = test_client.flush
+
+        def flush(timeout=None, callback=None):
+            real_flush(timeout=timeout, callback=callback)
+            items_w.write(json.dumps(telemetry).encode("utf-8") + b"\n")
+            items_w.write(b"flush\n")
+
+        monkeypatch.setattr(test_client.transport, "capture_envelope", append)
+        monkeypatch.setattr(test_client, "flush", flush)
+
+        return EventStreamReader(items_r, items_w)
 
     return inner
 
@@ -417,22 +563,33 @@ def maybe_monkeypatched_threading(request):
 
 @pytest.fixture
 def render_span_tree():
-    def inner(event):
-        assert event["type"] == "transaction"
+    def inner(spans, root_span=None):
+        streamed_spans = False
+        if root_span is None:
+            streamed_spans = True
 
         by_parent = {}
-        for span in event["spans"]:
+        for span in spans:
+            if "parent_span_id" not in span:
+                root_span = span
+                continue
+
             by_parent.setdefault(span["parent_span_id"], []).append(span)
 
         def render_span(span):
-            yield "- op={}: description={}".format(
-                json.dumps(span.get("op")), json.dumps(span.get("description"))
-            )
+            if streamed_spans:
+                yield "- sentry.op={}: name={}".format(
+                    json.dumps(span["attributes"].get("sentry.op")),
+                    json.dumps(span["name"]),
+                )
+            else:
+                yield "- op={}: description={}".format(
+                    json.dumps(span.get("op")), json.dumps(span.get("description"))
+                )
+
             for subspan in by_parent.get(span["span_id"]) or ():
                 for line in render_span(subspan):
                     yield "  {}".format(line)
-
-        root_span = event["contexts"]["trace"]
 
         return "\n".join(render_span(root_span))
 
@@ -640,21 +797,27 @@ def suppress_deprecation_warnings():
         yield
 
 
+def _make_session_message(jsonrpc_msg):
+    """Construct a SessionMessage compatible with both MCP v1 and v2."""
+    if _IS_MCP_V2:
+        return SessionMessage(message=jsonrpc_msg)  # type: ignore
+    else:
+        return SessionMessage(message=JSONRPCMessage(root=jsonrpc_msg))  # type: ignore
+
+
 @pytest.fixture
 def get_initialization_payload():
     def inner(request_id: str):
-        return SessionMessage(  # type: ignore
-            message=JSONRPCMessage(  # type: ignore
-                root=JSONRPCRequest(  # type: ignore
-                    jsonrpc="2.0",
-                    id=request_id,
-                    method="initialize",
-                    params={
-                        "protocolVersion": "2025-11-25",
-                        "capabilities": {},
-                        "clientInfo": {"name": "test-client", "version": "1.0.0"},
-                    },
-                )
+        return _make_session_message(
+            JSONRPCRequest(  # type: ignore
+                jsonrpc="2.0",
+                id=request_id,
+                method="initialize",
+                params={
+                    "protocolVersion": "2025-11-25",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test-client", "version": "1.0.0"},
+                },
             )
         )
 
@@ -664,12 +827,10 @@ def get_initialization_payload():
 @pytest.fixture
 def get_initialized_notification_payload():
     def inner():
-        return SessionMessage(  # type: ignore
-            message=JSONRPCMessage(  # type: ignore
-                root=JSONRPCNotification(  # type: ignore
-                    jsonrpc="2.0",
-                    method="notifications/initialized",
-                )
+        return _make_session_message(
+            JSONRPCNotification(  # type: ignore
+                jsonrpc="2.0",
+                method="notifications/initialized",
             )
         )
 
@@ -679,14 +840,12 @@ def get_initialized_notification_payload():
 @pytest.fixture
 def get_mcp_command_payload():
     def inner(method: str, params, request_id: str):
-        return SessionMessage(  # type: ignore
-            message=JSONRPCMessage(  # type: ignore
-                root=JSONRPCRequest(  # type: ignore
-                    jsonrpc="2.0",
-                    id=request_id,
-                    method=method,
-                    params=params,
-                )
+        return _make_session_message(
+            JSONRPCRequest(  # type: ignore
+                jsonrpc="2.0",
+                id=request_id,
+                method=method,
+                params=params,
             )
         )
 
@@ -1050,7 +1209,12 @@ def get_model_response():
         )
 
         if serialize_pydantic:
-            response_content = json.dumps(response_content.model_dump()).encode("utf-8")
+            response_content = json.dumps(
+                response_content.model_dump(
+                    by_alias=True,
+                    exclude_none=True,
+                )
+            ).encode("utf-8")
 
         response = HttpxResponse(
             200,
@@ -1061,6 +1225,190 @@ def get_model_response():
         return response
 
     return inner
+
+
+@pytest.fixture
+def get_rate_limit_model_response():
+    def inner(request_headers=None):
+        if request_headers is None:
+            request_headers = {}
+
+        model_request = HttpxRequest(
+            "POST",
+            "/responses",
+            headers=request_headers,
+        )
+
+        response = HttpxResponse(
+            429,
+            request=model_request,
+        )
+
+        return response
+
+    return inner
+
+
+@pytest.fixture
+def streaming_chat_completions_model_response():
+    return [
+        openai.types.chat.ChatCompletionChunk(
+            id="chatcmpl-test",
+            object="chat.completion.chunk",
+            created=10000000,
+            model="gpt-3.5-turbo",
+            choices=[
+                openai.types.chat.chat_completion_chunk.Choice(
+                    index=0,
+                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
+                        role="assistant"
+                    ),
+                    finish_reason=None,
+                ),
+            ],
+        ),
+        openai.types.chat.ChatCompletionChunk(
+            id="chatcmpl-test",
+            object="chat.completion.chunk",
+            created=10000000,
+            model="gpt-3.5-turbo",
+            choices=[
+                openai.types.chat.chat_completion_chunk.Choice(
+                    index=0,
+                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
+                        content="Tes"
+                    ),
+                    finish_reason=None,
+                ),
+            ],
+        ),
+        openai.types.chat.ChatCompletionChunk(
+            id="chatcmpl-test",
+            object="chat.completion.chunk",
+            created=10000000,
+            model="gpt-3.5-turbo",
+            choices=[
+                openai.types.chat.chat_completion_chunk.Choice(
+                    index=0,
+                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
+                        content="t r"
+                    ),
+                    finish_reason=None,
+                ),
+            ],
+        ),
+        openai.types.chat.ChatCompletionChunk(
+            id="chatcmpl-test",
+            object="chat.completion.chunk",
+            created=10000000,
+            model="gpt-3.5-turbo",
+            choices=[
+                openai.types.chat.chat_completion_chunk.Choice(
+                    index=0,
+                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
+                        content="esp"
+                    ),
+                    finish_reason=None,
+                ),
+            ],
+        ),
+        openai.types.chat.ChatCompletionChunk(
+            id="chatcmpl-test",
+            object="chat.completion.chunk",
+            created=10000000,
+            model="gpt-3.5-turbo",
+            choices=[
+                openai.types.chat.chat_completion_chunk.Choice(
+                    index=0,
+                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
+                        content="ons"
+                    ),
+                    finish_reason=None,
+                ),
+            ],
+        ),
+        openai.types.chat.ChatCompletionChunk(
+            id="chatcmpl-test",
+            object="chat.completion.chunk",
+            created=10000000,
+            model="gpt-3.5-turbo",
+            choices=[
+                openai.types.chat.chat_completion_chunk.Choice(
+                    index=0,
+                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(
+                        content="e"
+                    ),
+                    finish_reason=None,
+                ),
+            ],
+        ),
+        openai.types.chat.ChatCompletionChunk(
+            id="chatcmpl-test",
+            object="chat.completion.chunk",
+            created=10000000,
+            model="gpt-3.5-turbo",
+            choices=[
+                openai.types.chat.chat_completion_chunk.Choice(
+                    index=0,
+                    delta=openai.types.chat.chat_completion_chunk.ChoiceDelta(),
+                    finish_reason="stop",
+                ),
+            ],
+            usage=openai.types.CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
+        ),
+    ]
+
+
+@pytest.fixture
+def nonstreaming_chat_completions_model_response():
+    def inner(
+        response_id: str,
+        response_model: str,
+        message_content: str,
+        created: int,
+        usage: openai.types.CompletionUsage,
+    ):
+        return openai.types.chat.ChatCompletion(
+            id=response_id,
+            choices=[
+                openai.types.chat.chat_completion.Choice(
+                    index=0,
+                    finish_reason="stop",
+                    message=openai.types.chat.ChatCompletionMessage(
+                        role="assistant", content=message_content
+                    ),
+                )
+            ],
+            created=created,
+            model=response_model,
+            object="chat.completion",
+            usage=usage,
+        )
+
+    return inner
+
+
+@pytest.fixture
+def openai_embedding_model_response():
+    return openai.types.CreateEmbeddingResponse(
+        data=[
+            openai.types.Embedding(
+                embedding=[0.1, 0.2, 0.3],
+                index=0,
+                object="embedding",
+            )
+        ],
+        model="text-embedding-ada-002",
+        object="list",
+        usage=openai.types.create_embedding_response.Usage(
+            prompt_tokens=5,
+            total_tokens=5,
+        ),
+    )
 
 
 @pytest.fixture
@@ -1092,6 +1440,7 @@ def nonstreaming_responses_model_response():
             input_tokens=10,
             input_tokens_details=openai.types.responses.response_usage.InputTokensDetails(
                 cached_tokens=0,
+                cache_write_tokens=0,
             ),
             output_tokens=20,
             output_tokens_details=openai.types.responses.response_usage.OutputTokensDetails(
@@ -1103,7 +1452,55 @@ def nonstreaming_responses_model_response():
 
 
 @pytest.fixture
-def responses_tool_call_model_responses():
+def nonstreaming_anthropic_model_response():
+    return anthropic.types.Message(
+        id="msg_123",
+        type="message",
+        role="assistant",
+        model="claude-3-opus-20240229",
+        content=[
+            anthropic.types.TextBlock(
+                type="text",
+                text="Hello, how can I help you?",
+            )
+        ],
+        stop_reason="end_turn",
+        stop_sequence=None,
+        usage=anthropic.types.Usage(
+            input_tokens=10,
+            output_tokens=20,
+        ),
+    )
+
+
+@pytest.fixture
+def nonstreaming_google_genai_model_response():
+    return google.genai.types.GenerateContentResponse(
+        response_id="resp_123",
+        candidates=[
+            google.genai.types.Candidate(
+                content=google.genai.types.Content(
+                    role="model",
+                    parts=[
+                        google.genai.types.Part(
+                            text="Hello, how can I help you?",
+                        )
+                    ],
+                ),
+                finish_reason="STOP",
+            )
+        ],
+        model_version="gemini/gemini-pro",
+        usage_metadata=google.genai.types.GenerateContentResponseUsageMetadata(
+            prompt_token_count=10,
+            candidates_token_count=20,
+            total_token_count=30,
+        ),
+    )
+
+
+@pytest.fixture
+def nonstreaming_responses_tool_call_model_responses():
     def inner(
         tool_name: str,
         arguments: str,
@@ -1157,6 +1554,128 @@ def responses_tool_call_model_responses():
             object="response",
             usage=next(usages),
         )
+
+    return inner
+
+
+@pytest.fixture
+def streaming_responses_tool_call_model_responses():
+    def inner(
+        tool_name: str,
+        arguments: str,
+        response_model: str,
+        response_text: str,
+        response_ids: "Iterator[str]",
+        usages: "Iterator[openai.types.responses.ResponseUsage]",
+    ):
+        first_id = next(response_ids)
+        second_id = next(response_ids)
+        first_usage = next(usages)
+        second_usage = next(usages)
+
+        yield [
+            openai.types.responses.ResponseCreatedEvent(
+                response=openai.types.responses.Response(
+                    id=first_id,
+                    output=[
+                        openai.types.responses.ResponseFunctionToolCall(
+                            id="call_123",
+                            call_id="call_123",
+                            name=tool_name,
+                            type="function_call",
+                            arguments=arguments,
+                        )
+                    ],
+                    parallel_tool_calls=False,
+                    tool_choice="none",
+                    tools=[],
+                    created_at=10000000,
+                    model=response_model,
+                    object="response",
+                    usage=first_usage,
+                ),
+                sequence_number=0,
+                type="response.created",
+            ),
+            openai.types.responses.ResponseCompletedEvent(
+                response=openai.types.responses.Response(
+                    id=first_id,
+                    output=[
+                        openai.types.responses.ResponseFunctionToolCall(
+                            id="call_123",
+                            call_id="call_123",
+                            name=tool_name,
+                            type="function_call",
+                            arguments=arguments,
+                        )
+                    ],
+                    parallel_tool_calls=False,
+                    tool_choice="none",
+                    tools=[],
+                    created_at=10000000,
+                    model=response_model,
+                    object="response",
+                    usage=first_usage,
+                ),
+                sequence_number=5,
+                type="response.completed",
+            ),
+        ]
+
+        yield [
+            openai.types.responses.ResponseCreatedEvent(
+                response=openai.types.responses.Response(
+                    id=second_id,
+                    output=[
+                        openai.types.responses.ResponseOutputMessage(
+                            id="msg_final",
+                            type="message",
+                            status="in_progress",
+                            content=[],
+                            role="assistant",
+                        )
+                    ],
+                    parallel_tool_calls=False,
+                    tool_choice="none",
+                    tools=[],
+                    created_at=10000000,
+                    model=response_model,
+                    object="response",
+                    usage=second_usage,
+                ),
+                sequence_number=0,
+                type="response.created",
+            ),
+            openai.types.responses.ResponseCompletedEvent(
+                response=openai.types.responses.Response(
+                    id=second_id,
+                    output=[
+                        openai.types.responses.ResponseOutputMessage(
+                            id="msg_final",
+                            type="message",
+                            status="completed",
+                            content=[
+                                openai.types.responses.ResponseOutputText(
+                                    text=response_text,
+                                    type="output_text",
+                                    annotations=[],
+                                )
+                            ],
+                            role="assistant",
+                        )
+                    ],
+                    parallel_tool_calls=False,
+                    tool_choice="none",
+                    tools=[],
+                    created_at=10000000,
+                    model=response_model,
+                    object="response",
+                    usage=second_usage,
+                ),
+                sequence_number=7,
+                type="response.completed",
+            ),
+        ]
 
     return inner
 
@@ -1245,52 +1764,61 @@ class ApproxDict(dict):
 CapturedData = namedtuple("CapturedData", ["path", "event", "envelope", "compressed"])
 
 
-class CapturingServer(WSGIServer):
-    def __init__(self, host="127.0.0.1", port=0, ssl_context=None):
-        WSGIServer.__init__(self, host, port, self, ssl_context=ssl_context)
-        self.code = 204
-        self.headers = {}
-        self.captured = []
+@pytest.fixture(scope="module")
+def wsgi_capturing_server():
+    assert WSGIServer is not None
 
-    def respond_with(self, code=200, headers=None):
-        self.code = code
-        if headers:
-            self.headers = headers
+    class CapturingServer(WSGIServer):
+        def __init__(self, host="127.0.0.1", port=0, ssl_context=None):
+            WSGIServer.__init__(self, host, port, self, ssl_context=ssl_context)
+            self.code = 204
+            self.headers = {}
+            self.captured = []
 
-    def clear_captured(self):
-        del self.captured[:]
+        def respond_with(self, code=200, headers=None):
+            self.code = code
+            if headers:
+                self.headers = headers
 
-    def __call__(self, environ, start_response):
-        """
-        This is the WSGI application.
-        """
-        request = Request(environ)
-        event = envelope = None
-        content_encoding = request.headers.get("content-encoding")
-        if content_encoding == "gzip":
-            rdr = gzip.GzipFile(fileobj=io.BytesIO(request.data))
-            compressed = True
-        elif content_encoding == "br":
-            rdr = io.BytesIO(brotli.decompress(request.data))
-            compressed = True
-        else:
-            rdr = io.BytesIO(request.data)
-            compressed = False
+        def clear_captured(self):
+            del self.captured[:]
 
-        if request.mimetype == "application/json":
-            event = parse_json(rdr.read())
-        else:
-            envelope = Envelope.deserialize_from(rdr)
+        def __call__(self, environ, start_response):
+            """
+            This is the WSGI application.
+            """
+            assert Request is not None
+            assert Response is not None
 
-        self.captured.append(
-            CapturedData(
-                path=request.path,
-                event=event,
-                envelope=envelope,
-                compressed=compressed,
+            request = Request(environ)
+            event = envelope = None
+            content_encoding = request.headers.get("content-encoding")
+            if content_encoding == "gzip":
+                rdr = gzip.GzipFile(fileobj=io.BytesIO(request.data))
+                compressed = True
+            elif content_encoding == "br":
+                rdr = io.BytesIO(brotli.decompress(request.data))
+                compressed = True
+            else:
+                rdr = io.BytesIO(request.data)
+                compressed = False
+
+            if request.mimetype == "application/json":
+                event = parse_json(rdr.read())
+            else:
+                envelope = Envelope.deserialize_from(rdr)
+
+            self.captured.append(
+                CapturedData(
+                    path=request.path,
+                    event=event,
+                    envelope=envelope,
+                    compressed=compressed,
+                )
             )
-        )
 
-        response = Response(status=self.code)
-        response.headers.extend(self.headers)
-        return response(environ, start_response)
+            response = Response(status=self.code)
+            response.headers.extend(self.headers)
+            return response(environ, start_response)
+
+    return CapturingServer()

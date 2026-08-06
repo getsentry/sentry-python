@@ -1,20 +1,17 @@
 import os
 from collections import deque
+from typing import TYPE_CHECKING
 
 from sentry_sdk._compat import PY311
 from sentry_sdk.utils import filename_for_module
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from sentry_sdk._lru_cache import LRUCache
     from types import FrameType
-    from typing import Deque
-    from typing import List
-    from typing import Optional
-    from typing import Sequence
-    from typing import Tuple
+    from typing import Deque, List, Optional, Sequence, Tuple
+
     from typing_extensions import TypedDict
+
+    from sentry_sdk._lru_cache import LRUCache
 
     ThreadId = str
 

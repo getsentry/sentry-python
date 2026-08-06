@@ -3,7 +3,6 @@ import pytest
 from sentry_sdk import get_client
 from sentry_sdk.integrations import _INTEGRATION_DEACTIVATES
 
-
 try:
     from sentry_sdk.integrations.langchain import LangchainIntegration
 

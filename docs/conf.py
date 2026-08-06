@@ -31,7 +31,7 @@ project = "sentry-python"
 copyright = "2019-{}, Sentry Team and Contributors".format(datetime.now().year)
 author = "Sentry Team and Contributors"
 
-release = "2.57.0"
+release = "2.66.1"
 version = ".".join(release.split(".")[:2])  # The short X.Y version.
 
 
@@ -95,6 +95,8 @@ html_theme = "shibuya"
 # documentation.
 #
 html_theme_options = {
+    "light_logo": "_static/logo-light.svg",
+    "dark_logo": "_static/logo-dark.svg",
     "github_url": "https://github.com/getsentry/sentry-python",
 }
 

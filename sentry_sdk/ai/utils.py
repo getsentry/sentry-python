@@ -4,16 +4,16 @@ from copy import deepcopy
 from typing import TYPE_CHECKING
 
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
+from sentry_sdk.ai.consts import DATA_URL_BASE64_REGEX
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, List, Optional, Tuple
+    from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
     from sentry_sdk.tracing import Span
 
 import sentry_sdk
-from sentry_sdk.utils import logger
 from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
+from sentry_sdk.utils import logger
 
 MAX_GEN_AI_MESSAGE_BYTES = 20_000  # 20KB
 # Maximum characters when only a single message is left after bytes truncation
@@ -489,13 +489,25 @@ def _normalize_data(data: "Any", unpack: bool = True) -> "Any":
 
 
 def set_data_normalized(
-    span: "Span", key: str, value: "Any", unpack: bool = True
+    span: "Union[Span, StreamedSpan]",
+    key: str,
+    value: "Any",
+    unpack: bool = True,
 ) -> None:
     normalized = _normalize_data(value, unpack=unpack)
     if isinstance(normalized, (int, float, bool, str)):
-        span.set_data(key, normalized)
+        _set_span_data_attribute(span, key, normalized)
     else:
-        span.set_data(key, json.dumps(normalized))
+        _set_span_data_attribute(span, key, json.dumps(normalized))
+
+
+def _set_span_data_attribute(
+    span: "Union[Span, StreamedSpan]", key: str, value: "Any"
+) -> None:
+    if isinstance(span, StreamedSpan):
+        span.set_attribute(key, value)
+    else:
+        span.set_data(key, value)
 
 
 def normalize_message_role(role: str) -> str:
@@ -525,13 +537,7 @@ def normalize_message_roles(messages: "list[dict[str, Any]]") -> "list[dict[str,
 
 
 def get_start_span_function() -> "Callable[..., Any]":
-    if has_span_streaming_enabled(sentry_sdk.get_client().options):
-        return sentry_sdk.traces.start_span
-
     current_span = sentry_sdk.get_current_span()
-    if isinstance(current_span, StreamedSpan):
-        # mypy
-        return sentry_sdk.traces.start_span
 
     transaction_exists = (
         current_span is not None and current_span.containing_transaction is not None
@@ -588,6 +594,25 @@ def _find_truncation_index(messages: "List[Dict[str, Any]]", max_bytes: int) -> 
     return 0
 
 
+def _is_image_type_with_blob_content(item: "Dict[str, Any]") -> bool:
+    """
+    Some content blocks contain an image_url property with base64 content as its value.
+    This is used to identify those while not leading to unnecessary copying of data when the image URL does not contain base64 content.
+    """
+    if item.get("type") != "image_url":
+        return False
+
+    image_url_val = item.get("image_url")
+    image_url = (
+        image_url_val.get("url", "")
+        if isinstance(image_url_val, dict)
+        else (image_url_val or "")
+    )
+    data_url_match = DATA_URL_BASE64_REGEX.match(image_url)
+
+    return bool(data_url_match)
+
+
 def redact_blob_message_parts(
     messages: "List[Dict[str, Any]]",
 ) -> "List[Dict[str, Any]]":
@@ -640,7 +665,9 @@ def redact_blob_message_parts(
         content = message.get("content")
         if isinstance(content, list):
             for item in content:
-                if isinstance(item, dict) and item.get("type") == "blob":
+                if isinstance(item, dict) and (
+                    item.get("type") == "blob" or _is_image_type_with_blob_content(item)
+                ):
                     has_blobs = True
                     break
         if has_blobs:
@@ -661,8 +688,14 @@ def redact_blob_message_parts(
         content = message.get("content")
         if isinstance(content, list):
             for item in content:
-                if isinstance(item, dict) and item.get("type") == "blob":
-                    item["content"] = BLOB_DATA_SUBSTITUTE
+                if isinstance(item, dict):
+                    if item.get("type") == "blob":
+                        item["content"] = BLOB_DATA_SUBSTITUTE
+                    elif _is_image_type_with_blob_content(item):
+                        if isinstance(item["image_url"], dict):
+                            item["image_url"]["url"] = BLOB_DATA_SUBSTITUTE
+                        else:
+                            item["image_url"] = BLOB_DATA_SUBSTITUTE
 
     return messages_copy
 

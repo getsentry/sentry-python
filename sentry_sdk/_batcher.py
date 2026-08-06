@@ -1,14 +1,15 @@
 import os
 import random
 import threading
+import weakref
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, TypeVar, Generic
+from typing import TYPE_CHECKING, Generic, TypeVar
 
-from sentry_sdk.utils import format_timestamp
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
+from sentry_sdk.utils import format_timestamp
 
 if TYPE_CHECKING:
-    from typing import Optional, Callable, Any
+    from typing import Any, Callable, Optional
 
 T = TypeVar("T")
 
@@ -37,6 +38,26 @@ class Batcher(Generic[T]):
 
         self._flusher: "Optional[threading.Thread]" = None
         self._flusher_pid: "Optional[int]" = None
+
+        # See https://github.com/getsentry/sentry-python/blob/051cc01640a29bfd64b1f1e2e3414c02f027dd1b/sentry_sdk/monitor.py#L41-L50
+        if hasattr(os, "register_at_fork"):
+            weak_reset = weakref.WeakMethod(self._reset_thread_state)
+
+            def _reset_in_child() -> None:
+                method = weak_reset()
+                if method is not None:
+                    method()
+
+            os.register_at_fork(after_in_child=_reset_in_child)
+
+    def _reset_thread_state(self) -> None:
+        self._buffer = []
+        self._running = True
+        self._lock = threading.Lock()
+        self._active = threading.local()
+        self._flush_event = threading.Event()
+        self._flusher = None
+        self._flusher_pid = None
 
     def _ensure_thread(self) -> bool:
         """For forking processes we might need to restart this thread.
@@ -132,9 +153,10 @@ class Batcher(Generic[T]):
                 },
                 payload=PayloadRef(
                     json={
+                        "version": 2,
                         "items": [
                             self._to_transport_format(item) for item in self._buffer
-                        ]
+                        ],
                     }
                 ),
             )

@@ -3,7 +3,6 @@
 *.egg
 *.db
 *.pid
-.python-version
 .coverage
 .coverage-sentry*
 coverage.xml
@@ -33,6 +32,8 @@ pip-wheel-metadata
 .claude/
 .serena
 .tool-versions
+.warden
+.auto/
 
 # for running AWS Lambda tests using AWS SAM
 sam.template.yaml

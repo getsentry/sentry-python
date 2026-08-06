@@ -6,13 +6,14 @@ except ImportError:
 
 from typing import TYPE_CHECKING, TypeVar, Union
 
-
 # Re-exported for compat, since code out there in the wild might use this variable.
 MYPY = TYPE_CHECKING
 
 
 SENSITIVE_DATA_SUBSTITUTE = "[Filtered]"
 BLOB_DATA_SUBSTITUTE = "[Blob substitute]"
+OVER_SIZE_LIMIT_SUBSTITUTE = "[Exceeds maximum size]"
+UNPARSABLE_RAW_DATA_SUBSTITUTE = "[Unparsable]"
 
 
 class AnnotatedValue:
@@ -47,6 +48,8 @@ class AnnotatedValue:
     @classmethod
     def removed_because_raw_data(cls) -> "AnnotatedValue":
         """The value was removed because it could not be parsed. This is done for request body values that are not json nor a form."""
+        # This is the legacy approach - we want to transition over to `substituted_because_raw_data` after we completely transition
+        # to span-first
         return AnnotatedValue(
             value="",
             metadata={
@@ -60,9 +63,46 @@ class AnnotatedValue:
         )
 
     @classmethod
+    def substituted_because_raw_data(cls) -> "AnnotatedValue":
+        """The value was replaced because it could not be parsed. This is done for request body values that are not json nor a form."""
+        return AnnotatedValue(
+            value=UNPARSABLE_RAW_DATA_SUBSTITUTE,
+            metadata={
+                "rem": [  # Remark
+                    [
+                        "!raw",  # Unparsable raw data
+                        "s",  # The fields original value was substituted
+                    ]
+                ]
+            },
+        )
+
+    @classmethod
     def removed_because_over_size_limit(cls, value: "Any" = "") -> "AnnotatedValue":
         """
         The actual value was removed because the size of the field exceeded the configured maximum size,
+        for example specified with the max_request_body_size sdk option.
+        """
+        # This is the legacy approach - we want to transition over to `substituted_because_over_size_limit` after we completely transition
+        # to span-first
+        return AnnotatedValue(
+            value=value,
+            metadata={
+                "rem": [  # Remark
+                    [
+                        "!config",  # Because of configured maximum size
+                        "x",  # The fields original value was removed
+                    ]
+                ]
+            },
+        )
+
+    @classmethod
+    def substituted_because_over_size_limit(
+        cls, value: "Any" = OVER_SIZE_LIMIT_SUBSTITUTE
+    ) -> "AnnotatedValue":
+        """
+        The actual value was replaced because the size of the field exceeded the configured maximum size,
         for example specified with the max_request_body_size sdk option.
         """
         return AnnotatedValue(
@@ -71,7 +111,7 @@ class AnnotatedValue:
                 "rem": [  # Remark
                     [
                         "!config",  # Because of configured maximum size
-                        "x",  # The fields original value was removed
+                        "s",  # The fields original value was substituted
                     ]
                 ]
             },
@@ -99,23 +139,71 @@ Annotated = Union[AnnotatedValue, T]
 
 if TYPE_CHECKING:
     from collections.abc import Container, MutableMapping, Sequence
-
     from datetime import datetime
-
     from types import TracebackType
-    from typing import Any
-    from typing import Callable
-    from typing import Dict
-    from typing import Mapping
-    from typing import NotRequired
-    from typing import Optional
-    from typing import Type
+    from typing import Any, Callable, Dict, List, Mapping, NotRequired, Optional, Type
+
     from typing_extensions import Literal, TypedDict
+
+    import sentry_sdk
 
     class SDKInfo(TypedDict):
         name: str
         version: str
         packages: "Sequence[Mapping[str, str]]"
+
+    class KeyValueCollectionBehaviour(TypedDict):
+        mode: 'Literal["off", "denylist", "allowlist"]'
+        terms: "NotRequired[List[str]]"
+
+    class GenAICollectionUserOptions(TypedDict, total=False):
+        inputs: bool
+        outputs: bool
+
+    class GenAICollectionBehaviour(TypedDict):
+        inputs: bool
+        outputs: bool
+
+    class GraphQLCollectionUserOptions(TypedDict, total=False):
+        document: bool
+        variables: bool
+
+    class GraphQLCollectionBehaviour(TypedDict):
+        document: bool
+        variables: bool
+
+    class HttpHeadersCollectionUserOptions(TypedDict, total=False):
+        request: "KeyValueCollectionBehaviour"
+
+    class HttpHeadersCollectionBehaviour(TypedDict):
+        request: "KeyValueCollectionBehaviour"
+
+    class DataCollectionUserOptions(TypedDict, total=False):
+        user_info: bool
+        cookies: "KeyValueCollectionBehaviour"
+        http_headers: "HttpHeadersCollectionUserOptions"
+        http_bodies: "List[str]"
+        url_query_params: "KeyValueCollectionBehaviour"
+        graphql: "GraphQLCollectionUserOptions"
+        gen_ai: "GenAICollectionUserOptions"
+        database_query_data: bool
+        queues: bool
+        stack_frame_variables: bool
+        frame_context_lines: int
+
+    class DataCollection(TypedDict):
+        provided_by_user: bool
+        user_info: bool
+        cookies: "KeyValueCollectionBehaviour"
+        http_headers: "HttpHeadersCollectionBehaviour"
+        http_bodies: "List[str]"
+        url_query_params: "KeyValueCollectionBehaviour"
+        graphql: "GraphQLCollectionBehaviour"
+        gen_ai: "GenAICollectionBehaviour"
+        database_query_data: bool
+        queues: bool
+        stack_frame_variables: bool
+        frame_context_lines: int
 
     # "critical" is an alias of "fatal" recognized by Relay
     LogLevelStr = Literal["fatal", "critical", "error", "warning", "info", "debug"]
@@ -209,6 +297,7 @@ if TYPE_CHECKING:
             "type": Literal["check_in", "transaction"],
             "user": dict[str, object],
             "_dropped_spans": int,
+            "_has_gen_ai_span": bool,
         },
         total=False,
     )
@@ -283,6 +372,22 @@ if TYPE_CHECKING:
     )
 
     MetricProcessor = Callable[[Metric, Hint], Optional[Metric]]
+
+    SpanJSON = TypedDict(
+        "SpanJSON",
+        {
+            "trace_id": str,
+            "span_id": str,
+            "parent_span_id": NotRequired[str],
+            "name": str,
+            "status": str,
+            "is_segment": bool,
+            "start_timestamp": float,
+            "end_timestamp": NotRequired[float],
+            "attributes": NotRequired[Attributes],
+            "_segment_span": NotRequired["sentry_sdk.traces.StreamedSpan"],
+        },
+    )
 
     # TODO: Make a proper type definition for this (PRs welcome!)
     Breadcrumb = Dict[str, Any]
@@ -366,6 +471,21 @@ if TYPE_CHECKING:
     class TextPart(TypedDict):
         type: Literal["text"]
         content: str
+
+    class ReasoningPart(TypedDict):
+        type: Literal["reasoning"]
+        content: str
+
+    class ToolCallPart(TypedDict):
+        type: Literal["tool_call"]
+        name: NotRequired[str]
+        arguments: NotRequired[Any]
+
+    class ToolDefinition(TypedDict):
+        type: str
+        name: NotRequired[str]
+        description: NotRequired[str]
+        parameters: NotRequired[dict[str, object]]
 
     IgnoreSpansName = Union[str, Pattern[str]]
     IgnoreSpansContext = TypedDict(

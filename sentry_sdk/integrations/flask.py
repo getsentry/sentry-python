@@ -1,5 +1,7 @@
+from typing import TYPE_CHECKING
+
 import sentry_sdk
-from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     RequestExtractor,
@@ -11,17 +13,17 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    has_data_collection_enabled,
     package_version,
 )
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Dict, Union
 
+    from werkzeug.datastructures import FileStorage, ImmutableMultiDict
+
     from sentry_sdk._types import Event, EventProcessor
     from sentry_sdk.integrations.wsgi import _ScopedResponse
-    from werkzeug.datastructures import FileStorage, ImmutableMultiDict
 
 
 try:
@@ -94,10 +96,9 @@ class FlaskIntegration(Integration):
         def sentry_patched_wsgi_app(
             self: "Any", environ: "Dict[str, str]", start_response: "Callable[..., Any]"
         ) -> "_ScopedResponse":
-            if sentry_sdk.get_client().get_integration(FlaskIntegration) is None:
-                return old_app(self, environ, start_response)
-
             integration = sentry_sdk.get_client().get_integration(FlaskIntegration)
+            if integration is None:
+                return old_app(self, environ, start_response)
 
             middleware = SentryWsgiMiddleware(
                 lambda *a, **kw: old_app(self, *a, **kw),
@@ -142,7 +143,8 @@ def _set_transaction_name_and_source(
 
 
 def _request_started(app: "Flask", **kwargs: "Any") -> None:
-    integration = sentry_sdk.get_client().get_integration(FlaskIntegration)
+    client = sentry_sdk.get_client()
+    integration = client.get_integration(FlaskIntegration)
     if integration is None:
         return
 
@@ -155,6 +157,19 @@ def _request_started(app: "Flask", **kwargs: "Any") -> None:
     )
 
     scope = sentry_sdk.get_isolation_scope()
+
+    if has_data_collection_enabled(client.options):
+        if client.options["data_collection"]["user_info"]:
+            with capture_internal_exceptions():
+                user_properties = _get_flask_user_properties()
+                if user_properties:
+                    scope.set_user(user_properties)
+    elif should_send_default_pii():
+        with capture_internal_exceptions():
+            user_properties = _get_flask_user_properties()
+            if user_properties:
+                scope.set_user(user_properties)
+
     evt_processor = _make_request_event_processor(app, request, integration)
     scope.add_event_processor(evt_processor)
 
@@ -201,7 +216,12 @@ def _make_request_event_processor(
         with capture_internal_exceptions():
             FlaskRequestExtractor(request).extract_into_event(event)
 
-        if should_send_default_pii():
+        client_options = sentry_sdk.get_client().options
+        if has_data_collection_enabled(client_options):
+            if client_options["data_collection"]["user_info"]:
+                with capture_internal_exceptions():
+                    _add_user_to_event(event)
+        elif should_send_default_pii():
             with capture_internal_exceptions():
                 _add_user_to_event(event)
 
@@ -223,43 +243,52 @@ def _capture_exception(
     sentry_sdk.capture_event(event, hint=hint)
 
 
-def _add_user_to_event(event: "Event") -> None:
+def _get_flask_user_properties() -> "Dict[str, str]":
     if flask_login is None:
-        return
+        return {}
 
     user = flask_login.current_user
     if user is None:
-        return
+        return {}
 
+    properties = {}
+
+    try:
+        user_id = user.get_id()
+        if user_id is not None:
+            properties["id"] = user_id
+    except AttributeError:
+        # might happen if:
+        # - flask_login could not be imported
+        # - flask_login is not configured
+        # - no user is logged in
+        pass
+
+    # The following attribute accesses are ineffective for the general
+    # Flask-Login case, because the User interface of Flask-Login does not
+    # care about anything but the ID. However, Flask-User (based on
+    # Flask-Login) documents a few optional extra attributes.
+    #
+    # https://github.com/lingthio/Flask-User/blob/a379fa0a281789618c484b459cb41236779b95b1/docs/source/data_models.rst#fixed-data-model-property-names
+    try:
+        if user.email is not None:
+            properties["email"] = user.email
+    except Exception:
+        pass
+
+    try:
+        if user.username is not None:
+            properties["username"] = user.username
+    except Exception:
+        pass
+
+    return properties
+
+
+def _add_user_to_event(event: "Event") -> None:
     with capture_internal_exceptions():
-        # Access this object as late as possible as accessing the user
-        # is relatively costly
-
-        user_info = event.setdefault("user", {})
-
-        try:
-            user_info.setdefault("id", user.get_id())
-            # TODO: more configurable user attrs here
-        except AttributeError:
-            # might happen if:
-            # - flask_login could not be imported
-            # - flask_login is not configured
-            # - no user is logged in
-            pass
-
-        # The following attribute accesses are ineffective for the general
-        # Flask-Login case, because the User interface of Flask-Login does not
-        # care about anything but the ID. However, Flask-User (based on
-        # Flask-Login) documents a few optional extra attributes.
-        #
-        # https://github.com/lingthio/Flask-User/blob/a379fa0a281789618c484b459cb41236779b95b1/docs/source/data_models.rst#fixed-data-model-property-names
-
-        try:
-            user_info.setdefault("email", user.email)
-        except Exception:
-            pass
-
-        try:
-            user_info.setdefault("username", user.username)
-        except Exception:
-            pass
+        user_properties = _get_flask_user_properties()
+        if user_properties:
+            user_info = event.setdefault("user", {})
+            for key, value in user_properties.items():
+                user_info.setdefault(key, value)

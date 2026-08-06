@@ -1,43 +1,44 @@
 import inspect
 import warnings
 from contextlib import contextmanager
+from typing import TYPE_CHECKING
 
-from sentry_sdk import tracing_utils, Client
+from sentry_sdk import Client, tracing_utils
 from sentry_sdk._init_implementation import init
 from sentry_sdk.consts import INSTRUMENTER
-from sentry_sdk.scope import Scope, _ScopeManager, new_scope, isolation_scope
-from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing import NoOpSpan, Transaction, trace
 from sentry_sdk.crons import monitor
-
-from typing import TYPE_CHECKING
+from sentry_sdk.scope import Scope, _ScopeManager, isolation_scope, new_scope
+from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.traces import get_current_span as _get_current_streamed_span
+from sentry_sdk.tracing import NoOpSpan, Transaction, trace
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
-
-    from typing import Any
-    from typing import Dict
-    from typing import Generator
-    from typing import Optional
-    from typing import overload
-    from typing import Callable
-    from typing import TypeVar
-    from typing import ContextManager
-    from typing import Union
+    from typing import (
+        Any,
+        Callable,
+        ContextManager,
+        Dict,
+        Generator,
+        Optional,
+        TypeVar,
+        Union,
+        overload,
+    )
 
     from typing_extensions import Unpack
 
-    from sentry_sdk.client import BaseClient
     from sentry_sdk._types import (
-        Event,
-        Hint,
         Breadcrumb,
         BreadcrumbHint,
+        Event,
         ExcInfo,
-        MeasurementUnit,
+        Hint,
         LogLevelStr,
+        MeasurementUnit,
         SamplingContext,
     )
+    from sentry_sdk.client import BaseClient
     from sentry_sdk.traces import StreamedSpan
     from sentry_sdk.tracing import Span, TransactionKwargs
 
@@ -75,6 +76,7 @@ __all__ = [
     "push_scope",
     "remove_attribute",
     "set_attribute",
+    "set_attributes",
     "set_context",
     "set_extra",
     "set_level",
@@ -297,10 +299,21 @@ def set_attribute(attribute: str, value: "Any") -> None:
     """
     Set an attribute.
 
-    Any attributes-based telemetry (logs, metrics) captured in this scope will
-    include this attribute.
+    Any attributes-based telemetry (logs, metrics, streamed spans) captured in
+    this scope will include this attribute.
     """
     return get_isolation_scope().set_attribute(attribute, value)
+
+
+@scopemethod
+def set_attributes(attributes: "dict[str, Any]") -> None:
+    """
+    Set multiple attributes.
+
+    Any attributes-based telemetry (logs, metrics, streamed spans) captured in
+    this scope will include these attributes.
+    """
+    return get_isolation_scope().set_attributes(attributes)
 
 
 @scopemethod
@@ -422,7 +435,7 @@ def set_measurement(name: str, value: float, unit: "MeasurementUnit" = "") -> No
 
 def get_current_span(
     scope: "Optional[Scope]" = None,
-) -> "Optional[Union[Span, StreamedSpan]]":
+) -> "Optional[Span]":
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
@@ -533,12 +546,7 @@ def update_current_span(
             attributes={"user_id": 123, "batch_size": 50}
         )
     """
-    current_span = get_current_span()
-
-    if current_span is None:
-        return
-
-    if isinstance(current_span, StreamedSpan):
+    if isinstance(_get_current_streamed_span(), StreamedSpan):
         warnings.warn(
             "The `update_current_span` API isn't available in streaming mode. "
             "Retrieve the current span with get_current_span() and use its API "
@@ -546,6 +554,11 @@ def update_current_span(
             DeprecationWarning,
             stacklevel=2,
         )
+        return
+
+    current_span = get_current_span()
+
+    if current_span is None:
         return
 
     if op is not None:

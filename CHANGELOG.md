@@ -1,5 +1,548 @@
 # Changelog
 
+## 2.66.1
+
+### Bug Fixes 🐛
+
+#### Tracing
+
+- Handle exceptions raised within traces_sampler and other callbacks by @ericapisani in [#6853](https://github.com/getsentry/sentry-python/pull/6853)
+
+### Internal Changes 🔧
+
+- Fix flaky decorator test by @sl0thentr0py in [#6830](https://github.com/getsentry/sentry-python/pull/6830)
+
+## 2.66.0
+
+### New Features ✨
+
+- (tracing) Promote trace_lifecycle and ignore_spans to top-level options by @ericapisani in [#6821](https://github.com/getsentry/sentry-python/pull/6821)
+
+### Bug Fixes 🐛
+
+#### Tracing
+
+- Skip child span creation in streaming path when no current span (HTTP clients) by @sentrivana in [#6811](https://github.com/getsentry/sentry-python/pull/6811)
+- Skip child span creation in streaming path when no current span (task queues) by @sentrivana in [#6814](https://github.com/getsentry/sentry-python/pull/6814)
+- Skip child span creation in streaming path when no current span (misc) by @sentrivana in [#6815](https://github.com/getsentry/sentry-python/pull/6815)
+- Skip child span creation in streaming path when no current span (databases) by @sentrivana in [#6808](https://github.com/getsentry/sentry-python/pull/6808)
+- Skip child span creation in streaming path when no current span (web frameworks) by @sentrivana in [#6810](https://github.com/getsentry/sentry-python/pull/6810)
+- Skip child span creation in streaming path when no current span (django) by @sentrivana in [#6809](https://github.com/getsentry/sentry-python/pull/6809)
+
+### Internal Changes 🔧
+
+- (logging) Fix flaky test_logging_captured_warnings by @ericapisani in [#6824](https://github.com/getsentry/sentry-python/pull/6824)
+- Remove flaky no cyclic garbage test by @alexander-alderman-webb in [#6817](https://github.com/getsentry/sentry-python/pull/6817)
+- Remove Claude permission settings by @cleptric in [#6806](https://github.com/getsentry/sentry-python/pull/6806)
+- Move `nullcontext` to `sentry_sdk.utils` by @sentrivana in [#6805](https://github.com/getsentry/sentry-python/pull/6805)
+
+## 2.65.0
+
+### New Features ✨
+
+#### Huey
+
+- Set `messaging.destination.name` on consumer spans by @alexander-alderman-webb in [#6779](https://github.com/getsentry/sentry-python/pull/6779)
+- Set `messaging.destination.name` on producer spans by @alexander-alderman-webb in [#6778](https://github.com/getsentry/sentry-python/pull/6778)
+
+#### Other
+
+- (arq) Set `messaging.destination.name` on consumer spans by @alexander-alderman-webb in [#6767](https://github.com/getsentry/sentry-python/pull/6767)
+- (dramatiq) Set `messaging.destination.name` on consumer spans by @alexander-alderman-webb in [#6776](https://github.com/getsentry/sentry-python/pull/6776)
+- (rq) Set `messaging.destination.name` on consumer spans by @alexander-alderman-webb in [#6774](https://github.com/getsentry/sentry-python/pull/6774)
+
+### Bug Fixes 🐛
+
+#### Tracing
+
+- Take first sentry-trace header in case multiple are supplied by @sl0thentr0py in [#6722](https://github.com/getsentry/sentry-python/pull/6722)
+
+#### Other
+
+- (django) Avoid `ValueError` in async middleware `process_*` hooks by @r0ro in [#6698](https://github.com/getsentry/sentry-python/pull/6698)
+- (scope) Drop None user attribute values in set_user by @ericapisani in [#6692](https://github.com/getsentry/sentry-python/pull/6692)
+- (starlette) Don't overwrite user set during request in AuthenticationMiddleware by @ericapisani in [#6760](https://github.com/getsentry/sentry-python/pull/6760)
+
+### Internal Changes 🔧
+
+- (mcp) Add package to the typing group by @alexander-alderman-webb in [#6727](https://github.com/getsentry/sentry-python/pull/6727)
+- (starlette) Add package to typing group by @alexander-alderman-webb in [#6728](https://github.com/getsentry/sentry-python/pull/6728)
+- Add required `cache_write_tokens` field by @alexander-alderman-webb in [#6804](https://github.com/getsentry/sentry-python/pull/6804)
+- Pin extra test dependencies for generated test suites by @alexander-alderman-webb in [#6696](https://github.com/getsentry/sentry-python/pull/6696)
+- Add `pydantic` to the typing group by @alexander-alderman-webb in [#6730](https://github.com/getsentry/sentry-python/pull/6730)
+- Add `python_multipart` to the typing group by @alexander-alderman-webb in [#6729](https://github.com/getsentry/sentry-python/pull/6729)
+- 🤖 Update test matrix with new releases (07/06) by @github-actions in [#6753](https://github.com/getsentry/sentry-python/pull/6753)
+- Remove dependabot by @alexander-alderman-webb in [#6720](https://github.com/getsentry/sentry-python/pull/6720)
+- Update Renovate config by @alexander-alderman-webb in [#6716](https://github.com/getsentry/sentry-python/pull/6716)
+- Stop inheriting secrets for `changelog-preview` by @alexander-alderman-webb in [#6723](https://github.com/getsentry/sentry-python/pull/6723)
+- Stop inheriting secrets in tests by @alexander-alderman-webb in [#6721](https://github.com/getsentry/sentry-python/pull/6721)
+- Configure Renovate by @renovate in [#6701](https://github.com/getsentry/sentry-python/pull/6701)
+- Move conversation ID tests to their own file by @sentrivana in [#6699](https://github.com/getsentry/sentry-python/pull/6699)
+- Replace `requirements-testing.txt` with a `uv` dependency group by @alexander-alderman-webb in [#6693](https://github.com/getsentry/sentry-python/pull/6693)
+
+## 2.64.0
+
+The SDK now extracts all `gen_ai` spans out of a transaction and sends them as v2 envelope items by default. This prevents `gen_ai` spans from being dropped when the transaction payload exceeds size limits. Because they are no longer constrained by transaction size limits, AI message data is also no longer truncated. To keep the previous behavior, set `stream_gen_ai_spans=False`.
+
+Self-hosted Sentry users should opt out with `stream_gen_ai_spans=False`, since streamed `gen_ai` spans may not be ingested by their Sentry instance.
+
+### Bug Fixes 🐛
+
+- (asyncpg) Use distinct span ops for cursor iteration and fetch to prevent N+1 false positives by @ericapisani in [#6609](https://github.com/getsentry/sentry-python/pull/6609)
+- (aiohttp) Gate url.full, url.path, url.query on send_default_pii by @ericapisani in [#6650](https://github.com/getsentry/sentry-python/pull/6650)
+- (asgi) Add url.path to ASGI request span attributes by @ericapisani in [#6652](https://github.com/getsentry/sentry-python/pull/6652)
+- (boto3) Gate url.full, url.query, url.fragment behind send_default_pii by @ericapisani in [#6674](https://github.com/getsentry/sentry-python/pull/6674)
+- (httpx) Gate url.full, url.query, and url.fragment behind send_default_pii by @ericapisani in [#6668](https://github.com/getsentry/sentry-python/pull/6668)
+- (httpx2) Gate url.full, url.query on send_default_pii by @ericapisani in [#6670](https://github.com/getsentry/sentry-python/pull/6670)
+- (langgraph) Ignore `GraphBubbleUp` exceptions by @alexander-alderman-webb in [#6608](https://github.com/getsentry/sentry-python/pull/6608)
+- (litellm) Store span off-band, not in forwarded metadata by @jgreer013 in [#6598](https://github.com/getsentry/sentry-python/pull/6598)
+- (mcp) Support MCP SDK v2 handler signature and removed request_ctx by @ericapisani in [#6583](https://github.com/getsentry/sentry-python/pull/6583)
+- (pydantic-ai) Stop truncating in the streaming trace lifecycle by @alexander-alderman-webb in [#6659](https://github.com/getsentry/sentry-python/pull/6659)
+- (pymongo) Add db.query.text to streamed query spans by @ericapisani in [#6637](https://github.com/getsentry/sentry-python/pull/6637)
+- (pyreqwest) Gate url.full, url.query, url.fragment on send_default_pii by @ericapisani in [#6673](https://github.com/getsentry/sentry-python/pull/6673)
+- (sanic) Gate url.full, url.path, and http.query behind send_default_pii by @ericapisani in [#6663](https://github.com/getsentry/sentry-python/pull/6663)
+- (starlette) Stop duplicating `scope["root_path"]` in URLs by @alexander-alderman-webb in [#6579](https://github.com/getsentry/sentry-python/pull/6579)
+- (stdlib) Gate url.full and http.query behind send_default_pii by @ericapisani in [#6666](https://github.com/getsentry/sentry-python/pull/6666)
+- (tests) Fix flaky OTel propagator entry point test by @ericapisani in [#6655](https://github.com/getsentry/sentry-python/pull/6655)
+- (tornado) Gate url.full, url.path, url.query on send_default_pii by @ericapisani in [#6664](https://github.com/getsentry/sentry-python/pull/6664)
+- (wsgi) Gate url.full, url.path, and http.query behind send_default_pii by @ericapisani in [#6654](https://github.com/getsentry/sentry-python/pull/6654)
+- Stop unconditionally importing `contextvars` by @alexander-alderman-webb in [#6625](https://github.com/getsentry/sentry-python/pull/6625)
+- (.agents) Update project agent lockfiles by @ericapisani in [#6662](https://github.com/getsentry/sentry-python/pull/6662)
+
+### Documentation 📚
+
+- Add light/dark logos by @hwhsu1231 in [#6627](https://github.com/getsentry/sentry-python/pull/6627)
+- Fix typos by @juliosuas in [#6602](https://github.com/getsentry/sentry-python/pull/6602)
+
+### Internal Changes 🔧
+
+- (mcp) Pin mcp package to <2.0.0 while alphas are in flight by @ericapisani in [#6687](https://github.com/getsentry/sentry-python/pull/6687)
+- 🤖 Update test matrix with new releases (06/29) by @github-actions in [#6682](https://github.com/getsentry/sentry-python/pull/6682)
+- Make `stream_gen_ai_spans` opt out by @alexander-alderman-webb in [#6658](https://github.com/getsentry/sentry-python/pull/6658)
+- Remove `setuptools` from `requirements-testing.txt` by @alexander-alderman-webb in [#6618](https://github.com/getsentry/sentry-python/pull/6618)
+- Remove `executing` from `requirements-testing.txt` by @alexander-alderman-webb in [#6619](https://github.com/getsentry/sentry-python/pull/6619)
+- Remove `asttokens` from `requirements-testing.txt` by @alexander-alderman-webb in [#6615](https://github.com/getsentry/sentry-python/pull/6615)
+- Remove `responses` from `requirements-testing.txt` by @alexander-alderman-webb in [#6621](https://github.com/getsentry/sentry-python/pull/6621)
+- Remove `pytest-forked` from `requirements-testing.txt` by @alexander-alderman-webb in [#6611](https://github.com/getsentry/sentry-python/pull/6611)
+- Remove `docker` from `requirements-testing.txt` by @alexander-alderman-webb in [#6616](https://github.com/getsentry/sentry-python/pull/6616)
+- Add `--skip-version-update` option to `populate_tox.py` by @alexander-alderman-webb in [#6675](https://github.com/getsentry/sentry-python/pull/6675)
+- Remove `httpcore` from `requirements-testing.txt` by @alexander-alderman-webb in [#6622](https://github.com/getsentry/sentry-python/pull/6622)
+- Remove `pytest-timeout` from `requirements-testing.txt` by @alexander-alderman-webb in [#6613](https://github.com/getsentry/sentry-python/pull/6613)
+- Remove `pytest-localserver` from `requirements-testing.txt` by @alexander-alderman-webb in [#6612](https://github.com/getsentry/sentry-python/pull/6612)
+- Remove `jsonschema` from `requirements-testing.txt` by @alexander-alderman-webb in [#6620](https://github.com/getsentry/sentry-python/pull/6620)
+- Remove `socksio` from `requirements-testing.txt` by @alexander-alderman-webb in [#6617](https://github.com/getsentry/sentry-python/pull/6617)
+- Remove `pysocks` from `requirements-testing.txt` by @alexander-alderman-webb in [#6623](https://github.com/getsentry/sentry-python/pull/6623)
+- Remove `brotli` from `requirements-testing.txt` by @alexander-alderman-webb in [#6614](https://github.com/getsentry/sentry-python/pull/6614)
+- Remove `tomli` from `requirements-testing.txt` by @alexander-alderman-webb in [#6630](https://github.com/getsentry/sentry-python/pull/6630)
+- Remove `pytest-watch` from `requirements-testing.txt` by @alexander-alderman-webb in [#6624](https://github.com/getsentry/sentry-python/pull/6624)
+- Remove `pip` from `requirements-testing.txt` by @alexander-alderman-webb in [#6629](https://github.com/getsentry/sentry-python/pull/6629)
+- 🤖 Update test matrix with new releases (06/22) by @github-actions in [#6610](https://github.com/getsentry/sentry-python/pull/6610)
+- Pin test dependencies including package extras by @alexander-alderman-webb in [#6607](https://github.com/getsentry/sentry-python/pull/6607)
+- 🤖 Update test matrix with new releases (06/15) by @github-actions in [#6567](https://github.com/getsentry/sentry-python/pull/6567)
+- Bump deps for test-lambda-locally by @sl0thentr0py in [#6594](https://github.com/getsentry/sentry-python/pull/6594)
+- Catch pkg_resource warning by @sl0thentr0py in [#6595](https://github.com/getsentry/sentry-python/pull/6595)
+
+### Other
+
+- (test): exclude django 6.1 alphas and betas from tox by @ericapisani in [#6690](https://github.com/getsentry/sentry-python/pull/6690)
+- (test): need to include the alpha tag for mcp package inclusion by @ericapisani in [#6688](https://github.com/getsentry/sentry-python/pull/6688)
+
+## 2.63.0
+
+### Bug Fixes 🐛
+
+#### Fastapi
+
+- Prevent double wrapping of sync handlers on FastAPI >= 0.137 by @jhonny-on in [#6569](https://github.com/getsentry/sentry-python/pull/6569)
+- Use effective_route_context path for prefixed routers by @ericapisani in [#6572](https://github.com/getsentry/sentry-python/pull/6572)
+
+#### Other
+
+- (asgi) Gate query string and client IP behind send_default_pii by @ericapisani in [#6501](https://github.com/getsentry/sentry-python/pull/6501)
+- (serializer) Avoid creating reference cycles on every call by @Malkiz223 in [#6563](https://github.com/getsentry/sentry-python/pull/6563)
+- (user) Set `user.ip_address` on telemetry if present by @sentrivana in [#6555](https://github.com/getsentry/sentry-python/pull/6555)
+- Remove 0000 trace_id fallbacks by @sl0thentr0py in [#6570](https://github.com/getsentry/sentry-python/pull/6570)
+- MANIFEST.in: Graft tests directory. by @charlesroelli in [#6237](https://github.com/getsentry/sentry-python/pull/6237)
+
+### Internal Changes 🔧
+
+- (fastapi) Verify request info capture with POST endpoints by @alexander-alderman-webb in [#6287](https://github.com/getsentry/sentry-python/pull/6287)
+- (starlette) Verify request info capture with POST endpoints by @alexander-alderman-webb in [#6269](https://github.com/getsentry/sentry-python/pull/6269)
+
+## 2.62.0
+
+### New Features ✨
+
+- Add integration for `aiomysql` by @tonal in [#4703](https://github.com/getsentry/sentry-python/pull/4703)
+  
+  We're adding support for the `aiomysql` package. To enable the integration, add it to your `integrations` list:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.aiomysql import AioMySQLIntegration
+
+  sentry_sdk.init(
+      traces_sample_rate=1.0,
+      integrations=[AioMySQLIntegration()],
+  )
+  ```
+
+- Support HTTPX2 by @sentrivana in [#6463](https://github.com/getsentry/sentry-python/pull/6463)
+
+  We're adding out-of-the-box support for HTTPX2. As long as use the package, the Sentry integration
+  will be enabled automatically and you should see your requests instrumented in Sentry.
+
+  ```python
+  import httpx2
+  import sentry_sdk
+
+  sentry_sdk.init(...)
+  
+  with sentry_sdk.start_transaction(name="testing_sentry"):
+      httpx2.get("https://sentry.io/")
+  ```
+
+### Bug Fixes 🐛
+
+- (arq) Never capture control flow exceptions by @alexander-alderman-webb in [#6507](https://github.com/getsentry/sentry-python/pull/6507)
+- (client) Guard against dotless qualified_name in \_setup_instrumentation by @devteamaegis in [#6452](https://github.com/getsentry/sentry-python/pull/6452)
+- (pydantic-ai) Only use hooks when `ModelRequestContext.model` exists by @alexander-alderman-webb in [#6480](https://github.com/getsentry/sentry-python/pull/6480)
+- (rq) Restore `functools.wraps()` for patched functions by @alexander-alderman-webb in [#6532](https://github.com/getsentry/sentry-python/pull/6532)
+- (tracing_utils) Handle baggage values containing '=' in from_incoming_header by @devteamaegis in [#6450](https://github.com/getsentry/sentry-python/pull/6450)
+- (utils) Handle image_url string shorthand in \_is_image_type_with_blob_content by @devteamaegis in [#6478](https://github.com/getsentry/sentry-python/pull/6478)
+
+### Internal Changes 🔧
+
+- (arq) Only pin `fakeredis<2.36.0` in tests by @alexander-alderman-webb in [#6444](https://github.com/getsentry/sentry-python/pull/6444)
+- (flaky) Change env for flaky test detector by @sl0thentr0py in [#6492](https://github.com/getsentry/sentry-python/pull/6492)
+- (pydantic-ai) Create event loop before invoking sync methods by @alexander-alderman-webb in [#6475](https://github.com/getsentry/sentry-python/pull/6475)
+- Use `package-ecosystem: uv` in dependabot by @sentrivana in [#6522](https://github.com/getsentry/sentry-python/pull/6522)
+- 🤖 Update test matrix with new releases (06/08) by @github-actions in [#6519](https://github.com/getsentry/sentry-python/pull/6519)
+- Raise minimum supported `aiomysql` version and update text matrix by @alexander-alderman-webb in [#6496](https://github.com/getsentry/sentry-python/pull/6496)
+- Deprecate OpenTelemetryIntegration in favor of OTLPIntegration and no-op for span first by @sl0thentr0py in [#6494](https://github.com/getsentry/sentry-python/pull/6494)
+- 🤖 Update test matrix with new releases (06/03) by @github-actions in [#6489](https://github.com/getsentry/sentry-python/pull/6489)
+- Raise `update-tox` timeout to 20 minutes by @alexander-alderman-webb in [#6488](https://github.com/getsentry/sentry-python/pull/6488)
+- Prevent `grpcio-tools` source builds when generating test matrices by @alexander-alderman-webb in [#6487](https://github.com/getsentry/sentry-python/pull/6487)
+- Add weekly flaky test detector workflow by @sl0thentr0py in [#6484](https://github.com/getsentry/sentry-python/pull/6484)
+- Pin transitive dependencies for tests on Python>=3.8 by @alexander-alderman-webb in [#6437](https://github.com/getsentry/sentry-python/pull/6437)
+- Install uv in `update-tox` job by @alexander-alderman-webb in [#6453](https://github.com/getsentry/sentry-python/pull/6453)
+- Only pin `setuptools` in relevant tests by @alexander-alderman-webb in [#6467](https://github.com/getsentry/sentry-python/pull/6467)
+
+## 2.61.1
+
+### Internal Changes 🔧
+
+#### Rq
+
+- Pin `fakeredis<2.36.0` in tests by @alexander-alderman-webb in [#6454](https://github.com/getsentry/sentry-python/pull/6454)
+- Unpin `redis` and `fakeredis` for tests by @alexander-alderman-webb in [#6443](https://github.com/getsentry/sentry-python/pull/6443)
+
+#### Other
+
+- (aiohttp) Unfurl spans explicitly instead of using pop() by @sentrivana in [#6435](https://github.com/getsentry/sentry-python/pull/6435)
+- (tox) Migrate from pip to uv via tox-uv by @sentry-junior in [#6390](https://github.com/getsentry/sentry-python/pull/6390)
+- Pin redis<8 for rq by @sl0thentr0py in [#6438](https://github.com/getsentry/sentry-python/pull/6438)
+
+## 2.61.0
+
+### New Features ✨
+
+- Add `server.address` to transformed spans when `stream_gen_ai_spans=True` by @alexander-alderman-webb in [#6307](https://github.com/getsentry/sentry-python/pull/6307)
+- Allow integrations to define control flow exceptions by @sentrivana in [#6425](https://github.com/getsentry/sentry-python/pull/6425)
+- Disable string truncation for events by default by @alexander-alderman-webb in [#6290](https://github.com/getsentry/sentry-python/pull/6290)
+
+  Following a previous significant increase of the string truncation limit, we've now completely removed the limit by default.
+  In case you have large strings in your events, you should now be able to see them.
+  
+  In rare cases, if you have really long strings (or a lot of them), you might see envelopes being dropped because of their size.
+  If that happens, you can set the `max_value_length` `init` option to the previous value of `100_000`:
+
+  ```python
+  sentry_sdk.init(
+      ...,
+      max_value_length=100_000,
+  )
+  ```
+
+### Bug Fixes 🐛
+
+#### Langchain
+
+- Stop setting transaction status when child span fails by @alexander-alderman-webb in [#6301](https://github.com/getsentry/sentry-python/pull/6301)
+- Catch `TypeError` on `langchain.agents` import by @alexander-alderman-webb in [#6268](https://github.com/getsentry/sentry-python/pull/6268)
+
+#### Openai Agents
+
+- Handle `starting_agent` keyword argument in runner patches by @ericapisani in [#6428](https://github.com/getsentry/sentry-python/pull/6428)
+- Remove hosted MCP tool spans by @alexander-alderman-webb in [#6391](https://github.com/getsentry/sentry-python/pull/6391)
+- Use `name`, not `description` in `start_span` by @sentrivana in [#6323](https://github.com/getsentry/sentry-python/pull/6323)
+- Stop setting transaction status when child span fails by @alexander-alderman-webb in [#6303](https://github.com/getsentry/sentry-python/pull/6303)
+
+#### Pydantic AI
+
+- Stop setting tokens on Invoke Agent spans by @alexander-alderman-webb in [#6320](https://github.com/getsentry/sentry-python/pull/6320)
+- Stop setting transaction status when child span fails by @alexander-alderman-webb in [#6302](https://github.com/getsentry/sentry-python/pull/6302)
+- Remove `Agent.run_stream_events()` patch by @alexander-alderman-webb in [#6281](https://github.com/getsentry/sentry-python/pull/6281)
+
+#### Strawberry
+
+- Wrap yields in try-except to ensure span cleanup by @ericapisani in [#6381](https://github.com/getsentry/sentry-python/pull/6381)
+- Fix `AttributeError` on `graphql_span` in `resolve` by @sentrivana in [#6289](https://github.com/getsentry/sentry-python/pull/6289)
+
+#### Other
+
+- (anthropic) Do not set `gen_ai.response.model` to `None` by @alexander-alderman-webb in [#6312](https://github.com/getsentry/sentry-python/pull/6312)
+- (asyncpg) Use Sentry span attribute name conventions by @ericapisani in [#6306](https://github.com/getsentry/sentry-python/pull/6306)
+- (boto3) Guard setting method by @sentrivana in [#6288](https://github.com/getsentry/sentry-python/pull/6288)
+- (cohere) Stop setting transaction status when child span fails by @alexander-alderman-webb in [#6300](https://github.com/getsentry/sentry-python/pull/6300)
+- (google-genai) Guard against `None` response ID and response model by @alexander-alderman-webb in [#6314](https://github.com/getsentry/sentry-python/pull/6314)
+- (huey) Fix group and chord handling in enqueue by @ericapisani in [#6392](https://github.com/getsentry/sentry-python/pull/6392)
+- (integrations) Auto-wrap root gen_ai spans for openai, cohere, langgraph, huggingface_hub by @constantinius in [#6285](https://github.com/getsentry/sentry-python/pull/6285)
+- (serializer) Don't call `__iter__` on arbitrary sequences by @sentrivana in [#6304](https://github.com/getsentry/sentry-python/pull/6304)
+
+  Previously, we'd attempt to serialize any `Sequence` by walking through it by calling its `__iter__` function.
+  We've now changed the serializer to only serialize built-in sequences (like lists, tuples, and sets) to avoid
+  triggering side-effects from custom `__iter__` implementations.
+
+  This might mean some objects might be serialized differently. If you want to continue serializing a specific
+  custom sequence class the old way, you can register it via `sentry_sdk.serializer.add_repr_sequence_type` (see
+  [here](https://github.com/getsentry/sentry-python/blob/54f768680cad8a40ab97be4dddd16c12c9cba493/sentry_sdk/serializer.py#L60-L61)).
+
+- Memory leak in SentrySpanProcessor by @volodkindv in [#6271](https://github.com/getsentry/sentry-python/pull/6271)
+
+### Documentation 📚
+
+- (celery) Remove duplicated "is" in `beat.py` docstring by @quyentonndbs in [#6266](https://github.com/getsentry/sentry-python/pull/6266)
+
+### Internal Changes 🔧
+
+#### Langchain
+
+- Deduplicate by removing `node.callspec.id` matching by @alexander-alderman-webb in [#6426](https://github.com/getsentry/sentry-python/pull/6426)
+- Remove `WatchedSpan` class by @alexander-alderman-webb in [#6407](https://github.com/getsentry/sentry-python/pull/6407)
+
+#### Openai Agents
+
+- Deduplicate by removing `node.callspec.id` matching by @alexander-alderman-webb in [#6424](https://github.com/getsentry/sentry-python/pull/6424)
+- Fix asyncio loop missing for sync tests by @sl0thentr0py in [#6412](https://github.com/getsentry/sentry-python/pull/6412)
+
+#### Pydantic Ai
+
+- Support `Agent.run_stream_events()` returning a context manager by @alexander-alderman-webb in [#6322](https://github.com/getsentry/sentry-python/pull/6322)
+- Remove test without assertions by @alexander-alderman-webb in [#6321](https://github.com/getsentry/sentry-python/pull/6321)
+
+#### Other
+
+- (openai) Deduplicate by removing `node.callspec.id` matching by @alexander-alderman-webb in [#6427](https://github.com/getsentry/sentry-python/pull/6427)
+- Respect context manager lifecycles in `fake_record_sql_queries` by @alexander-alderman-webb in [#6295](https://github.com/getsentry/sentry-python/pull/6295)
+
+## 2.60.0
+
+Adds a new `stream_gen_ai_spans` option that controls how `gen_ai` spans are
+sent to Sentry. When set, the SDK extracts all `gen_ai` spans out of a
+transaction and sends them as v2 envelope items.
+
+Enable this option if `gen_ai` spans are being dropped because the transaction payload exceeds size limits.
+
+```python
+import sentry_sdk
+
+sentry_sdk.init(
+  dsn='https://examplePublicKey@o0.ingest.sentry.io/0',
+  stream_gen_ai_spans=True,
+)
+```
+
+### New Features ✨
+
+- (asyncpg) Add cursor span support via BaseCursor method patching by @ericapisani in [#6252](https://github.com/getsentry/sentry-python/pull/6252)
+- (integrations) Pass along the conversation ID for openai `responses` calls by @constantinius in [#6199](https://github.com/getsentry/sentry-python/pull/6199)
+- (wsgi,asgi) Introduce substitute values for filtered fields in span-streaming mode by @ericapisani in [#6178](https://github.com/getsentry/sentry-python/pull/6178)
+- Remove truncation when `stream_gen_ai_spans` is enabled by @alexander-alderman-webb in [#6260](https://github.com/getsentry/sentry-python/pull/6260)
+- Add option to send GenAI spans in the new span format by @alexander-alderman-webb in [#6079](https://github.com/getsentry/sentry-python/pull/6079)
+
+### Bug Fixes 🐛
+
+#### Openai
+
+- Guard against `choices=None` by @cla7aye15I4nd in [#6216](https://github.com/getsentry/sentry-python/pull/6216)
+- Stop setting transaction status when child span fails by @alexander-alderman-webb in [#6192](https://github.com/getsentry/sentry-python/pull/6192)
+- Only finish relevant spans in Responses patches by @alexander-alderman-webb in [#6191](https://github.com/getsentry/sentry-python/pull/6191)
+- Only finish relevant spans in Chat Completions patches by @alexander-alderman-webb in [#6190](https://github.com/getsentry/sentry-python/pull/6190)
+
+#### Other
+
+- (stdlib) Instrument response body read for chunked HTTP responses by @sentrivana in [#6202](https://github.com/getsentry/sentry-python/pull/6202)
+- (typing) Add `@sentry_sdk.traces.trace` overloads to fix typing by @sentrivana in [#6236](https://github.com/getsentry/sentry-python/pull/6236)
+- Use proto version 2 to fix backfilled user agent and IP by @sentrivana in [#6256](https://github.com/getsentry/sentry-python/pull/6256)
+- Make sure `http.server` spans are segments by @sentrivana in [#6230](https://github.com/getsentry/sentry-python/pull/6230)
+- Handle mypy 2.0 related failures by @alexander-alderman-webb in [#6218](https://github.com/getsentry/sentry-python/pull/6218)
+
+### Internal Changes 🔧
+
+#### Django
+
+- Check transaction annotations on transaction events by @alexander-alderman-webb in [#6251](https://github.com/getsentry/sentry-python/pull/6251)
+- Reload middleware on test teardown by @alexander-alderman-webb in [#6249](https://github.com/getsentry/sentry-python/pull/6249)
+
+#### Openai
+
+- Separate sync and async embeddings patches by @alexander-alderman-webb in [#6189](https://github.com/getsentry/sentry-python/pull/6189)
+- Separate sync and async Responses patches by @alexander-alderman-webb in [#6188](https://github.com/getsentry/sentry-python/pull/6188)
+- Separate sync and async Chat Completions patches by @alexander-alderman-webb in [#6187](https://github.com/getsentry/sentry-python/pull/6187)
+
+#### Other
+
+- (langchain) Inline global state by @alexander-alderman-webb in [#6261](https://github.com/getsentry/sentry-python/pull/6261)
+- (stdlib) Only capture relevant telemetry with `capture_items()` by @alexander-alderman-webb in [#6214](https://github.com/getsentry/sentry-python/pull/6214)
+- (tests) Replace custom `envelopes_to_x` helpers with `capture_items` by @sentrivana in [#6233](https://github.com/getsentry/sentry-python/pull/6233)
+- (traces) Cache valid span statuses in a module-level frozenset by @ericapisani in [#6208](https://github.com/getsentry/sentry-python/pull/6208)
+- Assert presence of profile chunks after session shutdown by @alexander-alderman-webb in [#6213](https://github.com/getsentry/sentry-python/pull/6213)
+- 🤖 Update test matrix with new releases (05/11) by @github-actions in [#6247](https://github.com/getsentry/sentry-python/pull/6247)
+- Make `set_custom_sampling_context()` a classmethod by @alexander-alderman-webb in [#6238](https://github.com/getsentry/sentry-python/pull/6238)
+- Rename `_timestamp` to `_end_timestamp` by @sentrivana in [#6235](https://github.com/getsentry/sentry-python/pull/6235)
+- Move batcher fork safety test to batcher tests by @sentrivana in [#6225](https://github.com/getsentry/sentry-python/pull/6225)
+- Introduce inline type check for whether a span is StreamedSpan by @ericapisani in [#6180](https://github.com/getsentry/sentry-python/pull/6180)
+- Add `botocore-stubs` by @alexander-alderman-webb in [#6203](https://github.com/getsentry/sentry-python/pull/6203)
+- Add option to drop scrubbed user IP addresses by @juliosuas in [#6241](https://github.com/getsentry/sentry-python/pull/6241)
+- Add .warden to .gitignore by @ericapisani in [#6210](https://github.com/getsentry/sentry-python/pull/6210)
+- removed universal bdist_wheel option by @Muskaan436 in [#6197](https://github.com/getsentry/sentry-python/pull/6197)
+- (transport) Add EnvelopePrinterTransport for debug logging by @ericapisani in [#6181](https://github.com/getsentry/sentry-python/pull/6181)
+
+## 2.59.0
+
+### New Features ✨
+
+#### Langchain
+
+- Record `run_name` as `gen_ai.function_id` on Invoke Agent Spans by @alexander-alderman-webb in [#5926](https://github.com/getsentry/sentry-python/pull/5926)
+- Record `run_name` in `on_tool_start` by @alexander-alderman-webb in [#5925](https://github.com/getsentry/sentry-python/pull/5925)
+- Record `run_name` in `on_chat_model_start` by @alexander-alderman-webb in [#5924](https://github.com/getsentry/sentry-python/pull/5924)
+
+#### Other
+
+- (ci) Cancel in-progress PR workflows on new commit push by @joshuarli in [#5994](https://github.com/getsentry/sentry-python/pull/5994)
+- (consts) Add updated span convention constants to SPANDATA by @ericapisani in [#6093](https://github.com/getsentry/sentry-python/pull/6093)
+- (fastapi) Support span streaming in active thread tracking by @ericapisani in [#6118](https://github.com/getsentry/sentry-python/pull/6118)
+- (httpx) Migrate to span first by @ericapisani in [#6084](https://github.com/getsentry/sentry-python/pull/6084)
+- (huggingface_hub) Migrate to span first by @ericapisani in [#6124](https://github.com/getsentry/sentry-python/pull/6124)
+- (mcp) Migrate to span first by @ericapisani in [#6131](https://github.com/getsentry/sentry-python/pull/6131)
+- Add `db.driver.name` spans to database integrations by @ericapisani in [#6082](https://github.com/getsentry/sentry-python/pull/6082)
+
+### Bug Fixes 🐛
+
+We've put additional data that might contain sensitive information, like GraphQL documents, behind the `send_default_pii` option.
+
+#### Httpx
+
+- Consistently early-exit when adding request source by @alexander-alderman-webb in [#6151](https://github.com/getsentry/sentry-python/pull/6151)
+- Set `code.namespace` and `code.function` instead of `code.function.name` in span streaming by @alexander-alderman-webb in [#6150](https://github.com/getsentry/sentry-python/pull/6150)
+
+#### Langchain
+
+- Record `run_name` as `gen_ai.function_id` for text completions by @alexander-alderman-webb in [#6073](https://github.com/getsentry/sentry-python/pull/6073)
+- Set agent name as `gen_ai.agent.name` for chat and tool spans by @alexander-alderman-webb in [#5877](https://github.com/getsentry/sentry-python/pull/5877)
+
+#### Other
+
+- (asgi) Use `inspect.iscoroutinefunction` on Python 3.14+ by @alexander-alderman-webb in [#6135](https://github.com/getsentry/sentry-python/pull/6135)
+- (batcher) Reset lock and flusher in child after fork by @ericapisani in [#6163](https://github.com/getsentry/sentry-python/pull/6163)
+- (google_genai) Redact binary data in inline_data and fix multi-part message extraction by @ericapisani in [#5977](https://github.com/getsentry/sentry-python/pull/5977)
+- (grpc) Add isolation_scope to async server interceptor by @robinvd in [#5940](https://github.com/getsentry/sentry-python/pull/5940)
+- (metrics,logs) Don't attach `span_id` if no active span by @sentrivana in [#6162](https://github.com/getsentry/sentry-python/pull/6162)
+- (monitor) Release `Monitor._thread_lock` after fork (#6148) by @vokracko in [#6159](https://github.com/getsentry/sentry-python/pull/6159)
+- (openai-agents) Resolve agent from `bindings` for openai-agents >= 0.14 by @ericapisani in [#6102](https://github.com/getsentry/sentry-python/pull/6102)
+- (profiler) Stop nulling buffer on teardown by @ericapisani in [#6075](https://github.com/getsentry/sentry-python/pull/6075)
+- (quart) Use `inspect.iscoroutinefunction` when Quart does by @alexander-alderman-webb in [#6133](https://github.com/getsentry/sentry-python/pull/6133)
+- (security) Prevent GitHub script injection in update-tox workflow by @fix-it-felix-sentry in [#6171](https://github.com/getsentry/sentry-python/pull/6171)
+- (starlette/fastapi) Use `inspect.iscoroutinefunction` when Starlette does by @alexander-alderman-webb in [#6134](https://github.com/getsentry/sentry-python/pull/6134)
+- (tornado) Make sure context manager doesn't double yield by @sentrivana in [#6152](https://github.com/getsentry/sentry-python/pull/6152)
+- Introduce `_get_current_streamed_span()` to keep types backwards compatible by @alexander-alderman-webb in [#6177](https://github.com/getsentry/sentry-python/pull/6177)
+
+### Internal Changes 🔧
+
+#### Stdlib
+
+- Pin timestamps in `add_http_request_source()` patch by @alexander-alderman-webb in [#6160](https://github.com/getsentry/sentry-python/pull/6160)
+- Stop mocking `HTTPSConnection.send` in trace header tests by @alexander-alderman-webb in [#6156](https://github.com/getsentry/sentry-python/pull/6156)
+
+#### Other
+
+- (batcher) Only flush the bucket that triggered the flush event by @sentrivana in [#6168](https://github.com/getsentry/sentry-python/pull/6168)
+- (celery) Remove unused `NoOpMgr` from utils by @sentrivana in [#6078](https://github.com/getsentry/sentry-python/pull/6078)
+- (ci) Update outdated pinned action version comments by @JoshuaMoelans in [#6088](https://github.com/getsentry/sentry-python/pull/6088)
+- (fastmcp) Span streaming tests by @alexander-alderman-webb in [#6167](https://github.com/getsentry/sentry-python/pull/6167)
+- (graphql) Update document setting by @sentrivana in [#6153](https://github.com/getsentry/sentry-python/pull/6153)
+- (grpc) Mirror sync interceptor by @sentrivana in [#6158](https://github.com/getsentry/sentry-python/pull/6158)
+- (langchain) Separate test to remove conditional by @alexander-alderman-webb in [#6076](https://github.com/getsentry/sentry-python/pull/6076)
+- (pydantic-ai) Remove dead `Model.request` patch by @alexander-alderman-webb in [#5956](https://github.com/getsentry/sentry-python/pull/5956)
+- (queues) Update integrations by @sentrivana in [#6157](https://github.com/getsentry/sentry-python/pull/6157)
+- (tests) Replace deprecated `enable_tracing`with `traces_sample_rate` by @sentrivana in [#6077](https://github.com/getsentry/sentry-python/pull/6077)
+- (transport) Remove redundant checks for dsn by @psh9508 in [#6104](https://github.com/getsentry/sentry-python/pull/6104)
+- Rename file by @sentrivana in [#6194](https://github.com/getsentry/sentry-python/pull/6194)
+- 🤖 Update test matrix with new releases (05/04) by @github-actions in [#6186](https://github.com/getsentry/sentry-python/pull/6186)
+- Assert presence of profile chunks after shutdown by @alexander-alderman-webb in [#6174](https://github.com/getsentry/sentry-python/pull/6174)
+- 🤖 Update test matrix with new releases (04/29) by @github-actions in [#6173](https://github.com/getsentry/sentry-python/pull/6173)
+- Limit `update-tox` action to master branch by @alexander-alderman-webb in [#6172](https://github.com/getsentry/sentry-python/pull/6172)
+- Expand scrubbing by @sentrivana in [#6161](https://github.com/getsentry/sentry-python/pull/6161)
+- Remove Python 2 compat from qualname_from_function by @ericapisani in [#6137](https://github.com/getsentry/sentry-python/pull/6137)
+- Update test matrix with new releases (04/27) by @alexander-alderman-webb in [#6146](https://github.com/getsentry/sentry-python/pull/6146)
+- Raise shutdown timeout in aws lambda tests by @sentrivana in [#6129](https://github.com/getsentry/sentry-python/pull/6129)
+- Join thread in continuous profiler test by @alexander-alderman-webb in [#6125](https://github.com/getsentry/sentry-python/pull/6125)
+- 🤖 Update test matrix with new releases (04/20) by @github-actions in [#6100](https://github.com/getsentry/sentry-python/pull/6100)
+- Set explicit base-branch for codecov action by @ericapisani in [#5992](https://github.com/getsentry/sentry-python/pull/5992)
+
+## 2.58.0
+
+### New Features ✨
+
+- (ai) Redact base64 data URLs in image_url content blocks by @ericapisani in [#5953](https://github.com/getsentry/sentry-python/pull/5953)
+- (integrations) Instrument pyreqwest tracing by @servusdei2018 in [#5682](https://github.com/getsentry/sentry-python/pull/5682)
+- (litellm) Add async callbacks by @alexander-alderman-webb in [#5969](https://github.com/getsentry/sentry-python/pull/5969)
+
+### Bug Fixes 🐛
+
+#### Anthropic
+
+- Capture exceptions for `stream()` calls by @alexander-alderman-webb in [#5950](https://github.com/getsentry/sentry-python/pull/5950)
+- Stop setting transaction status when child span fails by @alexander-alderman-webb in [#5717](https://github.com/getsentry/sentry-python/pull/5717)
+- Only finish relevant spans in .create() patches by @alexander-alderman-webb in [#5716](https://github.com/getsentry/sentry-python/pull/5716)
+
+#### Pydantic Ai
+
+- Adapt import for new library versions by @alexander-alderman-webb in [#5984](https://github.com/getsentry/sentry-python/pull/5984)
+- Use first-class hooks when available by @alexander-alderman-webb in [#5947](https://github.com/getsentry/sentry-python/pull/5947)
+
+#### Other
+
+- (huggingface_hub) Stop setting transaction status when a child span fails by @Zenithatic in [#5952](https://github.com/getsentry/sentry-python/pull/5952)
+- (litellm) Avoid double span exits when streaming by @alexander-alderman-webb in [#5933](https://github.com/getsentry/sentry-python/pull/5933)
+- (wsgi) Respect HTTP_X_FORWARDED_PROTO in request.url construction by @sl0thentr0py in [#5963](https://github.com/getsentry/sentry-python/pull/5963)
+
+### Internal Changes 🔧
+
+#### Litellm
+
+- Replace mocks with `httpx` types in rate-limit test by @alexander-alderman-webb in [#5975](https://github.com/getsentry/sentry-python/pull/5975)
+- Replace mocks with `httpx` types in embedding tests by @alexander-alderman-webb in [#5970](https://github.com/getsentry/sentry-python/pull/5970)
+- Replace mocks with `httpx` types in nonstreaming `completion()` tests by @alexander-alderman-webb in [#5937](https://github.com/getsentry/sentry-python/pull/5937)
+- Remove dead attributes by @alexander-alderman-webb in [#5985](https://github.com/getsentry/sentry-python/pull/5985)
+
+#### Other
+
+- (ai) Remove `gen_ai.tool.type` span attribute by @ericapisani in [#5964](https://github.com/getsentry/sentry-python/pull/5964)
+- (anthropic) Separate sync and async .create() patches by @alexander-alderman-webb in [#5715](https://github.com/getsentry/sentry-python/pull/5715)
+- (openai) Split token counting by API for easier deprecation by @ericapisani in [#5930](https://github.com/getsentry/sentry-python/pull/5930)
+- (openai-agents) Remove error attributes by @alexander-alderman-webb in [#5986](https://github.com/getsentry/sentry-python/pull/5986)
+- (opentelemetry) Ignore mypy error by @alexander-alderman-webb in [#5927](https://github.com/getsentry/sentry-python/pull/5927)
+- 🤖 Update test matrix with new releases (04/13) by @github-actions in [#5983](https://github.com/getsentry/sentry-python/pull/5983)
+- Fix license metadata in setup.py by @sl0thentr0py in [#5934](https://github.com/getsentry/sentry-python/pull/5934)
+- Update validate-pr workflow by @stephanie-anderson in [#5931](https://github.com/getsentry/sentry-python/pull/5931)
+
+### Other
+
+- Handle `None` span context in the span processor and pin tokenizers version for anthropic tests on Python 3.8 by @alexander-alderman-webb in [#5967](https://github.com/getsentry/sentry-python/pull/5967)
+
 ## 2.57.0
 
 ### New Features ✨

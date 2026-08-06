@@ -1,7 +1,18 @@
 import functools
+from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.tracing import SOURCE_FOR_STYLE
+from sentry_sdk.integrations import (
+    _DEFAULT_FAILED_REQUEST_STATUS_CODES,
+    DidNotEnable,
+    Integration,
+    _check_minimum_version,
+)
+from sentry_sdk.integrations._wsgi_common import RequestExtractor
+from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+from sentry_sdk.traces import SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE
+from sentry_sdk.tracing import SOURCE_FOR_STYLE as TRANSACTION_SOURCE_FOR_STYLE
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -9,36 +20,27 @@ from sentry_sdk.utils import (
     parse_version,
     transaction_from_function,
 )
-from sentry_sdk.integrations import (
-    Integration,
-    DidNotEnable,
-    _DEFAULT_FAILED_REQUEST_STATUS_CODES,
-    _check_minimum_version,
-)
-from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.integrations._wsgi_common import RequestExtractor
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Set
+    from typing import Any, Callable, Dict, Optional
 
-    from sentry_sdk.integrations.wsgi import _ScopedResponse
-    from typing import Any
-    from typing import Dict
-    from typing import Callable
-    from typing import Optional
     from bottle import FileUpload, FormsDict, LocalRequest  # type: ignore
 
-    from sentry_sdk._types import EventProcessor, Event
+    from sentry_sdk._types import Event, EventProcessor
+    from sentry_sdk.integrations.wsgi import _ScopedResponse
 
 try:
     from bottle import (
         Bottle,
         HTTPResponse,
         Route,
-        request as bottle_request,
+    )
+    from bottle import (
         __version__ as BOTTLE_VERSION,
+    )
+    from bottle import (
+        request as bottle_request,
     )
 except ImportError:
     raise DidNotEnable("Bottle not installed")
@@ -102,6 +104,11 @@ class BottleIntegration(Integration):
             )
             res = old_handle(self, environ)
 
+            if has_span_streaming_enabled(sentry_sdk.get_client().options):
+                _set_segment_name_and_source(
+                    transaction_style=integration.transaction_style
+                )
+
             return res
 
         Bottle._handle = _patched_handle
@@ -163,6 +170,25 @@ class BottleRequestExtractor(RequestExtractor):
         return file.content_length
 
 
+def _set_segment_name_and_source(transaction_style: str) -> None:
+    try:
+        if transaction_style == "url":
+            name = bottle_request.route.rule or "bottle request"
+        else:
+            name = (
+                bottle_request.route.name
+                or transaction_from_function(bottle_request.route.callback)
+                or "bottle request"
+            )
+
+        sentry_sdk.get_current_scope().set_transaction_name(
+            name,
+            source=SEGMENT_SOURCE_FOR_STYLE[transaction_style],
+        )
+    except RuntimeError:
+        pass
+
+
 def _set_transaction_name_and_source(
     event: "Event", transaction_style: str, request: "Any"
 ) -> None:
@@ -185,7 +211,9 @@ def _set_transaction_name_and_source(
             pass
 
     event["transaction"] = name
-    event["transaction_info"] = {"source": SOURCE_FOR_STYLE[transaction_style]}
+    event["transaction_info"] = {
+        "source": TRANSACTION_SOURCE_FOR_STYLE[transaction_style]
+    }
 
 
 def _make_request_event_processor(

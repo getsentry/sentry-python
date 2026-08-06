@@ -1,24 +1,28 @@
 import sys
 
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANSTATUS
-from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
+from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.tracing import Transaction, TransactionSource
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
+    SENSITIVE_DATA_SUBSTITUTE,
+    _register_control_flow_exception,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    SENSITIVE_DATA_SUBSTITUTE,
+    has_data_collection_enabled,
     parse_version,
     reraise,
 )
 
 try:
     import arq.worker
-    from arq.version import VERSION as ARQ_VERSION
     from arq.connections import ArqRedis
+    from arq.version import VERSION as ARQ_VERSION
     from arq.worker import JobExecutionFailed, Retry, RetryJob, Worker
 except ImportError:
     raise DidNotEnable("Arq is not installed")
@@ -28,12 +32,12 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import Any, Dict, Optional, Union
 
-    from sentry_sdk._types import EventProcessor, Event, ExcInfo, Hint
-
     from arq.cron import CronJob
     from arq.jobs import Job
     from arq.typing import WorkerCoroutine
     from arq.worker import Function
+
+    from sentry_sdk._types import Event, EventProcessor, ExcInfo, Hint
 
 ARQ_CONTROL_FLOW_EXCEPTIONS = (JobExecutionFailed, Retry, RetryJob)
 
@@ -59,6 +63,8 @@ class ArqIntegration(Integration):
         patch_run_job()
         patch_create_worker()
 
+        _register_control_flow_exception(ARQ_CONTROL_FLOW_EXCEPTIONS)  # type: ignore
+
         ignore_logger("arq.worker")
 
 
@@ -69,9 +75,22 @@ def patch_enqueue_job() -> None:
     async def _sentry_enqueue_job(
         self: "ArqRedis", function: str, *args: "Any", **kwargs: "Any"
     ) -> "Optional[Job]":
-        integration = sentry_sdk.get_client().get_integration(ArqIntegration)
-        if integration is None:
+        client = sentry_sdk.get_client()
+        if client.get_integration(ArqIntegration) is None:
             return await old_enqueue_job(self, function, *args, **kwargs)
+
+        if has_span_streaming_enabled(client.options):
+            if sentry_sdk.traces.get_current_span() is None:
+                return await old_enqueue_job(self, function, *args, **kwargs)
+
+            with sentry_sdk.traces.start_span(
+                name=function,
+                attributes={
+                    "sentry.op": OP.QUEUE_SUBMIT_ARQ,
+                    "sentry.origin": ArqIntegration.origin,
+                },
+            ):
+                return await old_enqueue_job(self, function, *args, **kwargs)
 
         with sentry_sdk.start_span(
             op=OP.QUEUE_SUBMIT_ARQ, name=function, origin=ArqIntegration.origin
@@ -86,13 +105,30 @@ def patch_run_job() -> None:
     old_run_job = Worker.run_job
 
     async def _sentry_run_job(self: "Worker", job_id: str, score: int) -> None:
-        integration = sentry_sdk.get_client().get_integration(ArqIntegration)
-        if integration is None:
+        client = sentry_sdk.get_client()
+        if client.get_integration(ArqIntegration) is None:
             return await old_run_job(self, job_id, score)
 
         with sentry_sdk.isolation_scope() as scope:
             scope._name = "arq"
             scope.clear_breadcrumbs()
+
+            if has_span_streaming_enabled(client.options):
+                with sentry_sdk.traces.start_span(
+                    name="unknown arq task",
+                    attributes={
+                        "sentry.op": OP.QUEUE_TASK_ARQ,
+                        "sentry.origin": ArqIntegration.origin,
+                        "sentry.segment.name.source": SegmentNameSource.TASK,
+                        SPANDATA.MESSAGING_MESSAGE_ID: job_id,
+                    },
+                    parent_span=None,
+                ) as span:
+                    if self.queue_name is not None:
+                        span.set_attribute(
+                            SPANDATA.MESSAGING_DESTINATION_NAME, self.queue_name
+                        )
+                    return await old_run_job(self, job_id, score)
 
             transaction = Transaction(
                 name="unknown arq task",
@@ -102,7 +138,9 @@ def patch_run_job() -> None:
                 origin=ArqIntegration.origin,
             )
 
-            with sentry_sdk.start_transaction(transaction):
+            with sentry_sdk.start_transaction(transaction) as span:
+                if self.queue_name is not None:
+                    span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, self.queue_name)
                 return await old_run_job(self, job_id, score)
 
     Worker.run_job = _sentry_run_job
@@ -117,6 +155,9 @@ def _capture_exception(exc_info: "ExcInfo") -> None:
             return
 
         scope.transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
+
+    if exc_info[0] in ARQ_CONTROL_FLOW_EXCEPTIONS:
+        return
 
     event, hint = event_from_exception(
         exc_info,
@@ -140,16 +181,25 @@ def _make_event_processor(
             tags["arq_task_id"] = ctx["job_id"]
             tags["arq_task_retry"] = ctx["job_try"] > 1
             extra = event.setdefault("extra", {})
-            extra["arq-job"] = {
+
+            arq_job_dict = {
                 "task": ctx["job_name"],
-                "args": (
-                    args if should_send_default_pii() else SENSITIVE_DATA_SUBSTITUTE
-                ),
-                "kwargs": (
-                    kwargs if should_send_default_pii() else SENSITIVE_DATA_SUBSTITUTE
-                ),
                 "retry": ctx["job_try"],
             }
+            client_options = sentry_sdk.get_client().options
+
+            if has_data_collection_enabled(client_options):
+                if client_options["data_collection"]["queues"]:
+                    arq_job_dict["args"] = args
+                    arq_job_dict["kwargs"] = kwargs
+            elif should_send_default_pii():
+                arq_job_dict["args"] = args
+                arq_job_dict["kwargs"] = kwargs
+            else:
+                arq_job_dict["args"] = SENSITIVE_DATA_SUBSTITUTE
+                arq_job_dict["kwargs"] = SENSITIVE_DATA_SUBSTITUTE
+
+            extra["arq-job"] = arq_job_dict
 
         return event
 
@@ -160,9 +210,18 @@ def _wrap_coroutine(name: str, coroutine: "WorkerCoroutine") -> "WorkerCoroutine
     async def _sentry_coroutine(
         ctx: "Dict[Any, Any]", *args: "Any", **kwargs: "Any"
     ) -> "Any":
-        integration = sentry_sdk.get_client().get_integration(ArqIntegration)
+        client = sentry_sdk.get_client()
+        integration = client.get_integration(ArqIntegration)
         if integration is None:
             return await coroutine(ctx, *args, **kwargs)
+
+        if has_span_streaming_enabled(client.options):
+            scope = sentry_sdk.get_current_scope()
+            span = scope.streamed_span
+            if span is not None:
+                span.name = name
+
+            scope.set_transaction_name(name)
 
         sentry_sdk.get_isolation_scope().add_event_processor(
             _make_event_processor({**ctx, "job_name": name}, *args, **kwargs)

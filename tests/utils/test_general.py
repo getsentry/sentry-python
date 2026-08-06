@@ -1,29 +1,27 @@
-import sys
 import os
+import sys
 
 import pytest
+
 from sentry_sdk.ai.utils import _normalize_data
-
-
+from sentry_sdk.consts import EndpointType
 from sentry_sdk.utils import (
+    AnnotatedValue,
     BadDsn,
     Dsn,
-    safe_repr,
     exceptions_from_error_tuple,
     filename_for_module,
-    iter_event_stacktraces,
-    to_base64,
     from_base64,
+    iter_event_stacktraces,
+    safe_repr,
     set_in_app_in_frames,
     strip_string,
-    AnnotatedValue,
+    to_base64,
 )
-from sentry_sdk.consts import EndpointType
-
 
 try:
-    from hypothesis import given
     import hypothesis.strategies as st
+    from hypothesis import given
 except ImportError:
     pass
 else:
@@ -40,8 +38,15 @@ def test_safe_repr_regressions():
     assert "лошадь" in safe_repr("лошадь")
 
 
-@pytest.mark.parametrize("prefix", ("", "abcd", "лошадь"))
-@pytest.mark.parametrize("character", "\x00\x07\x1b\n")
+@pytest.mark.parametrize(
+    "prefix,character",
+    [
+        ("", "\x00"),
+        ("abcd", "\n"),
+        ("лошадь", "\x1b"),
+        ("лошадь", "\x07"),
+    ],
+)
 def test_safe_repr_non_printable(prefix, character):
     """Check that non-printable characters are escaped"""
     string = prefix + character

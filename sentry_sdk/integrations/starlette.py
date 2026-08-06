@@ -1,17 +1,22 @@
-import asyncio
 import functools
+import json
+import sys
 import warnings
 from collections.abc import Set
 from copy import deepcopy
 from json import JSONDecodeError
+from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.consts import OP
+from sentry_sdk._types import OVER_SIZE_LIMIT_SUBSTITUTE
+from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.data_collection import _apply_key_value_collection_filtering
 from sentry_sdk.integrations import (
+    _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     DidNotEnable,
     Integration,
-    _DEFAULT_FAILED_REQUEST_STATUS_CODES,
 )
+from sentry_sdk.integrations._asgi_common import _RootPathInPath
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     HttpCodeRangeContainer,
@@ -20,44 +25,57 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import StreamedSpan, get_current_span
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TransactionSource,
 )
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    has_data_collection_enabled,
+    nullcontext,
     parse_version,
     transaction_from_function,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any, Awaitable, Callable, Container, Dict, Optional, Tuple, Union
+    from typing import (
+        Any,
+        Awaitable,
+        Callable,
+        Container,
+        Dict,
+        Optional,
+        Tuple,
+        Union,
+    )
 
     from sentry_sdk._types import Event, HttpStatusCodeRange
-
 try:
-    import starlette  # type: ignore
+    import starlette
     from starlette import __version__ as STARLETTE_VERSION
-    from starlette.applications import Starlette  # type: ignore
-    from starlette.datastructures import UploadFile  # type: ignore
-    from starlette.middleware import Middleware  # type: ignore
-    from starlette.middleware.authentication import (  # type: ignore
+    from starlette.applications import Starlette
+    from starlette.datastructures import (
+        UploadFile,
+    )
+    from starlette.middleware import Middleware
+    from starlette.middleware.authentication import (
         AuthenticationMiddleware,
     )
-    from starlette.requests import Request  # type: ignore
-    from starlette.routing import Match  # type: ignore
-    from starlette.types import ASGIApp, Receive, Scope as StarletteScope, Send  # type: ignore
+    from starlette.requests import Request
+    from starlette.routing import Match
+    from starlette.types import ASGIApp, Receive, Send
+    from starlette.types import Scope as StarletteScope
 except ImportError:
     raise DidNotEnable("Starlette is not installed")
 
 try:
     # Starlette 0.20
-    from starlette.middleware.exceptions import ExceptionMiddleware  # type: ignore
+    from starlette.middleware.exceptions import ExceptionMiddleware
 except ImportError:
     # Startlette 0.19.1
     from starlette.exceptions import ExceptionMiddleware  # type: ignore
@@ -66,12 +84,19 @@ try:
     # Optional dependency of Starlette to parse form data.
     try:
         # python-multipart 0.0.13 and later
-        import python_multipart as multipart  # type: ignore
+        import python_multipart as multipart
     except ImportError:
         # python-multipart 0.0.12 and earlier
         import multipart  # type: ignore
 except ImportError:
-    multipart = None
+    multipart = None  # type: ignore[assignment]
+
+
+# Vendored: https://github.com/Kludex/starlette/blob/0a29b5ccdcbd1285c75c4fdb5d62ae1d244a21b0/starlette/_utils.py#L11-L17
+if sys.version_info >= (3, 13):  # pragma: no cover
+    from inspect import iscoroutinefunction
+else:
+    from asyncio import iscoroutinefunction
 
 
 _DEFAULT_TRANSACTION_NAME = "generic Starlette request"
@@ -130,15 +155,22 @@ class StarletteIntegration(Integration):
             )
 
         patch_middlewares()
-        patch_asgi_app()
+        # Starlette tolerates both starting with:
+        # https://github.com/Kludex/starlette/commit/e8f0dcd54e4ceec47e02c45f5275374e292339ad.
+        root_path_in_path = (
+            _RootPathInPath.EITHER if version >= (0, 33) else _RootPathInPath.EXCLUDED
+        )
+        patch_asgi_app(root_path_in_path=root_path_in_path)
         patch_request_response()
 
         if version >= (0, 24):
             patch_templates()
 
 
-def _enable_span_for_middleware(middleware_class: "Any") -> type:
-    old_call = middleware_class.__call__
+def _enable_span_for_middleware(
+    middleware_class: "Any",
+) -> "Any":
+    old_call: "Callable[..., Awaitable[Any]]" = middleware_class.__call__
 
     async def _create_span_call(
         app: "Any",
@@ -147,7 +179,8 @@ def _enable_span_for_middleware(middleware_class: "Any") -> type:
         send: "Callable[[Dict[str, Any]], Awaitable[None]]",
         **kwargs: "Any",
     ) -> None:
-        integration = sentry_sdk.get_client().get_integration(StarletteIntegration)
+        client = sentry_sdk.get_client()
+        integration = client.get_integration(StarletteIntegration)
         if integration is None:
             return await old_call(app, scope, receive, send, **kwargs)
 
@@ -164,22 +197,40 @@ def _enable_span_for_middleware(middleware_class: "Any") -> type:
             return await old_call(app, scope, receive, send, **kwargs)
 
         middleware_name = app.__class__.__name__
+        is_span_streaming_enabled = has_span_streaming_enabled(client.options)
 
-        with sentry_sdk.start_span(
-            op=OP.MIDDLEWARE_STARLETTE,
-            name=middleware_name,
-            origin=StarletteIntegration.origin,
+        def _start_middleware_span(op: str, name: str) -> "Any":
+            if is_span_streaming_enabled:
+                if sentry_sdk.traces.get_current_span() is None:
+                    return nullcontext()
+                return sentry_sdk.traces.start_span(
+                    name=name,
+                    attributes={
+                        "sentry.op": op,
+                        "sentry.origin": StarletteIntegration.origin,
+                        "middleware.name": middleware_name,
+                    },
+                )
+            return sentry_sdk.start_span(
+                op=op,
+                name=name,
+                origin=StarletteIntegration.origin,
+            )
+
+        with _start_middleware_span(
+            op=OP.MIDDLEWARE_STARLETTE, name=middleware_name
         ) as middleware_span:
-            middleware_span.set_tag("starlette.middleware_name", middleware_name)
+            if not is_span_streaming_enabled:
+                middleware_span.set_tag("starlette.middleware_name", middleware_name)
 
             # Creating spans for the "receive" callback
             async def _sentry_receive(*args: "Any", **kwargs: "Any") -> "Any":
-                with sentry_sdk.start_span(
+                with _start_middleware_span(
                     op=OP.MIDDLEWARE_STARLETTE_RECEIVE,
                     name=getattr(receive, "__qualname__", str(receive)),
-                    origin=StarletteIntegration.origin,
                 ) as span:
-                    span.set_tag("starlette.middleware_name", middleware_name)
+                    if not is_span_streaming_enabled:
+                        span.set_tag("starlette.middleware_name", middleware_name)
                     return await receive(*args, **kwargs)
 
             receive_name = getattr(receive, "__name__", str(receive))
@@ -188,12 +239,12 @@ def _enable_span_for_middleware(middleware_class: "Any") -> type:
 
             # Creating spans for the "send" callback
             async def _sentry_send(*args: "Any", **kwargs: "Any") -> "Any":
-                with sentry_sdk.start_span(
+                with _start_middleware_span(
                     op=OP.MIDDLEWARE_STARLETTE_SEND,
                     name=getattr(send, "__qualname__", str(send)),
-                    origin=StarletteIntegration.origin,
                 ) as span:
-                    span.set_tag("starlette.middleware_name", middleware_name)
+                    if not is_span_streaming_enabled:
+                        span.set_tag("starlette.middleware_name", middleware_name)
                     return await send(*args, **kwargs)
 
             send_name = getattr(send, "__name__", str(send))
@@ -212,6 +263,16 @@ def _enable_span_for_middleware(middleware_class: "Any") -> type:
         middleware_class.__call__ = _create_span_call
 
     return middleware_class
+
+
+def _serialize_request_body_data(data: "Any") -> str:
+    # data may be a JSON-serializable value, an AnnotatedValue, or a dict with AnnotatedValue values
+    def _default(value: "Any") -> "Any":
+        if isinstance(value, AnnotatedValue):
+            return value.value
+        return str(value)
+
+    return json.dumps(data, default=_default)
 
 
 @ensure_integration_enabled(StarletteIntegration)
@@ -314,7 +375,11 @@ def _add_user_to_sentry_scope(scope: "Dict[str, Any]") -> None:
     if "user" not in scope:
         return
 
-    if not should_send_default_pii():
+    client_options = sentry_sdk.get_client().options
+    if has_data_collection_enabled(client_options):
+        if not client_options["data_collection"]["user_info"]:
+            return
+    elif not should_send_default_pii():
         return
 
     user_info: "Dict[str, Any]" = {}
@@ -352,8 +417,8 @@ def patch_authentication_middleware(middleware_class: "Any") -> None:
             receive: "Callable[[], Awaitable[Dict[str, Any]]]",
             send: "Callable[[Dict[str, Any]], Awaitable[None]]",
         ) -> None:
-            await old_call(self, scope, receive, send)
             _add_user_to_sentry_scope(scope)
+            await old_call(self, scope, receive, send)
 
         middleware_class.__call__ = _sentry_authenticationmiddleware_call
 
@@ -366,7 +431,6 @@ def patch_middlewares() -> None:
     old_middleware_init = Middleware.__init__
 
     not_yet_patched = "_sentry_middleware_init" not in str(old_middleware_init)
-
     if not_yet_patched:
 
         def _sentry_middleware_init(
@@ -384,10 +448,10 @@ def patch_middlewares() -> None:
             if cls == ExceptionMiddleware:
                 patch_exception_middleware(cls)
 
-        Middleware.__init__ = _sentry_middleware_init
+        Middleware.__init__ = _sentry_middleware_init  # type: ignore[method-assign]
 
 
-def patch_asgi_app() -> None:
+def patch_asgi_app(root_path_in_path: "_RootPathInPath") -> None:
     """
     Instrument Starlette ASGI app using the SentryAsgiMiddleware.
     """
@@ -411,11 +475,12 @@ def patch_asgi_app() -> None:
                 else DEFAULT_HTTP_METHODS_TO_CAPTURE
             ),
             asgi_version=3,
+            root_path_in_path=root_path_in_path,
         )
 
         return await middleware(scope, receive, send)
 
-    Starlette.__call__ = _sentry_patched_asgi_app
+    Starlette.__call__ = _sentry_patched_asgi_app  # type: ignore[method-assign]
 
 
 # This was vendored in from Starlette to support Starlette 0.19.1 because
@@ -424,9 +489,105 @@ def _is_async_callable(obj: "Any") -> bool:
     while isinstance(obj, functools.partial):
         obj = obj.func
 
-    return asyncio.iscoroutinefunction(obj) or (
-        callable(obj) and asyncio.iscoroutinefunction(obj.__call__)
+    return iscoroutinefunction(obj) or (
+        callable(obj) and iscoroutinefunction(obj.__call__)  # type: ignore[operator]
     )
+
+
+def _get_cached_request_body_attribute(
+    client: "sentry_sdk.client.BaseClient", request: "Request"
+) -> "Optional[str]":
+    """
+    Returns a stringified JSON representation of the request body if the request body is cached and within size bounds.
+    """
+    if "content-length" not in request.headers:
+        return None
+
+    try:
+        content_length = int(request.headers["content-length"])
+    except ValueError:
+        return None
+
+    if content_length and not request_body_within_bounds(client, content_length):
+        return OVER_SIZE_LIMIT_SUBSTITUTE
+
+    if hasattr(request, "_json"):
+        return json.dumps(request._json)
+
+    formdata_body = getattr(request, "_form", None)
+    if formdata_body is None:
+        return None
+
+    form_data = {}
+    for key, val in formdata_body.items():
+        is_file = isinstance(val, UploadFile)
+        form_data[key] = val if not is_file else "[Unparsable]"
+
+    return json.dumps(form_data)
+
+
+async def _wrap_async_handler(
+    handler: "Callable[..., Awaitable[Any]]", *args: "Any", **kwargs: "Any"
+) -> "Any":
+    """
+    Wraps an asynchronous handler function to attach request info to errors and the server segment span.
+    The request body cached on the Starlette Request object is attached to streamed spans, but consuming the request body in the event
+    processor can still cause application hangs.
+    """
+    client = sentry_sdk.get_client()
+    integration = client.get_integration(StarletteIntegration)
+    if integration is None:
+        return await handler(*args, **kwargs)
+
+    request = args[0]
+
+    _set_transaction_name_and_source(
+        sentry_sdk.get_current_scope(),
+        integration.transaction_style,
+        request,
+    )
+
+    sentry_scope = sentry_sdk.get_isolation_scope()
+    extractor = StarletteRequestExtractor(request)
+
+    info = await extractor.extract_request_info()
+
+    def _make_request_event_processor(
+        req: "Any", integration: "Any"
+    ) -> "Callable[[Event, dict[str, Any]], Event]":
+        def event_processor(event: "Event", hint: "Dict[str, Any]") -> "Event":
+            # Add info from request to event
+            request_info = event.get("request", {})
+            if info:
+                if "cookies" in info:
+                    request_info["cookies"] = info["cookies"]
+                if "data" in info:
+                    request_info["data"] = info["data"]
+            event["request"] = deepcopy(request_info)
+
+            return event
+
+        return event_processor
+
+    sentry_scope._name = StarletteIntegration.identifier
+    sentry_scope.add_event_processor(
+        _make_request_event_processor(request, integration)
+    )
+
+    try:
+        return await handler(*args, **kwargs)
+    finally:
+        current_span = get_current_span()
+
+        if type(current_span) is StreamedSpan:
+            request_body = _get_cached_request_body_attribute(
+                client=client, request=request
+            )
+            if request_body:
+                current_span._segment.set_attribute(
+                    SPANDATA.HTTP_REQUEST_BODY_DATA,
+                    request_body,
+                )
 
 
 def patch_request_response() -> None:
@@ -439,49 +600,7 @@ def patch_request_response() -> None:
         if is_coroutine:
 
             async def _sentry_async_func(*args: "Any", **kwargs: "Any") -> "Any":
-                integration = sentry_sdk.get_client().get_integration(
-                    StarletteIntegration
-                )
-                if integration is None:
-                    return await old_func(*args, **kwargs)
-
-                request = args[0]
-
-                _set_transaction_name_and_source(
-                    sentry_sdk.get_current_scope(),
-                    integration.transaction_style,
-                    request,
-                )
-
-                sentry_scope = sentry_sdk.get_isolation_scope()
-                extractor = StarletteRequestExtractor(request)
-                info = await extractor.extract_request_info()
-
-                def _make_request_event_processor(
-                    req: "Any", integration: "Any"
-                ) -> "Callable[[Event, dict[str, Any]], Event]":
-                    def event_processor(
-                        event: "Event", hint: "Dict[str, Any]"
-                    ) -> "Event":
-                        # Add info from request to event
-                        request_info = event.get("request", {})
-                        if info:
-                            if "cookies" in info:
-                                request_info["cookies"] = info["cookies"]
-                            if "data" in info:
-                                request_info["data"] = info["data"]
-                        event["request"] = deepcopy(request_info)
-
-                        return event
-
-                    return event_processor
-
-                sentry_scope._name = StarletteIntegration.identifier
-                sentry_scope.add_event_processor(
-                    _make_request_event_processor(request, integration)
-                )
-
-                return await old_func(*args, **kwargs)
+                return await _wrap_async_handler(old_func, *args, **kwargs)
 
             func = _sentry_async_func
 
@@ -489,14 +608,21 @@ def patch_request_response() -> None:
 
             @functools.wraps(old_func)
             def _sentry_sync_func(*args: "Any", **kwargs: "Any") -> "Any":
-                integration = sentry_sdk.get_client().get_integration(
-                    StarletteIntegration
-                )
+                client = sentry_sdk.get_client()
+
+                integration = client.get_integration(StarletteIntegration)
                 if integration is None:
                     return old_func(*args, **kwargs)
 
                 current_scope = sentry_sdk.get_current_scope()
-                if current_scope.transaction is not None:
+
+                span_streaming = has_span_streaming_enabled(client.options)
+                if span_streaming:
+                    current_span = current_scope.streamed_span
+
+                    if type(current_span) is StreamedSpan:
+                        current_span._segment._update_active_thread()
+                elif current_scope.transaction is not None:
                     current_scope.transaction.update_active_thread()
 
                 sentry_scope = sentry_sdk.get_isolation_scope()
@@ -554,7 +680,7 @@ def patch_templates() -> None:
 
     # https://github.com/Kludex/starlette/commit/96479daca2e4bd8157f68d914fd162aa94eff73a
     try:
-        from starlette.templating import Jinja2Templates  # type: ignore
+        from starlette.templating import Jinja2Templates
     except ImportError:
         return
 
@@ -584,7 +710,7 @@ def patch_templates() -> None:
 
             return old_jinja2templates_init(self, *args, **kwargs)
 
-        Jinja2Templates.__init__ = _sentry_jinja2templates_init
+        Jinja2Templates.__init__ = _sentry_jinja2templates_init  # type: ignore[method-assign]
 
 
 class StarletteRequestExtractor:
@@ -593,16 +719,21 @@ class StarletteRequestExtractor:
     (like form data or cookies) and adds it to the Sentry event.
     """
 
-    request: "Request" = None
-
     def __init__(self: "StarletteRequestExtractor", request: "Request") -> None:
         self.request = request
 
     def extract_cookies_from_request(
         self: "StarletteRequestExtractor",
     ) -> "Optional[Dict[str, Any]]":
+        client_options = sentry_sdk.get_client().options
         cookies: "Optional[Dict[str, Any]]" = None
-        if should_send_default_pii():
+
+        if has_data_collection_enabled(client_options):
+            cookies = _apply_key_value_collection_filtering(
+                items=self.cookies(),
+                behaviour=client_options["data_collection"]["cookies"],
+            )
+        elif should_send_default_pii():
             cookies = self.cookies()
 
         return cookies
@@ -616,7 +747,14 @@ class StarletteRequestExtractor:
 
         with capture_internal_exceptions():
             # Add cookies
-            if should_send_default_pii():
+            if has_data_collection_enabled(client.options):
+                cookies = _apply_key_value_collection_filtering(
+                    items=self.cookies(),
+                    behaviour=client.options["data_collection"]["cookies"],
+                )
+                if cookies:
+                    request_info["cookies"] = cookies
+            elif should_send_default_pii():
                 request_info["cookies"] = self.cookies()
 
             # If there is no body, just return the cookies

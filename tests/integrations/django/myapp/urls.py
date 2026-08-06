@@ -23,8 +23,9 @@ except ImportError:
         return url("^{}$".format(path), *args, **kwargs)
 
 
-from . import views
 from django_helpers import views as helper_views
+
+from . import views
 
 urlpatterns = [
     path("view-exc", views.view_exc, name="view_exc"),
@@ -46,6 +47,11 @@ urlpatterns = [
     path("nomessage", views.nomessage, name="nomessage"),
     path("view-with-signal", views.view_with_signal, name="view_with_signal"),
     path("mylogin", views.mylogin, name="mylogin"),
+    path(
+        "mylogin-with-exception",
+        views.mylogin_with_exception,
+        name="mylogin_with_exception",
+    ),
     path("classbased", views.ClassBasedView.as_view(), name="classbased"),
     path("sentryclass", views.SentryClassBasedView(), name="sentryclass"),
     path(

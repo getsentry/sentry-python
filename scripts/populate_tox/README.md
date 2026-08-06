@@ -9,17 +9,19 @@ test automatically and generating parts of `tox.ini` to capture this.
 
 ## Running the script
 
-You require a free-threaded interpreter with pip installed to run the script. With
-a recent version of `uv` you can directly run the script with the following
-command:
+You require a free-threaded python interpreter to run the script.
+Run it via the `toxgen` dependency group with `uv`:
 
 ```
-uv run --python 3.14t \
-  --with pip \
-  --with-requirements scripts/populate_tox/requirements.txt \
-  --with-editable . \
-  python scripts/populate_tox/populate_tox.py
+UV_PROJECT_ENVIRONMENT=toxgen.venv \
+  uv run --python 3.14t \
+    --group toxgen \
+    --with-editable . \
+    python scripts/populate_tox/populate_tox.py
 ```
+
+Or just run `scripts/generate-test-files.sh`, which wraps this and also runs
+`split_tox_gh_actions`.
 
 ## How it works
 

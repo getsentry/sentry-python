@@ -4,12 +4,12 @@ import inspect
 import os
 import re
 import sys
+import uuid
 import warnings
 from collections.abc import Mapping, MutableMapping
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from random import Random
 from urllib.parse import quote, unquote
-import uuid
 
 try:
     from re import Pattern
@@ -17,36 +17,30 @@ except ImportError:
     # 3.6
     from typing import Pattern
 
+from typing import TYPE_CHECKING
+
 import sentry_sdk
-from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS, SPANTEMPLATE
+from sentry_sdk.consts import OP, SPANDATA, SPANTEMPLATE
 from sentry_sdk.utils import (
+    _is_external_source,
+    _is_in_project_root,
+    _module_in_list,
     capture_internal_exceptions,
     filename_for_module,
+    has_data_collection_enabled,
+    is_sentry_url,
+    is_valid_sample_rate,
     logger,
     match_regex_list,
     qualname_from_function,
     safe_repr,
     to_string,
     try_convert,
-    is_sentry_url,
-    is_valid_sample_rate,
-    _is_external_source,
-    _is_in_project_root,
-    _module_in_list,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Dict
-    from typing import Generator
-    from typing import Optional
-    from typing import Union
-    from typing import Iterator
-    from typing import Tuple
-
     from types import FrameType
+    from typing import Any, Dict, Generator, Iterator, Optional, Tuple, Union
 
     from sentry_sdk._types import Attributes
 
@@ -120,7 +114,23 @@ def has_span_streaming_enabled(options: "Optional[dict[str, Any]]") -> bool:
     if options is None:
         return False
 
-    return (options.get("_experiments") or {}).get("trace_lifecycle") == "stream"
+    is_enabled_in_experiment_config = (options.get("_experiments") or {}).get(
+        "trace_lifecycle"
+    ) == "stream"
+
+    if options.get("trace_lifecycle") is not None:
+        return options.get("trace_lifecycle") == "stream"
+
+    return is_enabled_in_experiment_config
+
+
+def should_truncate_gen_ai_input(options: "Optional[dict[str, Any]]") -> bool:
+    if options is None:
+        return True
+
+    return not options.get(
+        "stream_gen_ai_spans", True
+    ) and not has_span_streaming_enabled(options)
 
 
 @contextlib.contextmanager
@@ -132,17 +142,31 @@ def record_sql_queries(
     executemany: bool,
     record_cursor_repr: bool = False,
     span_origin: str = "manual",
-) -> "Generator[sentry_sdk.tracing.Span, None, None]":
+    span_op_override_value: "Optional[str]" = None,
+) -> "Generator[Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan], None, None]":
     # TODO: Bring back capturing of params by default
-    if sentry_sdk.get_client().options["_experiments"].get("record_sql_params", False):
-        if not params_list or params_list == [None]:
-            params_list = None
+    client = sentry_sdk.get_client()
+    if has_data_collection_enabled(client.options):
+        if client.options["data_collection"]["database_query_data"]:
+            if not params_list or params_list == [None]:
+                params_list = None
 
-        if paramstyle == "pyformat":
-            paramstyle = "format"
+            if paramstyle == "pyformat":
+                paramstyle = "format"
+        else:
+            params_list = None
+            paramstyle = None
     else:
-        params_list = None
-        paramstyle = None
+        # TODO: remove this else block once data collection is released
+        if client.options["_experiments"].get("record_sql_params", False):
+            if not params_list or params_list == [None]:
+                params_list = None
+
+            if paramstyle == "pyformat":
+                paramstyle = "format"
+        else:
+            params_list = None
+            paramstyle = None
 
     query = _format_sql(cursor, query)
 
@@ -159,14 +183,31 @@ def record_sql_queries(
     with capture_internal_exceptions():
         sentry_sdk.add_breadcrumb(message=query, category="query", data=data)
 
-    with sentry_sdk.start_span(
-        op=OP.DB,
-        name=query,
-        origin=span_origin,
-    ) as span:
-        for k, v in data.items():
-            span.set_data(k, v)
-        yield span
+    if has_span_streaming_enabled(client.options):
+        additional_attributes = {}
+        if query is not None:
+            additional_attributes["db.query.text"] = query
+
+        with sentry_sdk.traces.start_span(
+            name="<unknown SQL query>" if query is None else query,
+            attributes={
+                "sentry.origin": span_origin,
+                "sentry.op": span_op_override_value
+                if span_op_override_value
+                else OP.DB,
+                **additional_attributes,
+            },
+        ) as span:
+            yield span
+    else:
+        with sentry_sdk.start_span(
+            op=span_op_override_value if span_op_override_value is not None else OP.DB,
+            name=query,
+            origin=span_origin,
+        ) as span:
+            for k, v in data.items():
+                span.set_data(k, v)
+            yield span
 
 
 def maybe_create_breadcrumbs_from_span(
@@ -229,7 +270,7 @@ def _should_be_included(
 
 
 def add_source(
-    span: "sentry_sdk.tracing.Span",
+    span: "Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]",
     project_root: "Optional[str]",
     in_app_include: "Optional[list[str]]",
     in_app_exclude: "Optional[list[str]]",
@@ -273,14 +314,20 @@ def add_source(
         except Exception:
             lineno = None
         if lineno is not None:
-            span.set_data(SPANDATA.CODE_LINENO, frame.f_lineno)
+            if isinstance(span, Span):
+                span.set_data(SPANDATA.CODE_LINENO, lineno)
+            else:
+                span.set_attribute("code.line.number", lineno)
 
         try:
             namespace = frame.f_globals.get("__name__")
         except Exception:
             namespace = None
         if namespace is not None:
-            span.set_data(SPANDATA.CODE_NAMESPACE, namespace)
+            if isinstance(span, Span):
+                span.set_data(SPANDATA.CODE_NAMESPACE, namespace)
+            else:
+                span.set_attribute(SPANDATA.CODE_NAMESPACE, namespace)
 
         filepath = _get_frame_module_abs_path(frame)
         if filepath is not None:
@@ -290,7 +337,12 @@ def add_source(
                 in_app_path = filepath.replace(project_root, "").lstrip(os.sep)
             else:
                 in_app_path = filepath
-            span.set_data(SPANDATA.CODE_FILEPATH, in_app_path)
+
+            if isinstance(span, Span):
+                span.set_data(SPANDATA.CODE_FILEPATH, in_app_path)
+            else:
+                if in_app_path is not None:
+                    span.set_attribute("code.file.path", in_app_path)
 
         try:
             code_function = frame.f_code.co_name
@@ -298,10 +350,15 @@ def add_source(
             code_function = None
 
         if code_function is not None:
-            span.set_data(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
+            if isinstance(span, Span):
+                span.set_data(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
+            else:
+                span.set_attribute(SPANDATA.CODE_FUNCTION, frame.f_code.co_name)
 
 
-def add_query_source(span: "sentry_sdk.tracing.Span") -> None:
+def add_query_source(
+    span: "Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]",
+) -> None:
     """
     Adds OTel compatible source code information to a database query span
     """
@@ -309,14 +366,28 @@ def add_query_source(span: "sentry_sdk.tracing.Span") -> None:
     if not client.is_active():
         return
 
-    if span.timestamp is None or span.start_timestamp is None:
+    if isinstance(span, Span):
+        # In the StreamedSpan case, we need to add the extra span information before
+        # the span finishes, so it's expected that this will be None. In the Span case,
+        # it should already be finished.
+        if span.timestamp is None:
+            return
+
+    if span.start_timestamp is None:
         return
 
     should_add_query_source = client.options.get("enable_db_query_source", True)
     if not should_add_query_source:
         return
 
-    duration = span.timestamp - span.start_timestamp
+    if isinstance(span, StreamedSpan):
+        end_timestamp = span.end_timestamp
+    else:
+        end_timestamp = span.timestamp
+
+    end_timestamp = end_timestamp or datetime.now(timezone.utc)
+
+    duration = end_timestamp - span.start_timestamp
     threshold = client.options.get("db_query_source_threshold_ms", 0)
     slow_query = duration / timedelta(milliseconds=1) > threshold
 
@@ -331,7 +402,9 @@ def add_query_source(span: "sentry_sdk.tracing.Span") -> None:
     )
 
 
-def add_http_request_source(span: "sentry_sdk.tracing.Span") -> None:
+def add_http_request_source(
+    span: "Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]",
+) -> None:
     """
     Adds OTel compatible source code information to a span for an outgoing HTTP request
     """
@@ -339,14 +412,28 @@ def add_http_request_source(span: "sentry_sdk.tracing.Span") -> None:
     if not client.is_active():
         return
 
-    if span.timestamp is None or span.start_timestamp is None:
+    if isinstance(span, Span):
+        # In the StreamedSpan case, we need to add the extra span information before
+        # the span finishes, so it's expected that this will be None. In the Span case,
+        # it should already be finished.
+        if span.timestamp is None:
+            return
+
+    if span.start_timestamp is None:
         return
 
     should_add_request_source = client.options.get("enable_http_request_source", True)
     if not should_add_request_source:
         return
 
-    duration = span.timestamp - span.start_timestamp
+    if isinstance(span, StreamedSpan):
+        end_timestamp = span.end_timestamp
+    else:
+        end_timestamp = span.timestamp
+
+    end_timestamp = end_timestamp or datetime.now(timezone.utc)
+
+    duration = end_timestamp - span.start_timestamp
     threshold = client.options.get("http_request_source_threshold_ms", 0)
     slow_query = duration / timedelta(milliseconds=1) > threshold
 
@@ -367,6 +454,14 @@ def extract_sentrytrace_data(
     """
     Given a `sentry-trace` header string, return a dictionary of data.
     """
+    if not header:
+        return None
+
+    if "," in header:
+        # Multiple headers may have been combined into one comma-separated value (RFC 7230 3.2.2); use the first non-empty one.
+        parts = [part.strip() for part in header.split(",")]
+        header = next((part for part in parts if part), "")
+
     if not header:
         return None
 
@@ -589,7 +684,7 @@ class PropagationContext:
 
         # Get the sample rate and compute the transformation that will map the random value
         # to the desired range: [0, 1), [0, sample_rate), or [sample_rate, 1).
-        sample_rate = try_convert(float, self.baggage.sentry_items.get("sample_rate"))
+        sample_rate = self._sample_rate()
         lower, upper = _sample_rand_range(self.parent_sampled, sample_rate)
 
         try:
@@ -613,6 +708,13 @@ class PropagationContext:
             return None
 
         return self.baggage.sentry_items.get("sample_rand")
+
+    def _sample_rate(self) -> "Optional[float]":
+        """Convenience method to get the sample_rate value from the baggage."""
+        if self.baggage is None:
+            return None
+
+        return try_convert(float, self.baggage.sentry_items.get("sample_rate"))
 
 
 class Baggage:
@@ -660,7 +762,7 @@ class Baggage:
 
                 with capture_internal_exceptions():
                     item = item.strip()
-                    key, val = item.split("=")
+                    key, val = item.split("=", 1)
                     if Baggage.SENTRY_PREFIX_REGEX.match(key):
                         baggage_key = unquote(key.split("-")[1])
                         sentry_items[baggage_key] = unquote(val)
@@ -782,7 +884,8 @@ class Baggage:
         options = client.options or {}
 
         sentry_items["trace_id"] = segment.trace_id
-        sentry_items["sample_rand"] = f"{segment._sample_rand:.6f}"  # noqa: E231
+        if segment._sample_rand is not None:
+            sentry_items["sample_rand"] = f"{segment._sample_rand:.6f}"
 
         if options.get("environment"):
             sentry_items["environment"] = options["environment"]
@@ -796,10 +899,10 @@ class Baggage:
                 sentry_items["org_id"] = client.parsed_dsn.org_id
 
         if (
-            segment.get_attributes().get("sentry.span.source")
+            segment.get_attributes().get("sentry.segment.name.source")
             not in LOW_QUALITY_SEGMENT_SOURCES
-        ) and segment._name:
-            sentry_items["transaction"] = segment._name
+        ) and segment.name:
+            sentry_items["transaction"] = segment.name
 
         if segment._sample_rate is not None:
             sentry_items["sample_rate"] = str(segment._sample_rate)
@@ -881,6 +984,37 @@ def should_propagate_trace(client: "sentry_sdk.client.BaseClient", url: str) -> 
         return False
 
     return match_regex_list(url, trace_propagation_targets, substring_matching=True)
+
+
+def propagate_trace_headers(
+    client: "sentry_sdk.client.BaseClient", request: "Any"
+) -> None:
+    """
+    Attach Sentry trace propagation headers (``sentry-trace``/``baggage``) from the
+    current scope's propagation context to an outgoing request, if the request's
+    URL matches the configured ``trace_propagation_targets``.
+
+    ``request`` is expected to expose ``url`` and a mutable ``headers`` mapping
+    (e.g. an ``httpx``/``httpx2`` ``Request``).
+    """
+    if not hasattr(request, "url") or not hasattr(request, "headers"):
+        logger.warning(
+            "Unable to propagate trace headers in request - missing url or headers attributes"
+        )
+        return
+
+    if not should_propagate_trace(client, str(request.url)):
+        return
+
+    for key, value in sentry_sdk.get_current_scope().iter_trace_propagation_headers():
+        logger.debug(
+            f"[Tracing] Adding `{key}` header {value} to outgoing request to {request.url}."
+        )
+
+        if key == BAGGAGE_HEADER_NAME:
+            add_sentry_baggage_to_headers(request.headers, value)
+        else:
+            request.headers[key] = value
 
 
 def normalize_incoming_data(incoming_data: "Dict[str, Any]") -> "Dict[str, Any]":
@@ -1038,11 +1172,14 @@ def create_streaming_span_decorator(
         """
         Decorator to create a span for the given function.
         """
+        new_attributes = dict(attributes) if attributes else {}
+        if "sentry.op" not in new_attributes:
+            new_attributes["sentry.op"] = OP.FUNCTION
 
         @functools.wraps(f)
         async def async_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
             client = sentry_sdk.get_client()
-            if not has_span_streaming_enabled(client.options):
+            if client.is_active() and not has_span_streaming_enabled(client.options):
                 warnings.warn(
                     "Using span streaming API in non-span-streaming mode. Use "
                     "@sentry_sdk.trace instead.",
@@ -1052,7 +1189,7 @@ def create_streaming_span_decorator(
             span_name = name or qualname_from_function(f) or ""
 
             with start_streaming_span(
-                name=span_name, attributes=attributes, active=active
+                name=span_name, attributes=new_attributes, active=active
             ):
                 result = await f(*args, **kwargs)
                 return result
@@ -1065,7 +1202,7 @@ def create_streaming_span_decorator(
         @functools.wraps(f)
         def sync_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
             client = sentry_sdk.get_client()
-            if not has_span_streaming_enabled(client.options):
+            if client.is_active() and not has_span_streaming_enabled(client.options):
                 warnings.warn(
                     "Using span streaming API in non-span-streaming mode. Use "
                     "@sentry_sdk.trace instead.",
@@ -1075,7 +1212,7 @@ def create_streaming_span_decorator(
             span_name = name or qualname_from_function(f) or ""
 
             with start_streaming_span(
-                name=span_name, attributes=attributes, active=active
+                name=span_name, attributes=new_attributes, active=active
             ):
                 return f(*args, **kwargs)
 
@@ -1094,33 +1231,13 @@ def create_streaming_span_decorator(
 
 def get_current_span(
     scope: "Optional[sentry_sdk.Scope]" = None,
-) -> "Optional[Union[Span, StreamedSpan]]":
+) -> "Optional[Span]":
     """
     Returns the currently active span if there is one running, otherwise `None`
     """
     scope = scope or sentry_sdk.get_current_scope()
     current_span = scope.span
     return current_span
-
-
-def set_span_errored(span: "Optional[Union[Span, StreamedSpan]]" = None) -> None:
-    """
-    Set the status of the current or given span to INTERNAL_ERROR.
-    Also sets the status of the transaction (root span) to INTERNAL_ERROR.
-    """
-    from sentry_sdk.traces import StreamedSpan, SpanStatus
-
-    span = span or get_current_span()
-
-    if span is not None:
-        if isinstance(span, Span):
-            span.set_status(SPANSTATUS.INTERNAL_ERROR)
-            if span.containing_transaction is not None:
-                span.containing_transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
-        elif isinstance(span, StreamedSpan):
-            span.status = SpanStatus.ERROR
-            if span._segment is not None:
-                span._segment.status = SpanStatus.ERROR
 
 
 def _generate_sample_rand(
@@ -1475,22 +1592,22 @@ def _make_sampling_decision(
     name: str,
     attributes: "Optional[Attributes]",
     scope: "sentry_sdk.Scope",
-) -> "tuple[bool, Optional[float], Optional[float], Optional[str]]":
+) -> "tuple[Optional[bool], Optional[float], Optional[float], Optional[str]]":
     """
     Decide whether a span should be sampled.
 
     Returns a tuple with:
-    1. the sampling decision
+    1. the sampling decision (sampled, unsampled, deferred)
     2. the effective sample rate
     3. the sample rand
     4. the reason for not sampling the span, if unsampled
     """
     client = sentry_sdk.get_client()
 
-    if not has_tracing_enabled(client.options):
-        return False, None, None, None
-
     propagation_context = scope.get_active_propagation_context()
+
+    if not has_tracing_enabled(client.options):
+        return propagation_context.parent_sampled, None, None, None
 
     sample_rand = None
     if propagation_context.baggage is not None:
@@ -1501,20 +1618,42 @@ def _make_sampling_decision(
     # If there's a traces_sampler, use that; otherwise use traces_sample_rate
     traces_sampler_defined = callable(client.options.get("traces_sampler"))
     if traces_sampler_defined:
+        if attributes is not None:
+            attributes = dict(attributes)
+        else:
+            attributes = {}
+
         sampling_context = {
-            "span_context": {
-                "name": name,
+            "transaction_context": {
                 "trace_id": propagation_context.trace_id,
+                "span_id": None,
                 "parent_span_id": propagation_context.parent_span_id,
-                "parent_sampled": propagation_context.parent_sampled,
-                "attributes": dict(attributes) if attributes else {},
+                "op": attributes.get("sentry.op"),
+                "name": name,
+                "description": name,
+                "start_timestamp": None,
+                "timestamp": None,
+                "source": attributes.get("sentry.segment.name.source"),
+                "sampled": None,
+                "data": attributes,
             },
+            "parent_sampled": propagation_context.parent_sampled,
         }
 
         if propagation_context.custom_sampling_context:
             sampling_context.update(propagation_context.custom_sampling_context)
 
-        sample_rate = client.options["traces_sampler"](sampling_context)
+        try:
+            sample_rate = client.options["traces_sampler"](sampling_context)
+        except Exception:
+            logger.warning(
+                "[Tracing] traces_sampler raised; falling back to parent sample rate or traces_sample_rate",
+                exc_info=True,
+            )
+            if propagation_context.parent_sampled is not None:
+                sample_rate = propagation_context.parent_sampled
+            else:
+                sample_rate = client.options["traces_sample_rate"]
     else:
         if propagation_context.parent_sampled is not None:
             sample_rate = propagation_context.parent_sampled
@@ -1530,14 +1669,15 @@ def _make_sampling_decision(
     sample_rate = float(sample_rate)
     if not sample_rate:
         if traces_sampler_defined:
-            reason = "traces_sampler returned 0 or False"
+            reason = "traces_sampler returned 0 or False, or is using a fallback sample rate that is 0 or False"
         else:
             reason = "traces_sample_rate is set to 0"
 
         logger.debug(f"[Tracing] Discarding {name} because {reason}")
-        return False, 0.0, None, "sample_rate"
+        return False, 0.0, sample_rand, "sample_rate"
 
     # Adjust sample rate if we're under backpressure
+    sample_rate_before_backpressure = sample_rate
     if client.monitor:
         sample_rate /= 2**client.monitor.downsample_factor
 
@@ -1545,16 +1685,31 @@ def _make_sampling_decision(
             logger.debug(f"[Tracing] Discarding {name} because backpressure")
             return False, 0.0, None, "backpressure"
 
+    # Make the actual decision
     sampled = sample_rand < sample_rate
 
     if sampled:
         logger.debug(f"[Tracing] Starting {name}")
         outcome = None
+
     else:
-        logger.debug(
-            f"[Tracing] Discarding {name} because it's not included in the random sample (sampling rate = {sample_rate})"
-        )
-        outcome = "sample_rate"
+        # Determine why exactly the span will not be sampled. If we've lowered
+        # the effective sample_rate because of backpressure, check whether the
+        # span would've been sampled if backpressure wasn't active. If that's the
+        # case, backpressure is the actual reason, otherwise just pure sampling
+        # rate.
+        if (
+            sample_rate_before_backpressure != sample_rate
+            and sample_rand < sample_rate_before_backpressure
+        ):
+            logger.debug(f"[Tracing] Discarding {name} because backpressure")
+            outcome = "backpressure"
+
+        else:
+            logger.debug(
+                f"[Tracing] Discarding {name} because it's not included in the random sample (sampling rate = {sample_rate})"
+            )
+            outcome = "sample_rate"
 
     return sampled, sample_rate, sample_rand, outcome
 
@@ -1562,7 +1717,16 @@ def _make_sampling_decision(
 def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
     """Determine if a span fits one of the rules in ignore_spans."""
     client = sentry_sdk.get_client()
-    ignore_spans = (client.options.get("_experiments") or {}).get("ignore_spans")
+    is_ignored_at_top_level = client.options.get("ignore_spans", None)
+    is_ignored_in_experiment_config = (client.options.get("_experiments") or {}).get(
+        "ignore_spans"
+    )
+
+    ignore_spans = (
+        is_ignored_at_top_level
+        if is_ignored_at_top_level is not None
+        else is_ignored_in_experiment_config
+    )
 
     if not ignore_spans:
         return False
@@ -1585,12 +1749,12 @@ def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
             name_matches = True
             attributes_match = True
 
-            attributes = attributes or {}
-
             if "name" in rule:
                 name_matches = _matches(rule["name"], name)
 
             if "attributes" in rule:
+                attributes = attributes or {}
+
                 for attribute, value in rule["attributes"].items():
                     if attribute not in attributes or not _matches(
                         value, attributes[attribute]
@@ -1605,16 +1769,18 @@ def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
 
 
 # Circular imports
+from sentry_sdk.traces import (
+    LOW_QUALITY_SEGMENT_SOURCES,
+    StreamedSpan,
+)
+from sentry_sdk.traces import (
+    start_span as start_streaming_span,
+)
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     LOW_QUALITY_TRANSACTION_SOURCES,
     SENTRY_TRACE_HEADER_NAME,
     Span,
-)
-from sentry_sdk.traces import (
-    LOW_QUALITY_SEGMENT_SOURCES,
-    StreamedSpan,
-    start_span as start_streaming_span,
 )
 
 if TYPE_CHECKING:

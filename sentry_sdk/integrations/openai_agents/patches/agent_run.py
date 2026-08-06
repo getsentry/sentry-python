@@ -1,23 +1,23 @@
 import sys
+from typing import TYPE_CHECKING
 
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.utils import capture_internal_exceptions, reraise
-from ..spans import (
-    invoke_agent_span,
-    end_invoke_agent_span,
-    handoff_span,
-)
-from ..utils import _record_exception_on_span
 
-from typing import TYPE_CHECKING
+from ..spans import (
+    handoff_span,
+    invoke_agent_span,
+    update_invoke_agent_span,
+)
 
 if TYPE_CHECKING:
-    from typing import Any, Optional, Callable, Awaitable
-
-    from sentry_sdk.tracing import Span
+    from typing import Any, Awaitable, Callable, Optional, Union
 
     from agents.run_internal.run_steps import SingleStepResult
+
+    from sentry_sdk.tracing import Span
 
 try:
     import agents
@@ -51,7 +51,7 @@ def _maybe_start_agent_span(
     should_run_agent_start_hooks: bool,
     span_kwargs: "dict[str, Any]",
     is_streaming: bool = False,
-) -> "Optional[Span]":
+) -> "Optional[Union[Span, StreamedSpan]]":
     """
     Start an agent invocation span if conditions are met.
     Handles ending any existing span for a different agent.
@@ -65,7 +65,13 @@ def _maybe_start_agent_span(
     if _has_active_agent_span(context_wrapper):
         current_agent = _get_current_agent(context_wrapper)
         if current_agent and current_agent != agent:
-            end_invoke_agent_span(context_wrapper, current_agent)
+            span = getattr(context_wrapper, "_sentry_agent_span", None)
+            if span:
+                update_invoke_agent_span(
+                    span=span, context=context_wrapper, agent=agent
+                )
+                span.__exit__(None, None, None)
+                delattr(context_wrapper, "_sentry_agent_span")
 
     # Store the agent on the context wrapper so we can access it later
     context_wrapper._sentry_current_agent = agent
@@ -73,7 +79,12 @@ def _maybe_start_agent_span(
     context_wrapper._sentry_agent_span = span
     agent._sentry_agent_span = span
 
-    if is_streaming:
+    if not is_streaming:
+        return span
+
+    if isinstance(span, StreamedSpan):
+        span.set_attribute(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
+    else:
         span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, True)
 
     return span
@@ -89,7 +100,13 @@ async def _run_single_turn(
     - creates agent invocation spans if there is no already active agent invocation span.
     - ends the agent invocation span if and only if an exception is raised in `_run_single_turn()`.
     """
-    agent = kwargs.get("agent")
+    # openai-agents >= 0.14 passes `bindings: AgentBindings` instead of `agent`.
+    bindings = kwargs.get("bindings")
+    agent = (
+        getattr(bindings, "public_agent", None)
+        if bindings is not None
+        else kwargs.get("agent")
+    )
     context_wrapper = kwargs.get("context_wrapper")
     should_run_agent_start_hooks = kwargs.get("should_run_agent_start_hooks", False)
 
@@ -97,13 +114,26 @@ async def _run_single_turn(
         context_wrapper, agent, should_run_agent_start_hooks, kwargs
     )
 
+    if (
+        span is None
+        or (isinstance(span, StreamedSpan) and span.end_timestamp is not None)
+        or (not isinstance(span, StreamedSpan) and span.timestamp is not None)
+    ):
+        return await original_run_single_turn(*args, **kwargs)
+
     try:
         result = await original_run_single_turn(*args, **kwargs)
-    except Exception as exc:
-        if span is not None and span.timestamp is None:
-            _record_exception_on_span(span, exc)
-            end_invoke_agent_span(context_wrapper, agent)
-        reraise(*sys.exc_info())
+    except Exception:
+        exc_info = sys.exc_info()
+        with capture_internal_exceptions():
+            span = getattr(context_wrapper, "_sentry_agent_span", None)
+            if span:
+                update_invoke_agent_span(
+                    span=span, context=context_wrapper, agent=agent
+                )
+                span.__exit__(*exc_info)
+                delattr(context_wrapper, "_sentry_agent_span")
+        reraise(*exc_info)
 
     return result
 
@@ -119,7 +149,7 @@ async def _run_single_turn_streamed(
     - ends the agent invocation span if and only if `_run_single_turn_streamed()` raises an exception.
 
     Note: Unlike _run_single_turn which uses keyword-only arguments (*,),
-    _run_single_turn_streamed uses positional arguments. The call signature is:
+    _run_single_turn_streamed uses positional arguments. The call signature <v0.14 is:
     _run_single_turn_streamed(
         streamed_result,              # args[0]
         agent,                        # args[1]
@@ -131,9 +161,26 @@ async def _run_single_turn_streamed(
         all_tools,                    # args[7]
         server_conversation_tracker,  # args[8] (optional)
     )
+
+    The call signature >=v0.14 is:
+    _run_single_turn_streamed(
+        streamed_result,              # args[0]
+        bindings,                     # args[1]
+        hooks,                        # args[2]
+        context_wrapper,              # args[3]
+        run_config,                   # args[4]
+        should_run_agent_start_hooks, # args[5]
+        tool_use_tracker,             # args[6]
+        all_tools,                    # args[7]
+        server_conversation_tracker,  # args[8] (optional)
+    )
     """
     streamed_result = args[0] if len(args) > 0 else kwargs.get("streamed_result")
-    agent = args[1] if len(args) > 1 else kwargs.get("agent")
+    # openai-agents >= 0.14 passes `bindings: AgentBindings` at args[1] instead of `agent`.
+    agent_or_bindings = (
+        args[1] if len(args) > 1 else kwargs.get("bindings", kwargs.get("agent"))
+    )
+    agent = getattr(agent_or_bindings, "public_agent", agent_or_bindings)
     context_wrapper = args[3] if len(args) > 3 else kwargs.get("context_wrapper")
     should_run_agent_start_hooks = bool(
         args[5] if len(args) > 5 else kwargs.get("should_run_agent_start_hooks", False)
@@ -151,14 +198,25 @@ async def _run_single_turn_streamed(
         is_streaming=True,
     )
 
+    if (
+        span is None
+        or (isinstance(span, StreamedSpan) and span.end_timestamp is not None)
+        or (not isinstance(span, StreamedSpan) and span.timestamp is not None)
+    ):
+        return await original_run_single_turn_streamed(*args, **kwargs)
+
     try:
         result = await original_run_single_turn_streamed(*args, **kwargs)
-    except Exception as exc:
+    except Exception:
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
-            if span is not None and span.timestamp is None:
-                _record_exception_on_span(span, exc)
-                end_invoke_agent_span(context_wrapper, agent)
+            span = getattr(context_wrapper, "_sentry_agent_span", None)
+            if span:
+                update_invoke_agent_span(
+                    span=span, context=context_wrapper, agent=agent
+                )
+                span.__exit__(*exc_info)
+                delattr(context_wrapper, "_sentry_agent_span")
             _close_streaming_workflow_span(agent)
         reraise(*exc_info)
 
@@ -179,13 +237,24 @@ async def _execute_handoffs(
 
     context_wrapper = kwargs.get("context_wrapper")
     run_handoffs = kwargs.get("run_handoffs")
-    agent = kwargs.get("agent")
+    # openai-agents >= 0.14 renamed `agent` to `public_agent`.
+    agent = kwargs.get("public_agent", kwargs.get("agent"))
 
     # Create Sentry handoff span for the first handoff (agents library only processes the first one)
     if run_handoffs:
         first_handoff = run_handoffs[0]
         handoff_agent_name = first_handoff.handoff.agent_name
         handoff_span(context_wrapper, agent, handoff_agent_name)
+
+    if not agent or not context_wrapper or not _has_active_agent_span(context_wrapper):
+        # Call original method with all parameters
+        try:
+            return await original_execute_handoffs(*args, **kwargs)
+        except Exception:
+            exc_info = sys.exc_info()
+            with capture_internal_exceptions():
+                _close_streaming_workflow_span(agent)
+            reraise(*exc_info)
 
     # Call original method with all parameters
     try:
@@ -194,11 +263,20 @@ async def _execute_handoffs(
         exc_info = sys.exc_info()
         with capture_internal_exceptions():
             _close_streaming_workflow_span(agent)
+            span = getattr(context_wrapper, "_sentry_agent_span", None)
+            if span:
+                update_invoke_agent_span(
+                    span=span, context=context_wrapper, agent=agent
+                )
+                span.__exit__(*exc_info)
+                delattr(context_wrapper, "_sentry_agent_span")
         reraise(*exc_info)
-    finally:
-        # End span for current agent after handoff processing is complete
-        if agent and context_wrapper and _has_active_agent_span(context_wrapper):
-            end_invoke_agent_span(context_wrapper, agent)
+
+    span = getattr(context_wrapper, "_sentry_agent_span", None)
+    if span:
+        update_invoke_agent_span(span=span, context=context_wrapper, agent=agent)
+        span.__exit__(None, None, None)
+        delattr(context_wrapper, "_sentry_agent_span")
 
     return result
 
@@ -214,17 +292,41 @@ async def _execute_final_output(
     - ends the workflow span if the response is streamed.
     """
 
-    agent = kwargs.get("agent")
+    # openai-agents >= 0.14 renamed `agent` to `public_agent`.
+    agent = kwargs.get("public_agent", kwargs.get("agent"))
     context_wrapper = kwargs.get("context_wrapper")
     final_output = kwargs.get("final_output")
 
+    if not agent or not context_wrapper or not _has_active_agent_span(context_wrapper):
+        try:
+            return await original_execute_final_output(*args, **kwargs)
+        finally:
+            with capture_internal_exceptions():
+                # For streaming, close the workflow span (non-streaming uses context manager in _create_run_wrapper)
+                _close_streaming_workflow_span(agent)
+
     try:
         result = await original_execute_final_output(*args, **kwargs)
-    finally:
+    except Exception:
+        exc_info = sys.exc_info()
         with capture_internal_exceptions():
-            if agent and context_wrapper and _has_active_agent_span(context_wrapper):
-                end_invoke_agent_span(context_wrapper, agent, final_output)
             # For streaming, close the workflow span (non-streaming uses context manager in _create_run_wrapper)
             _close_streaming_workflow_span(agent)
+            span = getattr(context_wrapper, "_sentry_agent_span", None)
+            if span:
+                update_invoke_agent_span(
+                    span=span, context=context_wrapper, agent=agent, output=final_output
+                )
+                span.__exit__(*exc_info)
+                delattr(context_wrapper, "_sentry_agent_span")
+        reraise(*exc_info)
+
+    span = getattr(context_wrapper, "_sentry_agent_span", None)
+    if span:
+        update_invoke_agent_span(
+            span=span, context=context_wrapper, agent=agent, output=final_output
+        )
+        span.__exit__(None, None, None)
+        delattr(context_wrapper, "_sentry_agent_span")
 
     return result

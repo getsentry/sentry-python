@@ -2,12 +2,14 @@ from contextlib import contextmanager
 
 import sentry_sdk
 from sentry_sdk.consts import OP
-from sentry_sdk.integrations import _check_minimum_version, DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
+    has_data_collection_enabled,
     package_version,
 )
 
@@ -21,9 +23,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Generator
     from typing import Any, Dict, Union
+
     from graphene.language.source import Source  # type: ignore
     from graphql.execution import ExecutionResult
     from graphql.type import GraphQLSchema
+
     from sentry_sdk._types import Event
 
 
@@ -106,10 +110,17 @@ def _patch_graphql() -> None:
 
 
 def _event_processor(event: "Event", hint: "Dict[str, Any]") -> "Event":
-    if should_send_default_pii():
+    client_options = sentry_sdk.get_client().options
+
+    if has_data_collection_enabled(client_options):
+        if client_options["data_collection"]["graphql"]["document"]:
+            request_info = event.setdefault("request", {})
+            request_info["api_target"] = "graphql"
+        elif event.get("request", {}).get("data"):
+            del event["request"]["data"]
+    elif should_send_default_pii():
         request_info = event.setdefault("request", {})
         request_info["api_target"] = "graphql"
-
     elif event.get("request", {}).get("data"):
         del event["request"]["data"]
 
@@ -120,7 +131,7 @@ def _event_processor(event: "Event", hint: "Dict[str, Any]") -> "Event":
 def graphql_span(
     schema: "GraphQLSchema", source: "Union[str, Source]", kwargs: "Dict[str, Any]"
 ) -> "Generator[None, None, None]":
-    operation_name = kwargs.get("operation_name")
+    operation_name = kwargs.get("operation_name") or "<unknown graphql operation>"
 
     operation_type = "query"
     op = OP.GRAPHQL_QUERY
@@ -141,15 +152,48 @@ def graphql_span(
         },
     )
 
-    _graphql_span = sentry_sdk.start_span(op=op, name=operation_name)
+    client_options = sentry_sdk.get_client().options
+    is_span_streaming_enabled = has_span_streaming_enabled(client_options)
 
-    _graphql_span.set_data("graphql.document", source)
-    _graphql_span.set_data("graphql.operation.name", operation_name)
-    _graphql_span.set_data("graphql.operation.type", operation_type)
+    if is_span_streaming_enabled:
+        if sentry_sdk.traces.get_current_span() is None:
+            yield
+            return
 
-    _graphql_span.__enter__()
+        additional_attributes = {}
+        if has_data_collection_enabled(client_options):
+            if client_options["data_collection"]["graphql"]["document"]:
+                additional_attributes["graphql.document"] = source
+        elif should_send_default_pii():
+            additional_attributes["graphql.document"] = source
+
+        _graphql_span = sentry_sdk.traces.start_span(
+            name=operation_name,
+            attributes={
+                "sentry.op": op,
+                "graphql.operation.name": operation_name,
+                "graphql.operation.type": operation_type,
+                **additional_attributes,
+            },
+        )
+    else:
+        _graphql_span = sentry_sdk.start_span(op=op, name=operation_name)
+
+        if has_data_collection_enabled(client_options):
+            if client_options["data_collection"]["graphql"]["document"]:
+                _graphql_span.set_data("graphql.document", source)
+        elif should_send_default_pii():
+            _graphql_span.set_data("graphql.document", source)
+
+        _graphql_span.set_data("graphql.operation.name", operation_name)
+        _graphql_span.set_data("graphql.operation.type", operation_type)
+
+        _graphql_span.__enter__()
 
     try:
         yield
     finally:
-        _graphql_span.__exit__(None, None, None)
+        if is_span_streaming_enabled:
+            _graphql_span.end()  # type: ignore
+        else:
+            _graphql_span.__exit__(None, None, None)

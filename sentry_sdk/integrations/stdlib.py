@@ -1,17 +1,21 @@
 import os
+import platform
 import subprocess
 import sys
-import platform
-from http.client import HTTPConnection
+from http.client import HTTPConnection, HTTPResponse
+from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration
-from sentry_sdk.scope import add_global_event_processor
+from sentry_sdk.scope import add_global_event_processor, should_send_default_pii
+from sentry_sdk.traces import StreamedSpan
+from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import (
     EnvironHeaders,
-    should_propagate_trace,
     add_http_request_source,
+    has_span_streaming_enabled,
+    should_propagate_trace,
 )
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
@@ -19,18 +23,12 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     is_sentry_url,
     logger,
-    safe_repr,
     parse_url,
+    safe_repr,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Callable
-    from typing import Dict
-    from typing import Optional
-    from typing import List
+    from typing import Any, Callable, Dict, List, Optional, Union
 
     from sentry_sdk._types import Event, Hint
 
@@ -54,7 +52,8 @@ class StdlibIntegration(Integration):
         def add_python_runtime_context(
             event: "Event", hint: "Hint"
         ) -> "Optional[Event]":
-            if sentry_sdk.get_client().get_integration(StdlibIntegration) is not None:
+            client = sentry_sdk.get_client()
+            if client.get_integration(StdlibIntegration) is not None:
                 contexts = event.setdefault("contexts", {})
                 if isinstance(contexts, dict) and "runtime" not in contexts:
                     contexts["runtime"] = _RUNTIME_CONTEXT
@@ -62,9 +61,22 @@ class StdlibIntegration(Integration):
             return event
 
 
+def _complete_span(span: "Union[Span, StreamedSpan]") -> None:
+    if isinstance(span, StreamedSpan):
+        with capture_internal_exceptions():
+            add_http_request_source(span)
+        span.end()
+    else:
+        span.finish()
+        with capture_internal_exceptions():
+            add_http_request_source(span)
+
+
 def _install_httplib() -> None:
     real_putrequest = HTTPConnection.putrequest
     real_getresponse = HTTPConnection.getresponse
+    real_read = HTTPResponse.read
+    real_close = HTTPResponse.close
 
     def putrequest(
         self: "HTTPConnection", method: str, url: str, *args: "Any", **kwargs: "Any"
@@ -99,22 +111,51 @@ def _install_httplib() -> None:
         with capture_internal_exceptions():
             parsed_url = parse_url(real_url, sanitize=False)
 
-        span = sentry_sdk.start_span(
-            op=OP.HTTP_CLIENT,
-            name="%s %s"
-            % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
-            origin="auto.http.stdlib.httplib",
-        )
-        span.set_data(SPANDATA.HTTP_METHOD, method)
-        if parsed_url is not None:
-            span.set_data("url", parsed_url.url)
-            span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-            span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+        span_streaming = has_span_streaming_enabled(client.options)
+        span: "Union[Span, StreamedSpan, None]"
+        if span_streaming:
+            if sentry_sdk.traces.get_current_span() is None:
+                span = None
+            else:
+                span = sentry_sdk.traces.start_span(
+                    name="%s %s"
+                    % (
+                        method,
+                        parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
+                    ),
+                    attributes={
+                        "sentry.origin": "auto.http.stdlib.httplib",
+                        "sentry.op": OP.HTTP_CLIENT,
+                        SPANDATA.HTTP_REQUEST_METHOD: method,
+                    },
+                )
+
+                if parsed_url is not None and should_send_default_pii():
+                    span.set_attribute(SPANDATA.URL_FRAGMENT, parsed_url.fragment)
+                    span.set_attribute(SPANDATA.URL_FULL, parsed_url.url)
+                    span.set_attribute(SPANDATA.URL_QUERY, parsed_url.query)
+
+                set_on_span = span.set_attribute
+        else:
+            span = sentry_sdk.start_span(
+                op=OP.HTTP_CLIENT,
+                name="%s %s"
+                % (method, parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE),
+                origin="auto.http.stdlib.httplib",
+            )
+
+            span.set_data(SPANDATA.HTTP_METHOD, method)
+            if parsed_url is not None:
+                span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+                span.set_data("url", parsed_url.url)
+                span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
+
+            set_on_span = span.set_data
 
         # for proxies, these point to the proxy host/port
-        if tunnel_host:
-            span.set_data(SPANDATA.NETWORK_PEER_ADDRESS, self.host)
-            span.set_data(SPANDATA.NETWORK_PEER_PORT, self.port)
+        if span and tunnel_host:
+            set_on_span(SPANDATA.NETWORK_PEER_ADDRESS, self.host)
+            set_on_span(SPANDATA.NETWORK_PEER_PORT, self.port)
 
         rv = real_putrequest(self, method, url, *args, **kwargs)
 
@@ -144,19 +185,57 @@ def _install_httplib() -> None:
 
         try:
             rv = real_getresponse(self, *args, **kwargs)
+        except BaseException:
+            _complete_span(span)
+            raise
 
+        if isinstance(span, StreamedSpan):
+            status_code = int(rv.status)
+            span.status = "error" if status_code >= 400 else "ok"
+            span.set_attribute("http.response.status_code", status_code)
+        else:
             span.set_http_status(int(rv.status))
             span.set_data("reason", rv.reason)
-        finally:
-            span.finish()
 
-            with capture_internal_exceptions():
-                add_http_request_source(span)
+        # getresponse doesn't include actually reading the response body. This
+        # is done in read(). So if the metadata/headers suggest there's a body to
+        # read, don't finish the span just yet, but save it for ending it later.
+        has_body = rv.chunked or (rv.length is not None and rv.length > 0)
+        if has_body:
+            rv._sentrysdk_span = span  # type: ignore[attr-defined]
+        else:
+            _complete_span(span)
 
         return rv
 
+    def read(self: "HTTPResponse", *args: "Any", **kwargs: "Any") -> "Any":
+        try:
+            return real_read(self, *args, **kwargs)
+        finally:
+            span = getattr(self, "_sentrysdk_span", None)
+            # read() might be called multiple times to consume a single body,
+            # so we can't just end the span when read() is done. Instead,
+            # try to figure out whether the response body has been fully read.
+            if span and (self.fp is None or self.closed):
+                self._sentrysdk_span = None  # type: ignore[attr-defined]
+                _complete_span(span)
+
+    def close(self: "HTTPResponse") -> None:
+        # We patch close() as a best effort fallback in case the span is not
+        # ended yet in getresponse() or read().
+
+        try:
+            real_close(self)
+        finally:
+            span = getattr(self, "_sentrysdk_span", None)
+            if span is not None:
+                self._sentrysdk_span = None  # type: ignore[attr-defined]
+                _complete_span(span)
+
     HTTPConnection.putrequest = putrequest  # type: ignore[method-assign]
     HTTPConnection.getresponse = getresponse  # type: ignore[method-assign]
+    HTTPResponse.read = read  # type: ignore[method-assign]
+    HTTPResponse.close = close  # type: ignore[assignment,method-assign]
 
 
 def _init_argument(
@@ -226,11 +305,27 @@ def _install_subprocess() -> None:
 
         env = None
 
-        with sentry_sdk.start_span(
-            op=OP.SUBPROCESS,
-            name=description,
-            origin="auto.subprocess.stdlib.subprocess",
-        ) as span:
+        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+        span: "Union[Span, StreamedSpan]"
+        if span_streaming:
+            if sentry_sdk.traces.get_current_span() is None:
+                return old_popen_init(self, *a, **kw)
+
+            span = sentry_sdk.traces.start_span(
+                name=description,
+                attributes={
+                    "sentry.op": OP.SUBPROCESS,
+                    "sentry.origin": "auto.subprocess.stdlib.subprocess",
+                },
+            )
+        else:
+            span = sentry_sdk.start_span(
+                op=OP.SUBPROCESS,
+                name=description,
+                origin="auto.subprocess.stdlib.subprocess",
+            )
+
+        with span:
             for k, v in sentry_sdk.get_current_scope().iter_trace_propagation_headers(
                 span=span
             ):
@@ -244,12 +339,16 @@ def _install_subprocess() -> None:
                     )
                 env["SUBPROCESS_" + k.upper().replace("-", "_")] = v
 
-            if cwd:
+            if cwd and isinstance(span, Span):
                 span.set_data("subprocess.cwd", cwd)
 
             rv = old_popen_init(self, *a, **kw)
 
-            span.set_tag("subprocess.pid", self.pid)
+            if isinstance(span, StreamedSpan):
+                span.set_attribute(SPANDATA.PROCESS_PID, self.pid)
+            else:
+                span.set_tag("subprocess.pid", self.pid)
+
             return rv
 
     subprocess.Popen.__init__ = sentry_patched_popen_init  # type: ignore
@@ -260,12 +359,26 @@ def _install_subprocess() -> None:
     def sentry_patched_popen_wait(
         self: "subprocess.Popen[Any]", *a: "Any", **kw: "Any"
     ) -> "Any":
-        with sentry_sdk.start_span(
-            op=OP.SUBPROCESS_WAIT,
-            origin="auto.subprocess.stdlib.subprocess",
-        ) as span:
-            span.set_tag("subprocess.pid", self.pid)
-            return old_popen_wait(self, *a, **kw)
+        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+        if span_streaming:
+            if sentry_sdk.traces.get_current_span() is None:
+                return old_popen_wait(self, *a, **kw)
+            with sentry_sdk.traces.start_span(
+                name=OP.SUBPROCESS_WAIT,
+                attributes={
+                    "sentry.op": OP.SUBPROCESS_WAIT,
+                    "sentry.origin": "auto.subprocess.stdlib.subprocess",
+                },
+            ) as span:
+                span.set_attribute(SPANDATA.PROCESS_PID, self.pid)
+                return old_popen_wait(self, *a, **kw)
+        else:
+            with sentry_sdk.start_span(
+                op=OP.SUBPROCESS_WAIT,
+                origin="auto.subprocess.stdlib.subprocess",
+            ) as span:
+                span.set_tag("subprocess.pid", self.pid)
+                return old_popen_wait(self, *a, **kw)
 
     subprocess.Popen.wait = sentry_patched_popen_wait  # type: ignore
 
@@ -275,12 +388,26 @@ def _install_subprocess() -> None:
     def sentry_patched_popen_communicate(
         self: "subprocess.Popen[Any]", *a: "Any", **kw: "Any"
     ) -> "Any":
-        with sentry_sdk.start_span(
-            op=OP.SUBPROCESS_COMMUNICATE,
-            origin="auto.subprocess.stdlib.subprocess",
-        ) as span:
-            span.set_tag("subprocess.pid", self.pid)
-            return old_popen_communicate(self, *a, **kw)
+        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+        if span_streaming:
+            if sentry_sdk.traces.get_current_span() is None:
+                return old_popen_communicate(self, *a, **kw)
+            with sentry_sdk.traces.start_span(
+                name=OP.SUBPROCESS_COMMUNICATE,
+                attributes={
+                    "sentry.op": OP.SUBPROCESS_COMMUNICATE,
+                    "sentry.origin": "auto.subprocess.stdlib.subprocess",
+                },
+            ) as span:
+                span.set_attribute(SPANDATA.PROCESS_PID, self.pid)
+                return old_popen_communicate(self, *a, **kw)
+        else:
+            with sentry_sdk.start_span(
+                op=OP.SUBPROCESS_COMMUNICATE,
+                origin="auto.subprocess.stdlib.subprocess",
+            ) as span:
+                span.set_tag("subprocess.pid", self.pid)
+                return old_popen_communicate(self, *a, **kw)
 
     subprocess.Popen.communicate = sentry_patched_popen_communicate  # type: ignore
 

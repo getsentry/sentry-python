@@ -1,12 +1,19 @@
+from contextlib import contextmanager
+from typing import Any, Generator
+
 import sentry_sdk
 from sentry_sdk import start_span
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import Integration, DidNotEnable
+from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
 from sentry_sdk.tracing_utils import (
-    should_propagate_trace,
     add_http_request_source,
     add_sentry_baggage_to_headers,
+    has_span_streaming_enabled,
+    propagate_trace_headers,
+    should_propagate_trace,
 )
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
@@ -15,18 +22,21 @@ from sentry_sdk.utils import (
     parse_url,
 )
 
-from contextlib import contextmanager
-from typing import Any, Generator
-
 try:
-    from pyreqwest.client import ClientBuilder, SyncClientBuilder  # type: ignore[import-not-found]
-    from pyreqwest.request import (  # type: ignore[import-not-found]
-        Request,
-        OneOffRequestBuilder,
-        SyncOneOffRequestBuilder,
+    from pyreqwest.client import (  # type: ignore[import-not-found]
+        ClientBuilder,
+        SyncClientBuilder,
     )
     from pyreqwest.middleware import Next, SyncNext  # type: ignore[import-not-found]
-    from pyreqwest.response import Response, SyncResponse  # type: ignore[import-not-found]
+    from pyreqwest.request import (  # type: ignore[import-not-found]
+        OneOffRequestBuilder,
+        Request,
+        SyncOneOffRequestBuilder,
+    )
+    from pyreqwest.response import (  # type: ignore[import-not-found]
+        Response,
+        SyncResponse,
+    )
 except ImportError:
     raise DidNotEnable("pyreqwest not installed or incompatible version installed")
 
@@ -77,6 +87,36 @@ def _sentry_pyreqwest_span(request: "Request") -> "Generator[Any, None, None]":
     with capture_internal_exceptions():
         parsed_url = parse_url(str(request.url), sanitize=False)
 
+    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+    if span_streaming:
+        if sentry_sdk.traces.get_current_span() is None:
+            propagate_trace_headers(client=sentry_sdk.get_client(), request=request)
+            yield None
+            return
+
+        with sentry_sdk.traces.start_span(
+            name=f"{request.method} {parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE}",
+            attributes={
+                "sentry.op": OP.HTTP_CLIENT,
+                "sentry.origin": PyreqwestIntegration.origin,
+                SPANDATA.HTTP_REQUEST_METHOD: request.method,
+            },
+        ) as span:
+            if parsed_url is not None and should_send_default_pii():
+                span.set_attribute(SPANDATA.URL_FULL, parsed_url.url)
+                span.set_attribute(SPANDATA.URL_QUERY, parsed_url.query)
+                span.set_attribute(SPANDATA.URL_FRAGMENT, parsed_url.fragment)
+
+            propagate_trace_headers(client=sentry_sdk.get_client(), request=request)
+
+            yield span
+
+            if span is not None:
+                with capture_internal_exceptions():
+                    add_http_request_source(span)
+
+            return
+
     with start_span(
         op=OP.HTTP_CLIENT,
         name=f"{request.method} {parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE}",
@@ -118,7 +158,14 @@ async def sentry_async_middleware(
 
     with _sentry_pyreqwest_span(request) as span:
         response = await next_handler.run(request)
-        span.set_http_status(response.status)
+        if isinstance(span, StreamedSpan):
+            span.status = "error" if response.status >= 400 else "ok"
+            span.set_attribute(
+                SPANDATA.HTTP_STATUS_CODE,
+                response.status,
+            )
+        elif span is not None:
+            span.set_http_status(response.status)
 
     return response
 
@@ -131,6 +178,13 @@ def sentry_sync_middleware(
 
     with _sentry_pyreqwest_span(request) as span:
         response = next_handler.run(request)
-        span.set_http_status(response.status)
+        if isinstance(span, StreamedSpan):
+            span.status = "error" if response.status >= 400 else "ok"
+            span.set_attribute(
+                SPANDATA.HTTP_STATUS_CODE,
+                response.status,
+            )
+        elif span is not None:
+            span.set_http_status(response.status)
 
     return response

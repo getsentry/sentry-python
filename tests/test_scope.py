@@ -1,7 +1,8 @@
 import copy
 import os
-import pytest
 from unittest import mock
+
+import pytest
 
 import sentry_sdk
 from sentry_sdk import (
@@ -13,11 +14,11 @@ from sentry_sdk.client import Client, NonRecordingClient
 from sentry_sdk.scope import (
     Scope,
     ScopeType,
-    use_isolation_scope,
-    use_scope,
-    should_send_default_pii,
     register_external_propagation_context,
     remove_external_propagation_context,
+    should_send_default_pii,
+    use_isolation_scope,
+    use_scope,
 )
 
 
@@ -65,6 +66,43 @@ def test_scope_flags_copy():
         {"flag": "a", "result": False},
         {"flag": "c", "result": True},
     ]
+
+
+def test_set_user(sentry_init, capture_events):
+    sentry_init()
+    events = capture_events()
+
+    sentry_sdk.get_isolation_scope().set_user({"id": "42", "email": "bob@example.com"})
+    capture_exception(NameError())
+    assert events[-1]["user"] == {"id": "42", "email": "bob@example.com"}
+
+    sentry_sdk.get_isolation_scope().set_user(None)
+    capture_exception(NameError())
+    assert "user" not in events[-1]
+
+
+def test_set_user_none_values_are_dropped_when_copying_to_attributes(
+    sentry_init, capture_items
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        trace_lifecycle="stream",
+    )
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="test_segment"):
+        sentry_sdk.get_isolation_scope().set_user(
+            {"email": "ada@beans.com", "username": None}
+        )
+        capture_exception(NameError())
+
+    sentry_sdk.flush()
+
+    segment = items[0].payload
+
+    assert "user.name" not in segment["attributes"]
+    assert segment["attributes"]["user.email"] == "ada@beans.com"
 
 
 def test_merging(sentry_init, capture_events):
@@ -876,7 +914,7 @@ def test_set_tags():
 
 
 def test_last_event_id(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     assert Scope.last_event_id() is None
 
@@ -886,7 +924,7 @@ def test_last_event_id(sentry_init):
 
 
 def test_last_event_id_transaction(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     assert Scope.last_event_id() is None
 
@@ -897,7 +935,7 @@ def test_last_event_id_transaction(sentry_init):
 
 
 def test_last_event_id_cleared(sentry_init):
-    sentry_init(enable_tracing=True)
+    sentry_init(traces_sample_rate=1.0)
 
     # Make sure last_event_id is set
     sentry_sdk.capture_exception(Exception("test"))

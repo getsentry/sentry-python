@@ -1,11 +1,10 @@
 import base64
-import contextvars
+import copy
 import json
 import linecache
 import logging
 import math
 import os
-import copy
 import random
 import re
 import subprocess
@@ -35,7 +34,6 @@ from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE, Annotated, AnnotatedVal
 from sentry_sdk.consts import (
     DEFAULT_ADD_FULL_STACK,
     DEFAULT_MAX_STACK_FRAMES,
-    DEFAULT_MAX_VALUE_LENGTH,
     EndpointType,
 )
 
@@ -65,12 +63,13 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import (
         AttributeValue,
-        SerializedAttributeValue,
         Event,
         ExcInfo,
         Hint,
         Log,
         Metric,
+        SerializedAttributeValue,
+        SpanJSON,
     )
 
     P = ParamSpec("P")
@@ -83,25 +82,6 @@ epoch = datetime(1970, 1, 1)
 logger = logging.getLogger("sentry_sdk.errors")
 
 _installed_modules = None
-
-_is_sentry_internal_task = contextvars.ContextVar(
-    "is_sentry_internal_task", default=False
-)
-
-
-def is_internal_task() -> bool:
-    return _is_sentry_internal_task.get()
-
-
-@contextmanager
-def mark_sentry_task_internal() -> "Generator[None, None, None]":
-    """Context manager to mark a task as Sentry internal."""
-    token = _is_sentry_internal_task.set(True)
-    try:
-        yield
-    finally:
-        _is_sentry_internal_task.reset(token)
-
 
 BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 
@@ -748,7 +728,7 @@ def single_exception_from_error_tuple(
     if client_options is None:
         include_local_variables = True
         include_source_context = True
-        max_value_length = DEFAULT_MAX_VALUE_LENGTH  # fallback
+        max_value_length = None  # fallback
         custom_repr = None
     else:
         include_local_variables = client_options["include_local_variables"]
@@ -1262,11 +1242,8 @@ def _get_size_in_bytes(value: str) -> "Optional[int]":
 def strip_string(
     value: str, max_length: "Optional[int]" = None
 ) -> "Union[AnnotatedValue, str]":
-    if not value:
+    if not value or max_length is None:
         return value
-
-    if max_length is None:
-        max_length = DEFAULT_MAX_VALUE_LENGTH
 
     byte_size = _get_size_in_bytes(value)
     text_size = len(value)
@@ -1467,20 +1444,30 @@ requests.
 Please refer to https://docs.sentry.io/platforms/python/contextvars/ for more information.
 """
 
+_is_sentry_internal_task = ContextVar("is_sentry_internal_task", default=False)
+
+# These exceptions won't set the span status to error if they occur. Use
+# register_control_flow_exception to add to this list
+_control_flow_exception_classes: "set[type]" = set()
+
+
+def is_internal_task() -> bool:
+    return _is_sentry_internal_task.get()
+
+
+@contextmanager
+def mark_sentry_task_internal() -> "Generator[None, None, None]":
+    """Context manager to mark a task as Sentry internal."""
+    token = _is_sentry_internal_task.set(True)
+    try:
+        yield
+    finally:
+        _is_sentry_internal_task.reset(token)
+
 
 def qualname_from_function(func: "Callable[..., Any]") -> "Optional[str]":
     """Return the qualified name of func. Works with regular function, lambda, partial and partialmethod."""
     func_qualname: "Optional[str]" = None
-
-    # Python 2
-    try:
-        return "%s.%s.%s" % (
-            func.im_class.__module__,  # type: ignore
-            func.im_class.__name__,  # type: ignore
-            func.__name__,
-        )
-    except Exception:
-        pass
 
     prefix, suffix = "", ""
 
@@ -1499,10 +1486,9 @@ def qualname_from_function(func: "Callable[..., Any]") -> "Optional[str]":
 
     if hasattr(func, "__qualname__"):
         func_qualname = func.__qualname__
-    elif hasattr(func, "__name__"):  # Python 2.7 has no __qualname__
+    elif hasattr(func, "__name__"):
         func_qualname = func.__name__
 
-    # Python 3: methods, functions, classes
     if func_qualname is not None:
         if hasattr(func, "__module__") and isinstance(func.__module__, str):
             func_qualname = func.__module__ + "." + func_qualname
@@ -1992,9 +1978,21 @@ def get_current_thread_meta(
     return None, None
 
 
+def _register_control_flow_exception(
+    exc_type: "Union[type, list[type], tuple[type], set[type]]",
+) -> None:
+    if isinstance(exc_type, (list, tuple, set)):
+        _control_flow_exception_classes.update(exc_type)
+    else:
+        _control_flow_exception_classes.add(exc_type)
+
+
 def should_be_treated_as_error(ty: "Any", value: "Any") -> bool:
     if ty == SystemExit and hasattr(value, "code") and value.code in (0, None):
         # https://docs.python.org/3/library/exceptions.html#SystemExit
+        return False
+
+    if issubclass(ty, tuple(_control_flow_exception_classes)):
         return False
 
     return True
@@ -2082,6 +2080,13 @@ def has_logs_enabled(options: "Optional[dict[str, Any]]") -> bool:
     )
 
 
+def has_data_collection_enabled(options: "Optional[dict[str, Any]]") -> bool:
+    if options is None:
+        return False
+
+    return "data_collection" in options.get("_experiments", {})
+
+
 def get_before_send_log(
     options: "Optional[dict[str, Any]]",
 ) -> "Optional[Callable[[Log, Hint], Optional[Log]]]":
@@ -2108,6 +2113,17 @@ def get_before_send_metric(
 
     return options.get("before_send_metric") or options["_experiments"].get(
         "before_send_metric"
+    )
+
+
+def get_before_send_span(
+    options: "Optional[dict[str, Any]]",
+) -> "Optional[Callable[[SpanJSON, Hint], Optional[SpanJSON]]]":
+    if options is None:
+        return None
+
+    return options.get("before_send_span") or options["_experiments"].get(
+        "before_send_span"
     )
 
 
@@ -2162,3 +2178,9 @@ def serialize_attribute(val: "AttributeValue") -> "SerializedAttributeValue":
     # Coerce to string if we don't know what to do with the value. This should
     # never happen as we pre-format early in format_attribute, but let's be safe.
     return {"value": safe_repr(val), "type": "string"}
+
+
+# This noop context manager can be replaced with "from contextlib import nullcontext" when we drop Python 3.6 support
+@contextmanager
+def nullcontext() -> "Iterator[None]":
+    yield

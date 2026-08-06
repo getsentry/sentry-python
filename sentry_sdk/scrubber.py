@@ -1,14 +1,15 @@
+from typing import TYPE_CHECKING, Dict, List, cast
+
 from sentry_sdk.utils import (
-    capture_internal_exceptions,
     AnnotatedValue,
+    capture_internal_exceptions,
     iter_event_frames,
 )
 
-from typing import TYPE_CHECKING, cast, List, Dict
-
 if TYPE_CHECKING:
-    from sentry_sdk._types import Event
     from typing import Optional
+
+    from sentry_sdk._types import Event
 
 
 DEFAULT_DENYLIST = [
@@ -34,6 +35,7 @@ DEFAULT_DENYLIST = [
     "set_cookie",
     "cookie",
     "authorization",
+    "proxy-authorization",
     "x_api_key",
     # other common names used in the wild
     "aiohttp_session",  # aiohttp
@@ -136,7 +138,10 @@ class EventScrubber:
     def scrub_user(self, event: "Event") -> None:
         with capture_internal_exceptions():
             if "user" in event:
-                self.scrub_dict(event["user"])
+                user = event["user"]
+                if "ip_address" in self.denylist and isinstance(user, dict):
+                    user.pop("ip_address", None)
+                self.scrub_dict(user)
 
     def scrub_breadcrumbs(self, event: "Event") -> None:
         with capture_internal_exceptions():

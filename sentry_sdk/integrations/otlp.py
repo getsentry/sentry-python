@@ -1,57 +1,54 @@
-from sentry_sdk import get_client, capture_event
-from sentry_sdk.integrations import Integration, DidNotEnable
-from sentry_sdk.scope import register_external_propagation_context
-from sentry_sdk.utils import (
-    Dsn,
-    logger,
-    event_from_exception,
-    capture_internal_exceptions,
-)
+from sentry_sdk import capture_event, get_client
 from sentry_sdk.consts import VERSION, EndpointType
-from sentry_sdk.tracing_utils import Baggage
+from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.scope import register_external_propagation_context
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
 )
+from sentry_sdk.tracing_utils import Baggage
+from sentry_sdk.utils import (
+    Dsn,
+    capture_internal_exceptions,
+    event_from_exception,
+    logger,
+)
 
 try:
-    from opentelemetry.propagate import set_global_textmap
-    from opentelemetry.sdk.trace import TracerProvider, Span
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor
-    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-
-    from opentelemetry.trace import (
-        get_current_span,
-        get_tracer_provider,
-        set_tracer_provider,
-        format_trace_id,
-        format_span_id,
-        SpanContext,
-        INVALID_SPAN_ID,
-        INVALID_TRACE_ID,
-    )
-
     from opentelemetry.context import (
         Context,
         get_current,
         get_value,
     )
-
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+    from opentelemetry.propagate import set_global_textmap
     from opentelemetry.propagators.textmap import (
         CarrierT,
         Setter,
         default_setter,
     )
+    from opentelemetry.sdk.trace import Span, TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    from opentelemetry.trace import (
+        INVALID_SPAN_ID,
+        INVALID_TRACE_ID,
+        SpanContext,
+        format_span_id,
+        format_trace_id,
+        get_current_span,
+        get_tracer_provider,
+        set_tracer_provider,
+    )
 
-    from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
     from sentry_sdk.integrations.opentelemetry.consts import SENTRY_BAGGAGE_KEY
+    from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
 except ImportError:
     raise DidNotEnable("opentelemetry-distro[otlp] is not installed")
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Optional, Dict, Any, Tuple
+    from typing import Any, Dict, Optional, Tuple
 
 
 def otel_propagation_context() -> "Optional[Tuple[str, str]]":
