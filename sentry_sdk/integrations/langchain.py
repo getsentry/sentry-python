@@ -45,7 +45,6 @@ if TYPE_CHECKING:
 
 try:
     from langchain_core import __version__ as LANGCHAIN_VERSION
-    from langchain_core.agents import AgentFinish
     from langchain_core.callbacks import (
         BaseCallbackHandler,
         BaseCallbackManager,
@@ -621,26 +620,6 @@ class SentryLangchainCallback(BaseCallbackHandler):
     ) -> "Any":
         """Run when Chat Model errors."""
         self._handle_error(run_id, error)
-
-    def on_agent_finish(
-        self: "SentryLangchainCallback",
-        finish: "AgentFinish",
-        *,
-        run_id: "UUID",
-        **kwargs: "Any",
-    ) -> "Any":
-        with capture_internal_exceptions():
-            if not run_id or run_id not in self.span_map:
-                return
-
-            span = self.span_map[run_id]
-
-            if should_send_default_pii() and self.include_prompts:
-                set_data_normalized(
-                    span, SPANDATA.GEN_AI_RESPONSE_TEXT, finish.return_values.items()
-                )
-
-            self._exit_span(span, run_id)
 
     def on_tool_start(
         self: "SentryLangchainCallback",
