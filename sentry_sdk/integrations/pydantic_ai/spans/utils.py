@@ -12,7 +12,7 @@ from sentry_sdk.traces import StreamedSpan
 if TYPE_CHECKING:
     from typing import Any, Dict, Union
 
-    from pydantic_ai.usage import RequestUsage, RunUsage  # type: ignore
+    from pydantic_ai.usage import RequestUsage, RunUsage
 
 
 def _serialize_image_url_item(item: "Any") -> "Dict[str, Any]":
