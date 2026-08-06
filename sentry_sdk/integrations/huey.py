@@ -38,7 +38,7 @@ try:
     from huey.api import Huey, PeriodicTask, Result, ResultGroup, Task
     from huey.exceptions import CancelExecution, RetryTask, TaskLockedException
 except ImportError:
-    raise DidNotEnable("Huey is not installed")
+    raise DidNotEnable("Huey is not installed or incompatible")
 
 try:
     from huey.api import chord as HueyChord

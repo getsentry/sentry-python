@@ -31,7 +31,7 @@ try:
     from tornado import version_info as TORNADO_VERSION
     from tornado.web import HTTPError, RequestHandler
 except ImportError:
-    raise DidNotEnable("Tornado not installed")
+    raise DidNotEnable("Tornado not installed or incompatible")
 
 from typing import TYPE_CHECKING
 

@@ -27,7 +27,7 @@ try:
     from httpx import AsyncClient, Client, Request, Response
     from httpx import __version__ as HTTPX_VERSION
 except ImportError:
-    raise DidNotEnable("httpx is not installed")
+    raise DidNotEnable("httpx is not installed or incompatible")
 
 __all__ = ["HttpxIntegration"]
 

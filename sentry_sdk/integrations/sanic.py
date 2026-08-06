@@ -43,7 +43,7 @@ try:
     from sanic.handlers import ErrorHandler
     from sanic.router import Router
 except ImportError:
-    raise DidNotEnable("Sanic not installed")
+    raise DidNotEnable("Sanic not installed or incompatible")
 
 old_error_handler_lookup = ErrorHandler.lookup
 old_handle_request = Sanic.handle_request

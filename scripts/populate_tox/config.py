@@ -515,7 +515,7 @@ TEST_SUITE_CONFIG = {
         },
         "num_versions": 2,
     },
-    "trytond": {
+    "trytond_wsgi": {
         "package": "trytond",
         "deps": {
             "*": ["werkzeug"],

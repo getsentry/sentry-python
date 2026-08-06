@@ -38,7 +38,7 @@ try:
     if TYPE_CHECKING:
         from cohere import StreamedChatResponse
 except ImportError:
-    raise DidNotEnable("Cohere not installed")
+    raise DidNotEnable("Cohere not installed or incompatible")
 
 try:
     # cohere 5.9.3+

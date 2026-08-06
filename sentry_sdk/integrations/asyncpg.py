@@ -28,7 +28,7 @@ try:
     )
 
 except ImportError:
-    raise DidNotEnable("asyncpg not installed.")
+    raise DidNotEnable("asyncpg not installed or incompatible")
 
 
 class AsyncPGIntegration(Integration):

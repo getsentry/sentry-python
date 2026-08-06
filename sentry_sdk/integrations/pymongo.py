@@ -18,7 +18,7 @@ try:
     from pymongo import __version__ as PYMONGO_VERSION
     from pymongo import monitoring
 except ImportError:
-    raise DidNotEnable("Pymongo not installed")
+    raise DidNotEnable("Pymongo not installed or incompatible")
 
 from typing import TYPE_CHECKING
 

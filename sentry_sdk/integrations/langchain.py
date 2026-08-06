@@ -56,7 +56,7 @@ try:
     from langchain_core.outputs import ChatGeneration, LLMResult
 
 except ImportError:
-    raise DidNotEnable("langchain not installed")
+    raise DidNotEnable("langchain not installed or incompatible")
 
 
 try:

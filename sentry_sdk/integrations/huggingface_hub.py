@@ -31,7 +31,7 @@ try:
     import huggingface_hub.inference._client
     from huggingface_hub import __version__ as HUGGINGFACE_HUB_VERSION
 except ImportError:
-    raise DidNotEnable("Huggingface not installed")
+    raise DidNotEnable("Huggingface not installed or incompatible")
 
 
 class HuggingfaceHubIntegration(Integration):

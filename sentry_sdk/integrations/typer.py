@@ -22,7 +22,7 @@ try:
     from typer import __version__ as TYPER_VERSION
     from typer.main import except_hook
 except ImportError:
-    raise DidNotEnable("Typer not installed")
+    raise DidNotEnable("Typer not installed or incompatible")
 
 
 class TyperIntegration(Integration):

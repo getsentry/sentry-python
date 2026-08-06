@@ -70,7 +70,7 @@ try:
     from starlette.types import ASGIApp, Receive, Send
     from starlette.types import Scope as StarletteScope
 except ImportError:
-    raise DidNotEnable("Starlette is not installed")
+    raise DidNotEnable("Starlette is not installed or incompatible")
 
 try:
     # Optional dependency of Starlette to parse form data.

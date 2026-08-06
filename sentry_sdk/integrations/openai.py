@@ -99,7 +99,7 @@ try:
             ChatCompletionMessageParam,
         )
 except ImportError:
-    raise DidNotEnable("OpenAI not installed")
+    raise DidNotEnable("OpenAI not installed or incompatible")
 
 RESPONSES_API_ENABLED = True
 try:

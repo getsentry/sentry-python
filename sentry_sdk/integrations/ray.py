@@ -21,7 +21,7 @@ try:
     from ray import __version__ as RAY_VERSION
     from ray import remote
 except ImportError:
-    raise DidNotEnable("Ray not installed.")
+    raise DidNotEnable("Ray not installed or incompatible")
 
 from typing import TYPE_CHECKING
 

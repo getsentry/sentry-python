@@ -50,7 +50,7 @@ try:
         websocket_started,
     )
 except ImportError:
-    raise DidNotEnable("Quart is not installed")
+    raise DidNotEnable("Quart is not installed or incompatible")
 
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 

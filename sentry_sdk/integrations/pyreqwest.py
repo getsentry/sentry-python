@@ -42,7 +42,7 @@ try:
         SyncResponse,
     )
 except ImportError:
-    raise DidNotEnable("pyreqwest not installed or incompatible version installed")
+    raise DidNotEnable("pyreqwest not installed or incompatible")
 
 
 class PyreqwestIntegration(Integration):

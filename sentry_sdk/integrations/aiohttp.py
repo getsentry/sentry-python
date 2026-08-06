@@ -62,7 +62,7 @@ try:
     from aiohttp import __version__ as AIOHTTP_VERSION
     from aiohttp.web import Application, HTTPException, UrlDispatcher
 except ImportError:
-    raise DidNotEnable("AIOHTTP not installed")
+    raise DidNotEnable("AIOHTTP not installed or incompatible")
 
 from typing import TYPE_CHECKING
 

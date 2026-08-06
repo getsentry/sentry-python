@@ -17,7 +17,7 @@ try:
     from sqlalchemy.engine import Engine  # type: ignore
     from sqlalchemy.event import listen  # type: ignore
 except ImportError:
-    raise DidNotEnable("SQLAlchemy not installed.")
+    raise DidNotEnable("SQLAlchemy not installed or incompatible")
 
 from typing import TYPE_CHECKING
 

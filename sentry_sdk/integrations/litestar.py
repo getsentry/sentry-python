@@ -31,7 +31,7 @@ try:
     from litestar.middleware import DefineMiddleware  # type: ignore
     from litestar.routes.http import HTTPRoute  # type: ignore
 except ImportError:
-    raise DidNotEnable("Litestar is not installed")
+    raise DidNotEnable("Litestar is not installed or incompatible")
 
 from typing import TYPE_CHECKING
 

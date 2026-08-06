@@ -28,7 +28,7 @@ try:
     )
     from chalice.app import RestAPIEventHandler
 except ImportError:
-    raise DidNotEnable("Chalice is not installed")
+    raise DidNotEnable("Chalice is not installed or incompatible")
 
 from typing import TYPE_CHECKING
 
