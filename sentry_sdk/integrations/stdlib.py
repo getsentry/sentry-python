@@ -196,17 +196,12 @@ def _install_httplib() -> None:
         try:
             rv = real_putrequest(self, method, url, *args, **kwargs)
         except BaseException:
-            self._sentrysdk_trace_headers = ()  # type: ignore[attr-defined]
             self._sentrysdk_trace_url = None  # type: ignore[attr-defined]
             raise
 
         if should_propagate_trace(client, real_url):
-            self._sentrysdk_trace_headers = tuple(  # type: ignore[attr-defined]
-                sentry_sdk.get_current_scope().iter_trace_propagation_headers(span=span)
-            )
             self._sentrysdk_trace_url = real_url  # type: ignore[attr-defined]
         else:
-            self._sentrysdk_trace_headers = ()  # type: ignore[attr-defined]
             self._sentrysdk_trace_url = None  # type: ignore[attr-defined]
 
         self._sentrysdk_span = span  # type: ignore[attr-defined]
@@ -214,16 +209,21 @@ def _install_httplib() -> None:
         return rv
 
     def endheaders(self: "HTTPConnection", *args: "Any", **kwargs: "Any") -> "Any":
-        trace_headers = getattr(self, "_sentrysdk_trace_headers", ())
         real_url = getattr(self, "_sentrysdk_trace_url", None)
+        span = getattr(self, "_sentrysdk_span", None)
 
         try:
-            if trace_headers:
+            if real_url is not None:
                 request_buffer = getattr(self, "_buffer", None)
                 existing_headers = _request_header_names(request_buffer)
                 signed_headers = _aws_sigv4_signed_headers(request_buffer)
 
-                for header_name, header_value in trace_headers:
+                for (
+                    header_name,
+                    header_value,
+                ) in sentry_sdk.get_current_scope().iter_trace_propagation_headers(
+                    span=span
+                ):
                     normalized_header = header_name.lower()
                     # preserve signed headers and avoid duplicate `sentry-trace`.
                     if normalized_header in existing_headers and (
@@ -241,7 +241,6 @@ def _install_httplib() -> None:
 
             return real_endheaders(self, *args, **kwargs)
         finally:
-            self._sentrysdk_trace_headers = ()  # type: ignore[attr-defined]
             self._sentrysdk_trace_url = None  # type: ignore[attr-defined]
 
     def getresponse(self: "HTTPConnection", *args: "Any", **kwargs: "Any") -> "Any":
