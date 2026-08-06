@@ -314,7 +314,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                     usage = None
 
                     with capture_internal_exceptions():
-                        for chunk in cast(Iterable[ChatCompletionStreamOutput], res):
+                        for chunk in cast("Iterable[ChatCompletionStreamOutput]", res):
                             if hasattr(chunk, "model") and chunk.model is not None:
                                 response_model = chunk.model
 
