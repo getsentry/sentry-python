@@ -71,7 +71,7 @@ def _aws_sigv4_signed_headers(buffer: "Optional[List[bytes]]") -> "Set[str]":
 
         value = value.lstrip()
         if not value.startswith((b"AWS4-HMAC-SHA256", b"AWS4-ECDSA-P256-SHA256")):
-            return set()
+            continue
 
         for part in value.split(b","):
             part = part.strip()
