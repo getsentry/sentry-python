@@ -7,7 +7,6 @@ import pytest
 import sentry_sdk
 from sentry_sdk.integrations.falcon import FalconIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
-from sentry_sdk.utils import parse_version
 
 try:
     import falcon.asgi
@@ -15,9 +14,6 @@ except ImportError:
     pass
 else:
     import falcon.inspect  # We only need this module for the ASGI test
-
-
-FALCON_VERSION = parse_version(falcon.__version__)
 
 
 @pytest.fixture

@@ -4,7 +4,6 @@ from io import BytesIO
 
 import pyramid.testing
 import pytest
-from packaging.version import Version
 from pyramid.authorization import ACLAuthorizationPolicy
 from pyramid.response import Response
 from werkzeug.test import Client
@@ -16,19 +15,6 @@ from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from sentry_sdk.traces import SpanStatus
 from tests.conftest import unpack_werkzeug_response
 from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
-
-try:
-    from importlib.metadata import version
-
-    PYRAMID_VERSION = Version(version("pyramid")).release
-
-except ImportError:
-    # < py3.8
-    import pkg_resources
-
-    PYRAMID_VERSION = tuple(
-        map(int, pkg_resources.get_distribution("pyramid").version.split("."))
-    )
 
 
 def hi(request):
