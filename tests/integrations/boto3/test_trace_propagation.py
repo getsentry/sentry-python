@@ -31,21 +31,6 @@ def _start_server():
     return server, thread
 
 
-def _head_object(client, span_streaming):
-    if span_streaming:
-        with sentry_sdk.traces.start_span(name="incoming"):  # type: ignore[attr-defined]
-            return client.head_object(
-                Bucket="example-bucket",
-                Key="example-key",
-            )
-
-    with sentry_sdk.start_transaction(name="incoming", sampled=True):
-        return client.head_object(
-            Bucket="example-bucket",
-            Key="example-key",
-        )
-
-
 @pytest.mark.parametrize("span_streaming", [False, True])
 def test_botocore_merges_propagation_before_sigv4_signing(sentry_init, span_streaming):
     sentry_init(
@@ -88,7 +73,20 @@ def test_botocore_merges_propagation_before_sigv4_signing(sentry_init, span_stre
             "before-sign", capture_headers_after_instrumentation
         )
 
-        response = _head_object(client, span_streaming)
+        if span_streaming:
+            with sentry_sdk.traces.start_span(  # type: ignore[attr-defined]
+                name="incoming"
+            ):
+                response = client.head_object(
+                    Bucket="example-bucket",
+                    Key="example-key",
+                )
+        else:
+            with sentry_sdk.start_transaction(name="incoming", sampled=True):
+                response = client.head_object(
+                    Bucket="example-bucket",
+                    Key="example-key",
+                )
 
         assert response["ResponseMetadata"]["HTTPStatusCode"] == 200
         headers = _AwsRequestHandler.requests[-1]
@@ -152,7 +150,20 @@ def test_botocore_without_boto3_integration_preserves_signed_baggage(
         # register `before-sign` handler that third-party signed baggage.
         client.meta.events.register("before-sign", _inject_signed_baggage)
 
-        response = _head_object(client, span_streaming)
+        if span_streaming:
+            with sentry_sdk.traces.start_span(  # type: ignore[attr-defined]
+                name="incoming"
+            ):
+                response = client.head_object(
+                    Bucket="example-bucket",
+                    Key="example-key",
+                )
+        else:
+            with sentry_sdk.start_transaction(name="incoming", sampled=True):
+                response = client.head_object(
+                    Bucket="example-bucket",
+                    Key="example-key",
+                )
 
         assert response["ResponseMetadata"]["HTTPStatusCode"] == 200
         headers = _AwsRequestHandler.requests[-1]
