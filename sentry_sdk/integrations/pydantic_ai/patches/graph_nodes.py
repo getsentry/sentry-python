@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
 from functools import wraps
 
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
+from sentry_sdk.traces import StreamedSpan
 
 from ..spans import (
     ai_client_span,
@@ -59,9 +61,19 @@ def _patch_graph_nodes() -> None:
 
     @wraps(original_model_request_run)
     async def wrapped_model_request_run(self: "Any", ctx: "Any") -> "Any":
+        did_stream = getattr(self, "_did_stream", None)
+        cached_result = getattr(self, "_result", None)
+        if did_stream or cached_result is not None:
+            return await original_model_request_run(self, ctx)
+
         messages, model, model_settings = _extract_span_data(self, ctx)
 
         with ai_client_span(messages, None, model, model_settings) as span:
+            if isinstance(span, StreamedSpan):
+                span.set_attribute(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
+            else:
+                span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
+
             result = await original_model_request_run(self, ctx)
 
             # Extract response from result if available
@@ -85,10 +97,20 @@ def _patch_graph_nodes() -> None:
         @asynccontextmanager
         @wraps(original_stream_method)
         async def wrapped_model_request_stream(self: "Any", ctx: "Any") -> "Any":
+            did_stream = getattr(self, "_did_stream", None)
+            if did_stream:
+                async with original_stream_method(self, ctx) as stream:
+                    yield stream
+
             messages, model, model_settings = _extract_span_data(self, ctx)
 
             # Create chat span for streaming request
             with ai_client_span(messages, None, model, model_settings) as span:
+                if isinstance(span, StreamedSpan):
+                    span.set_attribute(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
+                else:
+                    span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, False)
+
                 # Call the original stream method
                 async with original_stream_method(self, ctx) as stream:
                     yield stream

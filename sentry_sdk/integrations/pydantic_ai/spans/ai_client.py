@@ -23,7 +23,6 @@ from ..utils import (
     _set_model_data,
     _should_send_prompts,
     get_current_agent,
-    get_is_streaming,
 )
 from .utils import (
     _serialize_binary_content_item,
@@ -314,7 +313,6 @@ def ai_client_span(
                 "sentry.op": OP.GEN_AI_CHAT,
                 "sentry.origin": SPAN_ORIGIN,
                 SPANDATA.GEN_AI_OPERATION_NAME: "chat",
-                SPANDATA.GEN_AI_RESPONSE_STREAMING: get_is_streaming(),
             },
         )
     else:
@@ -325,8 +323,6 @@ def ai_client_span(
         )
 
         span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
-        # Set streaming flag from contextvar
-        span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, get_is_streaming())
 
     _set_agent_data(span, agent)
     _set_model_data(span, model, model_settings)

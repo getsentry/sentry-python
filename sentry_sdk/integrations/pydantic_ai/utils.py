@@ -18,10 +18,10 @@ _agent_context_stack: "ContextVar[list[dict[str, Any]]]" = ContextVar(
 )
 
 
-def push_agent(agent: "Any", is_streaming: bool = False) -> None:
-    """Push an agent context onto the stack along with its streaming flag."""
+def push_agent(agent: "Any") -> None:
+    """Push an agent context onto the stack."""
     stack = _agent_context_stack.get().copy()
-    stack.append({"agent": agent, "is_streaming": is_streaming})
+    stack.append(agent)
     _agent_context_stack.set(stack)
 
 
@@ -37,16 +37,8 @@ def get_current_agent() -> "Any":
     """Get the current agent from the contextvar stack."""
     stack = _agent_context_stack.get()
     if stack:
-        return stack[-1]["agent"]
+        return stack[-1]
     return None
-
-
-def get_is_streaming() -> bool:
-    """Get the streaming flag from the contextvar stack."""
-    stack = _agent_context_stack.get()
-    if stack:
-        return stack[-1].get("is_streaming", False)
-    return False
 
 
 def _should_send_prompts() -> bool:
