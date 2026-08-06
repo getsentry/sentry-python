@@ -30,7 +30,7 @@ try:
         is_async_callable,
     )
 except ImportError:
-    raise DidNotEnable("Starlite is not installed")
+    raise DidNotEnable("Starlite is not installed or incompatible")
 
 from typing import TYPE_CHECKING
 

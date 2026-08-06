@@ -23,13 +23,13 @@ try:
         _get_cached_request_body_attribute,
     )
 except DidNotEnable:
-    raise DidNotEnable("Starlette is not installed")
+    raise DidNotEnable("Starlette is not installed or incompatible")
 
 try:
     import fastapi  # type: ignore
     from fastapi import __version__ as FASTAPI_VERSION
 except ImportError:
-    raise DidNotEnable("FastAPI is not installed")
+    raise DidNotEnable("FastAPI is not installed or incompatible")
 
 
 _DEFAULT_TRANSACTION_NAME = "generic FastAPI request"

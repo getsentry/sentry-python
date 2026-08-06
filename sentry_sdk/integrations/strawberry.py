@@ -36,7 +36,7 @@ try:
     )
     from strawberry.http import async_base_view, sync_base_view
 except ImportError:
-    raise DidNotEnable("strawberry-graphql is not installed")
+    raise DidNotEnable("strawberry-graphql is not installed or incompatible")
 
 try:
     from strawberry.extensions.tracing import (

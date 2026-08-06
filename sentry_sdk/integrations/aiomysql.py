@@ -22,7 +22,7 @@ try:
     from aiomysql.connection import Connection  # type: ignore[import-not-found]
     from aiomysql.cursors import Cursor  # type: ignore[import-not-found]
 except ImportError:
-    raise DidNotEnable("aiomysql not installed.")
+    raise DidNotEnable("aiomysql not installed or incompatible")
 
 
 class AioMySQLIntegration(Integration):

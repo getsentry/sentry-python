@@ -40,7 +40,7 @@ try:
     )
 
 except ImportError:
-    raise DidNotEnable("clickhouse-driver not installed.")
+    raise DidNotEnable("clickhouse-driver not installed or incompatible")
 
 
 class ClickhouseDriverIntegration(Integration):

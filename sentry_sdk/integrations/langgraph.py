@@ -26,7 +26,7 @@ try:
     from langgraph.graph import StateGraph
     from langgraph.pregel import Pregel
 except ImportError:
-    raise DidNotEnable("langgraph not installed")
+    raise DidNotEnable("langgraph not installed or incompatible")
 
 
 class LanggraphIntegration(Integration):

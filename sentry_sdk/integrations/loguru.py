@@ -24,7 +24,7 @@ try:
     if TYPE_CHECKING:
         from loguru import Message
 except ImportError:
-    raise DidNotEnable("LOGURU is not installed")
+    raise DidNotEnable("LOGURU is not installed or incompatible")
 
 
 class LoggingLevels(enum.IntEnum):

@@ -29,7 +29,7 @@ try:
     from dramatiq.message import Message
     from dramatiq.middleware import Middleware, default_middleware
 except ImportError:
-    raise DidNotEnable("Dramatiq is not installed")
+    raise DidNotEnable("Dramatiq is not installed or incompatible")
 
 from typing import TYPE_CHECKING
 

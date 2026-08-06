@@ -15,7 +15,7 @@ try:
         from ldclient.evaluation import EvaluationDetail
         from ldclient.hook import EvaluationSeriesContext
 except ImportError:
-    raise DidNotEnable("LaunchDarkly is not installed")
+    raise DidNotEnable("LaunchDarkly is not installed or incompatible")
 
 
 class LaunchDarklyIntegration(Integration):

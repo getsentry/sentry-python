@@ -35,7 +35,7 @@ try:
             request_ctx,
         )
 except ImportError:
-    raise DidNotEnable("MCP SDK not installed")
+    raise DidNotEnable("MCP SDK not installed or incompatible")
 
 try:
     from fastmcp import FastMCP  # type: ignore[import-not-found]
