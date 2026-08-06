@@ -81,19 +81,12 @@ def setup_continuous_profiler(
         # them to spawn a native thread for sampling.
         # Instead we default to the GeventContinuousScheduler which is capable of
         # spawning native threads within gevent.
-        default_profiler_mode = GeventContinuousScheduler.mode
+        profiler_mode = GeventContinuousScheduler.mode
     else:
-        default_profiler_mode = ThreadContinuousScheduler.mode
+        profiler_mode = ThreadContinuousScheduler.mode
 
     if options.get("profiler_mode") is not None:
         profiler_mode = options["profiler_mode"]
-    else:
-        # TODO: deprecate this and just use the existing `profiler_mode`
-        experiments = options.get("_experiments", {})
-
-        profiler_mode = (
-            experiments.get("continuous_profiling_mode") or default_profiler_mode
-        )
 
     frequency = DEFAULT_SAMPLING_FREQUENCY
 
