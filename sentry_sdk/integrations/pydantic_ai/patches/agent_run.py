@@ -10,7 +10,7 @@ from ..spans import invoke_agent_span, update_invoke_agent_span
 from ..utils import _capture_exception, pop_agent, push_agent
 
 try:
-    from pydantic_ai.agent import Agent  # type: ignore
+    from pydantic_ai.agent import Agent
 except ImportError:
     raise DidNotEnable("pydantic-ai not installed")
 
@@ -192,7 +192,7 @@ def _patch_agent_run() -> None:
     original_run_stream = Agent.run_stream
 
     # Wrap and apply patches for non-streaming methods
-    Agent.run = _create_run_wrapper(original_run, is_streaming=False)
+    Agent.run = _create_run_wrapper(original_run, is_streaming=False)  # type: ignore[method-assign]
 
     # Wrap and apply patches for streaming methods
-    Agent.run_stream = _create_streaming_wrapper(original_run_stream)
+    Agent.run_stream = _create_streaming_wrapper(original_run_stream)  # type: ignore[method-assign]

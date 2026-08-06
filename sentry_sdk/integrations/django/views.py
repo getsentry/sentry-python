@@ -9,17 +9,7 @@ from sentry_sdk.tracing_utils import has_span_streaming_enabled
 if TYPE_CHECKING:
     from typing import Any
 
-
-try:
-    from asyncio import iscoroutinefunction
-except ImportError:
-    iscoroutinefunction = None  # type: ignore
-
-
-try:
-    from sentry_sdk.integrations.django.asgi import wrap_async_view
-except (ImportError, SyntaxError):
-    wrap_async_view = None  # type: ignore
+from sentry_sdk.integrations.django.asgi import iscoroutinefunction, wrap_async_view
 
 
 def patch_views() -> None:
@@ -62,21 +52,13 @@ def patch_views() -> None:
         # efficient way to wrap views (or build a cache?)
 
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
-        if integration is not None:
-            is_async_view = (
-                iscoroutinefunction is not None
-                and wrap_async_view is not None
-                and iscoroutinefunction(callback)
-            )
-            if is_async_view:
-                sentry_wrapped_callback = wrap_async_view(callback)
-            else:
-                sentry_wrapped_callback = _wrap_sync_view(callback)
+        if integration is None:
+            return callback
 
-        else:
-            sentry_wrapped_callback = callback
+        if iscoroutinefunction(callback):
+            return wrap_async_view(callback)
 
-        return sentry_wrapped_callback
+        return _wrap_sync_view(callback)
 
     SimpleTemplateResponse.render = sentry_patched_render
     BaseHandler.make_view_atomic = sentry_patched_make_view_atomic
