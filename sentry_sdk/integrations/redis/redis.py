@@ -6,8 +6,6 @@ https://github.com/redis/redis-py
 
 from typing import TYPE_CHECKING
 
-import redis.asyncio
-
 from sentry_sdk.integrations.redis._async_common import (
     patch_redis_async_client,
     patch_redis_async_pipeline,
@@ -27,6 +25,8 @@ def _get_redis_command_args(command: "Any") -> "Sequence[Any]":
 
 
 def _patch_redis(StrictRedis: "Any", client: "Any") -> None:  # noqa: N803
+    import redis.asyncio
+
     patch_redis_client(
         StrictRedis,
         is_cluster=False,
