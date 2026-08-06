@@ -165,7 +165,7 @@ GROUPS = {
         "loguru",
         "otlp",
         "pure_eval",
-        "trytond",
+        "trytond_wsgi",
         "typer",
         "integration_deactivation",
         "shadowed_module",

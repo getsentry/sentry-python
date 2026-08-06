@@ -49,10 +49,10 @@ jobs:
         run: |
           set -x # print commands that are executed
           ./scripts/runtox.sh "py${{ matrix.python-version }}-pure_eval"
-      - name: Test trytond
+      - name: Test trytond_wsgi
         run: |
           set -x # print commands that are executed
-          ./scripts/runtox.sh "py${{ matrix.python-version }}-trytond"
+          ./scripts/runtox.sh "py${{ matrix.python-version }}-trytond_wsgi"
       - name: Test typer
         run: |
           set -x # print commands that are executed
