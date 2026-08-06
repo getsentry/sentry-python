@@ -253,14 +253,13 @@ TEST_SUITE_CONFIG = {
             "*": [
                 "pytest-asyncio",
                 "openai",
-                "google-genai",
                 "tiktoken",
                 "langchain-openai",
-                "langchain-google-genai",
             ],
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
             ">=1.0": ["langchain-classic"],
+            ">=1.1.2": ["google-genai", "langchain-google-genai>=4"],
         },
         "python": {
             "<1.0": "<3.14",  # https://github.com/langchain-ai/langchain/issues/33449#issuecomment-3408876631
@@ -273,13 +272,11 @@ TEST_SUITE_CONFIG = {
             "*": [
                 "pytest-asyncio",
                 "openai",
-                "google-genai",
                 "langchain-openai",
-                "langchain-google-genai",
             ],
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
-            ">=1.0": ["langchain-classic"],
+            ">=1.1.2": ["google-genai", "langchain-google-genai>=4"],
         },
         "python": {
             "<1.0": "<3.14",  # https://github.com/langchain-ai/langchain/issues/33449#issuecomment-3408876631

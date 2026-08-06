@@ -20,7 +20,13 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessageChunk, BaseMessage
 from langchain_core.outputs import ChatGenerationChunk, ChatResult
 from langchain_core.runnables import RunnableConfig
-from langchain_google_genai import ChatGoogleGenerativeAI
+
+try:
+    import google
+    from langchain_google_genai import ChatGoogleGenerativeAI
+except ImportError:
+    ChatGoogleGenerativeAI = None
+    google = None
 
 import sentry_sdk
 from sentry_sdk import start_transaction
@@ -45,13 +51,6 @@ except ImportError:
     # langchain <v1
     from langchain.agents import AgentExecutor, create_openai_tools_agent, tool
 
-from google.genai.types import (
-    Candidate,
-    Content,
-    GenerateContentResponse,
-    GenerateContentResponseUsageMetadata,
-    Part,
-)
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from openai.types.chat.chat_completion_chunk import (
@@ -241,25 +240,25 @@ def streaming_chat_completions_model_responses():
 
 @pytest.fixture
 def nonstreaming_multi_candidate_google_genai_model_response():
-    return GenerateContentResponse(
+    return google.genai.types.GenerateContentResponse(
         response_id="resp_123",
         candidates=[
-            Candidate(
-                content=Content(
+            google.genai.types.Candidate(
+                content=google.genai.types.Content(
                     role="model",
                     parts=[
-                        Part(
+                        google.genai.types.Part(
                             text="Hello, how can I help you?",
                         )
                     ],
                 ),
                 finish_reason="STOP",
             ),
-            Candidate(
-                content=Content(
+            google.genai.types.Candidate(
+                content=google.genai.types.Content(
                     role="model",
                     parts=[
-                        Part(
+                        google.genai.types.Part(
                             text="Hello, how are you?",
                         )
                     ],
@@ -268,7 +267,7 @@ def nonstreaming_multi_candidate_google_genai_model_response():
             ),
         ],
         model_version="gemini/gemini-pro",
-        usage_metadata=GenerateContentResponseUsageMetadata(
+        usage_metadata=google.genai.types.GenerateContentResponseUsageMetadata(
             prompt_token_count=10,
             candidates_token_count=20,
             total_token_count=30,
@@ -532,6 +531,10 @@ def test_langchain_chat_with_run_name(
         )
 
 
+@pytest.mark.skipif(
+    ChatGoogleGenerativeAI is None,
+    reason="Requires langchain-google-genai.",
+)
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_langchain_multi_choice_response(
