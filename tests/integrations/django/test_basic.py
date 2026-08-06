@@ -1369,7 +1369,6 @@ def test_request_body(
     assert "" not in event
 
 
-@pytest.mark.xfail
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_read_request(
     sentry_init,
