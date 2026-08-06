@@ -1,18 +1,10 @@
-import inspect
-import sys
-import warnings
 from contextvars import ContextVar
-from functools import wraps
 from typing import TYPE_CHECKING
 
-import sentry_sdk.utils
-from sentry_sdk import start_span
 from sentry_sdk.ai.utils import _set_span_data_attribute
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
-from sentry_sdk.utils import capture_internal_exceptions, reraise
 
 if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable, Optional, TypeVar, Union
@@ -30,160 +22,6 @@ def set_ai_pipeline_name(name: "Optional[str]") -> None:
 
 def get_ai_pipeline_name() -> "Optional[str]":
     return _ai_pipeline_name.get()
-
-
-def ai_track(description: str, **span_kwargs: "Any") -> "Callable[[F], F]":
-    warnings.warn(
-        "sentry_sdk.ai.ai_track is deprecated and will be removed in version 3.0 of sentry-sdk. "
-        "Use the manual span API instead, e.g. sentry_sdk.start_span().",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
-    def decorator(f: "F") -> "F":
-        def sync_wrapped(*args: "Any", **kwargs: "Any") -> "Any":
-            client = sentry_sdk.get_client()
-
-            curr_pipeline = _ai_pipeline_name.get()
-            op = span_kwargs.pop("op", "ai.run" if curr_pipeline else "ai.pipeline")
-
-            if has_span_streaming_enabled(client.options):
-                with sentry_sdk.traces.start_span(
-                    name=description, attributes={"sentry.op": op}
-                ) as span:
-                    for k, v in kwargs.pop("sentry_tags", {}).items():
-                        span.set_attribute(k, v)
-                    for k, v in kwargs.pop("sentry_data", {}).items():
-                        span.set_attribute(k, v)
-
-                    if curr_pipeline:
-                        span.set_attribute(SPANDATA.GEN_AI_PIPELINE_NAME, curr_pipeline)
-                        return f(*args, **kwargs)
-                    else:
-                        _ai_pipeline_name.set(description)
-                        try:
-                            res = f(*args, **kwargs)
-                        except Exception as e:
-                            exc_info = sys.exc_info()
-                            with capture_internal_exceptions():
-                                event, hint = sentry_sdk.utils.event_from_exception(
-                                    e,
-                                    client_options=sentry_sdk.get_client().options,
-                                    mechanism={
-                                        "type": "ai_monitoring",
-                                        "handled": False,
-                                    },
-                                )
-                                sentry_sdk.capture_event(event, hint=hint)
-                            reraise(*exc_info)
-                        finally:
-                            _ai_pipeline_name.set(None)
-                        return res
-
-            else:
-                with start_span(name=description, op=op, **span_kwargs) as span:
-                    for k, v in kwargs.pop("sentry_tags", {}).items():
-                        span.set_tag(k, v)
-                    for k, v in kwargs.pop("sentry_data", {}).items():
-                        span.set_data(k, v)
-                    if curr_pipeline:
-                        span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, curr_pipeline)
-                        return f(*args, **kwargs)
-                    else:
-                        _ai_pipeline_name.set(description)
-                        try:
-                            res = f(*args, **kwargs)
-                        except Exception as e:
-                            exc_info = sys.exc_info()
-                            with capture_internal_exceptions():
-                                event, hint = sentry_sdk.utils.event_from_exception(
-                                    e,
-                                    client_options=sentry_sdk.get_client().options,
-                                    mechanism={
-                                        "type": "ai_monitoring",
-                                        "handled": False,
-                                    },
-                                )
-                                sentry_sdk.capture_event(event, hint=hint)
-                            reraise(*exc_info)
-                        finally:
-                            _ai_pipeline_name.set(None)
-                        return res
-
-        async def async_wrapped(*args: "Any", **kwargs: "Any") -> "Any":
-            client = sentry_sdk.get_client()
-
-            curr_pipeline = _ai_pipeline_name.get()
-            op = span_kwargs.pop("op", "ai.run" if curr_pipeline else "ai.pipeline")
-
-            if has_span_streaming_enabled(client.options):
-                with sentry_sdk.traces.start_span(
-                    name=description, attributes={"sentry.op": op}
-                ) as span:
-                    for k, v in kwargs.pop("sentry_tags", {}).items():
-                        span.set_attribute(k, v)
-                    for k, v in kwargs.pop("sentry_data", {}).items():
-                        span.set_attribute(k, v)
-
-                    if curr_pipeline:
-                        span.set_attribute(SPANDATA.GEN_AI_PIPELINE_NAME, curr_pipeline)
-                        return await f(*args, **kwargs)
-                    else:
-                        _ai_pipeline_name.set(description)
-                        try:
-                            res = await f(*args, **kwargs)
-                        except Exception as e:
-                            exc_info = sys.exc_info()
-                            with capture_internal_exceptions():
-                                event, hint = sentry_sdk.utils.event_from_exception(
-                                    e,
-                                    client_options=sentry_sdk.get_client().options,
-                                    mechanism={
-                                        "type": "ai_monitoring",
-                                        "handled": False,
-                                    },
-                                )
-                                sentry_sdk.capture_event(event, hint=hint)
-                            reraise(*exc_info)
-                        finally:
-                            _ai_pipeline_name.set(None)
-                        return res
-            else:
-                with start_span(name=description, op=op, **span_kwargs) as span:
-                    for k, v in kwargs.pop("sentry_tags", {}).items():
-                        span.set_tag(k, v)
-                    for k, v in kwargs.pop("sentry_data", {}).items():
-                        span.set_data(k, v)
-                    if curr_pipeline:
-                        span.set_data(SPANDATA.GEN_AI_PIPELINE_NAME, curr_pipeline)
-                        return await f(*args, **kwargs)
-                    else:
-                        _ai_pipeline_name.set(description)
-                        try:
-                            res = await f(*args, **kwargs)
-                        except Exception as e:
-                            exc_info = sys.exc_info()
-                            with capture_internal_exceptions():
-                                event, hint = sentry_sdk.utils.event_from_exception(
-                                    e,
-                                    client_options=sentry_sdk.get_client().options,
-                                    mechanism={
-                                        "type": "ai_monitoring",
-                                        "handled": False,
-                                    },
-                                )
-                                sentry_sdk.capture_event(event, hint=hint)
-                            reraise(*exc_info)
-                        finally:
-                            _ai_pipeline_name.set(None)
-                        return res
-
-        if inspect.iscoroutinefunction(f):
-            return wraps(f)(async_wrapped)  # type: ignore
-        else:
-            return wraps(f)(sync_wrapped)  # type: ignore
-
-    return decorator
 
 
 def record_token_usage(
