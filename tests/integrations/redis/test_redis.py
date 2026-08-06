@@ -502,7 +502,7 @@ def test_breadcrumbs(sentry_init, capture_events):
     crumbs = event["breadcrumbs"]["values"]
 
     assert crumbs[0] == {
-        "message": "SET 'somekey1' 'aaaaaaaaaaa...",
+        "message": "SET 'somekey1' '" + 30 * "a" + "'",
         "type": "redis",
         "category": "redis",
         "data": {
