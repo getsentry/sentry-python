@@ -1736,7 +1736,6 @@ def test_render_spans(
             )
 
 
-@pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
 def test_render_spans_queryset_in_data(sentry_init, client, capture_events):
@@ -2123,7 +2122,6 @@ def test_csrf(sentry_init, client):
     assert content == b"ok"
 
 
-@pytest.mark.skipif(DJANGO_VERSION < (2, 0), reason="Requires Django > 2.0")
 @pytest.mark.parametrize("middleware_spans", [False, True])
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_custom_urlconf_middleware(
@@ -2248,7 +2246,6 @@ def test_get_receiver_name():
         assert name == "partial(<function " + a_partial.func.__name__ + ">)"
 
 
-@pytest.mark.skipif(DJANGO_VERSION <= (1, 11), reason="Requires Django > 1.11")
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_span_origin(
     sentry_init,

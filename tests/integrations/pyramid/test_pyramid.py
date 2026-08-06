@@ -348,10 +348,6 @@ def test_errorhandler_ok(
     assert not errors
 
 
-@pytest.mark.skipif(
-    PYRAMID_VERSION < (1, 9),
-    reason="We don't have the right hooks in older Pyramid versions",
-)
 def test_errorhandler_500(
     sentry_init, pyramid_config, capture_exceptions, route, get_client
 ):

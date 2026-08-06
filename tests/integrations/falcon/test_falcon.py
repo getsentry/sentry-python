@@ -647,9 +647,6 @@ def test_does_not_leak_scope(
     assert not sentry_sdk.get_isolation_scope()._tags["request_data"]
 
 
-@pytest.mark.skipif(
-    not hasattr(falcon, "asgi"), reason="This Falcon version lacks ASGI support."
-)
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_falcon_not_breaking_asgi(sentry_init, span_streaming):
     """
@@ -672,10 +669,6 @@ def test_falcon_not_breaking_asgi(sentry_init, span_streaming):
         pytest.fail("Falcon integration causing errors in ASGI apps.")
 
 
-@pytest.mark.skipif(
-    (FALCON_VERSION or ()) < (3,),
-    reason="The Sentry Falcon integration only supports custom error handlers on Falcon 3+",
-)
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_falcon_custom_error_handler(
     sentry_init,

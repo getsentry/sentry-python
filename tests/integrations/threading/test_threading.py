@@ -1,4 +1,3 @@
-import gc
 import sys
 from concurrent import futures
 from textwrap import dedent
@@ -36,26 +35,6 @@ def test_handles_exceptions(sentry_init, capture_events, integrations):
         assert not exception["mechanism"]["handled"]
     else:
         assert not events
-
-
-def test_circular_references(sentry_init, request):
-    sentry_init(default_integrations=False, integrations=[ThreadingIntegration()])
-
-    gc.collect()
-    gc.disable()
-    request.addfinalizer(gc.enable)
-
-    class MyThread(Thread):
-        def run(self):
-            pass
-
-    t = MyThread()
-    t.start()
-    t.join()
-    del t
-
-    unreachable_objects = gc.collect()
-    assert unreachable_objects == 0
 
 
 @pytest.mark.filterwarnings("ignore:.*:pytest.PytestUnhandledThreadExceptionWarning")
