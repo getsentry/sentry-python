@@ -858,7 +858,7 @@ def test_tool_execution_span(
     send_default_pii,
     include_prompts,
     get_model_response,
-    responses_tool_call_model_responses,
+    nonstreaming_responses_tool_call_model_responses,
     stream_gen_ai_spans,
     span_streaming,
 ):
@@ -875,7 +875,7 @@ def test_tool_execution_span(
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    responses = responses_tool_call_model_responses(
+    responses = nonstreaming_responses_tool_call_model_responses(
         tool_name="get_word_length",
         arguments='{"word": "eudca"}',
         response_model="gpt-4-0613",

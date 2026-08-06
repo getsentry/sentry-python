@@ -1,7 +1,10 @@
 from functools import wraps
 from typing import TYPE_CHECKING
 
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
+from sentry_sdk.scope import should_send_default_pii
+from sentry_sdk.traces import StreamedSpan
 
 from ..spans import execute_tool_span, update_execute_tool_span
 
@@ -52,6 +55,14 @@ async def _get_all_tools(
                     # because it is nested inside this import time code. As if they made it hard to patch on purpose...
                     result = await current_on_invoke(*args, **kwargs)
                     update_execute_tool_span(span, agent, current_tool, result)
+
+                    if not should_send_default_pii():
+                        return result
+
+                    if isinstance(span, StreamedSpan):
+                        span.set_attribute(SPANDATA.GEN_AI_TOOL_INPUT, args[1])
+                    else:
+                        span.set_data(SPANDATA.GEN_AI_TOOL_INPUT, args[1])
 
                 return result
 

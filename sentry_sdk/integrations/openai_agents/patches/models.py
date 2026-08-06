@@ -17,7 +17,7 @@ from sentry_sdk.utils import logger
 from ..spans import ai_client_span, update_ai_client_span
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Optional, Union
+    from typing import Any, Callable, Union
 
     from sentry_sdk.tracing import Span
 
@@ -26,19 +26,6 @@ try:
     from agents.tool import HostedMCPTool
 except ImportError:
     raise DidNotEnable("OpenAI Agents not installed")
-
-
-def _set_response_model_on_agent_span(
-    agent: "agents.Agent", response_model: "Optional[str]"
-) -> None:
-    """Set the response model on the agent's invoke_agent span if available."""
-    if response_model:
-        agent_span = getattr(agent, "_sentry_agent_span", None)
-        if agent_span:
-            if isinstance(agent_span, StreamedSpan):
-                agent_span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
-            else:
-                agent_span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
 
 
 def _inject_trace_propagation_headers(
@@ -123,7 +110,6 @@ def _get_model(
             if response_model:
                 delattr(agent, "_sentry_response_model")
 
-            _set_response_model_on_agent_span(agent, response_model)
             update_ai_client_span(span, result, response_model, agent)
 
         return result
@@ -187,7 +173,6 @@ def _get_model(
                         and streaming_response.model
                         else None
                     )
-                    _set_response_model_on_agent_span(agent, response_model)
                     update_ai_client_span(
                         span, streaming_response, response_model, agent
                     )

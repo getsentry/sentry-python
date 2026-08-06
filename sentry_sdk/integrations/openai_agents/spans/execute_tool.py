@@ -30,8 +30,6 @@ def execute_tool_span(
                 SPANDATA.GEN_AI_TOOL_DESCRIPTION: tool.description,
             },
         )
-
-        set_on_span = span.set_attribute
     else:
         span = sentry_sdk.start_span(
             op=OP.GEN_AI_EXECUTE_TOOL,
@@ -43,12 +41,6 @@ def execute_tool_span(
 
         span.set_data(SPANDATA.GEN_AI_TOOL_NAME, tool.name)
         span.set_data(SPANDATA.GEN_AI_TOOL_DESCRIPTION, tool.description)
-
-        set_on_span = span.set_data
-
-    if should_send_default_pii():
-        input = args[1]
-        set_on_span(SPANDATA.GEN_AI_TOOL_INPUT, input)
 
     return span
 
