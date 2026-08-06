@@ -250,7 +250,14 @@ TEST_SUITE_CONFIG = {
         "package": "langchain",
         "integration_name": "langchain",
         "deps": {
-            "*": ["pytest-asyncio", "openai", "tiktoken", "langchain-openai"],
+            "*": [
+                "pytest-asyncio",
+                "openai",
+                "google-genai",
+                "tiktoken",
+                "langchain-openai",
+                "langchain-google-genai",
+            ],
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
             ">=1.0": ["langchain-classic"],
@@ -263,7 +270,13 @@ TEST_SUITE_CONFIG = {
         "package": "langchain",
         "integration_name": "langchain",
         "deps": {
-            "*": ["pytest-asyncio", "openai", "langchain-openai"],
+            "*": [
+                "pytest-asyncio",
+                "openai",
+                "google-genai",
+                "langchain-openai",
+                "langchain-google-genai",
+            ],
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
             ">=1.0": ["langchain-classic"],
