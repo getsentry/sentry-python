@@ -6,6 +6,12 @@ https://github.com/redis/redis-py
 
 from typing import TYPE_CHECKING
 
+import redis.asyncio
+
+from sentry_sdk.integrations.redis._async_common import (
+    patch_redis_async_client,
+    patch_redis_async_pipeline,
+)
 from sentry_sdk.integrations.redis._sync_common import (
     patch_redis_client,
     patch_redis_pipeline,
@@ -32,36 +38,15 @@ def _patch_redis(StrictRedis: "Any", client: "Any") -> None:  # noqa: N803
         get_command_args_fn=_get_redis_command_args,
         set_db_data_fn=_set_db_data,
     )
-    try:
-        strict_pipeline = client.StrictPipeline
-    except AttributeError:
-        pass
-    else:
-        patch_redis_pipeline(
-            strict_pipeline,
-            is_cluster=False,
-            get_command_args_fn=_get_redis_command_args,
-            set_db_data_fn=_set_db_data,
-        )
 
-    try:
-        import redis.asyncio
-    except ImportError:
-        pass
-    else:
-        from sentry_sdk.integrations.redis._async_common import (
-            patch_redis_async_client,
-            patch_redis_async_pipeline,
-        )
-
-        patch_redis_async_client(
-            redis.asyncio.client.StrictRedis,
-            is_cluster=False,
-            set_db_data_fn=_set_db_data,
-        )
-        patch_redis_async_pipeline(
-            redis.asyncio.client.Pipeline,
-            False,
-            _get_redis_command_args,
-            set_db_data_fn=_set_db_data,
-        )
+    patch_redis_async_client(
+        redis.asyncio.client.StrictRedis,
+        is_cluster=False,
+        set_db_data_fn=_set_db_data,
+    )
+    patch_redis_async_pipeline(
+        redis.asyncio.client.Pipeline,
+        False,
+        _get_redis_command_args,
+        set_db_data_fn=_set_db_data,
+    )

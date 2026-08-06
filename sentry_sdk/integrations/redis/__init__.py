@@ -1,8 +1,6 @@
-import warnings
 from typing import TYPE_CHECKING
 
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.integrations.redis.consts import _DEFAULT_MAX_DATA_SIZE
 from sentry_sdk.integrations.redis.rb import _patch_rb
 from sentry_sdk.integrations.redis.redis import _patch_redis
 from sentry_sdk.integrations.redis.redis_cluster import _patch_redis_cluster
@@ -17,19 +15,9 @@ class RedisIntegration(Integration):
 
     def __init__(
         self,
-        max_data_size: "Optional[int]" = _DEFAULT_MAX_DATA_SIZE,
         cache_prefixes: "Optional[list[str]]" = None,
     ) -> None:
-        self.max_data_size = max_data_size
         self.cache_prefixes = cache_prefixes if cache_prefixes is not None else []
-
-        if max_data_size is not None:
-            warnings.warn(
-                "The `max_data_size` parameter of `RedisIntegration` is "
-                "deprecated and will be removed in version 3.0 of sentry-sdk.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
 
     @staticmethod
     def setup_once() -> None:
