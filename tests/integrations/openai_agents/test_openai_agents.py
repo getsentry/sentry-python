@@ -3071,6 +3071,260 @@ async def test_run_streamed_tool_execution_span(
         assert tool_span["data"]["gen_ai.tool.output"] == "Tool executed with: hello"
 
 
+@pytest.fixture
+def run_tool_agent(
+    sentry_init,
+    capture_events,
+    capture_items,
+    test_agent,
+    get_model_response,
+    nonstreaming_responses_tool_call_model_responses,
+):
+    async def inner(tool, span_streaming, run_kwargs=None, **init_kwargs):
+        client = AsyncOpenAI(api_key="test-key")
+        model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
+        agent_with_tool = test_agent.clone(tools=[tool], model=model)
+
+        responses = nonstreaming_responses_tool_call_model_responses(
+            tool_name=tool.name,
+            arguments='{"message": "hello"}',
+            response_model="gpt-4",
+            response_text="Task completed using the tool",
+            response_ids=iter(["resp_tool_123", "resp_final_123"]),
+            usages=iter(
+                [
+                    ResponseUsage(
+                        input_tokens=10,
+                        input_tokens_details=InputTokensDetails(
+                            cached_tokens=0,
+                            cache_write_tokens=0,
+                        ),
+                        output_tokens=5,
+                        output_tokens_details=OutputTokensDetails(
+                            reasoning_tokens=0,
+                        ),
+                        total_tokens=15,
+                    ),
+                    ResponseUsage(
+                        input_tokens=15,
+                        input_tokens_details=InputTokensDetails(
+                            cached_tokens=0,
+                            cache_write_tokens=0,
+                        ),
+                        output_tokens=10,
+                        output_tokens_details=OutputTokensDetails(
+                            reasoning_tokens=0,
+                        ),
+                        total_tokens=25,
+                    ),
+                ]
+            ),
+        )
+        tool_response = get_model_response(
+            next(responses),
+            serialize_pydantic=True,
+        )
+        final_response = get_model_response(
+            next(responses),
+            serialize_pydantic=True,
+        )
+
+        with patch.object(
+            agent_with_tool.model._client._client,
+            "send",
+            side_effect=[tool_response, final_response],
+        ) as _:
+            sentry_init(
+                integrations=[OpenAIAgentsIntegration()],
+                disabled_integrations=[StdlibIntegration],
+                traces_sample_rate=1.0,
+                stream_gen_ai_spans=span_streaming,
+                trace_lifecycle="stream" if span_streaming else "static",
+                **init_kwargs,
+            )
+
+            items = capture_items("span") if span_streaming else None
+            events = None if span_streaming else capture_events()
+
+            await agents.Runner.run(
+                agent_with_tool,
+                "Please use the tool",
+                run_config=test_run_config,
+                **(run_kwargs or {}),
+            )
+
+        if span_streaming:
+            sentry_sdk.flush()
+            tool_span = next(
+                item.payload
+                for item in items
+                if item.payload["attributes"].get("sentry.op") == OP.GEN_AI_EXECUTE_TOOL
+            )
+            return tool_span, tool_span["attributes"]
+
+        (transaction,) = events
+        tool_span = next(
+            span
+            for span in transaction["spans"]
+            if span["op"] == OP.GEN_AI_EXECUTE_TOOL
+        )
+        return tool_span, tool_span["data"]
+
+    return inner
+
+
+@pytest.fixture
+def simple_test_tool():
+    @agents.function_tool
+    def simple_test_tool(message: str) -> str:
+        """A simple tool"""
+        return f"Tool executed with: {message}"
+
+    return simple_test_tool
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,expect_input,expect_output",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": True}},
+            False,
+            True,
+            True,
+            id="gen-ai-inputs-and-outputs-enabled-overrides-pii-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": False}},
+            True,
+            False,
+            False,
+            id="gen-ai-inputs-and-outputs-disabled-overrides-pii-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": False}},
+            False,
+            True,
+            False,
+            id="gen-ai-only-inputs-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": True}},
+            False,
+            False,
+            True,
+            id="gen-ai-only-outputs-enabled",
+        ),
+        pytest.param(
+            {},
+            False,
+            True,
+            True,
+            id="gen-ai-omitted-defaults-to-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": False}},
+            False,
+            False,
+            False,
+            id="gen-ai-inputs-and-outputs-disabled-and-pii-disabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            False,
+            False,
+            id="no-gen-ai-data-collection-falls-back-to-send-default-pii",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            True,
+            id="no-gen-ai-data-collection-pii-enabled-collects",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_tool_execution_span_data_collection(
+    run_tool_agent,
+    simple_test_tool,
+    data_collection,
+    send_default_pii,
+    expect_input,
+    expect_output,
+    span_streaming,
+):
+    init_kwargs = {"send_default_pii": send_default_pii}
+    if data_collection is not None:
+        init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    _, tool_span_data = await run_tool_agent(
+        simple_test_tool,
+        span_streaming,
+        **init_kwargs,
+    )
+
+    if expect_input:
+        assert tool_span_data[SPANDATA.GEN_AI_TOOL_INPUT] == '{"message": "hello"}'
+    else:
+        assert SPANDATA.GEN_AI_TOOL_INPUT not in tool_span_data
+
+    if expect_output:
+        assert (
+            tool_span_data[SPANDATA.GEN_AI_TOOL_OUTPUT] == "Tool executed with: hello"
+        )
+    else:
+        assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_span_data
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.asyncio
+async def test_tool_execution_error_data_collection(
+    run_tool_agent,
+    span_streaming,
+):
+    @agents.function_tool
+    def failing_tool(message: str) -> str:
+        """A tool that fails"""
+        raise ValueError("Tool execution failed")
+
+    tool_span, tool_span_data = await run_tool_agent(
+        failing_tool,
+        span_streaming,
+        _experiments={"data_collection": {"gen_ai": {"outputs": False}}},
+    )
+
+    assert tool_span_data[SPANDATA.GEN_AI_TOOL_NAME] == "failing_tool"
+    assert tool_span["status"] == ("error" if span_streaming else "internal_error")
+    assert SPANDATA.GEN_AI_TOOL_OUTPUT not in tool_span_data
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.skipif(
+    parse_version(OPENAI_AGENTS_VERSION) < (0, 4, 0),
+    reason="conversation_id support requires openai-agents >= 0.4.0",
+)
+@pytest.mark.asyncio
+async def test_tool_execution_span_non_pii_data_always_set(
+    run_tool_agent,
+    simple_test_tool,
+    span_streaming,
+):
+    _, tool_span_data = await run_tool_agent(
+        simple_test_tool,
+        span_streaming,
+        run_kwargs={"conversation_id": "conv_tool_test_456"},
+        _experiments={
+            "data_collection": {"gen_ai": {"inputs": False, "outputs": False}}
+        },
+    )
+
+    assert tool_span_data[SPANDATA.GEN_AI_TOOL_NAME] == "simple_test_tool"
+    assert tool_span_data[SPANDATA.GEN_AI_TOOL_DESCRIPTION] == "A simple tool"
+    assert tool_span_data[SPANDATA.GEN_AI_CONVERSATION_ID] == "conv_tool_test_456"
+
+
 @pytest.mark.asyncio
 async def test_hosted_mcp_tool_propagation_header_streamed(
     sentry_init,
