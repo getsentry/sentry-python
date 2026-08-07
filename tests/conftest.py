@@ -48,11 +48,6 @@ try:
 except ImportError:
     gevent = None
 
-try:
-    import eventlet
-except ImportError:
-    eventlet = None
-
 import sentry_sdk
 import sentry_sdk.utils
 from sentry_sdk.envelope import Envelope, parse_json
@@ -61,7 +56,6 @@ from sentry_sdk.integrations import (  # noqa: F401
     _installed_integrations,
     _processed_integrations,
 )
-from sentry_sdk.profiler import teardown_profiler
 from sentry_sdk.profiler.continuous_profiler import teardown_continuous_profiler
 from sentry_sdk.transport import Transport
 from sentry_sdk.utils import package_version, reraise
@@ -272,12 +266,7 @@ def reset_integrations():
     but this also means some other stuff will be monkeypatched twice.
     """
     global _DEFAULT_INTEGRATIONS, _processed_integrations
-    try:
-        _DEFAULT_INTEGRATIONS.remove(
-            "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration"
-        )
-    except ValueError:
-        pass
+
     _processed_integrations.clear()
     _installed_integrations.clear()
 
@@ -529,23 +518,11 @@ class EventStreamReader:
 # scope=session ensures that fixture is run earlier
 @pytest.fixture(
     scope="session",
-    params=[None, "eventlet", "gevent"],
-    ids=("threads", "eventlet", "greenlet"),
+    params=[None, "gevent"],
+    ids=("threads", "greenlet"),
 )
 def maybe_monkeypatched_threading(request):
-    if request.param == "eventlet":
-        if eventlet is None:
-            pytest.skip("no eventlet installed")
-
-        try:
-            eventlet.monkey_patch()
-        except AttributeError as e:
-            if "'thread.RLock' object has no attribute" in str(e):
-                # https://bitbucket.org/pypy/pypy/issues/2962/gevent-cannot-patch-rlock-under-pypy-27-7
-                pytest.skip("https://github.com/eventlet/eventlet/issues/546")
-            else:
-                raise
-    elif request.param == "gevent":
+    if request.param == "gevent":
         if gevent is None:
             pytest.skip("no gevent installed")
         try:
@@ -776,13 +753,11 @@ def object_described_by_matcher():
 @pytest.fixture
 def teardown_profiling():
     # Make sure that a previous test didn't leave the profiler running
-    teardown_profiler()
     teardown_continuous_profiler()
 
     yield
 
-    # Make sure that to shut down the profiler after the test
-    teardown_profiler()
+    # Make sure to shut down the profiler after the test
     teardown_continuous_profiler()
 
 

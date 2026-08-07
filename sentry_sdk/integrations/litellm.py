@@ -12,13 +12,13 @@ from sentry_sdk.ai.utils import (
     truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
     should_truncate_gen_ai_input,
 )
-from sentry_sdk.utils import event_from_exception
+from sentry_sdk.utils import event_from_exception, package_version
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -28,7 +28,7 @@ try:
     import litellm  # type: ignore[import-not-found]
     from litellm import failure_callback, input_callback, success_callback
 except ImportError:
-    raise DidNotEnable("LiteLLM not installed")
+    raise DidNotEnable("LiteLLM not installed or incompatible")
 
 
 # Stash the span on a top-level key of the per-request kwargs dict litellm passes
@@ -359,6 +359,9 @@ class LiteLLMIntegration(Integration):
     @staticmethod
     def setup_once() -> None:
         """Set up LiteLLM callbacks for monitoring."""
+        version = package_version("litellm")
+        _check_minimum_version(LiteLLMIntegration, version)
+
         litellm.input_callback = input_callback or []
         if _input_callback not in litellm.input_callback:
             litellm.input_callback.append(_input_callback)

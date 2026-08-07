@@ -15,14 +15,22 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
 
 import sentry_sdk
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.utils import capture_internal_exceptions, event_from_exception, reraise
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    event_from_exception,
+    parse_version,
+    reraise,
+)
 
 try:
     from cohere import (
         ChatStreamEndEvent,
         NonStreamedChatResponse,
+    )
+    from cohere import (
+        __version__ as COHERE_VERSION,
     )
     from cohere.base_client import BaseCohere
     from cohere.client import Client
@@ -30,7 +38,7 @@ try:
     if TYPE_CHECKING:
         from cohere import StreamedChatResponse
 except ImportError:
-    raise DidNotEnable("Cohere not installed")
+    raise DidNotEnable("Cohere not installed or incompatible")
 
 try:
     # cohere 5.9.3+
@@ -78,6 +86,9 @@ class CohereIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        version = parse_version(COHERE_VERSION)
+        _check_minimum_version(CohereIntegration, version)
+
         BaseCohere.chat = _wrap_chat(BaseCohere.chat, streaming=False)
         Client.embed = _wrap_embed(Client.embed)
         BaseCohere.chat_stream = _wrap_chat(BaseCohere.chat_stream, streaming=True)

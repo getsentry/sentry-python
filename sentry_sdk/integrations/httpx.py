@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing_utils import (
     add_http_request_source,
@@ -14,6 +14,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     parse_url,
+    parse_version,
 )
 
 if TYPE_CHECKING:
@@ -24,8 +25,9 @@ if TYPE_CHECKING:
 
 try:
     from httpx import AsyncClient, Client, Request, Response
+    from httpx import __version__ as HTTPX_VERSION
 except ImportError:
-    raise DidNotEnable("httpx is not installed")
+    raise DidNotEnable("httpx is not installed or incompatible")
 
 __all__ = ["HttpxIntegration"]
 
@@ -40,6 +42,9 @@ class HttpxIntegration(Integration):
         httpx has its own transport layer and can be customized when needed,
         so patch Client.send and AsyncClient.send to support both synchronous and async interfaces.
         """
+        version = parse_version(HTTPX_VERSION)
+        _check_minimum_version(HttpxIntegration, version)
+
         _install_httpx_client()
         _install_httpx_async_client()
 

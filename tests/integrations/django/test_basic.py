@@ -1736,7 +1736,6 @@ def test_render_spans(
             )
 
 
-@pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
 def test_render_spans_queryset_in_data(sentry_init, client, capture_events):
@@ -2123,7 +2122,6 @@ def test_csrf(sentry_init, client):
     assert content == b"ok"
 
 
-@pytest.mark.skipif(DJANGO_VERSION < (2, 0), reason="Requires Django > 2.0")
 @pytest.mark.parametrize("middleware_spans", [False, True])
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_custom_urlconf_middleware(
@@ -2248,7 +2246,6 @@ def test_get_receiver_name():
         assert name == "partial(<function " + a_partial.func.__name__ + ">)"
 
 
-@pytest.mark.skipif(DJANGO_VERSION <= (1, 11), reason="Requires Django > 1.11")
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_span_origin(
     sentry_init,
@@ -2384,61 +2381,6 @@ def test_transaction_http_method_custom(
         (event1, event2) = events
         assert event1["request"]["method"] == "OPTIONS"
         assert event2["request"]["method"] == "HEAD"
-
-
-def test_ensures_spotlight_middleware_when_spotlight_is_enabled(sentry_init, settings):
-    """
-    Test that ensures if Spotlight is enabled, relevant SpotlightMiddleware
-    is added to middleware list in settings.
-    """
-    settings.DEBUG = True
-    original_middleware = frozenset(settings.MIDDLEWARE)
-
-    sentry_init(integrations=[DjangoIntegration()], spotlight=True)
-
-    added = frozenset(settings.MIDDLEWARE) ^ original_middleware
-
-    assert "sentry_sdk.spotlight.SpotlightMiddleware" in added
-
-
-def test_ensures_no_spotlight_middleware_when_env_killswitch_is_false(
-    monkeypatch, sentry_init, settings
-):
-    """
-    Test that ensures if Spotlight is enabled, but is set to a falsy value
-    the relevant SpotlightMiddleware is NOT added to middleware list in settings.
-    """
-    settings.DEBUG = True
-    monkeypatch.setenv("SENTRY_SPOTLIGHT_ON_ERROR", "no")
-
-    original_middleware = frozenset(settings.MIDDLEWARE)
-
-    sentry_init(integrations=[DjangoIntegration()], spotlight=True)
-
-    added = frozenset(settings.MIDDLEWARE) ^ original_middleware
-
-    assert "sentry_sdk.spotlight.SpotlightMiddleware" not in added
-
-
-def test_ensures_no_spotlight_middleware_when_no_spotlight(
-    monkeypatch, sentry_init, settings
-):
-    """
-    Test that ensures if Spotlight is not enabled
-    the relevant SpotlightMiddleware is NOT added to middleware list in settings.
-    """
-    settings.DEBUG = True
-
-    # We should NOT have the middleware even if the env var is truthy if Spotlight is off
-    monkeypatch.setenv("SENTRY_SPOTLIGHT_ON_ERROR", "1")
-
-    original_middleware = frozenset(settings.MIDDLEWARE)
-
-    sentry_init(integrations=[DjangoIntegration()], spotlight=False)
-
-    added = frozenset(settings.MIDDLEWARE) ^ original_middleware
-
-    assert "sentry_sdk.spotlight.SpotlightMiddleware" not in added
 
 
 def test_get_frame_name_when_in_lazy_object():

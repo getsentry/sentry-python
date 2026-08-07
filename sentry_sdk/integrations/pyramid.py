@@ -4,7 +4,7 @@ import sys
 import weakref
 
 import sentry_sdk
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
@@ -16,6 +16,7 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
     has_data_collection_enabled,
+    package_version,
     reraise,
 )
 
@@ -23,12 +24,12 @@ try:
     from pyramid.httpexceptions import HTTPException
     from pyramid.request import Request
 except ImportError:
-    raise DidNotEnable("Pyramid not installed")
+    raise DidNotEnable("Pyramid not installed or incompatible")
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Optional
+    from typing import Any, Callable, Dict
 
     from pyramid.response import Response
     from webob.cookies import RequestCookies
@@ -37,16 +38,6 @@ if TYPE_CHECKING:
     from sentry_sdk._types import Event, EventProcessor
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from sentry_sdk.utils import ExcInfo
-
-
-if getattr(Request, "authenticated_userid", None):
-
-    def authenticated_userid(request: "Request") -> "Optional[Any]":
-        return request.authenticated_userid
-
-else:
-    # bw-compat for pyramid < 1.5
-    from pyramid.security import authenticated_userid  # type: ignore
 
 
 TRANSACTION_STYLE_VALUES = ("route_name", "route_pattern")
@@ -68,6 +59,9 @@ class PyramidIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        version = package_version("pyramid")
+        _check_minimum_version(PyramidIntegration, version)
+
         from pyramid import router
 
         old_call_view = router._call_view
@@ -90,11 +84,11 @@ class PyramidIntegration(Integration):
             if has_span_streaming_enabled(client.options):
                 if has_data_collection_enabled(client.options):
                     if client.options["data_collection"]["user_info"]:
-                        user_id = authenticated_userid(request)
+                        user_id = request.authenticated_userid
                         if user_id:
                             scope.set_user({"id": user_id})
                 elif should_send_default_pii():
-                    user_id = authenticated_userid(request)
+                    user_id = request.authenticated_userid
                     if user_id:
                         scope.set_user({"id": user_id})
 
@@ -241,11 +235,11 @@ def _make_event_processor(
             if client_options["data_collection"]["user_info"]:
                 with capture_internal_exceptions():
                     user_info = event.setdefault("user", {})
-                    user_info.setdefault("id", authenticated_userid(request))
+                    user_info.setdefault("id", request.authenticated_userid)
         elif should_send_default_pii():
             with capture_internal_exceptions():
                 user_info = event.setdefault("user", {})
-                user_info.setdefault("id", authenticated_userid(request))
+                user_info.setdefault("id", request.authenticated_userid)
 
         return event
 

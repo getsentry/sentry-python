@@ -250,7 +250,6 @@ def test_envelope_item_data_category_mapping():
         ("session", "session"),
         ("attachment", "attachment"),
         ("client_report", "internal"),
-        ("profile", "profile"),
         ("profile_chunk", "profile_chunk"),
         ("check_in", "monitor"),
         ("unknown_type", "default"),

@@ -7,7 +7,6 @@ import os
 import re
 import threading
 import warnings
-from unittest import mock
 
 import pytest
 import starlette
@@ -1437,44 +1436,6 @@ def test_legacy_setup(
 
 
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
-@mock.patch("sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0)
-def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, endpoint):
-    sentry_init(
-        traces_sample_rate=1.0,
-        profiles_sample_rate=1.0,
-    )
-    app = starlette_app_factory()
-    asgi_app = SentryAsgiMiddleware(app)
-
-    envelopes = capture_envelopes()
-
-    client = TestClient(asgi_app)
-    response = client.get(endpoint)
-    assert response.status_code == 200
-
-    data = json.loads(response.content)
-
-    envelopes = [envelope for envelope in envelopes]
-    assert len(envelopes) == 1
-
-    profiles = [item for item in envelopes[0].items if item.type == "profile"]
-    assert len(profiles) == 1
-
-    for item in profiles:
-        transactions = item.payload.json["transactions"]
-        assert len(transactions) == 1
-        assert str(data["active"]) == transactions[0]["active_thread_id"]
-
-    transactions = [item for item in envelopes[0].items if item.type == "transaction"]
-    assert len(transactions) == 1
-
-    for item in transactions:
-        transaction = item.payload.json
-        trace_context = transaction["contexts"]["trace"]
-        assert str(data["active"]) == trace_context["data"]["thread.id"]
-
-
-@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
 def test_active_thread_id_span_streaming(sentry_init, capture_items, endpoint):
     sentry_init(
         auto_enabling_integrations=False,  # avoid legacy spans from auto-enabled integrations leaking into streaming mode
@@ -1760,82 +1721,6 @@ def test_span_origin(sentry_init, capture_events, capture_items, span_streaming)
         assert event["contexts"]["trace"]["origin"] == "auto.http.starlette"
         for span in event["spans"]:
             assert span["origin"] == "auto.http.starlette"
-
-
-class NonIterableContainer:
-    """Wraps any container and makes it non-iterable.
-
-    Used to test backwards compatibility with our old way of defining failed_request_status_codes, which allowed
-    passing in a list of (possibly non-iterable) containers. The Python standard library does not provide any built-in
-    non-iterable containers, so we have to define our own.
-    """
-
-    def __init__(self, inner):
-        self.inner = inner
-
-    def __contains__(self, item):
-        return item in self.inner
-
-
-parametrize_test_configurable_status_codes_deprecated = pytest.mark.parametrize(
-    "failed_request_status_codes,status_code,expected_error",
-    [
-        (None, 500, True),
-        (None, 400, False),
-        ([500, 501], 500, True),
-        ([500, 501], 401, False),
-        ([range(400, 499)], 401, True),
-        ([range(400, 499)], 500, False),
-        ([range(400, 499), range(500, 599)], 300, False),
-        ([range(400, 499), range(500, 599)], 403, True),
-        ([range(400, 499), range(500, 599)], 503, True),
-        ([range(400, 403), 500, 501], 401, True),
-        ([range(400, 403), 500, 501], 405, False),
-        ([range(400, 403), 500, 501], 501, True),
-        ([range(400, 403), 500, 501], 503, False),
-        ([], 500, False),
-        ([NonIterableContainer(range(500, 600))], 500, True),
-        ([NonIterableContainer(range(500, 600))], 404, False),
-    ],
-)
-"""Test cases for configurable status codes (deprecated API).
-Also used by the FastAPI tests.
-"""
-
-
-@parametrize_test_configurable_status_codes_deprecated
-def test_configurable_status_codes_deprecated(
-    sentry_init,
-    capture_events,
-    failed_request_status_codes,
-    status_code,
-    expected_error,
-):
-    with pytest.warns(DeprecationWarning):
-        starlette_integration = StarletteIntegration(
-            failed_request_status_codes=failed_request_status_codes
-        )
-
-    sentry_init(integrations=[starlette_integration])
-
-    events = capture_events()
-
-    async def _error(request):
-        raise HTTPException(status_code)
-
-    app = starlette.applications.Starlette(
-        routes=[
-            starlette.routing.Route("/error", _error, methods=["GET"]),
-        ],
-    )
-
-    client = TestClient(app)
-    client.get("/error")
-
-    if expected_error:
-        assert len(events) == 1
-    else:
-        assert not events
 
 
 @pytest.mark.skipif(

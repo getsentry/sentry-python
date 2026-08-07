@@ -1,5 +1,4 @@
 import concurrent.futures as cf
-import sys
 from random import random
 from unittest import mock
 
@@ -85,7 +84,6 @@ def test_is_enabled_threaded(sentry_init, capture_events, uninstall_integration)
     }
 
 
-@pytest.mark.skipif(sys.version_info < (3, 7), reason="requires python3.7 or higher")
 def test_is_enabled_asyncio(sentry_init, capture_events, uninstall_integration):
     asyncio = pytest.importorskip("asyncio")
     uninstall_integration(UnleashIntegration.identifier)

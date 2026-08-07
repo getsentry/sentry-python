@@ -16,7 +16,7 @@ from sentry_sdk.ai.utils import (
     truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
@@ -24,7 +24,7 @@ from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
     should_truncate_gen_ai_input,
 )
-from sentry_sdk.utils import capture_internal_exceptions, logger
+from sentry_sdk.utils import capture_internal_exceptions, logger, parse_version
 
 if TYPE_CHECKING:
     from typing import (
@@ -44,6 +44,7 @@ if TYPE_CHECKING:
 
 
 try:
+    from langchain_core import __version__ as LANGCHAIN_VERSION
     from langchain_core.callbacks import (
         BaseCallbackHandler,
         BaseCallbackManager,
@@ -54,7 +55,7 @@ try:
     from langchain_core.outputs import ChatGeneration, LLMResult
 
 except ImportError:
-    raise DidNotEnable("langchain not installed")
+    raise DidNotEnable("langchain not installed or incompatible")
 
 
 try:
@@ -229,6 +230,9 @@ class LangchainIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        version = parse_version(LANGCHAIN_VERSION)
+        _check_minimum_version(LangchainIntegration, version)
+
         manager._configure = _wrap_configure(manager._configure)
 
         if AgentExecutor is not None:

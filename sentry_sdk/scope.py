@@ -4,6 +4,7 @@ import sys
 import warnings
 from collections import deque
 from contextlib import contextmanager
+from contextvars import ContextVar
 from copy import copy, deepcopy
 from datetime import datetime, timezone
 from enum import Enum
@@ -17,7 +18,6 @@ from sentry_sdk.attachments import Attachment
 from sentry_sdk.consts import (
     DEFAULT_MAX_BREADCRUMBS,
     FALSE_VALUES,
-    INSTRUMENTER,
     SPANDATA,
 )
 from sentry_sdk.feature_flags import DEFAULT_FLAG_CAPACITY, FlagBuffer
@@ -26,7 +26,6 @@ from sentry_sdk.profiler.continuous_profiler import (
     try_autostart_continuous_profiler,
     try_profile_lifecycle_trace_start,
 )
-from sentry_sdk.profiler.transaction_profiler import Profile
 from sentry_sdk.session import Session
 from sentry_sdk.traces import (
     _DEFAULT_PARENT_SPAN,
@@ -49,7 +48,6 @@ from sentry_sdk.tracing_utils import (
     is_ignored_span,
 )
 from sentry_sdk.utils import (
-    ContextVar,
     capture_internal_exception,
     capture_internal_exceptions,
     datetime_from_isoformat,
@@ -118,11 +116,15 @@ _global_scope: "Optional[Scope]" = None
 # This is used to isolate data for different requests or users.
 # The isolation scope is usually created by integrations, but may also
 # be created manually
-_isolation_scope = ContextVar("isolation_scope", default=None)
+_isolation_scope: "ContextVar[Optional[Scope]]" = ContextVar(
+    "isolation_scope", default=None
+)
 
 # Holds data for the active span.
 # This can be used to manually add additional data to a span.
-_current_scope = ContextVar("current_scope", default=None)
+_current_scope: "ContextVar[Optional[Scope]]" = ContextVar(
+    "current_scope", default=None
+)
 
 global_event_processors: "List[EventProcessor]" = []
 
@@ -139,7 +141,7 @@ class ScopeType(Enum):
 
 
 class _ScopeManager:
-    def __init__(self, hub: "Optional[Any]" = None) -> None:
+    def __init__(self) -> None:
         self._old_scopes: "List[Scope]" = []
 
     def __enter__(self) -> "Scope":
@@ -235,7 +237,6 @@ class Scope:
         "_session",
         "_attachments",
         "_force_auto_session_tracking",
-        "_profile",
         "_propagation_context",
         "client",
         "_type",
@@ -301,8 +302,6 @@ class Scope:
         rv._session = self._session
         rv._force_auto_session_tracking = self._force_auto_session_tracking
         rv._attachments = self._attachments.copy()
-
-        rv._profile = self._profile
 
         rv._last_event_id = self._last_event_id
 
@@ -467,8 +466,9 @@ class Scope:
         If no client is available a :py:class:`sentry_sdk.client.NonRecordingClient` is returned.
         """
         current_scope = _current_scope.get()
+
         try:
-            client = current_scope.client
+            client = current_scope.client  # type: ignore[union-attr]
         except AttributeError:
             client = None
 
@@ -477,7 +477,7 @@ class Scope:
 
         isolation_scope = _isolation_scope.get()
         try:
-            client = isolation_scope.client
+            client = isolation_scope.client  # type: ignore[union-attr]
         except AttributeError:
             client = None
 
@@ -688,13 +688,6 @@ class Scope:
         If no span is given, the trace data is taken from the scope.
         """
         client = self.get_client()
-        if not client.options.get("propagate_traces"):
-            warnings.warn(
-                "The `propagate_traces` parameter is deprecated. Please use `trace_propagation_targets` instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            return
 
         span = kwargs.pop("span", None)
         if not span:
@@ -757,8 +750,6 @@ class Scope:
         self._span: "Optional[Union[Span, StreamedSpan]]" = None
         self._session: "Optional[Session]" = None
         self._force_auto_session_tracking: "Optional[bool]" = None
-
-        self._profile: "Optional[Profile]" = None
 
         self._propagation_context = None
 
@@ -932,14 +923,6 @@ class Scope:
                     span._attributes["sentry.segment.name.source"]
                 )
 
-    @property
-    def profile(self) -> "Optional[Profile]":
-        return self._profile
-
-    @profile.setter
-    def profile(self, profile: "Optional[Profile]") -> None:
-        self._profile = profile
-
     def set_tag(self, key: str, value: "Any") -> None:
         """
         Sets a tag for a key to a specific value.
@@ -1107,7 +1090,6 @@ class Scope:
     def start_transaction(
         self,
         transaction: "Optional[Transaction]" = None,
-        instrumenter: str = INSTRUMENTER.SENTRY,
         custom_sampling_context: "Optional[SamplingContext]" = None,
         **kwargs: "Unpack[TransactionKwargs]",
     ) -> "Union[Transaction, NoOpSpan]":
@@ -1135,8 +1117,6 @@ class Scope:
 
         :param transaction: The transaction to start. If omitted, we create and
             start a new transaction.
-        :param instrumenter: This parameter is meant for internal use only. It
-            will be removed in the next major version.
         :param custom_sampling_context: The transaction's custom sampling context.
         :param kwargs: Optional keyword arguments to be passed to the Transaction
             constructor. See :py:class:`sentry_sdk.tracing.Transaction` for
@@ -1152,11 +1132,6 @@ class Scope:
             return NoOpSpan()
 
         kwargs.setdefault("scope", self)
-
-        configuration_instrumenter = client.options["instrumenter"]
-
-        if instrumenter != configuration_instrumenter:
-            return NoOpSpan()
 
         try_autostart_continuous_profiler()
 
@@ -1193,13 +1168,6 @@ class Scope:
                 )
 
         if transaction.sampled:
-            profile = Profile(
-                transaction.sampled, transaction._start_timestamp_monotonic_ns
-            )
-            profile._set_initial_sampling_decision(sampling_context=sampling_context)
-
-            transaction._profile = profile
-
             transaction._continuous_profile = try_profile_lifecycle_trace_start()
 
             # Typically, the profiler is set when the transaction is created. But when
@@ -1215,9 +1183,7 @@ class Scope:
 
         return transaction
 
-    def start_span(
-        self, instrumenter: str = INSTRUMENTER.SENTRY, **kwargs: "Any"
-    ) -> "Span":
+    def start_span(self, **kwargs: "Any") -> "Span":
         """
         Start a span whose parent is the currently active span or transaction, if any.
 
@@ -1232,10 +1198,6 @@ class Scope:
         one is not already in progress.
 
         For supported `**kwargs` see :py:class:`sentry_sdk.tracing.Span`.
-
-        The instrumenter parameter is deprecated for user code, and it will
-        be removed in the next major version. Going forward, it should only
-        be used by the SDK itself.
         """
         client = sentry_sdk.get_client()
         if has_span_streaming_enabled(client.options):
@@ -1257,11 +1219,6 @@ class Scope:
             kwargs.setdefault("scope", self)
 
             client = self.get_client()
-
-            configuration_instrumenter = client.options["instrumenter"]
-
-            if instrumenter != configuration_instrumenter:
-                return NoOpSpan()
 
             # get current span or transaction
             span = self.span or self.get_isolation_scope().span
@@ -1964,8 +1921,6 @@ class Scope:
             self._span = scope._span
         if scope._attachments:
             self._attachments.extend(scope._attachments)
-        if scope._profile:
-            self._profile = scope._profile
         if scope._propagation_context:
             self._propagation_context = scope._propagation_context
         if scope._session:

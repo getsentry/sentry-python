@@ -99,7 +99,6 @@ def patch_django_asgi_handler_impl(cls: "Any") -> None:
 
         middleware = SentryAsgiMiddleware(
             old_app.__get__(self, cls),
-            unsafe_context_data=True,
             span_origin=DjangoIntegration.origin,
             http_methods_to_capture=integration.http_methods_to_capture,
         )._run_asgi3
@@ -154,7 +153,6 @@ def patch_channels_asgi_handler_impl(cls: "Any") -> None:
 
             middleware = SentryAsgiMiddleware(
                 lambda _scope: old_app.__get__(self, cls),
-                unsafe_context_data=True,
                 span_origin=DjangoIntegration.origin,
                 http_methods_to_capture=integration.http_methods_to_capture,
             )
@@ -187,10 +185,6 @@ def wrap_async_view(callback: "Any") -> "Any":
         else:
             if current_scope.transaction is not None:
                 current_scope.transaction.update_active_thread()
-
-        sentry_scope = sentry_sdk.get_isolation_scope()
-        if sentry_scope.profile is not None:
-            sentry_scope.profile.update_active_thread_id()
 
         integration = client.get_integration(DjangoIntegration)
         if not integration or not integration.middleware_spans:

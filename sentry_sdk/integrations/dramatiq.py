@@ -4,7 +4,7 @@ from typing import TypeVar
 import sentry_sdk
 from sentry_sdk.api import continue_trace, get_baggage, get_traceparent
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import request_body_within_bounds
 from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.tracing import (
@@ -17,17 +17,19 @@ from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
     event_from_exception,
+    parse_version,
 )
 
 R = TypeVar("R")
 
 try:
+    from dramatiq import __version__ as DRAMATIQ_VERSION
     from dramatiq.broker import Broker
     from dramatiq.errors import Retry
     from dramatiq.message import Message
     from dramatiq.middleware import Middleware, default_middleware
 except ImportError:
-    raise DidNotEnable("Dramatiq is not installed")
+    raise DidNotEnable("Dramatiq is not installed or incompatible")
 
 from typing import TYPE_CHECKING
 
@@ -54,6 +56,9 @@ class DramatiqIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        version = parse_version(DRAMATIQ_VERSION)
+        _check_minimum_version(DramatiqIntegration, version)
+
         _patch_dramatiq_broker()
 
 

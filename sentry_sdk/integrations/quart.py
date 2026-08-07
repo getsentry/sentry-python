@@ -33,6 +33,7 @@ except ImportError:
     quart_auth = None
 
 try:
+    from flask.sansio.scaffold import Scaffold  # type: ignore
     from quart import (  # type: ignore
         Quart,
         Request,
@@ -49,13 +50,7 @@ try:
         websocket_started,
     )
 except ImportError:
-    raise DidNotEnable("Quart is not installed")
-else:
-    # Quart 0.19 is based on Flask and hence no longer has a Scaffold
-    try:
-        from quart.scaffold import Scaffold  # type: ignore
-    except ImportError:
-        from flask.sansio.scaffold import Scaffold  # type: ignore
+    raise DidNotEnable("Quart is not installed or incompatible")
 
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 
@@ -132,10 +127,6 @@ def patch_scaffold_route() -> None:
                         current_scope = sentry_sdk.get_current_scope()
                         if current_scope.transaction is not None:
                             current_scope.transaction.update_active_thread()
-
-                    sentry_scope = sentry_sdk.get_isolation_scope()
-                    if sentry_scope.profile is not None:
-                        sentry_scope.profile.update_active_thread_id()
 
                     return old_func(*args, **kwargs)
 
