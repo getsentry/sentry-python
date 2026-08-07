@@ -7,7 +7,7 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
+from sentry_sdk.tracing_utils import add_http_breadcrumb, has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     parse_url,
@@ -112,17 +112,31 @@ def _sentry_request_created(
     # request.context is an open-ended data-structure
     # where we can add anything useful in request life cycle.
     request.context["_sentrysdk_span"] = span
+    request.context["_sentrysdk_breadcrumb_data"] = {
+        SPANDATA.HTTP_METHOD: request.method,
+        "url": request.url,
+    }
 
 
 def _sentry_after_call(
     context: "Dict[str, Any]", parsed: "Dict[str, Any]", **kwargs: "Any"
 ) -> None:
     span: "Optional[Union[Span, StreamedSpan]]" = context.pop("_sentrysdk_span", None)
+    breadcrumb_data: "Optional[Dict[str, Any]]" = context.pop(
+        "_sentrysdk_breadcrumb_data", None
+    )
 
     # Span could be absent if the integration is disabled.
     if span is None:
         return
     span.__exit__(None, None, None)
+
+    with capture_internal_exceptions():
+        status_code = parsed.get("ResponseMetadata", {}).get("HTTPStatusCode")
+        data = breadcrumb_data or {}
+        if status_code is not None:
+            data[SPANDATA.HTTP_STATUS_CODE] = status_code
+        add_http_breadcrumb(status_code, data)
 
     body = parsed.get("Body")
     if not isinstance(body, StreamingBody):

@@ -9,6 +9,7 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
 from sentry_sdk.tracing_utils import (
+    add_http_breadcrumb,
     add_http_request_source,
     add_sentry_baggage_to_headers,
     has_span_streaming_enabled,
@@ -156,6 +157,11 @@ async def sentry_async_middleware(
     if sentry_sdk.get_client().get_integration(PyreqwestIntegration) is None:
         return await next_handler.run(request)
 
+    parsed_url = None
+    with capture_internal_exceptions():
+        parsed_url = parse_url(str(request.url), sanitize=False)
+    method = request.method
+
     with _sentry_pyreqwest_span(request) as span:
         response = await next_handler.run(request)
         if isinstance(span, StreamedSpan):
@@ -167,6 +173,18 @@ async def sentry_async_middleware(
         elif span is not None:
             span.set_http_status(response.status)
 
+    with capture_internal_exceptions():
+        add_http_breadcrumb(
+            response.status,
+            {
+                SPANDATA.HTTP_METHOD: method,
+                "url": parsed_url.url if parsed_url else None,
+                SPANDATA.HTTP_QUERY: parsed_url.query if parsed_url else None,
+                SPANDATA.HTTP_FRAGMENT: parsed_url.fragment if parsed_url else None,
+                SPANDATA.HTTP_STATUS_CODE: response.status,
+            },
+        )
+
     return response
 
 
@@ -175,6 +193,11 @@ def sentry_sync_middleware(
 ) -> "SyncResponse":
     if sentry_sdk.get_client().get_integration(PyreqwestIntegration) is None:
         return next_handler.run(request)
+
+    parsed_url = None
+    with capture_internal_exceptions():
+        parsed_url = parse_url(str(request.url), sanitize=False)
+    method = request.method
 
     with _sentry_pyreqwest_span(request) as span:
         response = next_handler.run(request)
@@ -186,5 +209,17 @@ def sentry_sync_middleware(
             )
         elif span is not None:
             span.set_http_status(response.status)
+
+    with capture_internal_exceptions():
+        add_http_breadcrumb(
+            response.status,
+            {
+                SPANDATA.HTTP_METHOD: method,
+                "url": parsed_url.url if parsed_url else None,
+                SPANDATA.HTTP_QUERY: parsed_url.query if parsed_url else None,
+                SPANDATA.HTTP_FRAGMENT: parsed_url.fragment if parsed_url else None,
+                SPANDATA.HTTP_STATUS_CODE: response.status,
+            },
+        )
 
     return response

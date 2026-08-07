@@ -36,6 +36,7 @@ from sentry_sdk.tracing import (
     TransactionSource,
 )
 from sentry_sdk.tracing_utils import (
+    add_http_breadcrumb,
     add_http_request_source,
     has_span_streaming_enabled,
     should_propagate_trace,
@@ -503,6 +504,20 @@ def create_trace_config() -> "TraceConfig":
             span.finish()
             with capture_internal_exceptions():
                 add_http_request_source(span)
+
+        with capture_internal_exceptions():
+            parsed_url = parse_url(str(params.url), sanitize=False)
+            add_http_breadcrumb(
+                status,
+                {
+                    SPANDATA.HTTP_METHOD: params.method.upper(),
+                    "url": parsed_url.url if parsed_url else None,
+                    SPANDATA.HTTP_QUERY: parsed_url.query if parsed_url else None,
+                    SPANDATA.HTTP_FRAGMENT: parsed_url.fragment if parsed_url else None,
+                    SPANDATA.HTTP_STATUS_CODE: status,
+                    "reason": params.response.reason,
+                },
+            )
 
     trace_config = TraceConfig()
 
