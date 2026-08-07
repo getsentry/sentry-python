@@ -95,9 +95,7 @@ def patch_redis_async_pipeline(
                     command_seq,
                 )
 
-            rv = await old_execute(self, *args, **kwargs)
-
-        return rv
+            return await old_execute(self, *args, **kwargs)
 
     pipeline_cls.execute = _sentry_execute  # type: ignore
 
