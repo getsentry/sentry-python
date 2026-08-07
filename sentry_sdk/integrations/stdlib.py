@@ -13,6 +13,7 @@ from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import (
     EnvironHeaders,
+    add_http_breadcrumb,
     add_http_request_source,
     has_span_streaming_enabled,
     should_propagate_trace,
@@ -174,6 +175,10 @@ def _install_httplib() -> None:
                 self.putheader(key, value)
 
         self._sentrysdk_span = span  # type: ignore[attr-defined]
+        self._sentrysdk_method = method  # type: ignore[attr-defined]
+        self._sentrysdk_url = parsed_url.url if parsed_url else None  # type: ignore[attr-defined]
+        self._sentrysdk_query = parsed_url.query if parsed_url else None  # type: ignore[attr-defined]
+        self._sentrysdk_fragment = parsed_url.fragment if parsed_url else None  # type: ignore[attr-defined]
 
         return rv
 
@@ -189,13 +194,26 @@ def _install_httplib() -> None:
             _complete_span(span)
             raise
 
+        status_code = int(rv.status)
         if isinstance(span, StreamedSpan):
-            status_code = int(rv.status)
             span.status = "error" if status_code >= 400 else "ok"
             span.set_attribute("http.response.status_code", status_code)
         else:
-            span.set_http_status(int(rv.status))
+            span.set_http_status(status_code)
             span.set_data("reason", rv.reason)
+
+        with capture_internal_exceptions():
+            add_http_breadcrumb(
+                status_code,
+                {
+                    SPANDATA.HTTP_METHOD: getattr(self, "_sentrysdk_method", None),
+                    "url": getattr(self, "_sentrysdk_url", None),
+                    SPANDATA.HTTP_QUERY: getattr(self, "_sentrysdk_query", None),
+                    SPANDATA.HTTP_FRAGMENT: getattr(self, "_sentrysdk_fragment", None),
+                    SPANDATA.HTTP_STATUS_CODE: status_code,
+                    "reason": rv.reason,
+                },
+            )
 
         # getresponse doesn't include actually reading the response body. This
         # is done in read(). So if the metadata/headers suggest there's a body to
