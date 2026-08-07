@@ -26,6 +26,7 @@ from sentry_sdk.tracing_utils import (
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
+    has_data_collection_enabled,
     package_version,
     reraise,
     safe_serialize,
@@ -390,12 +391,43 @@ def _set_common_input_data(
     )
     set_on_span(SPANDATA.GEN_AI_SYSTEM, "anthropic")
     set_on_span(SPANDATA.GEN_AI_OPERATION_NAME, "chat")
-    if (
-        messages is not None
-        and len(messages) > 0  # type: ignore
-        and should_send_default_pii()
-        and integration.include_prompts
-    ):
+
+    if max_tokens is not None and _is_given(max_tokens):
+        set_on_span(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
+    if model is not None and _is_given(model):
+        set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
+    if temperature is not None and _is_given(temperature):
+        set_on_span(SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature)
+    if top_k is not None and _is_given(top_k):
+        set_on_span(SPANDATA.GEN_AI_REQUEST_TOP_K, top_k)
+    if top_p is not None and _is_given(top_p):
+        set_on_span(SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
+
+    client = sentry_sdk.get_client()
+
+    if has_data_collection_enabled(client.options):
+        if client.options["data_collection"]["gen_ai"]["inputs"]:
+            if tools is not None and _is_given(tools) and len(tools) > 0:  # type: ignore
+                set_on_span(
+                    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
+                )
+    else:
+        # Tools were unconditionally added pre-data collection configuration.
+        # This can be removed once data collection is fully rolled out
+        if tools is not None and _is_given(tools) and len(tools) > 0:  # type: ignore
+            set_on_span(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools))
+
+    if messages is None or len(messages) == 0:  # type: ignore
+        return
+
+    record_inputs = False
+    if has_data_collection_enabled(client.options):
+        if client.options["data_collection"]["gen_ai"]["inputs"]:
+            record_inputs = True
+    elif should_send_default_pii() and integration.include_prompts:
+        record_inputs = True
+
+    if record_inputs:
         if isinstance(system, str) or isinstance(system, Iterable):
             set_on_span(
                 SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
@@ -447,7 +479,6 @@ def _set_common_input_data(
 
         role_normalized_messages = normalize_message_roles(normalized_messages)
 
-        client = sentry_sdk.get_client()
         scope = sentry_sdk.get_current_scope()
         messages_data = (
             truncate_and_annotate_messages(role_normalized_messages, span, scope)
@@ -456,22 +487,11 @@ def _set_common_input_data(
         )
         if messages_data is not None:
             set_data_normalized(
-                span, SPANDATA.GEN_AI_REQUEST_MESSAGES, messages_data, unpack=False
+                span,
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                messages_data,
+                unpack=False,
             )
-
-    if max_tokens is not None and _is_given(max_tokens):
-        set_on_span(SPANDATA.GEN_AI_REQUEST_MAX_TOKENS, max_tokens)
-    if model is not None and _is_given(model):
-        set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model)
-    if temperature is not None and _is_given(temperature):
-        set_on_span(SPANDATA.GEN_AI_REQUEST_TEMPERATURE, temperature)
-    if top_k is not None and _is_given(top_k):
-        set_on_span(SPANDATA.GEN_AI_REQUEST_TOP_K, top_k)
-    if top_p is not None and _is_given(top_p):
-        set_on_span(SPANDATA.GEN_AI_REQUEST_TOP_P, top_p)
-
-    if tools is not None and _is_given(tools) and len(tools) > 0:  # type: ignore
-        set_on_span(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools))
 
 
 def _set_create_input_data(
