@@ -6,6 +6,7 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
+from sentry_sdk.utils import has_data_collection_enabled
 
 try:
     from agents import (
@@ -207,7 +208,9 @@ def ai_client_span(
     elif hasattr(agent, "_sentry_request_model"):
         model_name = agent._sentry_request_model
 
-    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+    client_options = sentry_sdk.get_client().options
+
+    span_streaming = has_span_streaming_enabled(client_options)
     if span_streaming:
         span = sentry_sdk.traces.start_span(
             name=f"chat {model_name}",
@@ -232,10 +235,19 @@ def ai_client_span(
 
     _set_agent_data(span, agent)
 
-    set_on_span(
-        SPANDATA.GEN_AI_TOOL_DEFINITIONS,
-        json.dumps(_transform_tool_definitions(agent.tools)),
-    )
+    if has_data_collection_enabled(client_options):
+        if client_options["data_collection"]["gen_ai"]["inputs"]:
+            set_on_span(
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+                json.dumps(_transform_tool_definitions(agent.tools)),
+            )
+    else:
+        # This is set unconditionally prior to data collection being introduced.
+        # Remove this block once data collection is fully rolled out
+        set_on_span(
+            SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+            json.dumps(_transform_tool_definitions(agent.tools)),
+        )
 
     _set_input_data(span, get_response_kwargs)
 
