@@ -1093,6 +1093,7 @@ async def test_data_collection_inputs(
     capture_events,
     capture_items,
     test_agent,
+    simple_test_tool,
     nonstreaming_responses_model_response,
     get_model_response,
     data_collection,
@@ -1103,7 +1104,7 @@ async def test_data_collection_inputs(
 ):
     client = AsyncOpenAI(api_key="test-key")
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
-    agent = test_agent.clone(model=model)
+    agent = test_agent.clone(model=model, tools=[simple_test_tool])
 
     response = get_model_response(
         nonstreaming_responses_model_response, serialize_pydantic=True
@@ -1163,6 +1164,13 @@ async def test_data_collection_inputs(
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span_data
         assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in span_data
+
+    # Tool definitions are only gated once data_collection is configured; without it
+    # they are set unconditionally, as they were before data_collection existed.
+    if expect_input or data_collection is None:
+        assert "simple_test_tool" in span_data[SPANDATA.GEN_AI_TOOL_DEFINITIONS]
+    else:
+        assert SPANDATA.GEN_AI_TOOL_DEFINITIONS not in span_data
 
     # Non-PII data is unaffected by the gate
     assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-4"
