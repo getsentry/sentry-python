@@ -32,11 +32,11 @@ from .utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Union
+    from typing import Any, Dict, List, Optional, Union
 
-    from pydantic_ai.messages import ModelMessage, SystemPromptPart
+    from pydantic_ai.messages import ModelMessage, ModelResponse, SystemPromptPart
 
-    from sentry_sdk._types import TextPart as SentryTextPart
+    from sentry_sdk import _types
 
 try:
     from pydantic_ai.messages import (
@@ -59,13 +59,14 @@ except ImportError:
     ThinkingPart = None  # type: ignore[misc,assignment]
     BinaryContent = None  # type: ignore[misc,assignment]
     ImageUrl = None  # type: ignore[misc,assignment]
+    ThinkingPart = None  # type: ignore[misc,assignment]
 
 
 def _transform_system_instructions(
     permanent_instructions: "list[SystemPromptPart]",
     current_instructions: "list[str]",
-) -> "list[SentryTextPart]":
-    text_parts: "list[SentryTextPart]" = [
+) -> "list[_types.TextPart]":
+    text_parts: "list[_types.TextPart]" = [
         {
             "type": "text",
             "content": instruction.content,
@@ -231,7 +232,8 @@ def _set_input_messages(
 
 
 def _set_output_data(
-    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]", response: "Any"
+    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
+    response: "Optional[ModelResponse]",
 ) -> None:
     """Set output data on a span."""
     if not _should_send_prompts():
@@ -243,13 +245,11 @@ def _set_output_data(
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
     )
-    set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)
+    set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)  # type: ignore[arg-type]
 
     try:
-        # Extract text from ModelResponse
         if hasattr(response, "parts"):
-            texts = []
-            tool_calls = []
+            parts: "list[Union[_types.TextPart, _types.ReasoningPart, _types.ToolCallPart]]" = []
 
             for part in response.parts:
                 if (
@@ -257,25 +257,30 @@ def _set_output_data(
                     and isinstance(part, TextPart)
                     and hasattr(part, "content")
                 ):
-                    texts.append(part.content)
+                    parts.append({"type": "text", "content": part.content})
+
+                elif ThinkingPart is not None and isinstance(part, ThinkingPart):
+                    parts.append(
+                        {
+                            "type": "reasoning",
+                            "content": part.content,
+                        }
+                    )
+
                 elif BaseToolCallPart is not None and isinstance(
                     part, BaseToolCallPart
                 ):
-                    tool_call_data = {
-                        "type": "function",
-                    }
+                    tool_part: "_types.ToolCallPart" = {"type": "tool_call"}
                     if hasattr(part, "tool_name"):
-                        tool_call_data["name"] = part.tool_name
+                        tool_part["name"] = part.tool_name
                     if hasattr(part, "args"):
-                        tool_call_data["arguments"] = safe_serialize(part.args)
-                    tool_calls.append(tool_call_data)
+                        tool_part["arguments"] = safe_serialize(part.args)
+                    parts.append(tool_part)
 
-            if texts:
-                set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, texts)
-
-            if tool_calls:
+            if parts:
                 set_on_span(
-                    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(tool_calls)
+                    SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                    json.dumps([{"role": "assistant", "parts": parts}]),
                 )
 
     except Exception:
@@ -338,7 +343,8 @@ def ai_client_span(
 
 
 def update_ai_client_span(
-    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]", model_response: "Any"
+    span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
+    model_response: "Optional[ModelResponse]",
 ) -> None:
     """Update the AI client span with response data."""
     if not span:

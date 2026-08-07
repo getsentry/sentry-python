@@ -1,7 +1,7 @@
 import inspect
 import sys
 from functools import wraps
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import sentry_sdk
 from sentry_sdk.ai.monitoring import record_token_usage
@@ -24,6 +24,10 @@ from sentry_sdk.utils import (
 if TYPE_CHECKING:
     from typing import Any, Callable, Iterable, Union
 
+    from huggingface_hub import (
+        ChatCompletionStreamOutput,
+    )
+
     from sentry_sdk.tracing import Span
 
 try:
@@ -44,13 +48,13 @@ class HuggingfaceHubIntegration(Integration):
     @staticmethod
     def setup_once() -> None:
         # Other tasks that can be called: https://huggingface.co/docs/huggingface_hub/guides/inference#supported-providers-and-tasks
-        huggingface_hub.inference._client.InferenceClient.text_generation = (
+        huggingface_hub.inference._client.InferenceClient.text_generation = (  # type: ignore[method-assign]
             _wrap_huggingface_task(
                 huggingface_hub.inference._client.InferenceClient.text_generation,
                 OP.GEN_AI_TEXT_COMPLETION,
             )
         )
-        huggingface_hub.inference._client.InferenceClient.chat_completion = (
+        huggingface_hub.inference._client.InferenceClient.chat_completion = (  # type: ignore[method-assign]
             _wrap_huggingface_task(
                 huggingface_hub.inference._client.InferenceClient.chat_completion,
                 OP.GEN_AI_CHAT,
@@ -302,7 +306,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
 
             else:
                 # chat-completion stream output
-                def new_iterator() -> "Iterable[str]":
+                def new_iterator() -> "Iterable[ChatCompletionStreamOutput]":
                     finish_reason = None
                     response_model = None
                     response_text_buffer: "list[str]" = []
@@ -310,7 +314,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                     usage = None
 
                     with capture_internal_exceptions():
-                        for chunk in res:
+                        for chunk in cast("Iterable[ChatCompletionStreamOutput]", res):
                             if hasattr(chunk, "model") and chunk.model is not None:
                                 response_model = chunk.model
 
