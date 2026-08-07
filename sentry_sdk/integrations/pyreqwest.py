@@ -157,9 +157,6 @@ async def sentry_async_middleware(
     if sentry_sdk.get_client().get_integration(PyreqwestIntegration) is None:
         return await next_handler.run(request)
 
-    parsed_url = None
-    with capture_internal_exceptions():
-        parsed_url = parse_url(str(request.url), sanitize=False)
     method = request.method
 
     with _sentry_pyreqwest_span(request) as span:
@@ -173,17 +170,24 @@ async def sentry_async_middleware(
         elif span is not None:
             span.set_http_status(response.status)
 
+    breadcrumb_data = {
+        SPANDATA.HTTP_METHOD: method,
+        SPANDATA.HTTP_STATUS_CODE: response.status,
+    }
+
+    parsed_url = None
     with capture_internal_exceptions():
-        add_http_breadcrumb(
-            response.status,
+        parsed_url = parse_url(str(request.url), sanitize=False)
+    if parsed_url:
+        breadcrumb_data.update(
             {
-                SPANDATA.HTTP_METHOD: method,
-                "url": parsed_url.url if parsed_url else None,
-                SPANDATA.HTTP_QUERY: parsed_url.query if parsed_url else None,
-                SPANDATA.HTTP_FRAGMENT: parsed_url.fragment if parsed_url else None,
-                SPANDATA.HTTP_STATUS_CODE: response.status,
-            },
+                "url": parsed_url.url,
+                SPANDATA.HTTP_QUERY: parsed_url.query,
+                SPANDATA.HTTP_FRAGMENT: parsed_url.fragment,
+            }
         )
+
+    add_http_breadcrumb(response.status, breadcrumb_data)
 
     return response
 
@@ -194,9 +198,6 @@ def sentry_sync_middleware(
     if sentry_sdk.get_client().get_integration(PyreqwestIntegration) is None:
         return next_handler.run(request)
 
-    parsed_url = None
-    with capture_internal_exceptions():
-        parsed_url = parse_url(str(request.url), sanitize=False)
     method = request.method
 
     with _sentry_pyreqwest_span(request) as span:
@@ -210,16 +211,23 @@ def sentry_sync_middleware(
         elif span is not None:
             span.set_http_status(response.status)
 
+    breadcrumb_data = {
+        SPANDATA.HTTP_METHOD: method,
+        SPANDATA.HTTP_STATUS_CODE: response.status,
+    }
+
+    parsed_url = None
     with capture_internal_exceptions():
-        add_http_breadcrumb(
-            response.status,
+        parsed_url = parse_url(str(request.url), sanitize=False)
+    if parsed_url:
+        breadcrumb_data.update(
             {
-                SPANDATA.HTTP_METHOD: method,
-                "url": parsed_url.url if parsed_url else None,
-                SPANDATA.HTTP_QUERY: parsed_url.query if parsed_url else None,
-                SPANDATA.HTTP_FRAGMENT: parsed_url.fragment if parsed_url else None,
-                SPANDATA.HTTP_STATUS_CODE: response.status,
-            },
+                "url": parsed_url.url,
+                SPANDATA.HTTP_QUERY: parsed_url.query,
+                SPANDATA.HTTP_FRAGMENT: parsed_url.fragment,
+            }
         )
+
+    add_http_breadcrumb(response.status, breadcrumb_data)
 
     return response

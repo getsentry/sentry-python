@@ -130,18 +130,20 @@ def _install_httpx2_client() -> None:
             with capture_internal_exceptions():
                 add_http_request_source(span)
 
-        with capture_internal_exceptions():
-            add_http_breadcrumb(
-                rv.status_code,
+        breadcrumb_data = {
+            SPANDATA.HTTP_METHOD: request.method,
+            SPANDATA.HTTP_STATUS_CODE: rv.status_code,
+            "reason": rv.reason_phrase,
+        }
+        if parsed_url:
+            breadcrumb_data.update(
                 {
-                    SPANDATA.HTTP_METHOD: request.method,
-                    "url": parsed_url.url if parsed_url else None,
-                    SPANDATA.HTTP_QUERY: parsed_url.query if parsed_url else None,
-                    SPANDATA.HTTP_FRAGMENT: parsed_url.fragment if parsed_url else None,
-                    SPANDATA.HTTP_STATUS_CODE: rv.status_code,
-                    "reason": rv.reason_phrase,
-                },
+                    "url": parsed_url.url,
+                    SPANDATA.HTTP_QUERY: parsed_url.query,
+                    SPANDATA.HTTP_FRAGMENT: parsed_url.fragment,
+                }
             )
+        add_http_breadcrumb(rv.status_code, breadcrumb_data)
 
         return rv
 
@@ -236,18 +238,20 @@ def _install_httpx2_async_client() -> None:
             with capture_internal_exceptions():
                 add_http_request_source(span)
 
-        with capture_internal_exceptions():
-            add_http_breadcrumb(
-                rv.status_code,
+        breadcrumb_data = {
+            SPANDATA.HTTP_METHOD: request.method,
+            SPANDATA.HTTP_STATUS_CODE: rv.status_code,
+            "reason": rv.reason_phrase,
+        }
+        if parsed_url:
+            breadcrumb_data.update(
                 {
-                    SPANDATA.HTTP_METHOD: request.method,
-                    "url": parsed_url.url if parsed_url else None,
-                    SPANDATA.HTTP_QUERY: parsed_url.query if parsed_url else None,
-                    SPANDATA.HTTP_FRAGMENT: parsed_url.fragment if parsed_url else None,
-                    SPANDATA.HTTP_STATUS_CODE: rv.status_code,
-                    "reason": rv.reason_phrase,
-                },
+                    "url": parsed_url.url,
+                    SPANDATA.HTTP_QUERY: parsed_url.query,
+                    SPANDATA.HTTP_FRAGMENT: parsed_url.fragment,
+                }
             )
+        add_http_breadcrumb(rv.status_code, breadcrumb_data)
 
         return rv
 

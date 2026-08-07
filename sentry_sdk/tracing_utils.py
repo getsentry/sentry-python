@@ -222,6 +222,7 @@ def add_http_breadcrumb(status_code, data):
     kwargs = {"type": "http", "category": "httplib", "data": data}
     if level:
         kwargs["level"] = level
+
     sentry_sdk.add_breadcrumb(**kwargs)
 
 
