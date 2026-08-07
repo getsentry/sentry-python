@@ -45,6 +45,16 @@ def patch_redis_async_pipeline(
         if client.get_integration(RedisIntegration) is None:
             return await old_execute(self, *args, **kwargs)
 
+        sentry_sdk.add_breadcrumb(
+            message="redis.pipeline.execute",
+            type="redis",
+            category="redis",
+            data={
+                "redis.is_cluster": is_cluster,
+                "redis.transaction": False if is_cluster else self.is_transaction,
+            },
+        )
+
         span_streaming = has_span_streaming_enabled(client.options)
 
         span: "Union[Span, StreamedSpan]"
@@ -84,20 +94,7 @@ def patch_redis_async_pipeline(
                     command_seq,
                 )
 
-            rv = await old_execute(self, *args, **kwargs)
-
-        with capture_internal_exceptions():
-            sentry_sdk.add_breadcrumb(
-                message="redis.pipeline.execute",
-                type="redis",
-                category="redis",
-                data={
-                    "redis.is_cluster": is_cluster,
-                    "redis.transaction": False if is_cluster else self.is_transaction,
-                },
-            )
-
-        return rv
+            return await old_execute(self, *args, **kwargs)
 
     pipeline_cls.execute = _sentry_execute  # type: ignore
 
@@ -118,6 +115,24 @@ def patch_redis_async_client(
         integration = client.get_integration(RedisIntegration)
         if integration is None:
             return await old_execute_command(self, name, *args, **kwargs)
+
+        db_properties = _compile_db_span_properties(integration, name, args)
+
+        breadcrumb_data = {
+            "redis.is_cluster": is_cluster,
+            "redis.command": name,
+            "db.operation": name,
+        }
+        key = _extract_key(name, args)
+        if key is not None:
+            breadcrumb_data["redis.key"] = key
+
+        sentry_sdk.add_breadcrumb(
+            message=db_properties["description"],
+            type="redis",
+            category="redis",
+            data=breadcrumb_data,
+        )
 
         span_streaming = has_span_streaming_enabled(client.options)
 
@@ -156,8 +171,6 @@ def patch_redis_async_client(
                 )
             cache_span.__enter__()
 
-        db_properties = _compile_db_span_properties(integration, name, args)
-
         additional_db_span_attributes = {}
         with capture_internal_exceptions():
             additional_db_span_attributes[SPANDATA.DB_QUERY_TEXT] = _get_safe_command(
@@ -192,23 +205,6 @@ def patch_redis_async_client(
         if cache_span:
             _set_cache_data(cache_span, self, cache_properties, value)
             cache_span.__exit__(None, None, None)
-
-        with capture_internal_exceptions():
-            data = {
-                "redis.is_cluster": is_cluster,
-                "redis.command": name,
-                "db.operation": name,
-            }
-            key = _extract_key(name, args)
-            if key is not None:
-                data["redis.key"] = key
-
-            sentry_sdk.add_breadcrumb(
-                message=db_properties["description"],
-                type="redis",
-                category="redis",
-                data=data,
-            )
 
         return value
 
