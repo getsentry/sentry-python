@@ -305,17 +305,12 @@ def _install_subprocess() -> None:
 
         env = None
 
-        with capture_internal_exceptions():
-            data = {}
-            if cwd:
-                data["subprocess.cwd"] = cwd
-
-            sentry_sdk.add_breadcrumb(
-                type="subprocess",
-                category="subprocess",
-                message=description,
-                data=data,
-            )
+        sentry_sdk.add_breadcrumb(
+            type="subprocess",
+            category="subprocess",
+            message=description,
+            data={"subprocess.cwd": cwd} if cwd else {},
+        )
 
         span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
         span: "Union[Span, StreamedSpan]"
