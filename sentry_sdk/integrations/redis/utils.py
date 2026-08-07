@@ -161,7 +161,7 @@ def _set_client_data(
             span.set_tag("redis.key", key)
 
 
-def _extract_key(name: str, args: "Any") -> Optional[str]:
+def _extract_key(name: str, args: "Any") -> "Optional[str]":
     if not name or not args:
         return None
 
