@@ -36,6 +36,7 @@ from sentry_sdk.tracing import (
     TransactionSource,
 )
 from sentry_sdk.tracing_utils import (
+    add_http_breadcrumb,
     add_http_request_source,
     has_span_streaming_enabled,
     should_propagate_trace,
@@ -388,6 +389,8 @@ def create_trace_config() -> "TraceConfig":
         with capture_internal_exceptions():
             parsed_url = parse_url(str(params.url), sanitize=False)
 
+        breadcrumb = {}
+
         span_name = "%s %s" % (
             method,
             parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
@@ -395,53 +398,60 @@ def create_trace_config() -> "TraceConfig":
 
         span: "Union[Span, StreamedSpan, None]"
         if has_span_streaming_enabled(client.options):
-            if sentry_sdk.traces.get_current_span() is None:
-                span = None
-            else:
-                attributes: "Attributes" = {
-                    "sentry.op": OP.HTTP_CLIENT,
-                    "sentry.origin": AioHttpIntegration.origin,
-                    "http.request.method": method,
-                }
-                if parsed_url is not None:
-                    if has_data_collection_enabled(client.options):
-                        url_full = parsed_url.url
-                        attributes["url.path"] = params.url.path
+            attributes: "Attributes" = {
+                "sentry.op": OP.HTTP_CLIENT,
+                "sentry.origin": AioHttpIntegration.origin,
+                "http.request.method": method,
+            }
+            if parsed_url is not None:
+                if has_data_collection_enabled(client.options):
+                    url_full = parsed_url.url
+                    attributes["url.path"] = params.url.path
 
-                        if parsed_url.query:
-                            filtered_query = (
-                                _apply_data_collection_filtering_to_query_string(
-                                    query_string=parsed_url.query,
-                                    behaviour=client.options["data_collection"][
-                                        "url_query_params"
-                                    ],
-                                )
+                    if parsed_url.query:
+                        filtered_query = (
+                            _apply_data_collection_filtering_to_query_string(
+                                query_string=parsed_url.query,
+                                behaviour=client.options["data_collection"][
+                                    "url_query_params"
+                                ],
                             )
-                            if filtered_query:
-                                attributes["url.query"] = filtered_query
-                                url_full += "?" + filtered_query
+                        )
+                        if filtered_query:
+                            attributes["url.query"] = filtered_query
+                            url_full += "?" + filtered_query
+                            breadcrumb[SPANDATA.HTTP_QUERY] = filtered_query
 
-                        if parsed_url.fragment:
-                            attributes["url.fragment"] = parsed_url.fragment
-                            url_full += "#" + parsed_url.fragment
+                    if parsed_url.fragment:
+                        attributes["url.fragment"] = parsed_url.fragment
+                        url_full += "#" + parsed_url.fragment
+                        breadcrumb[SPANDATA.HTTP_FRAGMENT] = parsed_url.fragment
 
-                        attributes["url.full"] = url_full
-                    elif should_send_default_pii():
-                        url_full = parsed_url.url
-                        attributes["url.path"] = params.url.path
+                    attributes["url.full"] = url_full
+                    breadcrumb["url"] = url_full
 
-                        if parsed_url.query:
-                            url_full += "?" + parsed_url.query
-                            attributes["url.query"] = parsed_url.query
-                        if parsed_url.fragment:
-                            url_full += "#" + parsed_url.fragment
-                            attributes["url.fragment"] = parsed_url.fragment
+                elif should_send_default_pii():
+                    url_full = parsed_url.url
+                    attributes["url.path"] = params.url.path
 
-                        attributes["url.full"] = url_full
+                    if parsed_url.query:
+                        url_full += "?" + parsed_url.query
+                        attributes["url.query"] = parsed_url.query
+                        breadcrumb[SPANDATA.HTTP_QUERY] = parsed_url.query
+                    if parsed_url.fragment:
+                        url_full += "#" + parsed_url.fragment
+                        attributes["url.fragment"] = parsed_url.fragment
+                        breadcrumb[SPANDATA.HTTP_FRAGMENT] = parsed_url.fragment
 
-                span = sentry_sdk.traces.start_span(
-                    name=span_name, attributes=attributes
-                )
+                    attributes["url.full"] = url_full
+                    breadcrumb["url"] = url_full
+
+                if sentry_sdk.traces.get_current_span() is None:
+                    span = None
+                else:
+                    span = sentry_sdk.traces.start_span(
+                        name=span_name, attributes=attributes
+                    )
         else:
             legacy_span = sentry_sdk.start_span(
                 op=OP.HTTP_CLIENT,
@@ -451,8 +461,13 @@ def create_trace_config() -> "TraceConfig":
             legacy_span.set_data(SPANDATA.HTTP_METHOD, method)
             if parsed_url is not None:
                 legacy_span.set_data("url", parsed_url.url)
-                legacy_span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-                legacy_span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+                breadcrumb.update(
+                    {
+                        SPANDATA.HTTP_QUERY: parsed_url.query,
+                        SPANDATA.HTTP_FRAGMENT: parsed_url.fragment,
+                        "url": parsed_url.url,
+                    }
+                )
             span = legacy_span
 
         if should_propagate_trace(client, str(params.url)):
@@ -475,18 +490,35 @@ def create_trace_config() -> "TraceConfig":
                 else:
                     params.headers[key] = value
 
-        trace_config_ctx.span = span
+        trace_config_ctx._sentry_span = span
+        trace_config_ctx._sentry_breadcrumb = breadcrumb
 
     async def on_request_end(
         session: "ClientSession",
         trace_config_ctx: "SimpleNamespace",
         params: "TraceRequestEndParams",
     ) -> None:
-        if trace_config_ctx.span is None:
+        status = int(params.response.status)
+
+        breadcrumb = trace_config_ctx._sentry_breadcrumb
+        if breadcrumb is not None:
+            breadcrumb.update(
+                {
+                    SPANDATA.HTTP_METHOD: params.method.upper(),
+                    SPANDATA.HTTP_STATUS_CODE: status,
+                    "reason": params.response.reason,
+                }
+            )
+
+            add_http_breadcrumb(
+                status,
+                breadcrumb,
+            )
+
+        if trace_config_ctx._sentry_span is None:
             return
 
-        span = trace_config_ctx.span
-        status = int(params.response.status)
+        span = trace_config_ctx._sentry_span
 
         if isinstance(span, StreamedSpan):
             span.set_attribute("http.response.status_code", status)

@@ -484,14 +484,18 @@ async def test_trace_from_headers_if_performance_disabled(
 
 @pytest.mark.asyncio
 async def test_crumb_capture(
-    sentry_init, aiohttp_raw_server, aiohttp_client, capture_events
+    sentry_init,
+    aiohttp_raw_server,
+    aiohttp_client,
+    capture_events,
 ):
     def before_breadcrumb(crumb, hint):
         crumb["data"]["extra"] = "foo"
         return crumb
 
     sentry_init(
-        integrations=[AioHttpIntegration()], before_breadcrumb=before_breadcrumb
+        integrations=[AioHttpIntegration()],
+        before_breadcrumb=before_breadcrumb,
     )
 
     async def handler(request):
@@ -523,6 +527,90 @@ async def test_crumb_capture(
                 "extra": "foo",
             }
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "pii_options,url_expected,query_expected",
+    [
+        ({}, False, False),
+        ({"send_default_pii": True}, True, True),
+        ({"send_default_pii": False}, False, False),
+        (
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "denylist", "terms": []}
+                    }
+                }
+            },
+            True,
+            True,
+        ),
+        (
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": []}
+                    }
+                }
+            },
+            True,
+            False,
+        ),
+    ],
+)
+async def test_crumb_capture_span_streaming(
+    sentry_init,
+    aiohttp_raw_server,
+    aiohttp_client,
+    capture_events,
+    pii_options,
+    url_expected,
+    query_expected,
+):
+    def before_breadcrumb(crumb, hint):
+        crumb["data"]["extra"] = "foo"
+        return crumb
+
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        before_breadcrumb=before_breadcrumb,
+        trace_lifecycle="stream",
+        **pii_options,
+    )
+
+    async def handler(request):
+        return web.Response(text="OK")
+
+    raw_server = await aiohttp_raw_server(handler)
+
+    events = capture_events()
+
+    client = await aiohttp_client(raw_server)
+    resp = await client.get("/?query=value")
+    assert resp.status == 200
+    capture_message("Testing!")
+
+    (event,) = events
+
+    crumb = event["breadcrumbs"]["values"][0]
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+
+    expected = {
+        "http.method": "GET",
+        "http.response.status_code": 200,
+        "reason": "OK",
+    }
+
+    if url_expected:
+        if query_expected:
+            expected["url"] = f"http://127.0.0.1:{raw_server.port}/?query=value"
+        else:
+            expected["url"] = (
+                f"http://127.0.0.1:{raw_server.port}/?query=%5BFiltered%5D"
+            )
 
 
 @pytest.mark.parametrize(
@@ -577,6 +665,102 @@ async def test_crumb_capture_client_error(
                 "http.response.status_code": status_code,
             }
         )
+
+
+@pytest.mark.parametrize(
+    "status_code,level,reason",
+    [
+        (200, None, "OK"),
+        (301, None, "Moved Permanently"),
+        (403, "warning", "Forbidden"),
+        (405, "warning", "Method Not Allowed"),
+        (500, "error", "Internal Server Error"),
+    ],
+)
+@pytest.mark.parametrize(
+    "pii_options,url_expected,query_expected",
+    [
+        ({}, False, False),
+        ({"send_default_pii": True}, True, True),
+        ({"send_default_pii": False}, False, False),
+        (
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "denylist", "terms": []}
+                    }
+                }
+            },
+            True,
+            True,
+        ),
+        (
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": []}
+                    }
+                }
+            },
+            True,
+            False,
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_crumb_capture_client_error_span_streaming(
+    sentry_init,
+    aiohttp_raw_server,
+    aiohttp_client,
+    capture_events,
+    status_code,
+    level,
+    reason,
+    pii_options,
+    url_expected,
+    query_expected,
+):
+    sentry_init(
+        integrations=[AioHttpIntegration()], trace_lifecycle="stream", **pii_options
+    )
+
+    async def handler(request):
+        return web.Response(status=status_code)
+
+    raw_server = await aiohttp_raw_server(handler)
+
+    events = capture_events()
+
+    client = await aiohttp_client(raw_server)
+    resp = await client.get("/?query=value")
+    assert resp.status == status_code
+    capture_message("Testing!")
+
+    (event,) = events
+
+    crumb = event["breadcrumbs"]["values"][0]
+    assert crumb["type"] == "http"
+    if level is None:
+        assert "level" not in crumb
+    else:
+        assert crumb["level"] == level
+    assert crumb["category"] == "httplib"
+
+    expected = {
+        "http.method": "GET",
+        "http.response.status_code": status_code,
+        "reason": reason,
+    }
+
+    if url_expected:
+        if query_expected:
+            expected["url"] = f"http://127.0.0.1:{raw_server.port}/?query=value"
+        else:
+            expected["url"] = (
+                f"http://127.0.0.1:{raw_server.port}/?query=%5BFiltered%5D"
+            )
+
+    assert crumb["data"] == ApproxDict(expected)
 
 
 @pytest.mark.asyncio

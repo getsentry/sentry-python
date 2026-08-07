@@ -210,6 +210,22 @@ def record_sql_queries(
             yield span
 
 
+def add_http_breadcrumb(status_code, data):
+    # type: (Optional[int], dict[str, Any]) -> None
+    level = None
+    if status_code:
+        if 500 <= status_code <= 599:
+            level = "error"
+        elif 400 <= status_code <= 499:
+            level = "warning"
+
+    kwargs: "dict[str, Any]" = {"type": "http", "category": "httplib", "data": data}
+    if level:
+        kwargs["level"] = level
+
+    sentry_sdk.add_breadcrumb(**kwargs)
+
+
 def maybe_create_breadcrumbs_from_span(
     scope: "sentry_sdk.Scope", span: "sentry_sdk.tracing.Span"
 ) -> None:
