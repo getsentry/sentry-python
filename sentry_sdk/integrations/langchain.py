@@ -736,7 +736,7 @@ def _extract_tokens_from_generations(
     total_total = 0
     total_cache_read = None
     total_cache_creation = None
-    reasoning = 0
+    reasoning = None
 
     for gen_list in generations:
         if not gen_list:
