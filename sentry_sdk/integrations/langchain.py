@@ -751,7 +751,8 @@ def _extract_tokens_from_generations(
 
         message = gen_list[0].message
 
-        if not isinstance(message, AIMessage):
+        # The property was added in https://github.com/langchain-ai/langchain/commit/fbfed65fb1ccff3eb8477c4f114450537a0510b2
+        if not isinstance(message, AIMessage) or not hasattr(message, "usage_metadata"):
             continue
 
         usage_metadata = message.usage_metadata
