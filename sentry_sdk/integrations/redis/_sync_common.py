@@ -89,9 +89,7 @@ def patch_redis_pipeline(
                     command_seq,
                 )
 
-            rv = old_execute(self, *args, **kwargs)
-
-        return rv
+            return old_execute(self, *args, **kwargs)
 
     pipeline_cls.execute = sentry_patched_execute
 
