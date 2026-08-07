@@ -759,6 +759,9 @@ def _extract_tokens_from_generations(
 
         usage_metadata = message.usage_metadata
 
+        if not isinstance(usage_metadata, dict):
+            continue
+
         input_token_details = usage_metadata.get("input_token_details")
         if not isinstance(input_token_details, dict):
             continue
