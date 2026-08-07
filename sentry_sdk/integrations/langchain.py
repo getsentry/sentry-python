@@ -742,9 +742,9 @@ def _extract_tokens_from_generations(
 
         token_usage = _get_token_usage(gen_list[0])
         input_tokens, output_tokens, total_tokens = _extract_tokens(token_usage)
-        total_input += input_tokens if input_tokens is not None else 0
-        total_output += output_tokens if output_tokens is not None else 0
-        total_total += total_tokens if total_tokens is not None else 0
+        total_input += input_tokens if isinstance(input_tokens, int) else 0
+        total_output += output_tokens if isinstance(output_tokens, int) else 0
+        total_total += total_tokens if isinstance(total_tokens, int) else 0
 
         if not isinstance(gen_list[0], ChatGeneration):
             continue
@@ -763,12 +763,12 @@ def _extract_tokens_from_generations(
         if not isinstance(input_token_details, dict):
             continue
 
-        if "cache_read" in input_token_details:
+        if isinstance(input_token_details.get("cache_read"), int):
             total_cache_read = (total_cache_read or 0) + input_token_details[
                 "cache_read"
             ]
 
-        if "cache_creation" in input_token_details:
+        if isinstance(input_token_details.get("cache_creation"), int):
             total_cache_creation = (total_cache_creation or 0) + input_token_details[
                 "cache_creation"
             ]
