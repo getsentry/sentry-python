@@ -461,6 +461,8 @@ def create_trace_config() -> "TraceConfig":
             legacy_span.set_data(SPANDATA.HTTP_METHOD, method)
             if parsed_url is not None:
                 legacy_span.set_data("url", parsed_url.url)
+                legacy_span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
+                legacy_span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
                 breadcrumb.update(
                     {
                         SPANDATA.HTTP_QUERY: parsed_url.query,
