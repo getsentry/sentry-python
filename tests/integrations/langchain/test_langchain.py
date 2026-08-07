@@ -981,7 +981,7 @@ def test_langchain_create_agent(
         assert chat_spans[0]["data"]["gen_ai.agent.name"] == "word_length_agent"
 
         assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 10
-        assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 25
+        assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 20
         assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 30
 
         assert chat_spans[0]["data"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 4
