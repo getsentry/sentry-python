@@ -535,7 +535,6 @@ def test_user_captured(
 def test_materialized_user_captured(
     sentry_init,
     client,
-    capture_events,
     capture_items,
 ):
     sentry_init(
