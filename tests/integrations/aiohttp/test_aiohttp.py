@@ -1069,7 +1069,7 @@ async def test_no_request_source_if_duration_too_short(
         trace_context = create_trace_config()
 
         async def overwrite_timestamps(session, trace_config_ctx, params):
-            span = trace_config_ctx.span
+            span = trace_config_ctx._sentry_span
             span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
             span.timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
 
@@ -1128,7 +1128,7 @@ async def test_request_source_if_duration_over_threshold(
         trace_context = create_trace_config()
 
         async def overwrite_timestamps(session, trace_config_ctx, params):
-            span = trace_config_ctx.span
+            span = trace_config_ctx._sentry_span
             span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
             span.timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
 
