@@ -268,12 +268,6 @@ def nonstreaming_multi_candidate_google_genai_model_response():
         ],
         model_version="gemini/gemini-pro",
         usage_metadata=google.genai.types.GenerateContentResponseUsageMetadata(
-            cache_tokens_details=[
-                google.genai.types.ModalityTokenCount(
-                    modality=google.genai.types.Modality.TEXT,
-                    token_count=6,
-                )
-            ],
             cached_content_token_count=4,
             prompt_token_count=10,
             candidates_token_count=20,
