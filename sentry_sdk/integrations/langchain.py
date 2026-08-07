@@ -4,7 +4,7 @@ import sys
 import warnings
 from collections import OrderedDict
 from functools import wraps
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 import sentry_sdk
 from sentry_sdk.ai.utils import (
@@ -50,7 +50,7 @@ try:
         Callbacks,
         manager,
     )
-    from langchain_core.messages import BaseMessage
+    from langchain_core.messages import AIMessage, BaseMessage
     from langchain_core.outputs import (
         ChatGeneration,
         ChatGenerationChunk,
@@ -61,6 +61,14 @@ try:
 
 except ImportError:
     raise DidNotEnable("langchain not installed")
+
+
+class TokenUsage(NamedTuple):
+    input_tokens: "Optional[int]"
+    output_tokens: "Optional[int]"
+    total_tokens: "Optional[int]"
+    cache_read: "Optional[int]"
+    cache_creation: "Optional[int]"
 
 
 try:
@@ -720,7 +728,7 @@ def _extract_tokens(
 
 def _extract_tokens_from_generations(
     generations: "list[list[Generation | ChatGeneration | GenerationChunk | ChatGenerationChunk]]",
-) -> "tuple[Optional[int], Optional[int], Optional[int]]":
+) -> "TokenUsage":
     """Extract token usage from response.generations structure."""
     if not generations:
         return None, None, None
@@ -728,6 +736,8 @@ def _extract_tokens_from_generations(
     total_input = 0
     total_output = 0
     total_total = 0
+    total_cache_read = None
+    total_cache_creation = None
 
     for gen_list in generations:
         if not gen_list:
@@ -739,10 +749,36 @@ def _extract_tokens_from_generations(
         total_output += output_tokens if output_tokens is not None else 0
         total_total += total_tokens if total_tokens is not None else 0
 
-    return (
+        if not isinstance(gen_list[0], ChatGeneration):
+            continue
+
+        message = gen_list[0].message
+
+        if not isinstance(message, AIMessage):
+            continue
+
+        usage_metadata = message.usage_metadata
+
+        input_token_details = usage_metadata.get("input_token_details")
+        if not isinstance(input_token_details, dict):
+            continue
+
+        if "cache_read" in input_token_details:
+            total_cache_read = (total_cache_read or 0) + input_token_details[
+                "cache_read"
+            ]
+
+        if "cache_creation" in input_token_details:
+            total_cache_creation = (total_cache_creation or 0) + input_token_details[
+                "cache_creation"
+            ]
+
+    return TokenUsage(
         total_input if total_input > 0 else None,
         total_output if total_output > 0 else None,
         total_total if total_total > 0 else None,
+        total_cache_read,
+        total_cache_creation,
     )
 
 
@@ -777,13 +813,29 @@ def _get_token_usage(obj: "Any") -> "Optional[Dict[str, Any]]":
 def _record_token_usage(
     span: "Union[Span, StreamedSpan]", response: "LLMResult"
 ) -> None:
+    input_tokens = None
+    output_tokens = None
+    total_tokens = None
+    cache_read_tokens = None
+    cache_creation_tokens = None
+
+    # Legacy that reads provider-specific token information.
     token_usage = _get_token_usage(response)
     if token_usage:
         input_tokens, output_tokens, total_tokens = _extract_tokens(token_usage)
-    else:
-        input_tokens, output_tokens, total_tokens = _extract_tokens_from_generations(
-            response.generations
-        )
+
+    # Prefer provider-agnostic UsageMetadata if available.
+    token_usage = _extract_tokens_from_generations(response.generations)
+    if token_usage.input_tokens is not None:
+        input_tokens = token_usage.input_tokens
+    if token_usage.output_tokens is not None:
+        output_tokens = token_usage.output_tokens
+    if token_usage.total_tokens is not None:
+        total_tokens = token_usage.total_tokens
+    if token_usage.cache_read is not None:
+        cache_read_tokens = token_usage.cache_read
+    if token_usage.cache_creation is not None:
+        cache_creation_tokens = token_usage.cache_creation
 
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
@@ -797,6 +849,14 @@ def _record_token_usage(
 
     if total_tokens is not None:
         set_on_span(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)
+
+    if cache_read_tokens is not None:
+        set_on_span(SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read_tokens)
+
+    if cache_creation_tokens is not None:
+        set_on_span(
+            SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, cache_creation_tokens
+        )
 
 
 def _get_request_data(

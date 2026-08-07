@@ -268,6 +268,13 @@ def nonstreaming_multi_candidate_google_genai_model_response():
         ],
         model_version="gemini/gemini-pro",
         usage_metadata=google.genai.types.GenerateContentResponseUsageMetadata(
+            cache_tokens_details=[
+                google.genai.types.ModalityTokenCount(
+                    modality=google.genai.types.Modality.TEXT,
+                    token_count=6,
+                )
+            ],
+            cached_content_token_count=4,
             prompt_token_count=10,
             candidates_token_count=20,
             total_token_count=30,
@@ -592,6 +599,11 @@ def test_langchain_multi_choice_response(
         assert chat_spans[0]["attributes"]["gen_ai.usage.input_tokens"] == 10
         assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens"] == 20
         assert chat_spans[0]["attributes"]["gen_ai.usage.total_tokens"] == 30
+
+        assert (
+            chat_spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]
+            == 4
+        )
     else:
         events = capture_events()
 
@@ -612,6 +624,8 @@ def test_langchain_multi_choice_response(
         assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 10
         assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 20
         assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 30
+
+        assert chat_spans[0]["data"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 4
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -798,6 +812,17 @@ def test_langchain_create_agent(
         assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens"] == 20
         assert chat_spans[0]["attributes"]["gen_ai.usage.total_tokens"] == 30
 
+        assert (
+            chat_spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]
+            == 4
+        )
+        assert (
+            chat_spans[0]["attributes"][
+                SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS
+            ]
+            == 6
+        )
+
         if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
             assert (
                 chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4"
@@ -874,6 +899,17 @@ def test_langchain_create_agent(
         assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens"] == 20
         assert chat_spans[0]["attributes"]["gen_ai.usage.total_tokens"] == 30
 
+        assert (
+            chat_spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]
+            == 4
+        )
+        assert (
+            chat_spans[0]["attributes"][
+                SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS
+            ]
+            == 6
+        )
+
         if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
             assert (
                 chat_spans[0]["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4"
@@ -942,6 +978,12 @@ def test_langchain_create_agent(
         assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 10
         assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 20
         assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 30
+
+        assert chat_spans[0]["data"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 4
+        assert (
+            chat_spans[0]["data"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]
+            == 6
+        )
 
         if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
             assert chat_spans[0]["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4"
@@ -1013,8 +1055,8 @@ def test_tool_execution_span(
                 ResponseUsage(
                     input_tokens=142,
                     input_tokens_details=InputTokensDetails(
-                        cached_tokens=0,
-                        cache_write_tokens=0,
+                        cached_tokens=69,
+                        cache_write_tokens=31,
                     ),
                     output_tokens=50,
                     output_tokens_details=OutputTokensDetails(
@@ -1025,8 +1067,8 @@ def test_tool_execution_span(
                 ResponseUsage(
                     input_tokens=89,
                     input_tokens_details=InputTokensDetails(
-                        cached_tokens=0,
-                        cache_write_tokens=0,
+                        cached_tokens=69,
+                        cache_write_tokens=10,
                     ),
                     output_tokens=28,
                     output_tokens_details=OutputTokensDetails(
@@ -1107,11 +1149,31 @@ def test_tool_execution_span(
         assert chat_spans[0]["attributes"]["gen_ai.usage.input_tokens"] == 142
         assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens"] == 50
         assert chat_spans[0]["attributes"]["gen_ai.usage.total_tokens"] == 192
+        assert (
+            chat_spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]
+            == 69
+        )
+        assert (
+            chat_spans[0]["attributes"][
+                SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS
+            ]
+            == 31
+        )
         assert chat_spans[0]["attributes"]["gen_ai.system"] == "openai-chat"
 
         assert chat_spans[1]["attributes"]["gen_ai.usage.input_tokens"] == 89
         assert chat_spans[1]["attributes"]["gen_ai.usage.output_tokens"] == 28
         assert chat_spans[1]["attributes"]["gen_ai.usage.total_tokens"] == 117
+        assert (
+            chat_spans[1]["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]
+            == 69
+        )
+        assert (
+            chat_spans[1]["attributes"][
+                SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS
+            ]
+            == 10
+        )
         assert chat_spans[1]["attributes"]["gen_ai.system"] == "openai-chat"
 
         if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
@@ -1220,11 +1282,31 @@ def test_tool_execution_span(
         assert chat_spans[0]["attributes"]["gen_ai.usage.input_tokens"] == 142
         assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens"] == 50
         assert chat_spans[0]["attributes"]["gen_ai.usage.total_tokens"] == 192
+        assert (
+            chat_spans[0]["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]
+            == 69
+        )
+        assert (
+            chat_spans[0]["attributes"][
+                SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS
+            ]
+            == 31
+        )
         assert chat_spans[0]["attributes"]["gen_ai.system"] == "openai-chat"
 
         assert chat_spans[1]["attributes"]["gen_ai.usage.input_tokens"] == 89
         assert chat_spans[1]["attributes"]["gen_ai.usage.output_tokens"] == 28
         assert chat_spans[1]["attributes"]["gen_ai.usage.total_tokens"] == 117
+        assert (
+            chat_spans[1]["attributes"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]
+            == 69
+        )
+        assert (
+            chat_spans[1]["attributes"][
+                SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS
+            ]
+            == 10
+        )
         assert chat_spans[1]["attributes"]["gen_ai.system"] == "openai-chat"
 
         if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
@@ -1333,11 +1415,25 @@ def test_tool_execution_span(
         assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 142
         assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 50
         assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 192
+        assert (
+            chat_spans[0]["data"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 69
+        )
+        assert (
+            chat_spans[0]["data"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]
+            == 31
+        )
         assert chat_spans[0]["data"]["gen_ai.system"] == "openai-chat"
 
         assert chat_spans[1]["data"]["gen_ai.usage.input_tokens"] == 89
         assert chat_spans[1]["data"]["gen_ai.usage.output_tokens"] == 28
         assert chat_spans[1]["data"]["gen_ai.usage.total_tokens"] == 117
+        assert (
+            chat_spans[1]["data"][SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS] == 69
+        )
+        assert (
+            chat_spans[1]["data"][SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]
+            == 10
+        )
         assert chat_spans[1]["data"]["gen_ai.system"] == "openai-chat"
 
         if LANGCHAIN_OPENAI_VERSION >= (0, 3, 13):
