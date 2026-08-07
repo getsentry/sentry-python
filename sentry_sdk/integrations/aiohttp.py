@@ -396,7 +396,7 @@ def create_trace_config() -> "TraceConfig":
             parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
         )
 
-        span: "Union[Span, StreamedSpan, None]"
+        span: "Union[Span, StreamedSpan, None]" = None
         if has_span_streaming_enabled(client.options):
             attributes: "Attributes" = {
                 "sentry.op": OP.HTTP_CLIENT,
@@ -446,12 +446,10 @@ def create_trace_config() -> "TraceConfig":
                     attributes["url.full"] = url_full
                     breadcrumb["url"] = url_full
 
-                if sentry_sdk.traces.get_current_span() is None:
-                    span = None
-                else:
-                    span = sentry_sdk.traces.start_span(
-                        name=span_name, attributes=attributes
-                    )
+            if sentry_sdk.traces.get_current_span() is not None:
+                span = sentry_sdk.traces.start_span(
+                    name=span_name, attributes=attributes
+                )
         else:
             legacy_span = sentry_sdk.start_span(
                 op=OP.HTTP_CLIENT,
