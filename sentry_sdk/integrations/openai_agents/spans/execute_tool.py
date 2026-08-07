@@ -5,6 +5,7 @@ from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SpanStatus, StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
+from sentry_sdk.utils import has_data_collection_enabled
 
 from ..consts import SPAN_ORIGIN
 from ..utils import _set_agent_data
@@ -19,6 +20,7 @@ def execute_tool_span(
     tool: "agents.Tool", *args: "Any", **kwargs: "Any"
 ) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+
     if span_streaming:
         span = sentry_sdk.traces.start_span(
             name=f"execute_tool {tool.name}",
@@ -51,6 +53,8 @@ def update_execute_tool_span(
     tool: "agents.Tool",
     result: "Any",
 ) -> None:
+    client = sentry_sdk.get_client()
+
     _set_agent_data(span, agent)
 
     if isinstance(result, str) and result.startswith(
@@ -65,7 +69,10 @@ def update_execute_tool_span(
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
     )
 
-    if should_send_default_pii():
+    if has_data_collection_enabled(client.options):
+        if client.options["data_collection"]["gen_ai"]["outputs"]:
+            set_on_span(SPANDATA.GEN_AI_TOOL_OUTPUT, result)
+    elif should_send_default_pii():
         set_on_span(SPANDATA.GEN_AI_TOOL_OUTPUT, result)
 
     # Add conversation ID from agent
