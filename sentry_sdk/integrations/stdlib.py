@@ -349,6 +349,15 @@ def _install_subprocess() -> None:
             else:
                 span.set_tag("subprocess.pid", self.pid)
 
+            with capture_internal_exceptions():
+                breadcrumb_data = {"subprocess.cwd": cwd} if cwd else {}
+                sentry_sdk.add_breadcrumb(
+                    type="subprocess",
+                    category="subprocess",
+                    message=description,
+                    data=breadcrumb_data,
+                )
+
             return rv
 
     subprocess.Popen.__init__ = sentry_patched_popen_init  # type: ignore
