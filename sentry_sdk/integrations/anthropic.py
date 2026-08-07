@@ -606,7 +606,16 @@ def _set_output_data(
         set_on_span(SPANDATA.GEN_AI_RESPONSE_ID, response_id)
     if finish_reason is not None:
         set_on_span(SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS, [finish_reason])
-    if should_send_default_pii() and integration.include_prompts:
+
+    client = sentry_sdk.get_client()
+    record_outputs = False
+    if has_data_collection_enabled(client.options):
+        if client.options["data_collection"]["gen_ai"]["outputs"]:
+            record_outputs = True
+    elif should_send_default_pii() and integration.include_prompts:
+        record_outputs = True
+
+    if record_outputs:
         output_messages: "dict[str, list[Any]]" = {
             "response": [],
             "tool": [],
