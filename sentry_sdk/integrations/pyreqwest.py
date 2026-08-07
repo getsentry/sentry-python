@@ -159,6 +159,12 @@ async def sentry_async_middleware(
 
     method = request.method
 
+    # If we want to access request.url, we need to do it early. It can't be
+    # retrieved after the request has been sent
+    parsed_url = None
+    with capture_internal_exceptions():
+        parsed_url = parse_url(str(request.url), sanitize=False)
+
     with _sentry_pyreqwest_span(request) as span:
         response = await next_handler.run(request)
         if isinstance(span, StreamedSpan):
@@ -174,10 +180,6 @@ async def sentry_async_middleware(
         SPANDATA.HTTP_METHOD: method,
         SPANDATA.HTTP_STATUS_CODE: response.status,
     }
-
-    parsed_url = None
-    with capture_internal_exceptions():
-        parsed_url = parse_url(str(request.url), sanitize=False)
     if parsed_url:
         breadcrumb_data.update(
             {
@@ -200,6 +202,12 @@ def sentry_sync_middleware(
 
     method = request.method
 
+    # If we want to access request.url, we need to do it early. It can't be
+    # retrieved after the request has been sent
+    parsed_url = None
+    with capture_internal_exceptions():
+        parsed_url = parse_url(str(request.url), sanitize=False)
+
     with _sentry_pyreqwest_span(request) as span:
         response = next_handler.run(request)
         if isinstance(span, StreamedSpan):
@@ -216,9 +224,6 @@ def sentry_sync_middleware(
         SPANDATA.HTTP_STATUS_CODE: response.status,
     }
 
-    parsed_url = None
-    with capture_internal_exceptions():
-        parsed_url = parse_url(str(request.url), sanitize=False)
     if parsed_url:
         breadcrumb_data.update(
             {
