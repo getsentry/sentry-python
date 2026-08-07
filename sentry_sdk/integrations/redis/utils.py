@@ -170,3 +170,5 @@ def _extract_key(name: str, args: "Any") -> "Optional[str]":
         name_low in _MULTI_KEY_COMMANDS and len(args) == 1
     ):
         return args[0]
+
+    return None
