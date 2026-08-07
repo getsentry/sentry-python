@@ -815,7 +815,6 @@ def test_sql_dict_query_params(
 
 
 @pytest.mark.forked
-@pytest_mark_django_db_decorator()
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_response_trace(
     sentry_init,
