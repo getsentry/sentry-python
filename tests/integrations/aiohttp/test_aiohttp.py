@@ -607,10 +607,14 @@ async def test_crumb_capture_span_streaming(
     if url_expected:
         if query_expected:
             expected["url"] = f"http://127.0.0.1:{raw_server.port}/?query=value"
+            expected["http.query"] = "query=value"
         else:
             expected["url"] = (
                 f"http://127.0.0.1:{raw_server.port}/?query=%5BFiltered%5D"
             )
+            expected["http.query"] = "query=%5BFiltered%5D"
+
+    assert crumb["data"] == ApproxDict(expected)
 
 
 @pytest.mark.parametrize(
@@ -755,10 +759,12 @@ async def test_crumb_capture_client_error_span_streaming(
     if url_expected:
         if query_expected:
             expected["url"] = f"http://127.0.0.1:{raw_server.port}/?query=value"
+            expected["http.query"] = "query=value"
         else:
             expected["url"] = (
                 f"http://127.0.0.1:{raw_server.port}/?query=%5BFiltered%5D"
             )
+            expected["http.query"] = "query=%5BFiltered%5D"
 
     assert crumb["data"] == ApproxDict(expected)
 
