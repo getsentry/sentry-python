@@ -234,14 +234,6 @@ def maybe_create_breadcrumbs_from_span(
         else:
             scope.add_breadcrumb(type="http", category="httplib", data=span._data)
 
-    elif span.op == "subprocess":
-        scope.add_breadcrumb(
-            type="subprocess",
-            category="subprocess",
-            message=span.description,
-            data=span._data,
-        )
-
 
 def _get_frame_module_abs_path(frame: "FrameType") -> "Optional[str]":
     try:
