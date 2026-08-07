@@ -229,7 +229,7 @@ def add_http_breadcrumb(status_code, data):
 def maybe_create_breadcrumbs_from_span(
     scope: "sentry_sdk.Scope", span: "sentry_sdk.tracing.Span"
 ) -> None:
-    if span.op == OP.HTTP_CLIENT:
+    if span.op == OP.HTTP_CLIENT and span.origin not in ("auto.http.aiohttp",):
         level = None
         status_code = span._data.get(SPANDATA.HTTP_STATUS_CODE)
         if status_code:
