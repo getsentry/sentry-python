@@ -1232,6 +1232,7 @@ async def test_data_collection_outputs(
     capture_events,
     capture_items,
     test_agent,
+    simple_test_tool,
     get_model_response,
     nonstreaming_responses_tool_call_model_responses,
     data_collection,
@@ -1240,11 +1241,6 @@ async def test_data_collection_outputs(
     stream_gen_ai_spans,
     span_streaming,
 ):
-    @agents.function_tool
-    def simple_test_tool(message: str) -> str:
-        """A simple tool"""
-        return f"Tool executed with: {message}"
-
     client = AsyncOpenAI(api_key="test-key")
     model = OpenAIResponsesModel(model="gpt-4", openai_client=client)
     agent_with_tool = test_agent.clone(tools=[simple_test_tool], model=model)
@@ -2815,6 +2811,7 @@ async def test_tool_execution_span(
     capture_events,
     capture_items,
     test_agent,
+    simple_test_tool,
     get_model_response,
     nonstreaming_responses_tool_call_model_responses,
     stream_gen_ai_spans,
@@ -2824,11 +2821,6 @@ async def test_tool_execution_span(
     """
     Test tool execution span creation with `AgentRunner.run()`.
     """
-
-    @agents.function_tool
-    def simple_test_tool(message: str) -> str:
-        """A simple tool"""
-        return f"Tool executed with: {message}"
 
     # Create agent with the tool
     client = AsyncOpenAI(api_key="test-key")
@@ -3443,6 +3435,7 @@ async def test_run_streamed_tool_execution_span(
     capture_events,
     capture_items,
     test_agent,
+    simple_test_tool,
     get_model_response,
     async_iterator,
     server_side_event_chunks,
@@ -3454,11 +3447,6 @@ async def test_run_streamed_tool_execution_span(
     """
     Test tool execution span creation with `AgentRunner.run_streamed()`.
     """
-
-    @agents.function_tool
-    def simple_test_tool(message: str) -> str:
-        """A simple tool"""
-        return f"Tool executed with: {message}"
 
     # Create agent with the tool
     client = AsyncOpenAI(api_key="test-key")
@@ -4233,6 +4221,7 @@ async def test_model_behavior_error(
     capture_events,
     capture_items,
     test_agent,
+    simple_test_tool,
     stream_gen_ai_spans,
     span_streaming,
 ):
@@ -4240,11 +4229,6 @@ async def test_model_behavior_error(
     Example raising agents.exceptions.AgentsException before the agent invocation span is complete.
     The mocked API response indicates that "wrong_tool" was called.
     """
-
-    @agents.function_tool
-    def simple_test_tool(message: str) -> str:
-        """A simple tool"""
-        return f"Tool executed with: {message}"
 
     # Create agent with the tool
     agent_with_tool = test_agent.clone(tools=[simple_test_tool])
