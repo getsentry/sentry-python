@@ -151,6 +151,20 @@ try:
     )
     urlpatterns.append(path("rest-hello", views.rest_hello, name="rest_hello"))
     urlpatterns.append(
+        path(
+            "rest-authenticated-hello",
+            views.rest_authenticated_hello,
+            name="rest_authenticated_hello",
+        )
+    )
+    urlpatterns.append(
+        path(
+            "rest-unauthenticated-hello",
+            views.rest_unauthenticated_hello,
+            name="rest_unauthenticated_hello",
+        )
+    )
+    urlpatterns.append(
         path("rest-json-response", views.rest_json_response, name="rest_json_response")
     )
     urlpatterns.append(

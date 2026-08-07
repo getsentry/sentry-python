@@ -1642,6 +1642,90 @@ def test_rest_framework_basic(
     assert event["request"]["headers"]["Content-Type"] == ct
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_rest_framework_authentication_span(
+    sentry_init,
+    client,
+    capture_events,
+    capture_items,
+    render_span_tree,
+    span_streaming,
+):
+    pytest.importorskip("rest_framework")
+    sentry_init(
+        integrations=[
+            DjangoIntegration(middleware_spans=False, signals_spans=False),
+        ],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    if span_streaming:
+        items = capture_items("span")
+
+        client.get(reverse("rest_authenticated_hello"))
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+
+        assert (
+            render_span_tree(spans)
+            == """\
+- sentry.op="http.server": name="/rest-authenticated-hello"
+  - sentry.op="view.authenticate": name="authenticate"\
+"""
+        )
+    else:
+        events = capture_events()
+
+        client.get(reverse("rest_authenticated_hello"))
+
+        (transaction,) = events
+
+        assert (
+            render_span_tree(transaction["spans"], transaction["contexts"]["trace"])
+            == """\
+- op="http.server": description=null
+  - op="view.authenticate": description="authenticate"\
+"""
+        )
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_rest_framework_authentication_span_without_authenticators(
+    sentry_init,
+    client,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
+    pytest.importorskip("rest_framework")
+    sentry_init(
+        integrations=[
+            DjangoIntegration(middleware_spans=False, signals_spans=False),
+        ],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    if span_streaming:
+        items = capture_items("span")
+
+        client.get(reverse("rest_unauthenticated_hello"))
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+
+        # only the root span
+        assert len(spans) == 1
+    else:
+        events = capture_events()
+
+        client.get(reverse("rest_unauthenticated_hello"))
+
+        (transaction,) = events
+
+        assert transaction["spans"] == []
+
+
 @pytest.mark.parametrize(
     "endpoint", ["rest_permission_denied_exc", "permission_denied_exc"]
 )
