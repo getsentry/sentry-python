@@ -45,16 +45,15 @@ def patch_redis_async_pipeline(
         if client.get_integration(RedisIntegration) is None:
             return await old_execute(self, *args, **kwargs)
 
-        with capture_internal_exceptions():
-            sentry_sdk.add_breadcrumb(
-                message="redis.pipeline.execute",
-                type="redis",
-                category="redis",
-                data={
-                    "redis.is_cluster": is_cluster,
-                    "redis.transaction": False if is_cluster else self.is_transaction,
-                },
-            )
+        sentry_sdk.add_breadcrumb(
+            message="redis.pipeline.execute",
+            type="redis",
+            category="redis",
+            data={
+                "redis.is_cluster": is_cluster,
+                "redis.transaction": False if is_cluster else self.is_transaction,
+            },
+        )
 
         span_streaming = has_span_streaming_enabled(client.options)
 
@@ -119,22 +118,21 @@ def patch_redis_async_client(
 
         db_properties = _compile_db_span_properties(integration, name, args)
 
-        with capture_internal_exceptions():
-            data = {
-                "redis.is_cluster": is_cluster,
-                "redis.command": name,
-                "db.operation": name,
-            }
-            key = _extract_key(name, args)
-            if key is not None:
-                data["redis.key"] = key
+        breadcrumb_data = {
+            "redis.is_cluster": is_cluster,
+            "redis.command": name,
+            "db.operation": name,
+        }
+        key = _extract_key(name, args)
+        if key is not None:
+            breadcrumb_data["redis.key"] = key
 
-            sentry_sdk.add_breadcrumb(
-                message=db_properties["description"],
-                type="redis",
-                category="redis",
-                data=data,
-            )
+        sentry_sdk.add_breadcrumb(
+            message=db_properties["description"],
+            type="redis",
+            category="redis",
+            data=breadcrumb_data,
+        )
 
         span_streaming = has_span_streaming_enabled(client.options)
 
