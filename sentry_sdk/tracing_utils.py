@@ -219,7 +219,7 @@ def add_http_breadcrumb(status_code, data):
         elif 400 <= status_code <= 499:
             level = "warning"
 
-    kwargs = {"type": "http", "category": "httplib", "data": data}
+    kwargs: "dict[str, Any]" = {"type": "http", "category": "httplib", "data": data}
     if level:
         kwargs["level"] = level
 
