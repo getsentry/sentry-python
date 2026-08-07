@@ -2,13 +2,16 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations.redis.consts import SPAN_ORIGIN
+from sentry_sdk.integrations.redis.consts import (
+    SPAN_ORIGIN,
+)
 from sentry_sdk.integrations.redis.modules.caches import (
     _compile_cache_span_properties,
     _set_cache_data,
 )
 from sentry_sdk.integrations.redis.modules.queries import _compile_db_span_properties
 from sentry_sdk.integrations.redis.utils import (
+    _extract_key,
     _get_safe_command,
     _set_client_data,
     _set_pipeline_data,
@@ -76,7 +79,20 @@ def patch_redis_pipeline(
                     command_seq,
                 )
 
-            return old_execute(self, *args, **kwargs)
+            rv = old_execute(self, *args, **kwargs)
+
+        with capture_internal_exceptions():
+            sentry_sdk.add_breadcrumb(
+                message="redis.pipeline.execute",
+                type="redis",
+                category="redis",
+                data={
+                    "redis.is_cluster": is_cluster,
+                    "redis.transaction": False if is_cluster else self.transaction,
+                },
+            )
+
+        return rv
 
     pipeline_cls.execute = sentry_patched_execute
 
@@ -175,6 +191,23 @@ def patch_redis_client(
         if cache_span:
             _set_cache_data(cache_span, self, cache_properties, value)
             cache_span.__exit__(None, None, None)
+
+        with capture_internal_exceptions():
+            data = {
+                "redis.is_cluster": is_cluster,
+                "redis.command": name,
+                "db.operation": name,
+            }
+            key = _extract_key(name, args)
+            if key is not None:
+                data["redis.key"] = key
+
+            sentry_sdk.add_breadcrumb(
+                message=db_properties["description"],
+                type="redis",
+                category="redis",
+                data=data,
+            )
 
         return value
 

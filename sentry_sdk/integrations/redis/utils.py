@@ -153,12 +153,20 @@ def _set_client_data(
             span.set_tag("redis.command", name)
             span.set_tag(SPANDATA.DB_OPERATION, name)
 
-    if name and args:
-        name_low = name.lower()
-        if (name_low in _SINGLE_KEY_COMMANDS) or (
-            name_low in _MULTI_KEY_COMMANDS and len(args) == 1
-        ):
-            if isinstance(span, StreamedSpan):
-                span.set_attribute("db.redis.key", args[0])
-            else:
-                span.set_tag("redis.key", args[0])
+    key = _extract_key(name, args)
+    if key is not None:
+        if isinstance(span, StreamedSpan):
+            span.set_attribute("db.redis.key", key)
+        else:
+            span.set_tag("redis.key", key)
+
+
+def _extract_key(name: str, args: "Any") -> Optional[str]:
+    if not name or not args:
+        return None
+
+    name_low = name.lower()
+    if (name_low in _SINGLE_KEY_COMMANDS) or (
+        name_low in _MULTI_KEY_COMMANDS and len(args) == 1
+    ):
+        return args[0]
