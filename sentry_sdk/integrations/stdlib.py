@@ -342,13 +342,6 @@ def _install_subprocess() -> None:
             if cwd and isinstance(span, Span):
                 span.set_data("subprocess.cwd", cwd)
 
-            rv = old_popen_init(self, *a, **kw)
-
-            if isinstance(span, StreamedSpan):
-                span.set_attribute(SPANDATA.PROCESS_PID, self.pid)
-            else:
-                span.set_tag("subprocess.pid", self.pid)
-
             with capture_internal_exceptions():
                 data = {}
                 if cwd:
@@ -360,6 +353,13 @@ def _install_subprocess() -> None:
                     message=description,
                     data=data,
                 )
+
+            rv = old_popen_init(self, *a, **kw)
+
+            if isinstance(span, StreamedSpan):
+                span.set_attribute(SPANDATA.PROCESS_PID, self.pid)
+            else:
+                span.set_tag("subprocess.pid", self.pid)
 
             return rv
 
