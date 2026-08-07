@@ -728,11 +728,8 @@ def _extract_tokens(
 
 def _extract_tokens_from_generations(
     generations: "list[list[Generation | ChatGeneration | GenerationChunk | ChatGenerationChunk]]",
-) -> "TokenUsage":
+) -> "Optional[TokenUsage]":
     """Extract token usage from response.generations structure."""
-    if not generations:
-        return None, None, None
-
     total_input = 0
     total_output = 0
     total_total = 0
@@ -828,17 +825,18 @@ def _record_token_usage(
         input_tokens, output_tokens, total_tokens = _extract_tokens(token_usage)
 
     # Prefer provider-agnostic UsageMetadata if available.
-    token_usage = _extract_tokens_from_generations(response.generations)
-    if token_usage.input_tokens is not None:
-        input_tokens = token_usage.input_tokens
-    if token_usage.output_tokens is not None:
-        output_tokens = token_usage.output_tokens
-    if token_usage.total_tokens is not None:
-        total_tokens = token_usage.total_tokens
-    if token_usage.cache_read is not None:
-        cache_read_tokens = token_usage.cache_read
-    if token_usage.cache_creation is not None:
-        cache_creation_tokens = token_usage.cache_creation
+    if response.generations is not None:
+        token_usage = _extract_tokens_from_generations(response.generations)
+        if token_usage.input_tokens is not None:
+            input_tokens = token_usage.input_tokens
+        if token_usage.output_tokens is not None:
+            output_tokens = token_usage.output_tokens
+        if token_usage.total_tokens is not None:
+            total_tokens = token_usage.total_tokens
+        if token_usage.cache_read is not None:
+            cache_read_tokens = token_usage.cache_read
+        if token_usage.cache_creation is not None:
+            cache_creation_tokens = token_usage.cache_creation
 
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
