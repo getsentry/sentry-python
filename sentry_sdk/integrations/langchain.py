@@ -728,7 +728,7 @@ def _extract_tokens(
 
 def _extract_tokens_from_generations(
     generations: "list[list[Generation | ChatGeneration | GenerationChunk | ChatGenerationChunk]]",
-) -> "Optional[TokenUsage]":
+) -> "TokenUsage":
     """Extract token usage from response.generations structure."""
     total_input = 0
     total_output = 0
