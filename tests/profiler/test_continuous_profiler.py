@@ -807,8 +807,12 @@ def test_continuous_profiler_auto_start_and_stop_sampled(
             assert profiler_id is not None, "profiler should be running"
             profiler_ids.add(profiler_id)
 
-        # wait at least 1 cycle for the profiler to stop
-        time.sleep(0.2)
+        # Poll up to 0.2 seconds (every 10ms) for the profiler to stop
+        deadline = time.monotonic() + 0.2
+        while time.monotonic() < deadline:
+            if get_profiler_id() is None:
+                break
+            time.sleep(0.01)
         assert get_profiler_id() is None, "profiler should not be running"
 
         assert len(profiler_ids) == 1
@@ -891,8 +895,12 @@ def test_continuous_profiler_auto_start_and_stop_sampled_span_streaming(
             assert profiler_id is not None, "profiler should be running"
             profiler_ids.add(profiler_id)
 
-        # wait at least 1 cycle for the profiler to stop
-        time.sleep(0.2)
+        # Poll up to 0.2 seconds (every 10ms) for the profiler to stop
+        deadline = time.monotonic() + 0.2
+        while time.monotonic() < deadline:
+            if get_profiler_id() is None:
+                break
+            time.sleep(0.01)
         assert get_profiler_id() is None, "profiler should not be running"
 
         assert len(profiler_ids) == 1
