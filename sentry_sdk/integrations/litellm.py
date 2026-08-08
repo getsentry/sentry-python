@@ -22,7 +22,7 @@ from sentry_sdk.utils import event_from_exception
 
 if TYPE_CHECKING:
     from datetime import datetime
-    from typing import Any, Dict, List
+    from typing import Any, Dict, List, Tuple
 
 try:
     import litellm  # type: ignore[import-not-found]
@@ -34,6 +34,19 @@ except ImportError:
 # Stash the span on a top-level key of the per-request kwargs dict litellm passes
 # to every callback, so it lives and dies with the request.
 _SPAN_KEY = "_sentry_span"
+
+# Call types whose gen_ai operation name we can determine accurately. Everything
+# else is not instrumented, since guessing records wrong data.
+_CALL_TYPE_OPERATIONS: "Dict[Any, Tuple[str, str]]" = {
+    "completion": ("chat", consts.OP.GEN_AI_CHAT),
+    "acompletion": ("chat", consts.OP.GEN_AI_CHAT),
+    "text_completion": ("text_completion", consts.OP.GEN_AI_TEXT_COMPLETION),
+    "atext_completion": ("text_completion", consts.OP.GEN_AI_TEXT_COMPLETION),
+    "embedding": ("embeddings", consts.OP.GEN_AI_EMBEDDINGS),
+    "aembedding": ("embeddings", consts.OP.GEN_AI_EMBEDDINGS),
+    "responses": ("responses", consts.OP.GEN_AI_RESPONSES),
+    "aresponses": ("responses", consts.OP.GEN_AI_RESPONSES),
+}
 
 
 def _store_span(kwargs: "Dict[str, Any]", span: "Any") -> None:
@@ -83,6 +96,12 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
     if integration is None:
         return
 
+    call_type = kwargs.get("call_type", None)
+    if call_type not in _CALL_TYPE_OPERATIONS:
+        return
+
+    operation, span_op = _CALL_TYPE_OPERATIONS[call_type]
+
     # Get key parameters
     full_model = kwargs.get("model", "")
     try:
@@ -91,33 +110,21 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
         model = full_model
         provider = "unknown"
 
-    call_type = kwargs.get("call_type", None)
-    if call_type == "embedding" or call_type == "aembedding":
-        operation = "embeddings"
-    else:
-        operation = "chat"
+    span_name = f"{operation} {model}"
 
     # Start a new span/transaction
     if has_span_streaming_enabled(client.options):
         span = sentry_sdk.traces.start_span(
-            name=f"{operation} {model}",
+            name=span_name,
             attributes={
-                "sentry.op": (
-                    consts.OP.GEN_AI_CHAT
-                    if operation == "chat"
-                    else consts.OP.GEN_AI_EMBEDDINGS
-                ),
+                "sentry.op": span_op,
                 "sentry.origin": LiteLLMIntegration.origin,
             },
         )
     else:
         span = get_start_span_function()(
-            op=(
-                consts.OP.GEN_AI_CHAT
-                if operation == "chat"
-                else consts.OP.GEN_AI_EMBEDDINGS
-            ),
-            name=f"{operation} {model}",
+            op=span_op,
+            name=span_name,
             origin=LiteLLMIntegration.origin,
         )
         span.__enter__()
