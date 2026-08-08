@@ -11,13 +11,15 @@ from sentry_sdk.utils import capture_internal_exceptions, reraise
 from ..spans import (
     agent_workflow_span,
     execute_tool_span,
+    handoff_span,
+    invoke_agent_span,
     update_execute_tool_span,
     update_invoke_agent_span,
 )
 from ..utils import _capture_exception
 
 try:
-    from agents import FunctionTool, RunHooks
+    from agents import FunctionTool, RunContextWrapper, RunHooks
     from agents.exceptions import AgentsException
 except ImportError:
     raise DidNotEnable("OpenAI Agents not installed")
@@ -27,7 +29,7 @@ from typing import TYPE_CHECKING, TypeVar
 if TYPE_CHECKING:
     from typing import Any, AsyncIterator, Callable
 
-    from agents import Agent, Tool, ToolContext
+    from agents import Agent, AgentHookContext, Tool, ToolContext
 
 
 TContext = TypeVar("TContext")
@@ -35,10 +37,65 @@ TContext = TypeVar("TContext")
 
 class _SentryRunHooks(RunHooks[TContext]):  # type: ignore[misc]
     """
-    Responsible for creating and managing Execute Tool spans. These spans are
-    stored on the ToolContext reference that is shared between `on_tool_start()`
-    and `on_tool_end()`
+    Responsible for creating Execute Tool and Invoke Agent spans. Both
+    spans can also be closed by hooks, and Execute Tool spans are exclusively
+    closed in the hook.
+
+    Execute Tool spans are stored on the ToolContext reference that is shared
+    between `on_tool_start()` and `on_tool_end()`.
+
+    Invoke Agent spans are stored as an instance variable on the hooks
+    instance. This works because agent invocations in a run are always
+    sequential.
+
+    The `on_agent_end()` hook only fires once in a given run.
+    In a handoff, `on_handoff()` and `on_agent_start()` with the new
+    agent are invoked. The `on_handoff()` hook therefore finishes the
+    span corresponding to the `from_agent`.
     """
+
+    async def on_agent_start(
+        self,
+        context: "AgentHookContext[TContext]",
+        agent: "Agent[TContext]",
+    ) -> "None":
+        self._sentry_invoke_agent_span = invoke_agent_span(agent, context.turn_input)
+
+    async def on_agent_end(
+        self,
+        context: "AgentHookContext[TContext]",
+        agent: "Agent[TContext]",
+        output: "Any",
+    ) -> "None":
+        span = getattr(self, "_sentry_invoke_agent_span", None)
+        if span is not None:
+            update_invoke_agent_span(
+                span=span,
+                usage=context.usage,
+                agent=agent,
+                output=output,
+            )
+            del self._sentry_invoke_agent_span
+            span.__exit__(None, None, None)
+
+    async def on_handoff(
+        self,
+        context: "RunContextWrapper[TContext]",
+        from_agent: "Agent[TContext]",
+        to_agent: "Agent[TContext]",
+    ) -> "None":
+        span = getattr(self, "_sentry_invoke_agent_span", None)
+        if span is not None:
+            update_invoke_agent_span(
+                span=span,
+                usage=context.usage,
+                agent=from_agent,
+                output=None,
+            )
+            del self._sentry_invoke_agent_span
+            span.__exit__(None, None, None)
+
+        handoff_span(context, from_agent, to_agent.name)
 
     async def on_tool_start(
         self,
@@ -88,10 +145,43 @@ def _patch_run_hooks(hooks: "RunHooks[TContext]") -> None:
     if is_already_patched:
         return
 
+    original_on_agent_start = hooks.on_agent_start
+    original_on_agent_end = hooks.on_agent_end
+    original_on_handoff = hooks.on_handoff
+
     original_on_tool_start = hooks.on_tool_start
     original_on_tool_end = hooks.on_tool_end
 
     sentry_hooks = _SentryRunHooks()  # type: ignore[var-annotated]
+
+    @wraps(original_on_agent_start)
+    async def on_agent_start(
+        context: "AgentHookContext[TContext]",
+        agent: "Agent[TContext]",
+    ) -> "None":
+        with capture_internal_exceptions():
+            await sentry_hooks.on_agent_start(context, agent)
+        await original_on_agent_start(context, agent)
+
+    @wraps(original_on_agent_end)
+    async def on_agent_end(
+        context: "AgentHookContext[TContext]",
+        agent: "Agent[TContext]",
+        output: "Any",
+    ) -> "None":
+        with capture_internal_exceptions():
+            await sentry_hooks.on_agent_end(context, agent, output)
+        await original_on_agent_end(context, agent, output)
+
+    @wraps(original_on_handoff)
+    async def on_handoff(
+        context: "RunContextWrapper[TContext]",
+        from_agent: "Agent[TContext]",
+        to_agent: "Agent[TContext]",
+    ) -> "None":
+        with capture_internal_exceptions():
+            await sentry_hooks.on_handoff(context, from_agent, to_agent)
+        await original_on_handoff(context, from_agent, to_agent)
 
     @wraps(original_on_tool_start)
     async def on_tool_start(
@@ -113,6 +203,11 @@ def _patch_run_hooks(hooks: "RunHooks[TContext]") -> None:
         await original_on_tool_end(context, agent, tool, result)
 
     hooks._sentry_is_patched = True
+
+    hooks.on_agent_start = on_agent_start
+    hooks.on_agent_end = on_agent_end
+    hooks.on_handoff = on_handoff
+
     hooks.on_tool_start = on_tool_start
     hooks.on_tool_end = on_tool_end
 
@@ -136,7 +231,8 @@ def _create_run_wrapper(
             if hooks is not None:
                 _patch_run_hooks(hooks=hooks)
             else:
-                kwargs["hooks"] = _SentryRunHooks()
+                hooks = _SentryRunHooks()
+                kwargs["hooks"] = hooks
 
         # Isolate each workflow so that when agents are run in asyncio tasks they
         # don't touch each other's scopes
@@ -175,7 +271,20 @@ def _create_run_wrapper(
                         _capture_exception(exc)
 
                         context_wrapper = getattr(exc.run_data, "context_wrapper", None)
-                        if context_wrapper is not None:
+                        if context_wrapper is not None and use_run_hooks:
+                            invoke_agent_span = getattr(
+                                hooks, "_sentry_invoke_agent_span", None
+                            )
+
+                            if invoke_agent_span is not None:
+                                update_invoke_agent_span(
+                                    span=invoke_agent_span,
+                                    usage=context_wrapper.usage,
+                                    agent=agent,
+                                )
+                                del hooks._sentry_invoke_agent_span
+                                invoke_agent_span.__exit__(*exc_info)
+                        elif context_wrapper is not None:
                             invoke_agent_span = getattr(
                                 context_wrapper, "_sentry_agent_span", None
                             )
@@ -192,7 +301,7 @@ def _create_run_wrapper(
                             ):
                                 update_invoke_agent_span(
                                     span=invoke_agent_span,
-                                    context=context_wrapper,
+                                    usage=context_wrapper.usage,
                                     agent=agent,
                                 )
 
@@ -208,20 +317,21 @@ def _create_run_wrapper(
                         _capture_exception(exc)
                     reraise(*exc_info)
 
-                invoke_agent_span = getattr(
-                    run_result.context_wrapper, "_sentry_agent_span", None
-                )
-                if not invoke_agent_span:
-                    return run_result
+                if not use_run_hooks:
+                    invoke_agent_span = getattr(
+                        run_result.context_wrapper, "_sentry_agent_span", None
+                    )
+                    if not invoke_agent_span:
+                        return run_result
 
-                update_invoke_agent_span(
-                    span=invoke_agent_span,
-                    context=run_result.context_wrapper,
-                    agent=agent,
-                )
+                    update_invoke_agent_span(
+                        span=invoke_agent_span,
+                        usage=run_result.context_wrapper.usage,
+                        agent=agent,
+                    )
 
-                invoke_agent_span.__exit__(None, None, None)
-                delattr(run_result.context_wrapper, "_sentry_agent_span")
+                    invoke_agent_span.__exit__(None, None, None)
+                    delattr(run_result.context_wrapper, "_sentry_agent_span")
                 return run_result
 
     return wrapper
