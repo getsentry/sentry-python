@@ -43,7 +43,6 @@ if TYPE_CHECKING:
     from typing import Any, Dict, Generator, Iterator, Optional, Tuple, Union
 
     from sentry_sdk._types import Attributes
-    from sentry_sdk.scope import Scope
 
 
 SENTRY_TRACE_REGEX = re.compile(
@@ -214,7 +213,7 @@ def record_sql_queries(
 def add_http_breadcrumb(
     status_code: "Optional[int]",
     data: "dict[str, Any]",
-    scope: "Optional[Scope]" = None,
+    scope: "Optional[sentry_sdk.Scope]" = None,
 ) -> None:
     level = None
     if status_code:
