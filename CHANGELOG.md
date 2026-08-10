@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.67.1
+
+### Bug Fixes 🐛
+
+- (batcher) Add global flush trigger based on the span number by @alexander-alderman-webb in [#7150](https://github.com/getsentry/sentry-python/pull/7150)
+
 ## 2.67.0
 
 ### New Features ✨
