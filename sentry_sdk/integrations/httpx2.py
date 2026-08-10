@@ -5,6 +5,7 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing_utils import (
+    add_http_breadcrumb,
     add_http_request_source,
     has_span_streaming_enabled,
     propagate_trace_headers,
@@ -129,6 +130,22 @@ def _install_httpx2_client() -> None:
             with capture_internal_exceptions():
                 add_http_request_source(span)
 
+        breadcrumb_data = {
+            SPANDATA.HTTP_METHOD: request.method,
+            SPANDATA.HTTP_STATUS_CODE: rv.status_code,
+            "reason": rv.reason_phrase,
+        }
+        if parsed_url and should_send_default_pii():
+            breadcrumb_data.update(
+                {
+                    "url": parsed_url.url,
+                    SPANDATA.HTTP_QUERY: parsed_url.query,
+                    SPANDATA.HTTP_FRAGMENT: parsed_url.fragment,
+                }
+            )
+
+        add_http_breadcrumb(rv.status_code, breadcrumb_data)
+
         return rv
 
     Client.send = send  # type: ignore
@@ -221,6 +238,22 @@ def _install_httpx2_async_client() -> None:
 
             with capture_internal_exceptions():
                 add_http_request_source(span)
+
+        breadcrumb_data = {
+            SPANDATA.HTTP_METHOD: request.method,
+            SPANDATA.HTTP_STATUS_CODE: rv.status_code,
+            "reason": rv.reason_phrase,
+        }
+        if parsed_url and should_send_default_pii():
+            breadcrumb_data.update(
+                {
+                    "url": parsed_url.url,
+                    SPANDATA.HTTP_QUERY: parsed_url.query,
+                    SPANDATA.HTTP_FRAGMENT: parsed_url.fragment,
+                }
+            )
+
+        add_http_breadcrumb(rv.status_code, breadcrumb_data)
 
         return rv
 
