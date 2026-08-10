@@ -17,7 +17,6 @@ from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.django.asgi import _asgi_middleware_mixin_factory
 from tests.integrations.django.myapp.asgi import channels_application
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
-from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
 
 try:
     from django.urls import reverse
@@ -1046,7 +1045,27 @@ async def test_async_middleware_process_exception_is_awaited(
 @pytest.mark.skipif(
     django.VERSION < (3, 0), reason="Django ASGI support shipped in 3.0"
 )
-@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
+# The full precedence table (data_collection winning over send_default_pii)
+# is covered by the WSGI tests in test_data_scrubbing.py; here we only need
+# each user-info branch of the ASGI middleware: legacy pii on/off and
+# data_collection user_info on/off (asgi.py:75-83, _asgi_common.py:129-143).
+@pytest.mark.parametrize(
+    "init_kwargs, expect_user",
+    [
+        pytest.param({"send_default_pii": True}, True, id="pii_on"),
+        pytest.param({"send_default_pii": False}, False, id="pii_off"),
+        pytest.param(
+            {"_experiments": {"data_collection": {"user_info": True}}},
+            True,
+            id="data_collection_user_info_on",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"user_info": False}}},
+            False,
+            id="data_collection_user_info_off",
+        ),
+    ],
+)
 @pytest_mark_django_db_decorator()
 async def test_user_identity_error_event_data_collection(
     sentry_init, capture_events, application, init_kwargs, expect_user
