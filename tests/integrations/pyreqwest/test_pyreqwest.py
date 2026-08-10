@@ -1009,29 +1009,76 @@ def test_crumb_capture(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("send_default_pii", [True, False])
-@pytest.mark.parametrize("span_streaming", [True, False])
 async def test_async_crumb_capture(
     sentry_init,
     capture_events,
     server_port,
     send_default_pii,
-    span_streaming,
 ):
     sentry_init(
         integrations=[PyreqwestIntegration()],
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     url = f"http://localhost:{server_port}/hello?q=test#frag"
 
     events = capture_events()
 
-    async with ClientBuilder().build() as client:
-        response = await client.get(url).build().send()
-        assert response.status == 200
+    # Ensure the isolation scope contextvar is set before pyreqwest spawns
+    # its middleware on a separate asyncio Task. Without this, the child task
+    # lazily creates its own isolation scope, and breadcrumbs added there
+    # don't propagate back to this task's context.
+    sentry_sdk.get_isolation_scope()
+
+    with sentry_sdk.start_transaction():
+        async with ClientBuilder().build() as client:
+            response = await client.get(url).build().send()
+            assert response.status == 200
 
         capture_message("Testing!")
+
+    (event,) = events
+
+    crumb = event["breadcrumbs"]["values"][0]
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+
+    expected = {
+        SPANDATA.HTTP_METHOD: "GET",
+        SPANDATA.HTTP_STATUS_CODE: 200,
+    }
+    if send_default_pii:
+        expected["url"] = f"http://localhost:{server_port}/hello"
+        expected[SPANDATA.HTTP_QUERY] = "q=test"
+        expected[SPANDATA.HTTP_FRAGMENT] = "frag"
+
+    assert crumb["data"] == ApproxDict(expected)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("send_default_pii", [True, False])
+async def test_async_crumb_capture_span_streaming(
+    sentry_init,
+    capture_events,
+    server_port,
+    send_default_pii,
+):
+    sentry_init(
+        integrations=[PyreqwestIntegration()],
+        send_default_pii=send_default_pii,
+        trace_lifecycle="stream",
+    )
+
+    url = f"http://localhost:{server_port}/hello?q=test#frag"
+
+    events = capture_events()
+
+    with sentry_sdk.traces.start_span(name="segment"):
+        async with ClientBuilder().build() as client:
+            response = await client.get(url).build().send()
+            assert response.status == 200
+
+            capture_message("Testing!")
 
     (event,) = events
 
@@ -1061,29 +1108,78 @@ async def test_async_crumb_capture(
         (500, "error"),
     ],
 )
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_crumb_capture_client_error(
     sentry_init,
     capture_events,
     server_port,
     status_code,
     level,
-    span_streaming,
 ):
     sentry_init(
         integrations=[PyreqwestIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     url = f"http://localhost:{server_port}/status/{status_code}"
 
     events = capture_events()
 
-    client = SyncClientBuilder().build()
-    response = client.get(url).build().send()
-    assert response.status == status_code
+    with sentry_sdk.start_transaction():
+        client = SyncClientBuilder().build()
+        response = client.get(url).build().send()
+        assert response.status == status_code
 
-    capture_message("Testing!")
+        capture_message("Testing!")
+
+    (event,) = events
+
+    crumb = event["breadcrumbs"]["values"][0]
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+
+    if level is None:
+        assert "level" not in crumb
+    else:
+        assert crumb["level"] == level
+
+    assert crumb["data"] == ApproxDict(
+        {
+            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.HTTP_STATUS_CODE: status_code,
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    "status_code,level",
+    [
+        (200, None),
+        (301, None),
+        (403, "warning"),
+        (405, "warning"),
+        (500, "error"),
+    ],
+)
+def test_crumb_capture_client_error_span_streaming(
+    sentry_init,
+    capture_events,
+    server_port,
+    status_code,
+    level,
+):
+    sentry_init(
+        integrations=[PyreqwestIntegration()],
+    )
+
+    url = f"http://localhost:{server_port}/status/{status_code}"
+
+    events = capture_events()
+
+    with sentry_sdk.traces.start_span(name="segment"):
+        client = SyncClientBuilder().build()
+        response = client.get(url).build().send()
+        assert response.status == status_code
+
+        capture_message("Testing!")
 
     (event,) = events
 

@@ -210,11 +210,7 @@ def record_sql_queries(
             yield span
 
 
-def add_http_breadcrumb(
-    status_code: "Optional[int]",
-    data: "dict[str, Any]",
-    scope: "Optional[sentry_sdk.Scope]" = None,
-) -> None:
+def add_http_breadcrumb(status_code: "Optional[int]", data: "dict[str, Any]") -> None:
     level = None
     if status_code:
         if 500 <= status_code <= 599:
@@ -226,10 +222,7 @@ def add_http_breadcrumb(
     if level:
         kwargs["level"] = level
 
-    if scope is not None:
-        scope.add_breadcrumb(**kwargs)
-    else:
-        sentry_sdk.add_breadcrumb(**kwargs)
+    sentry_sdk.add_breadcrumb(**kwargs)
 
 
 def maybe_create_breadcrumbs_from_span(
