@@ -183,6 +183,7 @@ async def sentry_async_middleware(
         # after the request has been sent
         parsed_url = parse_url(str(request.url), sanitize=False)
 
+    response = None
     with _sentry_pyreqwest_span(request) as span:
         response = await next_handler.run(request)
         if isinstance(span, StreamedSpan):
@@ -194,21 +195,22 @@ async def sentry_async_middleware(
         elif span is not None:
             span.set_http_status(response.status)
 
-    breadcrumb_data = {
-        SPANDATA.HTTP_METHOD: method,
-        SPANDATA.HTTP_STATUS_CODE: response.status,
-    }
+    if response is not None:
+        breadcrumb_data = {
+            SPANDATA.HTTP_METHOD: method,
+            SPANDATA.HTTP_STATUS_CODE: response.status,
+        }
 
-    if parsed_url and should_send_default_pii():
-        breadcrumb_data.update(
-            {
-                "url": parsed_url.url,
-                SPANDATA.HTTP_QUERY: parsed_url.query,
-                SPANDATA.HTTP_FRAGMENT: parsed_url.fragment,
-            }
-        )
+        if parsed_url and should_send_default_pii():
+            breadcrumb_data.update(
+                {
+                    "url": parsed_url.url,
+                    SPANDATA.HTTP_QUERY: parsed_url.query,
+                    SPANDATA.HTTP_FRAGMENT: parsed_url.fragment,
+                }
+            )
 
-    add_http_breadcrumb(response.status, breadcrumb_data, isolation_scope)
+        add_http_breadcrumb(response.status, breadcrumb_data, isolation_scope)
 
     return response
 
@@ -226,6 +228,7 @@ def sentry_sync_middleware(
         # after the request has been sent
         parsed_url = parse_url(str(request.url), sanitize=False)
 
+    response = None
     with _sentry_pyreqwest_span(request) as span:
         response = next_handler.run(request)
         if isinstance(span, StreamedSpan):
@@ -237,20 +240,21 @@ def sentry_sync_middleware(
         elif span is not None:
             span.set_http_status(response.status)
 
-    breadcrumb_data = {
-        SPANDATA.HTTP_METHOD: method,
-        SPANDATA.HTTP_STATUS_CODE: response.status,
-    }
+    if response is not None:
+        breadcrumb_data = {
+            SPANDATA.HTTP_METHOD: method,
+            SPANDATA.HTTP_STATUS_CODE: response.status,
+        }
 
-    if parsed_url and should_send_default_pii():
-        breadcrumb_data.update(
-            {
-                "url": parsed_url.url,
-                SPANDATA.HTTP_QUERY: parsed_url.query,
-                SPANDATA.HTTP_FRAGMENT: parsed_url.fragment,
-            }
-        )
+        if parsed_url and should_send_default_pii():
+            breadcrumb_data.update(
+                {
+                    "url": parsed_url.url,
+                    SPANDATA.HTTP_QUERY: parsed_url.query,
+                    SPANDATA.HTTP_FRAGMENT: parsed_url.fragment,
+                }
+            )
 
-    add_http_breadcrumb(response.status, breadcrumb_data)
+        add_http_breadcrumb(response.status, breadcrumb_data)
 
     return response
