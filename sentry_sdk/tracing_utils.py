@@ -213,12 +213,7 @@ def record_sql_queries(
 def maybe_create_breadcrumbs_from_span(
     scope: "sentry_sdk.Scope", span: "sentry_sdk.tracing.Span"
 ) -> None:
-    if span.op == OP.DB_REDIS:
-        scope.add_breadcrumb(
-            message=span.description, type="redis", category="redis", data=span._tags
-        )
-
-    elif span.op == OP.HTTP_CLIENT:
+    if span.op == OP.HTTP_CLIENT:
         level = None
         status_code = span._data.get(SPANDATA.HTTP_STATUS_CODE)
         if status_code:
@@ -233,14 +228,6 @@ def maybe_create_breadcrumbs_from_span(
             )
         else:
             scope.add_breadcrumb(type="http", category="httplib", data=span._data)
-
-    elif span.op == "subprocess":
-        scope.add_breadcrumb(
-            type="subprocess",
-            category="subprocess",
-            message=span.description,
-            data=span._data,
-        )
 
 
 def _get_frame_module_abs_path(frame: "FrameType") -> "Optional[str]":

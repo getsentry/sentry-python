@@ -85,6 +85,59 @@ EXAMPLE_MESSAGE = Message(
 )
 
 
+DATA_COLLECTION_EXAMPLE_TOOLS = [
+    {
+        "name": "get_weather",
+        "description": "Get the current weather in a given location",
+        "input_schema": {
+            "type": "object",
+            "properties": {"location": {"type": "string"}},
+            "required": ["location"],
+        },
+    }
+]
+
+DATA_COLLECTION_EXPECTED_INPUT_DATA = {
+    SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: [
+        {"type": "text", "content": "You are a helpful assistant."}
+    ],
+    SPANDATA.GEN_AI_REQUEST_MESSAGES: [{"role": "user", "content": "Hello, Claude"}],
+}
+
+DATA_COLLECTION_INPUT_DATA_KEYS = list(DATA_COLLECTION_EXPECTED_INPUT_DATA.keys())
+
+DATA_COLLECTION_EXPECTED_RESPONSE_TEXT = "Let me check the weather."
+
+DATA_COLLECTION_EXPECTED_TOOL_CALLS = [
+    {
+        "id": "toolu_01A09q90qw90lq917835lq9",
+        "input": {"location": "San Francisco, CA"},
+        "name": "get_weather",
+        "type": "tool_use",
+    }
+]
+
+
+def data_collection_tool_use_message():
+    return Message(
+        id="msg_01XFDUDYJgAACzvnptvVoYEL",
+        model="model",
+        role="assistant",
+        content=[
+            TextBlock(type="text", text=DATA_COLLECTION_EXPECTED_RESPONSE_TEXT),
+            ToolUseBlock(
+                id="toolu_01A09q90qw90lq917835lq9",
+                input={"location": "San Francisco, CA"},
+                name="get_weather",
+                type="tool_use",
+            ),
+        ],
+        type="message",
+        stop_reason="tool_use",
+        usage=Usage(input_tokens=10, output_tokens=20),
+    )
+
+
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
@@ -288,6 +341,536 @@ def test_nonstreaming_create_message(
             span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
         )
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["end_turn"]
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            False,
+            False,
+            DATA_COLLECTION_EXPECTED_INPUT_DATA,
+            [],
+            id="gen-ai-inputs-enabled-overrides-pii-and-include-prompts",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            True,
+            True,
+            {},
+            DATA_COLLECTION_INPUT_DATA_KEYS,
+            id="gen-ai-inputs-disabled-overrides-pii-and-include-prompts",
+        ),
+        pytest.param(
+            {"gen_ai": {}},
+            True,
+            True,
+            DATA_COLLECTION_EXPECTED_INPUT_DATA,
+            [],
+            id="gen-ai-inputs-omitted-defaults-to-enabled",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            DATA_COLLECTION_EXPECTED_INPUT_DATA,
+            [],
+            id="legacy-pii-and-include-prompts-enabled",
+        ),
+    ],
+)
+def test_nonstreaming_create_message_data_collection(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    send_default_pii,
+    include_prompts,
+    expected_present,
+    expected_absent,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init_kwargs = dict(
+        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+    sentry_init(**sentry_init_kwargs)
+
+    client = Anthropic(api_key="z")
+    client.messages._post = mock.Mock(return_value=EXAMPLE_MESSAGE)
+
+    create_kwargs = dict(
+        max_tokens=1024,
+        model="model",
+        system="You are a helpful assistant.",
+        messages=[{"role": "user", "content": "Hello, Claude"}],
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with start_transaction(name="anthropic"):
+            client.messages.create(**create_kwargs)
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+
+        with start_transaction(name="anthropic"):
+            client.messages.create(**create_kwargs)
+
+        (event,) = events
+        (span,) = event["spans"]
+        span_data = span["data"]
+
+    assert span_data[SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+
+    for key, expected_value in expected_present.items():
+        assert json.loads(span_data[key]) == expected_value
+
+    for key in expected_absent:
+        assert key not in span_data
+
+
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 27),
+    reason="Tools are not supported in this version of the anthropic package",
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,tools_collected",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            True,
+            id="gen-ai-inputs-enabled-tools-collected",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            False,
+            id="gen-ai-inputs-disabled-tools-not-collected",
+        ),
+        pytest.param(
+            None,
+            True,
+            id="legacy-pii-disabled-tools-still-collected",
+        ),
+    ],
+)
+def test_nonstreaming_create_message_data_collection_tools(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    tools_collected,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init_kwargs = dict(
+        integrations=[AnthropicIntegration(include_prompts=False)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=False,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+    sentry_init(**sentry_init_kwargs)
+
+    client = Anthropic(api_key="z")
+    client.messages._post = mock.Mock(return_value=EXAMPLE_MESSAGE)
+
+    create_kwargs = dict(
+        max_tokens=1024,
+        model="model",
+        messages=[],
+        tools=DATA_COLLECTION_EXAMPLE_TOOLS,
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with start_transaction(name="anthropic"):
+            client.messages.create(**create_kwargs)
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+
+        with start_transaction(name="anthropic"):
+            client.messages.create(**create_kwargs)
+
+        (event,) = events
+        (span,) = event["spans"]
+        span_data = span["data"]
+
+    if tools_collected:
+        assert (
+            json.loads(span_data[SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS])
+            == DATA_COLLECTION_EXAMPLE_TOOLS
+        )
+    else:
+        assert SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS not in span_data
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            False,
+            False,
+            DATA_COLLECTION_EXPECTED_INPUT_DATA,
+            [],
+            id="gen-ai-inputs-enabled-overrides-pii-and-include-prompts",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            True,
+            True,
+            {},
+            DATA_COLLECTION_INPUT_DATA_KEYS,
+            id="gen-ai-inputs-disabled-overrides-pii-and-include-prompts",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            DATA_COLLECTION_EXPECTED_INPUT_DATA,
+            [],
+            id="legacy-pii-and-include-prompts-enabled",
+        ),
+    ],
+)
+async def test_nonstreaming_create_message_data_collection_async(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    send_default_pii,
+    include_prompts,
+    expected_present,
+    expected_absent,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init_kwargs = dict(
+        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+    sentry_init(**sentry_init_kwargs)
+
+    client = AsyncAnthropic(api_key="z")
+    client.messages._post = AsyncMock(return_value=EXAMPLE_MESSAGE)
+
+    create_kwargs = dict(
+        max_tokens=1024,
+        model="model",
+        system="You are a helpful assistant.",
+        messages=[{"role": "user", "content": "Hello, Claude"}],
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with start_transaction(name="anthropic"):
+            await client.messages.create(**create_kwargs)
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+
+        with start_transaction(name="anthropic"):
+            await client.messages.create(**create_kwargs)
+
+        (event,) = events
+        (span,) = event["spans"]
+        span_data = span["data"]
+
+    assert span_data[SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+
+    for key, expected_value in expected_present.items():
+        assert json.loads(span_data[key]) == expected_value
+
+    for key in expected_absent:
+        assert key not in span_data
+
+
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 27),
+    reason="anthropic.types.ToolUseBlock was added in 0.27.0. Before that, tool use was only available under the beta namespace and could not appear in a standard Message.",
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,include_prompts,outputs_collected",
+    [
+        pytest.param(
+            {"gen_ai": {"outputs": True}},
+            False,
+            False,
+            True,
+            id="gen-ai-outputs-enabled-overrides-pii-and-include-prompts",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            True,
+            True,
+            False,
+            id="gen-ai-outputs-disabled-overrides-pii-and-include-prompts",
+        ),
+        pytest.param(
+            {"gen_ai": {}},
+            False,
+            False,
+            True,
+            id="gen-ai-outputs-omitted-defaults-to-enabled",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            True,
+            id="legacy-pii-and-include-prompts-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            True,
+            False,
+            id="legacy-pii-disabled",
+        ),
+    ],
+)
+def test_nonstreaming_create_message_data_collection_outputs(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    send_default_pii,
+    include_prompts,
+    outputs_collected,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init_kwargs = dict(
+        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+    sentry_init(**sentry_init_kwargs)
+
+    client = Anthropic(api_key="z")
+    client.messages._post = mock.Mock(return_value=data_collection_tool_use_message())
+
+    create_kwargs = dict(
+        max_tokens=1024,
+        model="model",
+        messages=[{"role": "user", "content": "What is the weather in San Francisco?"}],
+        tools=DATA_COLLECTION_EXAMPLE_TOOLS,
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with start_transaction(name="anthropic"):
+            client.messages.create(**create_kwargs)
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+
+        with start_transaction(name="anthropic"):
+            client.messages.create(**create_kwargs)
+
+        (event,) = events
+        (span,) = event["spans"]
+        span_data = span["data"]
+
+    # Output data that is not gated on data collection
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "model"
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["tool_use"]
+    assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+
+    if outputs_collected:
+        assert (
+            span_data[SPANDATA.GEN_AI_RESPONSE_TEXT]
+            == DATA_COLLECTION_EXPECTED_RESPONSE_TEXT
+        )
+        assert (
+            json.loads(span_data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS])
+            == DATA_COLLECTION_EXPECTED_TOOL_CALLS
+        )
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span_data
+
+
+@pytest.mark.skipif(
+    ANTHROPIC_VERSION < (0, 27),
+    reason="anthropic.types.ToolUseBlock was added in 0.27.0. Before that, tool use was only available under the beta namespace and could not appear in a standard Message.",
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,include_prompts,outputs_collected",
+    [
+        pytest.param(
+            {"gen_ai": {"outputs": True}},
+            False,
+            False,
+            True,
+            id="gen-ai-outputs-enabled-overrides-pii-and-include-prompts",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            True,
+            True,
+            False,
+            id="gen-ai-outputs-disabled-overrides-pii-and-include-prompts",
+        ),
+        pytest.param(
+            {"gen_ai": {}},
+            False,
+            False,
+            True,
+            id="gen-ai-outputs-omitted-defaults-to-enabled",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            True,
+            id="legacy-pii-and-include-prompts-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            True,
+            False,
+            id="legacy-pii-disabled",
+        ),
+    ],
+)
+async def test_nonstreaming_create_message_data_collection_outputs_async(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    send_default_pii,
+    include_prompts,
+    outputs_collected,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init_kwargs = dict(
+        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+    sentry_init(**sentry_init_kwargs)
+
+    client = AsyncAnthropic(api_key="z")
+    client.messages._post = AsyncMock(return_value=data_collection_tool_use_message())
+
+    create_kwargs = dict(
+        max_tokens=1024,
+        model="model",
+        messages=[{"role": "user", "content": "What is the weather in San Francisco?"}],
+        tools=DATA_COLLECTION_EXAMPLE_TOOLS,
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with start_transaction(name="anthropic"):
+            await client.messages.create(**create_kwargs)
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+
+        with start_transaction(name="anthropic"):
+            await client.messages.create(**create_kwargs)
+
+        (event,) = events
+        (span,) = event["spans"]
+        span_data = span["data"]
+
+    # Output data that is not gated on data collection
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "model"
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["tool_use"]
+    assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+
+    if outputs_collected:
+        assert (
+            span_data[SPANDATA.GEN_AI_RESPONSE_TEXT]
+            == DATA_COLLECTION_EXPECTED_RESPONSE_TEXT
+        )
+        assert (
+            json.loads(span_data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS])
+            == DATA_COLLECTION_EXPECTED_TOOL_CALLS
+        )
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span_data
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -737,6 +1320,298 @@ def test_streaming_create_message(
             span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
         )
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            False,
+            False,
+            DATA_COLLECTION_EXPECTED_INPUT_DATA,
+            [],
+            id="gen-ai-inputs-enabled-overrides-pii-and-include-prompts",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            True,
+            True,
+            {},
+            DATA_COLLECTION_INPUT_DATA_KEYS,
+            id="gen-ai-inputs-disabled-overrides-pii-and-include-prompts",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            DATA_COLLECTION_EXPECTED_INPUT_DATA,
+            [],
+            id="legacy-pii-and-include-prompts-enabled",
+        ),
+    ],
+)
+def test_streaming_create_message_data_collection(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    send_default_pii,
+    include_prompts,
+    expected_present,
+    expected_absent,
+    get_model_response,
+    server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init_kwargs = dict(
+        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+    sentry_init(**sentry_init_kwargs)
+
+    client = Anthropic(api_key="z")
+
+    response = get_model_response(
+        server_side_event_chunks(
+            [
+                MessageStartEvent(
+                    message=EXAMPLE_MESSAGE,
+                    type="message_start",
+                ),
+                ContentBlockStartEvent(
+                    type="content_block_start",
+                    index=0,
+                    content_block=TextBlock(type="text", text=""),
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="Hi", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockStopEvent(type="content_block_stop", index=0),
+                MessageDeltaEvent(
+                    delta=Delta(stop_reason="max_tokens"),
+                    usage=MessageDeltaUsage(output_tokens=10),
+                    type="message_delta",
+                ),
+            ]
+        )
+    )
+
+    create_kwargs = dict(
+        max_tokens=1024,
+        model="model",
+        system="You are a helpful assistant.",
+        messages=[{"role": "user", "content": "Hello, Claude"}],
+        stream=True,
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with mock.patch.object(
+            client._client,
+            "send",
+            return_value=response,
+        ), start_transaction(name="anthropic"):
+            message = client.messages.create(**create_kwargs)
+            for _ in message:
+                pass
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            client._client,
+            "send",
+            return_value=response,
+        ), start_transaction(name="anthropic"):
+            message = client.messages.create(**create_kwargs)
+            for _ in message:
+                pass
+
+        (event,) = events
+        span = next(s for s in event["spans"] if s["op"] == OP.GEN_AI_CHAT)
+        span_data = span["data"]
+
+    assert span_data[SPANDATA.GEN_AI_SYSTEM] == "anthropic"
+    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "model"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 1024
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+    for key, expected_value in expected_present.items():
+        assert json.loads(span_data[key]) == expected_value
+
+    for key in expected_absent:
+        assert key not in span_data
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,include_prompts,outputs_collected",
+    [
+        pytest.param(
+            {"gen_ai": {"outputs": True}},
+            False,
+            False,
+            True,
+            id="gen-ai-outputs-enabled-overrides-pii-and-include-prompts",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            True,
+            True,
+            False,
+            id="gen-ai-outputs-disabled-overrides-pii-and-include-prompts",
+        ),
+        pytest.param(
+            {"gen_ai": {}},
+            False,
+            False,
+            True,
+            id="gen-ai-outputs-omitted-defaults-to-enabled",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            True,
+            id="legacy-pii-and-include-prompts-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            True,
+            False,
+            id="legacy-pii-disabled",
+        ),
+    ],
+)
+def test_streaming_create_message_data_collection_outputs(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    send_default_pii,
+    include_prompts,
+    outputs_collected,
+    get_model_response,
+    server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init_kwargs = dict(
+        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+    sentry_init(**sentry_init_kwargs)
+
+    client = Anthropic(api_key="z")
+
+    response = get_model_response(
+        server_side_event_chunks(
+            [
+                MessageStartEvent(
+                    message=EXAMPLE_MESSAGE,
+                    type="message_start",
+                ),
+                ContentBlockStartEvent(
+                    type="content_block_start",
+                    index=0,
+                    content_block=TextBlock(type="text", text=""),
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="Hi", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="! I'm Claude!", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockStopEvent(type="content_block_stop", index=0),
+                MessageDeltaEvent(
+                    delta=Delta(stop_reason="max_tokens"),
+                    usage=MessageDeltaUsage(output_tokens=10),
+                    type="message_delta",
+                ),
+            ]
+        )
+    )
+
+    create_kwargs = dict(
+        max_tokens=1024,
+        model="model",
+        messages=[{"role": "user", "content": "Hello, Claude"}],
+        stream=True,
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with mock.patch.object(
+            client._client,
+            "send",
+            return_value=response,
+        ), start_transaction(name="anthropic"):
+            message = client.messages.create(**create_kwargs)
+            for _ in message:
+                pass
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            client._client,
+            "send",
+            return_value=response,
+        ), start_transaction(name="anthropic"):
+            message = client.messages.create(**create_kwargs)
+            for _ in message:
+                pass
+
+        (event,) = events
+        span = next(s for s in event["spans"] if s["op"] == OP.GEN_AI_CHAT)
+        span_data = span["data"]
+
+    # Output data that is not gated on data collection
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "model"
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
+    assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+
+    if outputs_collected:
+        assert span_data[SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -1391,6 +2266,160 @@ def test_stream_messages(
             span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
         )
         assert span["data"][SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,include_prompts,outputs_collected",
+    [
+        pytest.param(
+            {"gen_ai": {"outputs": True}},
+            False,
+            False,
+            True,
+            id="gen-ai-outputs-enabled-overrides-pii-and-include-prompts",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            True,
+            True,
+            False,
+            id="gen-ai-outputs-disabled-overrides-pii-and-include-prompts",
+        ),
+        pytest.param(
+            {"gen_ai": {}},
+            False,
+            False,
+            True,
+            id="gen-ai-outputs-omitted-defaults-to-enabled",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            True,
+            id="legacy-pii-and-include-prompts-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            True,
+            False,
+            id="legacy-pii-disabled",
+        ),
+    ],
+)
+def test_stream_messages_data_collection_outputs(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    send_default_pii,
+    include_prompts,
+    outputs_collected,
+    get_model_response,
+    server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init_kwargs = dict(
+        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+    sentry_init(**sentry_init_kwargs)
+
+    client = Anthropic(api_key="z")
+
+    response = get_model_response(
+        server_side_event_chunks(
+            [
+                MessageStartEvent(
+                    message=EXAMPLE_MESSAGE,
+                    type="message_start",
+                ),
+                ContentBlockStartEvent(
+                    type="content_block_start",
+                    index=0,
+                    content_block=TextBlock(type="text", text=""),
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="Hi", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockDeltaEvent(
+                    delta=TextDelta(text="! I'm Claude!", type="text_delta"),
+                    index=0,
+                    type="content_block_delta",
+                ),
+                ContentBlockStopEvent(type="content_block_stop", index=0),
+                MessageDeltaEvent(
+                    delta=Delta(stop_reason="max_tokens"),
+                    usage=MessageDeltaUsage(output_tokens=10),
+                    type="message_delta",
+                ),
+            ]
+        )
+    )
+
+    stream_kwargs = dict(
+        max_tokens=1024,
+        model="model",
+        messages=[{"role": "user", "content": "Hello, Claude"}],
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with mock.patch.object(
+            client._client,
+            "send",
+            return_value=response,
+        ), start_transaction(name="anthropic"), client.messages.stream(
+            **stream_kwargs
+        ) as stream:
+            for _ in stream:
+                pass
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            client._client,
+            "send",
+            return_value=response,
+        ), start_transaction(name="anthropic"), client.messages.stream(
+            **stream_kwargs
+        ) as stream:
+            for _ in stream:
+                pass
+
+        (event,) = events
+        span = next(s for s in event["spans"] if s["op"] == OP.GEN_AI_CHAT)
+        span_data = span["data"]
+
+    # Output data that is not gated on data collection
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "model"
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
+    assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+
+    if outputs_collected:
+        assert span_data[SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -2069,6 +3098,163 @@ async def test_streaming_create_message_async(
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,include_prompts,outputs_collected",
+    [
+        pytest.param(
+            {"gen_ai": {"outputs": True}},
+            False,
+            False,
+            True,
+            id="gen-ai-outputs-enabled-overrides-pii-and-include-prompts",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            True,
+            True,
+            False,
+            id="gen-ai-outputs-disabled-overrides-pii-and-include-prompts",
+        ),
+        pytest.param(
+            {"gen_ai": {}},
+            False,
+            False,
+            True,
+            id="gen-ai-outputs-omitted-defaults-to-enabled",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            True,
+            id="legacy-pii-and-include-prompts-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            True,
+            False,
+            id="legacy-pii-disabled",
+        ),
+    ],
+)
+async def test_streaming_create_message_data_collection_outputs_async(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    send_default_pii,
+    include_prompts,
+    outputs_collected,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init_kwargs = dict(
+        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+    sentry_init(**sentry_init_kwargs)
+
+    client = AsyncAnthropic(api_key="z")
+
+    response = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    MessageStartEvent(
+                        message=EXAMPLE_MESSAGE,
+                        type="message_start",
+                    ),
+                    ContentBlockStartEvent(
+                        type="content_block_start",
+                        index=0,
+                        content_block=TextBlock(type="text", text=""),
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="Hi", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="! I'm Claude!", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockStopEvent(type="content_block_stop", index=0),
+                    MessageDeltaEvent(
+                        delta=Delta(stop_reason="max_tokens"),
+                        usage=MessageDeltaUsage(output_tokens=10),
+                        type="message_delta",
+                    ),
+                ]
+            )
+        ),
+    )
+
+    create_kwargs = dict(
+        max_tokens=1024,
+        model="model",
+        messages=[{"role": "user", "content": "Hello, Claude"}],
+        stream=True,
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with mock.patch.object(
+            client._client,
+            "send",
+            return_value=response,
+        ), start_transaction(name="anthropic"):
+            message = await client.messages.create(**create_kwargs)
+            async for _ in message:
+                pass
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            client._client,
+            "send",
+            return_value=response,
+        ), start_transaction(name="anthropic"):
+            message = await client.messages.create(**create_kwargs)
+            async for _ in message:
+                pass
+
+        (event,) = events
+        span = next(s for s in event["spans"] if s["op"] == OP.GEN_AI_CHAT)
+        span_data = span["data"]
+
+    # Output data that is not gated on data collection
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "model"
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
+    assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+
+    if outputs_collected:
+        assert span_data[SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.asyncio
 async def test_streaming_create_message_async_close(
     sentry_init,
     capture_events,
@@ -2724,6 +3910,162 @@ async def test_stream_message_async(
         assert (
             span["data"][SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
         )
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,include_prompts,outputs_collected",
+    [
+        pytest.param(
+            {"gen_ai": {"outputs": True}},
+            False,
+            False,
+            True,
+            id="gen-ai-outputs-enabled-overrides-pii-and-include-prompts",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            True,
+            True,
+            False,
+            id="gen-ai-outputs-disabled-overrides-pii-and-include-prompts",
+        ),
+        pytest.param(
+            {"gen_ai": {}},
+            False,
+            False,
+            True,
+            id="gen-ai-outputs-omitted-defaults-to-enabled",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            True,
+            id="legacy-pii-and-include-prompts-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            True,
+            False,
+            id="legacy-pii-disabled",
+        ),
+    ],
+)
+async def test_stream_messages_data_collection_outputs_async(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    send_default_pii,
+    include_prompts,
+    outputs_collected,
+    get_model_response,
+    async_iterator,
+    server_side_event_chunks,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init_kwargs = dict(
+        integrations=[AnthropicIntegration(include_prompts=include_prompts)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+    sentry_init(**sentry_init_kwargs)
+
+    client = AsyncAnthropic(api_key="z")
+
+    response = get_model_response(
+        async_iterator(
+            server_side_event_chunks(
+                [
+                    MessageStartEvent(
+                        message=EXAMPLE_MESSAGE,
+                        type="message_start",
+                    ),
+                    ContentBlockStartEvent(
+                        type="content_block_start",
+                        index=0,
+                        content_block=TextBlock(type="text", text=""),
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="Hi", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockDeltaEvent(
+                        delta=TextDelta(text="! I'm Claude!", type="text_delta"),
+                        index=0,
+                        type="content_block_delta",
+                    ),
+                    ContentBlockStopEvent(type="content_block_stop", index=0),
+                    MessageDeltaEvent(
+                        delta=Delta(stop_reason="max_tokens"),
+                        usage=MessageDeltaUsage(output_tokens=10),
+                        type="message_delta",
+                    ),
+                ]
+            )
+        ),
+    )
+
+    stream_kwargs = dict(
+        max_tokens=1024,
+        model="model",
+        messages=[{"role": "user", "content": "Hello, Claude"}],
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("transaction", "span")
+
+        with mock.patch.object(
+            client._client,
+            "send",
+            return_value=response,
+        ), start_transaction(name="anthropic"):
+            async with client.messages.stream(**stream_kwargs) as stream:
+                async for _ in stream:
+                    pass
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        (span,) = [s for s in spans if s["attributes"]["sentry.op"] == OP.GEN_AI_CHAT]
+        span_data = span["attributes"]
+    else:
+        events = capture_events()
+
+        with mock.patch.object(
+            client._client,
+            "send",
+            return_value=response,
+        ), start_transaction(name="anthropic"):
+            async with client.messages.stream(**stream_kwargs) as stream:
+                async for _ in stream:
+                    pass
+
+        (event,) = events
+        span = next(s for s in event["spans"] if s["op"] == OP.GEN_AI_CHAT)
+        span_data = span["data"]
+
+    # Output data that is not gated on data collection
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "model"
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_ID] == "msg_01XFDUDYJgAACzvnptvVoYEL"
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == ["max_tokens"]
+    assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 10
+
+    if outputs_collected:
+        assert span_data[SPANDATA.GEN_AI_RESPONSE_TEXT] == "Hi! I'm Claude!"
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])

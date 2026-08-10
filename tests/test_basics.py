@@ -250,6 +250,34 @@ def test_option_before_breadcrumb(sentry_init, capture_events, monkeypatch):
     assert crumb["type"] == "default"
 
 
+@pytest.mark.tests_internal_exceptions
+def test_option_before_breadcrumb_exception(sentry_init, capture_events):
+    """Exceptions in before_breadcrumb are contained."""
+
+    def before_breadcrumb(crumb, hint):
+        1 / 0
+
+    sentry_init(before_breadcrumb=before_breadcrumb)
+    events = capture_events()
+
+    def do_this():
+        add_breadcrumb(message="Hello", hint={"foo": 42})
+        try:
+            raise ValueError("aha!")
+        except Exception:
+            capture_exception()
+
+    do_this()
+
+    (event,) = events
+
+    assert event["exception"]["values"][0]["type"] == "ValueError"
+    (crumb,) = event["breadcrumbs"]["values"]
+    assert "timestamp" in crumb
+    assert crumb["message"] == "Hello"
+    assert crumb["type"] == "default"
+
+
 @pytest.mark.parametrize(
     "enable_tracing, traces_sample_rate, tracing_enabled, updated_traces_sample_rate",
     [
