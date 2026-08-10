@@ -1,4 +1,3 @@
-import inspect
 from contextlib import contextmanager
 from typing import Any, Generator
 
@@ -68,25 +67,13 @@ def _patch_builder_method(cls: type, method_name: str, middleware: "Any") -> Non
 
     original_method = getattr(cls, method_name)
 
-    is_async = inspect.iscoroutinefunction(middleware)
-
     def sentry_patched_method(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         integration = sentry_sdk.get_client().get_integration(PyreqwestIntegration)
 
         if getattr(self, "_sentry_instrumented", False) or integration is None:
             return original_method(self, *args, **kwargs)
 
-        if is_async:
-            isolation_scope = sentry_sdk.get_isolation_scope()
-
-            async def bound_middleware(
-                request: "Request", next_handler: "Next"
-            ) -> "Response":
-                return await middleware(request, next_handler, isolation_scope)
-
-            self.with_middleware(bound_middleware)
-        else:
-            self.with_middleware(middleware)
+        self.with_middleware(middleware)
 
         try:
             self._sentry_instrumented = True
@@ -171,7 +158,6 @@ def _sentry_pyreqwest_span(request: "Request") -> "Generator[Any, None, None]":
 async def sentry_async_middleware(
     request: "Request",
     next_handler: "Next",
-    isolation_scope: "sentry_sdk.Scope",
 ) -> "Response":
     if sentry_sdk.get_client().get_integration(PyreqwestIntegration) is None:
         return await next_handler.run(request)
@@ -210,7 +196,7 @@ async def sentry_async_middleware(
                 }
             )
 
-        add_http_breadcrumb(response.status, breadcrumb_data, isolation_scope)
+        add_http_breadcrumb(response.status, breadcrumb_data)
 
     return response
 
