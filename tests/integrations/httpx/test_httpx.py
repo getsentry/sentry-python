@@ -84,13 +84,16 @@ def test_crumb_capture_and_hint_span_streaming(
 
     events = capture_events()
 
-    if inspect.iscoroutinefunction(httpx_client.get):
-        response = asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
-    else:
-        response = httpx_client.get(url)
+    with sentry_sdk.traces.start_span(name="segment"):
+        if inspect.iscoroutinefunction(httpx_client.get):
+            response = asyncio.get_event_loop().run_until_complete(
+                httpx_client.get(url)
+            )
+        else:
+            response = httpx_client.get(url)
 
-    assert response.status_code == 200
-    capture_message("Testing!")
+        assert response.status_code == 200
+        capture_message("Testing!")
 
     (event,) = events
 
