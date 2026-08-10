@@ -338,6 +338,81 @@ def test_weight_based_flushing_by_attribute_size(
     assert envelopes[0].items[0].payload.json["items"][1]["name"] == "big span"
 
 
+def test_global_length_based_flushing(sentry_init, capture_items, monkeypatch):
+    """When a the batcher reaches GLOBAL_MAX_BYTES_BEFORE_FLUSH, all buckets will be flushed."""
+    monkeypatch.setattr(SpanBatcher, "GLOBAL_MAX_BYTES_BEFORE_FLUSH", 3)
+    # set the time-based flush limit to something huge so that it doesn't
+    # interfere
+    monkeypatch.setattr(SpanBatcher, "FLUSH_WAIT_TIME", 100000)
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="span"):
+        pass
+
+    sentry_sdk.traces.new_trace()
+    with sentry_sdk.traces.start_span(name="span"):
+        pass
+
+    sentry_sdk.traces.new_trace()
+    with sentry_sdk.traces.start_span(name="span"):
+        pass
+
+    time.sleep(0.1)
+
+    assert len(items) == 3
+    assert items[0].payload["name"] == "span"
+
+
+def test_capture_after_length_based_flushing(sentry_init, capture_items, monkeypatch):
+    """Spans are flushed again after a flush reduces the combined span size in bytes below the global limit."""
+    monkeypatch.setattr(SpanBatcher, "GLOBAL_MAX_BYTES_BEFORE_FLUSH", 3)
+    # set the time-based flush limit to something huge so that it doesn't
+    # interfere
+    monkeypatch.setattr(SpanBatcher, "FLUSH_WAIT_TIME", 100000)
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="span"):
+        pass
+
+    sentry_sdk.traces.new_trace()
+    with sentry_sdk.traces.start_span(name="span"):
+        pass
+
+    sentry_sdk.traces.new_trace()
+    with sentry_sdk.traces.start_span(name="span"):
+        pass
+
+    time.sleep(0.1)
+
+    with sentry_sdk.traces.start_span(name="span"):
+        pass
+
+    sentry_sdk.traces.new_trace()
+    with sentry_sdk.traces.start_span(name="span"):
+        pass
+
+    sentry_sdk.traces.new_trace()
+    with sentry_sdk.traces.start_span(name="span"):
+        pass
+
+    time.sleep(0.1)
+
+    assert len(items) == 6
+    assert items[0].payload["name"] == "span"
+
+
 def test_bucket_recreated_after_flush(sentry_init, capture_envelopes, monkeypatch):
     """Spans for a trace that arrive after that trace's bucket was flushed land in a fresh bucket."""
     monkeypatch.setattr(SpanBatcher, "MAX_BEFORE_FLUSH", 2)
@@ -545,6 +620,8 @@ def test_span_batcher_lock_reset_in_child_after_fork(sentry_init):
     batcher._span_number = 1
 
     batcher._running_size["test-trace-id"] = 42
+    batcher._total_running_size = 42
+
     batcher._active.flag = True
     batcher._flush_event.set()
     batcher._running = False
@@ -559,6 +636,7 @@ def test_span_batcher_lock_reset_in_child_after_fork(sentry_init):
         span_number_reset = batcher._span_number == 0
 
         running_size_reset = len(batcher._running_size) == 0
+        total_running_size_reset = batcher._total_running_size == 0
 
         active_reset = not getattr(batcher._active, "flag", False)
         event_reset = not batcher._flush_event.is_set()
@@ -572,6 +650,7 @@ def test_span_batcher_lock_reset_in_child_after_fork(sentry_init):
             and span_buffer_reset
             and span_number_reset
             and running_size_reset
+            and total_running_size_reset
             and active_reset
             and event_reset
             and running_reset
