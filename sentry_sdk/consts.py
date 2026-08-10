@@ -814,6 +814,12 @@ class SPANDATA:
     Example: 100
     """
 
+    GEN_AI_USAGE_REASONING_OUTPUT_TOKENS = "gen_ai.usage.reasoning.output_tokens"
+    """
+    The number of tokens used for reasoning to create the AI output.
+    Example: 75
+    """
+
     GEN_AI_USAGE_OUTPUT_TOKENS = "gen_ai.usage.output_tokens"
     """
     The number of tokens in the output.

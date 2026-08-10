@@ -69,6 +69,7 @@ class TokenUsage(NamedTuple):
     total_tokens: "Optional[int]"
     cache_read: "Optional[int]"
     cache_creation: "Optional[int]"
+    reasoning: "Optional[int]"
 
 
 try:
@@ -735,6 +736,7 @@ def _extract_tokens_from_generations(
     total_total = 0
     total_cache_read = None
     total_cache_creation = None
+    reasoning = None
 
     for gen_list in generations:
         if not gen_list:
@@ -761,18 +763,23 @@ def _extract_tokens_from_generations(
             continue
 
         input_token_details = usage_metadata.get("input_token_details")
-        if not isinstance(input_token_details, dict):
+        if isinstance(input_token_details, dict):
+            if isinstance(input_token_details.get("cache_read"), int):
+                total_cache_read = (total_cache_read or 0) + input_token_details[
+                    "cache_read"
+                ]
+
+            if isinstance(input_token_details.get("cache_creation"), int):
+                total_cache_creation = (
+                    total_cache_creation or 0
+                ) + input_token_details["cache_creation"]
+
+        output_token_details = usage_metadata.get("output_token_details")
+        if not isinstance(output_token_details, dict):
             continue
 
-        if isinstance(input_token_details.get("cache_read"), int):
-            total_cache_read = (total_cache_read or 0) + input_token_details[
-                "cache_read"
-            ]
-
-        if isinstance(input_token_details.get("cache_creation"), int):
-            total_cache_creation = (total_cache_creation or 0) + input_token_details[
-                "cache_creation"
-            ]
+        if isinstance(output_token_details.get("reasoning"), int):
+            reasoning = (reasoning or 0) + output_token_details["reasoning"]
 
     return TokenUsage(
         total_input if total_input > 0 else None,
@@ -780,6 +787,7 @@ def _extract_tokens_from_generations(
         total_total if total_total > 0 else None,
         total_cache_read,
         total_cache_creation,
+        reasoning,
     )
 
 
@@ -819,6 +827,7 @@ def _record_token_usage(
     total_tokens = None
     cache_read_tokens = None
     cache_creation_tokens = None
+    reasoning = None
 
     # Legacy that reads provider-specific token information.
     token_usage = _get_token_usage(response)
@@ -838,6 +847,8 @@ def _record_token_usage(
             cache_read_tokens = token_usage.cache_read
         if token_usage.cache_creation is not None:
             cache_creation_tokens = token_usage.cache_creation
+        if token_usage.reasoning is not None:
+            reasoning = token_usage.reasoning
 
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
@@ -859,6 +870,9 @@ def _record_token_usage(
         set_on_span(
             SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, cache_creation_tokens
         )
+
+    if reasoning is not None:
+        set_on_span(SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS, reasoning)
 
 
 def _get_request_data(
