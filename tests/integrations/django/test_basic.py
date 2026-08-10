@@ -1761,6 +1761,96 @@ def test_does_not_capture_403(
         assert not events
 
 
+@pytest.mark.parametrize(
+    ("integration_kwargs", "endpoint", "status", "expected_type"),
+    (
+        # Django only turns exceptions into 4xx responses, so with the default
+        # (the 5xx range) none of them are reported
+        ({}, "permission_denied_exc", "403 forbidden", None),
+        ({}, "http404_exc", "404 not found", None),
+        (
+            {"failed_request_status_codes": set()},
+            "permission_denied_exc",
+            "403 forbidden",
+            None,
+        ),
+        (
+            {"failed_request_status_codes": {403, *range(500, 600)}},
+            "permission_denied_exc",
+            "403 forbidden",
+            "PermissionDenied",
+        ),
+        (
+            {"failed_request_status_codes": {404, *range(500, 600)}},
+            "http404_exc",
+            "404 not found",
+            "Http404",
+        ),
+        # Only the status codes that were opted into are reported
+        (
+            {"failed_request_status_codes": {403}},
+            "http404_exc",
+            "404 not found",
+            None,
+        ),
+    ),
+)
+def test_failed_request_status_codes(
+    sentry_init,
+    client,
+    capture_events,
+    integration_kwargs,
+    endpoint,
+    status,
+    expected_type,
+):
+    sentry_init(integrations=[DjangoIntegration(**integration_kwargs)])
+    events = capture_events()
+
+    _, response_status, _ = unpack_werkzeug_response(client.get(reverse(endpoint)))
+    assert response_status.lower() == status
+
+    # The test app's handler404 captures a message, ignore it here
+    error_events = [event for event in events if "exception" in event]
+
+    if expected_type is None:
+        assert not error_events
+    else:
+        (event,) = error_events
+        (exception,) = event["exception"]["values"]
+        assert exception["type"] == expected_type
+        assert exception["mechanism"]["type"] == "django"
+        assert exception["mechanism"]["handled"] is True
+
+
+@pytest.mark.parametrize(
+    "integration_kwargs",
+    (
+        {},
+        {"failed_request_status_codes": set()},
+        {"failed_request_status_codes": {404}},
+    ),
+)
+def test_failed_request_status_codes_unhandled_exception(
+    sentry_init, client, capture_events, integration_kwargs
+):
+    """
+    Exceptions Django gives up on are always reported, exactly once, no matter how
+    failed_request_status_codes is set.
+    """
+    sentry_init(integrations=[DjangoIntegration(**integration_kwargs)])
+    events = capture_events()
+
+    _, status, _ = unpack_werkzeug_response(client.get(reverse("view_exc")))
+    assert status.lower() == "500 internal server error"
+
+    (event,) = events
+    (exception,) = event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
+    assert exception["mechanism"]["type"] == "django"
+    assert exception["mechanism"]["handled"] is False
+
+
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_render_spans(
     sentry_init,
