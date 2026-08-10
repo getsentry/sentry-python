@@ -22,8 +22,23 @@ from tests.integrations.django.myapp.signals import (
 )
 
 try:
-    from rest_framework.decorators import api_view
+    from rest_framework.authentication import BaseAuthentication
+    from rest_framework.decorators import api_view, authentication_classes
     from rest_framework.response import Response
+
+    class DummyAuthentication(BaseAuthentication):
+        def authenticate(self, request):
+            return None
+
+    @api_view(["GET"])
+    @authentication_classes([DummyAuthentication])
+    def rest_authenticated_hello(request):
+        return HttpResponse("ok")
+
+    @api_view(["GET"])
+    @authentication_classes([])
+    def rest_unauthenticated_hello(request):
+        return HttpResponse("ok")
 
     @api_view(["POST"])
     def rest_framework_exc(request):
