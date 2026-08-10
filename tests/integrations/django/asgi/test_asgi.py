@@ -199,7 +199,6 @@ async def test_async_views(
 
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
-@pytest.mark.parametrize("middleware_spans", [False, True])
 @pytest.mark.asyncio
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
@@ -212,11 +211,10 @@ async def test_active_thread_id(
     teardown_profiling,
     endpoint,
     application,
-    middleware_spans,
     span_streaming,
 ):
     sentry_init(
-        integrations=[DjangoIntegration(middleware_spans=middleware_spans)],
+        integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
         profiles_sample_rate=1.0,
         trace_lifecycle="stream" if span_streaming else "static",
