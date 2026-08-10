@@ -4,21 +4,6 @@
 
 ### New Features ✨
 
-#### Aiohttp
-
-- Gate user info behind data_collection config by @ericapisani in [#6874](https://github.com/getsentry/sentry-python/pull/6874)
-- Apply data_collection filtering to URL query strings by @ericapisani in [#6833](https://github.com/getsentry/sentry-python/pull/6833)
-
-#### Anthropic
-
-- Gate output collection on data_collection option by @ericapisani in [#7121](https://github.com/getsentry/sentry-python/pull/7121)
-- Gate prompt collection on data_collection option by @ericapisani in [#7054](https://github.com/getsentry/sentry-python/pull/7054)
-
-#### Asgi
-
-- Gate client IP/user info behind data_collection config by @ericapisani in [#6841](https://github.com/getsentry/sentry-python/pull/6841)
-- Apply data_collection filtering to URL query strings by @ericapisani in [#6832](https://github.com/getsentry/sentry-python/pull/6832)
-
 #### Batcher
 
 - Add global flush trigger based on summed size estimates by @alexander-alderman-webb in [#7144](https://github.com/getsentry/sentry-python/pull/7144)
@@ -27,8 +12,6 @@
 #### Integrations
 
 - Add span for DRF authentication by @mgaligniana in [#6984](https://github.com/getsentry/sentry-python/pull/6984)
-- Gate user info behind data_collection config by @ericapisani in [#6876](https://github.com/getsentry/sentry-python/pull/6876)
-- Apply data_collection cookie filtering to wsgi, starlette, litestar, starlite by @ericapisani in [#6797](https://github.com/getsentry/sentry-python/pull/6797)
 
 #### Langchain
 
@@ -37,19 +20,9 @@
 
 #### Openai
 
-- Gate response output collection on data collection options by @ericapisani in [#7035](https://github.com/getsentry/sentry-python/pull/7035)
-- Deprecate include_prompts parameter in favour of data_collection options by @ericapisani in [#7034](https://github.com/getsentry/sentry-python/pull/7034)
-- Gate embeddings input collection on data_collection by @ericapisani in [#6977](https://github.com/getsentry/sentry-python/pull/6977)
-- Gate Chat Completions inputs behind data collection by @ericapisani in [#6965](https://github.com/getsentry/sentry-python/pull/6965)
-- Gate Responses API inputs behind data collection by @ericapisani in [#6964](https://github.com/getsentry/sentry-python/pull/6964)
 - Set `gen_ai.tool.definitions` for the Responses API by @alexander-alderman-webb in [#6951](https://github.com/getsentry/sentry-python/pull/6951)
 - Set `gen_ai.tool.definitions` for the Chat Completions API by @alexander-alderman-webb in [#6950](https://github.com/getsentry/sentry-python/pull/6950)
 - Add `gen_ai.request.reasoning.level` to OpenAI spans by @pabloDeputter in [#6892](https://github.com/getsentry/sentry-python/pull/6892)
-
-#### Sanic
-
-- Gate user info behind data_collection config by @ericapisani in [#6870](https://github.com/getsentry/sentry-python/pull/6870)
-- Apply data_collection filtering to URL query strings by @ericapisani in [#6836](https://github.com/getsentry/sentry-python/pull/6836)
 
 #### Streaming
 
@@ -57,42 +30,12 @@
 - Promote `before_send_span` to top-level option by @sentrivana in [#6885](https://github.com/getsentry/sentry-python/pull/6885)
 - Make `set_conversation_id` API work by @sentrivana in [#6866](https://github.com/getsentry/sentry-python/pull/6866)
 
-#### Tornado
-
-- Gate user info behind data_collection config by @ericapisani in [#6872](https://github.com/getsentry/sentry-python/pull/6872)
-- Apply data_collection filtering to URL query strings by @ericapisani in [#6834](https://github.com/getsentry/sentry-python/pull/6834)
-
-#### Wsgi
-
-- Gate client IP/user info behind data_collection config by @ericapisani in [#6858](https://github.com/getsentry/sentry-python/pull/6858)
-- Apply data_collection filtering to URL query strings by @ericapisani in [#6827](https://github.com/getsentry/sentry-python/pull/6827)
-
 #### Other
 
-- (aiomysql) Gate query parameters on data_collection option by @ericapisani in [#7051](https://github.com/getsentry/sentry-python/pull/7051)
 - (api) Add top-level `set_attributes` API by @sentrivana in [#6897](https://github.com/getsentry/sentry-python/pull/6897)
-- (ariadne) Gate GraphQL data collection behind data_collection option by @ericapisani in [#6890](https://github.com/getsentry/sentry-python/pull/6890)
-- (arq) Gate job args/kwargs behind data_collection option by @ericapisani in [#6912](https://github.com/getsentry/sentry-python/pull/6912)
-- (aws) Apply data_collection filtering to URL query strings by @ericapisani in [#6839](https://github.com/getsentry/sentry-python/pull/6839)
 - (aws-lambda) Enable Python 3.14 support to the Lambda layer by @pabloDeputter in [#6916](https://github.com/getsentry/sentry-python/pull/6916)
-- (celery) Respect data_collection.queues option for task args/kwargs by @ericapisani in [#6934](https://github.com/getsentry/sentry-python/pull/6934)
-- (clickhouse_driver) Respect data_collection.database_query_data option by @ericapisani in [#6938](https://github.com/getsentry/sentry-python/pull/6938)
-- (django) Gate user identity behind data_collection config by @ericapisani in [#6868](https://github.com/getsentry/sentry-python/pull/6868)
-- (flask) Gate user identity behind data_collection config by @ericapisani in [#6859](https://github.com/getsentry/sentry-python/pull/6859)
-- (gcp) Apply data_collection filtering to URL query strings by @ericapisani in [#6838](https://github.com/getsentry/sentry-python/pull/6838)
-- (gql) Gate GraphQL data collection behind data_collection option by @ericapisani in [#6889](https://github.com/getsentry/sentry-python/pull/6889)
-- (graphene) Gate GraphQL data collection behind data_collection option by @ericapisani in [#6886](https://github.com/getsentry/sentry-python/pull/6886)
-- (huey) Respect data_collection.queues option for task args/kwargs by @ericapisani in [#6930](https://github.com/getsentry/sentry-python/pull/6930)
 - (openai-agents) Set the `gen_ai.tool.definitions` attribute by @alexander-alderman-webb in [#6956](https://github.com/getsentry/sentry-python/pull/6956)
 - (pydantic-ai) Record `gen_ai.output.messages` including `ThinkingPart` by @alexander-alderman-webb in [#7037](https://github.com/getsentry/sentry-python/pull/7037)
-- (pymongo) Respect data_collection.database_query_data option by @ericapisani in [#6939](https://github.com/getsentry/sentry-python/pull/6939)
-- (pyramid) Gate user info behind data_collection config by @ericapisani in [#6873](https://github.com/getsentry/sentry-python/pull/6873)
-- (quart) Apply data_collection filtering to URL query strings by @ericapisani in [#6837](https://github.com/getsentry/sentry-python/pull/6837)
-- (redis) Support data_collection option by @ericapisani in [#6960](https://github.com/getsentry/sentry-python/pull/6960)
-- (rq) Respect data_collection.queues option for job args/kwargs by @ericapisani in [#6927](https://github.com/getsentry/sentry-python/pull/6927)
-- (starlite,litestar) Gate user info behind data_collection config by @ericapisani in [#6875](https://github.com/getsentry/sentry-python/pull/6875)
-- (strawberry) Gate GraphQL data collection behind data_collection option by @ericapisani in [#6887](https://github.com/getsentry/sentry-python/pull/6887)
-- (tracing) Gate SQL query params behind data collection options by @ericapisani in [#6976](https://github.com/getsentry/sentry-python/pull/6976)
 - Add possibility to allowlist integrations in toxgen by @sentrivana in [#6996](https://github.com/getsentry/sentry-python/pull/6996)
 
 ### Bug Fixes 🐛
@@ -130,11 +73,6 @@
 - Skip SSE test for `fastmcp>=4` by @alexander-alderman-webb in [#6923](https://github.com/getsentry/sentry-python/pull/6923)
 - Remove assertions on `RootModel` instances by @alexander-alderman-webb in [#6909](https://github.com/getsentry/sentry-python/pull/6909)
 - Replace broad `try...except` with `skipif` by @alexander-alderman-webb in [#6922](https://github.com/getsentry/sentry-python/pull/6922)
-
-#### Integrations
-
-- Deduplicate data_collection.queues test matrix by @ericapisani in [#6936](https://github.com/getsentry/sentry-python/pull/6936)
-- Route HTTP header filtering through data collection config by @ericapisani in [#6788](https://github.com/getsentry/sentry-python/pull/6788)
 
 #### Mcp
 
