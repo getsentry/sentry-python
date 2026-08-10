@@ -571,10 +571,7 @@ def test_cache_spans_templatetag(
         ),  # this case should never happen, just making sure that we are not raising an exception in that case.
     ],
 )
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_cache_spans_get_span_name(
-    method_name, args, kwargs, expected_name, span_streaming
-):
+def test_cache_spans_get_span_name(method_name, args, kwargs, expected_name):
     assert _get_span_description(method_name, args, kwargs) == expected_name
 
 
