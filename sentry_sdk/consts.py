@@ -1271,6 +1271,7 @@ class OP:
     SUBPROCESS_WAIT = "subprocess.wait"
     SUBPROCESS_COMMUNICATE = "subprocess.communicate"
     TEMPLATE_RENDER = "template.render"
+    VIEW_AUTHENTICATE = "view.authenticate"
     VIEW_RENDER = "view.render"
     VIEW_RESPONSE_RENDER = "view.response.render"
     WEBSOCKET_SERVER = "websocket.server"
