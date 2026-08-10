@@ -11,10 +11,10 @@ from pyreqwest.simple.request import pyreqwest_get as async_pyreqwest_get
 from pyreqwest.simple.sync_request import pyreqwest_get as sync_pyreqwest_get
 
 import sentry_sdk
-from sentry_sdk import start_transaction
+from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import MATCH_ALL, SPANDATA
 from sentry_sdk.integrations.pyreqwest import PyreqwestIntegration
-from tests.conftest import get_free_port
+from tests.conftest import ApproxDict, get_free_port
 
 
 class PyreqwestMockHandler(BaseHTTPRequestHandler):
@@ -956,3 +956,149 @@ def test_request_source_if_duration_over_threshold(
         assert SPANDATA.CODE_NAMESPACE in data
         assert SPANDATA.CODE_FILEPATH in data
     assert SPANDATA.CODE_FUNCTION in data
+
+
+@pytest.mark.parametrize("send_default_pii", [True, False])
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_crumb_capture(
+    sentry_init,
+    capture_events,
+    server_port,
+    send_default_pii,
+    span_streaming,
+):
+    def before_breadcrumb(crumb, hint):
+        crumb["data"]["extra"] = "foo"
+        return crumb
+
+    sentry_init(
+        integrations=[PyreqwestIntegration()],
+        before_breadcrumb=before_breadcrumb,
+        send_default_pii=send_default_pii,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    url = f"http://localhost:{server_port}/hello?q=test#frag"
+
+    events = capture_events()
+
+    client = SyncClientBuilder().build()
+    response = client.get(url).build().send()
+    assert response.status == 200
+
+    capture_message("Testing!")
+
+    (event,) = events
+
+    crumb = event["breadcrumbs"]["values"][0]
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+
+    expected = {
+        SPANDATA.HTTP_METHOD: "GET",
+        SPANDATA.HTTP_STATUS_CODE: 200,
+        "extra": "foo",
+    }
+    if send_default_pii:
+        expected["url"] = f"http://localhost:{server_port}/hello"
+        expected[SPANDATA.HTTP_QUERY] = "q=test"
+        expected[SPANDATA.HTTP_FRAGMENT] = "frag"
+
+    assert crumb["data"] == ApproxDict(expected)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("send_default_pii", [True, False])
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_async_crumb_capture(
+    sentry_init,
+    capture_events,
+    server_port,
+    send_default_pii,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[PyreqwestIntegration()],
+        send_default_pii=send_default_pii,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    url = f"http://localhost:{server_port}/hello?q=test#frag"
+
+    events = capture_events()
+
+    async with ClientBuilder().build() as client:
+        response = await client.get(url).build().send()
+        assert response.status == 200
+
+        capture_message("Testing!")
+
+    (event,) = events
+
+    crumb = event["breadcrumbs"]["values"][0]
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+
+    expected = {
+        SPANDATA.HTTP_METHOD: "GET",
+        SPANDATA.HTTP_STATUS_CODE: 200,
+    }
+    if send_default_pii:
+        expected["url"] = f"http://localhost:{server_port}/hello"
+        expected[SPANDATA.HTTP_QUERY] = "q=test"
+        expected[SPANDATA.HTTP_FRAGMENT] = "frag"
+
+    assert crumb["data"] == ApproxDict(expected)
+
+
+@pytest.mark.parametrize(
+    "status_code,level",
+    [
+        (200, None),
+        (301, None),
+        (403, "warning"),
+        (405, "warning"),
+        (500, "error"),
+    ],
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_crumb_capture_client_error(
+    sentry_init,
+    capture_events,
+    server_port,
+    status_code,
+    level,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[PyreqwestIntegration()],
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    url = f"http://localhost:{server_port}/status/{status_code}"
+
+    events = capture_events()
+
+    client = SyncClientBuilder().build()
+    response = client.get(url).build().send()
+    assert response.status == status_code
+
+    capture_message("Testing!")
+
+    (event,) = events
+
+    crumb = event["breadcrumbs"]["values"][0]
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+
+    if level is None:
+        assert "level" not in crumb
+    else:
+        assert crumb["level"] == level
+
+    assert crumb["data"] == ApproxDict(
+        {
+            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.HTTP_STATUS_CODE: status_code,
+        }
+    )
