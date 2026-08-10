@@ -135,7 +135,7 @@ def _install_httpx2_client() -> None:
             SPANDATA.HTTP_STATUS_CODE: rv.status_code,
             "reason": rv.reason_phrase,
         }
-        if parsed_url and should_send_default_pii():
+        if parsed_url and (not is_span_streaming_enabled or should_send_default_pii()):
             breadcrumb_data.update(
                 {
                     "url": parsed_url.url,
@@ -244,7 +244,7 @@ def _install_httpx2_async_client() -> None:
             SPANDATA.HTTP_STATUS_CODE: rv.status_code,
             "reason": rv.reason_phrase,
         }
-        if parsed_url and should_send_default_pii():
+        if parsed_url and (not is_span_streaming_enabled or should_send_default_pii()):
             breadcrumb_data.update(
                 {
                     "url": parsed_url.url,
