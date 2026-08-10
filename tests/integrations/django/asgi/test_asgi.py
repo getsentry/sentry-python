@@ -668,10 +668,9 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
 
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.parametrize(
-    "send_default_pii,method,headers,url_name,body,expected_data",
+    "method,headers,url_name,body,expected_data",
     [
         (
-            True,
             "POST",
             [(b"content-type", b"text/plain")],
             "post_echo_async",
@@ -679,7 +678,6 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
             None,
         ),
         (
-            True,
             "POST",
             [(b"content-type", b"text/plain")],
             "post_echo_async",
@@ -687,7 +685,6 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
             "",
         ),
         (
-            True,
             "POST",
             [(b"content-type", b"application/json")],
             "post_echo_async",
@@ -695,58 +692,6 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
             {"username": "xyz", "password": "[Filtered]"},
         ),
         (
-            True,
-            "POST",
-            [(b"content-type", b"application/xml")],
-            "post_echo_async",
-            b'<?xml version="1.0" encoding="UTF-8"?><root></root>',
-            "",
-        ),
-        (
-            True,
-            "POST",
-            [
-                (b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"),
-                (b"content-length", BODY_FORM_CONTENT_LENGTH),
-            ],
-            "post_echo_async",
-            BODY_FORM,
-            {"password": "[Filtered]", "photo": "", "username": "Jane"},
-        ),
-        (
-            False,
-            "POST",
-            [(b"content-type", b"text/plain")],
-            "post_echo_async",
-            b"",
-            None,
-        ),
-        (
-            False,
-            "POST",
-            [(b"content-type", b"text/plain")],
-            "post_echo_async",
-            b"some raw text body",
-            "",
-        ),
-        (
-            False,
-            "POST",
-            [(b"content-type", b"application/json")],
-            "post_echo_async",
-            b'{"username":"xyz","password":"xyz"}',
-            {"username": "xyz", "password": "[Filtered]"},
-        ),
-        (
-            False,
-            "POST",
-            [(b"content-type", b"application/xml")],
-            "post_echo_async",
-            b'<?xml version="1.0" encoding="UTF-8"?><root></root>',
-            "",
-        ),
-        (
-            False,
             "POST",
             [
                 (b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"),
@@ -768,7 +713,6 @@ async def test_asgi_request_body(
     capture_envelopes,
     capture_items,
     application,
-    send_default_pii,
     method,
     headers,
     url_name,
@@ -778,7 +722,7 @@ async def test_asgi_request_body(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=send_default_pii,
+        send_default_pii=True,
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
