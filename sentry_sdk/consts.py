@@ -782,6 +782,20 @@ class SPANDATA:
     Example: "rainy, 57°F"
     """
 
+    GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS = "gen_ai.usage.cache_read.input_tokens"
+    """
+    The number of cached tokens used to process the AI input (prompt).
+    Example: 50
+    """
+
+    GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS = (
+        "gen_ai.usage.cache_creation.input_tokens"
+    )
+    """
+    The number of tokens written to the cache when processing the AI input (prompt).
+    Example: 100
+    """
+
     GEN_AI_USAGE_INPUT_TOKENS = "gen_ai.usage.input_tokens"
     """
     The number of tokens in the input.
@@ -798,6 +812,12 @@ class SPANDATA:
     """
     The number of tokens written to the cache when processing the AI input (prompt).
     Example: 100
+    """
+
+    GEN_AI_USAGE_REASONING_OUTPUT_TOKENS = "gen_ai.usage.reasoning.output_tokens"
+    """
+    The number of tokens used for reasoning to create the AI output.
+    Example: 75
     """
 
     GEN_AI_USAGE_OUTPUT_TOKENS = "gen_ai.usage.output_tokens"
@@ -1820,4 +1840,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.66.1"
+VERSION = "2.67.0"
