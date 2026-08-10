@@ -238,6 +238,8 @@ def maybe_create_breadcrumbs_from_span(
     if span.op == OP.HTTP_CLIENT and span.origin not in (
         "auto.http.aiohttp",
         "auto.http.pyreqwest",
+        "auto.http.httpx",
+        "auto.http.httpx2",
     ):
         level = None
         status_code = span._data.get(SPANDATA.HTTP_STATUS_CODE)

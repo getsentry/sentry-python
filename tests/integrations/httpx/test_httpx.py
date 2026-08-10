@@ -24,7 +24,10 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client, httpx
         crumb["data"]["extra"] = "foo"
         return crumb
 
-    sentry_init(integrations=[HttpxIntegration()], before_breadcrumb=before_breadcrumb)
+    sentry_init(
+        integrations=[HttpxIntegration()],
+        before_breadcrumb=before_breadcrumb,
+    )
 
     url = "http://example.com/"
 
@@ -63,6 +66,54 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client, httpx
     "httpx_client",
     (httpx.Client(), httpx.AsyncClient()),
 )
+def test_crumb_capture_and_hint_span_streaming(
+    sentry_init, capture_events, httpx_client, httpx_mock
+):
+    httpx_mock.add_response()
+
+    def before_breadcrumb(crumb, hint):
+        crumb["data"]["extra"] = "foo"
+        return crumb
+
+    sentry_init(
+        integrations=[HttpxIntegration()],
+        before_breadcrumb=before_breadcrumb,
+    )
+
+    url = "http://example.com/"
+
+    events = capture_events()
+
+    if inspect.iscoroutinefunction(httpx_client.get):
+        response = asyncio.get_event_loop().run_until_complete(httpx_client.get(url))
+    else:
+        response = httpx_client.get(url)
+
+    assert response.status_code == 200
+    capture_message("Testing!")
+
+    (event,) = events
+
+    crumb = event["breadcrumbs"]["values"][0]
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+    assert crumb["data"] == ApproxDict(
+        {
+            "url": url,
+            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.HTTP_FRAGMENT: "",
+            SPANDATA.HTTP_QUERY: "",
+            SPANDATA.HTTP_STATUS_CODE: 200,
+            "reason": "OK",
+            "extra": "foo",
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    "httpx_client",
+    (httpx.Client(), httpx.AsyncClient()),
+)
 @pytest.mark.parametrize(
     "status_code,level",
     [
@@ -83,6 +134,64 @@ def test_crumb_capture_client_error(
     url = "http://example.com/"
 
     with start_transaction():
+        events = capture_events()
+
+        if inspect.iscoroutinefunction(httpx_client.get):
+            response = asyncio.get_event_loop().run_until_complete(
+                httpx_client.get(url)
+            )
+        else:
+            response = httpx_client.get(url)
+
+        assert response.status_code == status_code
+        capture_message("Testing!")
+
+        (event,) = events
+
+        crumb = event["breadcrumbs"]["values"][0]
+        assert crumb["type"] == "http"
+        assert crumb["category"] == "httplib"
+
+        if level is None:
+            assert "level" not in crumb
+        else:
+            assert crumb["level"] == level
+
+        assert crumb["data"] == ApproxDict(
+            {
+                "url": url,
+                SPANDATA.HTTP_METHOD: "GET",
+                SPANDATA.HTTP_FRAGMENT: "",
+                SPANDATA.HTTP_QUERY: "",
+                SPANDATA.HTTP_STATUS_CODE: status_code,
+            }
+        )
+
+
+@pytest.mark.parametrize(
+    "httpx_client",
+    (httpx.Client(), httpx.AsyncClient()),
+)
+@pytest.mark.parametrize(
+    "status_code,level",
+    [
+        (200, None),
+        (301, None),
+        (403, "warning"),
+        (405, "warning"),
+        (500, "error"),
+    ],
+)
+def test_crumb_capture_client_error_span_streaming(
+    sentry_init, capture_events, httpx_client, httpx_mock, status_code, level
+):
+    httpx_mock.add_response(status_code=status_code)
+
+    sentry_init(integrations=[HttpxIntegration()], trace_lifecycle="stream")
+
+    url = "http://example.com/"
+
+    with sentry_sdk.traces.start_span(name="segment"):
         events = capture_events()
 
         if inspect.iscoroutinefunction(httpx_client.get):
