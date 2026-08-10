@@ -240,6 +240,8 @@ class SpanBatcher(Batcher["SpanJSON"]):
                     envelopes.append(envelope)
 
                 del self._span_buffer[bucket_id]
+                self._span_number -= 1
+
                 del self._running_size[bucket_id]
 
         for envelope in envelopes:
