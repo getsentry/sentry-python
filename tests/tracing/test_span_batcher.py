@@ -366,7 +366,7 @@ def test_global_length_based_flushing(sentry_init, capture_items, monkeypatch):
     assert items[0].payload["name"] == "span"
 
 
-def test_size_total_reset_after_length_based_flushing(
+def test_total_size_reset_after_length_based_flushing(
     sentry_init, capture_items, monkeypatch
 ):
     """Span is not flushed after a flush reduces the combined span size in bytes below the global limit."""
