@@ -203,13 +203,54 @@ def test_drop_after_global_max_reached(
 
     assert len(envelopes) == 1
 
-    print("items are", envelopes[0].items[0].payload.json["items"])
-
     assert len(envelopes[0].items[0].payload.json["items"]) == 2
     assert envelopes[0].items[0].payload.json["items"][0]["name"] == "span 1"
     assert envelopes[0].items[0].payload.json["items"][1]["name"] == "span 2"
 
     assert record_lost_event_calls.count(("queue_overflow", "span", None, 1)) == 2
+
+
+def test_capture_after_flush_with_global_limit(
+    sentry_init, capture_envelopes, monkeypatch
+):
+    """New spans are captured again after a flush reduces the span number below the global limit."""
+    monkeypatch.setattr(SpanBatcher, "GLOBAL_MAX_BEFORE_DROP", 2)
+    # set the time-based flush limit to something huge so that we're not flushing
+    # prematurely
+    monkeypatch.setattr(SpanBatcher, "FLUSH_WAIT_TIME", 100000)
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    envelopes = capture_envelopes()
+
+    with sentry_sdk.traces.start_span(name="span 1"):
+        pass
+    with sentry_sdk.traces.start_span(name="span 2"):
+        pass
+
+    sentry_sdk.traces.new_trace()
+    with sentry_sdk.traces.start_span(name="span 3"):
+        pass
+
+    sentry_sdk.flush()
+
+    # The span is captured even though a span was dropped in the same trace.
+    with sentry_sdk.traces.start_span(name="span 4"):
+        pass
+
+    sentry_sdk.flush()
+
+    assert len(envelopes) == 2
+
+    assert len(envelopes[0].items[0].payload.json["items"]) == 2
+    assert envelopes[0].items[0].payload.json["items"][0]["name"] == "span 1"
+    assert envelopes[0].items[0].payload.json["items"][1]["name"] == "span 2"
+
+    assert len(envelopes[1].items[0].payload.json["items"]) == 1
+    assert envelopes[1].items[0].payload.json["items"][0]["name"] == "span 4"
 
 
 def test_length_based_flushing(sentry_init, capture_items, monkeypatch):
