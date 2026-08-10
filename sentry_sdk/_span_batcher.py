@@ -21,10 +21,10 @@ class SpanBatcher(Batcher["SpanJSON"]):
     # MAX_BEFORE_FLUSH should be lower than MAX_BEFORE_DROP, so that there is
     # a bit of a buffer for spans that appear between the trigger to flush
     # and actually flushing the buffer.
-    #
-    # The max limits are all per trace (per bucket).
     MAX_ENVELOPE_SIZE = 1000  # spans
+
     MAX_BEFORE_FLUSH = 1000
+    GLOBAL_MAX_BEFORE_FLUSH = 5_000
 
     MAX_BEFORE_DROP = 2000
     GLOBAL_MAX_BEFORE_DROP = 10_000
@@ -105,9 +105,13 @@ class SpanBatcher(Batcher["SpanJSON"]):
 
             self._flush(only_pending=True)
 
-            if self._total_running_size >= self.GLOBAL_MAX_BYTES_BEFORE_FLUSH or (
-                time.monotonic() - self._last_full_flush
-                >= self.FLUSH_WAIT_TIME + jitter
+            if (
+                self._span_number >= self.GLOBAL_MAX_BEFORE_FLUSH
+                or self._total_running_size >= self.GLOBAL_MAX_BYTES_BEFORE_FLUSH
+                or (
+                    time.monotonic() - self._last_full_flush
+                    >= self.FLUSH_WAIT_TIME + jitter
+                )
             ):
                 self._flush()
                 self._last_full_flush = time.monotonic()
@@ -155,7 +159,9 @@ class SpanBatcher(Batcher["SpanJSON"]):
                     notify = True
                 else:
                     notify = (
-                        self._total_running_size >= self.GLOBAL_MAX_BYTES_BEFORE_FLUSH
+                        self._span_number >= self.GLOBAL_MAX_BEFORE_FLUSH
+                        or self._total_running_size
+                        >= self.GLOBAL_MAX_BYTES_BEFORE_FLUSH
                     )
 
             if notify:

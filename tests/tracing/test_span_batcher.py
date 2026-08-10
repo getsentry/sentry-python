@@ -339,6 +339,67 @@ def test_weight_based_flushing_by_attribute_size(
 
 
 def test_global_length_based_flushing(sentry_init, capture_items, monkeypatch):
+    """A flush event is triggered when the batcher contains GLOBAL_MAX_BEFORE_FLUSH spans."""
+    monkeypatch.setattr(SpanBatcher, "GLOBAL_MAX_BEFORE_FLUSH", 2)
+    # set the time-based flush limit to something huge so that we're not hitting
+    # it since we want to test GLOBAL_MAX_BEFORE_FLUSH instead
+    monkeypatch.setattr(SpanBatcher, "FLUSH_WAIT_TIME", 100000)
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="span"):
+        pass
+
+    sentry_sdk.traces.new_trace()
+    with sentry_sdk.traces.start_span(name="span 2"):
+        pass
+
+    time.sleep(0.1)
+
+    assert len(items) == 2
+    assert items[0].payload["name"] == "span"
+
+
+def test_span_number_reset_after_length_based_flushing(
+    sentry_init, capture_items, monkeypatch
+):
+    """Span is not flushed after a flush reduces the number of spans in the batcher below the global limit."""
+    monkeypatch.setattr(SpanBatcher, "GLOBAL_MAX_BEFORE_FLUSH", 2)
+    # set the time-based flush limit to something huge so that we're not hitting
+    # it since we want to test GLOBAL_MAX_BYTES_BEFORE_FLUSH instead
+    monkeypatch.setattr(SpanBatcher, "FLUSH_WAIT_TIME", 100000)
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="span"):
+        pass
+
+    sentry_sdk.traces.new_trace()
+    with sentry_sdk.traces.start_span(name="span"):
+        pass
+
+    time.sleep(0.1)
+
+    with sentry_sdk.traces.start_span(name="span"):
+        pass
+
+    time.sleep(0.1)
+
+    assert len(items) == 2
+    assert items[0].payload["name"] == "span"
+
+
+def test_global_weight_based_flushing(sentry_init, capture_items, monkeypatch):
     """When the batcher reaches GLOBAL_MAX_BYTES_BEFORE_FLUSH, all buckets will be flushed."""
     # Limit of 2_000 is just above the size of a bare span.
     monkeypatch.setattr(SpanBatcher, "GLOBAL_MAX_BYTES_BEFORE_FLUSH", 2_000)
@@ -366,7 +427,7 @@ def test_global_length_based_flushing(sentry_init, capture_items, monkeypatch):
     assert items[0].payload["name"] == "span"
 
 
-def test_total_size_reset_after_length_based_flushing(
+def test_total_size_reset_after_weight_based_flushing(
     sentry_init, capture_items, monkeypatch
 ):
     """Span is not flushed after a flush reduces the combined span size in bytes below the global limit."""
