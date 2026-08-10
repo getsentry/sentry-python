@@ -13,11 +13,8 @@ from sentry_sdk.integrations.httpx import HttpxIntegration
 from tests.conftest import ApproxDict
 
 
-@pytest.mark.parametrize(
-    "httpx_client",
-    (httpx.Client(), httpx.AsyncClient()),
-)
-def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client, httpx_mock):
+def test_crumb_capture_and_hint_sync(sentry_init, capture_events, httpx_mock):
+    httpx_client = httpx.Client()
     httpx_mock.add_response()
 
     def before_breadcrumb(crumb, hint):
@@ -34,12 +31,7 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client, httpx
     with start_transaction():
         events = capture_events()
 
-        if inspect.iscoroutinefunction(httpx_client.get):
-            response = asyncio.get_event_loop().run_until_complete(
-                httpx_client.get(url)
-            )
-        else:
-            response = httpx_client.get(url)
+        response = httpx_client.get(url)
 
         assert response.status_code == 200
         capture_message("Testing!")
@@ -62,13 +54,52 @@ def test_crumb_capture_and_hint(sentry_init, capture_events, httpx_client, httpx
         )
 
 
-@pytest.mark.parametrize(
-    "httpx_client",
-    (httpx.Client(), httpx.AsyncClient()),
-)
-def test_crumb_capture_and_hint_span_streaming(
-    sentry_init, capture_events, httpx_client, httpx_mock
+@pytest.mark.asyncio
+async def test_crumb_capture_and_hint_async(sentry_init, capture_events, httpx_mock):
+    httpx_client = httpx.AsyncClient()
+    httpx_mock.add_response()
+
+    def before_breadcrumb(crumb, hint):
+        crumb["data"]["extra"] = "foo"
+        return crumb
+
+    sentry_init(
+        integrations=[HttpxIntegration()],
+        before_breadcrumb=before_breadcrumb,
+    )
+
+    url = "http://example.com/"
+
+    with start_transaction():
+        events = capture_events()
+
+        response = await httpx_client.get(url)
+
+        assert response.status_code == 200
+        capture_message("Testing!")
+
+        (event,) = events
+
+        crumb = event["breadcrumbs"]["values"][0]
+        assert crumb["type"] == "http"
+        assert crumb["category"] == "httplib"
+        assert crumb["data"] == ApproxDict(
+            {
+                "url": url,
+                SPANDATA.HTTP_METHOD: "GET",
+                SPANDATA.HTTP_FRAGMENT: "",
+                SPANDATA.HTTP_QUERY: "",
+                SPANDATA.HTTP_STATUS_CODE: 200,
+                "reason": "OK",
+                "extra": "foo",
+            }
+        )
+
+
+def test_crumb_capture_and_hint_sync_span_streaming(
+    sentry_init, capture_events, httpx_mock
 ):
+    httpx_client = httpx.Client()
     httpx_mock.add_response()
 
     def before_breadcrumb(crumb, hint):
@@ -91,6 +122,50 @@ def test_crumb_capture_and_hint_span_streaming(
             )
         else:
             response = httpx_client.get(url)
+
+        assert response.status_code == 200
+        capture_message("Testing!")
+
+    (event,) = events
+
+    crumb = event["breadcrumbs"]["values"][0]
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+    assert crumb["data"] == ApproxDict(
+        {
+            "url": url,
+            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.HTTP_FRAGMENT: "",
+            SPANDATA.HTTP_QUERY: "",
+            SPANDATA.HTTP_STATUS_CODE: 200,
+            "reason": "OK",
+            "extra": "foo",
+        }
+    )
+
+
+@pytest.mark.asyncio
+async def test_crumb_capture_and_hint_async_span_streaming(
+    sentry_init, capture_events, httpx_mock
+):
+    httpx_client = httpx.AsyncClient()
+    httpx_mock.add_response()
+
+    def before_breadcrumb(crumb, hint):
+        crumb["data"]["extra"] = "foo"
+        return crumb
+
+    sentry_init(
+        integrations=[HttpxIntegration()],
+        before_breadcrumb=before_breadcrumb,
+    )
+
+    url = "http://example.com/"
+
+    events = capture_events()
+
+    with sentry_sdk.traces.start_span(name="segment"):
+        response = await httpx_client.get(url)
 
         assert response.status_code == 200
         capture_message("Testing!")
