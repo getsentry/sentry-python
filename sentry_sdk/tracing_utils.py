@@ -210,8 +210,7 @@ def record_sql_queries(
             yield span
 
 
-def add_http_breadcrumb(status_code, data):
-    # type: (Optional[int], dict[str, Any]) -> None
+def add_http_breadcrumb(status_code: "Optional[int]", data: "dict[str, Any]") -> None:
     level = None
     if status_code:
         if 500 <= status_code <= 599:
