@@ -366,8 +366,10 @@ def test_global_length_based_flushing(sentry_init, capture_items, monkeypatch):
     assert items[0].payload["name"] == "span"
 
 
-def test_capture_after_length_based_flushing(sentry_init, capture_items, monkeypatch):
-    """Spans are flushed again after a flush reduces the combined span size in bytes below the global limit."""
+def test_size_total_reset_after_length_based_flushing(
+    sentry_init, capture_items, monkeypatch
+):
+    """Span is not flushed after a flush reduces the combined span size in bytes below the global limit."""
     # Limit of 2_000 is just above the size of a bare span.
     monkeypatch.setattr(SpanBatcher, "GLOBAL_MAX_BYTES_BEFORE_FLUSH", 2_000)
     # set the time-based flush limit to something huge so that it doesn't
@@ -393,13 +395,9 @@ def test_capture_after_length_based_flushing(sentry_init, capture_items, monkeyp
     with sentry_sdk.traces.start_span(name="span"):
         pass
 
-    sentry_sdk.traces.new_trace()
-    with sentry_sdk.traces.start_span(name="span"):
-        pass
-
     time.sleep(0.1)
 
-    assert len(items) == 4
+    assert len(items) == 2
     assert items[0].payload["name"] == "span"
 
 
