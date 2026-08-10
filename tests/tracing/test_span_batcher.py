@@ -340,7 +340,8 @@ def test_weight_based_flushing_by_attribute_size(
 
 def test_global_length_based_flushing(sentry_init, capture_items, monkeypatch):
     """When a the batcher reaches GLOBAL_MAX_BYTES_BEFORE_FLUSH, all buckets will be flushed."""
-    monkeypatch.setattr(SpanBatcher, "GLOBAL_MAX_BYTES_BEFORE_FLUSH", 3)
+    # Limit of 2_000 is just above size of bare span.
+    monkeypatch.setattr(SpanBatcher, "GLOBAL_MAX_BYTES_BEFORE_FLUSH", 2_000)
     # set the time-based flush limit to something huge so that it doesn't
     # interfere
     monkeypatch.setattr(SpanBatcher, "FLUSH_WAIT_TIME", 100000)
@@ -359,19 +360,16 @@ def test_global_length_based_flushing(sentry_init, capture_items, monkeypatch):
     with sentry_sdk.traces.start_span(name="span"):
         pass
 
-    sentry_sdk.traces.new_trace()
-    with sentry_sdk.traces.start_span(name="span"):
-        pass
-
     time.sleep(0.1)
 
-    assert len(items) == 3
+    assert len(items) == 2
     assert items[0].payload["name"] == "span"
 
 
 def test_capture_after_length_based_flushing(sentry_init, capture_items, monkeypatch):
     """Spans are flushed again after a flush reduces the combined span size in bytes below the global limit."""
-    monkeypatch.setattr(SpanBatcher, "GLOBAL_MAX_BYTES_BEFORE_FLUSH", 3)
+    # Limit of 2_000 is just above size of bare span.
+    monkeypatch.setattr(SpanBatcher, "GLOBAL_MAX_BYTES_BEFORE_FLUSH", 2_000)
     # set the time-based flush limit to something huge so that it doesn't
     # interfere
     monkeypatch.setattr(SpanBatcher, "FLUSH_WAIT_TIME", 100000)
@@ -390,10 +388,6 @@ def test_capture_after_length_based_flushing(sentry_init, capture_items, monkeyp
     with sentry_sdk.traces.start_span(name="span"):
         pass
 
-    sentry_sdk.traces.new_trace()
-    with sentry_sdk.traces.start_span(name="span"):
-        pass
-
     time.sleep(0.1)
 
     with sentry_sdk.traces.start_span(name="span"):
@@ -403,13 +397,9 @@ def test_capture_after_length_based_flushing(sentry_init, capture_items, monkeyp
     with sentry_sdk.traces.start_span(name="span"):
         pass
 
-    sentry_sdk.traces.new_trace()
-    with sentry_sdk.traces.start_span(name="span"):
-        pass
-
     time.sleep(0.1)
 
-    assert len(items) == 6
+    assert len(items) == 4
     assert items[0].payload["name"] == "span"
 
 
