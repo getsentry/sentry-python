@@ -4,7 +4,7 @@ import sys
 import warnings
 from collections import OrderedDict
 from functools import wraps
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 import sentry_sdk
 from sentry_sdk.ai.utils import (
@@ -50,11 +50,26 @@ try:
         Callbacks,
         manager,
     )
-    from langchain_core.messages import BaseMessage
-    from langchain_core.outputs import ChatGeneration, LLMResult
+    from langchain_core.messages import AIMessage, BaseMessage
+    from langchain_core.outputs import (
+        ChatGeneration,
+        ChatGenerationChunk,
+        Generation,
+        GenerationChunk,
+        LLMResult,
+    )
 
 except ImportError:
     raise DidNotEnable("langchain not installed")
+
+
+class TokenUsage(NamedTuple):
+    input_tokens: "Optional[int]"
+    output_tokens: "Optional[int]"
+    total_tokens: "Optional[int]"
+    cache_read: "Optional[int]"
+    cache_creation: "Optional[int]"
+    reasoning: "Optional[int]"
 
 
 try:
@@ -713,28 +728,66 @@ def _extract_tokens(
 
 
 def _extract_tokens_from_generations(
-    generations: "Any",
-) -> "tuple[Optional[int], Optional[int], Optional[int]]":
+    generations: "list[list[Generation | ChatGeneration | GenerationChunk | ChatGenerationChunk]]",
+) -> "TokenUsage":
     """Extract token usage from response.generations structure."""
-    if not generations:
-        return None, None, None
-
     total_input = 0
     total_output = 0
     total_total = 0
+    total_cache_read = None
+    total_cache_creation = None
+    reasoning = None
 
     for gen_list in generations:
-        for gen in gen_list:
-            token_usage = _get_token_usage(gen)
-            input_tokens, output_tokens, total_tokens = _extract_tokens(token_usage)
-            total_input += input_tokens if input_tokens is not None else 0
-            total_output += output_tokens if output_tokens is not None else 0
-            total_total += total_tokens if total_tokens is not None else 0
+        if not gen_list:
+            continue
 
-    return (
+        token_usage = _get_token_usage(gen_list[0])
+        input_tokens, output_tokens, total_tokens = _extract_tokens(token_usage)
+        total_input += input_tokens if isinstance(input_tokens, int) else 0
+        total_output += output_tokens if isinstance(output_tokens, int) else 0
+        total_total += total_tokens if isinstance(total_tokens, int) else 0
+
+        if not isinstance(gen_list[0], ChatGeneration):
+            continue
+
+        message = gen_list[0].message
+
+        # The property was added in https://github.com/langchain-ai/langchain/commit/fbfed65fb1ccff3eb8477c4f114450537a0510b2
+        if not isinstance(message, AIMessage) or not hasattr(message, "usage_metadata"):
+            continue
+
+        usage_metadata = message.usage_metadata
+
+        if not isinstance(usage_metadata, dict):
+            continue
+
+        input_token_details = usage_metadata.get("input_token_details")
+        if isinstance(input_token_details, dict):
+            if isinstance(input_token_details.get("cache_read"), int):
+                total_cache_read = (total_cache_read or 0) + input_token_details[
+                    "cache_read"
+                ]
+
+            if isinstance(input_token_details.get("cache_creation"), int):
+                total_cache_creation = (
+                    total_cache_creation or 0
+                ) + input_token_details["cache_creation"]
+
+        output_token_details = usage_metadata.get("output_token_details")
+        if not isinstance(output_token_details, dict):
+            continue
+
+        if isinstance(output_token_details.get("reasoning"), int):
+            reasoning = (reasoning or 0) + output_token_details["reasoning"]
+
+    return TokenUsage(
         total_input if total_input > 0 else None,
         total_output if total_output > 0 else None,
         total_total if total_total > 0 else None,
+        total_cache_read,
+        total_cache_creation,
+        reasoning,
     )
 
 
@@ -766,14 +819,36 @@ def _get_token_usage(obj: "Any") -> "Optional[Dict[str, Any]]":
     return None
 
 
-def _record_token_usage(span: "Union[Span, StreamedSpan]", response: "Any") -> None:
+def _record_token_usage(
+    span: "Union[Span, StreamedSpan]", response: "LLMResult"
+) -> None:
+    input_tokens = None
+    output_tokens = None
+    total_tokens = None
+    cache_read_tokens = None
+    cache_creation_tokens = None
+    reasoning = None
+
+    # Legacy that reads provider-specific token information.
     token_usage = _get_token_usage(response)
     if token_usage:
         input_tokens, output_tokens, total_tokens = _extract_tokens(token_usage)
-    else:
-        input_tokens, output_tokens, total_tokens = _extract_tokens_from_generations(
-            response.generations
-        )
+
+    # Prefer provider-agnostic UsageMetadata if available.
+    if response.generations is not None:
+        token_usage = _extract_tokens_from_generations(response.generations)
+        if token_usage.input_tokens is not None:
+            input_tokens = token_usage.input_tokens
+        if token_usage.output_tokens is not None:
+            output_tokens = token_usage.output_tokens
+        if token_usage.total_tokens is not None:
+            total_tokens = token_usage.total_tokens
+        if token_usage.cache_read is not None:
+            cache_read_tokens = token_usage.cache_read
+        if token_usage.cache_creation is not None:
+            cache_creation_tokens = token_usage.cache_creation
+        if token_usage.reasoning is not None:
+            reasoning = token_usage.reasoning
 
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
@@ -787,6 +862,17 @@ def _record_token_usage(span: "Union[Span, StreamedSpan]", response: "Any") -> N
 
     if total_tokens is not None:
         set_on_span(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)
+
+    if cache_read_tokens is not None:
+        set_on_span(SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read_tokens)
+
+    if cache_creation_tokens is not None:
+        set_on_span(
+            SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, cache_creation_tokens
+        )
+
+    if reasoning is not None:
+        set_on_span(SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS, reasoning)
 
 
 def _get_request_data(
