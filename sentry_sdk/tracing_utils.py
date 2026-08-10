@@ -43,6 +43,7 @@ if TYPE_CHECKING:
     from typing import Any, Dict, Generator, Iterator, Optional, Tuple, Union
 
     from sentry_sdk._types import Attributes
+    from sentry_sdk.scope import Scope
 
 
 SENTRY_TRACE_REGEX = re.compile(
@@ -210,7 +211,11 @@ def record_sql_queries(
             yield span
 
 
-def add_http_breadcrumb(status_code: "Optional[int]", data: "dict[str, Any]") -> None:
+def add_http_breadcrumb(
+    status_code: "Optional[int]",
+    data: "dict[str, Any]",
+    scope: "Optional[Scope]" = None,
+) -> None:
     level = None
     if status_code:
         if 500 <= status_code <= 599:
@@ -222,7 +227,10 @@ def add_http_breadcrumb(status_code: "Optional[int]", data: "dict[str, Any]") ->
     if level:
         kwargs["level"] = level
 
-    sentry_sdk.add_breadcrumb(**kwargs)
+    if scope is not None:
+        scope.add_breadcrumb(**kwargs)
+    else:
+        sentry_sdk.add_breadcrumb(**kwargs)
 
 
 def maybe_create_breadcrumbs_from_span(
