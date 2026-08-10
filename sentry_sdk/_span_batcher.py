@@ -123,10 +123,9 @@ class SpanBatcher(Batcher["SpanJSON"]):
                 return None
 
             with self._lock:
-                size = len(self._span_buffer[span["trace_id"]])
                 if (
-                    size >= self.MAX_BEFORE_DROP
-                    or self._span_number >= self.GLOBAL_MAX_BEFORE_DROP
+                    self._span_number >= self.GLOBAL_MAX_BEFORE_DROP
+                    or len(self._span_buffer[span["trace_id"]]) >= self.MAX_BEFORE_DROP
                 ):
                     self._record_lost_func(
                         reason="queue_overflow",
@@ -141,7 +140,8 @@ class SpanBatcher(Batcher["SpanJSON"]):
                 self._running_size[span["trace_id"]] += self._estimate_size(span)
 
                 if (
-                    size + 1 >= self.MAX_BEFORE_FLUSH
+                    len(self._span_buffer[span["trace_id"]]) + 1
+                    >= self.MAX_BEFORE_FLUSH
                     or self._running_size[span["trace_id"]]
                     >= self.MAX_BYTES_BEFORE_FLUSH
                 ):
