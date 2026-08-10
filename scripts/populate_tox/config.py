@@ -122,7 +122,6 @@ TEST_SUITE_CONFIG = {
             "<3.1": ["pytest-django<4.0", "six"],
             "py3.14,py3.14t": ["coverage==7.11.0"],
         },
-        "include": "<6.1b1",
     },
     "dramatiq": {
         "package": "dramatiq",
@@ -284,6 +283,7 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["anthropic", "google-genai", "pytest-asyncio"],
         },
+        "include": "<=1.96",  # https://github.com/BerriAI/litellm/issues/36384
     },
     "litestar": {
         "package": "litestar",
