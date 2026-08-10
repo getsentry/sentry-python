@@ -283,6 +283,7 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["anthropic", "google-genai", "pytest-asyncio"],
         },
+        "include": "<=1.96",  # https://github.com/BerriAI/litellm/issues/36384
     },
     "litestar": {
         "package": "litestar",
