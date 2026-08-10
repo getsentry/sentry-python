@@ -2202,6 +2202,7 @@ async def test_tool_data_collection_outputs(
     server = Server("test-server")
 
     if IS_MCP_V2:
+
         async def test_tool(ctx, params):
             return CallToolResult(
                 content=[
@@ -2407,6 +2408,7 @@ async def test_include_prompts_ignored_when_data_collection_set(
     server = Server("test-server")
 
     if IS_MCP_V2:
+
         async def test_tool(ctx, params):
             return CallToolResult(
                 content=[TextContent(type="text", text=json.dumps({"value": 42}))],
