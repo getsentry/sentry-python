@@ -21,6 +21,13 @@ from langchain_core.messages import AIMessageChunk, BaseMessage
 from langchain_core.outputs import ChatGenerationChunk, ChatResult
 from langchain_core.runnables import RunnableConfig
 
+try:
+    import google
+    from langchain_google_genai import ChatGoogleGenerativeAI
+except ImportError:
+    ChatGoogleGenerativeAI = None
+    google = None
+
 import sentry_sdk
 from sentry_sdk import start_transaction
 from sentry_sdk.integrations.langchain import (
@@ -229,6 +236,43 @@ def streaming_chat_completions_model_responses():
         ]
 
     return inner
+
+
+@pytest.fixture
+def nonstreaming_multi_candidate_google_genai_model_response():
+    return google.genai.types.GenerateContentResponse(
+        response_id="resp_123",
+        candidates=[
+            google.genai.types.Candidate(
+                content=google.genai.types.Content(
+                    role="model",
+                    parts=[
+                        google.genai.types.Part(
+                            text="Hello, how can I help you?",
+                        )
+                    ],
+                ),
+                finish_reason="STOP",
+            ),
+            google.genai.types.Candidate(
+                content=google.genai.types.Content(
+                    role="model",
+                    parts=[
+                        google.genai.types.Part(
+                            text="Hello, how are you?",
+                        )
+                    ],
+                ),
+                finish_reason="STOP",
+            ),
+        ],
+        model_version="gemini/gemini-pro",
+        usage_metadata=google.genai.types.GenerateContentResponseUsageMetadata(
+            prompt_token_count=10,
+            candidates_token_count=20,
+            total_token_count=30,
+        ),
+    )
 
 
 @tool
@@ -485,6 +529,89 @@ def test_langchain_chat_with_run_name(
         assert (
             chat_spans[0]["data"][SPANDATA.GEN_AI_FUNCTION_ID] == "my-snazzy-pipeline"
         )
+
+
+@pytest.mark.skipif(
+    ChatGoogleGenerativeAI is None,
+    reason="Requires langchain-google-genai.",
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+def test_langchain_multi_choice_response(
+    sentry_init,
+    capture_events,
+    capture_items,
+    get_model_response,
+    nonstreaming_multi_candidate_google_genai_model_response,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[
+            LangchainIntegration(
+                include_prompts=True,
+            )
+        ],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    model_response = get_model_response(
+        nonstreaming_multi_candidate_google_genai_model_response,
+        serialize_pydantic=True,
+    )
+
+    llm = ChatGoogleGenerativeAI(
+        model="gemini/gemini-pro",
+        temperature=0,
+        google_api_key="badkey",
+    )
+
+    if span_streaming or stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with patch.object(
+            llm.client._api_client._httpx_client,
+            "send",
+            return_value=model_response,
+        ) as _, start_transaction():
+            llm.invoke(
+                "How many letters in the word eudca",
+            )
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+        chat_spans = list(
+            x for x in spans if x["attributes"]["sentry.op"] == "gen_ai.chat"
+        )
+        assert len(chat_spans) == 1
+
+        assert chat_spans[0]["attributes"]["gen_ai.usage.input_tokens"] == 10
+        assert chat_spans[0]["attributes"]["gen_ai.usage.output_tokens"] == 20
+        assert chat_spans[0]["attributes"]["gen_ai.usage.total_tokens"] == 30
+    else:
+        events = capture_events()
+
+        with patch.object(
+            llm.client._api_client._httpx_client,
+            "send",
+            return_value=model_response,
+        ) as _, start_transaction():
+            llm.invoke(
+                "How many letters in the word eudca",
+            )
+
+        tx = events[0]
+
+        chat_spans = list(x for x in tx["spans"] if x["op"] == "gen_ai.chat")
+        assert len(chat_spans) == 1
+
+        assert chat_spans[0]["data"]["gen_ai.usage.input_tokens"] == 10
+        assert chat_spans[0]["data"]["gen_ai.usage.output_tokens"] == 20
+        assert chat_spans[0]["data"]["gen_ai.usage.total_tokens"] == 30
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])

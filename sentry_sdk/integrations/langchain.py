@@ -51,7 +51,13 @@ try:
         manager,
     )
     from langchain_core.messages import BaseMessage
-    from langchain_core.outputs import ChatGeneration, LLMResult
+    from langchain_core.outputs import (
+        ChatGeneration,
+        ChatGenerationChunk,
+        Generation,
+        GenerationChunk,
+        LLMResult,
+    )
 
 except ImportError:
     raise DidNotEnable("langchain not installed")
@@ -713,7 +719,7 @@ def _extract_tokens(
 
 
 def _extract_tokens_from_generations(
-    generations: "Any",
+    generations: "list[list[Generation | ChatGeneration | GenerationChunk | ChatGenerationChunk]]",
 ) -> "tuple[Optional[int], Optional[int], Optional[int]]":
     """Extract token usage from response.generations structure."""
     if not generations:
@@ -724,12 +730,14 @@ def _extract_tokens_from_generations(
     total_total = 0
 
     for gen_list in generations:
-        for gen in gen_list:
-            token_usage = _get_token_usage(gen)
-            input_tokens, output_tokens, total_tokens = _extract_tokens(token_usage)
-            total_input += input_tokens if input_tokens is not None else 0
-            total_output += output_tokens if output_tokens is not None else 0
-            total_total += total_tokens if total_tokens is not None else 0
+        if not gen_list:
+            continue
+
+        token_usage = _get_token_usage(gen_list[0])
+        input_tokens, output_tokens, total_tokens = _extract_tokens(token_usage)
+        total_input += input_tokens if input_tokens is not None else 0
+        total_output += output_tokens if output_tokens is not None else 0
+        total_total += total_tokens if total_tokens is not None else 0
 
     return (
         total_input if total_input > 0 else None,
@@ -766,7 +774,9 @@ def _get_token_usage(obj: "Any") -> "Optional[Dict[str, Any]]":
     return None
 
 
-def _record_token_usage(span: "Union[Span, StreamedSpan]", response: "Any") -> None:
+def _record_token_usage(
+    span: "Union[Span, StreamedSpan]", response: "LLMResult"
+) -> None:
     token_usage = _get_token_usage(response)
     if token_usage:
         input_tokens, output_tokens, total_tokens = _extract_tokens(token_usage)
