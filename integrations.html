@@ -2,11 +2,11 @@
 <html lang="en" data-accent-color="violet" data-content_root="./">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Integrations - sentry-python 2.66.1 documentation</title><link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="API Docs" href="apidocs.html" /><link rel="prev" title="Top Level API" href="api.html" /><script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Integrations - sentry-python 2.67.0 documentation</title><link rel="index" title="Index" href="genindex.html" /><link rel="search" title="Search" href="search.html" /><link rel="next" title="API Docs" href="apidocs.html" /><link rel="prev" title="Top Level API" href="api.html" /><script>
     function setColorMode(t){let e=document.documentElement;e.setAttribute("data-color-mode",t);let a=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches,s=t;"auto"===t&&(s=a?"dark":"light"),"light"===s?(e.classList.remove("dark"),e.classList.add("light")):(e.classList.remove("light"),e.classList.add("dark"))}
     setColorMode(localStorage._theme||"auto");
   </script><link rel="stylesheet" type="text/css" href="_static/pygments.css?v=e1a1ceaf" />
-    <link rel="stylesheet" type="text/css" href="_static/shibuya.css?v=9454f7d5" />
+    <link rel="stylesheet" type="text/css" href="_static/shibuya.css?v=2ceb65ce" />
     <link media="print" rel="stylesheet" type="text/css" href="_static/print.css?v=20ff2c19" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -111,13 +111,13 @@ data-aria-dark="Switch to auto color mode">
       <div class="relative min-w-0 max-w-6xl px-6 pb-6 pt-8 xl:px-12">
   <article class="yue" role="main">
           <section id="integrations">
-<h1>Integrations<a class="headerlink" href="#integrations" title="Link to this heading">¶</a></h1>
+<h1>Integrations<a class="headerlink" href="#integrations" title="Link to this heading">#</a></h1>
 <p>TBD</p>
 <section id="module-sentry_sdk.integrations.logging">
-<span id="logging"></span><h2>Logging<a class="headerlink" href="#module-sentry_sdk.integrations.logging" title="Link to this heading">¶</a></h2>
+<span id="logging"></span><h2>Logging<a class="headerlink" href="#module-sentry_sdk.integrations.logging" title="Link to this heading">#</a></h2>
 <dl class="py function">
 <dt class="sig sig-object py" id="sentry_sdk.integrations.logging.ignore_logger">
-<span class="sig-prename descclassname"><span class="pre">sentry_sdk.integrations.logging.</span></span><span class="sig-name descname"><span class="pre">ignore_logger</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/integrations/logging.html#ignore_logger"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.integrations.logging.ignore_logger" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">sentry_sdk.integrations.logging.</span></span><span class="sig-name descname"><span class="pre">ignore_logger</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/integrations/logging.html#ignore_logger"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.integrations.logging.ignore_logger" title="Link to this definition">#</a></dt>
 <dd><p>This disables recording (both in breadcrumbs and as events) calls to
 a logger of a specific name.  Among other uses, many of our integrations
 use this to prevent their actions being recorded as breadcrumbs. Exposed
@@ -136,14 +136,14 @@ to users as a way to quiet spammy loggers.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="sentry_sdk.integrations.logging.EventHandler">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sentry_sdk.integrations.logging.</span></span><span class="sig-name descname"><span class="pre">EventHandler</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/integrations/logging.html#EventHandler"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.integrations.logging.EventHandler" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sentry_sdk.integrations.logging.</span></span><span class="sig-name descname"><span class="pre">EventHandler</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/integrations/logging.html#EventHandler"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.integrations.logging.EventHandler" title="Link to this definition">#</a></dt>
 <dd><p>A logging handler that emits Sentry events for each log record</p>
 <p>Note that you do not have to use this class if the logging integration is enabled, which it is by default.</p>
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="sentry_sdk.integrations.logging.BreadcrumbHandler">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sentry_sdk.integrations.logging.</span></span><span class="sig-name descname"><span class="pre">BreadcrumbHandler</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/integrations/logging.html#BreadcrumbHandler"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.integrations.logging.BreadcrumbHandler" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sentry_sdk.integrations.logging.</span></span><span class="sig-name descname"><span class="pre">BreadcrumbHandler</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/sentry_sdk/integrations/logging.html#BreadcrumbHandler"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sentry_sdk.integrations.logging.BreadcrumbHandler" title="Link to this definition">#</a></dt>
 <dd><p>A logging handler that records breadcrumbs for each log record.</p>
 <p>Note that you do not have to use this class if the logging integration is enabled, which it is by default.</p>
 </dd></dl>
@@ -188,13 +188,13 @@ to users as a way to quiet spammy loggers.</p>
   </p>
 </div>
       <div class="sy-foot-socials">
-<a href="https://github.com/getsentry/sentry-python" aria-label="GitHub">
-  <iconify-icon icon="simple-icons:github"></iconify-icon>
-</a></div>
+  <a href="https://github.com/getsentry/sentry-python" aria-label="GitHub">
+    <iconify-icon icon="simple-icons:github"></iconify-icon>
+  </a></div>
     </div>
   </div>
 </footer>
-      <script src="_static/documentation_options.js?v=403681fe"></script>
+      <script src="_static/documentation_options.js?v=959b4fbe"></script>
       <script src="_static/doctools.js?v=9bcbadda"></script>
       <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="_static/shibuya.js?v=50760d75"></script></body>
