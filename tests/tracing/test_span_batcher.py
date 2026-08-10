@@ -340,7 +340,7 @@ def test_weight_based_flushing_by_attribute_size(
 
 def test_global_length_based_flushing(sentry_init, capture_items, monkeypatch):
     """When a the batcher reaches GLOBAL_MAX_BYTES_BEFORE_FLUSH, all buckets will be flushed."""
-    # Limit of 2_000 is just above size of bare span.
+    # Limit of 2_000 is just above the size of a bare span.
     monkeypatch.setattr(SpanBatcher, "GLOBAL_MAX_BYTES_BEFORE_FLUSH", 2_000)
     # set the time-based flush limit to something huge so that it doesn't
     # interfere
@@ -368,7 +368,7 @@ def test_global_length_based_flushing(sentry_init, capture_items, monkeypatch):
 
 def test_capture_after_length_based_flushing(sentry_init, capture_items, monkeypatch):
     """Spans are flushed again after a flush reduces the combined span size in bytes below the global limit."""
-    # Limit of 2_000 is just above size of bare span.
+    # Limit of 2_000 is just above the size of a bare span.
     monkeypatch.setattr(SpanBatcher, "GLOBAL_MAX_BYTES_BEFORE_FLUSH", 2_000)
     # set the time-based flush limit to something huge so that it doesn't
     # interfere
