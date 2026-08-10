@@ -6,7 +6,11 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.utils import capture_internal_exceptions, reraise
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    has_data_collection_enabled,
+    reraise,
+)
 
 from ..spans import (
     agent_workflow_span,
@@ -53,7 +57,11 @@ class _SentryRunHooks(RunHooks[TContext]):  # type: ignore[misc]
         span.__enter__()
         context._sentry_execute_tool_span = span
 
-        if not should_send_default_pii():
+        client = sentry_sdk.get_client()
+        if has_data_collection_enabled(client.options):
+            if not client.options["data_collection"]["gen_ai"]["inputs"]:
+                return
+        elif not should_send_default_pii():
             return
 
         if isinstance(span, StreamedSpan):
