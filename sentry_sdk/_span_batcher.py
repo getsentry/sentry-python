@@ -30,6 +30,7 @@ class SpanBatcher(Batcher["SpanJSON"]):
     GLOBAL_MAX_BEFORE_DROP = 10_000
 
     MAX_BYTES_BEFORE_FLUSH = 5 * 1024 * 1024  # 5 MB
+    GLOBAL_MAX_BYTES_BEFORE_FLUSH = 25 * 1024 * 1024  # 25 MB
 
     FLUSH_WAIT_TIME = 5.0
 
@@ -50,6 +51,8 @@ class SpanBatcher(Batcher["SpanJSON"]):
         self._span_number: int = 0
 
         self._running_size: dict[str, int] = defaultdict(lambda: 0)
+        self._total_running_size: int = 0
+
         self._capture_func = capture_func
         self._record_lost_func = record_lost_func
         self._running = True
@@ -79,6 +82,8 @@ class SpanBatcher(Batcher["SpanJSON"]):
         self._span_number = 0
 
         self._running_size = defaultdict(lambda: 0)
+        self._total_running_size = 0
+
         self._running = True
 
         self._lock = threading.Lock()
@@ -100,7 +105,7 @@ class SpanBatcher(Batcher["SpanJSON"]):
 
             self._flush(only_pending=True)
 
-            if (
+            if self._total_running_size >= self.GLOBAL_MAX_BYTES_BEFORE_FLUSH or (
                 time.monotonic() - self._last_full_flush
                 >= self.FLUSH_WAIT_TIME + jitter
             ):
@@ -137,7 +142,9 @@ class SpanBatcher(Batcher["SpanJSON"]):
                 self._span_buffer[span["trace_id"]].append(span)
                 self._span_number += 1
 
-                self._running_size[span["trace_id"]] += self._estimate_size(span)
+                estimated_size = self._estimate_size(span)
+                self._running_size[span["trace_id"]] += estimated_size
+                self._total_running_size += estimated_size
 
                 if (
                     len(self._span_buffer[span["trace_id"]]) >= self.MAX_BEFORE_FLUSH
@@ -147,7 +154,9 @@ class SpanBatcher(Batcher["SpanJSON"]):
                     self._pending_flush.add(span["trace_id"])
                     notify = True
                 else:
-                    notify = False
+                    notify = (
+                        self._total_running_size >= self.GLOBAL_MAX_BYTES_BEFORE_FLUSH
+                    )
 
             if notify:
                 self._flush_event.set()
@@ -241,6 +250,7 @@ class SpanBatcher(Batcher["SpanJSON"]):
                 self._span_number -= len(self._span_buffer[bucket_id])
                 del self._span_buffer[bucket_id]
 
+                self._total_running_size -= self._running_size[bucket_id]
                 del self._running_size[bucket_id]
 
         for envelope in envelopes:
