@@ -122,7 +122,6 @@ TEST_SUITE_CONFIG = {
             "<3.1": ["pytest-django<4.0", "six"],
             "py3.14,py3.14t": ["coverage==7.11.0"],
         },
-        "include": "<6.1b1",
     },
     "dramatiq": {
         "package": "dramatiq",
@@ -254,6 +253,7 @@ TEST_SUITE_CONFIG = {
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
             ">=1.0": ["langchain-classic"],
+            ">=1.1.2": ["google-genai", "langchain-google-genai>=4"],
         },
         "python": {
             "<1.0": "<3.14",  # https://github.com/langchain-ai/langchain/issues/33449#issuecomment-3408876631
@@ -267,6 +267,7 @@ TEST_SUITE_CONFIG = {
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
             ">=1.0": ["langchain-classic"],
+            ">=1.1.2": ["google-genai", "langchain-google-genai>=4"],
         },
         "python": {
             "<1.0": "<3.14",  # https://github.com/langchain-ai/langchain/issues/33449#issuecomment-3408876631
@@ -284,6 +285,7 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["anthropic", "google-genai", "pytest-asyncio"],
         },
+        "include": "<=1.96",  # https://github.com/BerriAI/litellm/issues/36384
     },
     "litestar": {
         "package": "litestar",
