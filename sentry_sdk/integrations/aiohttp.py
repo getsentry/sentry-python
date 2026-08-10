@@ -500,7 +500,7 @@ def create_trace_config() -> "TraceConfig":
     ) -> None:
         status = int(params.response.status)
 
-        breadcrumb = trace_config_ctx._sentry_breadcrumb
+        breadcrumb = getattr(trace_config_ctx, "_sentry_breadcrumb", None)
         if breadcrumb is not None:
             breadcrumb.update(
                 {
@@ -515,10 +515,9 @@ def create_trace_config() -> "TraceConfig":
                 breadcrumb,
             )
 
-        if trace_config_ctx._sentry_span is None:
+        span = getattr(trace_config_ctx, "_sentry_span", None)
+        if span is None:
             return
-
-        span = trace_config_ctx._sentry_span
 
         if isinstance(span, StreamedSpan):
             span.set_attribute("http.response.status_code", status)
