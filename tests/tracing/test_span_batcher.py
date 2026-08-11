@@ -432,6 +432,25 @@ def test_transport_format(sentry_init, capture_envelopes):
         assert value["type"] in ("string", "boolean", "integer", "double", "array")
 
 
+def test_trace_bucket_flushes_when_segment_ends(
+    sentry_init, capture_items, monkeypatch
+):
+    """All currently completed spans in a trace are flushed when the segment is finished."""
+    monkeypatch.setattr(SpanBatcher, "FLUSH_WAIT_TIME", 100000)
+
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="segment span"):
+        with sentry_sdk.traces.start_span(name="child"):
+            pass
+
+    time.sleep(0.1)
+
+    assert len(items) == 3
+    assert items[0].payload["name"] == "span"
+
+
 @pytest.mark.skipif(
     sys.platform == "win32"
     or not hasattr(os, "fork")
