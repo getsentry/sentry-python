@@ -113,7 +113,7 @@ def _install_httplib() -> None:
             parsed_url = parse_url(real_url, sanitize=False)
 
         span_streaming = has_span_streaming_enabled(client.options)
-        span: "Union[Span, StreamedSpan, None]"
+        span: "Union[Span, StreamedSpan, None]" = None
         breadcrumb: "dict[str, Any]" = {}
 
         if span_streaming:
@@ -127,9 +127,7 @@ def _install_httplib() -> None:
                     }
                 )
 
-            if sentry_sdk.traces.get_current_span() is None:
-                span = None
-            else:
+            if sentry_sdk.traces.get_current_span() is not None:
                 span = sentry_sdk.traces.start_span(
                     name="%s %s"
                     % (
@@ -149,6 +147,7 @@ def _install_httplib() -> None:
                     span.set_attribute(SPANDATA.URL_QUERY, parsed_url.query)
 
                 set_on_span = span.set_attribute
+
         else:
             span = sentry_sdk.start_span(
                 op=OP.HTTP_CLIENT,
@@ -176,9 +175,10 @@ def _install_httplib() -> None:
             set_on_span = span.set_data
 
         # for proxies, these point to the proxy host/port
-        if span and tunnel_host:
-            set_on_span(SPANDATA.NETWORK_PEER_ADDRESS, self.host)
-            set_on_span(SPANDATA.NETWORK_PEER_PORT, self.port)
+        if tunnel_host:
+            if span:
+                set_on_span(SPANDATA.NETWORK_PEER_ADDRESS, self.host)
+                set_on_span(SPANDATA.NETWORK_PEER_PORT, self.port)
             breadcrumb.update(
                 {
                     SPANDATA.NETWORK_PEER_ADDRESS: self.host,
@@ -238,11 +238,12 @@ def _install_httplib() -> None:
         has_body = rv.chunked or (rv.length is not None and rv.length > 0)
         if has_body:
             rv._sentrysdk_span = span  # type: ignore[attr-defined]
-            rv._sentrysdk_breadcrumb = breadcrumb  # type: ignore[attr-defined]
-        else:
-            if span:
-                _complete_span(span)
-            add_http_breadcrumb(status_code, breadcrumb)
+        elif span:
+            _complete_span(span)
+
+        # Regardless of whether the response itself has been fully read or not,
+        # the breadcrumb can now be emitted since we now have the status code.
+        add_http_breadcrumb(status_code, breadcrumb)
 
         return rv
 
@@ -251,18 +252,12 @@ def _install_httplib() -> None:
             return real_read(self, *args, **kwargs)
         finally:
             span = getattr(self, "_sentrysdk_span", None)
-            breadcrumb = getattr(self, "_sentrysdk_breadcrumb", None)
             # read() might be called multiple times to consume a single body,
             # so we can't just end the span when read() is done. Instead,
             # try to figure out whether the response body has been fully read.
-            if self.fp is None or self.closed:
-                if span:
-                    _complete_span(span)
-                if breadcrumb:
-                    add_http_breadcrumb(None, breadcrumb)
-
+            if span and (self.fp is None or self.closed):
+                _complete_span(span)
                 self._sentrysdk_span = None  # type: ignore[attr-defined]
-                self._sentrysdk_breadcrumb = None  # type: ignore[attr-defined]
 
     def close(self: "HTTPResponse") -> None:
         # We patch close() as a best effort fallback in case the span is not
@@ -272,15 +267,9 @@ def _install_httplib() -> None:
             real_close(self)
         finally:
             span = getattr(self, "_sentrysdk_span", None)
-            breadcrumb = getattr(self, "_sentrysdk_breadcrumb", None)
-
             if span is not None:
                 _complete_span(span)
-            if breadcrumb:
-                add_http_breadcrumb(None, breadcrumb)
-
             self._sentrysdk_span = None  # type: ignore[attr-defined]
-            self._sentrysdk_breadcrumb = None  # type: ignore[attr-defined]
 
     HTTPConnection.putrequest = putrequest  # type: ignore[method-assign]
     HTTPConnection.getresponse = getresponse  # type: ignore[method-assign]
