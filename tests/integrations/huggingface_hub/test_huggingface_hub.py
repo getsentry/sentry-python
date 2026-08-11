@@ -1568,9 +1568,42 @@ def test_chat_completion_streaming_with_tools(
         assert span["data"] == expected_data
 
 
+DATA_COLLECTION_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "Get current weather",
+            "parameters": {
+                "type": "object",
+                "properties": {"location": {"type": "string"}},
+                "required": ["location"],
+            },
+        },
+    }
+]
+
 DATA_COLLECTION_TEXT_GENERATION_EXPECTED_VALUES = {
     SPANDATA.GEN_AI_REQUEST_MESSAGES: "Hello",
     SPANDATA.GEN_AI_RESPONSE_TEXT: "[mocked] Hello! How can i help you?",
+}
+
+DATA_COLLECTION_TEXT_GENERATION_STREAMING_EXPECTED_VALUES = {
+    SPANDATA.GEN_AI_REQUEST_MESSAGES: "Hello",
+    SPANDATA.GEN_AI_RESPONSE_TEXT: "the mocked model response",
+}
+
+DATA_COLLECTION_CHAT_COMPLETION_TOOLS_EXPECTED_VALUES = {
+    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS: '[{"type": "function", "function": {"name": "get_weather", "description": "Get current weather", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"]}}}]',
+    SPANDATA.GEN_AI_REQUEST_MESSAGES: '[{"role": "user", "content": "What is the weather in Paris?"}]',
+    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS: '[{"function": {"arguments": {"location": "Paris"}, "name": "get_weather", "description": "None"}, "id": "call_123", "type": "function"}]',
+}
+
+DATA_COLLECTION_CHAT_COMPLETION_STREAMING_TOOLS_EXPECTED_VALUES = {
+    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS: '[{"type": "function", "function": {"name": "get_weather", "description": "Get current weather", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"]}}}]',
+    SPANDATA.GEN_AI_REQUEST_MESSAGES: '[{"role": "user", "content": "What is the weather in Paris?"}]',
+    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS: '[{"function": {"arguments": {"location": "Paris"}, "name": "get_weather"}, "id": "call_123", "type": "function", "index": "None"}]',
+    SPANDATA.GEN_AI_RESPONSE_TEXT: "response with tool calls follows",
 }
 
 
@@ -1717,12 +1750,6 @@ def test_text_generation_data_collection(
     assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "test-model"
     assert span_data[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "length"
     assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 10
-
-
-DATA_COLLECTION_TEXT_GENERATION_STREAMING_EXPECTED_VALUES = {
-    SPANDATA.GEN_AI_REQUEST_MESSAGES: "Hello",
-    SPANDATA.GEN_AI_RESPONSE_TEXT: "the mocked model response",
-}
 
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
@@ -1873,28 +1900,6 @@ def test_text_generation_streaming_data_collection(
     assert span_data[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "length"
     assert span_data[SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
     assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 10
-
-
-DATA_COLLECTION_TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "get_weather",
-            "description": "Get current weather",
-            "parameters": {
-                "type": "object",
-                "properties": {"location": {"type": "string"}},
-                "required": ["location"],
-            },
-        },
-    }
-]
-
-DATA_COLLECTION_CHAT_COMPLETION_TOOLS_EXPECTED_VALUES = {
-    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS: '[{"type": "function", "function": {"name": "get_weather", "description": "Get current weather", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"]}}}]',
-    SPANDATA.GEN_AI_REQUEST_MESSAGES: '[{"role": "user", "content": "What is the weather in Paris?"}]',
-    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS: '[{"function": {"arguments": {"location": "Paris"}, "name": "get_weather", "description": "None"}, "id": "call_123", "type": "function"}]',
-}
 
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
@@ -2058,14 +2063,6 @@ def test_chat_completion_data_collection_tools(
     assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
     assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 8
     assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 18
-
-
-DATA_COLLECTION_CHAT_COMPLETION_STREAMING_TOOLS_EXPECTED_VALUES = {
-    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS: '[{"type": "function", "function": {"name": "get_weather", "description": "Get current weather", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"]}}}]',
-    SPANDATA.GEN_AI_REQUEST_MESSAGES: '[{"role": "user", "content": "What is the weather in Paris?"}]',
-    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS: '[{"function": {"arguments": {"location": "Paris"}, "name": "get_weather"}, "id": "call_123", "type": "function", "index": "None"}]',
-    SPANDATA.GEN_AI_RESPONSE_TEXT: "response with tool calls follows",
-}
 
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
