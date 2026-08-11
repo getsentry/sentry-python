@@ -1574,90 +1574,88 @@ DATA_COLLECTION_TEXT_GENERATION_EXPECTED_VALUES = {
 }
 
 
-def _get_gen_ai_span_data(captured: "Any", stream_gen_ai_spans: "Any") -> "Any":
-    if stream_gen_ai_spans:
-        spans = [item.payload for item in captured if item.type == "span"]
-        (span,) = [
-            sp for sp in spans if sp["attributes"]["sentry.op"].startswith("gen_ai")
-        ]
-        return span["attributes"]
-
-    (transaction,) = captured
-    (span,) = [sp for sp in transaction["spans"] if sp["op"].startswith("gen_ai")]
-    return span["data"]
-
-
-def _expected_keys(
-    collect_inputs: "Any", collect_outputs: "Any", input_keys: "Any", output_keys: "Any"
-) -> "Any":
-    present = (input_keys if collect_inputs else []) + (
-        output_keys if collect_outputs else []
-    )
-    absent = ([] if collect_inputs else input_keys) + (
-        [] if collect_outputs else output_keys
-    )
-    return present, absent
-
-
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,collect_inputs,collect_outputs",
+    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
     [
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": True}},
             False,
             False,
-            True,
-            True,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            [],
             id="gen-ai-inputs-and-outputs-enabled-override-legacy-off",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": False}},
             True,
             True,
-            False,
-            False,
+            [],
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
             id="gen-ai-inputs-and-outputs-disabled-override-legacy-on",
         ),
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
             False,
             False,
-            True,
-            False,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+            ],
+            [
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
             id="gen-ai-inputs-enabled-outputs-disabled",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
             False,
             False,
-            False,
-            True,
+            [
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+            ],
             id="gen-ai-outputs-enabled-inputs-disabled",
         ),
         pytest.param(
             {"gen_ai": {}},
             False,
             False,
-            True,
-            True,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            [],
             id="gen-ai-inputs-and-outputs-omitted-default-to-enabled",
         ),
         pytest.param(
             None,
             True,
             True,
-            True,
-            True,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            [],
             id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
         ),
         pytest.param(
             None,
             False,
             True,
-            False,
-            False,
+            [],
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
             id="no-gen-ai-config-legacy-pii-disabled",
         ),
     ],
@@ -1670,17 +1668,10 @@ def test_text_generation_data_collection(
     data_collection: "Any",
     send_default_pii: "Any",
     include_prompts: "Any",
-    collect_inputs: "Any",
-    collect_outputs: "Any",
+    expected_present: "Any",
+    expected_absent: "Any",
     stream_gen_ai_spans: "Any",
 ) -> None:
-    expected_present, expected_absent = _expected_keys(
-        collect_inputs,
-        collect_outputs,
-        [SPANDATA.GEN_AI_REQUEST_MESSAGES],
-        [SPANDATA.GEN_AI_RESPONSE_TEXT],
-    )
-
     sentry_init_kwargs = dict(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -1703,7 +1694,16 @@ def test_text_generation_data_collection(
     with sentry_sdk.start_transaction(name="test"):
         client.text_generation("Hello", stream=False, details=True)
 
-    span_data = _get_gen_ai_span_data(captured, stream_gen_ai_spans)
+    if stream_gen_ai_spans:
+        spans = [item.payload for item in captured if item.type == "span"]
+        (span,) = [
+            sp for sp in spans if sp["attributes"]["sentry.op"].startswith("gen_ai")
+        ]
+        span_data = span["attributes"]
+    else:
+        (transaction,) = captured
+        (span,) = [sp for sp in transaction["spans"] if sp["op"].startswith("gen_ai")]
+        span_data = span["data"]
 
     for key in expected_present:
         assert key in span_data, f"{key} should have been collected"
@@ -1728,62 +1728,85 @@ DATA_COLLECTION_TEXT_GENERATION_STREAMING_EXPECTED_VALUES = {
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,collect_inputs,collect_outputs",
+    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
     [
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": True}},
             False,
             False,
-            True,
-            True,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            [],
             id="gen-ai-inputs-and-outputs-enabled-override-legacy-off",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": False}},
             True,
             True,
-            False,
-            False,
+            [],
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
             id="gen-ai-inputs-and-outputs-disabled-override-legacy-on",
         ),
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
             False,
             False,
-            True,
-            False,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+            ],
+            [
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
             id="gen-ai-inputs-enabled-outputs-disabled",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
             False,
             False,
-            False,
-            True,
+            [
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+            ],
             id="gen-ai-outputs-enabled-inputs-disabled",
         ),
         pytest.param(
             {"gen_ai": {}},
             False,
             False,
-            True,
-            True,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            [],
             id="gen-ai-inputs-and-outputs-omitted-default-to-enabled",
         ),
         pytest.param(
             None,
             True,
             True,
-            True,
-            True,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            [],
             id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
         ),
         pytest.param(
             None,
             False,
             True,
-            False,
-            False,
+            [],
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
             id="no-gen-ai-config-legacy-pii-disabled",
         ),
     ],
@@ -1796,17 +1819,10 @@ def test_text_generation_streaming_data_collection(
     data_collection: "Any",
     send_default_pii: "Any",
     include_prompts: "Any",
-    collect_inputs: "Any",
-    collect_outputs: "Any",
+    expected_present: "Any",
+    expected_absent: "Any",
     stream_gen_ai_spans: "Any",
 ) -> None:
-    expected_present, expected_absent = _expected_keys(
-        collect_inputs,
-        collect_outputs,
-        [SPANDATA.GEN_AI_REQUEST_MESSAGES],
-        [SPANDATA.GEN_AI_RESPONSE_TEXT],
-    )
-
     sentry_init_kwargs = dict(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -1830,7 +1846,16 @@ def test_text_generation_streaming_data_collection(
         for _ in client.text_generation(prompt="Hello", stream=True, details=True):
             pass
 
-    span_data = _get_gen_ai_span_data(captured, stream_gen_ai_spans)
+    if stream_gen_ai_spans:
+        spans = [item.payload for item in captured if item.type == "span"]
+        (span,) = [
+            sp for sp in spans if sp["attributes"]["sentry.op"].startswith("gen_ai")
+        ]
+        span_data = span["attributes"]
+    else:
+        (transaction,) = captured
+        (span,) = [sp for sp in transaction["spans"] if sp["op"].startswith("gen_ai")]
+        span_data = span["data"]
 
     for key in expected_present:
         assert key in span_data, f"{key} should have been collected"
@@ -1875,62 +1900,91 @@ DATA_COLLECTION_CHAT_COMPLETION_TOOLS_EXPECTED_VALUES = {
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,collect_inputs,collect_outputs",
+    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
     [
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": True}},
             False,
             False,
-            True,
-            True,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+            ],
+            [],
             id="gen-ai-inputs-and-outputs-enabled-override-legacy-off",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": False}},
             True,
             True,
-            False,
-            False,
+            [],
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+            ],
             id="gen-ai-inputs-and-outputs-disabled-override-legacy-on",
         ),
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
             False,
             False,
-            True,
-            False,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+            ],
+            [],
             id="gen-ai-inputs-enabled-outputs-disabled",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
             False,
             False,
-            False,
-            True,
+            [],
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+            ],
             id="gen-ai-outputs-enabled-inputs-disabled",
         ),
         pytest.param(
             {"gen_ai": {}},
             False,
             False,
-            True,
-            True,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+            ],
+            [],
             id="gen-ai-inputs-and-outputs-omitted-default-to-enabled",
         ),
         pytest.param(
             None,
             True,
             True,
-            True,
-            True,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+            ],
+            [],
             id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
         ),
         pytest.param(
             None,
             False,
             True,
-            False,
-            False,
+            [
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+            ],
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+            ],
             id="no-gen-ai-config-legacy-pii-disabled",
         ),
     ],
@@ -1943,24 +1997,10 @@ def test_chat_completion_data_collection_tools(
     data_collection: "Any",
     send_default_pii: "Any",
     include_prompts: "Any",
-    collect_inputs: "Any",
-    collect_outputs: "Any",
+    expected_present: "Any",
+    expected_absent: "Any",
     stream_gen_ai_spans: "Any",
 ) -> None:
-    expected_present, expected_absent = _expected_keys(
-        collect_inputs,
-        collect_outputs,
-        [SPANDATA.GEN_AI_REQUEST_MESSAGES, SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS],
-        [],
-    )
-
-    # Legacy behaviour sets the available tools unconditionally, data collection
-    # gates them on inputs
-    if data_collection is None or collect_inputs:
-        expected_present.append(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS)
-    else:
-        expected_absent.append(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS)
-
     sentry_init_kwargs = dict(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -1987,7 +2027,16 @@ def test_chat_completion_data_collection_tools(
             tool_choice="auto",
         )
 
-    span_data = _get_gen_ai_span_data(captured, stream_gen_ai_spans)
+    if stream_gen_ai_spans:
+        spans = [item.payload for item in captured if item.type == "span"]
+        (span,) = [
+            sp for sp in spans if sp["attributes"]["sentry.op"].startswith("gen_ai")
+        ]
+        span_data = span["attributes"]
+    else:
+        (transaction,) = captured
+        (span,) = [sp for sp in transaction["spans"] if sp["op"].startswith("gen_ai")]
+        span_data = span["data"]
 
     for key in expected_present:
         assert key in span_data, f"{key} should have been collected"
@@ -2022,62 +2071,100 @@ DATA_COLLECTION_CHAT_COMPLETION_STREAMING_TOOLS_EXPECTED_VALUES = {
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,collect_inputs,collect_outputs",
+    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
     [
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": True}},
             False,
             False,
-            True,
-            True,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+            ],
+            [],
             id="gen-ai-inputs-and-outputs-enabled-override-legacy-off",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": False}},
             True,
             True,
-            False,
-            False,
+            [],
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+            ],
             id="gen-ai-inputs-and-outputs-disabled-override-legacy-on",
         ),
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
             False,
             False,
-            True,
-            False,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+            ],
+            [
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
             id="gen-ai-inputs-enabled-outputs-disabled",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
             False,
             False,
-            False,
-            True,
+            [
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+            ],
             id="gen-ai-outputs-enabled-inputs-disabled",
         ),
         pytest.param(
             {"gen_ai": {}},
             False,
             False,
-            True,
-            True,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+            ],
+            [],
             id="gen-ai-inputs-and-outputs-omitted-default-to-enabled",
         ),
         pytest.param(
             None,
             True,
             True,
-            True,
-            True,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+            ],
+            [],
             id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
         ),
         pytest.param(
             None,
             False,
             True,
-            False,
-            False,
+            [
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+            ],
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
             id="no-gen-ai-config-legacy-pii-disabled",
         ),
     ],
@@ -2090,24 +2177,10 @@ def test_chat_completion_streaming_data_collection_tools(
     data_collection: "Any",
     send_default_pii: "Any",
     include_prompts: "Any",
-    collect_inputs: "Any",
-    collect_outputs: "Any",
+    expected_present: "Any",
+    expected_absent: "Any",
     stream_gen_ai_spans: "Any",
 ) -> None:
-    expected_present, expected_absent = _expected_keys(
-        collect_inputs,
-        collect_outputs,
-        [SPANDATA.GEN_AI_REQUEST_MESSAGES, SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS],
-        [SPANDATA.GEN_AI_RESPONSE_TEXT],
-    )
-
-    # Legacy behaviour sets the available tools unconditionally, data collection
-    # gates them on inputs
-    if data_collection is None or collect_inputs:
-        expected_present.append(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS)
-    else:
-        expected_absent.append(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS)
-
     sentry_init_kwargs = dict(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
@@ -2136,7 +2209,16 @@ def test_chat_completion_streaming_data_collection_tools(
         ):
             pass
 
-    span_data = _get_gen_ai_span_data(captured, stream_gen_ai_spans)
+    if stream_gen_ai_spans:
+        spans = [item.payload for item in captured if item.type == "span"]
+        (span,) = [
+            sp for sp in spans if sp["attributes"]["sentry.op"].startswith("gen_ai")
+        ]
+        span_data = span["attributes"]
+    else:
+        (transaction,) = captured
+        (span,) = [sp for sp in transaction["spans"] if sp["op"].startswith("gen_ai")]
+        span_data = span["data"]
 
     for key in expected_present:
         assert key in span_data, f"{key} should have been collected"
