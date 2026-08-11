@@ -1587,70 +1587,6 @@ def _get_gen_ai_span_data(captured: "Any", stream_gen_ai_spans: "Any") -> "Any":
     return span["data"]
 
 
-DATA_COLLECTION_PARAMS = [
-    pytest.param(
-        {"gen_ai": {"inputs": True, "outputs": True}},
-        False,
-        False,
-        True,
-        True,
-        id="gen-ai-inputs-and-outputs-enabled-override-legacy-off",
-    ),
-    pytest.param(
-        {"gen_ai": {"inputs": False, "outputs": False}},
-        True,
-        True,
-        False,
-        False,
-        id="gen-ai-inputs-and-outputs-disabled-override-legacy-on",
-    ),
-    pytest.param(
-        {"gen_ai": {"inputs": True, "outputs": False}},
-        False,
-        False,
-        True,
-        False,
-        id="gen-ai-inputs-enabled-outputs-disabled",
-    ),
-    pytest.param(
-        {"gen_ai": {"inputs": False, "outputs": True}},
-        False,
-        False,
-        False,
-        True,
-        id="gen-ai-outputs-enabled-inputs-disabled",
-    ),
-    pytest.param(
-        {"gen_ai": {}},
-        False,
-        False,
-        True,
-        True,
-        id="gen-ai-inputs-and-outputs-omitted-default-to-enabled",
-    ),
-    pytest.param(
-        None,
-        True,
-        True,
-        True,
-        True,
-        id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
-    ),
-    pytest.param(
-        None,
-        False,
-        True,
-        False,
-        False,
-        id="no-gen-ai-config-legacy-pii-disabled",
-    ),
-]
-
-DATA_COLLECTION_PARAM_NAMES = (
-    "data_collection,send_default_pii,include_prompts,collect_inputs,collect_outputs"
-)
-
-
 def _expected_keys(
     collect_inputs: "Any", collect_outputs: "Any", input_keys: "Any", output_keys: "Any"
 ) -> "Any":
@@ -1665,7 +1601,67 @@ def _expected_keys(
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
-@pytest.mark.parametrize(DATA_COLLECTION_PARAM_NAMES, DATA_COLLECTION_PARAMS)
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,include_prompts,collect_inputs,collect_outputs",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": True}},
+            False,
+            False,
+            True,
+            True,
+            id="gen-ai-inputs-and-outputs-enabled-override-legacy-off",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": False}},
+            True,
+            True,
+            False,
+            False,
+            id="gen-ai-inputs-and-outputs-disabled-override-legacy-on",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": False}},
+            False,
+            False,
+            True,
+            False,
+            id="gen-ai-inputs-enabled-outputs-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": True}},
+            False,
+            False,
+            False,
+            True,
+            id="gen-ai-outputs-enabled-inputs-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {}},
+            False,
+            False,
+            True,
+            True,
+            id="gen-ai-inputs-and-outputs-omitted-default-to-enabled",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            True,
+            True,
+            id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            True,
+            False,
+            False,
+            id="no-gen-ai-config-legacy-pii-disabled",
+        ),
+    ],
+)
 def test_text_generation_data_collection(
     sentry_init: "Any",
     capture_events: "Any",
@@ -1731,7 +1727,67 @@ DATA_COLLECTION_TEXT_GENERATION_STREAMING_EXPECTED_VALUES = {
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
-@pytest.mark.parametrize(DATA_COLLECTION_PARAM_NAMES, DATA_COLLECTION_PARAMS)
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,include_prompts,collect_inputs,collect_outputs",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": True}},
+            False,
+            False,
+            True,
+            True,
+            id="gen-ai-inputs-and-outputs-enabled-override-legacy-off",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": False}},
+            True,
+            True,
+            False,
+            False,
+            id="gen-ai-inputs-and-outputs-disabled-override-legacy-on",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": False}},
+            False,
+            False,
+            True,
+            False,
+            id="gen-ai-inputs-enabled-outputs-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": True}},
+            False,
+            False,
+            False,
+            True,
+            id="gen-ai-outputs-enabled-inputs-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {}},
+            False,
+            False,
+            True,
+            True,
+            id="gen-ai-inputs-and-outputs-omitted-default-to-enabled",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            True,
+            True,
+            id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            True,
+            False,
+            False,
+            id="no-gen-ai-config-legacy-pii-disabled",
+        ),
+    ],
+)
 def test_text_generation_streaming_data_collection(
     sentry_init: "Any",
     capture_events: "Any",
@@ -1818,7 +1874,67 @@ DATA_COLLECTION_CHAT_COMPLETION_TOOLS_EXPECTED_VALUES = {
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
-@pytest.mark.parametrize(DATA_COLLECTION_PARAM_NAMES, DATA_COLLECTION_PARAMS)
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,include_prompts,collect_inputs,collect_outputs",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": True}},
+            False,
+            False,
+            True,
+            True,
+            id="gen-ai-inputs-and-outputs-enabled-override-legacy-off",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": False}},
+            True,
+            True,
+            False,
+            False,
+            id="gen-ai-inputs-and-outputs-disabled-override-legacy-on",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": False}},
+            False,
+            False,
+            True,
+            False,
+            id="gen-ai-inputs-enabled-outputs-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": True}},
+            False,
+            False,
+            False,
+            True,
+            id="gen-ai-outputs-enabled-inputs-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {}},
+            False,
+            False,
+            True,
+            True,
+            id="gen-ai-inputs-and-outputs-omitted-default-to-enabled",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            True,
+            True,
+            id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            True,
+            False,
+            False,
+            id="no-gen-ai-config-legacy-pii-disabled",
+        ),
+    ],
+)
 def test_chat_completion_data_collection_tools(
     sentry_init: "Any",
     capture_events: "Any",
@@ -1905,7 +2021,67 @@ DATA_COLLECTION_CHAT_COMPLETION_STREAMING_TOOLS_EXPECTED_VALUES = {
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
-@pytest.mark.parametrize(DATA_COLLECTION_PARAM_NAMES, DATA_COLLECTION_PARAMS)
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,include_prompts,collect_inputs,collect_outputs",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": True}},
+            False,
+            False,
+            True,
+            True,
+            id="gen-ai-inputs-and-outputs-enabled-override-legacy-off",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": False}},
+            True,
+            True,
+            False,
+            False,
+            id="gen-ai-inputs-and-outputs-disabled-override-legacy-on",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": False}},
+            False,
+            False,
+            True,
+            False,
+            id="gen-ai-inputs-enabled-outputs-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": True}},
+            False,
+            False,
+            False,
+            True,
+            id="gen-ai-outputs-enabled-inputs-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {}},
+            False,
+            False,
+            True,
+            True,
+            id="gen-ai-inputs-and-outputs-omitted-default-to-enabled",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            True,
+            True,
+            id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            True,
+            False,
+            False,
+            id="no-gen-ai-config-legacy-pii-disabled",
+        ),
+    ],
+)
 def test_chat_completion_streaming_data_collection_tools(
     sentry_init: "Any",
     capture_events: "Any",
