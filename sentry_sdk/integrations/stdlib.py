@@ -222,7 +222,7 @@ def _install_httplib() -> None:
                 and "getresponse() got an unexpected keyword argument 'buffering'"
                 not in str(ex)
             ):
-                # the exception msg check is needed Python 3.6/requests compat
+                # the exception msg check is needed for Python 3.6/requests compat
                 add_http_breadcrumb(None, breadcrumb)
             raise
 
