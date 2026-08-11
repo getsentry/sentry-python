@@ -210,7 +210,7 @@ def _install_httplib() -> None:
 
     def getresponse(self: "HTTPConnection", *args: "Any", **kwargs: "Any") -> "Any":
         span = getattr(self, "_sentrysdk_span", None)
-        breadcrumb = getattr(self, "_sentrysdk_breadcrumb", None) or {}
+        breadcrumb = getattr(self, "_sentrysdk_breadcrumb", None)
 
         try:
             rv = real_getresponse(self, *args, **kwargs)
@@ -227,7 +227,9 @@ def _install_httplib() -> None:
             raise
 
         status_code = int(rv.status)
-        breadcrumb[SPANDATA.HTTP_STATUS_CODE] = status_code
+
+        if breadcrumb:
+            breadcrumb[SPANDATA.HTTP_STATUS_CODE] = status_code
 
         if span is None:
             add_http_breadcrumb(status_code, breadcrumb)
