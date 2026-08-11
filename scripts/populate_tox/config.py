@@ -117,7 +117,6 @@ TEST_SUITE_CONFIG = {
             "<3.1": ["pytest-django<4.0", "six"],
             "py3.14,py3.14t": ["coverage==7.11.0"],
         },
-        "include": "<6.1b1",
     },
     "dramatiq": {
         "package": "dramatiq",
@@ -200,7 +199,7 @@ TEST_SUITE_CONFIG = {
     "httpx": {
         "package": "httpx",
         "deps": {
-            "*": ["anyio>=3,<5"],
+            "*": ["anyio>=3,<5", "pytest-asyncio"],
             "<0.24": ["anyio<4"],
             ">=0.16,<0.17": ["pytest-httpx==0.10.0"],
             ">=0.17,<0.19": ["pytest-httpx==0.12.0"],
@@ -220,7 +219,7 @@ TEST_SUITE_CONFIG = {
     "httpx2": {
         "package": "httpx2",
         "deps": {
-            "*": ["anyio>=3,<5", "httpx2-pytest==1.0.1"],
+            "*": ["anyio>=3,<5", "httpx2-pytest==1.0.1", "pytest-asyncio"],
         },
         "python": ">=3.10",
     },
@@ -245,6 +244,7 @@ TEST_SUITE_CONFIG = {
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
             ">=1.0": ["langchain-classic"],
+            ">=1.1.2": ["google-genai", "langchain-google-genai>=4"],
         },
         "python": {
             "<1.0": "<3.14",  # https://github.com/langchain-ai/langchain/issues/33449#issuecomment-3408876631
@@ -258,6 +258,7 @@ TEST_SUITE_CONFIG = {
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
             ">=1.0": ["langchain-classic"],
+            ">=1.1.2": ["google-genai", "langchain-google-genai>=4"],
         },
         "python": {
             "<1.0": "<3.14",  # https://github.com/langchain-ai/langchain/issues/33449#issuecomment-3408876631
@@ -275,6 +276,7 @@ TEST_SUITE_CONFIG = {
         "deps": {
             "*": ["anthropic", "google-genai", "pytest-asyncio"],
         },
+        "include": "<=1.96",  # https://github.com/BerriAI/litellm/issues/36384
     },
     "litestar": {
         "package": "litestar",

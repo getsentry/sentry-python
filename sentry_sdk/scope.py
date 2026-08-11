@@ -1073,10 +1073,10 @@ class Scope:
         if crumb.get("type") is None:
             crumb["type"] = "default"
 
+        new_crumb = crumb
         if before_breadcrumb is not None:
-            new_crumb = before_breadcrumb(crumb, hint)
-        else:
-            new_crumb = crumb
+            with capture_internal_exceptions():
+                new_crumb = before_breadcrumb(crumb, hint)
 
         if new_crumb is not None:
             self._breadcrumbs.append(new_crumb)

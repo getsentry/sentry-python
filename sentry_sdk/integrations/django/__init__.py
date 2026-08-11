@@ -268,6 +268,10 @@ def _patch_drf() -> None:
     DRF request object, such that we can later use either in
     `DjangoRequestExtractor`.
 
+    We also patch DRF's authentication to create a span, so that the work done
+    by the configured authentication classes (which often involves database
+    queries) doesn't show up as part of the view itself.
+
     This function is not called directly on SDK setup, because importing almost
     any part of Django Rest Framework will try to access Django settings (where
     `sentry_sdk.init()` might be called from in the first place). Instead we
@@ -308,6 +312,43 @@ def _patch_drf() -> None:
                     return old_drf_initial(self, request, *args, **kwargs)
 
                 APIView.initial = sentry_patched_drf_initial
+
+        with capture_internal_exceptions():
+            try:
+                from rest_framework.request import Request  # type: ignore
+            except ImportError:
+                pass
+            else:
+                old_drf_authenticate = Request._authenticate
+
+                def sentry_patched_drf_authenticate(self: "Request") -> "Any":
+                    client = sentry_sdk.get_client()
+                    integration = client.get_integration(DjangoIntegration)
+                    # Nothing to time if there are no authenticators configured
+                    # for this view.
+                    if integration is None or not getattr(self, "authenticators", None):
+                        return old_drf_authenticate(self)
+
+                    if has_span_streaming_enabled(client.options):
+                        if sentry_sdk.traces.get_current_span() is None:
+                            return old_drf_authenticate(self)
+                        with sentry_sdk.traces.start_span(
+                            name="authenticate",
+                            attributes={
+                                "sentry.op": OP.VIEW_AUTHENTICATE,
+                                "sentry.origin": DjangoIntegration.origin,
+                            },
+                        ):
+                            return old_drf_authenticate(self)
+                    else:
+                        with sentry_sdk.start_span(
+                            op=OP.VIEW_AUTHENTICATE,
+                            name="authenticate",
+                            origin=DjangoIntegration.origin,
+                        ):
+                            return old_drf_authenticate(self)
+
+                Request._authenticate = sentry_patched_drf_authenticate
 
 
 def _patch_channels() -> None:

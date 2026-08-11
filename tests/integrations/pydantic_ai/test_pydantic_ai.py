@@ -123,7 +123,7 @@ async def test_agent_run_async(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # Check chat span
         chat_span = chat_spans[0]
@@ -173,7 +173,7 @@ async def test_agent_run_async(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # Check chat span
         chat_span = chat_spans[0]
@@ -219,7 +219,7 @@ async def test_agent_run_async(
 
         # Find child span types (invoke_agent is the transaction, not a child span)
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # Check chat span
         chat_span = chat_spans[0]
@@ -341,11 +341,10 @@ def test_agent_run_sync(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # Verify streaming flag is False for sync
-        for chat_span in chat_spans:
-            assert chat_span["attributes"]["gen_ai.response.streaming"] is False
+        assert chat_spans[0]["attributes"]["gen_ai.response.streaming"] is False
     elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
@@ -368,11 +367,10 @@ def test_agent_run_sync(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # Verify streaming flag is False for sync
-        for chat_span in chat_spans:
-            assert chat_span["attributes"]["gen_ai.response.streaming"] is False
+        assert chat_spans[0]["attributes"]["gen_ai.response.streaming"] is False
     else:
         events = capture_events()
 
@@ -390,11 +388,10 @@ def test_agent_run_sync(
 
         # Find span types
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # Verify streaming flag is False for sync
-        for chat_span in chat_spans:
-            assert chat_span["data"]["gen_ai.response.streaming"] is False
+        assert chat_spans[0]["data"]["gen_ai.response.streaming"] is False
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -507,34 +504,33 @@ async def test_agent_run_stream(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # Verify streaming flag is True for streaming
-        for chat_span in chat_spans:
-            assert chat_span["attributes"]["gen_ai.response.streaming"] is True
-            assert json.loads(
-                chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            ) == [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Message demonstrating the absence of truncation.",
-                        },
-                        {
-                            "type": "text",
-                            "text": "Test input",
-                        },
-                    ],
-                }
-            ]
-            assert "gen_ai.usage.input_tokens" in chat_span["attributes"]
-            # Streaming responses should still have output data
-            assert (
-                "gen_ai.response.text" in chat_span["attributes"]
-                or "gen_ai.response.model" in chat_span["attributes"]
-            )
+        assert chat_spans[0]["attributes"]["gen_ai.response.streaming"] is True
+        assert json.loads(
+            chat_spans[0]["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        ) == [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Message demonstrating the absence of truncation.",
+                    },
+                    {
+                        "type": "text",
+                        "text": "Test input",
+                    },
+                ],
+            }
+        ]
+        assert "gen_ai.usage.input_tokens" in chat_spans[0]["attributes"]
+        # Streaming responses should still have output data
+        assert (
+            "gen_ai.response.text" in chat_spans[0]["attributes"]
+            or "gen_ai.response.model" in chat_spans[0]["attributes"]
+        )
     elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
@@ -557,34 +553,33 @@ async def test_agent_run_stream(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # Verify streaming flag is True for streaming
-        for chat_span in chat_spans:
-            assert chat_span["attributes"]["gen_ai.response.streaming"] is True
-            assert json.loads(
-                chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            ) == [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Message demonstrating the absence of truncation.",
-                        },
-                        {
-                            "type": "text",
-                            "text": "Test input",
-                        },
-                    ],
-                }
-            ]
-            assert "gen_ai.usage.input_tokens" in chat_span["attributes"]
-            # Streaming responses should still have output data
-            assert (
-                "gen_ai.response.text" in chat_span["attributes"]
-                or "gen_ai.response.model" in chat_span["attributes"]
-            )
+        assert chat_spans[0]["attributes"]["gen_ai.response.streaming"] is True
+        assert json.loads(
+            chat_spans[0]["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
+        ) == [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Message demonstrating the absence of truncation.",
+                    },
+                    {
+                        "type": "text",
+                        "text": "Test input",
+                    },
+                ],
+            }
+        ]
+        assert "gen_ai.usage.input_tokens" in chat_spans[0]["attributes"]
+        # Streaming responses should still have output data
+        assert (
+            "gen_ai.response.text" in chat_spans[0]["attributes"]
+            or "gen_ai.response.model" in chat_spans[0]["attributes"]
+        )
     else:
         events = capture_events()
 
@@ -602,18 +597,17 @@ async def test_agent_run_stream(
 
         # Find chat spans
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # Verify streaming flag is True for streaming
-        for chat_span in chat_spans:
-            assert chat_span["data"]["gen_ai.response.streaming"] is True
-            assert "gen_ai.request.messages" in chat_span["data"]
-            assert "gen_ai.usage.input_tokens" in chat_span["data"]
-            # Streaming responses should still have output data
-            assert (
-                "gen_ai.response.text" in chat_span["data"]
-                or "gen_ai.response.model" in chat_span["data"]
-            )
+        assert chat_spans[0]["data"]["gen_ai.response.streaming"] is True
+        assert "gen_ai.request.messages" in chat_spans[0]["data"]
+        assert "gen_ai.usage.input_tokens" in chat_spans[0]["data"]
+        # Streaming responses should still have output data
+        assert (
+            "gen_ai.response.text" in chat_spans[0]["data"]
+            or "gen_ai.response.model" in chat_spans[0]["data"]
+        )
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -664,11 +658,10 @@ async def test_agent_run_stream_events(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # run_stream_events uses run() internally, so streaming should be False
-        for chat_span in chat_spans:
-            assert chat_span["attributes"]["gen_ai.response.streaming"] is False
+        assert chat_spans[0]["attributes"]["gen_ai.response.streaming"] is False
     elif stream_gen_ai_spans:
         items = capture_items("transaction", "span")
 
@@ -695,11 +688,10 @@ async def test_agent_run_stream_events(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # run_stream_events uses run() internally, so streaming should be False
-        for chat_span in chat_spans:
-            assert chat_span["attributes"]["gen_ai.response.streaming"] is False
+        assert chat_spans[0]["attributes"]["gen_ai.response.streaming"] is False
     else:
         events = capture_events()
 
@@ -719,11 +711,10 @@ async def test_agent_run_stream_events(
         # Find chat spans
         spans = transaction["spans"]
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # run_stream_events uses run() internally, so streaming should be False
-        for chat_span in chat_spans:
-            assert chat_span["data"]["gen_ai.response.streaming"] is False
+        assert chat_spans[0]["data"]["gen_ai.response.streaming"] is False
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -1051,14 +1042,13 @@ async def test_agent_with_tool_validation_error(
         assert "gen_ai.tool.input" in model_retry_tool_span["attributes"]
 
         # Check chat spans have available_tools
-        for chat_span in chat_spans:
-            assert "gen_ai.request.available_tools" in chat_span["attributes"]
-            available_tools_str = chat_span["attributes"][
-                "gen_ai.request.available_tools"
-            ]
+        assert "gen_ai.request.available_tools" in chat_spans[0]["attributes"]
+        available_tools_str = chat_spans[0]["attributes"][
+            "gen_ai.request.available_tools"
+        ]
 
-            # Available tools is serialized as a string
-            assert "add_numbers" in available_tools_str
+        # Available tools is serialized as a string
+        assert "add_numbers" in available_tools_str
     else:
         events = capture_events()
 
@@ -1096,11 +1086,10 @@ async def test_agent_with_tool_validation_error(
         assert "gen_ai.tool.input" in model_retry_tool_span["data"]
 
         # Check chat spans have available_tools
-        for chat_span in chat_spans:
-            assert "gen_ai.request.available_tools" in chat_span["data"]
-            available_tools_str = chat_span["data"]["gen_ai.request.available_tools"]
-            # Available tools is serialized as a string
-            assert "add_numbers" in available_tools_str
+        assert "gen_ai.request.available_tools" in chat_spans[0]["data"]
+        available_tools_str = chat_spans[0]["data"]["gen_ai.request.available_tools"]
+        # Available tools is serialized as a string
+        assert "add_numbers" in available_tools_str
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -1156,8 +1145,7 @@ async def test_agent_with_tools_streaming(
         assert len(tool_spans) >= 1
 
         # Verify streaming flag is True
-        for chat_span in chat_spans:
-            assert chat_span["attributes"]["gen_ai.response.streaming"] is True
+        assert chat_spans[0]["attributes"]["gen_ai.response.streaming"] is True
 
         # Check tool span
         tool_span = tool_spans[0]
@@ -1182,8 +1170,7 @@ async def test_agent_with_tools_streaming(
         assert len(tool_spans) >= 1
 
         # Verify streaming flag is True
-        for chat_span in chat_spans:
-            assert chat_span["data"]["gen_ai.response.streaming"] is True
+        assert chat_spans[0]["data"]["gen_ai.response.streaming"] is True
 
         # Check tool span
         tool_span = tool_spans[0]
@@ -1227,7 +1214,7 @@ async def test_model_settings(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         chat_span = chat_spans[0]
         # Check that model settings are captured
@@ -1244,7 +1231,7 @@ async def test_model_settings(
 
         # Find chat span
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         chat_span = chat_spans[0]
         # Check that model settings are captured
@@ -1303,7 +1290,7 @@ async def test_system_prompt_attribute(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         chat_span = chat_spans[0]
 
@@ -1329,7 +1316,7 @@ async def test_system_prompt_attribute(
 
         # The transaction IS the invoke_agent span, check for messages in chat spans instead
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         chat_span = chat_spans[0]
 
@@ -1403,7 +1390,7 @@ async def test_error_handling(
         await agent.run("Hello")
 
         # At minimum, we should have a transaction
-        assert len(events) >= 1
+        assert len(events) == 1
         transaction = [e for e in events if e.get("type") == "transaction"][0]
 
         assert transaction["transaction"] == "invoke_agent test_error"
@@ -1602,7 +1589,7 @@ async def test_multiple_agents_concurrent(
             assert transaction["type"] == "transaction"
             assert transaction["transaction"] == "invoke_agent test_agent"
             # Each should have its own spans
-            assert len(transaction["spans"]) >= 1
+            assert len(transaction["spans"]) == 1
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -1673,7 +1660,7 @@ async def test_message_history(
         await agent.run("What is my name?", message_history=history)
 
         # We should have 2 transactions
-        assert len(events) >= 2
+        assert len(events) == 2
 
         # Check the second transaction has the full history
         second_transaction = events[1]
@@ -1723,7 +1710,7 @@ async def test_gen_ai_system(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         chat_span = chat_spans[0]
         # gen_ai.system should be set from the model (TestModel -> 'test')
@@ -1739,7 +1726,7 @@ async def test_gen_ai_system(
 
         # Find chat span
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         chat_span = chat_spans[0]
         # gen_ai.system should be set from the model (TestModel -> 'test')
@@ -1843,9 +1830,8 @@ async def test_include_prompts_true(
         ]
 
         # Verify that messages are captured in chat spans
-        assert len(chat_spans) >= 1
-        for chat_span in chat_spans:
-            assert "gen_ai.request.messages" in chat_span["attributes"]
+        assert len(chat_spans) == 1
+        assert "gen_ai.request.messages" in chat_spans[0]["attributes"]
     else:
         events = capture_events()
 
@@ -1858,9 +1844,8 @@ async def test_include_prompts_true(
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
 
         # Verify that messages are captured in chat spans
-        assert len(chat_spans) >= 1
-        for chat_span in chat_spans:
-            assert "gen_ai.request.messages" in chat_span["data"]
+        assert len(chat_spans) == 1
+        assert "gen_ai.request.messages" in chat_spans[0]["data"]
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -2273,7 +2258,7 @@ async def test_invoke_agent_with_instructions(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         chat_span = chat_spans[0]
 
@@ -2298,7 +2283,7 @@ async def test_invoke_agent_with_instructions(
 
         # The transaction IS the invoke_agent span, check for messages in chat spans instead
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         chat_span = chat_spans[0]
 
@@ -2448,7 +2433,7 @@ async def test_usage_data_partial(
 
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
 
-    assert len(chat_spans) >= 1
+    assert len(chat_spans) == 1
 
     # Check that usage data fields exist (they may or may not be set depending on TestModel)
     chat_span = chat_spans[0]
@@ -2621,10 +2606,9 @@ async def test_output_with_tool_calls(
         assert len(chat_spans) >= 1
 
         # Check if tool calls are captured in response
-        for chat_span in chat_spans:
-            # Tool calls may or may not be in response depending on TestModel behavior
-            # Just verify the span was created and has basic data
-            assert "gen_ai.operation.name" in chat_span["attributes"]
+        # Tool calls may or may not be in response depending on TestModel behavior
+        # Just verify the span was created and has basic data
+        assert "gen_ai.operation.name" in chat_spans[0]["attributes"]
     else:
         events = capture_events()
 
@@ -2639,10 +2623,9 @@ async def test_output_with_tool_calls(
         assert len(chat_spans) >= 1
 
         # Check if tool calls are captured in response
-        for chat_span in chat_spans:
-            # Tool calls may or may not be in response depending on TestModel behavior
-            # Just verify the span was created and has basic data
-            assert "gen_ai.operation.name" in chat_span["data"]
+        # Tool calls may or may not be in response depending on TestModel behavior
+        # Just verify the span was created and has basic data
+        assert "gen_ai.operation.name" in chat_spans[0]["data"]
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -2697,7 +2680,7 @@ async def test_message_formatting_with_different_parts(
         ]
 
         # Should have chat spans
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # Check that messages are captured
         chat_span = chat_spans[0]
@@ -2715,7 +2698,7 @@ async def test_message_formatting_with_different_parts(
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
 
         # Should have chat spans
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         # Check that messages are captured
         chat_span = chat_spans[0]
@@ -3010,7 +2993,7 @@ async def test_message_parts_with_tool_return(
         chat_spans = [s for s in spans if s["op"] == "gen_ai.chat"]
 
     # Should have chat spans
-    assert len(chat_spans) >= 1
+    assert len(chat_spans) == 2
 
 
 @pytest.mark.asyncio
@@ -4249,7 +4232,7 @@ async def test_binary_content_in_agent_run(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         chat_span = chat_spans[0]
         if "gen_ai.request.messages" in chat_span["attributes"]:
@@ -4265,7 +4248,7 @@ async def test_binary_content_in_agent_run(
 
         (transaction,) = events
         chat_spans = [s for s in transaction["spans"] if s["op"] == "gen_ai.chat"]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
 
         chat_span = chat_spans[0]
         if "gen_ai.request.messages" in chat_span["data"]:
@@ -4438,7 +4421,7 @@ def test_image_url_base64_content_in_span(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
         messages_data = _get_messages_from_span(chat_spans[0]["attributes"])
 
         for msg in messages_data:
@@ -4463,7 +4446,7 @@ def test_image_url_base64_content_in_span(
 
         (event,) = events
         chat_spans = [s for s in event["spans"] if s["op"] == "gen_ai.chat"]
-        assert len(chat_spans) >= 1
+        assert len(chat_spans) == 1
         messages_data = _get_messages_from_span(chat_spans[0]["data"])
 
         for msg in messages_data:
@@ -4543,15 +4526,14 @@ async def test_invoke_agent_image_url(
         chat_spans = [
             s for s in spans if s["attributes"].get("sentry.op", "") == "gen_ai.chat"
         ]
-        for chat_span in chat_spans:
-            messages_data = _get_messages_from_span(chat_span["attributes"])
-            for msg in messages_data:
-                if "content" not in msg:
-                    continue
-                for content_item in msg["content"]:
-                    if content_item.get("type") == "image":
-                        assert content_item["content"] == expected_content
-                        found_image = True
+        messages_data = _get_messages_from_span(chat_spans[0]["attributes"])
+        for msg in messages_data:
+            if "content" not in msg:
+                continue
+            for content_item in msg["content"]:
+                if content_item.get("type") == "image":
+                    assert content_item["content"] == expected_content
+                    found_image = True
     else:
         events = capture_events()
 
@@ -4562,15 +4544,14 @@ async def test_invoke_agent_image_url(
         found_image = False
 
         chat_spans = [s for s in transaction["spans"] if s["op"] == "gen_ai.chat"]
-        for chat_span in chat_spans:
-            messages_data = _get_messages_from_span(chat_span["data"])
-            for msg in messages_data:
-                if "content" not in msg:
-                    continue
-                for content_item in msg["content"]:
-                    if content_item.get("type") == "image":
-                        assert content_item["content"] == expected_content
-                        found_image = True
+        messages_data = _get_messages_from_span(chat_spans[0]["data"])
+        for msg in messages_data:
+            if "content" not in msg:
+                continue
+            for content_item in msg["content"]:
+                if content_item.get("type") == "image":
+                    assert content_item["content"] == expected_content
+                    found_image = True
 
     assert found_image, "Image content item should be found in messages data"
 
