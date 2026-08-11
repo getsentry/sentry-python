@@ -104,6 +104,7 @@ def test_error_event_linked_without_performance_span_streaming(
 
     (event,) = (item.payload for item in items)
     assert event["transaction"] == "no-op span"
+    assert event["transaction_info"] == {"source": "custom"}
 
 
 @pytest.mark.parametrize("parent_sampled", [True, False, None])
