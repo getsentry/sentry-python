@@ -1718,7 +1718,7 @@ def get_aws_sigv4_signed_headers(
     if isinstance(authorization, bytes):
         authorization = authorization.decode("ascii", "ignore")
 
-    signed_headers = set()
+    signed_headers: "Set[str]" = set()
     if isinstance(authorization, str):
         # only AWS SigV4 authorization has the SignedHeaders parameter.
         value = authorization.lstrip()
