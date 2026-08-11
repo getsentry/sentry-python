@@ -115,7 +115,18 @@ def _install_httplib() -> None:
         span_streaming = has_span_streaming_enabled(client.options)
         span: "Union[Span, StreamedSpan, None]"
         breadcrumb: "dict[str, Any]" = {}
+
         if span_streaming:
+            breadcrumb[SPANDATA.HTTP_REQUEST_METHOD] = method
+            if parsed_url is not None and should_send_default_pii():
+                breadcrumb.update(
+                    {
+                        SPANDATA.URL_FRAGMENT: parsed_url.fragment,
+                        SPANDATA.URL_FULL: parsed_url.url,
+                        SPANDATA.URL_QUERY: parsed_url.query,
+                    }
+                )
+
             if sentry_sdk.traces.get_current_span() is None:
                 span = None
             else:
@@ -131,20 +142,11 @@ def _install_httplib() -> None:
                         SPANDATA.HTTP_REQUEST_METHOD: method,
                     },
                 )
-                breadcrumb[SPANDATA.HTTP_REQUEST_METHOD] = method
 
                 if parsed_url is not None and should_send_default_pii():
                     span.set_attribute(SPANDATA.URL_FRAGMENT, parsed_url.fragment)
                     span.set_attribute(SPANDATA.URL_FULL, parsed_url.url)
                     span.set_attribute(SPANDATA.URL_QUERY, parsed_url.query)
-
-                    breadcrumb.update(
-                        {
-                            SPANDATA.URL_FRAGMENT: parsed_url.fragment,
-                            SPANDATA.URL_FULL: parsed_url.url,
-                            SPANDATA.URL_QUERY: parsed_url.query,
-                        }
-                    )
 
                 set_on_span = span.set_attribute
         else:
@@ -209,31 +211,26 @@ def _install_httplib() -> None:
         span = getattr(self, "_sentrysdk_span", None)
         breadcrumb = getattr(self, "_sentrysdk_breadcrumb", None) or {}
 
-        if span is None:
-            return real_getresponse(self, *args, **kwargs)
-
         try:
             rv = real_getresponse(self, *args, **kwargs)
         except BaseException:
-            _complete_span(span)
+            if span:
+                _complete_span(span)
             if breadcrumb:
                 add_http_breadcrumb(None, breadcrumb)
             raise
 
         status_code = int(rv.status)
-        if isinstance(span, StreamedSpan):
-            span.status = "error" if status_code >= 400 else "ok"
-            span.set_attribute(SPANDATA.HTTP_STATUS_CODE, status_code)
-            breadcrumb[SPANDATA.HTTP_STATUS_CODE] = status_code
-        else:
-            span.set_http_status(status_code)
-            span.set_data("reason", rv.reason)
-            breadcrumb.update(
-                {
-                    SPANDATA.HTTP_STATUS_CODE: status_code,
-                    "reason": rv.reason,
-                }
-            )
+        breadcrumb[SPANDATA.HTTP_STATUS_CODE] = status_code
+
+        if span is not None:
+            if isinstance(span, StreamedSpan):
+                span.status = "error" if status_code >= 400 else "ok"
+                span.set_attribute(SPANDATA.HTTP_STATUS_CODE, status_code)
+            else:
+                span.set_http_status(status_code)
+                span.set_data("reason", rv.reason)
+                breadcrumb["reason"] = rv.reason
 
         # getresponse doesn't include actually reading the response body. This
         # is done in read(). So if the metadata/headers suggest there's a body to
@@ -243,7 +240,8 @@ def _install_httplib() -> None:
             rv._sentrysdk_span = span  # type: ignore[attr-defined]
             rv._sentrysdk_breadcrumb = breadcrumb  # type: ignore[attr-defined]
         else:
-            _complete_span(span)
+            if span:
+                _complete_span(span)
             add_http_breadcrumb(status_code, breadcrumb)
 
         return rv
