@@ -113,7 +113,7 @@ def _sentry_request_created(
             origin=Boto3Integration.origin,
         )
 
-        if request.url is not None:
+        if request.url is not None and parsed_url:
             with capture_internal_exceptions():
                 span.set_data("aws.request.url", parsed_url.url)
                 span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
@@ -136,25 +136,23 @@ def _sentry_request_created(
     # attached to this span.
     span.__enter__()
 
+    add_http_breadcrumb(None, breadcrumb)
+
     # request.context is an open-ended data-structure
     # where we can add anything useful in request life cycle.
     request.context["_sentrysdk_span"] = span
-    request.context["_sentrysdk_breadcrumb"] = breadcrumb
 
 
 def _sentry_after_call(
     context: "Dict[str, Any]", parsed: "Dict[str, Any]", **kwargs: "Any"
 ) -> None:
     span: "Optional[Union[Span, StreamedSpan]]" = context.pop("_sentrysdk_span", None)
-    breadcrumb: "Optional[dict[str, Any]]" = context.pop("_sentrysdk_breadcrumb", None)
 
     # Span could be absent if the integration is disabled.
     if span is None:
         return
 
     span.__exit__(None, None, None)
-    if breadcrumb:
-        add_http_breadcrumb(None, breadcrumb)
 
     body = parsed.get("Body")
     if not isinstance(body, StreamingBody):
@@ -214,11 +212,9 @@ def _sentry_after_call_error(
     context: "Dict[str, Any]", exception: "Type[BaseException]", **kwargs: "Any"
 ) -> None:
     span: "Optional[Union[Span, StreamedSpan]]" = context.pop("_sentrysdk_span", None)
-    breadcrumb: "Optional[dict[str, Any]]" = context.pop("_sentrysdk_breadcrumb", None)
 
     # Span could be absent if the integration is disabled.
     if span is None:
         return
 
-    add_http_breadcrumb(None, breadcrumb)
     span.__exit__(type(exception), exception, None)
