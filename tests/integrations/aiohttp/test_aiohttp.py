@@ -783,7 +783,7 @@ async def test_outgoing_trace_headers_skip_query_signed_baggage(
 
     async def handler(request):
         received_headers.append(request.headers.copy())
-        received_urls.append(str(request.url))
+        received_urls.append(str(request.rel_url))
         return web.Response(text="OK")
 
     raw_server = await aiohttp_raw_server(handler)
