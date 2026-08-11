@@ -259,8 +259,8 @@ def _install_httplib() -> None:
             # so we can't just end the span when read() is done. Instead,
             # try to figure out whether the response body has been fully read.
             if span and (self.fp is None or self.closed):
-                _complete_span(span)
                 self._sentrysdk_span = None  # type: ignore[attr-defined]
+                _complete_span(span)
 
     def close(self: "HTTPResponse") -> None:
         # We patch close() as a best effort fallback in case the span is not
@@ -271,8 +271,8 @@ def _install_httplib() -> None:
         finally:
             span = getattr(self, "_sentrysdk_span", None)
             if span is not None:
+                self._sentrysdk_span = None  # type: ignore[attr-defined]
                 _complete_span(span)
-            self._sentrysdk_span = None  # type: ignore[attr-defined]
 
     HTTPConnection.putrequest = putrequest  # type: ignore[method-assign]
     HTTPConnection.getresponse = getresponse  # type: ignore[method-assign]
