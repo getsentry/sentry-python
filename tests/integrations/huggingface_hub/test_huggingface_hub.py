@@ -1583,29 +1583,6 @@ DATA_COLLECTION_TOOLS = [
     }
 ]
 
-DATA_COLLECTION_TEXT_GENERATION_EXPECTED_VALUES = {
-    SPANDATA.GEN_AI_REQUEST_MESSAGES: "Hello",
-    SPANDATA.GEN_AI_RESPONSE_TEXT: "[mocked] Hello! How can i help you?",
-}
-
-DATA_COLLECTION_TEXT_GENERATION_STREAMING_EXPECTED_VALUES = {
-    SPANDATA.GEN_AI_REQUEST_MESSAGES: "Hello",
-    SPANDATA.GEN_AI_RESPONSE_TEXT: "the mocked model response",
-}
-
-DATA_COLLECTION_CHAT_COMPLETION_TOOLS_EXPECTED_VALUES = {
-    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS: '[{"type": "function", "function": {"name": "get_weather", "description": "Get current weather", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"]}}}]',
-    SPANDATA.GEN_AI_REQUEST_MESSAGES: '[{"role": "user", "content": "What is the weather in Paris?"}]',
-    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS: '[{"function": {"arguments": {"location": "Paris"}, "name": "get_weather", "description": "None"}, "id": "call_123", "type": "function"}]',
-}
-
-DATA_COLLECTION_CHAT_COMPLETION_STREAMING_TOOLS_EXPECTED_VALUES = {
-    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS: '[{"type": "function", "function": {"name": "get_weather", "description": "Get current weather", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"]}}}]',
-    SPANDATA.GEN_AI_REQUEST_MESSAGES: '[{"role": "user", "content": "What is the weather in Paris?"}]',
-    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS: '[{"function": {"arguments": {"location": "Paris"}, "name": "get_weather"}, "id": "call_123", "type": "function", "index": "None"}]',
-    SPANDATA.GEN_AI_RESPONSE_TEXT: "response with tool calls follows",
-}
-
 
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
@@ -1738,9 +1715,14 @@ def test_text_generation_data_collection(
         (span,) = [sp for sp in transaction["spans"] if sp["op"].startswith("gen_ai")]
         span_data = span["data"]
 
+    expected_values = {
+        SPANDATA.GEN_AI_REQUEST_MESSAGES: "Hello",
+        SPANDATA.GEN_AI_RESPONSE_TEXT: "[mocked] Hello! How can i help you?",
+    }
+
     for key in expected_present:
         assert key in span_data, f"{key} should have been collected"
-        assert span_data[key] == DATA_COLLECTION_TEXT_GENERATION_EXPECTED_VALUES[key]
+        assert span_data[key] == expected_values[key]
 
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
@@ -1884,12 +1866,14 @@ def test_text_generation_streaming_data_collection(
         (span,) = [sp for sp in transaction["spans"] if sp["op"].startswith("gen_ai")]
         span_data = span["data"]
 
+    expected_values = {
+        SPANDATA.GEN_AI_REQUEST_MESSAGES: "Hello",
+        SPANDATA.GEN_AI_RESPONSE_TEXT: "the mocked model response",
+    }
+
     for key in expected_present:
         assert key in span_data, f"{key} should have been collected"
-        assert (
-            span_data[key]
-            == DATA_COLLECTION_TEXT_GENERATION_STREAMING_EXPECTED_VALUES[key]
-        )
+        assert span_data[key] == expected_values[key]
 
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
@@ -2043,11 +2027,15 @@ def test_chat_completion_data_collection_tools(
         (span,) = [sp for sp in transaction["spans"] if sp["op"].startswith("gen_ai")]
         span_data = span["data"]
 
+    expected_values = {
+        SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS: '[{"type": "function", "function": {"name": "get_weather", "description": "Get current weather", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"]}}}]',
+        SPANDATA.GEN_AI_REQUEST_MESSAGES: '[{"role": "user", "content": "What is the weather in Paris?"}]',
+        SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS: '[{"function": {"arguments": {"location": "Paris"}, "name": "get_weather", "description": "None"}, "id": "call_123", "type": "function"}]',
+    }
+
     for key in expected_present:
         assert key in span_data, f"{key} should have been collected"
-        assert (
-            span_data[key] == DATA_COLLECTION_CHAT_COMPLETION_TOOLS_EXPECTED_VALUES[key]
-        )
+        assert span_data[key] == expected_values[key]
 
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
@@ -2217,12 +2205,16 @@ def test_chat_completion_streaming_data_collection_tools(
         (span,) = [sp for sp in transaction["spans"] if sp["op"].startswith("gen_ai")]
         span_data = span["data"]
 
+    expected_values = {
+        SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS: '[{"type": "function", "function": {"name": "get_weather", "description": "Get current weather", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"]}}}]',
+        SPANDATA.GEN_AI_REQUEST_MESSAGES: '[{"role": "user", "content": "What is the weather in Paris?"}]',
+        SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS: '[{"function": {"arguments": {"location": "Paris"}, "name": "get_weather"}, "id": "call_123", "type": "function", "index": "None"}]',
+        SPANDATA.GEN_AI_RESPONSE_TEXT: "response with tool calls follows",
+    }
+
     for key in expected_present:
         assert key in span_data, f"{key} should have been collected"
-        assert (
-            span_data[key]
-            == DATA_COLLECTION_CHAT_COMPLETION_STREAMING_TOOLS_EXPECTED_VALUES[key]
-        )
+        assert span_data[key] == expected_values[key]
 
     for key in expected_absent:
         assert key not in span_data, f"{key} should not have been collected"
