@@ -232,7 +232,8 @@ def _install_httplib() -> None:
             breadcrumb[SPANDATA.HTTP_STATUS_CODE] = status_code
 
         if span is None:
-            add_http_breadcrumb(status_code, breadcrumb)
+            if breadcrumb:
+                add_http_breadcrumb(status_code, breadcrumb)
             return rv
 
         if isinstance(span, StreamedSpan):
@@ -241,7 +242,8 @@ def _install_httplib() -> None:
         elif isinstance(span, Span):
             span.set_http_status(status_code)
             span.set_data("reason", rv.reason)
-            breadcrumb["reason"] = rv.reason
+            if breadcrumb:
+                breadcrumb["reason"] = rv.reason
 
         # getresponse doesn't include actually reading the response body. This
         # is done in read(). So if the metadata/headers suggest there's a body to
@@ -252,9 +254,10 @@ def _install_httplib() -> None:
         else:
             _complete_span(span)
 
-        # Regardless of whether the response itself has been fully read or not,
-        # the breadcrumb can now be emitted since we now have the status code.
-        add_http_breadcrumb(status_code, breadcrumb)
+        if breadcrumb:
+            # Regardless of whether the response itself has been fully read or not,
+            # the breadcrumb can now be emitted since we now have the status code.
+            add_http_breadcrumb(status_code, breadcrumb)
 
         return rv
 
