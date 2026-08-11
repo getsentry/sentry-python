@@ -21,6 +21,7 @@ from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     ensure_integration_enabled,
+    get_aws_sigv4_signed_headers,
     is_sentry_url,
     logger,
     parse_url,
@@ -59,30 +60,6 @@ class StdlibIntegration(Integration):
                     contexts["runtime"] = _RUNTIME_CONTEXT
 
             return event
-
-
-def _aws_sigv4_signed_headers(buffer: "Optional[List[bytes]]") -> "Set[str]":
-    if buffer is None:
-        return set()
-    for line in buffer:
-        name, separator, value = line.partition(b":")
-        if not separator or name.lower() != b"authorization":
-            continue
-
-        value = value.lstrip()
-        if not value.startswith((b"AWS4-HMAC-SHA256", b"AWS4-ECDSA-P256-SHA256")):
-            continue
-
-        for part in value.split(b","):
-            part = part.strip()
-            if part.startswith(b"SignedHeaders="):
-                _, _, header_names = part.partition(b"=")
-                return {
-                    header.decode("ascii", "ignore").lower()
-                    for header in header_names.split(b";")
-                    if header
-                }
-    return set()
 
 
 def _request_header_names(buffer: "Optional[List[bytes]]") -> "Set[str]":
@@ -216,7 +193,7 @@ def _install_httplib() -> None:
             if real_url is not None:
                 request_buffer = getattr(self, "_buffer", None)
                 existing_headers = _request_header_names(request_buffer)
-                signed_headers = _aws_sigv4_signed_headers(request_buffer)
+                signed_headers = get_aws_sigv4_signed_headers(request_buffer, real_url)
 
                 for (
                     header_name,
