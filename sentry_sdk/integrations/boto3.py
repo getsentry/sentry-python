@@ -113,18 +113,17 @@ def _sentry_request_created(
             origin=Boto3Integration.origin,
         )
 
-        if request.url is not None and parsed_url:
-            with capture_internal_exceptions():
-                span.set_data("aws.request.url", parsed_url.url)
-                span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
-                span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
-                breadcrumb.update(
-                    {
-                        "aws.request.url": parsed_url.url,
-                        SPANDATA.HTTP_QUERY: parsed_url.query,
-                        SPANDATA.HTTP_FRAGMENT: parsed_url.fragment,
-                    }
-                )
+        if parsed_url:
+            span.set_data("aws.request.url", parsed_url.url)
+            span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
+            span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+            breadcrumb.update(
+                {
+                    "aws.request.url": parsed_url.url,
+                    SPANDATA.HTTP_QUERY: parsed_url.query,
+                    SPANDATA.HTTP_FRAGMENT: parsed_url.fragment,
+                }
+            )
 
         span.set_tag("aws.service_id", service_id.hyphenize())
         span.set_tag("aws.operation_name", operation_name)
