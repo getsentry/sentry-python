@@ -925,15 +925,19 @@ class Scope:
 
         # Also set _transaction and _transaction_info in streaming mode as this
         # is used for populating events and linking them to segments
-        if isinstance(span, StreamedSpan) and span._is_segment():
-            if span.name is not None:
-                self._transaction = span.name
-            if type(span) is StreamedSpan and span._attributes.get(
-                "sentry.segment.name.source"
-            ):
+        if not isinstance(span, StreamedSpan) or not span._is_segment():
+            return
+
+        if type(span) is StreamedSpan:
+            self._transaction = span.name
+            if span._attributes.get("sentry.segment.name.source"):
                 self._transaction_info["source"] = str(
                     span._attributes["sentry.segment.name.source"]
                 )
+            return
+
+        if type(span) is NoOpStreamedSpan and span._noop_name is not None:
+            self._transaction = span.name
 
     @property
     def profile(self) -> "Optional[Profile]":
