@@ -1270,12 +1270,6 @@ class _Client(BaseClient):
                 if serialized is None:
                     return
 
-                if ty == "log" and self.log_batcher is not None:
-                    self.log_batcher.add(serialized)  # type: ignore
-
-                elif ty == "metric" and self.metrics_batcher is not None:
-                    self.metrics_batcher.add(serialized)  # type: ignore
-
             elif ty == "span" and isinstance(telemetry, StreamedSpan):
                 # Reset the span to its original value before we attempted
                 # to call the `before_send_span` callback
@@ -1298,16 +1292,21 @@ class _Client(BaseClient):
 
                 serialized = telemetry._to_json()
 
-                # We need a reference to the segment span in the batcher to populate
-                # the dynamic sampling context (DSC)
-                serialized["_segment_span"] = telemetry._segment
+        batcher = None
+        if ty == "log":
+            batcher = self.log_batcher
 
-                if self.span_batcher is None:
-                    return
+        elif ty == "metric":
+            batcher = self.metrics_batcher
 
-                self.span_batcher.add(
-                    serialized, flush_trace_bucket=telemetry._is_segment()
-                )
+        elif ty == "span":
+            # We need a reference to the segment span in the batcher to populate
+            # the dynamic sampling context (DSC)
+            serialized["_segment_span"] = telemetry._segment  # type: ignore
+            batcher = self.span_batcher
+
+        if batcher is not None:
+            batcher.add(serialized)  # type: ignore
 
     def _capture_log(self, log: "Optional[Log]", scope: "Scope") -> None:
         self._capture_telemetry(log, "log", scope)

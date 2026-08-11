@@ -100,7 +100,7 @@ class SpanBatcher(Batcher["SpanJSON"]):
                 self._flush()
                 self._last_full_flush = time.monotonic()
 
-    def add(self, span: "SpanJSON", flush_trace_bucket: "bool" = False) -> None:
+    def add(self, span: "SpanJSON") -> None:
         # Bail out if the current thread is already executing batcher code.
         # This prevents deadlocks when code running inside the batcher (e.g.
         # _add_to_envelope during flush, or _flush_event.wait/set) triggers
@@ -129,7 +129,7 @@ class SpanBatcher(Batcher["SpanJSON"]):
                 self._running_size[span["trace_id"]] += self._estimate_size(span)
 
                 if (
-                    flush_trace_bucket
+                    span["is_segment"] is True
                     or size + 1 >= self.MAX_BEFORE_FLUSH
                     or self._running_size[span["trace_id"]]
                     >= self.MAX_BYTES_BEFORE_FLUSH
