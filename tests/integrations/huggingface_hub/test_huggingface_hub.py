@@ -7,6 +7,7 @@ import responses
 from huggingface_hub import InferenceClient
 
 import sentry_sdk
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.huggingface_hub import HuggingfaceHubIntegration
 from sentry_sdk.utils import package_version, safe_serialize
 
@@ -1565,3 +1566,420 @@ def test_chat_completion_streaming_with_tools(
             assert "gen_ai.response.tool_calls" not in expected_data
 
         assert span["data"] == expected_data
+
+
+DATA_COLLECTION_TEXT_GENERATION_EXPECTED_VALUES = {
+    SPANDATA.GEN_AI_REQUEST_MESSAGES: "Hello",
+    SPANDATA.GEN_AI_RESPONSE_TEXT: "[mocked] Hello! How can i help you?",
+}
+
+
+def _get_gen_ai_span_data(captured: "Any", stream_gen_ai_spans: "Any") -> "Any":
+    if stream_gen_ai_spans:
+        spans = [item.payload for item in captured if item.type == "span"]
+        (span,) = [
+            sp for sp in spans if sp["attributes"]["sentry.op"].startswith("gen_ai")
+        ]
+        return span["attributes"]
+
+    (transaction,) = captured
+    (span,) = [sp for sp in transaction["spans"] if sp["op"].startswith("gen_ai")]
+    return span["data"]
+
+
+DATA_COLLECTION_PARAMS = [
+    pytest.param(
+        {"gen_ai": {"inputs": True, "outputs": True}},
+        False,
+        False,
+        True,
+        True,
+        id="gen-ai-inputs-and-outputs-enabled-override-legacy-off",
+    ),
+    pytest.param(
+        {"gen_ai": {"inputs": False, "outputs": False}},
+        True,
+        True,
+        False,
+        False,
+        id="gen-ai-inputs-and-outputs-disabled-override-legacy-on",
+    ),
+    pytest.param(
+        {"gen_ai": {"inputs": True, "outputs": False}},
+        False,
+        False,
+        True,
+        False,
+        id="gen-ai-inputs-enabled-outputs-disabled",
+    ),
+    pytest.param(
+        {"gen_ai": {"inputs": False, "outputs": True}},
+        False,
+        False,
+        False,
+        True,
+        id="gen-ai-outputs-enabled-inputs-disabled",
+    ),
+    pytest.param(
+        {"gen_ai": {}},
+        False,
+        False,
+        True,
+        True,
+        id="gen-ai-inputs-and-outputs-omitted-default-to-enabled",
+    ),
+    pytest.param(
+        None,
+        True,
+        True,
+        True,
+        True,
+        id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
+    ),
+    pytest.param(
+        None,
+        False,
+        True,
+        False,
+        False,
+        id="no-gen-ai-config-legacy-pii-disabled",
+    ),
+]
+
+DATA_COLLECTION_PARAM_NAMES = (
+    "data_collection,send_default_pii,include_prompts,collect_inputs,collect_outputs"
+)
+
+
+def _expected_keys(
+    collect_inputs: "Any", collect_outputs: "Any", input_keys: "Any", output_keys: "Any"
+) -> "Any":
+    present = (input_keys if collect_inputs else []) + (
+        output_keys if collect_outputs else []
+    )
+    absent = ([] if collect_inputs else input_keys) + (
+        [] if collect_outputs else output_keys
+    )
+    return present, absent
+
+
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
+@pytest.mark.parametrize(DATA_COLLECTION_PARAM_NAMES, DATA_COLLECTION_PARAMS)
+def test_text_generation_data_collection(
+    sentry_init: "Any",
+    capture_events: "Any",
+    capture_items: "Any",
+    mock_hf_text_generation_api: "Any",
+    data_collection: "Any",
+    send_default_pii: "Any",
+    include_prompts: "Any",
+    collect_inputs: "Any",
+    collect_outputs: "Any",
+    stream_gen_ai_spans: "Any",
+) -> None:
+    expected_present, expected_absent = _expected_keys(
+        collect_inputs,
+        collect_outputs,
+        [SPANDATA.GEN_AI_REQUEST_MESSAGES],
+        [SPANDATA.GEN_AI_RESPONSE_TEXT],
+    )
+
+    sentry_init_kwargs = dict(
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
+        stream_gen_ai_spans=stream_gen_ai_spans,
+    )
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    sentry_init(**sentry_init_kwargs)
+
+    client = InferenceClient(model="test-model")
+
+    captured = (
+        capture_items("transaction", "span")
+        if stream_gen_ai_spans
+        else capture_events()
+    )
+
+    with sentry_sdk.start_transaction(name="test"):
+        client.text_generation("Hello", stream=False, details=True)
+
+    span_data = _get_gen_ai_span_data(captured, stream_gen_ai_spans)
+
+    for key in expected_present:
+        assert key in span_data, f"{key} should have been collected"
+        assert span_data[key] == DATA_COLLECTION_TEXT_GENERATION_EXPECTED_VALUES[key]
+
+    for key in expected_absent:
+        assert key not in span_data, f"{key} should not have been collected"
+
+    # Data collection never gates non-PII attributes
+    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "text_completion"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "test-model"
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "length"
+    assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 10
+
+
+DATA_COLLECTION_TEXT_GENERATION_STREAMING_EXPECTED_VALUES = {
+    SPANDATA.GEN_AI_REQUEST_MESSAGES: "Hello",
+    SPANDATA.GEN_AI_RESPONSE_TEXT: "the mocked model response",
+}
+
+
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
+@pytest.mark.parametrize(DATA_COLLECTION_PARAM_NAMES, DATA_COLLECTION_PARAMS)
+def test_text_generation_streaming_data_collection(
+    sentry_init: "Any",
+    capture_events: "Any",
+    capture_items: "Any",
+    mock_hf_text_generation_api_streaming: "Any",
+    data_collection: "Any",
+    send_default_pii: "Any",
+    include_prompts: "Any",
+    collect_inputs: "Any",
+    collect_outputs: "Any",
+    stream_gen_ai_spans: "Any",
+) -> None:
+    expected_present, expected_absent = _expected_keys(
+        collect_inputs,
+        collect_outputs,
+        [SPANDATA.GEN_AI_REQUEST_MESSAGES],
+        [SPANDATA.GEN_AI_RESPONSE_TEXT],
+    )
+
+    sentry_init_kwargs = dict(
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
+        stream_gen_ai_spans=stream_gen_ai_spans,
+    )
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    sentry_init(**sentry_init_kwargs)
+
+    client = InferenceClient(model="test-model")
+
+    captured = (
+        capture_items("transaction", "span")
+        if stream_gen_ai_spans
+        else capture_events()
+    )
+
+    with sentry_sdk.start_transaction(name="test"):
+        for _ in client.text_generation(prompt="Hello", stream=True, details=True):
+            pass
+
+    span_data = _get_gen_ai_span_data(captured, stream_gen_ai_spans)
+
+    for key in expected_present:
+        assert key in span_data, f"{key} should have been collected"
+        assert (
+            span_data[key]
+            == DATA_COLLECTION_TEXT_GENERATION_STREAMING_EXPECTED_VALUES[key]
+        )
+
+    for key in expected_absent:
+        assert key not in span_data, f"{key} should not have been collected"
+
+    # Data collection never gates non-PII attributes
+    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "text_completion"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "test-model"
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "length"
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 10
+
+
+DATA_COLLECTION_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "Get current weather",
+            "parameters": {
+                "type": "object",
+                "properties": {"location": {"type": "string"}},
+                "required": ["location"],
+            },
+        },
+    }
+]
+
+DATA_COLLECTION_CHAT_COMPLETION_TOOLS_EXPECTED_VALUES = {
+    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS: '[{"type": "function", "function": {"name": "get_weather", "description": "Get current weather", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"]}}}]',
+    SPANDATA.GEN_AI_REQUEST_MESSAGES: '[{"role": "user", "content": "What is the weather in Paris?"}]',
+    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS: '[{"function": {"arguments": {"location": "Paris"}, "name": "get_weather", "description": "None"}, "id": "call_123", "type": "function"}]',
+}
+
+
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
+@pytest.mark.parametrize(DATA_COLLECTION_PARAM_NAMES, DATA_COLLECTION_PARAMS)
+def test_chat_completion_data_collection_tools(
+    sentry_init: "Any",
+    capture_events: "Any",
+    capture_items: "Any",
+    mock_hf_chat_completion_api_tools: "Any",
+    data_collection: "Any",
+    send_default_pii: "Any",
+    include_prompts: "Any",
+    collect_inputs: "Any",
+    collect_outputs: "Any",
+    stream_gen_ai_spans: "Any",
+) -> None:
+    expected_present, expected_absent = _expected_keys(
+        collect_inputs,
+        collect_outputs,
+        [SPANDATA.GEN_AI_REQUEST_MESSAGES, SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS],
+        [],
+    )
+
+    # Legacy behaviour sets the available tools unconditionally, data collection
+    # gates them on inputs
+    if data_collection is None or collect_inputs:
+        expected_present.append(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS)
+    else:
+        expected_absent.append(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS)
+
+    sentry_init_kwargs = dict(
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
+        stream_gen_ai_spans=stream_gen_ai_spans,
+    )
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    sentry_init(**sentry_init_kwargs)
+
+    client = get_hf_provider_inference_client()
+
+    captured = (
+        capture_items("transaction", "span")
+        if stream_gen_ai_spans
+        else capture_events()
+    )
+
+    with sentry_sdk.start_transaction(name="test"):
+        client.chat_completion(
+            messages=[{"role": "user", "content": "What is the weather in Paris?"}],
+            tools=DATA_COLLECTION_TOOLS,
+            tool_choice="auto",
+        )
+
+    span_data = _get_gen_ai_span_data(captured, stream_gen_ai_spans)
+
+    for key in expected_present:
+        assert key in span_data, f"{key} should have been collected"
+        assert (
+            span_data[key] == DATA_COLLECTION_CHAT_COMPLETION_TOOLS_EXPECTED_VALUES[key]
+        )
+
+    for key in expected_absent:
+        assert key not in span_data, f"{key} should not have been collected"
+
+    # This response carries only tool calls, so there is never any response text
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
+
+    # Data collection never gates non-PII attributes
+    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "test-model"
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "test-model-123"
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "tool_calls"
+    assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 8
+    assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 18
+
+
+DATA_COLLECTION_CHAT_COMPLETION_STREAMING_TOOLS_EXPECTED_VALUES = {
+    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS: '[{"type": "function", "function": {"name": "get_weather", "description": "Get current weather", "parameters": {"type": "object", "properties": {"location": {"type": "string"}}, "required": ["location"]}}}]',
+    SPANDATA.GEN_AI_REQUEST_MESSAGES: '[{"role": "user", "content": "What is the weather in Paris?"}]',
+    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS: '[{"function": {"arguments": {"location": "Paris"}, "name": "get_weather"}, "id": "call_123", "type": "function", "index": "None"}]',
+    SPANDATA.GEN_AI_RESPONSE_TEXT: "response with tool calls follows",
+}
+
+
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.httpx_mock(assert_all_requests_were_expected=False)
+@pytest.mark.parametrize(DATA_COLLECTION_PARAM_NAMES, DATA_COLLECTION_PARAMS)
+def test_chat_completion_streaming_data_collection_tools(
+    sentry_init: "Any",
+    capture_events: "Any",
+    capture_items: "Any",
+    mock_hf_chat_completion_api_streaming_tools: "Any",
+    data_collection: "Any",
+    send_default_pii: "Any",
+    include_prompts: "Any",
+    collect_inputs: "Any",
+    collect_outputs: "Any",
+    stream_gen_ai_spans: "Any",
+) -> None:
+    expected_present, expected_absent = _expected_keys(
+        collect_inputs,
+        collect_outputs,
+        [SPANDATA.GEN_AI_REQUEST_MESSAGES, SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS],
+        [SPANDATA.GEN_AI_RESPONSE_TEXT],
+    )
+
+    # Legacy behaviour sets the available tools unconditionally, data collection
+    # gates them on inputs
+    if data_collection is None or collect_inputs:
+        expected_present.append(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS)
+    else:
+        expected_absent.append(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS)
+
+    sentry_init_kwargs = dict(
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        integrations=[HuggingfaceHubIntegration(include_prompts=include_prompts)],
+        stream_gen_ai_spans=stream_gen_ai_spans,
+    )
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    sentry_init(**sentry_init_kwargs)
+
+    client = get_hf_provider_inference_client()
+
+    captured = (
+        capture_items("transaction", "span")
+        if stream_gen_ai_spans
+        else capture_events()
+    )
+
+    with sentry_sdk.start_transaction(name="test"):
+        for _ in client.chat_completion(
+            messages=[{"role": "user", "content": "What is the weather in Paris?"}],
+            tools=DATA_COLLECTION_TOOLS,
+            tool_choice="auto",
+            stream=True,
+        ):
+            pass
+
+    span_data = _get_gen_ai_span_data(captured, stream_gen_ai_spans)
+
+    for key in expected_present:
+        assert key in span_data, f"{key} should have been collected"
+        assert (
+            span_data[key]
+            == DATA_COLLECTION_CHAT_COMPLETION_STREAMING_TOOLS_EXPECTED_VALUES[key]
+        )
+
+    for key in expected_absent:
+        assert key not in span_data, f"{key} should not have been collected"
+
+    # Data collection never gates non-PII attributes
+    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "test-model"
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "test-model-123"
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "tool_calls"
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+
+    if HF_VERSION and HF_VERSION >= (0, 26, 0):
+        assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 183
+        assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 14
+        assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 197
