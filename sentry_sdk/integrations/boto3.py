@@ -72,7 +72,7 @@ def _sentry_request_created(
     breadcrumb: "dict[str, Any]" = {}
 
     is_span_streaming_enabled = has_span_streaming_enabled(client.options)
-    span: "Union[Span, StreamedSpan]"
+    span: "Union[Span, StreamedSpan, None]" = None
     if is_span_streaming_enabled:
         if parsed_url and should_send_default_pii():
             breadcrumb.update(
@@ -131,15 +131,16 @@ def _sentry_request_created(
             span.set_data(SPANDATA.HTTP_METHOD, request.method)
             breadcrumb[SPANDATA.HTTP_METHOD] = request.method
 
-    # We do it in order for subsequent http calls/retries be
-    # attached to this span.
-    span.__enter__()
+        # We do it in order for subsequent http calls/retries be
+        # attached to this span.
+        span.__enter__()
 
     add_http_breadcrumb(None, breadcrumb)
 
-    # request.context is an open-ended data-structure
-    # where we can add anything useful in request life cycle.
-    request.context["_sentrysdk_span"] = span
+    if span is not None:
+        # request.context is an open-ended data-structure
+        # where we can add anything useful in request life cycle.
+        request.context["_sentrysdk_span"] = span
 
 
 def _sentry_after_call(
