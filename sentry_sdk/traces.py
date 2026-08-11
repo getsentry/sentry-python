@@ -625,7 +625,6 @@ class StreamedSpan:
 
 class NoOpStreamedSpan(StreamedSpan):
     __slots__ = (
-        "_noop_name",
         "_sampled",
         "_finished",
         "_unsampled_reason",
@@ -645,7 +644,7 @@ class NoOpStreamedSpan(StreamedSpan):
         sample_rand: "Optional[float]" = None,
         sample_rate: "Optional[float]" = None,
     ) -> None:
-        self._noop_name = name
+        self._name = name  # type: ignore[assignment]
 
         self._span_id: "Optional[str]" = None
 
@@ -743,11 +742,11 @@ class NoOpStreamedSpan(StreamedSpan):
 
     @property
     def name(self) -> str:
-        return self._noop_name or ""
+        return self._name or ""
 
     @name.setter
     def name(self, name: str) -> None:
-        self._noop_name = name
+        self._name = name
 
     @property
     def active(self) -> bool:

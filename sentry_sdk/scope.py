@@ -933,7 +933,7 @@ class Scope:
                 )
             return
 
-        if type(span) is NoOpStreamedSpan and span._noop_name is not None:
+        if type(span) is NoOpStreamedSpan and span._name is not None:
             self._transaction = span.name
 
     @property
