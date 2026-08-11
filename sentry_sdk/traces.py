@@ -625,6 +625,7 @@ class StreamedSpan:
 
 class NoOpStreamedSpan(StreamedSpan):
     __slots__ = (
+        "_name",
         "_sampled",
         "_finished",
         "_unsampled_reason",
@@ -632,6 +633,7 @@ class NoOpStreamedSpan(StreamedSpan):
 
     def __init__(
         self,
+        name: "str",
         segment: "Optional[StreamedSpan]" = None,
         trace_id: "Optional[str]" = None,
         parent_span_id: "Optional[str]" = None,
@@ -643,6 +645,8 @@ class NoOpStreamedSpan(StreamedSpan):
         sample_rand: "Optional[float]" = None,
         sample_rate: "Optional[float]" = None,
     ) -> None:
+        self._name = name
+
         self._span_id: "Optional[str]" = None
 
         self._sampled = sampled

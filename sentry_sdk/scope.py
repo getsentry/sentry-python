@@ -925,7 +925,7 @@ class Scope:
 
         # Also set _transaction and _transaction_info in streaming mode as this
         # is used for populating events and linking them to segments
-        if type(span) is StreamedSpan and span._is_segment():
+        if isinstance(span, StreamedSpan) and span._is_segment():
             self._transaction = span.name
             if span._attributes.get("sentry.segment.name.source"):
                 self._transaction_info["source"] = str(
