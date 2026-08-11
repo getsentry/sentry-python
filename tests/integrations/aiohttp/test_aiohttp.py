@@ -783,7 +783,9 @@ async def test_outgoing_trace_headers_skip_query_signed_baggage(
 
     async def handler(request):
         received_headers.append(request.headers.copy())
-        received_urls.append(str(request.rel_url))
+        # Use the raw target so aiohttp/yarl URL canonicalization does not
+        # change the encoding of the presigned query parameters.
+        received_urls.append(request.raw_path)
         return web.Response(text="OK")
 
     raw_server = await aiohttp_raw_server(handler)
