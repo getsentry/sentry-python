@@ -5,7 +5,7 @@ from tornado.testing import AsyncHTTPTestCase
 from tornado.web import Application, HTTPError, RequestHandler
 
 import sentry_sdk
-from sentry_sdk import capture_message, start_transaction
+from sentry_sdk import capture_message
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.integrations.tornado import TornadoIntegration
 from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
@@ -69,47 +69,6 @@ class ChildSpanHandler(RequestHandler):
         with sentry_sdk.traces.start_span(name="child-span"):
             pass
         self.write("ok")
-
-
-def test_basic(tornado_testcase, sentry_init, capture_events):
-    sentry_init(integrations=[TornadoIntegration()], send_default_pii=True)
-    events = capture_events()
-    client = tornado_testcase(Application([(r"/hi", CrashingHandler)]))
-
-    response = client.fetch(
-        "/hi?foo=bar", headers={"Cookie": "name=value; name2=value2; name3=value3"}
-    )
-    assert response.code == 500
-
-    (event,) = events
-    (exception,) = event["exception"]["values"]
-    assert exception["type"] == "ZeroDivisionError"
-    assert exception["mechanism"]["type"] == "tornado"
-
-    request = event["request"]
-    host = request["headers"]["Host"]
-    assert event["request"] == {
-        "env": {"REMOTE_ADDR": "127.0.0.1"},
-        "headers": {
-            "Accept-Encoding": "gzip",
-            "Connection": "close",
-            "Cookie": "name=value; name2=value2; name3=value3",
-            **request["headers"],
-        },
-        "cookies": {"name": "value", "name2": "value2", "name3": "value3"},
-        "method": "GET",
-        "query_string": "foo=bar",
-        "url": "http://{host}/hi".format(host=host),
-    }
-
-    assert event["tags"] == {"foo": "42"}
-    assert (
-        event["transaction"]
-        == "tests.integrations.tornado.test_tornado.CrashingHandler.get"
-    )
-    assert event["transaction_info"] == {"source": "component"}
-
-    assert not sentry_sdk.get_isolation_scope()._tags
 
 
 # Sent by every data-collection cookie test below. Mixes benign cookies
@@ -317,7 +276,7 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
 @pytest.mark.parametrize(
     "init_kwargs, expected_query", _QUERY_PARAM_DATA_COLLECTION_CASES
 )
-def test_url_query_data_collection_span_streaming(
+def test_url_query_data_collection(
     tornado_testcase, sentry_init, capture_items, init_kwargs, expected_query
 ):
     init_kwargs = dict(init_kwargs)
@@ -356,41 +315,6 @@ def test_url_query_data_collection_span_streaming(
         assert server_span["attributes"]["url.full"].endswith(f"/hi?{expected_query}")
         assert server_span["attributes"]["url.full"].startswith("http://")
         assert server_span["attributes"]["url.path"] == "/hi"
-
-
-@pytest.mark.parametrize(
-    "init_kwargs, expected_query", _QUERY_PARAM_DATA_COLLECTION_CASES
-)
-def test_url_query_data_collection_event_processor(
-    tornado_testcase, sentry_init, capture_events, init_kwargs, expected_query
-):
-    sentry_init(
-        integrations=[TornadoIntegration()],
-        traces_sample_rate=1.0,
-        trace_lifecycle="static",
-        **init_kwargs,
-    )
-
-    events = capture_events()
-
-    client = tornado_testcase(Application([(r"/hi", QueryHandler)]))
-    response = client.fetch("/hi?toy=tennisball&color=red&auth=secret")
-    assert response.code == 200
-
-    sentry_sdk.flush()
-
-    (event,) = events
-
-    assert event["request"]["url"].endswith("/hi")
-    assert event["request"]["method"] == "GET"
-    if "data_collection" not in init_kwargs.get("_experiments", {}):
-        assert (
-            event["request"]["query_string"] == "toy=tennisball&color=red&auth=secret"
-        )
-    elif expected_query is None:
-        assert "query_string" not in event["request"]
-    else:
-        assert event["request"]["query_string"] == expected_query
 
 
 def test_url_query_data_collection_no_query_string(
@@ -441,56 +365,7 @@ def test_url_query_data_collection_repeated_and_blank_params(
     assert server_span["attributes"]["url.query"] == "a=1&a=2&b="
 
 
-def test_url_query_data_collection__event_processor_no_query_string(
-    tornado_testcase, sentry_init, capture_events
-):
-    sentry_init(
-        integrations=[TornadoIntegration()],
-        traces_sample_rate=1.0,
-        trace_lifecycle="static",
-        _experiments={"data_collection": {}},
-    )
-
-    events = capture_events()
-
-    client = tornado_testcase(Application([(r"/hi", QueryHandler)]))
-    response = client.fetch("/hi")
-    assert response.code == 200
-
-    sentry_sdk.flush()
-
-    (event,) = events
-
-    assert "query_string" not in event["request"]
-    assert event["request"]["url"].endswith("/hi")
-    assert event["request"]["method"] == "GET"
-
-
-def test_url_query_data_collection_event_processor_repeated_and_blank_params(
-    tornado_testcase, sentry_init, capture_events
-):
-    sentry_init(
-        integrations=[TornadoIntegration()],
-        traces_sample_rate=1.0,
-        trace_lifecycle="static",
-        _experiments={"data_collection": {}},
-    )
-
-    events = capture_events()
-
-    client = tornado_testcase(Application([(r"/hi", QueryHandler)]))
-    response = client.fetch("/hi?a=1&a=2&b=")
-    assert response.code == 200
-
-    sentry_sdk.flush()
-
-    (event,) = events
-
-    assert event["request"]["query_string"] == "a=1&a=2&b="
-
-
 @pytest.mark.parametrize("send_pii", [True, False])
-@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize(
     "handler,code",
     [
@@ -505,30 +380,21 @@ def test_transactions(
     capture_items,
     handler,
     code,
-    span_streaming,
     send_pii,
 ):
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_pii,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
-    if span_streaming:
-        items = capture_items("event", "span")
-    else:
-        events = capture_events()
+    items = capture_items("event", "span")
 
     client = tornado_testcase(Application([(r"/hi", handler)]))
 
-    if span_streaming:
-        with sentry_sdk.traces.start_span(name="client") as span:
-            request_headers = dict(span._iter_headers())
-    else:
-        with start_transaction(name="client") as span:
-            pass
-        request_headers = dict(span.iter_headers())
+    with sentry_sdk.traces.start_span(name="client") as span:
+        request_headers = dict(span._iter_headers())
 
     response = client.fetch(
         "/hi?foo=bar", method="POST", body=b"heyoo", headers=request_headers
@@ -537,111 +403,46 @@ def test_transactions(
 
     sentry_sdk.flush()
 
-    if span_streaming:
-        spans = [i.payload for i in items if i.type == "span"]
-        errors = [i.payload for i in items if i.type == "event"]
+    spans = [i.payload for i in items if i.type == "span"]
+    errors = [i.payload for i in items if i.type == "event"]
 
-        client_segment, server_segment = spans
+    client_segment, server_segment = spans
 
-        if code == 500:
-            assert len(errors) == 1
-            server_error = errors[0]
-            assert server_error["exception"]["values"][0]["type"] == "ZeroDivisionError"
-            assert (
-                server_error["transaction"]
-                == "tests.integrations.tornado.test_tornado.CrashingHandler.post"
-            )
-            assert server_error["transaction_info"] == {"source": "component"}
-            assert (
-                server_error["contexts"]["trace"]["trace_id"]
-                == server_segment["trace_id"]
-            )
-
-        expected_handler = (
-            "tests.integrations.tornado.test_tornado.HelloHandler.post"
-            if code == 200
-            else "tests.integrations.tornado.test_tornado.CrashingHandler.post"
-        )
-        assert server_segment["name"] == expected_handler
-        assert server_segment["attributes"]["sentry.segment.name.source"] == "component"
-        assert server_segment["attributes"]["http.request.method"] == "POST"
-        assert server_segment["attributes"]["http.request.body.data"] == "heyoo"
-        assert server_segment["attributes"]["http.response.status_code"] == code
-        assert server_segment["status"] == ("ok" if code == 200 else "error")
-        assert client_segment["trace_id"] == server_segment["trace_id"]
-
-        if send_pii:
-            assert server_segment["attributes"]["url.query"] == "foo=bar"
-            assert server_segment["attributes"]["url.full"].endswith("/hi?foo=bar")
-            assert server_segment["attributes"]["url.full"].startswith("http://")
-            assert server_segment["attributes"]["url.path"] == "/hi"
-        else:
-            assert "url.query" not in server_segment["attributes"]
-            assert "url.full" not in server_segment["attributes"]
-            assert "url.path" not in server_segment["attributes"]
-    else:
-        if code == 200:
-            client_tx, server_tx = events
-            server_error = None
-        else:
-            client_tx, server_error, server_tx = events
-
-        assert client_tx["type"] == "transaction"
-        assert client_tx["transaction"] == "client"
-        assert client_tx["transaction_info"] == {
-            "source": "custom"
-        }  # because this is just the start_transaction() above.
-
-        if server_error is not None:
-            assert server_error["exception"]["values"][0]["type"] == "ZeroDivisionError"
-            assert (
-                server_error["transaction"]
-                == "tests.integrations.tornado.test_tornado.CrashingHandler.post"
-            )
-            assert server_error["transaction_info"] == {"source": "component"}
-
-        if code == 200:
-            assert (
-                server_tx["transaction"]
-                == "tests.integrations.tornado.test_tornado.HelloHandler.post"
-            )
-        else:
-            assert (
-                server_tx["transaction"]
-                == "tests.integrations.tornado.test_tornado.CrashingHandler.post"
-            )
-
-        assert server_tx["transaction_info"] == {"source": "component"}
-        assert server_tx["type"] == "transaction"
-
-        request = server_tx["request"]
-        host = request["headers"]["Host"]
-        expected_request = {
-            "env": {"REMOTE_ADDR": "127.0.0.1"},
-            "headers": {
-                "Accept-Encoding": "gzip",
-                "Connection": "close",
-                **request["headers"],
-            },
-            "method": "POST",
-            "query_string": "foo=bar",
-            "data": {"heyoo": [""]},
-            "url": "http://{host}/hi".format(host=host),
-        }
-        if send_pii:
-            expected_request["cookies"] = {}
-        assert server_tx["request"] == expected_request
-
+    if code == 500:
+        assert len(errors) == 1
+        server_error = errors[0]
+        assert server_error["exception"]["values"][0]["type"] == "ZeroDivisionError"
         assert (
-            client_tx["contexts"]["trace"]["trace_id"]
-            == server_tx["contexts"]["trace"]["trace_id"]
+            server_error["transaction"]
+            == "tests.integrations.tornado.test_tornado.CrashingHandler.post"
+        )
+        assert server_error["transaction_info"] == {"source": "component"}
+        assert (
+            server_error["contexts"]["trace"]["trace_id"] == server_segment["trace_id"]
         )
 
-        if server_error is not None:
-            assert (
-                server_error["contexts"]["trace"]["trace_id"]
-                == server_tx["contexts"]["trace"]["trace_id"]
-            )
+    expected_handler = (
+        "tests.integrations.tornado.test_tornado.HelloHandler.post"
+        if code == 200
+        else "tests.integrations.tornado.test_tornado.CrashingHandler.post"
+    )
+    assert server_segment["name"] == expected_handler
+    assert server_segment["attributes"]["sentry.segment.name.source"] == "component"
+    assert server_segment["attributes"]["http.request.method"] == "POST"
+    assert server_segment["attributes"]["http.request.body.data"] == "heyoo"
+    assert server_segment["attributes"]["http.response.status_code"] == code
+    assert server_segment["status"] == ("ok" if code == 200 else "error")
+    assert client_segment["trace_id"] == server_segment["trace_id"]
+
+    if send_pii:
+        assert server_segment["attributes"]["url.query"] == "foo=bar"
+        assert server_segment["attributes"]["url.full"].endswith("/hi?foo=bar")
+        assert server_segment["attributes"]["url.full"].startswith("http://")
+        assert server_segment["attributes"]["url.path"] == "/hi"
+    else:
+        assert "url.query" not in server_segment["attributes"]
+        assert "url.full" not in server_segment["attributes"]
+        assert "url.path" not in server_segment["attributes"]
 
 
 def test_400_not_logged(tornado_testcase, sentry_init, capture_events):
@@ -782,47 +583,48 @@ def test_json(tornado_testcase, sentry_init, capture_events):
 
 
 def test_error_has_new_trace_context_performance_enabled(
-    tornado_testcase, sentry_init, capture_events
+    tornado_testcase, sentry_init, capture_items
 ):
     """
-    Check if an 'trace' context is added to errros and transactions when performance monitoring is enabled.
+    Check if a 'trace' context is added to events when performance monitoring is enabled.
     """
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
-    events = capture_events()
+    items = capture_items()
 
     client = tornado_testcase(Application([(r"/hi", CrashingWithMessageHandler)]))
     client.fetch("/hi")
 
-    (msg_event, error_event, transaction_event) = events
+    sentry_sdk.flush()
 
-    assert "trace" in msg_event["contexts"]
-    assert "trace_id" in msg_event["contexts"]["trace"]
+    (message, error, span) = [item.payload for item in items]
 
-    assert "trace" in error_event["contexts"]
-    assert "trace_id" in error_event["contexts"]["trace"]
+    assert "trace" in message["contexts"]
+    assert "trace_id" in message["contexts"]["trace"]
 
-    assert "trace" in transaction_event["contexts"]
-    assert "trace_id" in transaction_event["contexts"]["trace"]
+    assert "trace" in error["contexts"]
+    assert "trace_id" in error["contexts"]["trace"]
 
     assert (
-        msg_event["contexts"]["trace"]["trace_id"]
-        == error_event["contexts"]["trace"]["trace_id"]
-        == transaction_event["contexts"]["trace"]["trace_id"]
+        message["contexts"]["trace"]["trace_id"]
+        == error["contexts"]["trace"]["trace_id"]
     )
+    assert message["contexts"]["trace"]["trace_id"] == span["trace_id"]
 
 
 def test_error_has_new_trace_context_performance_disabled(
     tornado_testcase, sentry_init, capture_events
 ):
     """
-    Check if an 'trace' context is added to errros and transactions when performance monitoring is disabled.
+    Check if a 'trace' context is added to events when performance monitoring is disabled.
     """
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=None,  # this is the default, just added for clarity
+        trace_lifecycle="stream",
     )
     events = capture_events()
 
@@ -844,17 +646,18 @@ def test_error_has_new_trace_context_performance_disabled(
 
 
 def test_error_has_existing_trace_context_performance_enabled(
-    tornado_testcase, sentry_init, capture_events
+    tornado_testcase, sentry_init, capture_items
 ):
     """
-    Check if an 'trace' context is added to errros and transactions
+    Check if an 'trace' context is added to events
     from the incoming 'sentry-trace' header when performance monitoring is enabled.
     """
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
-    events = capture_events()
+    items = capture_items()
 
     trace_id = "471a43a4192642f0b136d5159a501701"
     parent_span_id = "6e8f22c393e68f19"
@@ -866,21 +669,19 @@ def test_error_has_existing_trace_context_performance_enabled(
     client = tornado_testcase(Application([(r"/hi", CrashingWithMessageHandler)]))
     client.fetch("/hi", headers=headers)
 
-    (msg_event, error_event, transaction_event) = events
+    sentry_sdk.flush()
 
-    assert "trace" in msg_event["contexts"]
-    assert "trace_id" in msg_event["contexts"]["trace"]
+    (message, error, span) = [item.payload for item in items]
 
-    assert "trace" in error_event["contexts"]
-    assert "trace_id" in error_event["contexts"]["trace"]
+    assert "trace" in message["contexts"]
+    assert "trace_id" in message["contexts"]["trace"]
 
-    assert "trace" in transaction_event["contexts"]
-    assert "trace_id" in transaction_event["contexts"]["trace"]
+    assert "trace" in error["contexts"]
+    assert "trace_id" in error["contexts"]["trace"]
 
     assert (
-        msg_event["contexts"]["trace"]["trace_id"]
-        == error_event["contexts"]["trace"]["trace_id"]
-        == transaction_event["contexts"]["trace"]["trace_id"]
+        message["contexts"]["trace"]["trace_id"]
+        == error["contexts"]["trace"]["trace_id"]
         == "471a43a4192642f0b136d5159a501701"
     )
 
@@ -889,12 +690,13 @@ def test_error_has_existing_trace_context_performance_disabled(
     tornado_testcase, sentry_init, capture_events
 ):
     """
-    Check if an 'trace' context is added to errros and transactions
+    Check if an 'trace' context is added to events
     from the incoming 'sentry-trace' header when performance monitoring is disabled.
     """
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=None,  # this is the default, just added for clarity
+        trace_lifecycle="stream",
     )
     events = capture_events()
 
@@ -923,20 +725,19 @@ def test_error_has_existing_trace_context_performance_disabled(
     )
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_span_origin(
-    tornado_testcase, sentry_init, capture_events, capture_items, span_streaming
+    tornado_testcase,
+    sentry_init,
+    capture_events,
+    capture_items,
 ):
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
-    if span_streaming:
-        items = capture_items("span")
-    else:
-        events = capture_events()
+    items = capture_items("span")
 
     client = tornado_testcase(Application([(r"/hi", CrashingHandler)]))
 
@@ -946,12 +747,8 @@ def test_span_origin(
 
     sentry_sdk.flush()
 
-    if span_streaming:
-        (segment,) = [i.payload for i in items]
-        assert segment["attributes"]["sentry.origin"] == "auto.http.tornado"
-    else:
-        (_, event) = events
-        assert event["contexts"]["trace"]["origin"] == "auto.http.tornado"
+    (segment,) = [i.payload for i in items]
+    assert segment["attributes"]["sentry.origin"] == "auto.http.tornado"
 
 
 @pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
