@@ -20,7 +20,11 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
-from sentry_sdk.utils import package_version, safe_serialize
+from sentry_sdk.utils import (
+    has_data_collection_enabled,
+    package_version,
+    safe_serialize,
+)
 
 try:
     from mcp.server.lowlevel import Server
@@ -324,12 +328,20 @@ async def _tool_handler_wrapper(
         original_kwargs: Original keyword arguments passed to the handler
         self: Optional instance for bound methods
     """
+    client = sentry_sdk.get_client()
+
     if original_kwargs is None:
         original_kwargs = {}
 
     handler_name, arguments = _extract_handler_data_from_args(
         "tool", original_args, original_kwargs
     )
+
+    if has_data_collection_enabled(client.options):
+        if not client.options["data_collection"]["gen_ai"]["inputs"]:
+            # Arguments can contain sensitive data and shouldn't be added to the span
+            # if the user has opted out via this config.
+            arguments = {}
 
     ctx = None
     try:
@@ -390,14 +402,17 @@ async def _tool_handler_wrapper(
                 return result
 
             # Get integration to check PII settings
-            integration = sentry_sdk.get_client().get_integration(MCPIntegration)
+            integration = client.get_integration(MCPIntegration)
             if integration is None:
                 return result
 
             # Check if we should include sensitive data
-            should_include_data = (
-                should_send_default_pii() and integration.include_prompts
-            )
+            should_include_data = False
+            if has_data_collection_enabled(client.options):
+                if client.options["data_collection"]["gen_ai"]["outputs"]:
+                    should_include_data = True
+            elif should_send_default_pii() and integration.include_prompts:
+                should_include_data = True
 
             extracted = _extract_tool_result_content(result)
             if extracted is not None and should_include_data:
@@ -424,15 +439,22 @@ async def _instrument_v2_tool_call(
     if ctx.params is None or ctx.params.get("name") is None:
         return await call_next(ctx)
 
+    client = sentry_sdk.get_client()
     handler_name = ctx.params["name"]
     arguments = ctx.params.get("arguments")
     if arguments is None:
         arguments = {}
 
+    if has_data_collection_enabled(client.options):
+        if not client.options["data_collection"]["gen_ai"]["inputs"]:
+            # Arguments can contain sensitive data and shouldn't be added to the span
+            # if the user has opted out via this config.
+            arguments = {}
+
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
-    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+    span_streaming = has_span_streaming_enabled(client.options)
 
     # Start span and execute
     with _active_http_scopes(ctx=ctx):
@@ -476,14 +498,17 @@ async def _instrument_v2_tool_call(
                 return result
 
             # Get integration to check PII settings
-            integration = sentry_sdk.get_client().get_integration(MCPIntegration)
+            integration = client.get_integration(MCPIntegration)
             if integration is None:
                 return result
 
             # Check if we should include sensitive data
-            should_include_data = (
-                should_send_default_pii() and integration.include_prompts
-            )
+            should_include_result_data = False
+            if has_data_collection_enabled(client.options):
+                if client.options["data_collection"]["gen_ai"]["outputs"]:
+                    should_include_result_data = True
+            elif should_send_default_pii() and integration.include_prompts:
+                should_include_result_data = True
 
             result_content = result
             if "structuredContent" in result:
@@ -491,7 +516,7 @@ async def _instrument_v2_tool_call(
             elif isinstance(result.get("content"), list):
                 result_content = _extract_text_from_content_blocks(result["content"])
 
-            if result_content is not None and should_include_data:
+            if result_content is not None and should_include_result_data:
                 _set_span_data_attribute(
                     span,
                     SPANDATA.MCP_TOOL_RESULT_CONTENT,
@@ -528,9 +553,16 @@ async def _prompt_handler_wrapper(
     if original_kwargs is None:
         original_kwargs = {}
 
+    client = sentry_sdk.get_client()
     handler_name, arguments = _extract_handler_data_from_args(
         "prompt", original_args, original_kwargs
     )
+
+    if has_data_collection_enabled(client.options):
+        if not client.options["data_collection"]["gen_ai"]["inputs"]:
+            # Arguments can contain sensitive data and shouldn't be added to the span
+            # if the user has opted out via this config.
+            arguments = {}
 
     ctx = None
     try:
@@ -541,7 +573,7 @@ async def _prompt_handler_wrapper(
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
-    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+    span_streaming = has_span_streaming_enabled(client.options)
 
     # Start span and execute
     with _active_http_scopes(ctx=ctx):
@@ -591,14 +623,17 @@ async def _prompt_handler_wrapper(
                 return result
 
             # Get integration to check PII settings
-            integration = sentry_sdk.get_client().get_integration(MCPIntegration)
+            integration = client.get_integration(MCPIntegration)
             if integration is None:
                 return result
 
             # Check if we should include sensitive data
-            should_include_data = (
-                should_send_default_pii() and integration.include_prompts
-            )
+            should_include_result_data = False
+            if has_data_collection_enabled(client.options):
+                if client.options["data_collection"]["gen_ai"]["inputs"]:
+                    should_include_result_data = True
+            elif should_send_default_pii() and integration.include_prompts:
+                should_include_result_data = True
 
             # For prompts, count messages and set role/content only for single-message prompts
             try:
@@ -621,7 +656,7 @@ async def _prompt_handler_wrapper(
                     )
 
                 # Only set role and content for single-message prompts if PII is allowed
-                if message_count == 1 and should_include_data and messages:
+                if message_count == 1 and should_include_result_data and messages:
                     first_message = messages[0]
                     # Extract role
                     role = None
@@ -677,15 +712,24 @@ async def _instrument_v2_prompt_get(
     if ctx.params is None or ctx.params.get("name") is None:
         return await call_next(ctx)
 
+    client = sentry_sdk.get_client()
     handler_name = ctx.params["name"]
+
     arguments = ctx.params.get("arguments")
+
     if arguments is None:
         arguments = {}
+
+    if has_data_collection_enabled(client.options):
+        if not client.options["data_collection"]["gen_ai"]["inputs"]:
+            # Arguments can contain sensitive data and shouldn't be added to the span
+            # if the user has opted out via this config.
+            arguments = {}
 
     # Get request ID, session ID, and transport from context
     request_id, session_id, mcp_transport = _get_request_context_data(ctx=ctx)
 
-    span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
+    span_streaming = has_span_streaming_enabled(client.options)
 
     # Start span and execute
     with _active_http_scopes(ctx=ctx):
@@ -728,14 +772,17 @@ async def _instrument_v2_prompt_get(
                 return result
 
             # Get integration to check PII settings
-            integration = sentry_sdk.get_client().get_integration(MCPIntegration)
+            integration = client.get_integration(MCPIntegration)
             if integration is None:
                 return result
 
             # Check if we should include sensitive data
-            should_include_data = (
-                should_send_default_pii() and integration.include_prompts
-            )
+            should_include_result_data = False
+            if has_data_collection_enabled(client.options):
+                if client.options["data_collection"]["gen_ai"]["inputs"]:
+                    should_include_result_data = True
+            elif should_send_default_pii() and integration.include_prompts:
+                should_include_result_data = True
 
             # For prompts, count messages and set role/content only for single-message prompts
             try:
@@ -753,7 +800,7 @@ async def _instrument_v2_prompt_get(
                     )
 
                 # Only set role and content for single-message prompts if PII is allowed
-                if message_count == 1 and should_include_data and messages:
+                if message_count == 1 and should_include_result_data and messages:
                     first_message = messages[0]
                     # Extract role
                     role = None
