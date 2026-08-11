@@ -91,6 +91,21 @@ def test_basic_span_streaming(sentry_init, capture_items, sample_rate):
         assert not items
 
 
+def test_error_event_linked_without_performance_span_streaming(
+    sentry_init, capture_items
+):
+    sentry_init(traces_sample_rate=None, trace_lifecycle="stream")
+    items = capture_items("event")
+
+    with sentry_sdk.traces.start_span(name="no-op span"):
+        sentry_sdk.capture_message("hi")
+
+    sentry_sdk.flush()
+
+    (event,) = (item.payload for item in items)
+    assert event["transaction"] == "no-op span"
+
+
 @pytest.mark.parametrize("parent_sampled", [True, False, None])
 @pytest.mark.parametrize("sample_rate", [0.0, 1.0])
 def test_continue_trace(sentry_init, capture_envelopes, parent_sampled, sample_rate):
