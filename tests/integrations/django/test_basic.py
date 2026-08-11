@@ -51,20 +51,20 @@ def test_view_exceptions(
     sentry_init,
     client,
     capture_exceptions,
-    capture_events,
+    capture_items,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
     )
     exceptions = capture_exceptions()
-    events = capture_events()
+    items = capture_items("event")
     client.get(reverse("view_exc"))
 
     (error,) = exceptions
     assert isinstance(error, ZeroDivisionError)
 
-    (event,) = events
+    (event,) = (item.payload for item in items)
 
     assert event["exception"]["values"][0]["mechanism"]["type"] == "django"
 
@@ -73,7 +73,7 @@ def test_ensures_x_forwarded_header_is_honored_in_sdk_when_enabled_in_django(
     sentry_init,
     client,
     capture_exceptions,
-    capture_events,
+    capture_items,
     settings,
 ):
     """
@@ -87,13 +87,13 @@ def test_ensures_x_forwarded_header_is_honored_in_sdk_when_enabled_in_django(
         send_default_pii=True,
     )
     exceptions = capture_exceptions()
-    events = capture_events()
+    items = capture_items("event")
     client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"})
 
     (error,) = exceptions
     assert isinstance(error, ZeroDivisionError)
 
-    (event,) = events
+    (event,) = (item.payload for item in items)
 
     assert event["request"]["url"] == "http://example.com/view-exc"
 
@@ -102,7 +102,7 @@ def test_ensures_x_forwarded_header_is_not_honored_when_unenabled_in_django(
     sentry_init,
     client,
     capture_exceptions,
-    capture_events,
+    capture_items,
 ):
     """
     Test that ensures if django settings.USE_X_FORWARDED_HOST is set to False
@@ -113,12 +113,12 @@ def test_ensures_x_forwarded_header_is_not_honored_when_unenabled_in_django(
         send_default_pii=True,
     )
     exceptions = capture_exceptions()
-    events = capture_events()
+    items = capture_items("event")
     client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"})
 
     (error,) = exceptions
     assert isinstance(error, ZeroDivisionError)
-    (event,) = events
+    (event,) = (item.payload for item in items)
 
     assert event["request"]["url"] == "http://localhost/view-exc"
 
@@ -135,18 +135,18 @@ def test_middleware_exceptions(sentry_init, client, capture_exceptions):
 def test_request_captured(
     sentry_init,
     client,
-    capture_events,
+    capture_items,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
     )
-    events = capture_events()
+    items = capture_items("event")
     content, status, headers = unpack_werkzeug_response(client.get(reverse("message")))
 
     assert content == b"ok"
 
-    (event,) = events
+    (event,) = (item.payload for item in items)
     assert event["transaction"] == "/message"
     assert event["request"] == {
         "cookies": {},
@@ -502,14 +502,14 @@ def test_materialized_user_captured(
 @pytest_mark_django_db_decorator()
 def test_queryset_repr(
     sentry_init,
-    capture_events,
+    capture_items,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
     )
 
     User.objects.create_user("john", "lennon@thebeatles.com", "johnpassword")
-    events = capture_events()
+    items = capture_items("event")
 
     try:
         my_queryset = User.objects.all()  # noqa
@@ -517,7 +517,7 @@ def test_queryset_repr(
     except Exception:
         capture_exception()
 
-    (event,) = events
+    (event,) = (item.payload for item in items)
 
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
@@ -531,13 +531,13 @@ def test_queryset_repr(
 @pytest_mark_django_db_decorator()
 def test_context_nested_queryset_repr(
     sentry_init,
-    capture_events,
+    capture_items,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
     )
     User.objects.create_user("john", "lennon@thebeatles.com", "johnpassword")
-    events = capture_events()
+    items = capture_items("event")
 
     try:
         context = make_context({"entries": User.objects.all()})  # noqa
@@ -545,7 +545,7 @@ def test_context_nested_queryset_repr(
     except Exception:
         capture_exception()
 
-    (event,) = events
+    (event,) = (item.payload for item in items)
 
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
@@ -556,16 +556,16 @@ def test_context_nested_queryset_repr(
 def test_custom_error_handler_request_context(
     sentry_init,
     client,
-    capture_events,
+    capture_items,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
     )
-    events = capture_events()
+    items = capture_items("event")
     content, status, headers = unpack_werkzeug_response(client.post("/404"))
     assert status.lower() == "404 not found"
 
-    (event,) = events
+    (event,) = (item.payload for item in items)
 
     assert event["message"] == "not found"
     assert event["level"] == "error"
@@ -602,7 +602,7 @@ def test_management_command_raises():
 @pytest.mark.parametrize("with_integration", [True, False])
 def test_sql_queries(
     sentry_init,
-    capture_events,
+    capture_items,
     with_integration,
 ):
     sentry_init(
@@ -613,7 +613,7 @@ def test_sql_queries(
 
     from django.db import connection
 
-    events = capture_events()
+    items = capture_items("event")
 
     sql = connection.cursor()
 
@@ -625,7 +625,7 @@ def test_sql_queries(
 
     capture_message("HI")
 
-    (event,) = events
+    (event,) = (item.payload for item in items)
 
     if with_integration:
         crumb = event["breadcrumbs"]["values"][-1]
@@ -638,7 +638,7 @@ def test_sql_queries(
 @pytest_mark_django_db_decorator()
 def test_sql_dict_query_params(
     sentry_init,
-    capture_events,
+    capture_items,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -653,7 +653,7 @@ def test_sql_dict_query_params(
 
     sql = connections["postgres"].cursor()
 
-    events = capture_events()
+    items = capture_items("event")
     sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
     with pytest.raises(ProgrammingError):
@@ -664,7 +664,7 @@ def test_sql_dict_query_params(
 
     capture_message("HI")
 
-    (event,) = events
+    (event,) = (item.payload for item in items)
 
     crumb = event["breadcrumbs"]["values"][-1]
     assert crumb["message"] == (
@@ -730,7 +730,7 @@ def test_response_trace(
 @pytest_mark_django_db_decorator()
 def test_sql_psycopg2_string_composition(
     sentry_init,
-    capture_events,
+    capture_items,
     query,
 ):
     sentry_init(
@@ -751,14 +751,14 @@ def test_sql_psycopg2_string_composition(
 
     sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-    events = capture_events()
+    items = capture_items("event")
 
     with pytest.raises(ProgrammingError):
         sql.execute(query(psycopg2.sql), {"my_param": 10})
 
     capture_message("HI")
 
-    (event,) = events
+    (event,) = (item.payload for item in items)
 
     crumb = event["breadcrumbs"]["values"][-1]
     assert crumb["message"] == ('SELECT %(my_param)s FROM "foobar"')
@@ -769,7 +769,7 @@ def test_sql_psycopg2_string_composition(
 @pytest_mark_django_db_decorator()
 def test_sql_psycopg2_placeholders(
     sentry_init,
-    capture_events,
+    capture_items,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -787,7 +787,7 @@ def test_sql_psycopg2_placeholders(
 
     sql = connections["postgres"].cursor()
 
-    events = capture_events()
+    items = capture_items("event")
     sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
     with pytest.raises(DataError):
@@ -806,7 +806,7 @@ def test_sql_psycopg2_placeholders(
 
     capture_message("HI")
 
-    (event,) = events
+    (event,) = (item.payload for item in items)
 
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
@@ -901,7 +901,7 @@ def test_django_connect_trace(
 @pytest_mark_django_db_decorator(transaction=True)
 def test_django_connect_breadcrumbs(
     sentry_init,
-    capture_events,
+    capture_items,
 ):
     """
     Verify we record a breadcrumb when opening a new database.
@@ -919,14 +919,14 @@ def test_django_connect_breadcrumbs(
     # trigger Django to open a new connection by marking the existing one as None.
     connections["postgres"].connection = None
 
-    events = capture_events()
+    items = capture_items("event")
 
     cursor = connections["postgres"].cursor()
     cursor.execute("select 1")
 
     # trigger recording of event.
     capture_message("HI")
-    (event,) = events
+    (event,) = (item.payload for item in items)
 
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
@@ -1095,19 +1095,19 @@ def test_transaction_style(
 def test_request_body(
     sentry_init,
     client,
-    capture_events,
+    capture_items,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
     )
-    events = capture_events()
+    items = capture_items("event")
     content, status, headers = unpack_werkzeug_response(
         client.post(reverse("post_echo"), data=b"heyooo", content_type="text/plain")
     )
     assert status.lower() == "200 ok"
     assert content == b"heyooo"
 
-    (event,) = events
+    (event,) = (item.payload for item in items)
 
     assert event["message"] == "hi"
     assert event["request"]["data"] == ""
@@ -1115,7 +1115,7 @@ def test_request_body(
         "rem": [["!raw", "x"]],
     }
 
-    del events[:]
+    del items[:]
 
     content, status, headers = unpack_werkzeug_response(
         client.post(
@@ -1127,7 +1127,7 @@ def test_request_body(
     assert status.lower() == "200 ok"
     assert content == b'{"hey": 42}'
 
-    (event,) = events
+    (event,) = (item.payload for item in items)
 
     assert event["message"] == "hi"
     assert event["request"]["data"] == {"hey": 42}
@@ -1137,12 +1137,12 @@ def test_request_body(
 def test_read_request(
     sentry_init,
     client,
-    capture_events,
+    capture_items,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
     )
-    events = capture_events()
+    items = capture_items("event")
 
     content, status, headers = unpack_werkzeug_response(
         client.post(
@@ -1154,7 +1154,7 @@ def test_read_request(
 
     assert status.lower() == "500 internal server error"
 
-    (event,) = events
+    (event,) = (item.payload for item in items)
 
     assert "data" not in event["request"]
 
@@ -1162,7 +1162,7 @@ def test_read_request(
 def test_request_body_already_read(
     sentry_init,
     client,
-    capture_events,
+    capture_items,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -1172,7 +1172,7 @@ def test_request_body_already_read(
         def raw_data(self):
             raise RawPostDataException
 
-    events = capture_events()
+    items = capture_items("event")
 
     with patch("sentry_sdk.integrations.django.DjangoRequestExtractor", MockExtractor):
         client.post(
@@ -1181,7 +1181,7 @@ def test_request_body_already_read(
             content_type="application/json",
         )
 
-        (event,) = events
+        (event,) = (item.payload for item in items)
 
     assert event["message"] == "hi"
     assert "data" not in event["request"]
@@ -1190,17 +1190,17 @@ def test_request_body_already_read(
 def test_template_tracing_meta(
     sentry_init,
     client,
-    capture_events,
+    capture_items,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
     )
-    events = capture_events()
+    items = capture_items("event")
 
     content, _, _ = unpack_werkzeug_response(client.get(reverse("template_test3")))
     rendered_meta = content.decode("utf-8")
 
-    traceparent, baggage = events[0]["message"].split("\n")
+    traceparent, baggage = items[0].payload["message"].split("\n")
     assert traceparent != ""
     assert baggage != ""
 
@@ -1219,20 +1219,20 @@ def test_template_tracing_meta(
 def test_template_exception(
     sentry_init,
     client,
-    capture_events,
+    capture_items,
     with_executing_integration,
 ):
     sentry_init(
         integrations=[DjangoIntegration()] + with_executing_integration,
     )
-    events = capture_events()
+    items = capture_items("event")
 
     content, status, headers = unpack_werkzeug_response(
         client.get(reverse("template_exc"))
     )
     assert status.lower() == "500 internal server error"
 
-    (event,) = events
+    (event,) = (item.payload for item in items)
 
     exception = event["exception"]["values"][-1]
     assert exception["type"] == "TemplateSyntaxError"
@@ -1430,7 +1430,7 @@ def test_rest_framework_authentication_span_without_authenticators(
 def test_does_not_capture_403(
     sentry_init,
     client,
-    capture_events,
+    capture_items,
     endpoint,
 ):
     if endpoint == "rest_permission_denied_exc":
@@ -1439,12 +1439,12 @@ def test_does_not_capture_403(
     sentry_init(
         integrations=[DjangoIntegration()],
     )
-    events = capture_events()
+    items = capture_items("event")
 
     _, status, _ = unpack_werkzeug_response(client.get(reverse(endpoint)))
     assert status.lower() == "403 forbidden"
 
-    assert not events
+    assert not items
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
