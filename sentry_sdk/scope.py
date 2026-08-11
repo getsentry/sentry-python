@@ -926,7 +926,8 @@ class Scope:
         # Also set _transaction and _transaction_info in streaming mode as this
         # is used for populating events and linking them to segments
         if isinstance(span, StreamedSpan) and span._is_segment():
-            self._transaction = span.name
+            if span.name is not None:
+                self._transaction = span.name
             if span._attributes.get("sentry.segment.name.source"):
                 self._transaction_info["source"] = str(
                     span._attributes["sentry.segment.name.source"]
@@ -1309,6 +1310,7 @@ class Scope:
 
             if is_ignored_span(name, attributes):
                 return NoOpStreamedSpan(
+                    name=name,
                     scope=self,
                     segment=None,
                     trace_id=propagation_context.trace_id,

@@ -633,7 +633,7 @@ class NoOpStreamedSpan(StreamedSpan):
 
     def __init__(
         self,
-        name: "str",
+        name: "Optional[str]" = None,
         segment: "Optional[StreamedSpan]" = None,
         trace_id: "Optional[str]" = None,
         parent_span_id: "Optional[str]" = None,
@@ -742,12 +742,8 @@ class NoOpStreamedSpan(StreamedSpan):
         pass
 
     @property
-    def name(self) -> str:
-        return ""
-
-    @name.setter
-    def name(self, value: str) -> None:
-        pass
+    def name(self) -> "Optional[str]":
+        return self._name
 
     @property
     def active(self) -> bool:
