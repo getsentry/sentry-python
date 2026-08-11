@@ -114,7 +114,7 @@ def _install_httplib() -> None:
 
         span_streaming = has_span_streaming_enabled(client.options)
         span: "Union[Span, StreamedSpan, None]"
-        breadcrumb = {}
+        breadcrumb: "dict[str, Any]" = {}
         if span_streaming:
             if sentry_sdk.traces.get_current_span() is None:
                 span = None
@@ -217,7 +217,7 @@ def _install_httplib() -> None:
         except BaseException:
             _complete_span(span)
             if breadcrumb:
-                add_http_breadcrumb(status=None, data=breadcrumb)
+                add_http_breadcrumb(None, breadcrumb)
             raise
 
         status_code = int(rv.status)
