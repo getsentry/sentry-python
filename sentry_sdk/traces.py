@@ -626,6 +626,7 @@ class StreamedSpan:
 class NoOpStreamedSpan(StreamedSpan):
     __slots__ = (
         "_noop_name",
+        "_segment_source",
         "_sampled",
         "_finished",
         "_unsampled_reason",
@@ -646,6 +647,7 @@ class NoOpStreamedSpan(StreamedSpan):
         sample_rate: "Optional[float]" = None,
     ) -> None:
         self._noop_name = name
+        self._segment_source: "Optional[str]" = None
 
         self._span_id: "Optional[str]" = None
 
@@ -725,10 +727,17 @@ class NoOpStreamedSpan(StreamedSpan):
         return {}
 
     def set_attribute(self, key: str, value: "AttributeValue") -> None:
-        pass
+        if key != "sentry.source.segment":
+            return
+
+        self._segment_source = value
 
     def set_attributes(self, attributes: "Attributes") -> None:
-        pass
+        for key, value in attributes.items():
+            if key != "sentry.source.segment":
+                continue
+
+            self._segment_source = value
 
     def remove_attribute(self, key: str) -> None:
         pass
