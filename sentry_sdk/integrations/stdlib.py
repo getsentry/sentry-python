@@ -255,12 +255,14 @@ def _install_httplib() -> None:
             # read() might be called multiple times to consume a single body,
             # so we can't just end the span when read() is done. Instead,
             # try to figure out whether the response body has been fully read.
-            if span and (self.fp is None or self.closed):
-                self._sentrysdk_span = None  # type: ignore[attr-defined]
-                self._sentrysdk_breadcrumb = None  # type: ignore[attr-defined]
-                _complete_span(span)
+            if self.fp is None or self.closed:
+                if span:
+                    _complete_span(span)
                 if breadcrumb:
                     add_http_breadcrumb(None, breadcrumb)
+
+                self._sentrysdk_span = None  # type: ignore[attr-defined]
+                self._sentrysdk_breadcrumb = None  # type: ignore[attr-defined]
 
     def close(self: "HTTPResponse") -> None:
         # We patch close() as a best effort fallback in case the span is not
@@ -271,12 +273,14 @@ def _install_httplib() -> None:
         finally:
             span = getattr(self, "_sentrysdk_span", None)
             breadcrumb = getattr(self, "_sentrysdk_breadcrumb", None)
+
             if span is not None:
-                self._sentrysdk_span = None  # type: ignore[attr-defined]
-                self._sentrysdk_breadcrumb = None  # type: ignore[attr-defined]
                 _complete_span(span)
-                if breadcrumb:
-                    add_http_breadcrumb(None, breadcrumb)
+            if breadcrumb:
+                add_http_breadcrumb(None, breadcrumb)
+
+            self._sentrysdk_span = None  # type: ignore[attr-defined]
+            self._sentrysdk_breadcrumb = None  # type: ignore[attr-defined]
 
     HTTPConnection.putrequest = putrequest  # type: ignore[method-assign]
     HTTPConnection.getresponse = getresponse  # type: ignore[method-assign]
