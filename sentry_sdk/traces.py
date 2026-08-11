@@ -733,7 +733,7 @@ class NoOpStreamedSpan(StreamedSpan):
         if key != "sentry.segment.name.source":
             return
 
-        self.set_attribute("sentry.segment.name.source", value)
+        super().set_attribute("sentry.segment.name.source", value)
 
     def set_attributes(self, attributes: "Attributes") -> None:
         for key, value in attributes.items():
