@@ -191,31 +191,33 @@ def _install_httplib() -> None:
 
         try:
             if real_url is not None:
-                request_buffer = getattr(self, "_buffer", None)
-                existing_headers = _request_header_names(request_buffer)
-                signed_headers = get_aws_sigv4_signed_headers(request_buffer, real_url)
-
-                for (
-                    header_name,
-                    header_value,
-                ) in sentry_sdk.get_current_scope().iter_trace_propagation_headers(
-                    span=span
-                ):
-                    normalized_header = header_name.lower()
-                    # preserve signed headers and avoid duplicate `sentry-trace`.
-                    if normalized_header in existing_headers and (
-                        normalized_header != BAGGAGE_HEADER_NAME
-                        or normalized_header in signed_headers
-                    ):
-                        continue
-
-                    logger.debug(
-                        "[Tracing] Adding `{key}` header {value} to outgoing request to {real_url}.".format(
-                            key=header_name, value=header_value, real_url=real_url
-                        )
+                with capture_internal_exceptions():
+                    request_buffer = getattr(self, "_buffer", None)
+                    existing_headers = _request_header_names(request_buffer)
+                    signed_headers = get_aws_sigv4_signed_headers(
+                        request_buffer, real_url
                     )
-                    self.putheader(header_name, header_value)
 
+                    for (
+                        header_name,
+                        header_value,
+                    ) in sentry_sdk.get_current_scope().iter_trace_propagation_headers(
+                        span=span
+                    ):
+                        normalized_header = header_name.lower()
+                        # preserve signed headers and avoid duplicate `sentry-trace`.
+                        if normalized_header in existing_headers and (
+                            normalized_header != BAGGAGE_HEADER_NAME
+                            or normalized_header in signed_headers
+                        ):
+                            continue
+
+                        logger.debug(
+                            "[Tracing] Adding `{key}` header {value} to outgoing request to {real_url}.".format(
+                                key=header_name, value=header_value, real_url=real_url
+                            )
+                        )
+                        self.putheader(header_name, header_value)
             return real_endheaders(self, *args, **kwargs)
         finally:
             self._sentrysdk_trace_url = None  # type: ignore[attr-defined]
