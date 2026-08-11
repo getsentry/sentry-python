@@ -625,8 +625,6 @@ class StreamedSpan:
 
 class NoOpStreamedSpan(StreamedSpan):
     __slots__ = (
-        "_noop_name",
-        "_segment_source",
         "_sampled",
         "_finished",
         "_unsampled_reason",
@@ -647,10 +645,12 @@ class NoOpStreamedSpan(StreamedSpan):
         sample_rand: "Optional[float]" = None,
         sample_rate: "Optional[float]" = None,
     ) -> None:
-        self._noop_name = name
-        self._segment_source: "Optional[AttributeValue]" = None
-        if attributes is not None:
-            self._segment_source = attributes.get("sentry.segment.name.source")
+        self._name = name  # type: ignore[assignment]
+        self._attributes = {}
+        if attributes is not None and "sentry.segment.name.source" in attributes:
+            self.set_attribute(
+                "sentry.segment.name.source", attributes["sentry.segment.name.source"]
+            )
 
         self._span_id: "Optional[str]" = None
 
@@ -733,14 +733,14 @@ class NoOpStreamedSpan(StreamedSpan):
         if key != "sentry.segment.name.source":
             return
 
-        self._segment_source = value
+        self.set_attribute("sentry.segment.name.source", value)
 
     def set_attributes(self, attributes: "Attributes") -> None:
         for key, value in attributes.items():
             if key != "sentry.segment.name.source":
                 continue
 
-            self._segment_source = value
+            self.set_attribute("sentry.segment.name.source", value)
 
     def remove_attribute(self, key: str) -> None:
         pass
@@ -755,11 +755,11 @@ class NoOpStreamedSpan(StreamedSpan):
 
     @property
     def name(self) -> str:
-        return self._noop_name or ""
+        return self._name or ""
 
     @name.setter
     def name(self, name: str) -> None:
-        self._noop_name = name
+        self._name = name
 
     @property
     def active(self) -> bool:

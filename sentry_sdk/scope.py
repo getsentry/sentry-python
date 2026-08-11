@@ -933,10 +933,13 @@ class Scope:
                 )
             return
 
-        if type(span) is NoOpStreamedSpan and span._noop_name is not None:
-            self._transaction = span.name
-            if span._segment_source is not None:
-                self._transaction_info["source"] = str(span._segment_source)
+        if type(span) is NoOpStreamedSpan:
+            if span._name is not None:
+                self._transaction = span.name
+            if span._attributes.get("sentry.segment.name.source"):
+                self._transaction_info["source"] = str(
+                    span._attributes["sentry.segment.name.source"]
+                )
 
     @property
     def profile(self) -> "Optional[Profile]":
