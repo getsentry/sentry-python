@@ -97,14 +97,17 @@ def test_error_event_linked_without_performance_span_streaming(
     sentry_init(traces_sample_rate=None, trace_lifecycle="stream")
     items = capture_items("event")
 
-    with sentry_sdk.traces.start_span(name="no-op span"):
+    with sentry_sdk.traces.start_span(
+        name="no-op span",
+        attributes={"sentry.segment.name.source": "custom segment source"},
+    ):
         sentry_sdk.capture_message("hi")
 
     sentry_sdk.flush()
 
     (event,) = (item.payload for item in items)
     assert event["transaction"] == "no-op span"
-    assert event["transaction_info"] == {"source": "custom"}
+    assert event["transaction_info"] == {"source": "custom segment source"}
 
 
 @pytest.mark.parametrize("parent_sampled", [True, False, None])

@@ -635,6 +635,7 @@ class NoOpStreamedSpan(StreamedSpan):
     def __init__(
         self,
         name: "Optional[str]" = None,
+        attributes: "Optional[Attributes]" = None,
         segment: "Optional[StreamedSpan]" = None,
         trace_id: "Optional[str]" = None,
         parent_span_id: "Optional[str]" = None,
@@ -648,6 +649,8 @@ class NoOpStreamedSpan(StreamedSpan):
     ) -> None:
         self._noop_name = name
         self._segment_source: "Optional[AttributeValue]" = None
+        if attributes is not None:
+            self._segment_source = attributes.get("sentry.segment.name.source")
 
         self._span_id: "Optional[str]" = None
 
