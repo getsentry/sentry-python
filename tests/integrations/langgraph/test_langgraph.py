@@ -2196,7 +2196,7 @@ def _invoke_span_data(items_or_events, span_streaming):
         ),
     ],
 )
-def test_pregel_invoke_data_collection_inputs(
+def test_pregel_invoke_gates_request_messages_and_tool_calls_on_inputs_setting(
     sentry_init,
     capture_events,
     capture_items,
@@ -2205,7 +2205,6 @@ def test_pregel_invoke_data_collection_inputs(
     expect_inputs,
     span_streaming,
 ):
-    """Request messages and tool calls are gated on the gen_ai inputs setting."""
     init_kwargs = {
         "integrations": [LanggraphIntegration()],
         "traces_sample_rate": 1.0,
@@ -2298,7 +2297,7 @@ def test_pregel_invoke_data_collection_inputs(
         ),
     ],
 )
-def test_pregel_invoke_data_collection_outputs(
+def test_pregel_invoke_gates_response_text_on_outputs_setting(
     sentry_init,
     capture_events,
     capture_items,
@@ -2307,7 +2306,6 @@ def test_pregel_invoke_data_collection_outputs(
     expect_outputs,
     span_streaming,
 ):
-    """The response text is gated on the gen_ai outputs setting."""
     init_kwargs = {
         "integrations": [LanggraphIntegration()],
         "traces_sample_rate": 1.0,
@@ -2378,7 +2376,7 @@ def test_pregel_invoke_data_collection_outputs(
         ),
     ],
 )
-def test_pregel_ainvoke_data_collection(
+def test_pregel_ainvoke_gates_inputs_and_outputs_independently(
     sentry_init,
     capture_events,
     capture_items,
@@ -2388,7 +2386,6 @@ def test_pregel_ainvoke_data_collection(
     expect_outputs,
     span_streaming,
 ):
-    """The async wrapper gates inputs and outputs independently."""
     init_kwargs = {
         "integrations": [LanggraphIntegration()],
         "traces_sample_rate": 1.0,
@@ -2477,14 +2474,13 @@ def test_pregel_ainvoke_data_collection(
         ),
     ],
 )
-def test_state_graph_compile_data_collection_available_tools(
+def test_state_graph_compile_gates_available_tools_only_when_data_collection_configured(
     sentry_init,
     capture_events,
     data_collection,
     send_default_pii,
     expect_available_tools,
 ):
-    """Available tools are only gated once data collection has been configured."""
     init_kwargs = {
         "integrations": [LanggraphIntegration()],
         "traces_sample_rate": 1.0,
