@@ -1034,7 +1034,7 @@ def set_span_data_for_response(
     tool_calls = extract_tool_calls(response)
     if tool_calls:
         if has_data_collection_enabled(client.options):
-            if client.options["data_collection"]["gen_ai"]["outputs"]:
+            if client.options["data_collection"]["gen_ai"]["inputs"]:
                 set_on_span(
                     SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(tool_calls)
                 )
