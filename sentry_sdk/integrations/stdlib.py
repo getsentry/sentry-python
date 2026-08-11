@@ -179,6 +179,7 @@ def _install_httplib() -> None:
             if span:
                 set_on_span(SPANDATA.NETWORK_PEER_ADDRESS, self.host)
                 set_on_span(SPANDATA.NETWORK_PEER_PORT, self.port)
+
             breadcrumb.update(
                 {
                     SPANDATA.NETWORK_PEER_ADDRESS: self.host,
@@ -213,10 +214,15 @@ def _install_httplib() -> None:
 
         try:
             rv = real_getresponse(self, *args, **kwargs)
-        except BaseException:
+        except BaseException as ex:
             if span:
                 _complete_span(span)
-            if breadcrumb:
+            if (
+                breadcrumb
+                and "getresponse() got an unexpected keyword argument 'buffering'"
+                not in str(ex)
+            ):
+                # the exception msg check is needed Python 3.6/requests compat
                 add_http_breadcrumb(None, breadcrumb)
             raise
 
