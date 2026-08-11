@@ -139,9 +139,7 @@ class SpanBatcher(Batcher["SpanJSON"]):
                 else:
                     notify = False
 
-            if span["is_segment"] is True:
-                self._flush(only_pending=True)
-            elif notify:
+            if notify:
                 self._flush_event.set()
         finally:
             self._active.flag = False
