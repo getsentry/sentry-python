@@ -25,10 +25,7 @@ class SpanBatcher(Batcher["SpanJSON"]):
     # The max limits are all per trace (per bucket).
     MAX_ENVELOPE_SIZE = 1000  # spans
     MAX_BEFORE_FLUSH = 1000
-
     MAX_BEFORE_DROP = 2000
-    GLOBAL_MAX_BEFORE_DROP = 10_000
-
     MAX_BYTES_BEFORE_FLUSH = 5 * 1024 * 1024  # 5 MB
 
     FLUSH_WAIT_TIME = 5.0
@@ -47,8 +44,6 @@ class SpanBatcher(Batcher["SpanJSON"]):
         # envelope.
         # trace_id -> span buffer
         self._span_buffer: dict[str, list["SpanJSON"]] = defaultdict(list)
-        self._span_number: int = 0
-
         self._running_size: dict[str, int] = defaultdict(lambda: 0)
         self._capture_func = capture_func
         self._record_lost_func = record_lost_func
@@ -76,8 +71,6 @@ class SpanBatcher(Batcher["SpanJSON"]):
 
     def _reset_thread_state(self) -> None:
         self._span_buffer = defaultdict(list)
-        self._span_number = 0
-
         self._running_size = defaultdict(lambda: 0)
         self._running = True
 
@@ -123,10 +116,8 @@ class SpanBatcher(Batcher["SpanJSON"]):
                 return None
 
             with self._lock:
-                if (
-                    self._span_number >= self.GLOBAL_MAX_BEFORE_DROP
-                    or len(self._span_buffer[span["trace_id"]]) >= self.MAX_BEFORE_DROP
-                ):
+                size = len(self._span_buffer[span["trace_id"]])
+                if size >= self.MAX_BEFORE_DROP:
                     self._record_lost_func(
                         reason="queue_overflow",
                         data_category="span",
@@ -135,12 +126,10 @@ class SpanBatcher(Batcher["SpanJSON"]):
                     return None
 
                 self._span_buffer[span["trace_id"]].append(span)
-                self._span_number += 1
-
                 self._running_size[span["trace_id"]] += self._estimate_size(span)
 
                 if (
-                    len(self._span_buffer[span["trace_id"]]) >= self.MAX_BEFORE_FLUSH
+                    size + 1 >= self.MAX_BEFORE_FLUSH
                     or self._running_size[span["trace_id"]]
                     >= self.MAX_BYTES_BEFORE_FLUSH
                 ):
@@ -238,9 +227,7 @@ class SpanBatcher(Batcher["SpanJSON"]):
 
                     envelopes.append(envelope)
 
-                self._span_number -= len(self._span_buffer[bucket_id])
                 del self._span_buffer[bucket_id]
-
                 del self._running_size[bucket_id]
 
         for envelope in envelopes:

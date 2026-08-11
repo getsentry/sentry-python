@@ -171,88 +171,6 @@ def test_drop_isolated_per_bucket(
     assert record_lost_event_calls.count(("queue_overflow", "span", None, 1)) == 1
 
 
-def test_drop_after_global_max_reached(
-    sentry_init, capture_envelopes, capture_record_lost_event_calls, monkeypatch
-):
-    """New spans are dropped if the buffer reaches GLOBAL_MAX_BEFORE_DROP spans."""
-    monkeypatch.setattr(SpanBatcher, "GLOBAL_MAX_BEFORE_DROP", 2)
-    # set the time-based flush limit to something huge so that we're not flushing
-    # prematurely
-    monkeypatch.setattr(SpanBatcher, "FLUSH_WAIT_TIME", 100000)
-
-    sentry_init(
-        traces_sample_rate=1.0,
-        trace_lifecycle="stream",
-    )
-
-    envelopes = capture_envelopes()
-    record_lost_event_calls = capture_record_lost_event_calls()
-
-    with sentry_sdk.traces.start_span(name="span 1"):
-        pass
-    with sentry_sdk.traces.start_span(name="span 2"):
-        pass
-    with sentry_sdk.traces.start_span(name="span 3"):
-        pass
-
-    sentry_sdk.traces.new_trace()
-    with sentry_sdk.traces.start_span(name="span 4"):
-        pass
-
-    sentry_sdk.flush()
-
-    assert len(envelopes) == 1
-
-    assert len(envelopes[0].items[0].payload.json["items"]) == 2
-    assert envelopes[0].items[0].payload.json["items"][0]["name"] == "span 1"
-    assert envelopes[0].items[0].payload.json["items"][1]["name"] == "span 2"
-
-    assert record_lost_event_calls.count(("queue_overflow", "span", None, 1)) == 2
-
-
-def test_capture_after_flush_with_global_limit(
-    sentry_init, capture_envelopes, monkeypatch
-):
-    """New spans are captured again after a flush reduces the span number below the global limit."""
-    monkeypatch.setattr(SpanBatcher, "GLOBAL_MAX_BEFORE_DROP", 2)
-    # set the time-based flush limit to something huge so that we're not flushing
-    # prematurely
-    monkeypatch.setattr(SpanBatcher, "FLUSH_WAIT_TIME", 100000)
-
-    sentry_init(
-        traces_sample_rate=1.0,
-        trace_lifecycle="stream",
-    )
-
-    envelopes = capture_envelopes()
-
-    with sentry_sdk.traces.start_span(name="span 1"):
-        pass
-    with sentry_sdk.traces.start_span(name="span 2"):
-        pass
-
-    sentry_sdk.traces.new_trace()
-    with sentry_sdk.traces.start_span(name="span 3"):
-        pass
-
-    sentry_sdk.flush()
-
-    # The span is captured even though a span was dropped in the same trace.
-    with sentry_sdk.traces.start_span(name="span 4"):
-        pass
-
-    sentry_sdk.flush()
-
-    assert len(envelopes) == 2
-
-    assert len(envelopes[0].items[0].payload.json["items"]) == 2
-    assert envelopes[0].items[0].payload.json["items"][0]["name"] == "span 1"
-    assert envelopes[0].items[0].payload.json["items"][1]["name"] == "span 2"
-
-    assert len(envelopes[1].items[0].payload.json["items"]) == 1
-    assert envelopes[1].items[0].payload.json["items"][0]["name"] == "span 4"
-
-
 def test_length_based_flushing(sentry_init, capture_items, monkeypatch):
     """A flush event is triggered when a bucket contains MAX_BEFORE_FLUSH spans."""
     monkeypatch.setattr(SpanBatcher, "MAX_BEFORE_FLUSH", 1)
@@ -542,8 +460,6 @@ def test_span_batcher_lock_reset_in_child_after_fork(sentry_init):
     original_lock.acquire()
 
     batcher._span_buffer["test-trace-id"].append(object())
-    batcher._span_number = 1
-
     batcher._running_size["test-trace-id"] = 42
     batcher._active.flag = True
     batcher._flush_event.set()
@@ -556,8 +472,6 @@ def test_span_batcher_lock_reset_in_child_after_fork(sentry_init):
 
         flusher_reset = batcher._flusher is None and batcher._flusher_pid is None
         span_buffer_reset = len(batcher._span_buffer) == 0
-        span_number_reset = batcher._span_number == 0
-
         running_size_reset = len(batcher._running_size) == 0
 
         active_reset = not getattr(batcher._active, "flag", False)
@@ -570,7 +484,6 @@ def test_span_batcher_lock_reset_in_child_after_fork(sentry_init):
             and unheld
             and flusher_reset
             and span_buffer_reset
-            and span_number_reset
             and running_size_reset
             and active_reset
             and event_reset
