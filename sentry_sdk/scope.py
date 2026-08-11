@@ -928,7 +928,9 @@ class Scope:
         if isinstance(span, StreamedSpan) and span._is_segment():
             if span.name is not None:
                 self._transaction = span.name
-            if span._attributes.get("sentry.segment.name.source"):
+            if type(span) is StreamedSpan and span._attributes.get(
+                "sentry.segment.name.source"
+            ):
                 self._transaction_info["source"] = str(
                     span._attributes["sentry.segment.name.source"]
                 )
