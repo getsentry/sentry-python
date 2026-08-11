@@ -1270,10 +1270,10 @@ class _Client(BaseClient):
                 if serialized is None:
                     return
 
-                if ty == "log":
+                if ty == "log" and self.log_batcher is not None:
                     self.log_batcher.add(serialized)  # type: ignore
 
-                elif ty == "metric":
+                elif ty == "metric" and self.metrics_batcher is not None:
                     self.metrics_batcher.add(serialized)  # type: ignore
 
             elif ty == "span" and isinstance(telemetry, StreamedSpan):
@@ -1300,10 +1300,14 @@ class _Client(BaseClient):
 
                 # We need a reference to the segment span in the batcher to populate
                 # the dynamic sampling context (DSC)
-                serialized["_segment_span"] = telemetry._segment  # type: ignore
+                serialized["_segment_span"] = telemetry._segment
+
+                if self.span_batcher is None:
+                    return
+
                 self.span_batcher.add(
                     serialized, flush_trace_bucket=telemetry._is_segment()
-                )  # type: ignore
+                )
 
     def _capture_log(self, log: "Optional[Log]", scope: "Scope") -> None:
         self._capture_telemetry(log, "log", scope)
