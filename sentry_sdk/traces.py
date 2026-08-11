@@ -647,7 +647,7 @@ class NoOpStreamedSpan(StreamedSpan):
         sample_rate: "Optional[float]" = None,
     ) -> None:
         self._noop_name = name
-        self._segment_source: "Optional[str]" = None
+        self._segment_source: "Optional[AttributeValue]" = None
 
         self._span_id: "Optional[str]" = None
 
