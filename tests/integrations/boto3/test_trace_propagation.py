@@ -9,6 +9,7 @@ from botocore.config import Config
 import sentry_sdk
 from sentry_sdk.integrations.boto3 import Boto3Integration
 from sentry_sdk.integrations.stdlib import StdlibIntegration
+from sentry_sdk.utils import get_aws_sigv4_signed_headers
 
 
 class _AwsRequestHandler(BaseHTTPRequestHandler):
@@ -112,12 +113,9 @@ def test_botocore_merges_propagation_before_sigv4_signing(sentry_init, span_stre
         assert sentry_trace_headers is not None
         assert len(sentry_trace_headers) == 1
         assert sentry_trace_headers == signed_request_headers["sentry-trace"]
-
-        authorization = headers["Authorization"]
-        signed_headers = authorization.split("SignedHeaders=", 1)[1].split(",", 1)[0]
         # both `baggage` and `sentry-trace` are signed.
-        assert "baggage" in signed_headers.split(";")
-        assert "sentry-trace" in signed_headers.split(";")
+        signed_headers = get_aws_sigv4_signed_headers(headers=headers)
+        assert signed_headers >= {"baggage", "sentry-trace"}
     finally:
         server.shutdown()
         server.server_close()
@@ -172,6 +170,9 @@ def test_botocore_without_boto3_integration_preserves_signed_baggage(
         assert headers.get_all("baggage") == ["vendor=value"]
         # `httplib` still adds single `sentry-trace` header.
         assert len(headers.get_all("sentry-trace")) == 1
+        signed_headers = get_aws_sigv4_signed_headers(headers=headers)
+        assert "baggage" in signed_headers
+        assert "sentry-trace" not in signed_headers
     finally:
         server.shutdown()
         server.server_close()
@@ -200,6 +201,7 @@ def test_presigned_urls_do_not_require_sentry_headers(sentry_init):
 
     # only `host` header is signed.
     assert query["X-Amz-SignedHeaders"] == ["host"]
+    assert get_aws_sigv4_signed_headers(headers={}, url=url) == {"host"}
     # no `sentry-*` or baggage are added.
     assert "sentry-trace" not in url
     assert "baggage" not in url
