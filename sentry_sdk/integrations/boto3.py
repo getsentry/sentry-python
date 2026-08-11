@@ -7,7 +7,7 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
+from sentry_sdk.tracing_utils import add_http_breadcrumb, has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     parse_url,
@@ -64,28 +64,48 @@ def _sentry_request_created(
     if client.get_integration(Boto3Integration) is None:
         return
 
+    parsed_url = None
+    if request.url is not None:
+        with capture_internal_exceptions():
+            parsed_url = parse_url(request.url, sanitize=False)
+
+    breadcrumb: "dict[str, Any]" = {}
+
     is_span_streaming_enabled = has_span_streaming_enabled(client.options)
     span: "Union[Span, StreamedSpan]"
     if is_span_streaming_enabled:
-        if sentry_sdk.traces.get_current_span() is None:
-            return
-        span = sentry_sdk.traces.start_span(
-            name=description,
-            attributes={
-                "sentry.op": OP.HTTP_CLIENT,
-                "sentry.origin": Boto3Integration.origin,
-                SPANDATA.RPC_METHOD: f"{service_id}/{operation_name}",
-            },
-        )
-        if request.url is not None and should_send_default_pii():
-            with capture_internal_exceptions():
-                parsed_url = parse_url(request.url, sanitize=False)
-                span.set_attribute(SPANDATA.URL_FULL, parsed_url.url)
-                span.set_attribute(SPANDATA.URL_QUERY, parsed_url.query)
-                span.set_attribute(SPANDATA.URL_FRAGMENT, parsed_url.fragment)
+        if parsed_url and should_send_default_pii():
+            breadcrumb.update(
+                {
+                    SPANDATA.URL_FULL: parsed_url.url,
+                    SPANDATA.URL_QUERY: parsed_url.query,
+                    SPANDATA.URL_FRAGMENT: parsed_url.fragment,
+                }
+            )
 
         if request.method is not None:
-            span.set_attribute(SPANDATA.HTTP_REQUEST_METHOD, request.method)
+            breadcrumb[SPANDATA.HTTP_REQUEST_METHOD] = request.method
+
+        if sentry_sdk.traces.get_current_span() is not None:
+            span = sentry_sdk.traces.start_span(
+                name=description,
+                attributes={
+                    "sentry.op": OP.HTTP_CLIENT,
+                    "sentry.origin": Boto3Integration.origin,
+                    SPANDATA.RPC_METHOD: f"{service_id}/{operation_name}",
+                },
+            )
+            if parsed_url and should_send_default_pii():
+                span.set_attributes(
+                    {
+                        SPANDATA.URL_FULL: parsed_url.url,
+                        SPANDATA.URL_QUERY: parsed_url.query,
+                        SPANDATA.URL_FRAGMENT: parsed_url.fragment,
+                    }
+                )
+
+            if request.method is not None:
+                span.set_attribute(SPANDATA.HTTP_REQUEST_METHOD, request.method)
     else:
         span = sentry_sdk.start_span(
             op=OP.HTTP_CLIENT,
@@ -95,15 +115,22 @@ def _sentry_request_created(
 
         if request.url is not None:
             with capture_internal_exceptions():
-                parsed_url = parse_url(request.url, sanitize=False)
                 span.set_data("aws.request.url", parsed_url.url)
                 span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
                 span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+                breadcrumb.update(
+                    {
+                        "aws.request.url": parsed_url.url,
+                        SPANDATA.HTTP_QUERY: parsed_url.query,
+                        SPANDATA.HTTP_FRAGMENT: parsed_url.fragment,
+                    }
+                )
 
         span.set_tag("aws.service_id", service_id.hyphenize())
         span.set_tag("aws.operation_name", operation_name)
         if request.method is not None:
             span.set_data(SPANDATA.HTTP_METHOD, request.method)
+            breadcrumb[SPANDATA.HTTP_METHOD] = request.method
 
     # We do it in order for subsequent http calls/retries be
     # attached to this span.
@@ -112,17 +139,22 @@ def _sentry_request_created(
     # request.context is an open-ended data-structure
     # where we can add anything useful in request life cycle.
     request.context["_sentrysdk_span"] = span
+    request.context["_sentrysdk_breadcrumb"] = breadcrumb
 
 
 def _sentry_after_call(
     context: "Dict[str, Any]", parsed: "Dict[str, Any]", **kwargs: "Any"
 ) -> None:
     span: "Optional[Union[Span, StreamedSpan]]" = context.pop("_sentrysdk_span", None)
+    breadcrumb: "Optional[dict[str, Any]]" = context.pop("_sentrysdk_breadcrumb", None)
 
     # Span could be absent if the integration is disabled.
     if span is None:
         return
+
     span.__exit__(None, None, None)
+    if breadcrumb:
+        add_http_breadcrumb(None, breadcrumb)
 
     body = parsed.get("Body")
     if not isinstance(body, StreamingBody):
@@ -182,8 +214,11 @@ def _sentry_after_call_error(
     context: "Dict[str, Any]", exception: "Type[BaseException]", **kwargs: "Any"
 ) -> None:
     span: "Optional[Union[Span, StreamedSpan]]" = context.pop("_sentrysdk_span", None)
+    breadcrumb: "Optional[dict[str, Any]]" = context.pop("_sentrysdk_breadcrumb", None)
 
     # Span could be absent if the integration is disabled.
     if span is None:
         return
+
+    add_http_breadcrumb(None, breadcrumb)
     span.__exit__(type(exception), exception, None)
