@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 import sentry_sdk
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
@@ -8,7 +9,7 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.tracing import SOURCE_FOR_STYLE
+from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -134,10 +135,11 @@ def _set_transaction_name_and_source(
             "url": request.url_rule.rule,
             "endpoint": request.url_rule.endpoint,
         }
-        scope.set_transaction_name(
-            name_for_style[transaction_style],
-            source=SOURCE_FOR_STYLE[transaction_style],
-        )
+        name = name_for_style[transaction_style]
+        source = SOURCE_FOR_STYLE[transaction_style]
+        if source == TransactionSource.ROUTE:
+            scope.set_segment_attribute(SPANDATA.HTTP_ROUTE, name)
+        scope.set_transaction_name(name, source=source)
     except Exception:
         pass
 

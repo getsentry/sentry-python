@@ -246,13 +246,19 @@ class SentryAsgiMiddleware:
                     span_ctx: "ContextManager[Union[Span, StreamedSpan, None]]"
                     if span_streaming:
                         segment: "Optional[StreamedSpan]" = None
+                        segment_source = getattr(
+                            transaction_source, "value", transaction_source
+                        )
                         attributes: "Attributes" = {
-                            "sentry.segment.name.source": getattr(
-                                transaction_source, "value", transaction_source
-                            ),
+                            "sentry.segment.name.source": segment_source,
                             "sentry.origin": self.span_origin,
                             "network.protocol.name": ty,
                         }
+                        if (
+                            segment_source == SegmentNameSource.ROUTE.value
+                            and transaction_name != _DEFAULT_TRANSACTION_NAME
+                        ):
+                            attributes[SPANDATA.HTTP_ROUTE] = transaction_name
 
                         if scope.get("client"):
                             client_options = sentry_sdk.get_client().options
@@ -412,6 +418,13 @@ class SentryAsgiMiddleware:
                                         span.set_attribute(
                                             "sentry.segment.name.source", source
                                         )
+                                        if (
+                                            source == SegmentNameSource.ROUTE.value
+                                            and name != _DEFAULT_TRANSACTION_NAME
+                                        ):
+                                            span.set_attribute(
+                                                SPANDATA.HTTP_ROUTE, name
+                                            )
         finally:
             _asgi_middleware_applied.set(False)
 
