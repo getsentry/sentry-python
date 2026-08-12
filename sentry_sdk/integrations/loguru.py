@@ -79,7 +79,7 @@ class LoguruIntegration(Integration):
         breadcrumb_format: "str | loguru.FormatFunction" = DEFAULT_FORMAT,
         event_format: "str | loguru.FormatFunction" = DEFAULT_FORMAT,
         sentry_logs_level: "Optional[int]" = DEFAULT_LEVEL,
-        capture_sentry_logs: Optional[bool] = False,
+        capture_sentry_logs: "Optional[bool]" = False,
     ) -> None:
         LoguruIntegration.level = level
         LoguruIntegration.event_level = event_level

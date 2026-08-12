@@ -325,7 +325,7 @@ def test_ignore_logger_for_sentry_logs(
     sentry_init, capture_envelopes, capture_items, request
 ):
     """ignore_logger_for_sentry_logs should suppress Sentry Logs but not events."""
-    sentry_init(enable_logs=True)
+    sentry_init(integrations=[LoggingIntegration(capture_sentry_logs=True)])
     envelopes = capture_envelopes()
     items = capture_items("log")
 
@@ -446,7 +446,7 @@ def test_logging_errors(sentry_init, capture_envelopes, capture_items):
     """
     The python logger module should be able to log errors without erroring
     """
-    sentry_init(enable_logs=True)
+    sentry_init(integrations=[LoggingIntegration(capture_sentry_logs=True)])
     envelopes = capture_envelopes()
     items = capture_items("log")
 

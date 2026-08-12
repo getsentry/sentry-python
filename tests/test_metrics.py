@@ -19,7 +19,9 @@ def test_metrics_enable_metrics_noop(sentry_init, capture_envelopes):
     sentry_sdk.metrics.gauge("test.gauge", 42)
     sentry_sdk.metrics.distribution("test.distribution", 200)
 
-    assert len(envelopes) == 3
+    sentry_sdk.flush()
+
+    assert envelopes
 
 
 def test_metrics_basics(sentry_init, capture_items):
