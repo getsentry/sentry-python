@@ -209,10 +209,16 @@ def _set_output_data(
     span: "Union[sentry_sdk.tracing.Span, StreamedSpan]", result: "Any"
 ) -> None:
     client = sentry_sdk.get_client()
+    record_inputs = False
+    record_outputs = False
     if has_data_collection_enabled(client.options):
-        if not client.options["data_collection"]["gen_ai"]["outputs"]:
-            return
-    elif not should_send_default_pii():
+        record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
+        record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
+    elif should_send_default_pii():
+        record_inputs = True
+        record_outputs = True
+
+    if not record_inputs and not record_outputs:
         return
 
     output_messages: "dict[str, list[Any]]" = {
@@ -231,7 +237,7 @@ def _set_output_data(
                     # Unknown output message type, just return the json
                     output_messages["response"].append(output_message.dict())
 
-    if len(output_messages["tool"]) > 0:
+    if record_inputs and len(output_messages["tool"]) > 0:
         if isinstance(span, StreamedSpan):
             span.set_attribute(
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
@@ -243,7 +249,7 @@ def _set_output_data(
                 safe_serialize(output_messages["tool"]),
             )
 
-    if len(output_messages["response"]) > 0:
+    if record_outputs and len(output_messages["response"]) > 0:
         set_data_normalized(
             span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
         )

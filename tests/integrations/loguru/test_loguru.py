@@ -140,7 +140,7 @@ def test_sentry_logs_warning(
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(enable_logs=True)
+    sentry_init(integrations=[LoguruIntegration(capture_sentry_logs=True)])
     items = capture_items("log")
 
     logger.warning("this is {} a {}", "just", "template")
@@ -164,7 +164,7 @@ def test_sentry_logs_debug(
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(enable_logs=True)
+    sentry_init(integrations=[LoguruIntegration(capture_sentry_logs=True)])
     envelopes = capture_envelopes()
 
     logger.debug("this is %s a template %s", "1", "2")
@@ -178,8 +178,11 @@ def test_sentry_log_levels(sentry_init, capture_items, uninstall_integration, re
     request.addfinalizer(logger.remove)
 
     sentry_init(
-        integrations=[LoguruIntegration(sentry_logs_level=LoggingLevels.SUCCESS)],
-        enable_logs=True,
+        integrations=[
+            LoguruIntegration(
+                capture_sentry_logs=True, sentry_logs_level=LoggingLevels.SUCCESS
+            )
+        ],
     )
     items = capture_items("log")
 
@@ -212,8 +215,9 @@ def test_disable_loguru_logs(
     request.addfinalizer(logger.remove)
 
     sentry_init(
-        integrations=[LoguruIntegration(sentry_logs_level=None)],
-        enable_logs=True,
+        integrations=[
+            LoguruIntegration(capture_sentry_logs=True, sentry_logs_level=None)
+        ],
     )
     items = capture_items("log")
 
@@ -230,14 +234,36 @@ def test_disable_loguru_logs(
     assert len(logs) == 0
 
 
-def test_disable_sentry_logs(
+def test_disable_sentry_logs_by_default(
+    sentry_init, capture_items, uninstall_integration, request
+):
+    uninstall_integration("loguru")
+    request.addfinalizer(logger.remove)
+
+    sentry_init()
+    items = capture_items("log")
+
+    logger.trace("this is a log")
+    logger.debug("this is a log")
+    logger.info("this is a log")
+    logger.success("this is a log")
+    logger.warning("this is a log")
+    logger.error("this is a log")
+    logger.critical("this is a log")
+
+    sentry_sdk.get_client().flush()
+    logs = [item.payload for item in items]
+    assert len(logs) == 0
+
+
+def test_disable_sentry_logs_explicitly(
     sentry_init, capture_items, uninstall_integration, request
 ):
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
     sentry_init(
-        _experiments={"enable_logs": False},
+        integrations=[LoguruIntegration(capture_sentry_logs=False)],
     )
     items = capture_items("log")
 
@@ -264,8 +290,11 @@ def test_no_log_infinite_loop(
     request.addfinalizer(logger.remove)
 
     sentry_init(
-        enable_logs=True,
-        integrations=[LoguruIntegration(sentry_logs_level=LoggingLevels.DEBUG)],
+        integrations=[
+            LoguruIntegration(
+                capture_sentry_logs=True, sentry_logs_level=LoggingLevels.DEBUG
+            )
+        ],
         debug=True,
     )
     envelopes = capture_envelopes()
@@ -283,7 +312,7 @@ def test_logging_errors(
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(enable_logs=True)
+    sentry_init(integrations=[LoguruIntegration(capture_sentry_logs=True)])
     envelopes = capture_envelopes()
     items = capture_items("log")
 
@@ -313,7 +342,7 @@ def test_log_strips_project_root(
     request.addfinalizer(logger.remove)
 
     sentry_init(
-        enable_logs=True,
+        integrations=[LoguruIntegration(capture_sentry_logs=True)],
         project_root="/custom/test",
     )
     items = capture_items("log")
@@ -362,7 +391,7 @@ def test_log_keeps_full_path_if_not_in_project_root(
     request.addfinalizer(logger.remove)
 
     sentry_init(
-        enable_logs=True,
+        integrations=[LoguruIntegration(capture_sentry_logs=True)],
         project_root="/custom/test",
     )
     items = capture_items("log")
@@ -410,7 +439,7 @@ def test_logger_with_all_attributes(
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(enable_logs=True)
+    sentry_init(integrations=[LoguruIntegration(capture_sentry_logs=True)])
     items = capture_items("log")
 
     logger.warning("log #{}", 1)
@@ -482,7 +511,7 @@ def test_logger_capture_parameters_from_args(
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(enable_logs=True)
+    sentry_init(integrations=[LoguruIntegration(capture_sentry_logs=True)])
     items = capture_items("log")
 
     logger.warning("Task ID: {}", 123)
@@ -501,7 +530,7 @@ def test_logger_capture_parameters_from_kwargs(
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(enable_logs=True)
+    sentry_init(integrations=[LoguruIntegration(capture_sentry_logs=True)])
     items = capture_items("log")
 
     logger.warning("Task ID: {task_id}", task_id=123)
@@ -520,7 +549,7 @@ def test_logger_capture_parameters_from_contextualize(
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(enable_logs=True)
+    sentry_init(integrations=[LoguruIntegration(capture_sentry_logs=True)])
     items = capture_items("log")
 
     with logger.contextualize(task_id=123):
@@ -540,7 +569,7 @@ def test_logger_capture_parameters_from_bind(
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(enable_logs=True)
+    sentry_init(integrations=[LoguruIntegration(capture_sentry_logs=True)])
     items = capture_items("log")
 
     logger.bind(task_id=123).warning("Log")
@@ -558,7 +587,7 @@ def test_logger_capture_parameters_from_patch(
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(enable_logs=True)
+    sentry_init(integrations=[LoguruIntegration(capture_sentry_logs=True)])
     items = capture_items("log")
 
     logger.patch(lambda record: record["extra"].update(task_id=123)).warning("Log")
@@ -576,7 +605,7 @@ def test_no_parameters_no_template(
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(enable_logs=True)
+    sentry_init(integrations=[LoguruIntegration(capture_sentry_logs=True)])
     items = capture_items("log")
 
     logger.warning("Logging a hardcoded warning")
