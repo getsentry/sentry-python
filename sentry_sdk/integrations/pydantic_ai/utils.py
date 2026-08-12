@@ -2,13 +2,15 @@ from contextvars import ContextVar
 from typing import TYPE_CHECKING
 
 import sentry_sdk
+from sentry_sdk.ai.utils import _set_span_data_attribute
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.utils import event_from_exception, safe_serialize
 
 if TYPE_CHECKING:
     from typing import Any, Optional, Union
+
+    from sentry_sdk.traces import StreamedSpan
 
 
 # Store the current agent context in a contextvar for re-entrant safety
@@ -85,10 +87,7 @@ def _set_agent_data(
         agent_obj = get_current_agent()
 
     if agent_obj and hasattr(agent_obj, "name") and agent_obj.name:
-        if isinstance(span, StreamedSpan):
-            span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, agent_obj.name)
-        else:
-            span.set_data(SPANDATA.GEN_AI_AGENT_NAME, agent_obj.name)
+        _set_span_data_attribute(span, SPANDATA.GEN_AI_AGENT_NAME, agent_obj.name)
 
 
 def _get_model_name(model_obj: "Any") -> "Optional[str]":
@@ -136,19 +135,15 @@ def _set_model_data(
     if not model_obj and agent_obj and hasattr(agent_obj, "model"):
         model_obj = agent_obj.model
 
-    set_on_span = (
-        span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
-    )
-
     if model_obj:
         # Set system from model
         if hasattr(model_obj, "system"):
-            set_on_span(SPANDATA.GEN_AI_SYSTEM, model_obj.system)
+            _set_span_data_attribute(span, SPANDATA.GEN_AI_SYSTEM, model_obj.system)
 
         # Set model name
         model_name = _get_model_name(model_obj)
         if model_name:
-            set_on_span(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
+            _set_span_data_attribute(span, SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
 
     # Extract model settings
     settings = model_settings
@@ -169,14 +164,14 @@ def _set_model_data(
             for setting_name, spandata_key in settings_map.items():
                 value = settings.get(setting_name)
                 if value is not None:
-                    set_on_span(spandata_key, value)
+                    _set_span_data_attribute(span, spandata_key, value)
         else:
             # Fallback for object-style settings
             for setting_name, spandata_key in settings_map.items():
                 if hasattr(settings, setting_name):
                     value = getattr(settings, setting_name)
                     if value is not None:
-                        set_on_span(spandata_key, value)
+                        _set_span_data_attribute(span, spandata_key, value)
 
 
 def _set_available_tools(
@@ -211,14 +206,9 @@ def _set_available_tools(
                 tools.append(tool_info)
 
         if tools:
-            if isinstance(span, StreamedSpan):
-                span.set_attribute(
-                    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
-                )
-            else:
-                span.set_data(
-                    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
-                )
+            _set_span_data_attribute(
+                span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
+            )
     except Exception:
         # If we can't extract tools, just skip it
         pass

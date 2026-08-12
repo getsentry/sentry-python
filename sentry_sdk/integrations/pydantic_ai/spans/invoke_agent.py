@@ -2,13 +2,13 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.ai.utils import (
+    _set_span_data_attribute,
     get_start_span_function,
     normalize_message_roles,
     set_data_normalized,
     truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
     should_truncate_gen_ai_input,
@@ -28,6 +28,8 @@ from .utils import (
 
 if TYPE_CHECKING:
     from typing import Any, Union
+
+    from sentry_sdk.traces import StreamedSpan
 
 try:
     from pydantic_ai.messages import BinaryContent, ImageUrl
@@ -173,12 +175,9 @@ def update_invoke_agent_span(
         try:
             response = result.response
             if hasattr(response, "model_name") and response.model_name:
-                if isinstance(span, StreamedSpan):
-                    span.set_attribute(
-                        SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name
-                    )
-                else:
-                    span.set_data(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)
+                _set_span_data_attribute(
+                    span, SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name
+                )
         except Exception:
             # If response access fails, continue without setting model name
             pass
