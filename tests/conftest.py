@@ -297,7 +297,7 @@ def uninstall_integration():
 def _install_flush_completion_handshake(client: "sentry_sdk.Client") -> None:
     """Make batcher.flush() wait for the flusher thread to drain.
 
-    Otherwise, test assertions can be run before envelopes are captured.
+    Otherwise, test assertions can run before envelopes are captured.
     The span batcher flushes pending items asynchronously with the main thread.
     Flushes triggered by segments finishing are asynchronous, and can collect buckets
     that would have otherwise been flushed synchronously by `sentry_sdk.flush()`.
