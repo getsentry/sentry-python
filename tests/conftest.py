@@ -323,9 +323,9 @@ def _install_flush_completion_handshake(client: "sentry_sdk.Client") -> None:
 
     def flush() -> None:
         nonlocal drained_count
-        # Re-entrancy guard: if this `flush()`` is invoked from within an
-        # in-progress drain (e.g. a custom transport), waiting on the background flusher
-        # would deadlock, because the flusher is blocked inside our own handler.
+        # Re-entrancy guard: if `flush()` is invoked from within a drain (e.g. a
+        # custom transport), waiting on the flusher thread would deadlock, because
+        # the flusher is blocked inside our own handler.
         if getattr(getattr(batcher, "_active", None), "flag", False):
             orig_flush()
             return
