@@ -212,7 +212,7 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
                 # Store input messages to later compare with output
                 input_messages = None
-                if len(args) > 0 and _should_record_inputs(integration):
+                if len(args) > 0:
                     input_messages = _parse_langgraph_messages(args[0])
                     if input_messages:
                         normalized_input_messages = normalize_message_roles(
@@ -227,7 +227,9 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                             if should_truncate_gen_ai_input(client.options)
                             else normalized_input_messages
                         )
-                        if messages_data is not None:
+                        if messages_data is not None and _should_record_inputs(
+                            integration
+                        ):
                             set_data_normalized(
                                 span,
                                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -254,7 +256,7 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
                 # Store input messages to later compare with output
                 input_messages = None
-                if len(args) > 0 and _should_record_inputs(integration):
+                if len(args) > 0:
                     input_messages = _parse_langgraph_messages(args[0])
                     if input_messages:
                         normalized_input_messages = normalize_message_roles(
@@ -269,7 +271,9 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                             if should_truncate_gen_ai_input(client.options)
                             else normalized_input_messages
                         )
-                        if messages_data is not None:
+                        if messages_data is not None and _should_record_inputs(
+                            integration
+                        ):
                             set_data_normalized(
                                 span,
                                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -313,7 +317,7 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, graph_name)
 
                 input_messages = None
-                if len(args) > 0 and _should_record_inputs(integration):
+                if len(args) > 0:
                     input_messages = _parse_langgraph_messages(args[0])
                     if input_messages:
                         normalized_input_messages = normalize_message_roles(
@@ -328,7 +332,9 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                             if should_truncate_gen_ai_input(client.options)
                             else normalized_input_messages
                         )
-                        if messages_data is not None:
+                        if messages_data is not None and _should_record_inputs(
+                            integration
+                        ):
                             set_data_normalized(
                                 span,
                                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
@@ -354,7 +360,7 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
 
             input_messages = None
-            if len(args) > 0 and _should_record_inputs(integration):
+            if len(args) > 0:
                 input_messages = _parse_langgraph_messages(args[0])
                 if input_messages:
                     normalized_input_messages = normalize_message_roles(input_messages)
@@ -367,7 +373,7 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                         if should_truncate_gen_ai_input(client.options)
                         else normalized_input_messages
                     )
-                    if messages_data is not None:
+                    if messages_data is not None and _should_record_inputs(integration):
                         set_data_normalized(
                             span,
                             SPANDATA.GEN_AI_REQUEST_MESSAGES,

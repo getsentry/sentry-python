@@ -2445,6 +2445,157 @@ def test_pregel_ainvoke_gates_inputs_and_outputs_independently(
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in data
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_pregel_invoke_message_delta_ignores_gen_ai_inputs_setting(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[LanggraphIntegration()],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=span_streaming,
+        trace_lifecycle="stream" if span_streaming else "static",
+        _experiments={
+            "data_collection": {"gen_ai": {"inputs": False, "outputs": True}}
+        },
+    )
+
+    prior_response = "Of course! How can I assist you?"
+    test_state = {
+        "messages": [
+            MockMessage("Hello, can you help me?", name="user"),
+            MockMessage(
+                prior_response,
+                name="assistant",
+                response_metadata={
+                    "token_usage": {
+                        "total_tokens": 300,
+                        "prompt_tokens": 100,
+                        "completion_tokens": 200,
+                    },
+                    "model_name": "gpt-3.5-turbo",
+                },
+            ),
+        ]
+    }
+    pregel = MockPregelInstance("test_graph")
+    expected_assistant_response = "I'll help you with that task!"
+
+    def original_invoke(self, *args, **kwargs):
+        return {
+            "messages": args[0].get("messages", [])
+            + [
+                MockMessage(
+                    content=expected_assistant_response,
+                    name="assistant",
+                    response_metadata={
+                        "token_usage": {
+                            "total_tokens": 30,
+                            "prompt_tokens": 10,
+                            "completion_tokens": 20,
+                        },
+                        "model_name": "gpt-4.1-2025-04-14",
+                    },
+                )
+            ]
+        }
+
+    captured = capture_items("span") if span_streaming else capture_events()
+
+    with start_transaction():
+        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+        wrapped_invoke(pregel, test_state)
+
+    data = _invoke_span_data(captured, span_streaming)
+
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in data
+    assert data[SPANDATA.GEN_AI_RESPONSE_TEXT] == expected_assistant_response
+    assert prior_response not in data[SPANDATA.GEN_AI_RESPONSE_TEXT]
+    assert data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4.1-2025-04-14"
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_pregel_ainvoke_message_delta_ignores_gen_ai_inputs_setting(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[LanggraphIntegration()],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=span_streaming,
+        trace_lifecycle="stream" if span_streaming else "static",
+        _experiments={
+            "data_collection": {"gen_ai": {"inputs": False, "outputs": True}}
+        },
+    )
+
+    prior_response = "It is sunny in Berlin."
+    test_state = {
+        "messages": [
+            MockMessage("What is the weather?", name="user"),
+            MockMessage(
+                prior_response,
+                name="assistant",
+                response_metadata={
+                    "token_usage": {
+                        "total_tokens": 300,
+                        "prompt_tokens": 100,
+                        "completion_tokens": 200,
+                    },
+                    "model_name": "gpt-3.5-turbo",
+                },
+            ),
+        ]
+    }
+    pregel = MockPregelInstance("async_graph")
+    expected_assistant_response = "Let me check the weather for you!"
+
+    async def original_ainvoke(self, *args, **kwargs):
+        return {
+            "messages": args[0].get("messages", [])
+            + [
+                MockMessage(
+                    content=expected_assistant_response,
+                    name="assistant",
+                    response_metadata={
+                        "token_usage": {
+                            "total_tokens": 30,
+                            "prompt_tokens": 10,
+                            "completion_tokens": 20,
+                        },
+                        "model_name": "gpt-4.1-2025-04-14",
+                    },
+                )
+            ]
+        }
+
+    async def run_test():
+        with start_transaction():
+            wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
+            return await wrapped_ainvoke(pregel, test_state)
+
+    captured = capture_items("span") if span_streaming else capture_events()
+
+    asyncio.run(run_test())
+
+    data = _invoke_span_data(captured, span_streaming)
+
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in data
+    assert data[SPANDATA.GEN_AI_RESPONSE_TEXT] == expected_assistant_response
+    assert prior_response not in data[SPANDATA.GEN_AI_RESPONSE_TEXT]
+    assert data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4.1-2025-04-14"
+
+
 @pytest.mark.parametrize(
     "data_collection, send_default_pii, expect_available_tools",
     [
