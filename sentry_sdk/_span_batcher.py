@@ -129,7 +129,8 @@ class SpanBatcher(Batcher["SpanJSON"]):
                 self._running_size[span["trace_id"]] += self._estimate_size(span)
 
                 if (
-                    size + 1 >= self.MAX_BEFORE_FLUSH
+                    span["is_segment"] is True
+                    or size + 1 >= self.MAX_BEFORE_FLUSH
                     or self._running_size[span["trace_id"]]
                     >= self.MAX_BYTES_BEFORE_FLUSH
                 ):

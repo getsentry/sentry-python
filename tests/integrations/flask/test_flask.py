@@ -1211,20 +1211,31 @@ def test_transaction_or_segment_http_method_custom(
     response = client.options("/nomessage")
     assert response.status_code == 200
 
-    response = client.head("/nomessage")
-    assert response.status_code == 200
-
     if span_streaming:
         sentry_sdk.flush()
         spans = [i.payload for i in items]
-        assert len(spans) == 2
-        (options_segment, head_segment) = spans
+        (options_segment,) = spans
         assert options_segment["attributes"]["http.request.method"] == "OPTIONS"
+
+        response = client.head("/nomessage")
+        assert response.status_code == 200
+
+        sentry_sdk.flush()
+        spans = [i.payload for i in items]
+        assert len(spans) == 2
+        (_, head_segment) = spans
+
         assert head_segment["attributes"]["http.request.method"] == "HEAD"
     else:
-        assert len(events) == 2
-        (event1, event2) = events
+        (event1,) = events
         assert event1["request"]["method"] == "OPTIONS"
+
+        response = client.head("/nomessage")
+        assert response.status_code == 200
+
+        assert len(events) == 2
+        (_, event2) = events
+
         assert event2["request"]["method"] == "HEAD"
 
 
