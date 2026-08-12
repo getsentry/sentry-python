@@ -47,6 +47,7 @@ if TYPE_CHECKING:
         Generator,
         Iterator,
         List,
+        Mapping,
         NoReturn,
         Optional,
         ParamSpec,
@@ -1698,25 +1699,9 @@ def parse_url(url: str, sanitize: bool = True) -> "ParsedUrl":
 
 
 def get_aws_sigv4_signed_headers(
-    headers: "Any", url: "Optional[str]" = None
+    headers: "Optional[Mapping[str, str]]", url: "Optional[str]" = None
 ) -> "Set[str]":
-    # httpConnection exposes buffer, aiohttp uses header mapping.
-    if isinstance(headers, (str, bytes)):
-        authorization = headers
-    elif headers is None:
-        authorization = ""
-    elif hasattr(headers, "get"):
-        authorization = headers.get("Authorization", "")
-    else:
-        authorization = ""
-        for line in headers:
-            name, separator, value = line.partition(b":")
-            if separator and name.lower() == b"authorization":
-                authorization = value
-                break
-
-    if isinstance(authorization, bytes):
-        authorization = authorization.decode("ascii", "ignore")
+    authorization = headers.get("Authorization", "") if headers is not None else ""
 
     signed_headers: "Set[str]" = set()
     if isinstance(authorization, str):
