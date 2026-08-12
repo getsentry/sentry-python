@@ -799,7 +799,7 @@ def test_continue_trace_unsampled(sentry_init, capture_items):
         ...
 
     assert span.sampled is False
-    assert span.name == ""
+    assert span.name == "segment"
     assert span.trace_id == trace_id
     assert span.span_id != "0000000000000000"
 
