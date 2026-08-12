@@ -299,6 +299,8 @@ def _install_flush_completion_handshake(client: "sentry_sdk.Client") -> None:
 
     Otherwise, test assertions can be run before envelopes are captured.
     The span batcher flushes pending items asynchronously with the main thread.
+    Flushes triggered by segments finishing are asynchronous, and can collect buckets
+    that would have otherwise been flushed synchronously by `sentry_sdk.flush()`.
     """
     batcher = client.span_batcher
     if batcher is None:
@@ -306,17 +308,31 @@ def _install_flush_completion_handshake(client: "sentry_sdk.Client") -> None:
 
     orig_flush_raw = batcher._flush
     orig_flush = batcher.flush
-    done = threading.Event()
+    lock = threading.Lock()
+    drained_count = 0
+    wake = threading.Event()
 
     def _flush(*args: "Any", **kwargs: "Any") -> "Any":
+        nonlocal drained_count
         try:
             return orig_flush_raw(*args, **kwargs)
         finally:
-            done.set()
+            with lock:
+                drained_count += 1
+            wake.set()
 
     def flush() -> None:
-        if not done.is_set():
-            done.wait()
+        nonlocal drained_count
+        with lock:
+            target = drained_count
+
+        batcher._flush_event.set()
+        while True:
+            with lock:
+                if drained_count > target:
+                    break
+            wake.wait()
+            wake.clear()
         orig_flush()
 
     object.__setattr__(batcher, "_flush", _flush)
