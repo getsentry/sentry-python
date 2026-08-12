@@ -248,7 +248,7 @@ def _install_httplib() -> None:
             return real_endheaders(self, *args, **kwargs)
         finally:
             self._sentrysdk_trace_url = None  # type: ignore[attr-defined]
-            self._sentrysdk_request_header = None  # type: ignore[attr-defined]
+            self._sentrysdk_request_headers = None  # type: ignore[attr-defined]
             self._sentrysdk_signed_headers = None  # type: ignore[attr-defined]
 
     def getresponse(self: "HTTPConnection", *args: "Any", **kwargs: "Any") -> "Any":
