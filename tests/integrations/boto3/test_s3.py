@@ -4,6 +4,8 @@ import boto3
 import pytest
 
 import sentry_sdk
+from sentry_sdk import capture_message
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.boto3 import Boto3Integration
 from tests.conftest import ApproxDict
 from tests.integrations.boto3 import read_fixture
@@ -360,3 +362,79 @@ def test_span_origin(
 
         assert event["contexts"]["trace"]["origin"] == "manual"
         assert event["spans"][0]["origin"] == "auto.http.boto3"
+
+
+def test_breadcrumb(sentry_init, capture_events):
+    sentry_init(
+        integrations=[Boto3Integration()],
+        default_integrations=False,
+    )
+
+    s3 = session.resource("s3")
+    bucket = s3.Bucket("bucket")
+
+    events = capture_events()
+
+    with MockResponse(s3.meta.client, 200, {}, read_fixture("s3_list.xml")):
+        _ = [obj for obj in bucket.objects.all()]
+
+    capture_message("Testing!")
+
+    (event,) = events
+    (crumb,) = event["breadcrumbs"]["values"]
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+    assert crumb["data"] == ApproxDict(
+        {
+            "aws.request.url": mock.ANY,
+            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.HTTP_QUERY: mock.ANY,
+            SPANDATA.HTTP_FRAGMENT: "",
+        }
+    )
+
+
+@pytest.mark.parametrize("send_default_pii", [True, False])
+def test_breadcrumb_span_streaming(sentry_init, capture_events, send_default_pii):
+    sentry_init(
+        integrations=[Boto3Integration()],
+        default_integrations=False,
+        trace_lifecycle="stream",
+        send_default_pii=send_default_pii,
+    )
+
+    s3 = session.resource("s3")
+    bucket = s3.Bucket("bucket")
+
+    events = capture_events()
+
+    with sentry_sdk.traces.start_span(name="custom parent"), MockResponse(
+        s3.meta.client, 200, {}, read_fixture("s3_list.xml")
+    ):
+        _ = [obj for obj in bucket.objects.all()]
+
+    capture_message("Testing!")
+
+    (event,) = events
+    (crumb,) = event["breadcrumbs"]["values"]
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+
+    if send_default_pii:
+        assert crumb["data"] == ApproxDict(
+            {
+                SPANDATA.URL_FULL: mock.ANY,
+                SPANDATA.HTTP_REQUEST_METHOD: "GET",
+                SPANDATA.URL_QUERY: mock.ANY,
+                SPANDATA.URL_FRAGMENT: "",
+            }
+        )
+    else:
+        assert crumb["data"] == ApproxDict(
+            {
+                SPANDATA.HTTP_REQUEST_METHOD: "GET",
+            }
+        )
+        assert SPANDATA.URL_FULL not in crumb["data"]
+        assert SPANDATA.URL_QUERY not in crumb["data"]
+        assert SPANDATA.URL_FRAGMENT not in crumb["data"]
