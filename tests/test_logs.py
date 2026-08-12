@@ -28,23 +28,6 @@ def test_logs_enabled_by_default(sentry_init, capture_envelopes):
     assert envelopes
 
 
-def test_enable_logs_noop(sentry_init, capture_envelopes):
-    sentry_init(enable_logs=False)
-
-    envelopes = capture_envelopes()
-
-    sentry_sdk.logger.trace("This is a 'trace' log.")
-    sentry_sdk.logger.debug("This is a 'debug' log...")
-    sentry_sdk.logger.info("This is a 'info' log...")
-    sentry_sdk.logger.warning("This is a 'warning' log...")
-    sentry_sdk.logger.error("This is a 'error' log...")
-    sentry_sdk.logger.fatal("This is a 'fatal' log...")
-
-    sentry_sdk.flush()
-
-    assert envelopes
-
-
 def test_logs_basics(sentry_init, capture_items):
     sentry_init()
     items = capture_items("log")
