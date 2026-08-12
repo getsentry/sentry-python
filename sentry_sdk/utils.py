@@ -47,7 +47,6 @@ if TYPE_CHECKING:
         Generator,
         Iterator,
         List,
-        Mapping,
         NoReturn,
         Optional,
         ParamSpec,
