@@ -231,6 +231,37 @@ def test_logging_captured_warnings(sentry_init, capture_events, recwarn):
     assert len(third_warnings) == 1
 
 
+def test_sentry_logs_collection_off_by_default(sentry_init, capture_items, request):
+    """Automatic logs capture by Sentry logs needs explicit opt-in via capture_sentry_logs."""
+    sentry_init()
+    items = capture_items("log")
+
+    python_logger = logging.Logger("test-logger")
+    python_logger.warning("this is %s a template %s", "1", "2")
+
+    get_client().flush()
+
+    assert not items
+
+
+def test_sentry_logs_collection_opt_in(sentry_init, capture_items, request):
+    """Automatic logs capture by Sentry logs needs explicit opt-in via capture_sentry_logs."""
+    sentry_init(integrations=[LoggingIntegration(capture_sentry_logs=True)])
+    items = capture_items("log")
+
+    python_logger = logging.Logger("test-logger")
+    python_logger.warning("this is %s a template %s", "1", "2")
+
+    get_client().flush()
+
+    assert len(items) == 1
+
+    log = items[0].payload
+    assert log["attributes"]["sentry.message.template"] == "this is %s a template %s"
+    assert log["attributes"]["sentry.severity_number"] == 13
+    assert log["attributes"]["sentry.severity_text"] == "warn"
+
+
 def test_ignore_logger(sentry_init, capture_events, request):
     sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
     events = capture_events()
@@ -276,7 +307,7 @@ def test_ignore_logger_wildcard(sentry_init, capture_events, request):
 
 def test_ignore_logger_does_not_affect_sentry_logs(sentry_init, capture_items, request):
     """ignore_logger should suppress events/breadcrumbs but not Sentry Logs."""
-    sentry_init(enable_logs=True)
+    sentry_init(integrations=[LoggingIntegration(capture_sentry_logs=True)])
     items = capture_items("log")
 
     ignore_logger("testfoo")
@@ -294,7 +325,7 @@ def test_ignore_logger_for_sentry_logs(
     sentry_init, capture_envelopes, capture_items, request
 ):
     """ignore_logger_for_sentry_logs should suppress Sentry Logs but not events."""
-    sentry_init(enable_logs=True)
+    sentry_init(integrations=[LoggingIntegration(capture_sentry_logs=True)])
     envelopes = capture_envelopes()
     items = capture_items("log")
 
@@ -355,7 +386,7 @@ def test_sentry_logs_warning(sentry_init, capture_items):
     """
     The python logger module should create 'warn' sentry logs if the flag is on.
     """
-    sentry_init(enable_logs=True)
+    sentry_init(integrations=[LoggingIntegration(capture_sentry_logs=True)])
     items = capture_items("log")
 
     python_logger = logging.Logger("test-logger")
@@ -380,7 +411,7 @@ def test_sentry_logs_debug(sentry_init, capture_envelopes):
     """
     The python logger module should not create 'debug' sentry logs if the flag is on by default
     """
-    sentry_init(enable_logs=True)
+    sentry_init(integrations=[LoggingIntegration(capture_sentry_logs=True)])
     envelopes = capture_envelopes()
 
     python_logger = logging.Logger("test-logger")
@@ -395,8 +426,11 @@ def test_no_log_infinite_loop(sentry_init, capture_envelopes):
     If 'debug' mode is true, and you set a low log level in the logging integration, there should be no infinite loops.
     """
     sentry_init(
-        enable_logs=True,
-        integrations=[LoggingIntegration(sentry_logs_level=logging.DEBUG)],
+        integrations=[
+            LoggingIntegration(
+                capture_sentry_logs=True, sentry_logs_level=logging.DEBUG
+            )
+        ],
         debug=True,
     )
     envelopes = capture_envelopes()
@@ -412,7 +446,7 @@ def test_logging_errors(sentry_init, capture_envelopes, capture_items):
     """
     The python logger module should be able to log errors without erroring
     """
-    sentry_init(enable_logs=True)
+    sentry_init(integrations=[LoggingIntegration(capture_sentry_logs=True)])
     envelopes = capture_envelopes()
     items = capture_items("log")
 
@@ -447,8 +481,8 @@ def test_log_strips_project_root(sentry_init, capture_items):
     The python logger should strip project roots from the log record path
     """
     sentry_init(
-        enable_logs=True,
         project_root="/custom/test",
+        integrations=[LoggingIntegration(capture_sentry_logs=True)],
     )
     items = capture_items("log")
 
@@ -476,7 +510,7 @@ def test_logger_with_all_attributes(sentry_init, capture_items):
     """
     The python logger should be able to log all attributes, including extra data.
     """
-    sentry_init(enable_logs=True)
+    sentry_init(integrations=[LoggingIntegration(capture_sentry_logs=True)])
     items = capture_items("log")
 
     python_logger = logging.Logger("test-logger")
@@ -553,7 +587,7 @@ def test_sentry_logs_named_parameters(sentry_init, capture_items):
     """
     The python logger module should capture named parameters from dictionary arguments in Sentry logs.
     """
-    sentry_init(enable_logs=True)
+    sentry_init(integrations=[LoggingIntegration(capture_sentry_logs=True)])
     items = capture_items("log")
 
     python_logger = logging.Logger("test-logger")
@@ -598,7 +632,7 @@ def test_sentry_logs_named_parameters_complex_values(sentry_init, capture_items)
     """
     The python logger module should handle complex values in named parameters using safe_repr.
     """
-    sentry_init(enable_logs=True)
+    sentry_init(integrations=[LoggingIntegration(capture_sentry_logs=True)])
     items = capture_items("log")
 
     python_logger = logging.Logger("test-logger")
@@ -632,7 +666,7 @@ def test_sentry_logs_no_parameters_no_template(sentry_init, capture_items):
     """
     There shouldn't be a template if there are no parameters.
     """
-    sentry_init(enable_logs=True)
+    sentry_init(integrations=[LoggingIntegration(capture_sentry_logs=True)])
     items = capture_items("log")
 
     python_logger = logging.Logger("test-logger")

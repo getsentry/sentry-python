@@ -13,6 +13,7 @@ from importlib import import_module
 from typing import TYPE_CHECKING, Dict, List, cast, overload
 
 from sentry_sdk._compat import check_uwsgi_thread_support
+from sentry_sdk._log_batcher import LogBatcher
 from sentry_sdk._metrics_batcher import MetricsBatcher
 from sentry_sdk._span_batcher import SpanBatcher
 from sentry_sdk.consts import (
@@ -58,8 +59,6 @@ from sentry_sdk.utils import (
     get_type_name,
     handle_in_app,
     has_data_collection_enabled,
-    has_logs_enabled,
-    has_metrics_enabled,
     logger,
 )
 
@@ -629,22 +628,27 @@ class _Client(BaseClient):
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
-            self.log_batcher = None
-
-            if has_logs_enabled(self.options):
-                from sentry_sdk._log_batcher import LogBatcher
-
-                self.log_batcher = LogBatcher(
-                    capture_func=_capture_envelope,
-                    record_lost_func=_record_lost_event,
+            if self.options.get("enable_logs", False) or self.options[
+                "_experiments"
+            ].get("enable_logs", False):
+                logger.warning(
+                    "The enable_logs option has no effect and will be removed in the next major."
                 )
 
-            self.metrics_batcher = None
-            if has_metrics_enabled(self.options):
-                self.metrics_batcher = MetricsBatcher(
-                    capture_func=_capture_envelope,
-                    record_lost_func=_record_lost_event,
+            self.log_batcher = LogBatcher(
+                capture_func=_capture_envelope,
+                record_lost_func=_record_lost_event,
+            )
+
+            if self.options.get("enable_metrics", True) is False:
+                logger.warning(
+                    "The enable_metrics option has no effect and will be removed in the next major."
                 )
+
+            self.metrics_batcher = MetricsBatcher(
+                capture_func=_capture_envelope,
+                record_lost_func=_record_lost_event,
+            )
 
             self.span_batcher = None
             if has_span_streaming_enabled(self.options):

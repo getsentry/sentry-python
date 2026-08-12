@@ -9,6 +9,7 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
 from sentry_sdk.tracing_utils import (
+    add_http_breadcrumb,
     add_http_request_source,
     add_sentry_baggage_to_headers,
     has_span_streaming_enabled,
@@ -74,15 +75,19 @@ def _patch_builder_method(cls: type, method_name: str, middleware: "Any") -> Non
     original_method = getattr(cls, method_name)
 
     def sentry_patched_method(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
-        if not getattr(self, "_sentry_instrumented", False):
-            integration = sentry_sdk.get_client().get_integration(PyreqwestIntegration)
-            if integration is not None:
-                self.with_middleware(middleware)
-                try:
-                    self._sentry_instrumented = True
-                except (TypeError, AttributeError):
-                    # In case the instance itself is immutable or doesn't allow extra attributes
-                    pass
+        integration = sentry_sdk.get_client().get_integration(PyreqwestIntegration)
+
+        if getattr(self, "_sentry_instrumented", False) or integration is None:
+            return original_method(self, *args, **kwargs)
+
+        self.with_middleware(middleware)
+
+        try:
+            self._sentry_instrumented = True
+        except (TypeError, AttributeError):
+            # In case the instance itself is immutable or doesn't allow extra attributes
+            pass
+
         return original_method(self, *args, **kwargs)
 
     setattr(cls, method_name, sentry_patched_method)
@@ -158,11 +163,20 @@ def _sentry_pyreqwest_span(request: "Request") -> "Generator[Any, None, None]":
 
 
 async def sentry_async_middleware(
-    request: "Request", next_handler: "Next"
+    request: "Request",
+    next_handler: "Next",
 ) -> "Response":
     if sentry_sdk.get_client().get_integration(PyreqwestIntegration) is None:
         return await next_handler.run(request)
 
+    method = request.method
+    parsed_url = None
+    with capture_internal_exceptions():
+        # This needs to be done early because the URL is no longer accessible
+        # after the request has been sent
+        parsed_url = parse_url(str(request.url), sanitize=False)
+
+    response = None
     with _sentry_pyreqwest_span(request) as span:
         response = await next_handler.run(request)
         if isinstance(span, StreamedSpan):
@@ -174,6 +188,23 @@ async def sentry_async_middleware(
         elif span is not None:
             span.set_http_status(response.status)
 
+    if response is not None:
+        breadcrumb_data = {
+            SPANDATA.HTTP_METHOD: method,
+            SPANDATA.HTTP_STATUS_CODE: response.status,
+        }
+
+        if parsed_url and should_send_default_pii():
+            breadcrumb_data.update(
+                {
+                    "url": parsed_url.url,
+                    SPANDATA.HTTP_QUERY: parsed_url.query,
+                    SPANDATA.HTTP_FRAGMENT: parsed_url.fragment,
+                }
+            )
+
+        add_http_breadcrumb(response.status, breadcrumb_data)
+
     return response
 
 
@@ -183,6 +214,14 @@ def sentry_sync_middleware(
     if sentry_sdk.get_client().get_integration(PyreqwestIntegration) is None:
         return next_handler.run(request)
 
+    method = request.method
+    parsed_url = None
+    with capture_internal_exceptions():
+        # This needs to be done early because the URL is no longer accessible
+        # after the request has been sent
+        parsed_url = parse_url(str(request.url), sanitize=False)
+
+    response = None
     with _sentry_pyreqwest_span(request) as span:
         response = next_handler.run(request)
         if isinstance(span, StreamedSpan):
@@ -193,5 +232,22 @@ def sentry_sync_middleware(
             )
         elif span is not None:
             span.set_http_status(response.status)
+
+    if response is not None:
+        breadcrumb_data = {
+            SPANDATA.HTTP_METHOD: method,
+            SPANDATA.HTTP_STATUS_CODE: response.status,
+        }
+
+        if parsed_url and should_send_default_pii():
+            breadcrumb_data.update(
+                {
+                    "url": parsed_url.url,
+                    SPANDATA.HTTP_QUERY: parsed_url.query,
+                    SPANDATA.HTTP_FRAGMENT: parsed_url.fragment,
+                }
+            )
+
+        add_http_breadcrumb(response.status, breadcrumb_data)
 
     return response

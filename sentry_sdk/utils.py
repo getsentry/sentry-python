@@ -1944,16 +1944,6 @@ def safe_serialize(data: "Any") -> str:
         return str(data)
 
 
-def has_logs_enabled(options: "Optional[dict[str, Any]]") -> bool:
-    if options is None:
-        return False
-
-    return bool(
-        options.get("enable_logs", False)
-        or options["_experiments"].get("enable_logs", False)
-    )
-
-
 def has_data_collection_enabled(options: "Optional[dict[str, Any]]") -> bool:
     if options is None:
         return False
@@ -1970,13 +1960,6 @@ def get_before_send_log(
     return options.get("before_send_log") or options["_experiments"].get(
         "before_send_log"
     )
-
-
-def has_metrics_enabled(options: "Optional[dict[str, Any]]") -> bool:
-    if options is None:
-        return False
-
-    return bool(options.get("enable_metrics", True))
 
 
 def get_before_send_metric(

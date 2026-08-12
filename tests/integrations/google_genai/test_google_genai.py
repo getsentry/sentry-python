@@ -3843,11 +3843,19 @@ def test_generate_content_data_collection(
             {"gen_ai": {"inputs": True, "outputs": False}},
             [
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
-            ],
-            [
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
             ],
-            id="gen-ai-inputs-enabled-outputs-disabled-available-tools-only",
+            [],
+            id="gen-ai-inputs-enabled-outputs-disabled-tools-collected",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": True}},
+            [],
+            [
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+            ],
+            id="gen-ai-inputs-disabled-outputs-enabled-tools-not-collected",
         ),
         pytest.param(
             {"gen_ai": {}},
@@ -4195,11 +4203,19 @@ def test_streaming_generate_content_data_collection(
             {"gen_ai": {"inputs": True, "outputs": False}},
             [
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
-            ],
-            [
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
             ],
-            id="gen-ai-inputs-enabled-outputs-disabled-available-tools-only",
+            [],
+            id="gen-ai-inputs-enabled-outputs-disabled-tools-collected",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": True}},
+            [],
+            [
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+            ],
+            id="gen-ai-inputs-disabled-outputs-enabled-tools-not-collected",
         ),
         pytest.param(
             {"gen_ai": {}},

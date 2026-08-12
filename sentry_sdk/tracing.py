@@ -653,8 +653,6 @@ class Span:
             if has_ai_op or is_ai_span_op:
                 self.set_data("gen_ai.conversation.id", conversation_id)
 
-        maybe_create_breadcrumbs_from_span(scope, self)
-
         return None
 
     def to_json(self) -> "Dict[str, Any]":
@@ -1361,5 +1359,4 @@ from sentry_sdk.tracing_utils import (
     extract_sentrytrace_data,
     has_span_streaming_enabled,
     has_tracing_enabled,
-    maybe_create_breadcrumbs_from_span,
 )

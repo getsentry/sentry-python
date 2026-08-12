@@ -717,7 +717,10 @@ def _set_common_output_data(
         }
 
         if has_data_collection_enabled(client.options):
-            if client.options["data_collection"]["gen_ai"]["outputs"]:
+            record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
+            record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
+
+            if record_inputs or record_outputs:
                 for output in response.output:
                     if output.type == "function_call":
                         output_messages["tool"].append(output.dict())
@@ -731,7 +734,7 @@ def _set_common_output_data(
                                     output_message.dict()
                                 )
 
-                if len(output_messages["tool"]) > 0:
+                if record_inputs and len(output_messages["tool"]) > 0:
                     set_data_normalized(
                         span,
                         SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
@@ -739,7 +742,7 @@ def _set_common_output_data(
                         unpack=False,
                     )
 
-                if len(output_messages["response"]) > 0:
+                if record_outputs and len(output_messages["response"]) > 0:
                     set_data_normalized(
                         span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
                     )
