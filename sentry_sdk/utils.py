@@ -1697,6 +1697,43 @@ def parse_url(url: str, sanitize: bool = True) -> "ParsedUrl":
     )
 
 
+def get_aws_sigv4_signed_headers(
+    authorization: "Optional[str]", url: "Optional[str]" = None
+) -> "Set[str]":
+
+    signed_headers: "Set[str]" = set()
+    if authorization is not None:
+        # only AWS SigV4 authorization has the SignedHeaders parameter.
+        value = authorization.lstrip()
+        if value.startswith(("AWS4-HMAC-SHA256", "AWS4-ECDSA-P256-SHA256")):
+            for part in value.split(","):
+                part = part.strip()
+                if part.startswith("SignedHeaders="):
+                    _, _, header_names = part.partition("=")
+                    signed_headers.update(
+                        header.lower() for header in header_names.split(";") if header
+                    )
+                    break
+
+    if url is None:
+        return signed_headers
+
+    query = {
+        key.lower(): values for key, values in parse_qs(urlsplit(url).query).items()
+    }
+    algorithm = query.get("x-amz-algorithm", [""])[0]
+    if algorithm not in ("AWS4-HMAC-SHA256", "AWS4-ECDSA-P256-SHA256"):
+        return signed_headers
+
+    # presigned requests have SignedHeaders in the URL query.
+    signed_headers.update(
+        header.lower()
+        for header in query.get("x-amz-signedheaders", [""])[0].split(";")
+        if header
+    )
+    return signed_headers
+
+
 def is_valid_sample_rate(rate: "Any", source: str) -> bool:
     """
     Checks the given sample rate to make sure it is valid type and value (a

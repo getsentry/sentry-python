@@ -18,6 +18,7 @@ from sentry_sdk.utils import (
     env_to_bool,
     exc_info_from_error,
     format_timestamp,
+    get_aws_sigv4_signed_headers,
     get_current_thread_meta,
     get_default_release,
     get_error_message,
@@ -663,6 +664,33 @@ def test_default_release_empty_string():
         release = get_default_release()
 
     assert release is None
+
+
+@pytest.mark.parametrize(
+    "authorization,url,expected",
+    [
+        (
+            "AWS4-HMAC-SHA256 "
+            "Credential=test/20260804/eu-west-1/secretsmanager/aws4_request, "
+            "SignedHeaders=Host;X-Amz-Date, "
+            "Signature=sixtyseven",
+            None,
+            {"host", "x-amz-date"},
+        ),
+        (
+            "",
+            "https://example.com/?"
+            "X-Amz-Algorithm=AWS4-HMAC-SHA256&"
+            "X-Amz-SignedHeaders=host%3Bx-amz-date&"
+            "X-Amz-Signature=sixtyseven",
+            {"host", "x-amz-date"},
+        ),
+    ],
+)
+def test_get_aws_sigv4_signed_headers(authorization, url, expected):
+    assert (
+        get_aws_sigv4_signed_headers(authorization=authorization, url=url) == expected
+    )
 
 
 def test_get_default_release_sentry_release_env(monkeypatch):

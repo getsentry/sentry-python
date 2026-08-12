@@ -24,7 +24,7 @@ from sentry_sdk.integrations.aiohttp import (
     AioHttpIntegration,
     create_trace_config,
 )
-from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
+from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE, get_aws_sigv4_signed_headers
 from tests.conftest import ApproxDict
 from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
 
@@ -828,6 +828,200 @@ async def test_outgoing_trace_headers_append_to_baggage(
                 resp.request_info.headers["baggage"]
                 == "custom=value,sentry-trace_id=0123456789012345678901234567890,sentry-sample_rand=0.500000,sentry-environment=production,sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,sentry-transaction=/interactions/other-dogs/new-dog,sentry-sample_rate=1.0,sentry-sampled=true"
             )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [False, True])
+async def test_outgoing_trace_headers_preserve_signed_headers(
+    sentry_init, aiohttp_raw_server, aiohttp_client, span_streaming
+):
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    received_headers = []
+
+    async def handler(request):
+        received_headers.append(request.headers)
+        return web.Response(text="OK")
+
+    raw_server = await aiohttp_raw_server(handler)
+    authorization = (
+        "AWS4-HMAC-SHA256 "
+        "Credential=test/20260804/eu-west-1/secretsmanager/aws4_request, "
+        "SignedHeaders=baggage;host;sentry-trace, "
+        "Signature=sixtyseven"
+    )
+
+    client = await aiohttp_client(raw_server)
+
+    if span_streaming:
+        with sentry_sdk.traces.start_span(name="test"):  # type: ignore[attr-defined]
+            response = await client.get(
+                "/",
+                headers={
+                    "Authorization": authorization,
+                    "baggage": "vendor=value",
+                    "sentry-trace": "existing-trace",
+                },
+            )
+    else:
+        with sentry_sdk.start_transaction(name="test", sampled=True):
+            response = await client.get(
+                "/",
+                headers={
+                    "Authorization": authorization,
+                    "baggage": "vendor=value",
+                    "sentry-trace": "existing-trace",
+                },
+            )
+
+    request_headers = received_headers[0]
+
+    assert response.status == 200
+    # signed `baggage` and `sentry-trace` headers are preserved.
+    assert len(request_headers.getall("baggage")) == 1
+    assert request_headers["baggage"] == "vendor=value"
+    assert len(request_headers.getall("sentry-trace")) == 1
+    assert request_headers["sentry-trace"] == "existing-trace"
+    assert get_aws_sigv4_signed_headers(
+        authorization=request_headers.get("Authorization", "")
+    ) >= {
+        "host",
+        "baggage",
+        "sentry-trace",
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [False, True])
+async def test_outgoing_trace_headers_add_unsigned_headers(
+    sentry_init, aiohttp_raw_server, aiohttp_client, span_streaming
+):
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    received_headers = []
+
+    async def handler(request):
+        received_headers.append(request.headers.copy())
+        return web.Response(text="OK")
+
+    raw_server = await aiohttp_raw_server(handler)
+    authorization = (
+        "AWS4-HMAC-SHA256 "
+        "Credential=test/20260804/eu-west-1/secretsmanager/aws4_request, "
+        "SignedHeaders=host;x-amz-date,"
+        "Signature=sixtyseven"
+    )
+
+    client = await aiohttp_client(raw_server)
+
+    if span_streaming:
+        with sentry_sdk.traces.start_span(name="test"):  # type: ignore[attr-defined]
+            response = await client.get(
+                "/",
+                headers={
+                    "Authorization": authorization,
+                    "baggage": "vendor=value",
+                    "sentry-trace": "existing-trace",
+                },
+            )
+    else:
+        with sentry_sdk.start_transaction(name="test", sampled=True):
+            response = await client.get(
+                "/",
+                headers={
+                    "Authorization": authorization,
+                    "baggage": "vendor=value",
+                    "sentry-trace": "existing-trace",
+                },
+            )
+    request_headers = received_headers[0]
+
+    assert response.status == 200
+    # unsigned `baggage` and `sentry-trace` headers are injected.
+    assert len(request_headers.getall("sentry-trace")) == 1
+    assert request_headers["sentry-trace"] != "existing-trace"
+    assert len(request_headers.getall("baggage")) == 1
+    assert request_headers["baggage"].startswith("vendor=value,")
+    assert request_headers["baggage"].count("sentry-trace_id=") == 1
+    # added `baggage` and `sentry-trace` are not in the signed header set.
+    assert get_aws_sigv4_signed_headers(
+        authorization=request_headers.get("Authorization", "")
+    ) == {
+        "host",
+        "x-amz-date",
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [False, True])
+async def test_outgoing_trace_headers_skip_query_signed_baggage(
+    sentry_init, aiohttp_raw_server, aiohttp_client, span_streaming
+):
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+        default_integrations=False,
+    )
+
+    received_headers = []
+    received_urls = []
+
+    async def handler(request):
+        received_headers.append(request.headers.copy())
+        # Use the raw target so aiohttp/yarl URL canonicalization does not
+        # change the encoding of the presigned query parameters.
+        received_urls.append(request.raw_path)
+        return web.Response(text="OK")
+
+    raw_server = await aiohttp_raw_server(handler)
+    path = (
+        "/"
+        "?X-Amz-Algorithm=AWS4-HMAC-SHA256"
+        "&X-Amz-Credential="
+        "test%2F20260804%2Feu-west-1%2Fs3%2Faws4_request"
+        "&X-Amz-Date=20260804T120000Z"
+        "&X-Amz-Expires=60"
+        "&X-Amz-SignedHeaders=baggage%3Bhost"
+        "&X-Amz-Signature=sixtyseven"
+    )
+
+    client = await aiohttp_client(raw_server)
+
+    if span_streaming:
+        with sentry_sdk.traces.start_span(name="test"):  # type: ignore[attr-defined]
+            response = await client.get(
+                path,
+                headers={"baggage": "vendor=value"},
+            )
+    else:
+        with sentry_sdk.start_transaction(name="test", sampled=True):
+            response = await client.get(
+                path,
+                headers={"baggage": "vendor=value"},
+            )
+
+    headers = received_headers[0]
+    assert response.status == 200
+    # `baggage` is part of X-Amz-SignedHeaders, so it must not be modified.
+    assert len(headers.getall("baggage")) == 1
+    assert headers["baggage"] == "vendor=value"
+    # `sentry-trace` was not signed, so it can be propagated.
+    assert len(headers.getall("sentry-trace")) == 1
+    assert get_aws_sigv4_signed_headers(
+        authorization=headers.get("Authorization", ""), url=received_urls[0]
+    ) == {
+        "baggage",
+        "host",
+    }
 
 
 @pytest.mark.asyncio
