@@ -660,7 +660,7 @@ class _Client(BaseClient):
                 record_lost_func=_record_lost_event,
             )
 
-            if self.options.get("enable_metrics", False):
+            if self.options.get("enable_metrics", True) is False:
                 logger.warning(
                     "The enable_metrics option has no effect and will be removed in the next major."
                 )

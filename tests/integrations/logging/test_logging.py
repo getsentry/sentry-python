@@ -411,7 +411,7 @@ def test_sentry_logs_debug(sentry_init, capture_envelopes):
     """
     The python logger module should not create 'debug' sentry logs if the flag is on by default
     """
-    sentry_init(enable_logs=True)
+    sentry_init(integrations=[LoggingIntegration(capture_sentry_logs=True)])
     envelopes = capture_envelopes()
 
     python_logger = logging.Logger("test-logger")
