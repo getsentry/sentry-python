@@ -233,6 +233,7 @@ def maybe_create_breadcrumbs_from_span(
         "auto.http.pyreqwest",
         "auto.http.httpx",
         "auto.http.httpx2",
+        "auto.http.stdlib.httplib",
     ):
         level = None
         status_code = span._data.get(SPANDATA.HTTP_STATUS_CODE)

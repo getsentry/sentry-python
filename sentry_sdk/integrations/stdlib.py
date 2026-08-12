@@ -13,6 +13,7 @@ from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import (
     EnvironHeaders,
+    add_http_breadcrumb,
     add_http_request_source,
     has_span_streaming_enabled,
     should_propagate_trace,
@@ -112,11 +113,21 @@ def _install_httplib() -> None:
             parsed_url = parse_url(real_url, sanitize=False)
 
         span_streaming = has_span_streaming_enabled(client.options)
-        span: "Union[Span, StreamedSpan, None]"
+        span: "Union[Span, StreamedSpan, None]" = None
+        breadcrumb: "dict[str, Any]" = {}
+
         if span_streaming:
-            if sentry_sdk.traces.get_current_span() is None:
-                span = None
-            else:
+            breadcrumb[SPANDATA.HTTP_REQUEST_METHOD] = method
+            if parsed_url is not None and should_send_default_pii():
+                breadcrumb.update(
+                    {
+                        SPANDATA.URL_FRAGMENT: parsed_url.fragment,
+                        SPANDATA.URL_FULL: parsed_url.url,
+                        SPANDATA.URL_QUERY: parsed_url.query,
+                    }
+                )
+
+            if sentry_sdk.traces.get_current_span() is not None:
                 span = sentry_sdk.traces.start_span(
                     name="%s %s"
                     % (
@@ -136,6 +147,7 @@ def _install_httplib() -> None:
                     span.set_attribute(SPANDATA.URL_QUERY, parsed_url.query)
 
                 set_on_span = span.set_attribute
+
         else:
             span = sentry_sdk.start_span(
                 op=OP.HTTP_CLIENT,
@@ -145,17 +157,35 @@ def _install_httplib() -> None:
             )
 
             span.set_data(SPANDATA.HTTP_METHOD, method)
+            breadcrumb[SPANDATA.HTTP_METHOD] = method
+
             if parsed_url is not None:
                 span.set_data(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
                 span.set_data("url", parsed_url.url)
                 span.set_data(SPANDATA.HTTP_QUERY, parsed_url.query)
 
+                breadcrumb.update(
+                    {
+                        SPANDATA.HTTP_FRAGMENT: parsed_url.fragment,
+                        "url": parsed_url.url,
+                        SPANDATA.HTTP_QUERY: parsed_url.query,
+                    }
+                )
+
             set_on_span = span.set_data
 
         # for proxies, these point to the proxy host/port
-        if span and tunnel_host:
-            set_on_span(SPANDATA.NETWORK_PEER_ADDRESS, self.host)
-            set_on_span(SPANDATA.NETWORK_PEER_PORT, self.port)
+        if tunnel_host:
+            if span:
+                set_on_span(SPANDATA.NETWORK_PEER_ADDRESS, self.host)
+                set_on_span(SPANDATA.NETWORK_PEER_PORT, self.port)
+
+            breadcrumb.update(
+                {
+                    SPANDATA.NETWORK_PEER_ADDRESS: self.host,
+                    SPANDATA.NETWORK_PEER_PORT: self.port,
+                }
+            )
 
         rv = real_putrequest(self, method, url, *args, **kwargs)
 
@@ -174,28 +204,46 @@ def _install_httplib() -> None:
                 self.putheader(key, value)
 
         self._sentrysdk_span = span  # type: ignore[attr-defined]
+        self._sentrysdk_breadcrumb = breadcrumb  # type: ignore[attr-defined]
 
         return rv
 
     def getresponse(self: "HTTPConnection", *args: "Any", **kwargs: "Any") -> "Any":
         span = getattr(self, "_sentrysdk_span", None)
-
-        if span is None:
-            return real_getresponse(self, *args, **kwargs)
+        breadcrumb = getattr(self, "_sentrysdk_breadcrumb", None)
 
         try:
             rv = real_getresponse(self, *args, **kwargs)
-        except BaseException:
-            _complete_span(span)
+        except BaseException as ex:
+            if span:
+                _complete_span(span)
+            if (
+                breadcrumb
+                and "getresponse() got an unexpected keyword argument 'buffering'"
+                not in str(ex)
+            ):
+                # the exception msg check is needed for Python 3.6/requests compat
+                add_http_breadcrumb(None, breadcrumb)
             raise
 
+        status_code = int(rv.status)
+
+        if breadcrumb:
+            breadcrumb[SPANDATA.HTTP_STATUS_CODE] = status_code
+
+        if span is None:
+            if breadcrumb:
+                add_http_breadcrumb(status_code, breadcrumb)
+            return rv
+
         if isinstance(span, StreamedSpan):
-            status_code = int(rv.status)
             span.status = "error" if status_code >= 400 else "ok"
-            span.set_attribute("http.response.status_code", status_code)
-        else:
-            span.set_http_status(int(rv.status))
+            span.set_attribute(SPANDATA.HTTP_STATUS_CODE, status_code)
+        elif isinstance(span, Span):
+            span.set_http_status(status_code)
             span.set_data("reason", rv.reason)
+            if breadcrumb:
+                breadcrumb["reason"] = rv.reason
 
         # getresponse doesn't include actually reading the response body. This
         # is done in read(). So if the metadata/headers suggest there's a body to
@@ -205,6 +253,11 @@ def _install_httplib() -> None:
             rv._sentrysdk_span = span  # type: ignore[attr-defined]
         else:
             _complete_span(span)
+
+        if breadcrumb:
+            # Regardless of whether the response itself has been fully read or not,
+            # the breadcrumb can now be emitted since we now have the status code.
+            add_http_breadcrumb(status_code, breadcrumb)
 
         return rv
 
