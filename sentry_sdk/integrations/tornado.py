@@ -2,7 +2,6 @@ import contextlib
 import weakref
 
 import sentry_sdk
-from sentry_sdk.api import continue_trace
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query_string
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
@@ -14,9 +13,7 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import SegmentNameSource, StreamedSpan
-from sentry_sdk.tracing import TransactionSource
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
+from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
@@ -36,10 +33,9 @@ except ImportError:
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, ContextManager, Dict, Generator, Optional, Union
+    from typing import Any, Callable, Dict, Generator, Optional, Union
 
     from sentry_sdk._types import Event, EventProcessor
-    from sentry_sdk.tracing import Span
 
 
 class TornadoIntegration(Integration):
@@ -91,7 +87,6 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
 
     weak_handler = weakref.ref(self)
     client = sentry_sdk.get_client()
-    is_span_streaming_enabled = has_span_streaming_enabled(client.options)
 
     with sentry_sdk.isolation_scope() as scope:
         headers = self.request.headers
@@ -100,75 +95,49 @@ def _handle_request_impl(self: "RequestHandler") -> "Generator[None, None, None]
         processor = _make_event_processor(weak_handler)
         scope.add_event_processor(processor)
 
-        span_ctx: "ContextManager[Union[Span, StreamedSpan, None]]"
+        sentry_sdk.traces.continue_trace(dict(headers))
+        scope.set_custom_sampling_context({"tornado_request": self.request})
 
-        if is_span_streaming_enabled:
-            sentry_sdk.traces.continue_trace(dict(headers))
-            scope.set_custom_sampling_context({"tornado_request": self.request})
-
-            if self.request.remote_ip:
-                if has_data_collection_enabled(client.options):
-                    if client.options["data_collection"]["user_info"]:
-                        scope.set_attribute(
-                            SPANDATA.USER_IP_ADDRESS, self.request.remote_ip
-                        )
-                elif should_send_default_pii():
+        if self.request.remote_ip:
+            if has_data_collection_enabled(client.options):
+                if client.options["data_collection"]["user_info"]:
                     scope.set_attribute(
                         SPANDATA.USER_IP_ADDRESS, self.request.remote_ip
                     )
+            elif should_send_default_pii():
+                scope.set_attribute(SPANDATA.USER_IP_ADDRESS, self.request.remote_ip)
 
-            span_ctx = sentry_sdk.traces.start_span(
-                name=_DEFAULT_ROOT_SPAN_NAME,
-                attributes={
-                    "sentry.op": OP.HTTP_SERVER,
-                    "sentry.origin": TornadoIntegration.origin,
-                    "sentry.segment.name.source": SegmentNameSource.ROUTE,
-                },
-                parent_span=None,
-            )
-        else:
-            transaction = continue_trace(
-                headers,
-                op=OP.HTTP_SERVER,
-                # Like with all other integrations, this is our
-                # fallback transaction in case there is no route.
-                # sentry_urldispatcher_resolve is responsible for
-                # setting a transaction name later.
-                name=_DEFAULT_ROOT_SPAN_NAME,
-                source=TransactionSource.ROUTE,
-                origin=TornadoIntegration.origin,
-            )
-            span_ctx = sentry_sdk.start_transaction(
-                transaction,
-                custom_sampling_context={"tornado_request": self.request},
-            )
-
-        with span_ctx as span:
+        with sentry_sdk.traces.start_span(
+            name=_DEFAULT_ROOT_SPAN_NAME,
+            attributes={
+                "sentry.op": OP.HTTP_SERVER,
+                "sentry.origin": TornadoIntegration.origin,
+                "sentry.segment.name.source": SegmentNameSource.ROUTE,
+            },
+            parent_span=None,
+        ) as span:
             try:
                 yield
             finally:
-                if type(span) is StreamedSpan:
-                    with capture_internal_exceptions():
-                        for attr, value in _get_request_attributes(
-                            self.request
-                        ).items():
-                            span.set_attribute(attr, value)
+                with capture_internal_exceptions():
+                    for attr, value in _get_request_attributes(self.request).items():
+                        span.set_attribute(attr, value)
 
-                    with capture_internal_exceptions():
-                        method = getattr(self, self.request.method.lower(), None)
-                        if method is not None:
-                            span_name = transaction_from_function(method)
-                            if span_name:
-                                span.name = span_name
-                                span.set_attribute(
-                                    "sentry.segment.name.source",
-                                    SegmentNameSource.COMPONENT,
-                                )
+                with capture_internal_exceptions():
+                    method = getattr(self, self.request.method.lower(), None)
+                    if method is not None:
+                        span_name = transaction_from_function(method)
+                        if span_name:
+                            span.name = span_name
+                            span.set_attribute(
+                                "sentry.segment.name.source",
+                                SegmentNameSource.COMPONENT,
+                            )
 
-                    with capture_internal_exceptions():
-                        status_int = self.get_status()
-                        span.set_attribute(SPANDATA.HTTP_STATUS_CODE, status_int)
-                        span.status = "error" if status_int >= 400 else "ok"
+                with capture_internal_exceptions():
+                    status_int = self.get_status()
+                    span.set_attribute(SPANDATA.HTTP_STATUS_CODE, status_int)
+                    span.status = "error" if status_int >= 400 else "ok"
 
 
 def _get_request_attributes(request: "Any") -> "Dict[str, Any]":
@@ -265,7 +234,7 @@ def _make_event_processor(
         with capture_internal_exceptions():
             method = getattr(handler, handler.request.method.lower())
             event["transaction"] = transaction_from_function(method) or ""
-            event["transaction_info"] = {"source": TransactionSource.COMPONENT}
+            event["transaction_info"] = {"source": SegmentNameSource.COMPONENT}
 
         client_options = sentry_sdk.get_client().options
         with capture_internal_exceptions():
