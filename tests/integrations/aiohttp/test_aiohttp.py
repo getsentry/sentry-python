@@ -696,7 +696,7 @@ async def test_outgoing_trace_headers_preserve_signed_headers(
     assert request_headers["baggage"] == "vendor=value"
     assert len(request_headers.getall("sentry-trace")) == 1
     assert request_headers["sentry-trace"] == "existing-trace"
-    assert get_aws_sigv4_signed_headers(headers=request_headers) >= {
+    assert get_aws_sigv4_signed_headers(authorization=request_headers.get("Authorization", "")) >= {
         "host",
         "baggage",
         "sentry-trace",
@@ -760,7 +760,7 @@ async def test_outgoing_trace_headers_add_unsigned_headers(
     assert request_headers["baggage"].startswith("vendor=value,")
     assert request_headers["baggage"].count("sentry-trace_id=") == 1
     # added `baggage` and `sentry-trace` are not in the signed header set.
-    assert get_aws_sigv4_signed_headers(headers=request_headers) == {
+    assert get_aws_sigv4_signed_headers(authorization=request_headers.get("Authorization", "")) == {
         "host",
         "x-amz-date",
     }
@@ -822,7 +822,7 @@ async def test_outgoing_trace_headers_skip_query_signed_baggage(
     assert headers["baggage"] == "vendor=value"
     # `sentry-trace` was not signed, so it can be propagated.
     assert len(headers.getall("sentry-trace")) == 1
-    assert get_aws_sigv4_signed_headers(headers=headers, url=received_urls[0]) == {
+    assert get_aws_sigv4_signed_headers(authorization=headers.get("Authorization", ""), url=received_urls[0]) == {
         "baggage",
         "host",
     }

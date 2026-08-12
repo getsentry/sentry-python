@@ -1699,12 +1699,11 @@ def parse_url(url: str, sanitize: bool = True) -> "ParsedUrl":
 
 
 def get_aws_sigv4_signed_headers(
-    headers: "Optional[Mapping[str, str]]", url: "Optional[str]" = None
+    authorization: "Optional[str]", url: "Optional[str]" = None
 ) -> "Set[str]":
-    authorization = headers.get("Authorization", "") if headers is not None else ""
 
     signed_headers: "Set[str]" = set()
-    if isinstance(authorization, str):
+    if authorization is not None:
         # only AWS SigV4 authorization has the SignedHeaders parameter.
         value = authorization.lstrip()
         if value.startswith(("AWS4-HMAC-SHA256", "AWS4-ECDSA-P256-SHA256")):

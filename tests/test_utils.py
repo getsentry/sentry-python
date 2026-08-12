@@ -667,22 +667,18 @@ def test_default_release_empty_string():
 
 
 @pytest.mark.parametrize(
-    "headers,url,expected",
+    "authorization,url,expected",
     [
         (
-            {
-                "Authorization": (
-                    "AWS4-HMAC-SHA256 "
-                    "Credential=test/20260804/eu-west-1/secretsmanager/aws4_request, "
-                    "SignedHeaders=Host;X-Amz-Date, "
-                    "Signature=sixtyseven"
-                )
-            },
+            "AWS4-HMAC-SHA256 "
+            "Credential=test/20260804/eu-west-1/secretsmanager/aws4_request, "
+            "SignedHeaders=Host;X-Amz-Date, "
+            "Signature=sixtyseven",
             None,
             {"host", "x-amz-date"},
         ),
         (
-            {},
+            "",
             "https://example.com/?"
             "X-Amz-Algorithm=AWS4-HMAC-SHA256&"
             "X-Amz-SignedHeaders=host%3Bx-amz-date&"
@@ -691,8 +687,8 @@ def test_default_release_empty_string():
         ),
     ],
 )
-def test_get_aws_sigv4_signed_headers(headers, url, expected):
-    assert get_aws_sigv4_signed_headers(headers, url) == expected
+def test_get_aws_sigv4_signed_headers(authorization, url, expected):
+    assert get_aws_sigv4_signed_headers(authorization=authorization, url=url) == expected
 
 
 def test_get_default_release_sentry_release_env(monkeypatch):

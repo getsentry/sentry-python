@@ -643,7 +643,9 @@ def test_outgoing_trace_headers_skip_signed_baggage(
     assert headers.get_all("baggage") == ["vendor=value"]
     # preserves existing `sentry-trace` header.
     assert headers.get_all("sentry-trace") == ["existing-trace"]
-    assert get_aws_sigv4_signed_headers(headers=headers) >= {
+    assert get_aws_sigv4_signed_headers(
+        authorization=headers.get("Authorization", "")
+    ) >= {
         "baggage",
         "host",
         "sentry-trace",
@@ -694,7 +696,7 @@ def test_outgoing_trace_headers_skip_query_signed_baggage(
     # `sentry-trace` was not signed, so it can be propagated.
     assert len(headers.get_all("sentry-trace")) == 1
     assert get_aws_sigv4_signed_headers(
-        headers=headers, url=f"http://127.0.0.1:{server.server_port}{path}"
+        authorization=headers.get("Authorization", ""), url=f"http://127.0.0.1:{server.server_port}{path}"
     ) >= {"baggage", "host"}
 
 
