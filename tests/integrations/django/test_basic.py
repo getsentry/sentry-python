@@ -132,14 +132,18 @@ def test_middleware_exceptions(sentry_init, client, capture_exceptions):
     assert isinstance(error, ZeroDivisionError)
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 def test_request_captured(
     sentry_init,
     client,
+    capture_events,
     capture_items,
+    span_streaming,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
+        trace_lifecycle="stream" if span_streaming else "static",
     )
     items = capture_items("event")
     content, status, headers = unpack_werkzeug_response(client.get(reverse("message")))
@@ -147,6 +151,7 @@ def test_request_captured(
     assert content == b"ok"
 
     (event,) = (item.payload for item in items)
+
     assert event["transaction"] == "/message"
     assert event["request"] == {
         "cookies": {},
@@ -1187,20 +1192,27 @@ def test_request_body_already_read(
     assert "data" not in event["request"]
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 def test_template_tracing_meta(
     sentry_init,
     client,
+    capture_events,
     capture_items,
+    span_streaming,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
+        trace_lifecycle="stream" if span_streaming else "static",
     )
+
     items = capture_items("event")
 
     content, _, _ = unpack_werkzeug_response(client.get(reverse("template_test3")))
     rendered_meta = content.decode("utf-8")
 
-    traceparent, baggage = items[0].payload["message"].split("\n")
+    events = [item.payload for item in items]
+
+    traceparent, baggage = events[0]["message"].split("\n")
     assert traceparent != ""
     assert baggage != ""
 
@@ -1427,19 +1439,24 @@ def test_rest_framework_authentication_span_without_authenticators(
 @pytest.mark.parametrize(
     "endpoint", ["rest_permission_denied_exc", "permission_denied_exc"]
 )
+@pytest.mark.parametrize("span_streaming", [True, False])
 def test_does_not_capture_403(
     sentry_init,
     client,
+    capture_events,
     capture_items,
     endpoint,
+    span_streaming,
 ):
     if endpoint == "rest_permission_denied_exc":
         pytest.importorskip("rest_framework")
 
     sentry_init(
         integrations=[DjangoIntegration()],
+        trace_lifecycle="stream" if span_streaming else "static",
     )
-    items = capture_items("event")
+
+    items = capture_items("event", "transaction", "span")
 
     _, status, _ = unpack_werkzeug_response(client.get(reverse(endpoint)))
     assert status.lower() == "403 forbidden"
