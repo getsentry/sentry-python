@@ -62,17 +62,6 @@ class StdlibIntegration(Integration):
             return event
 
 
-def _request_header_names(buffer: "Optional[List[bytes]]") -> "Set[str]":
-    if buffer is None:
-        return set()
-    names = set()
-    for line in buffer:
-        name, separator, _ = line.partition(b":")
-        if separator:
-            names.add(name.decode("ascii", "ignore").lower())
-    return names
-
-
 def _complete_span(span: "Union[Span, StreamedSpan]") -> None:
     if isinstance(span, StreamedSpan):
         with capture_internal_exceptions():
@@ -86,10 +75,37 @@ def _complete_span(span: "Union[Span, StreamedSpan]") -> None:
 
 def _install_httplib() -> None:
     real_putrequest = HTTPConnection.putrequest
+    real_putheader = HTTPConnection.putheader
     real_endheaders = HTTPConnection.endheaders
     real_getresponse = HTTPConnection.getresponse
     real_read = HTTPResponse.read
     real_close = HTTPResponse.close
+
+    def putheader(self: "HTTPConnection", header: "Any", *values: "Any") -> "Any":
+        rv = real_putheader(self, header, *values)
+
+        request_header_names = getattr(self, "_sentrysdk_request_headers", None)
+        if request_header_names is None:
+            return rv
+
+        if isinstance(header, bytes):
+            normalized_header = header.decode("ascii", "ignore").lower()
+        elif isinstance(header, str):
+            normalized_header = header.lower()
+        else:
+            return rv
+
+        request_header_names.add(normalized_header)
+        if normalized_header == "authorization" and values:
+            signed_headers = getattr(self, "_sentrysdk_signed_headers", None)
+            if signed_headers is not None:
+                with capture_internal_exceptions():
+                    authorization = values[0]
+                    if isinstance(authorization, bytes):
+                        authorization = authorization.decode("ascii", "ignore")
+                    signed_headers.update(get_aws_sigv4_signed_headers(authorization))
+
+        return rv
 
     def putrequest(
         self: "HTTPConnection", method: str, url: str, *args: "Any", **kwargs: "Any"
@@ -170,10 +186,17 @@ def _install_httplib() -> None:
             set_on_span(SPANDATA.NETWORK_PEER_ADDRESS, self.host)
             set_on_span(SPANDATA.NETWORK_PEER_PORT, self.port)
 
+        # track existing headers separately from signed so thatexisting unsigned
+        # baggage header can be extended while signed baggage stays unchanged.
+        self._sentrysdk_request_headers = set()  # type: ignore[attr-defined]
+        self._sentrysdk_signed_headers = set()  # type: ignore[attr-defined]
+
         try:
             rv = real_putrequest(self, method, url, *args, **kwargs)
         except BaseException:
             self._sentrysdk_trace_url = None  # type: ignore[attr-defined]
+            self._sentrysdk_request_headers = None  # type: ignore[attr-defined]
+            self._sentrysdk_signed_headers = None  # type: ignore[attr-defined]
             raise
 
         if should_propagate_trace(client, real_url):
@@ -192,10 +215,14 @@ def _install_httplib() -> None:
         try:
             if real_url is not None:
                 with capture_internal_exceptions():
-                    request_buffer = getattr(self, "_buffer", None)
-                    existing_headers = _request_header_names(request_buffer)
-                    signed_headers = get_aws_sigv4_signed_headers(
-                        request_buffer, real_url
+                    existing_headers: "Set[str]" = getattr(
+                        self, "_sentrysdk_request_headers", set()
+                    )
+                    signed_headers: "Set[str]" = getattr(
+                        self, "_sentrysdk_signed_headers", set()
+                    )
+                    signed_headers.update(
+                        get_aws_sigv4_signed_headers(authorization=None, url=real_url)
                     )
 
                     for (
@@ -221,6 +248,8 @@ def _install_httplib() -> None:
             return real_endheaders(self, *args, **kwargs)
         finally:
             self._sentrysdk_trace_url = None  # type: ignore[attr-defined]
+            self._sentrysdk_request_header_names = None  # type: ignore[attr-defined]
+            self._sentrysdk_signed_headers = None  # type: ignore[attr-defined]
 
     def getresponse(self: "HTTPConnection", *args: "Any", **kwargs: "Any") -> "Any":
         span = getattr(self, "_sentrysdk_span", None)
@@ -277,6 +306,7 @@ def _install_httplib() -> None:
                 self._sentrysdk_span = None  # type: ignore[attr-defined]
                 _complete_span(span)
 
+    HTTPConnection.putheader = putheader  # type: ignore[method-assign]
     HTTPConnection.putrequest = putrequest  # type: ignore[method-assign]
     HTTPConnection.endheaders = endheaders  # type: ignore[method-assign]
     HTTPConnection.getresponse = getresponse  # type: ignore[method-assign]
