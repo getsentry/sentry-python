@@ -719,14 +719,13 @@ def test_sibling_segments_new_trace(sentry_init, capture_items):
     spans = [item.payload for item in items]
 
     assert len(spans) == 2
-    segment1, segment2 = spans
 
-    assert segment1["name"] == "segment1"
+    (segment1,) = (span for span in spans if span["name"] == "segment1")
     assert segment1["attributes"]["sentry.segment.name"] == "segment1"
     assert segment1["is_segment"] is True
     assert "parent_span_id" not in segment1
 
-    assert segment2["name"] == "segment2"
+    (segment2,) = (span for span in spans if span["name"] == "segment2")
     assert segment2["attributes"]["sentry.segment.name"] == "segment2"
     assert segment2["is_segment"] is True
     assert "parent_span_id" not in segment2
