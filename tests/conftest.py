@@ -4,6 +4,7 @@ import io
 import json
 import os
 import socket
+import threading
 import warnings
 from collections import namedtuple
 from contextlib import contextmanager
@@ -293,11 +294,47 @@ def uninstall_integration():
     return inner
 
 
+def _install_flush_completion_handshake(client: "sentry_sdk.Client") -> None:
+    """Make batcher.flush() wait for the flusher thread to drain.
+
+    Otherwise, test assertions can be run before envelopes are captured
+    despite `sentry_sdk.flush()`. The span batcher flushes pending items
+    asynchronously with the main thread.
+    """
+    batcher = client.span_batcher
+    if batcher is None:
+        return
+
+    orig_flush_raw = batcher._flush
+    orig_flush = batcher.flush
+    done = threading.Event()
+
+    def _flush(*args: "Any", **kwargs: "Any") -> "Any":
+        try:
+            return orig_flush_raw(*args, **kwargs)
+        finally:
+            done.set()
+
+    def flush() -> None:
+        # If a segment or threshold already woke the background flusher and
+        # it drained, `done` is set and we can skip waiting. Otherwise,
+        # poke the flusher so a drain is guaranteed to happen (otherwise
+        # done.wait() could hang for tests that rely on flush() itself).
+        if not done.is_set():
+            batcher._flush_event.set()
+            done.wait()
+        orig_flush()
+
+    object.__setattr__(batcher, "_flush", _flush)
+    object.__setattr__(batcher, "flush", flush)
+
+
 @pytest.fixture
 def sentry_init(request):
     def inner(*a, **kw):
         kw.setdefault("transport", TestTransport())
         client = sentry_sdk.Client(*a, **kw)
+        _install_flush_completion_handshake(client)
         sentry_sdk.get_global_scope().set_client(client)
 
     if request.node.get_closest_marker("forked"):
