@@ -208,7 +208,7 @@ TEST_SUITE_CONFIG = {
     "httpx": {
         "package": "httpx",
         "deps": {
-            "*": ["anyio>=3,<5"],
+            "*": ["anyio>=3,<5", "pytest-asyncio"],
             "<0.24": ["anyio<4"],
             ">=0.16,<0.17": ["pytest-httpx==0.10.0"],
             ">=0.17,<0.19": ["pytest-httpx==0.12.0"],
@@ -228,7 +228,7 @@ TEST_SUITE_CONFIG = {
     "httpx2": {
         "package": "httpx2",
         "deps": {
-            "*": ["anyio>=3,<5", "httpx2-pytest==1.0.1"],
+            "*": ["anyio>=3,<5", "httpx2-pytest==1.0.1", "pytest-asyncio"],
         },
         "python": ">=3.10",
     },
