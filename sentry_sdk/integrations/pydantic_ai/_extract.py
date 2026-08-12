@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from sentry_sdk.ai.consts import DATA_URL_BASE64_REGEX
 from sentry_sdk.ai.utils import get_modality_from_mime_type
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.utils import safe_serialize
 
 try:
@@ -53,24 +54,15 @@ class ModelInfo:
     settings: "Dict[str, Any]" = field(default_factory=dict)
 
 
-@dataclass
-class UsageInfo:
-    input_tokens: "Optional[int]" = None
-    cache_read_tokens: "Optional[int]" = None
-    cache_write_tokens: "Optional[int]" = None
-    output_tokens: "Optional[int]" = None
-    total_tokens: "Optional[int]" = None
-
-
-# Model settings that get mirrored onto spans; values are read with dict
-# access first because ModelSettings is a TypedDict (dict at runtime).
-MODEL_SETTING_NAMES = (
-    "max_tokens",
-    "temperature",
-    "top_p",
-    "frequency_penalty",
-    "presence_penalty",
-)
+# Single source of truth for which model settings get mirrored onto spans
+# and which span attribute each one maps to.
+MODEL_SETTINGS_TO_SPANDATA = {
+    "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
+    "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
+    "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
+    "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
+    "presence_penalty": SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
+}
 
 
 def get_model_name(model_obj: "Any") -> "Optional[str]":
@@ -97,7 +89,7 @@ def extract_model_settings(settings: "Any") -> "Dict[str, Any]":
     if not settings:
         return extracted
 
-    for setting_name in MODEL_SETTING_NAMES:
+    for setting_name in MODEL_SETTINGS_TO_SPANDATA:
         if isinstance(settings, dict):
             value = settings.get(setting_name)
         else:
@@ -167,8 +159,8 @@ def extract_available_tools(agent: "Any") -> "Optional[List[Dict[str, Any]]]":
         return None
 
 
-def extract_usage(usage: "Any") -> "Optional[UsageInfo]":
-    """Extract token usage counts.
+def extract_usage_kwargs(usage: "Any") -> "Optional[Dict[str, Optional[int]]]":
+    """Extract token usage counts as record_token_usage keyword arguments.
 
     Works with both RequestUsage (single request) and RunUsage (agent run)
     objects from pydantic-ai; note the library uses cache_read_tokens /
@@ -177,13 +169,13 @@ def extract_usage(usage: "Any") -> "Optional[UsageInfo]":
     if usage is None:
         return None
 
-    return UsageInfo(
-        input_tokens=getattr(usage, "input_tokens", None),
-        cache_read_tokens=getattr(usage, "cache_read_tokens", None),
-        cache_write_tokens=getattr(usage, "cache_write_tokens", None),
-        output_tokens=getattr(usage, "output_tokens", None),
-        total_tokens=getattr(usage, "total_tokens", None),
-    )
+    return {
+        "input_tokens": getattr(usage, "input_tokens", None),
+        "input_tokens_cached": getattr(usage, "cache_read_tokens", None),
+        "input_tokens_cache_write": getattr(usage, "cache_write_tokens", None),
+        "output_tokens": getattr(usage, "output_tokens", None),
+        "total_tokens": getattr(usage, "total_tokens", None),
+    }
 
 
 def serialize_image_url_item(item: "Any") -> "Dict[str, Any]":
