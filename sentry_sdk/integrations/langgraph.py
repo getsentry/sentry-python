@@ -219,23 +219,22 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                             input_messages
                         )
 
-                        scope = sentry_sdk.get_current_scope()
-                        messages_data = (
-                            truncate_and_annotate_messages(
-                                normalized_input_messages, span, scope
+                        if _should_record_inputs(integration):
+                            scope = sentry_sdk.get_current_scope()
+                            messages_data = (
+                                truncate_and_annotate_messages(
+                                    normalized_input_messages, span, scope
+                                )
+                                if should_truncate_gen_ai_input(client.options)
+                                else normalized_input_messages
                             )
-                            if should_truncate_gen_ai_input(client.options)
-                            else normalized_input_messages
-                        )
-                        if messages_data is not None and _should_record_inputs(
-                            integration
-                        ):
-                            set_data_normalized(
-                                span,
-                                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                                messages_data,
-                                unpack=False,
-                            )
+                            if messages_data is not None:
+                                set_data_normalized(
+                                    span,
+                                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                                    messages_data,
+                                    unpack=False,
+                                )
 
                 result = f(self, *args, **kwargs)
 
@@ -263,23 +262,22 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                             input_messages
                         )
 
-                        scope = sentry_sdk.get_current_scope()
-                        messages_data = (
-                            truncate_and_annotate_messages(
-                                normalized_input_messages, span, scope
+                        if _should_record_inputs(integration):
+                            scope = sentry_sdk.get_current_scope()
+                            messages_data = (
+                                truncate_and_annotate_messages(
+                                    normalized_input_messages, span, scope
+                                )
+                                if should_truncate_gen_ai_input(client.options)
+                                else normalized_input_messages
                             )
-                            if should_truncate_gen_ai_input(client.options)
-                            else normalized_input_messages
-                        )
-                        if messages_data is not None and _should_record_inputs(
-                            integration
-                        ):
-                            set_data_normalized(
-                                span,
-                                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                                messages_data,
-                                unpack=False,
-                            )
+                            if messages_data is not None:
+                                set_data_normalized(
+                                    span,
+                                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                                    messages_data,
+                                    unpack=False,
+                                )
 
                 result = f(self, *args, **kwargs)
 
@@ -324,23 +322,22 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                             input_messages
                         )
 
-                        scope = sentry_sdk.get_current_scope()
-                        messages_data = (
-                            truncate_and_annotate_messages(
-                                normalized_input_messages, span, scope
+                        if _should_record_inputs(integration):
+                            scope = sentry_sdk.get_current_scope()
+                            messages_data = (
+                                truncate_and_annotate_messages(
+                                    normalized_input_messages, span, scope
+                                )
+                                if should_truncate_gen_ai_input(client.options)
+                                else normalized_input_messages
                             )
-                            if should_truncate_gen_ai_input(client.options)
-                            else normalized_input_messages
-                        )
-                        if messages_data is not None and _should_record_inputs(
-                            integration
-                        ):
-                            set_data_normalized(
-                                span,
-                                SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                                messages_data,
-                                unpack=False,
-                            )
+                            if messages_data is not None:
+                                set_data_normalized(
+                                    span,
+                                    SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                                    messages_data,
+                                    unpack=False,
+                                )
 
                 result = await f(self, *args, **kwargs)
 
@@ -365,21 +362,22 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 if input_messages:
                     normalized_input_messages = normalize_message_roles(input_messages)
 
-                    scope = sentry_sdk.get_current_scope()
-                    messages_data = (
-                        truncate_and_annotate_messages(
-                            normalized_input_messages, span, scope
+                    if _should_record_inputs(integration):
+                        scope = sentry_sdk.get_current_scope()
+                        messages_data = (
+                            truncate_and_annotate_messages(
+                                normalized_input_messages, span, scope
+                            )
+                            if should_truncate_gen_ai_input(client.options)
+                            else normalized_input_messages
                         )
-                        if should_truncate_gen_ai_input(client.options)
-                        else normalized_input_messages
-                    )
-                    if messages_data is not None and _should_record_inputs(integration):
-                        set_data_normalized(
-                            span,
-                            SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                            messages_data,
-                            unpack=False,
-                        )
+                        if messages_data is not None:
+                            set_data_normalized(
+                                span,
+                                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                                messages_data,
+                                unpack=False,
+                            )
 
             result = await f(self, *args, **kwargs)
 
