@@ -933,8 +933,13 @@ class Scope:
                 )
             return
 
-        if type(span) is NoOpStreamedSpan and span._name is not None:
-            self._transaction = span.name
+        if type(span) is NoOpStreamedSpan:
+            if span._name is not None:
+                self._transaction = span.name
+            if span._attributes.get("sentry.segment.name.source"):
+                self._transaction_info["source"] = str(
+                    span._attributes["sentry.segment.name.source"]
+                )
 
     @property
     def profile(self) -> "Optional[Profile]":
@@ -1314,6 +1319,7 @@ class Scope:
             if is_ignored_span(name, attributes):
                 return NoOpStreamedSpan(
                     name=name,
+                    attributes=attributes,
                     scope=self,
                     segment=None,
                     trace_id=propagation_context.trace_id,
@@ -1335,6 +1341,7 @@ class Scope:
             if sampled is False or sampled is None:
                 return NoOpStreamedSpan(
                     name=name,
+                    attributes=attributes,
                     scope=self,
                     segment=None,
                     trace_id=propagation_context.trace_id,
@@ -1366,6 +1373,7 @@ class Scope:
             if is_ignored_span(name, attributes):
                 return NoOpStreamedSpan(
                     name=name,
+                    attributes=attributes,
                     segment=parent_span._segment,
                     trace_id=parent_span.trace_id,
                     parent_span_id=parent_span.span_id,
@@ -1376,6 +1384,7 @@ class Scope:
             if isinstance(parent_span, NoOpStreamedSpan):
                 return NoOpStreamedSpan(
                     name=name,
+                    attributes=attributes,
                     segment=parent_span._segment,
                     trace_id=parent_span.trace_id,
                     parent_span_id=parent_span.span_id,

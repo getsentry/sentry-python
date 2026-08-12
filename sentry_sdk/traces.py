@@ -633,6 +633,7 @@ class NoOpStreamedSpan(StreamedSpan):
     def __init__(
         self,
         name: "Optional[str]" = None,
+        attributes: "Optional[Attributes]" = None,
         segment: "Optional[StreamedSpan]" = None,
         trace_id: "Optional[str]" = None,
         parent_span_id: "Optional[str]" = None,
@@ -645,6 +646,11 @@ class NoOpStreamedSpan(StreamedSpan):
         sample_rate: "Optional[float]" = None,
     ) -> None:
         self._name = name  # type: ignore[assignment]
+        self._attributes = {}
+        if attributes is not None and "sentry.segment.name.source" in attributes:
+            self.set_attribute(
+                "sentry.segment.name.source", attributes["sentry.segment.name.source"]
+            )
 
         self._span_id: "Optional[str]" = None
 
@@ -724,10 +730,17 @@ class NoOpStreamedSpan(StreamedSpan):
         return {}
 
     def set_attribute(self, key: str, value: "AttributeValue") -> None:
-        pass
+        if key != "sentry.segment.name.source":
+            return
+
+        super().set_attribute("sentry.segment.name.source", value)
 
     def set_attributes(self, attributes: "Attributes") -> None:
-        pass
+        for key, value in attributes.items():
+            if key != "sentry.segment.name.source":
+                continue
+
+            self.set_attribute("sentry.segment.name.source", value)
 
     def remove_attribute(self, key: str) -> None:
         pass
