@@ -114,6 +114,7 @@ def unignore_logger_for_sentry_logs(
 
 class LoggingIntegration(Integration):
     identifier = "logging"
+    capture_sentry_logs: "Optional[bool]" = False
 
     def __init__(
         self,
