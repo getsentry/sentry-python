@@ -861,10 +861,7 @@ class Scope:
         """Set the transaction name and optionally the transaction source."""
         self._transaction = name
         if self._span:
-            if isinstance(self._span, NoOpStreamedSpan):
-                return
-
-            elif isinstance(self._span, StreamedSpan):
+            if isinstance(self._span, StreamedSpan):
                 self._span._segment.name = name
                 if source:
                     self._span._segment.set_attribute(
@@ -925,8 +922,20 @@ class Scope:
 
         # Also set _transaction and _transaction_info in streaming mode as this
         # is used for populating events and linking them to segments
-        if type(span) is StreamedSpan and span._is_segment():
+        if not isinstance(span, StreamedSpan) or not span._is_segment():
+            return
+
+        if type(span) is StreamedSpan:
             self._transaction = span.name
+            if span._attributes.get("sentry.segment.name.source"):
+                self._transaction_info["source"] = str(
+                    span._attributes["sentry.segment.name.source"]
+                )
+            return
+
+        if type(span) is NoOpStreamedSpan:
+            if span._name is not None:
+                self._transaction = span.name
             if span._attributes.get("sentry.segment.name.source"):
                 self._transaction_info["source"] = str(
                     span._attributes["sentry.segment.name.source"]
@@ -1309,6 +1318,8 @@ class Scope:
 
             if is_ignored_span(name, attributes):
                 return NoOpStreamedSpan(
+                    name=name,
+                    attributes=attributes,
                     scope=self,
                     segment=None,
                     trace_id=propagation_context.trace_id,
@@ -1329,6 +1340,8 @@ class Scope:
 
             if sampled is False or sampled is None:
                 return NoOpStreamedSpan(
+                    name=name,
+                    attributes=attributes,
                     scope=self,
                     segment=None,
                     trace_id=propagation_context.trace_id,
@@ -1359,6 +1372,8 @@ class Scope:
         with new_scope():
             if is_ignored_span(name, attributes):
                 return NoOpStreamedSpan(
+                    name=name,
+                    attributes=attributes,
                     segment=parent_span._segment,
                     trace_id=parent_span.trace_id,
                     parent_span_id=parent_span.span_id,
@@ -1368,6 +1383,8 @@ class Scope:
 
             if isinstance(parent_span, NoOpStreamedSpan):
                 return NoOpStreamedSpan(
+                    name=name,
+                    attributes=attributes,
                     segment=parent_span._segment,
                     trace_id=parent_span.trace_id,
                     parent_span_id=parent_span.span_id,

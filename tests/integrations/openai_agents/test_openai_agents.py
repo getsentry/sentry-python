@@ -1180,11 +1180,12 @@ async def test_data_collection_inputs(
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,expect_output",
+    "data_collection,send_default_pii,expect_output,expect_tool_calls",
     [
         pytest.param(
             {"gen_ai": {"outputs": True}},
             False,
+            True,
             True,
             id="gen-ai-outputs-enabled-overrides-pii-disabled",
         ),
@@ -1192,34 +1193,40 @@ async def test_data_collection_inputs(
             {"gen_ai": {"outputs": False}},
             True,
             False,
-            id="gen-ai-outputs-disabled-overrides-pii-enabled",
+            True,
+            id="gen-ai-outputs-disabled-still-collects-tool-calls-gated-on-inputs",
         ),
         pytest.param(
             {},
             False,
             True,
+            True,
             id="gen-ai-omitted-defaults-to-enabled",
         ),
         pytest.param(
-            {"gen_ai": {"outputs": False}},
+            {"gen_ai": {"inputs": False, "outputs": False}},
             False,
             False,
-            id="gen-ai-outputs-disabled-and-pii-disabled",
+            False,
+            id="gen-ai-inputs-and-outputs-disabled-and-pii-disabled",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False}},
             False,
             True,
-            id="gen-ai-inputs-disabled-does-not-affect-outputs",
+            False,
+            id="gen-ai-inputs-disabled-drops-tool-calls-only",
         ),
         pytest.param(
             None,
+            False,
             False,
             False,
             id="no-data-collection-falls-back-to-send-default-pii",
         ),
         pytest.param(
             None,
+            True,
             True,
             True,
             id="no-data-collection-pii-enabled-collects",
@@ -1238,6 +1245,7 @@ async def test_data_collection_outputs(
     data_collection,
     send_default_pii,
     expect_output,
+    expect_tool_calls,
     stream_gen_ai_spans,
     span_streaming,
 ):
@@ -1318,11 +1326,16 @@ async def test_data_collection_outputs(
 
     assert len(chat_span_data) == 2
 
-    if expect_output:
+    if expect_tool_calls:
         assert any(
             "simple_test_tool" in data.get(SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, "")
             for data in chat_span_data
         )
+    else:
+        for data in chat_span_data:
+            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in data
+
+    if expect_output:
         assert any(
             "Task completed using the tool"
             in str(data.get(SPANDATA.GEN_AI_RESPONSE_TEXT, ""))
@@ -1330,7 +1343,6 @@ async def test_data_collection_outputs(
         )
     else:
         for data in chat_span_data:
-            assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in data
             assert SPANDATA.GEN_AI_RESPONSE_TEXT not in data
 
     # Non-PII data is unaffected by the gate
