@@ -1,5 +1,4 @@
 import functools
-import hashlib
 import warnings
 from inspect import isawaitable
 
@@ -130,18 +129,6 @@ class SentryAsyncExtension(SchemaExtension):
     ) -> None:
         if execution_context:
             self.execution_context = execution_context
-
-    @functools.cached_property
-    def _resource_name(self) -> str:
-        query_hash = self.hash_query(self.execution_context.query)  # type: ignore
-
-        if self.execution_context.operation_name:
-            return "{}:{}".format(self.execution_context.operation_name, query_hash)
-
-        return query_hash
-
-    def hash_query(self, query: str) -> str:
-        return hashlib.md5(query.encode("utf-8")).hexdigest()
 
     def on_operation(self) -> "Generator[None, None, None]":
         operation_name = self.execution_context.operation_name
