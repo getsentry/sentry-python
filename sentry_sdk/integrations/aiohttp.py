@@ -458,7 +458,8 @@ def create_trace_config() -> "TraceConfig":
 
         if should_propagate_trace(client, str(params.url)):
             signed_headers = get_aws_sigv4_signed_headers(
-                authorization=params.headers.get("Authorization", ""), url=str(params.url)
+                authorization=params.headers.get("Authorization", ""),
+                url=str(params.url),
             )
             for (
                 key,

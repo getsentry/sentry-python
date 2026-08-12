@@ -688,7 +688,9 @@ def test_default_release_empty_string():
     ],
 )
 def test_get_aws_sigv4_signed_headers(authorization, url, expected):
-    assert get_aws_sigv4_signed_headers(authorization=authorization, url=url) == expected
+    assert (
+        get_aws_sigv4_signed_headers(authorization=authorization, url=url) == expected
+    )
 
 
 def test_get_default_release_sentry_release_env(monkeypatch):
