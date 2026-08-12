@@ -139,6 +139,7 @@ def _sentry_before_sign(
             return
 
         def _replace_header(request: "AWSRequest", key: str, value: str) -> None:
+            # HTTPHeaders appends on assignment, so delete existing values first.
             if key in request.headers:
                 del request.headers[key]
             request.headers[key] = value
