@@ -2449,19 +2449,18 @@ def test_transaction_http_method_custom(
 
         client.get("/nomessage")
         client.options("/nomessage")
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+
+        assert spans[2]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "OPTIONS"
+
         client.head("/nomessage")
 
         sentry_sdk.flush()
         spans = [item.payload for item in items]
 
-        http_methods = [
-            span["attributes"][SPANDATA.HTTP_REQUEST_METHOD]
-            for span in spans
-            if span.get("parent_span_id") is None
-        ]
-
-        assert "OPTIONS" in http_methods
-        assert "HEAD" in http_methods
+        assert spans[5]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "HEAD"
     else:
         events = capture_events()
 
