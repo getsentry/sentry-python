@@ -58,8 +58,6 @@ from sentry_sdk.utils import (
     exc_info_from_error,
     format_attribute,
     has_data_collection_enabled,
-    has_logs_enabled,
-    has_metrics_enabled,
     logger,
 )
 
@@ -1487,8 +1485,6 @@ class Scope:
             return
 
         client = self.get_client()
-        if not has_logs_enabled(client.options):
-            return
 
         merged_scope = self._merge_scopes()
 
@@ -1505,8 +1501,6 @@ class Scope:
             return
 
         client = self.get_client()
-        if not has_metrics_enabled(client.options):
-            return
 
         merged_scope = self._merge_scopes()
 
