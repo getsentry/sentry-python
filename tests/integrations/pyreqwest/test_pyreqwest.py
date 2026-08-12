@@ -1168,6 +1168,7 @@ def test_crumb_capture_client_error_span_streaming(
 ):
     sentry_init(
         integrations=[PyreqwestIntegration()],
+        trace_lifecycle="stream",
     )
 
     url = f"http://localhost:{server_port}/status/{status_code}"
