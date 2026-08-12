@@ -6,6 +6,7 @@ import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.utils import capture_internal_exceptions, reraise
 
+from .._extract import extract_tool_call_args
 from ..spans import execute_tool_span, update_execute_tool_span
 from ..utils import _capture_exception, get_current_agent
 
@@ -52,10 +53,7 @@ def _patch_execute_tool_call() -> None:
         agent = get_current_agent()
 
         if agent and tool:
-            try:
-                args_dict = call.args_as_dict()
-            except Exception:
-                args_dict = call.args if isinstance(call.args, dict) else {}
+            args_dict = extract_tool_call_args(call)
 
             # Create execute_tool span
             # Nesting is handled by isolation_scope() to ensure proper parent-child relationships
@@ -125,10 +123,7 @@ def _patch_call_tool() -> None:
         agent = get_current_agent()
 
         if agent and tool:
-            try:
-                args_dict = call.args_as_dict()
-            except Exception:
-                args_dict = call.args if isinstance(call.args, dict) else {}
+            args_dict = extract_tool_call_args(call)
 
             # Create execute_tool span
             # Nesting is handled by isolation_scope() to ensure proper parent-child relationships

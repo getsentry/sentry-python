@@ -3,6 +3,7 @@ from functools import wraps
 
 from sentry_sdk.integrations import DidNotEnable
 
+from .._extract import extract_graph_request_data
 from ..spans import (
     ai_client_span,
     update_ai_client_span,
@@ -19,31 +20,6 @@ if TYPE_CHECKING:
     from typing import Any, Callable, Optional
 
     from pydantic_ai.messages import ModelResponse
-
-
-def _extract_span_data(node: "Any", ctx: "Any") -> "tuple[list[Any], Any, Any]":
-    """Extract common data needed for creating chat spans.
-
-    Returns:
-        Tuple of (messages, model, model_settings)
-    """
-    # Extract model and settings from context
-    model = None
-    model_settings = None
-    if hasattr(ctx, "deps"):
-        model = getattr(ctx.deps, "model", None)
-        model_settings = getattr(ctx.deps, "model_settings", None)
-
-    # Build full message list: history + current request
-    messages = []
-    if hasattr(ctx, "state") and hasattr(ctx.state, "message_history"):
-        messages.extend(ctx.state.message_history)
-
-    current_request = getattr(node, "request", None)
-    if current_request:
-        messages.append(current_request)
-
-    return messages, model, model_settings
 
 
 def _patch_graph_nodes() -> None:
@@ -67,7 +43,7 @@ def _patch_graph_nodes() -> None:
         if did_stream or cached_result is not None:
             return await original_model_request_run(self, ctx)
 
-        messages, model, model_settings = _extract_span_data(self, ctx)
+        messages, model, model_settings = extract_graph_request_data(self, ctx)
 
         with ai_client_span(messages, None, model, model_settings) as span:
             result = await original_model_request_run(self, ctx)
@@ -101,7 +77,7 @@ def _patch_graph_nodes() -> None:
                     yield stream
                 return
 
-            messages, model, model_settings = _extract_span_data(self, ctx)
+            messages, model, model_settings = extract_graph_request_data(self, ctx)
 
             # Create chat span for streaming request
             with ai_client_span(messages, None, model, model_settings) as span:

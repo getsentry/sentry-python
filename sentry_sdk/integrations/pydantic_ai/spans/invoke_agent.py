@@ -14,6 +14,7 @@ from sentry_sdk.tracing_utils import (
     should_truncate_gen_ai_input,
 )
 
+from .._extract import extract_agent_prompt_messages, extract_response_model_name
 from ..consts import SPAN_ORIGIN
 from ..utils import (
     _set_agent_data,
@@ -21,21 +22,11 @@ from ..utils import (
     _set_model_data,
     _should_send_prompts,
 )
-from .utils import (
-    _serialize_binary_content_item,
-    _serialize_image_url_item,
-)
 
 if TYPE_CHECKING:
     from typing import Any, Union
 
     from sentry_sdk.traces import StreamedSpan
-
-try:
-    from pydantic_ai.messages import BinaryContent, ImageUrl
-except ImportError:
-    BinaryContent = None  # type: ignore[misc,assignment]
-    ImageUrl = None  # type: ignore[misc,assignment]
 
 
 def invoke_agent_span(
@@ -76,66 +67,7 @@ def invoke_agent_span(
 
     # Add user prompt and system prompts if available and prompts are enabled
     if _should_send_prompts():
-        messages = []
-
-        # Add system prompts (both instructions and system_prompt)
-        system_texts = []
-
-        if agent:
-            # Check for system_prompt
-            system_prompts = getattr(agent, "_system_prompts", None) or []
-            for prompt in system_prompts:
-                if isinstance(prompt, str):
-                    system_texts.append(prompt)
-
-            # Check for instructions (stored in _instructions)
-            instructions = getattr(agent, "_instructions", None)
-            if instructions:
-                if isinstance(instructions, str):
-                    system_texts.append(instructions)
-                elif isinstance(instructions, (list, tuple)):
-                    for instr in instructions:
-                        if isinstance(instr, str):
-                            system_texts.append(instr)
-                        elif callable(instr):
-                            # Skip dynamic/callable instructions
-                            pass
-
-        # Add all system texts as system messages
-        for system_text in system_texts:
-            messages.append(
-                {
-                    "content": [{"text": system_text, "type": "text"}],
-                    "role": "system",
-                }
-            )
-
-        # Add user prompt
-        if user_prompt:
-            if isinstance(user_prompt, str):
-                messages.append(
-                    {
-                        "content": [{"text": user_prompt, "type": "text"}],
-                        "role": "user",
-                    }
-                )
-            elif isinstance(user_prompt, list):
-                # Handle list of user content
-                content = []
-                for item in user_prompt:
-                    if isinstance(item, str):
-                        content.append({"text": item, "type": "text"})
-                    elif ImageUrl is not None and isinstance(item, ImageUrl):
-                        content.append(_serialize_image_url_item(item))
-                    elif BinaryContent is not None and isinstance(item, BinaryContent):
-                        content.append(_serialize_binary_content_item(item))
-                if content:
-                    messages.append(
-                        {
-                            "content": content,
-                            "role": "user",
-                        }
-                    )
+        messages = extract_agent_prompt_messages(agent, user_prompt)
 
         if messages:
             normalized_messages = normalize_message_roles(messages)
@@ -171,13 +103,8 @@ def update_invoke_agent_span(
         )
 
     # Set model name from response if available
-    if hasattr(result, "response"):
-        try:
-            response = result.response
-            if hasattr(response, "model_name") and response.model_name:
-                _set_span_data_attribute(
-                    span, SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name
-                )
-        except Exception:
-            # If response access fails, continue without setting model name
-            pass
+    response_model_name = extract_response_model_name(result)
+    if response_model_name:
+        _set_span_data_attribute(
+            span, SPANDATA.GEN_AI_RESPONSE_MODEL, response_model_name
+        )
