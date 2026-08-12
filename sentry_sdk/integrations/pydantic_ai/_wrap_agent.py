@@ -1,20 +1,20 @@
+"""Instrumentation of the Agent.run / Agent.run_stream entry points."""
+
 import sys
 from contextlib import ExitStack
 from functools import wraps
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.utils import capture_internal_exceptions, reraise
 
-from .._run_context import agent_run_scope
-from ..spans import invoke_agent_span, update_invoke_agent_span
-from ..utils import _capture_exception
-
-try:
-    from pydantic_ai.agent import Agent
-except ImportError:
-    raise DidNotEnable("pydantic-ai not installed")
+from ._compat import USES_REQUEST_HOOKS, Agent
+from ._run_context import agent_run_scope
+from ._spans import (
+    _capture_exception,
+    invoke_agent_span,
+    update_invoke_agent_span,
+)
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional, Union
@@ -26,6 +26,17 @@ def _extract_run_params(
     """Extract (user_prompt, model, model_settings) from a run call."""
     user_prompt = kwargs.get("user_prompt") or (args[0] if args else None)
     return user_prompt, kwargs.get("model"), kwargs.get("model_settings")
+
+
+def _seed_run_metadata(kwargs: "dict[str, Any]") -> None:
+    """Seed the run's metadata dict when the request hooks are in use.
+
+    The hooks pair each chat span with its model request through the run's
+    RunContext.metadata dict (see _wrap_model.py), which requires the
+    metadata object to be a dict shared by reference between hooks.
+    """
+    if USES_REQUEST_HOOKS and kwargs.get("metadata") is None:
+        kwargs["metadata"] = {"_sentry_span": None}
 
 
 class _StreamingContextManagerWrapper:
@@ -72,14 +83,21 @@ class _StreamingContextManagerWrapper:
         self._result = result
         return result
 
-    async def __aexit__(self, exc_type: "Any", exc_val: "Any", exc_tb: "Any") -> None:
+    async def __aexit__(self, exc_type: "Any", exc_val: "Any", exc_tb: "Any") -> "Any":
         try:
-            # Exit the original context manager first
-            await self.original_ctx_manager.__aexit__(exc_type, exc_val, exc_tb)
+            # Exit the original context manager first; propagate its exception
+            # suppression so the integration never changes control flow.
+            suppressed = await self.original_ctx_manager.__aexit__(
+                exc_type, exc_val, exc_tb
+            )
+            if suppressed:
+                exc_type = exc_val = exc_tb = None
 
             # Update span with result if successful
             if exc_type is None and self._result and self._span is not None:
                 update_invoke_agent_span(self._span, self._result)
+
+            return suppressed
         finally:
             if self._contexts is not None:
                 self._contexts.__exit__(exc_type, exc_val, exc_tb)
@@ -89,17 +107,11 @@ def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., A
     """
     Wraps the Agent.run method to create an invoke_agent span.
     """
-    from sentry_sdk.integrations.pydantic_ai import (
-        PydanticAIIntegration,
-    )  # Required to avoid circular import
 
     @wraps(original_func)
     async def wrapper(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         user_prompt, model, model_settings = _extract_run_params(args, kwargs)
-
-        if PydanticAIIntegration.using_request_hooks:
-            if kwargs.get("metadata") is None:
-                kwargs["metadata"] = {"_sentry_span": None}
+        _seed_run_metadata(kwargs)
 
         # Isolate each workflow so that when agents are run in asyncio tasks
         # they don't touch each other's scopes
@@ -129,17 +141,11 @@ def _create_streaming_wrapper(
     """
     Wraps run_stream method that returns an async context manager.
     """
-    from sentry_sdk.integrations.pydantic_ai import (
-        PydanticAIIntegration,
-    )  # Required to avoid circular import
 
     @wraps(original_func)
     def wrapper(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
         user_prompt, model, model_settings = _extract_run_params(args, kwargs)
-
-        if PydanticAIIntegration.using_request_hooks:
-            if kwargs.get("metadata") is None:
-                kwargs["metadata"] = {"_sentry_span": None}
+        _seed_run_metadata(kwargs)
 
         # Call original function to get the context manager
         original_ctx_manager = original_func(self, *args, **kwargs)

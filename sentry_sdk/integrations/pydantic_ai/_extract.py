@@ -4,8 +4,8 @@ This module concentrates reads of pydantic-ai object internals (including
 private attributes and version-dependent shapes) so that upstream library
 changes are absorbed here rather than throughout the integration. The one
 exception is control-flow state read at the patch points themselves (e.g.
-ModelRequestNode._did_stream in patches/graph_nodes.py and Tool.tool_def in
-patches/tools.py); everything else consumes the plain data structures
+ModelRequestNode._did_stream in _wrap_model.py and Tool.tool_def in
+_wrap_tools.py); everything else consumes the plain data structures
 returned here.
 """
 
@@ -18,25 +18,15 @@ from sentry_sdk.ai.utils import get_modality_from_mime_type
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.utils import safe_serialize
 
-try:
-    from pydantic_ai.messages import (
-        BaseToolCallPart,
-        BaseToolReturnPart,
-        BinaryContent,
-        ImageUrl,
-        SystemPromptPart,
-        TextPart,
-        ThinkingPart,
-    )
-except ImportError:
-    # Fallback if these classes are not available
-    BaseToolCallPart = None  # type: ignore[misc,assignment]
-    BaseToolReturnPart = None  # type: ignore[misc,assignment]
-    BinaryContent = None  # type: ignore[misc,assignment]
-    ImageUrl = None  # type: ignore[misc,assignment]
-    SystemPromptPart = None  # type: ignore[misc,assignment]
-    TextPart = None  # type: ignore[misc,assignment]
-    ThinkingPart = None  # type: ignore[misc,assignment]
+from ._compat import (
+    BaseToolCallPart,
+    BaseToolReturnPart,
+    BinaryContent,
+    ImageUrl,
+    SystemPromptPart,
+    TextPart,
+    ThinkingPart,
+)
 
 if TYPE_CHECKING:
     from typing import Any, Dict, List, Optional

@@ -24,8 +24,10 @@ import sentry_sdk
 from sentry_sdk._types import BLOB_DATA_SUBSTITUTE
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.pydantic_ai import PydanticAIIntegration
-from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_input_messages
-from sentry_sdk.integrations.pydantic_ai.spans.utils import _set_usage_data
+from sentry_sdk.integrations.pydantic_ai._spans import (
+    _set_input_messages,
+    _set_usage_data,
+)
 from sentry_sdk.utils import package_version
 
 PYDANTIC_AI_VERSION = package_version("pydantic-ai")
@@ -2360,7 +2362,7 @@ async def test_model_settings_object_style(sentry_init, capture_items):
     from unittest.mock import MagicMock
 
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_model_data
+    from sentry_sdk.integrations.pydantic_ai._spans import _set_model_data
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -2714,7 +2716,7 @@ async def test_update_invoke_agent_span_with_none_output(sentry_init, capture_it
     Test that update_invoke_agent_span handles None output gracefully.
     """
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.invoke_agent import (
+    from sentry_sdk.integrations.pydantic_ai._spans import (
         update_invoke_agent_span,
     )
 
@@ -2742,7 +2744,7 @@ async def test_update_ai_client_span_with_none_response(sentry_init, capture_ite
     Test that update_ai_client_span handles None response gracefully.
     """
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import (
+    from sentry_sdk.integrations.pydantic_ai._spans import (
         update_ai_client_span,
     )
 
@@ -2855,7 +2857,7 @@ async def test_available_tools_error_handling(sentry_init, capture_items):
     from unittest.mock import MagicMock
 
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_available_tools
+    from sentry_sdk.integrations.pydantic_ai._spans import _set_available_tools
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -2884,7 +2886,7 @@ async def test_set_usage_data_with_none_usage(sentry_init, capture_items):
     Test that _set_usage_data handles None usage gracefully.
     """
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_usage_data
+    from sentry_sdk.integrations.pydantic_ai._spans import _set_usage_data
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -2911,7 +2913,7 @@ async def test_set_usage_data_with_partial_fields(sentry_init, capture_items):
     from unittest.mock import MagicMock
 
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_usage_data
+    from sentry_sdk.integrations.pydantic_ai._spans import _set_usage_data
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -3203,7 +3205,7 @@ async def test_output_data_error_handling(sentry_init, capture_items):
     from unittest.mock import MagicMock
 
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import _set_output_data
+    from sentry_sdk.integrations.pydantic_ai._spans import _set_output_data
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -3399,7 +3401,7 @@ async def test_set_model_data_with_system(sentry_init, capture_items):
     from unittest.mock import MagicMock
 
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_model_data
+    from sentry_sdk.integrations.pydantic_ai._spans import _set_model_data
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -3431,7 +3433,7 @@ async def test_set_model_data_from_agent_scope(sentry_init, capture_items):
     from unittest.mock import MagicMock
 
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_model_data
+    from sentry_sdk.integrations.pydantic_ai._spans import _set_model_data
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -3464,7 +3466,7 @@ async def test_set_model_data_with_none_settings_values(sentry_init, capture_ite
     Test that _set_model_data skips None values in settings.
     """
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_model_data
+    from sentry_sdk.integrations.pydantic_ai._spans import _set_model_data
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -3495,7 +3497,7 @@ async def test_should_send_prompts_without_pii(sentry_init, capture_items):
     """
     Test that _should_send_prompts returns False when PII disabled.
     """
-    from sentry_sdk.integrations.pydantic_ai.utils import _should_send_prompts
+    from sentry_sdk.integrations.pydantic_ai._spans import _should_send_prompts
 
     sentry_init(
         integrations=[PydanticAIIntegration(include_prompts=True)],
@@ -3514,7 +3516,7 @@ async def test_set_agent_data_without_agent(sentry_init, capture_items):
     Test that _set_agent_data handles None agent gracefully.
     """
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_agent_data
+    from sentry_sdk.integrations.pydantic_ai._spans import _set_agent_data
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -3541,7 +3543,7 @@ async def test_set_agent_data_from_scope(sentry_init, capture_items):
     from unittest.mock import MagicMock
 
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_agent_data
+    from sentry_sdk.integrations.pydantic_ai._spans import _set_agent_data
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -3574,7 +3576,7 @@ async def test_set_agent_data_without_name(sentry_init, capture_items):
     from unittest.mock import MagicMock
 
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_agent_data
+    from sentry_sdk.integrations.pydantic_ai._spans import _set_agent_data
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -3605,7 +3607,7 @@ async def test_set_available_tools_without_toolset(sentry_init, capture_items):
     from unittest.mock import MagicMock
 
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_available_tools
+    from sentry_sdk.integrations.pydantic_ai._spans import _set_available_tools
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -3636,7 +3638,7 @@ async def test_set_available_tools_with_schema(sentry_init, capture_items):
     from unittest.mock import MagicMock
 
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.utils import _set_available_tools
+    from sentry_sdk.integrations.pydantic_ai._spans import _set_available_tools
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -3671,7 +3673,7 @@ async def test_execute_tool_span_creation(sentry_init, capture_items):
     Test direct creation of execute_tool span.
     """
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.execute_tool import (
+    from sentry_sdk.integrations.pydantic_ai._spans import (
         execute_tool_span,
         update_execute_tool_span,
     )
@@ -3698,7 +3700,7 @@ async def test_execute_tool_span_with_mcp_type(sentry_init, capture_items):
     Test execute_tool span with MCP tool type.
     """
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.execute_tool import (
+    from sentry_sdk.integrations.pydantic_ai._spans import (
         execute_tool_span,
     )
 
@@ -3724,7 +3726,7 @@ async def test_execute_tool_span_without_prompts(sentry_init, capture_items):
     Test that execute_tool span respects _should_send_prompts().
     """
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.execute_tool import (
+    from sentry_sdk.integrations.pydantic_ai._spans import (
         execute_tool_span,
         update_execute_tool_span,
     )
@@ -3751,7 +3753,7 @@ async def test_execute_tool_span_with_none_args(sentry_init, capture_items):
     Test execute_tool span with None args.
     """
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.execute_tool import execute_tool_span
+    from sentry_sdk.integrations.pydantic_ai._spans import execute_tool_span
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -3773,7 +3775,7 @@ async def test_update_execute_tool_span_with_none_span(sentry_init, capture_item
     """
     Test that update_execute_tool_span handles None span gracefully.
     """
-    from sentry_sdk.integrations.pydantic_ai.spans.execute_tool import (
+    from sentry_sdk.integrations.pydantic_ai._spans import (
         update_execute_tool_span,
     )
 
@@ -3795,7 +3797,7 @@ async def test_update_execute_tool_span_with_none_result(sentry_init, capture_it
     Test that update_execute_tool_span handles None result gracefully.
     """
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.execute_tool import (
+    from sentry_sdk.integrations.pydantic_ai._spans import (
         execute_tool_span,
         update_execute_tool_span,
     )
@@ -3853,7 +3855,7 @@ async def test_invoke_agent_span_with_callable_instruction(sentry_init, capture_
     from unittest.mock import MagicMock
 
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.invoke_agent import invoke_agent_span
+    from sentry_sdk.integrations.pydantic_ai._spans import invoke_agent_span
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -3887,7 +3889,7 @@ async def test_invoke_agent_span_with_string_instructions(sentry_init, capture_i
     from unittest.mock import MagicMock
 
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.invoke_agent import invoke_agent_span
+    from sentry_sdk.integrations.pydantic_ai._spans import invoke_agent_span
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -3916,7 +3918,7 @@ async def test_ai_client_span_with_streaming_flag(sentry_init, capture_items):
     Test that ai_client_span reads streaming flag from scope.
     """
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import ai_client_span
+    from sentry_sdk.integrations.pydantic_ai._spans import ai_client_span
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -3944,7 +3946,7 @@ async def test_ai_client_span_gets_agent_from_scope(sentry_init, capture_items):
     from unittest.mock import MagicMock
 
     import sentry_sdk
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import ai_client_span
+    from sentry_sdk.integrations.pydantic_ai._spans import ai_client_span
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -4392,7 +4394,7 @@ def test_image_url_base64_content_in_span(
     stream_gen_ai_spans,
     span_streaming,
 ):
-    from sentry_sdk.integrations.pydantic_ai.spans.ai_client import ai_client_span
+    from sentry_sdk.integrations.pydantic_ai._spans import ai_client_span
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
