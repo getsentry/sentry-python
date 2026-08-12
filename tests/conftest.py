@@ -323,6 +323,13 @@ def _install_flush_completion_handshake(client: "sentry_sdk.Client") -> None:
 
     def flush() -> None:
         nonlocal drained_count
+        # If the background flusher thread was never started (no spans have
+        # been added), there is no thread to drain and the counter will never
+        # advance. Fall back to the original synchronous flush.
+        if batcher._flusher is None or not batcher._flusher.is_alive():
+            orig_flush()
+            return
+
         with lock:
             target = drained_count
 
