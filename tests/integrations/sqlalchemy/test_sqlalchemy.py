@@ -265,6 +265,7 @@ def test_large_event_not_truncated(sentry_init, capture_events, max_value_length
         traces_sample_rate=1,
         integrations=[SqlalchemyIntegration()],
         max_value_length=max_value_length,
+        trace_lifecycle="stream",
     )
     events = capture_events()
 
