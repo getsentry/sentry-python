@@ -632,7 +632,7 @@ def patch_request_response() -> None:
                 request = args[0]
 
                 _set_transaction_name_and_source(
-                    sentry_scope, integration.transaction_style, request
+                    current_scope, integration.transaction_style, request
                 )
 
                 extractor = StarletteRequestExtractor(request)
