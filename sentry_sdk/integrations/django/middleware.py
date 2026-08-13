@@ -10,16 +10,14 @@ from django import VERSION as DJANGO_VERSION
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Optional, TypeVar, Union
+    from typing import Any, Callable, Optional, TypeVar
 
     from sentry_sdk.traces import StreamedSpan
-    from sentry_sdk.tracing import Span
 
     F = TypeVar("F", bound=Callable[..., Any])
 
@@ -68,7 +66,7 @@ def _wrap_middleware(middleware: "Any", middleware_name: str) -> "Any":
 
     def _check_middleware_span(
         old_method: "Callable[..., Any]",
-    ) -> "Optional[Union[Span, StreamedSpan]]":
+    ) -> "Optional[StreamedSpan]":
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
         if integration is None or not integration.middleware_spans:
             return None
@@ -78,25 +76,17 @@ def _wrap_middleware(middleware: "Any", middleware_name: str) -> "Any":
         if function_basename:
             description = "{}.{}".format(description, function_basename)
 
-        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-        middleware_span: "Union[Span, StreamedSpan]"
-        if span_streaming:
-            if sentry_sdk.traces.get_current_span() is None:
-                return None
-            middleware_span = sentry_sdk.traces.start_span(
-                name=description,
-                attributes={
-                    "sentry.op": OP.MIDDLEWARE_DJANGO,
-                    "sentry.origin": DjangoIntegration.origin,
-                    SPANDATA.MIDDLEWARE_NAME: middleware_name,
-                },
-            )
-        else:
-            middleware_span = sentry_sdk.start_span(
-                op=OP.MIDDLEWARE_DJANGO,
-                name=description,
-                origin=DjangoIntegration.origin,
-            )
+        if sentry_sdk.traces.get_current_span() is None:
+            return None
+
+        middleware_span = sentry_sdk.traces.start_span(
+            name=description,
+            attributes={
+                "sentry.op": OP.MIDDLEWARE_DJANGO,
+                "sentry.origin": DjangoIntegration.origin,
+                SPANDATA.MIDDLEWARE_NAME: middleware_name,
+            },
+        )
 
         return middleware_span
 
