@@ -7,10 +7,21 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import event_from_exception, safe_serialize
 
+from ._extract import extract_agent_name, extract_available_tools, extract_model_info
+
 if TYPE_CHECKING:
-    from typing import Any, Optional, Union
+    from typing import Any, Union
 
     from sentry_sdk.traces import StreamedSpan
+
+
+_MODEL_SETTINGS_SPANDATA = {
+    "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
+    "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
+    "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
+    "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
+    "presence_penalty": SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
+}
 
 
 # Store the current agent context in a contextvar for re-entrant safety
@@ -81,38 +92,9 @@ def _set_agent_data(
         agent: Agent object (can be None, will try to get from contextvar if not provided)
     """
     # Extract agent name from agent object or contextvar
-    agent_obj = agent
-    if not agent_obj:
-        # Try to get from contextvar
-        agent_obj = get_current_agent()
-
-    if agent_obj and hasattr(agent_obj, "name") and agent_obj.name:
-        _set_span_data_attribute(span, SPANDATA.GEN_AI_AGENT_NAME, agent_obj.name)
-
-
-def _get_model_name(model_obj: "Any") -> "Optional[str]":
-    """Extract model name from a model object.
-
-    Args:
-        model_obj: Model object to extract name from
-
-    Returns:
-        Model name string or None if not found
-    """
-    if not model_obj:
-        return None
-
-    if hasattr(model_obj, "model_name"):
-        return model_obj.model_name
-    elif hasattr(model_obj, "name"):
-        try:
-            return model_obj.name()
-        except Exception:
-            return str(model_obj)
-    elif isinstance(model_obj, str):
-        return model_obj
-    else:
-        return str(model_obj)
+    agent_name = extract_agent_name(agent or get_current_agent())
+    if agent_name:
+        _set_span_data_attribute(span, SPANDATA.GEN_AI_AGENT_NAME, agent_name)
 
 
 def _set_model_data(
@@ -127,51 +109,18 @@ def _set_model_data(
         model: Model object (can be None, will try to get from agent if not provided)
         model_settings: Model settings (can be None, will try to get from agent if not provided)
     """
-    # Try to get agent from contextvar if we need it
-    agent_obj = get_current_agent()
+    model_info = extract_model_info(model, model_settings, get_current_agent())
 
-    # Extract model information
-    model_obj = model
-    if not model_obj and agent_obj and hasattr(agent_obj, "model"):
-        model_obj = agent_obj.model
+    if model_info.system is not None:
+        _set_span_data_attribute(span, SPANDATA.GEN_AI_SYSTEM, model_info.system)
 
-    if model_obj:
-        # Set system from model
-        if hasattr(model_obj, "system"):
-            _set_span_data_attribute(span, SPANDATA.GEN_AI_SYSTEM, model_obj.system)
+    if model_info.name:
+        _set_span_data_attribute(span, SPANDATA.GEN_AI_REQUEST_MODEL, model_info.name)
 
-        # Set model name
-        model_name = _get_model_name(model_obj)
-        if model_name:
-            _set_span_data_attribute(span, SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
-
-    # Extract model settings
-    settings = model_settings
-    if not settings and agent_obj and hasattr(agent_obj, "model_settings"):
-        settings = agent_obj.model_settings
-
-    if settings:
-        settings_map = {
-            "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
-            "temperature": SPANDATA.GEN_AI_REQUEST_TEMPERATURE,
-            "top_p": SPANDATA.GEN_AI_REQUEST_TOP_P,
-            "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
-            "presence_penalty": SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
-        }
-
-        # ModelSettings is a TypedDict (dict at runtime), so use dict access
-        if isinstance(settings, dict):
-            for setting_name, spandata_key in settings_map.items():
-                value = settings.get(setting_name)
-                if value is not None:
-                    _set_span_data_attribute(span, spandata_key, value)
-        else:
-            # Fallback for object-style settings
-            for setting_name, spandata_key in settings_map.items():
-                if hasattr(settings, setting_name):
-                    value = getattr(settings, setting_name)
-                    if value is not None:
-                        _set_span_data_attribute(span, spandata_key, value)
+    for setting_name, value in model_info.settings.items():
+        spandata_key = _MODEL_SETTINGS_SPANDATA.get(setting_name)
+        if spandata_key is not None:
+            _set_span_data_attribute(span, spandata_key, value)
 
 
 def _set_available_tools(
@@ -183,35 +132,11 @@ def _set_available_tools(
         span: The span to set data on
         agent: Agent object with _function_toolset attribute
     """
-    if not agent or not hasattr(agent, "_function_toolset"):
-        return
-
-    try:
-        tools = []
-        # Get tools from the function toolset
-        if hasattr(agent._function_toolset, "tools"):
-            for tool_name, tool in agent._function_toolset.tools.items():
-                tool_info = {"name": tool_name}
-
-                # Add description from function_schema if available
-                if hasattr(tool, "function_schema"):
-                    schema = tool.function_schema
-                    if getattr(schema, "description", None):
-                        tool_info["description"] = schema.description
-
-                    # Add parameters from json_schema
-                    if getattr(schema, "json_schema", None):
-                        tool_info["parameters"] = schema.json_schema
-
-                tools.append(tool_info)
-
-        if tools:
-            _set_span_data_attribute(
-                span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
-            )
-    except Exception:
-        # If we can't extract tools, just skip it
-        pass
+    tools = extract_available_tools(agent)
+    if tools:
+        _set_span_data_attribute(
+            span, SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, safe_serialize(tools)
+        )
 
 
 def _capture_exception(exc: "Any", handled: bool = False) -> None:

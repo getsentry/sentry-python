@@ -13,11 +13,15 @@ from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
     should_truncate_gen_ai_input,
 )
-from sentry_sdk.utils import safe_serialize
 
+from .._extract import (
+    extract_model_info,
+    extract_request_messages,
+    extract_response_parts,
+    extract_system_instructions,
+)
 from ..consts import SPAN_ORIGIN
 from ..utils import (
-    _get_model_name,
     _set_agent_data,
     _set_available_tools,
     _set_model_data,
@@ -25,83 +29,14 @@ from ..utils import (
     get_current_agent,
     get_is_streaming,
 )
-from .utils import (
-    _serialize_binary_content_item,
-    _serialize_image_url_item,
-    _set_usage_data,
-)
+from .utils import _set_usage_data
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, List, Optional, Union
+    from typing import Any, Optional, Union
 
-    from pydantic_ai.messages import ModelMessage, ModelResponse, SystemPromptPart
+    from pydantic_ai.messages import ModelResponse
 
-    from sentry_sdk import _types
     from sentry_sdk.traces import StreamedSpan
-
-try:
-    from pydantic_ai.messages import (
-        BaseToolCallPart,
-        BaseToolReturnPart,
-        BinaryContent,
-        ImageUrl,
-        SystemPromptPart,
-        TextPart,
-        ThinkingPart,
-        UserPromptPart,
-    )
-except ImportError:
-    # Fallback if these classes are not available
-    BaseToolCallPart = None  # type: ignore[misc,assignment]
-    BaseToolReturnPart = None  # type: ignore[misc,assignment]
-    SystemPromptPart = None  # type: ignore[misc,assignment]
-    UserPromptPart = None  # type: ignore[misc,assignment]
-    TextPart = None  # type: ignore[misc,assignment]
-    ThinkingPart = None  # type: ignore[misc,assignment]
-    BinaryContent = None  # type: ignore[misc,assignment]
-    ImageUrl = None  # type: ignore[misc,assignment]
-    ThinkingPart = None  # type: ignore[misc,assignment]
-
-
-def _transform_system_instructions(
-    permanent_instructions: "list[SystemPromptPart]",
-    current_instructions: "list[str]",
-) -> "list[_types.TextPart]":
-    text_parts: "list[_types.TextPart]" = [
-        {
-            "type": "text",
-            "content": instruction.content,
-        }
-        for instruction in permanent_instructions
-    ]
-
-    text_parts.extend(
-        {
-            "type": "text",
-            "content": instruction,
-        }
-        for instruction in current_instructions
-    )
-
-    return text_parts
-
-
-def _get_system_instructions(
-    messages: "list[ModelMessage]",
-) -> "tuple[list[SystemPromptPart], list[str]]":
-    permanent_instructions = []
-    current_instructions = []
-
-    for msg in messages:
-        if hasattr(msg, "parts"):
-            for part in msg.parts:
-                if SystemPromptPart is not None and isinstance(part, SystemPromptPart):
-                    permanent_instructions.append(part)
-
-        if hasattr(msg, "instructions") and msg.instructions is not None:
-            current_instructions.append(msg.instructions)
-
-    return permanent_instructions, current_instructions
 
 
 def _set_input_messages(
@@ -114,97 +49,16 @@ def _set_input_messages(
     if not messages:
         return
 
-    permanent_instructions, current_instructions = _get_system_instructions(messages)
-    if len(permanent_instructions) > 0 or len(current_instructions) > 0:
+    system_instructions = extract_system_instructions(messages)
+    if system_instructions:
         _set_span_data_attribute(
             span,
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-            json.dumps(
-                _transform_system_instructions(
-                    permanent_instructions, current_instructions
-                )
-            ),
+            json.dumps(system_instructions),
         )
 
     try:
-        formatted_messages = []
-
-        for msg in messages:
-            if hasattr(msg, "parts"):
-                for part in msg.parts:
-                    role = "user"
-                    # Use isinstance checks with proper base classes
-                    if SystemPromptPart is not None and isinstance(
-                        part, SystemPromptPart
-                    ):
-                        continue
-                    elif (
-                        (TextPart is not None and isinstance(part, TextPart))
-                        or (ThinkingPart is not None and isinstance(part, ThinkingPart))
-                        or (
-                            BaseToolCallPart is not None
-                            and isinstance(part, BaseToolCallPart)
-                        )
-                    ):
-                        role = "assistant"
-                    elif BaseToolReturnPart is not None and isinstance(
-                        part, BaseToolReturnPart
-                    ):
-                        role = "tool"
-
-                    content: "List[Dict[str, Any] | str]" = []
-                    tool_calls = None
-                    tool_call_id = None
-
-                    # Handle ToolCallPart (assistant requesting tool use)
-                    if BaseToolCallPart is not None and isinstance(
-                        part, BaseToolCallPart
-                    ):
-                        tool_call_data = {}
-                        if hasattr(part, "tool_name"):
-                            tool_call_data["name"] = part.tool_name
-                        if hasattr(part, "args"):
-                            tool_call_data["arguments"] = safe_serialize(part.args)
-                        if tool_call_data:
-                            tool_calls = [tool_call_data]
-                    # Handle ToolReturnPart (tool result)
-                    elif BaseToolReturnPart is not None and isinstance(
-                        part, BaseToolReturnPart
-                    ):
-                        if hasattr(part, "tool_name"):
-                            tool_call_id = part.tool_name
-                        if hasattr(part, "content"):
-                            content.append({"type": "text", "text": str(part.content)})
-                    # Handle regular content
-                    elif hasattr(part, "content"):
-                        if isinstance(part.content, str):
-                            content.append({"type": "text", "text": part.content})
-                        elif isinstance(part.content, list):
-                            for item in part.content:
-                                if isinstance(item, str):
-                                    content.append({"type": "text", "text": item})
-                                elif ImageUrl is not None and isinstance(
-                                    item, ImageUrl
-                                ):
-                                    content.append(_serialize_image_url_item(item))
-                                elif BinaryContent is not None and isinstance(
-                                    item, BinaryContent
-                                ):
-                                    content.append(_serialize_binary_content_item(item))
-                                else:
-                                    content.append(safe_serialize(item))
-                        else:
-                            content.append({"type": "text", "text": str(part.content)})
-                    # Add message if we have content or tool calls
-                    if content or tool_calls:
-                        message: "Dict[str, Any]" = {"role": role}
-                        if content:
-                            message["content"] = content
-                        if tool_calls:
-                            message["tool_calls"] = tool_calls
-                        if tool_call_id:
-                            message["tool_call_id"] = tool_call_id
-                        formatted_messages.append(message)
+        formatted_messages = extract_request_messages(messages)
 
         if formatted_messages:
             normalized_messages = normalize_message_roles(formatted_messages)
@@ -240,42 +94,13 @@ def _set_output_data(
         )
 
     try:
-        if hasattr(response, "parts"):
-            parts: "list[Union[_types.TextPart, _types.ReasoningPart, _types.ToolCallPart]]" = []
-
-            for part in response.parts:
-                if (
-                    TextPart is not None
-                    and isinstance(part, TextPart)
-                    and hasattr(part, "content")
-                ):
-                    parts.append({"type": "text", "content": part.content})
-
-                elif ThinkingPart is not None and isinstance(part, ThinkingPart):
-                    parts.append(
-                        {
-                            "type": "reasoning",
-                            "content": part.content,
-                        }
-                    )
-
-                elif BaseToolCallPart is not None and isinstance(
-                    part, BaseToolCallPart
-                ):
-                    tool_part: "_types.ToolCallPart" = {"type": "tool_call"}
-                    if hasattr(part, "tool_name"):
-                        tool_part["name"] = part.tool_name
-                    if hasattr(part, "args"):
-                        tool_part["arguments"] = safe_serialize(part.args)
-                    parts.append(tool_part)
-
-            if parts:
-                _set_span_data_attribute(
-                    span,
-                    SPANDATA.GEN_AI_OUTPUT_MESSAGES,
-                    json.dumps([{"role": "assistant", "parts": parts}]),
-                )
-
+        parts = extract_response_parts(response)
+        if parts:
+            _set_span_data_attribute(
+                span,
+                SPANDATA.GEN_AI_OUTPUT_MESSAGES,
+                json.dumps([{"role": "assistant", "parts": parts}]),
+            )
     except Exception:
         # If we fail to format output, just skip it
         pass
@@ -292,12 +117,11 @@ def ai_client_span(
         model: Model object
         model_settings: Model settings
     """
-    # Determine model name for span name
-    model_obj = model
-    if agent and hasattr(agent, "model"):
-        model_obj = agent.model
-
-    model_name = _get_model_name(model_obj) or "unknown"
+    # Determine model name for span name, resolving the same way as
+    # _set_model_data so the span name and gen_ai.request.model agree
+    model_name = (
+        extract_model_info(model, None, agent or get_current_agent()).name or "unknown"
+    )
 
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
     if span_streaming:

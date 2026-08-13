@@ -2304,7 +2304,7 @@ async def test_model_name_extraction_with_callable(sentry_init, capture_items):
     """
     from unittest.mock import MagicMock
 
-    from sentry_sdk.integrations.pydantic_ai.utils import _get_model_name
+    from sentry_sdk.integrations.pydantic_ai._extract import get_model_name
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -2318,7 +2318,7 @@ async def test_model_name_extraction_with_callable(sentry_init, capture_items):
     mock_model.name = lambda: "custom-model-name"
 
     # Get model name - should call the callable name()
-    result = _get_model_name(mock_model)
+    result = get_model_name(mock_model)
 
     # Should return the result from callable
     assert result == "custom-model-name"
@@ -2331,7 +2331,7 @@ async def test_model_name_extraction_fallback_to_str(sentry_init, capture_items)
     """
     from unittest.mock import MagicMock
 
-    from sentry_sdk.integrations.pydantic_ai.utils import _get_model_name
+    from sentry_sdk.integrations.pydantic_ai._extract import get_model_name
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -2345,7 +2345,7 @@ async def test_model_name_extraction_fallback_to_str(sentry_init, capture_items)
     del mock_model.model_name
 
     # Get model name - should fall back to str()
-    result = _get_model_name(mock_model)
+    result = get_model_name(mock_model)
 
     # Should return string representation
     assert result is not None
@@ -3331,11 +3331,11 @@ async def test_set_input_messages_without_prompts(sentry_init, capture_items):
 @pytest.mark.asyncio
 async def test_get_model_name_with_exception_in_callable(sentry_init, capture_items):
     """
-    Test that _get_model_name handles exceptions in name() callable.
+    Test that get_model_name handles exceptions in name() callable.
     """
     from unittest.mock import MagicMock
 
-    from sentry_sdk.integrations.pydantic_ai.utils import _get_model_name
+    from sentry_sdk.integrations.pydantic_ai._extract import get_model_name
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -3347,7 +3347,7 @@ async def test_get_model_name_with_exception_in_callable(sentry_init, capture_it
     mock_model.name = MagicMock(side_effect=Exception("Error"))
 
     # Should fall back to str()
-    result = _get_model_name(mock_model)
+    result = get_model_name(mock_model)
 
     # Should return something (str fallback)
     assert result is not None
@@ -3356,9 +3356,9 @@ async def test_get_model_name_with_exception_in_callable(sentry_init, capture_it
 @pytest.mark.asyncio
 async def test_get_model_name_with_string_model(sentry_init, capture_items):
     """
-    Test that _get_model_name handles string models.
+    Test that get_model_name handles string models.
     """
-    from sentry_sdk.integrations.pydantic_ai.utils import _get_model_name
+    from sentry_sdk.integrations.pydantic_ai._extract import get_model_name
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -3366,7 +3366,7 @@ async def test_get_model_name_with_string_model(sentry_init, capture_items):
     )
 
     # Pass a string as model
-    result = _get_model_name("gpt-4")
+    result = get_model_name("gpt-4")
 
     # Should return the string
     assert result == "gpt-4"
@@ -3375,9 +3375,9 @@ async def test_get_model_name_with_string_model(sentry_init, capture_items):
 @pytest.mark.asyncio
 async def test_get_model_name_with_none(sentry_init, capture_items):
     """
-    Test that _get_model_name handles None model.
+    Test that get_model_name handles None model.
     """
-    from sentry_sdk.integrations.pydantic_ai.utils import _get_model_name
+    from sentry_sdk.integrations.pydantic_ai._extract import get_model_name
 
     sentry_init(
         integrations=[PydanticAIIntegration()],
@@ -3385,7 +3385,7 @@ async def test_get_model_name_with_none(sentry_init, capture_items):
     )
 
     # Pass None
-    result = _get_model_name(None)
+    result = get_model_name(None)
 
     # Should return None
     assert result is None
