@@ -2132,3 +2132,539 @@ def test_graph_bubble_up_ignored(sentry_init, capture_items):
         model.invoke([HumanMessage(content="hi")])
 
     assert len(events) == 0
+
+
+def _invoke_span_data(items_or_events, span_streaming):
+    if span_streaming:
+        sentry_sdk.flush()
+        spans = [item.payload for item in items_or_events]
+        invoke_spans = [
+            span
+            for span in spans
+            if span["attributes"]["sentry.op"] == OP.GEN_AI_INVOKE_AGENT
+        ]
+        assert len(invoke_spans) == 1
+        return invoke_spans[0]["attributes"]
+
+    tx = items_or_events[0]
+    invoke_spans = [
+        span for span in tx["spans"] if span["op"] == OP.GEN_AI_INVOKE_AGENT
+    ]
+    assert len(invoke_spans) == 1
+    return invoke_spans[0]["data"]
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize(
+    "data_collection, send_default_pii, expect_inputs",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            False,
+            True,
+            id="gen-ai-inputs-enabled-overrides-pii-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            True,
+            False,
+            id="gen-ai-inputs-disabled-overrides-pii-enabled",
+        ),
+        pytest.param(
+            {},
+            False,
+            True,
+            id="gen-ai-omitted-defaults-to-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            False,
+            True,
+            id="gen-ai-outputs-disabled-does-not-affect-inputs",
+        ),
+        pytest.param(
+            None,
+            False,
+            False,
+            id="no-data-collection-falls-back-to-send-default-pii",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            id="no-data-collection-pii-enabled-collects",
+        ),
+    ],
+)
+def test_pregel_invoke_gates_request_messages_and_tool_calls_on_inputs_setting(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    send_default_pii,
+    expect_inputs,
+    span_streaming,
+):
+    init_kwargs = {
+        "integrations": [LanggraphIntegration()],
+        "traces_sample_rate": 1.0,
+        "send_default_pii": send_default_pii,
+        "stream_gen_ai_spans": span_streaming,
+        "trace_lifecycle": "stream" if span_streaming else "static",
+    }
+    if data_collection is not None:
+        init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    sentry_init(**init_kwargs)
+
+    test_state = {"messages": [MockMessage("Hello, can you help me?", name="user")]}
+    pregel = MockPregelInstance("test_graph")
+    expected_tool_calls = [
+        {
+            "id": "call_test_123",
+            "type": "function",
+            "function": {"name": "search_tool", "arguments": '{"query": "help"}'},
+        }
+    ]
+
+    def original_invoke(self, *args, **kwargs):
+        return {
+            "messages": args[0].get("messages", [])
+            + [
+                MockMessage(
+                    content="I'll help you with that task!",
+                    name="assistant",
+                    tool_calls=expected_tool_calls,
+                )
+            ]
+        }
+
+    captured = capture_items("span") if span_streaming else capture_events()
+
+    with start_transaction():
+        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+        wrapped_invoke(pregel, test_state)
+
+    data = _invoke_span_data(captured, span_streaming)
+
+    if expect_inputs:
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in data
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in data
+    else:
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in data
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in data
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize(
+    "data_collection, send_default_pii, expect_outputs",
+    [
+        pytest.param(
+            {"gen_ai": {"outputs": True}},
+            False,
+            True,
+            id="gen-ai-outputs-enabled-overrides-pii-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"outputs": False}},
+            True,
+            False,
+            id="gen-ai-outputs-disabled-overrides-pii-enabled",
+        ),
+        pytest.param(
+            {},
+            False,
+            True,
+            id="gen-ai-omitted-defaults-to-enabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            False,
+            True,
+            id="gen-ai-inputs-disabled-does-not-affect-outputs",
+        ),
+        pytest.param(
+            None,
+            False,
+            False,
+            id="no-data-collection-falls-back-to-send-default-pii",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            id="no-data-collection-pii-enabled-collects",
+        ),
+    ],
+)
+def test_pregel_invoke_gates_response_text_on_outputs_setting(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    send_default_pii,
+    expect_outputs,
+    span_streaming,
+):
+    init_kwargs = {
+        "integrations": [LanggraphIntegration()],
+        "traces_sample_rate": 1.0,
+        "send_default_pii": send_default_pii,
+        "stream_gen_ai_spans": span_streaming,
+        "trace_lifecycle": "stream" if span_streaming else "static",
+    }
+    if data_collection is not None:
+        init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    sentry_init(**init_kwargs)
+
+    test_state = {"messages": [MockMessage("Hello, can you help me?", name="user")]}
+    pregel = MockPregelInstance("test_graph")
+    expected_assistant_response = "I'll help you with that task!"
+
+    def original_invoke(self, *args, **kwargs):
+        return {
+            "messages": args[0].get("messages", [])
+            + [MockMessage(content=expected_assistant_response, name="assistant")]
+        }
+
+    captured = capture_items("span") if span_streaming else capture_events()
+
+    with start_transaction():
+        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+        wrapped_invoke(pregel, test_state)
+
+    data = _invoke_span_data(captured, span_streaming)
+
+    if expect_outputs:
+        assert data[SPANDATA.GEN_AI_RESPONSE_TEXT] == expected_assistant_response
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in data
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize(
+    "data_collection, send_default_pii, expect_inputs, expect_outputs",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": False}},
+            False,
+            True,
+            False,
+            id="gen-ai-inputs-enabled-outputs-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": True}},
+            True,
+            False,
+            True,
+            id="gen-ai-inputs-disabled-outputs-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            False,
+            False,
+            id="no-data-collection-falls-back-to-send-default-pii",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            True,
+            id="no-data-collection-pii-enabled-collects",
+        ),
+    ],
+)
+def test_pregel_ainvoke_gates_inputs_and_outputs_independently(
+    sentry_init,
+    capture_events,
+    capture_items,
+    data_collection,
+    send_default_pii,
+    expect_inputs,
+    expect_outputs,
+    span_streaming,
+):
+    init_kwargs = {
+        "integrations": [LanggraphIntegration()],
+        "traces_sample_rate": 1.0,
+        "send_default_pii": send_default_pii,
+        "stream_gen_ai_spans": span_streaming,
+        "trace_lifecycle": "stream" if span_streaming else "static",
+    }
+    if data_collection is not None:
+        init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    sentry_init(**init_kwargs)
+
+    test_state = {"messages": [MockMessage("What is the weather?", name="user")]}
+    pregel = MockPregelInstance("async_graph")
+    expected_assistant_response = "Let me check the weather for you!"
+    expected_tool_calls = [
+        {
+            "id": "call_weather_456",
+            "type": "function",
+            "function": {"name": "get_weather", "arguments": '{"location": "Berlin"}'},
+        }
+    ]
+
+    async def original_ainvoke(self, *args, **kwargs):
+        return {
+            "messages": args[0].get("messages", [])
+            + [
+                MockMessage(
+                    content=expected_assistant_response,
+                    name="assistant",
+                    tool_calls=expected_tool_calls,
+                )
+            ]
+        }
+
+    async def run_test():
+        with start_transaction():
+            wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
+            return await wrapped_ainvoke(pregel, test_state)
+
+    captured = capture_items("span") if span_streaming else capture_events()
+
+    asyncio.run(run_test())
+
+    data = _invoke_span_data(captured, span_streaming)
+
+    if expect_inputs:
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES in data
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in data
+    else:
+        assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in data
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in data
+
+    if expect_outputs:
+        assert data[SPANDATA.GEN_AI_RESPONSE_TEXT] == expected_assistant_response
+    else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in data
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_pregel_invoke_message_delta_ignores_gen_ai_inputs_setting(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[LanggraphIntegration()],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=span_streaming,
+        trace_lifecycle="stream" if span_streaming else "static",
+        _experiments={
+            "data_collection": {"gen_ai": {"inputs": False, "outputs": True}}
+        },
+    )
+
+    prior_response = "Of course! How can I assist you?"
+    test_state = {
+        "messages": [
+            MockMessage("Hello, can you help me?", name="user"),
+            MockMessage(
+                prior_response,
+                name="assistant",
+                response_metadata={
+                    "token_usage": {
+                        "total_tokens": 300,
+                        "prompt_tokens": 100,
+                        "completion_tokens": 200,
+                    },
+                    "model_name": "gpt-3.5-turbo",
+                },
+            ),
+        ]
+    }
+    pregel = MockPregelInstance("test_graph")
+    expected_assistant_response = "I'll help you with that task!"
+
+    def original_invoke(self, *args, **kwargs):
+        return {
+            "messages": args[0].get("messages", [])
+            + [
+                MockMessage(
+                    content=expected_assistant_response,
+                    name="assistant",
+                    response_metadata={
+                        "token_usage": {
+                            "total_tokens": 30,
+                            "prompt_tokens": 10,
+                            "completion_tokens": 20,
+                        },
+                        "model_name": "gpt-4.1-2025-04-14",
+                    },
+                )
+            ]
+        }
+
+    captured = capture_items("span") if span_streaming else capture_events()
+
+    with start_transaction():
+        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+        wrapped_invoke(pregel, test_state)
+
+    data = _invoke_span_data(captured, span_streaming)
+
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in data
+    assert data[SPANDATA.GEN_AI_RESPONSE_TEXT] == expected_assistant_response
+    assert prior_response not in data[SPANDATA.GEN_AI_RESPONSE_TEXT]
+    assert data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4.1-2025-04-14"
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_pregel_ainvoke_message_delta_ignores_gen_ai_inputs_setting(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[LanggraphIntegration()],
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=span_streaming,
+        trace_lifecycle="stream" if span_streaming else "static",
+        _experiments={
+            "data_collection": {"gen_ai": {"inputs": False, "outputs": True}}
+        },
+    )
+
+    prior_response = "It is sunny in Berlin."
+    test_state = {
+        "messages": [
+            MockMessage("What is the weather?", name="user"),
+            MockMessage(
+                prior_response,
+                name="assistant",
+                response_metadata={
+                    "token_usage": {
+                        "total_tokens": 300,
+                        "prompt_tokens": 100,
+                        "completion_tokens": 200,
+                    },
+                    "model_name": "gpt-3.5-turbo",
+                },
+            ),
+        ]
+    }
+    pregel = MockPregelInstance("async_graph")
+    expected_assistant_response = "Let me check the weather for you!"
+
+    async def original_ainvoke(self, *args, **kwargs):
+        return {
+            "messages": args[0].get("messages", [])
+            + [
+                MockMessage(
+                    content=expected_assistant_response,
+                    name="assistant",
+                    response_metadata={
+                        "token_usage": {
+                            "total_tokens": 30,
+                            "prompt_tokens": 10,
+                            "completion_tokens": 20,
+                        },
+                        "model_name": "gpt-4.1-2025-04-14",
+                    },
+                )
+            ]
+        }
+
+    async def run_test():
+        with start_transaction():
+            wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
+            return await wrapped_ainvoke(pregel, test_state)
+
+    captured = capture_items("span") if span_streaming else capture_events()
+
+    asyncio.run(run_test())
+
+    data = _invoke_span_data(captured, span_streaming)
+
+    assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in data
+    assert data[SPANDATA.GEN_AI_RESPONSE_TEXT] == expected_assistant_response
+    assert prior_response not in data[SPANDATA.GEN_AI_RESPONSE_TEXT]
+    assert data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
+    assert data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-4.1-2025-04-14"
+
+
+@pytest.mark.parametrize(
+    "data_collection, send_default_pii, expect_available_tools",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            False,
+            True,
+            id="gen-ai-inputs-enabled-overrides-pii-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            True,
+            False,
+            id="gen-ai-inputs-disabled-overrides-pii-enabled",
+        ),
+        pytest.param(
+            {},
+            False,
+            True,
+            id="gen-ai-omitted-defaults-to-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            True,
+            id="no-data-collection-collects-regardless-of-pii",
+        ),
+    ],
+)
+def test_state_graph_compile_gates_available_tools_only_when_data_collection_configured(
+    sentry_init,
+    capture_events,
+    data_collection,
+    send_default_pii,
+    expect_available_tools,
+):
+    init_kwargs = {
+        "integrations": [LanggraphIntegration()],
+        "traces_sample_rate": 1.0,
+        "send_default_pii": send_default_pii,
+        "stream_gen_ai_spans": False,
+    }
+    if data_collection is not None:
+        init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    sentry_init(**init_kwargs)
+
+    graph = MockStateGraph()
+
+    def original_compile(self, *args, **kwargs):
+        return MockCompiledGraph(self.name)
+
+    events = capture_events()
+
+    with patch("sentry_sdk.integrations.langgraph.StateGraph"), start_transaction():
+        wrapped_compile = _wrap_state_graph_compile(original_compile)
+        wrapped_compile(graph, model="test-model", checkpointer=None)
+
+    tx = events[0]
+    agent_spans = [span for span in tx["spans"] if span["op"] == OP.GEN_AI_CREATE_AGENT]
+    assert len(agent_spans) == 1
+    data = agent_spans[0]["data"]
+
+    if expect_available_tools:
+        assert data[SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS] == [
+            "search_tool",
+            "calculator",
+        ]
+    else:
+        assert SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS not in data
+
+    assert data[SPANDATA.GEN_AI_AGENT_NAME] == "test_graph"
