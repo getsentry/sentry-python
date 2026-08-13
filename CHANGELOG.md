@@ -2,6 +2,42 @@
 
 ## 2.68.0
 
+### Important
+
+- We're making `enable_logs` and `enable_metrics` no-op with this release ([#7177](https://github.com/getsentry/sentry-python/pull/7177)), and they'll be dropped in the next major.
+
+  Previously, `enable_logs` also controlled automatic logs collection from the logging and Loguru integrations. These integrations now get an integration-level `capture_sentry_logs` boolean option to allow for more control over the auto-collection. These options are `False` by default, i.e., **nothing is auto-collected without your explicit opt-in**.
+
+  #### Action Needed
+
+  If you had `enable_logs` set to `True`:
+  - If you were using the `sentry_sdk.logger.X` API, no action necessary, the API will just work.
+  - If you were auto-collecting logs from either `LoggingIntegration` or `LoguruIntegration`, the auto-collection **will be turned off in this release**. You can switch auto-collection on explicitly with:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.logging import LoggingIntegration
+  from sentry_sdk.integrations.loguru import LoguruIntegration
+
+  sentry_sdk.init(
+      integrations=[
+          LoggingIntegration(capture_sentry_logs=True),
+          LoguruIntegration(capture_sentry_logs=True),
+      ],
+  )
+  ```
+
+  If you had `enable_logs` set to `False`:
+  - If you were using it to gate usages of the `sentry_sdk.logger.X` API, you'll need to remove the calls entirely or define a `before_send_log` callback to filter out unwanted logs.
+
+  If you has `enable_metrics` set to `False`:
+  - Any metrics emitted using the metrics API will be emitted. You'll need to drop them in a `before_send_metric` or remove the calls to the API.
+
+  ### Why We're Doing This
+
+  We recognize this is a disruptive change for some folks and want to make it clear this is a one-off. We're removing the options because they were an unnecessary hurdle that one had to jump through to be able to use logs and metrics, and it was confusing why the logging API would not just work on its own. On the other hand, we wanted to give you more fine-grained control over automatic collection.
+
+
 ### New Features ✨
 
 #### Other
@@ -16,7 +52,7 @@
 
 ### Internal Changes 🔧
 
-#### Httpx,Httpx2
+#### HTTPX, HTTPX2
 
 - Move crumbs to integrations by @sentrivana in [#7149](https://github.com/getsentry/sentry-python/pull/7149)
 - Split into sync/async tests by @sentrivana in [#7152](https://github.com/getsentry/sentry-python/pull/7152)
@@ -29,7 +65,6 @@
 - (pyreqwest) Move crumbs to integration by @sentrivana in [#7148](https://github.com/getsentry/sentry-python/pull/7148)
 - (stdlib) Move crumbs to integration by @sentrivana in [#7161](https://github.com/getsentry/sentry-python/pull/7161)
 - Flush trace buckets when segment spans finish by @alexander-alderman-webb in [#7170](https://github.com/getsentry/sentry-python/pull/7170)
-- Make `enable_logs`, `enable_metrics` no-op by @sentrivana in [#7177](https://github.com/getsentry/sentry-python/pull/7177)
 - Revert global span batcher limits by @alexander-alderman-webb in [#7168](https://github.com/getsentry/sentry-python/pull/7168)
 
 ## 2.67.0
