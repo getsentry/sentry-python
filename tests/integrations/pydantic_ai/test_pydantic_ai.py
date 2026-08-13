@@ -4933,8 +4933,8 @@ async def test_data_collection_gen_ai_outputs_gates_response_text_and_tool_outpu
     else:
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in invoke_agent_data
 
-    # The output messages themselves can still be present when outputs are
-    # disabled (tool calls are gated on inputs), so assert on the part types.
+    # Every part of the output message follows the outputs gate, so the
+    # attribute is dropped entirely when outputs are disabled.
     response_part_types = set()
     for chat_span in chat_spans:
         for message in json.loads(chat_span.get(SPANDATA.GEN_AI_OUTPUT_MESSAGES, "[]")):
@@ -4944,8 +4944,9 @@ async def test_data_collection_gen_ai_outputs_gates_response_text_and_tool_outpu
     if expect_outputs:
         assert "text" in response_part_types
     else:
-        assert "text" not in response_part_types
-        assert "reasoning" not in response_part_types
+        assert response_part_types == set()
+        for chat_span in chat_spans:
+            assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in chat_span
 
     for tool_span in tool_spans:
         if expect_outputs:
@@ -4960,43 +4961,38 @@ async def test_data_collection_gen_ai_outputs_gates_response_text_and_tool_outpu
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
-    "gen_ai,expect_text,expect_tool_calls",
+    "gen_ai,expect_outputs",
     [
         pytest.param(
             {"inputs": True, "outputs": False},
             False,
-            True,
-            id="gen-ai-outputs-disabled-keeps-tool-calls-gated-on-inputs",
+            id="gen-ai-outputs-disabled-drops-text-and-tool-calls",
         ),
         pytest.param(
             {"inputs": False, "outputs": True},
             True,
-            False,
-            id="gen-ai-inputs-disabled-drops-tool-calls-keeps-text",
+            id="gen-ai-inputs-disabled-does-not-affect-output-messages",
         ),
         pytest.param(
             {"inputs": True, "outputs": True},
-            True,
             True,
             id="gen-ai-inputs-and-outputs-enabled",
         ),
         pytest.param(
             {"inputs": False, "outputs": False},
             False,
-            False,
             id="gen-ai-inputs-and-outputs-disabled",
         ),
     ],
 )
 @pytest.mark.asyncio
-async def test_data_collection_gen_ai_output_message_tool_calls_follow_inputs_gate_text_follows_outputs_gate(
+async def test_data_collection_gen_ai_output_message_parts_follow_outputs_gate(
     sentry_init,
     capture_events,
     capture_items,
     get_test_agent,
     gen_ai,
-    expect_text,
-    expect_tool_calls,
+    expect_outputs,
     stream_gen_ai_spans,
     span_streaming,
 ):
@@ -5039,25 +5035,21 @@ async def test_data_collection_gen_ai_output_message_tool_calls_follow_inputs_ga
 
     part_types = {part["type"] for part in parts}
 
-    if expect_text:
+    if expect_outputs:
         assert "text" in part_types
-    else:
-        assert "text" not in part_types
-        assert "reasoning" not in part_types
 
-    if expect_tool_calls:
         tool_calls = [part for part in parts if part["type"] == "tool_call"]
         assert len(tool_calls) >= 1
         assert tool_calls[0]["name"] == "add_numbers"
         assert tool_calls[0]["arguments"]
     else:
-        assert "tool_call" not in part_types
+        assert part_types == set()
 
     for chat_span in chat_spans:
         # The response model is not PII, so it is recorded regardless of the gates
         assert SPANDATA.GEN_AI_RESPONSE_MODEL in chat_span
 
-        if not expect_text and not expect_tool_calls:
+        if not expect_outputs:
             assert SPANDATA.GEN_AI_OUTPUT_MESSAGES not in chat_span
 
 

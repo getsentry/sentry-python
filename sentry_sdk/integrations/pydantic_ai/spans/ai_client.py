@@ -237,7 +237,6 @@ def _set_output_data(
     response: "Optional[ModelResponse]",
 ) -> None:
     """Set output data on a span."""
-    record_inputs = _should_send_inputs()
     record_outputs = _should_send_outputs()
 
     if not response:
@@ -248,7 +247,7 @@ def _set_output_data(
     )
     set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)  # type: ignore[arg-type]
 
-    if not record_inputs and not record_outputs:
+    if not record_outputs:
         return
 
     try:
@@ -257,18 +256,13 @@ def _set_output_data(
 
             for part in response.parts:
                 if (
-                    record_outputs
-                    and TextPart is not None
+                    TextPart is not None
                     and isinstance(part, TextPart)
                     and hasattr(part, "content")
                 ):
                     parts.append({"type": "text", "content": part.content})
 
-                elif (
-                    record_outputs
-                    and ThinkingPart is not None
-                    and isinstance(part, ThinkingPart)
-                ):
+                elif ThinkingPart is not None and isinstance(part, ThinkingPart):
                     parts.append(
                         {
                             "type": "reasoning",
@@ -276,10 +270,8 @@ def _set_output_data(
                         }
                     )
 
-                elif (
-                    record_inputs
-                    and BaseToolCallPart is not None
-                    and isinstance(part, BaseToolCallPart)
+                elif BaseToolCallPart is not None and isinstance(
+                    part, BaseToolCallPart
                 ):
                     tool_part: "_types.ToolCallPart" = {"type": "tool_call"}
                     if hasattr(part, "tool_name"):
