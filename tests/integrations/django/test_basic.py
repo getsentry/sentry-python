@@ -1097,6 +1097,57 @@ def test_transaction_style(
     assert event["transaction"] == expected_transaction
 
 
+@pytest.mark.parametrize(
+    "transaction_style,client_url,expected_transaction,expected_source,expected_response",
+    [
+        (
+            "function_name",
+            "/message",
+            "tests.integrations.django.myapp.views.message",
+            "component",
+            b"ok",
+        ),
+        ("url", "/message", "/message", "route", b"ok"),
+        ("url", "/404", "/404", "url", b"404"),
+    ],
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_transaction_style_tracing_disabled(
+    sentry_init,
+    client,
+    capture_events,
+    capture_items,
+    transaction_style,
+    client_url,
+    expected_transaction,
+    expected_source,
+    expected_response,
+    span_streaming,
+):
+    sentry_init(
+        integrations=[DjangoIntegration(transaction_style=transaction_style)],
+        send_default_pii=True,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    if span_streaming:
+        items = capture_items("event")
+
+        content, status, headers = unpack_werkzeug_response(client.get(client_url))
+        assert content == expected_response
+
+        (event,) = (item.payload for item in items if item.type == "event")
+    else:
+        events = capture_events()
+
+        content, status, headers = unpack_werkzeug_response(client.get(client_url))
+        assert content == expected_response
+
+        (event,) = events
+
+    assert event["transaction"] == expected_transaction
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
 def test_request_body(
     sentry_init,
     client,
@@ -1139,6 +1190,7 @@ def test_request_body(
     assert "" not in event
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 def test_read_request(
     sentry_init,
     client,
@@ -2152,12 +2204,17 @@ def test_transaction_http_method_custom(
 
         client.get("/nomessage")
         client.options("/nomessage")
-        client.head("/nomessage")
 
         sentry_sdk.flush()
         spans = [item.payload for item in items]
 
         assert spans[2]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "OPTIONS"
+
+        client.head("/nomessage")
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+
         assert spans[5]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "HEAD"
     else:
         events = capture_events()

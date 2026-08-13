@@ -9,7 +9,7 @@ from sentry_sdk.integrations.logging import (
     _BaseHandler,
 )
 from sentry_sdk.logger import _log_level_to_otel
-from sentry_sdk.utils import has_logs_enabled, safe_repr
+from sentry_sdk.utils import safe_repr
 
 if TYPE_CHECKING:
     from logging import LogRecord
@@ -70,6 +70,7 @@ class LoguruIntegration(Integration):
     breadcrumb_format = DEFAULT_FORMAT
     event_format = DEFAULT_FORMAT
     sentry_logs_level: "Optional[int]" = DEFAULT_LEVEL
+    capture_sentry_logs: "Optional[bool]" = False
 
     def __init__(
         self,
@@ -78,12 +79,14 @@ class LoguruIntegration(Integration):
         breadcrumb_format: "str | loguru.FormatFunction" = DEFAULT_FORMAT,
         event_format: "str | loguru.FormatFunction" = DEFAULT_FORMAT,
         sentry_logs_level: "Optional[int]" = DEFAULT_LEVEL,
+        capture_sentry_logs: "Optional[bool]" = False,
     ) -> None:
         LoguruIntegration.level = level
         LoguruIntegration.event_level = event_level
         LoguruIntegration.breadcrumb_format = breadcrumb_format
         LoguruIntegration.event_format = event_format
         LoguruIntegration.sentry_logs_level = sentry_logs_level
+        LoguruIntegration.capture_sentry_logs = capture_sentry_logs
 
     @staticmethod
     def setup_once() -> None:
@@ -142,11 +145,10 @@ def loguru_sentry_logs_handler(message: "Message") -> None:
     # This is intentionally a callable sink instead of a standard logging handler
     # since otherwise we wouldn't get direct access to message.record
     client = sentry_sdk.get_client()
-
     if not client.is_active():
         return
 
-    if not has_logs_enabled(client.options):
+    if not LoguruIntegration.capture_sentry_logs:
         return
 
     record = message.record
