@@ -1,4 +1,5 @@
 import sys
+from contextlib import ExitStack
 from functools import wraps
 from typing import TYPE_CHECKING
 
@@ -6,8 +7,9 @@ import sentry_sdk
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.utils import capture_internal_exceptions, reraise
 
+from .._run_context import agent_run_scope
 from ..spans import invoke_agent_span, update_invoke_agent_span
-from ..utils import _capture_exception, pop_agent, push_agent
+from ..utils import _capture_exception
 
 try:
     from pydantic_ai.agent import Agent
@@ -16,6 +18,14 @@ except ImportError:
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional, Union
+
+
+def _extract_run_params(
+    args: "tuple[Any, ...]", kwargs: "dict[str, Any]"
+) -> "tuple[Any, Any, Any]":
+    """Extract (user_prompt, model, model_settings) from a run call."""
+    user_prompt = kwargs.get("user_prompt") or (args[0] if args else None)
+    return user_prompt, kwargs.get("model"), kwargs.get("model_settings")
 
 
 class _StreamingContextManagerWrapper:
@@ -28,39 +38,37 @@ class _StreamingContextManagerWrapper:
         user_prompt: "Any",
         model: "Any",
         model_settings: "Any",
-        is_streaming: bool = True,
     ) -> None:
         self.agent = agent
         self.original_ctx_manager = original_ctx_manager
         self.user_prompt = user_prompt
         self.model = model
         self.model_settings = model_settings
-        self.is_streaming = is_streaming
-        self._isolation_scope: "Any" = None
+        self._contexts: "Optional[ExitStack]" = None
         self._span: "Optional[Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan]]" = None
         self._result: "Any" = None
 
     async def __aenter__(self) -> "Any":
-        # Set up isolation scope and invoke_agent span
-        self._isolation_scope = sentry_sdk.isolation_scope()
-        self._isolation_scope.__enter__()
+        # Isolation scope, invoke_agent span, and run-context tracking are all
+        # owned by one ExitStack so they unwind together in __aexit__ (or
+        # right here if entering the original context manager fails).
+        with ExitStack() as contexts:
+            contexts.enter_context(sentry_sdk.isolation_scope())
+            span = invoke_agent_span(
+                self.user_prompt,
+                self.agent,
+                self.model,
+                self.model_settings,
+                is_streaming=True,
+            )
+            contexts.enter_context(span)
+            self._span = span
+            contexts.enter_context(agent_run_scope(self.agent, is_streaming=True))
 
-        # Create invoke_agent span (will be closed in __aexit__)
-        self._span = invoke_agent_span(
-            self.user_prompt,
-            self.agent,
-            self.model,
-            self.model_settings,
-            self.is_streaming,
-        )
-        self._span.__enter__()
+            result = await self.original_ctx_manager.__aenter__()
 
-        # Push agent to contextvar stack after span is successfully created and entered
-        # This ensures proper pairing with pop_agent() in __aexit__ even if exceptions occur
-        push_agent(self.agent, self.is_streaming)
+            self._contexts = contexts.pop_all()
 
-        # Enter the original context manager
-        result = await self.original_ctx_manager.__aenter__()
         self._result = result
         return result
 
@@ -73,27 +81,13 @@ class _StreamingContextManagerWrapper:
             if exc_type is None and self._result and self._span is not None:
                 update_invoke_agent_span(self._span, self._result)
         finally:
-            # Pop agent from contextvar stack
-            pop_agent()
-
-            # Clean up invoke span
-            if self._span:
-                self._span.__exit__(exc_type, exc_val, exc_tb)
-
-            # Clean up isolation scope
-            if self._isolation_scope:
-                self._isolation_scope.__exit__(exc_type, exc_val, exc_tb)
+            if self._contexts is not None:
+                self._contexts.__exit__(exc_type, exc_val, exc_tb)
 
 
-def _create_run_wrapper(
-    original_func: "Callable[..., Any]", is_streaming: bool = False
-) -> "Callable[..., Any]":
+def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., Any]":
     """
     Wraps the Agent.run method to create an invoke_agent span.
-
-    Args:
-        original_func: The original run method
-        is_streaming: Whether this is a streaming method (for future use)
     """
     from sentry_sdk.integrations.pydantic_ai import (
         PydanticAIIntegration,
@@ -101,42 +95,30 @@ def _create_run_wrapper(
 
     @wraps(original_func)
     async def wrapper(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
-        # Isolate each workflow so that when agents are run in asyncio tasks they
-        # don't touch each other's scopes
+        user_prompt, model, model_settings = _extract_run_params(args, kwargs)
+
+        if PydanticAIIntegration.using_request_hooks:
+            if kwargs.get("metadata") is None:
+                kwargs["metadata"] = {"_sentry_span": None}
+
+        # Isolate each workflow so that when agents are run in asyncio tasks
+        # they don't touch each other's scopes
         with sentry_sdk.isolation_scope():
-            # Extract parameters for the span
-            user_prompt = kwargs.get("user_prompt") or (args[0] if args else None)
-            model = kwargs.get("model")
-            model_settings = kwargs.get("model_settings")
-
-            if PydanticAIIntegration.using_request_hooks:
-                metadata = kwargs.get("metadata")
-                if metadata is None:
-                    kwargs["metadata"] = {"_sentry_span": None}
-
-            # Create invoke_agent span
             with invoke_agent_span(
-                user_prompt, self, model, model_settings, is_streaming
+                user_prompt, self, model, model_settings, is_streaming=False
             ) as span:
-                # Push agent to contextvar stack after span is successfully created and entered
-                # This ensures proper pairing with pop_agent() in finally even if exceptions occur
-                push_agent(self, is_streaming)
+                with agent_run_scope(self, is_streaming=False):
+                    try:
+                        result = await original_func(self, *args, **kwargs)
 
-                try:
-                    result = await original_func(self, *args, **kwargs)
+                        update_invoke_agent_span(span, result)
 
-                    # Update span with result
-                    update_invoke_agent_span(span, result)
-
-                    return result
-                except Exception as exc:
-                    exc_info = sys.exc_info()
-                    with capture_internal_exceptions():
-                        _capture_exception(exc)
-                    reraise(*exc_info)
-                finally:
-                    # Pop agent from contextvar stack
-                    pop_agent()
+                        return result
+                    except Exception as exc:
+                        exc_info = sys.exc_info()
+                        with capture_internal_exceptions():
+                            _capture_exception(exc)
+                        reraise(*exc_info)
 
     return wrapper
 
@@ -153,14 +135,10 @@ def _create_streaming_wrapper(
 
     @wraps(original_func)
     def wrapper(self: "Any", *args: "Any", **kwargs: "Any") -> "Any":
-        # Extract parameters for the span
-        user_prompt = kwargs.get("user_prompt") or (args[0] if args else None)
-        model = kwargs.get("model")
-        model_settings = kwargs.get("model_settings")
+        user_prompt, model, model_settings = _extract_run_params(args, kwargs)
 
         if PydanticAIIntegration.using_request_hooks:
-            metadata = kwargs.get("metadata")
-            if metadata is None:
+            if kwargs.get("metadata") is None:
                 kwargs["metadata"] = {"_sentry_span": None}
 
         # Call original function to get the context manager
@@ -173,7 +151,6 @@ def _create_streaming_wrapper(
             user_prompt=user_prompt,
             model=model,
             model_settings=model_settings,
-            is_streaming=True,
         )
 
     return wrapper
@@ -183,8 +160,8 @@ def _patch_agent_run() -> None:
     """
     Patches the Agent run methods to create spans for agent execution.
 
-    This patches both non-streaming (run, run_sync) and streaming
-    (run_stream, run_stream_events) methods.
+    This patches both the non-streaming (run) and streaming (run_stream)
+    entry points; run_sync delegates to run.
     """
 
     # Store original methods
@@ -192,7 +169,7 @@ def _patch_agent_run() -> None:
     original_run_stream = Agent.run_stream
 
     # Wrap and apply patches for non-streaming methods
-    Agent.run = _create_run_wrapper(original_run, is_streaming=False)  # type: ignore[method-assign]
+    Agent.run = _create_run_wrapper(original_run)  # type: ignore[method-assign]
 
     # Wrap and apply patches for streaming methods
     Agent.run_stream = _create_streaming_wrapper(original_run_stream)  # type: ignore[method-assign]

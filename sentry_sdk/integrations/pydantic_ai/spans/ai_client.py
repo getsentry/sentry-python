@@ -20,14 +20,13 @@ from .._extract import (
     extract_response_parts,
     extract_system_instructions,
 )
+from .._run_context import get_current_agent, get_is_streaming
 from ..consts import SPAN_ORIGIN
 from ..utils import (
     _set_agent_data,
     _set_available_tools,
     _set_model_data,
     _should_send_prompts,
-    get_current_agent,
-    get_is_streaming,
 )
 from .utils import _set_usage_data
 
@@ -49,15 +48,15 @@ def _set_input_messages(
     if not messages:
         return
 
-    system_instructions = extract_system_instructions(messages)
-    if system_instructions:
-        _set_span_data_attribute(
-            span,
-            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-            json.dumps(system_instructions),
-        )
-
     try:
+        system_instructions = extract_system_instructions(messages)
+        if system_instructions:
+            _set_span_data_attribute(
+                span,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                json.dumps(system_instructions),
+            )
+
         formatted_messages = extract_request_messages(messages)
 
         if formatted_messages:
@@ -117,11 +116,10 @@ def ai_client_span(
         model: Model object
         model_settings: Model settings
     """
-    # Determine model name for span name, resolving the same way as
-    # _set_model_data so the span name and gen_ai.request.model agree
-    model_name = (
-        extract_model_info(model, None, agent or get_current_agent()).name or "unknown"
-    )
+    # Resolve the agent once so the span name and every attribute derived
+    # below (gen_ai.request.model, agent data, available tools) agree
+    agent_obj = agent or get_current_agent()
+    model_name = extract_model_info(model, model_settings, agent_obj).name or "unknown"
 
     span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
     if span_streaming:
@@ -145,11 +143,10 @@ def ai_client_span(
         # Set streaming flag from contextvar
         span.set_data(SPANDATA.GEN_AI_RESPONSE_STREAMING, get_is_streaming())
 
-    _set_agent_data(span, agent)
-    _set_model_data(span, model, model_settings)
+    _set_agent_data(span, agent_obj)
+    _set_model_data(span, model, model_settings, agent=agent_obj)
 
     # Add available tools if agent is available
-    agent_obj = agent or get_current_agent()
     _set_available_tools(span, agent_obj)
 
     # Set input messages (full conversation history)

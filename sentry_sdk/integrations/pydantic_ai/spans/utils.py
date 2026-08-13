@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.ai.monitoring import record_token_usage
 
-from .._extract import extract_usage
+from .._extract import extract_usage_kwargs
 
 if TYPE_CHECKING:
     from typing import Union
@@ -28,15 +28,8 @@ def _set_usage_data(
         span: The Sentry span to set data on.
         usage: RequestUsage or RunUsage object containing token usage information.
     """
-    usage_info = extract_usage(usage)
-    if usage_info is None:
+    usage_kwargs = extract_usage_kwargs(usage)
+    if usage_kwargs is None:
         return
 
-    record_token_usage(
-        span,
-        input_tokens=usage_info.input_tokens,
-        input_tokens_cached=usage_info.cache_read_tokens,
-        input_tokens_cache_write=usage_info.cache_write_tokens,
-        output_tokens=usage_info.output_tokens,
-        total_tokens=usage_info.total_tokens,
-    )
+    record_token_usage(span, **usage_kwargs)

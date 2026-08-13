@@ -31,6 +31,13 @@ if TYPE_CHECKING:
 def register_hooks(hooks: "Hooks") -> None:
     """
     Creates hooks for chat model calls and register the hooks by adding the hooks to the `capabilities` argument passed to `Agent.__init__()`.
+
+    The chat span opened in on_request is stored in the run's `RunContext.metadata`
+    dict, which pydantic-ai shares by reference between the hooks of one run. This
+    keeps span pairing correct per run (even for overlapping runs in one task) and
+    covers every entry point that fires request hooks (including `Agent.iter()`,
+    which the Agent.run/run_stream wrappers never see). It requires seeding a
+    metadata dict in `patched_init` below when the user did not provide one.
     """
 
     @hooks.on.before_model_request
@@ -41,12 +48,17 @@ def register_hooks(hooks: "Hooks") -> None:
         if not isinstance(run_context_metadata, dict):
             return request_context
 
-        span = ai_client_span(
-            messages=request_context.messages,
-            agent=None,
-            model=request_context.model,
-            model_settings=request_context.model_settings,
-        )
+        span = None
+        with capture_internal_exceptions():
+            span = ai_client_span(
+                messages=request_context.messages,
+                agent=None,
+                model=request_context.model,
+                model_settings=request_context.model_settings,
+            )
+
+        if span is None:
+            return request_context
 
         run_context_metadata["_sentry_span"] = span
         span.__enter__()
@@ -68,7 +80,8 @@ def register_hooks(hooks: "Hooks") -> None:
         if span is None:
             return response
 
-        update_ai_client_span(span, response)
+        with capture_internal_exceptions():
+            update_ai_client_span(span, response)
         span.__exit__(None, None, None)
 
         return response
@@ -116,15 +129,15 @@ class PydanticAIIntegration(Integration):
     Typical interaction with the library:
     1. The user creates an Agent instance with configuration, including system instructions sent to every model call.
     2. The user calls `Agent.run()` or `Agent.run_stream()` to start an agent run. The latter can be used to incrementally receive progress.
-    - Each run invocation has `RunContext` objects that are passed to the library hooks.
     3. In a loop, the agent repeatedly calls the model, maintaining a conversation history that includes previous messages and tool results, which is passed to each call.
 
     Internally, Pydantic AI maintains an execution graph in which ModelRequestNode are responsible for model calls, including retries.
-    Hooks using the decorators provided by `pydantic_ai.capabilities` create and manage spans for model calls when these hooks are available (newer library versions).
-    The span is created in `on_request` and stored in the metadata of the `RunContext` object shared with `on_response` and `on_error`.
+    Hooks using the decorators provided by `pydantic_ai.capabilities` create and manage spans for model calls when these hooks are available (newer library versions);
+    older versions are instrumented by patching the graph nodes directly (see patches/graph_nodes.py).
 
-    The metadata dictionary on the RunContext instance is initialized with `{"_sentry_span": None}` in the `_create_run_wrapper()` and `_create_streaming_wrapper()` wrappers that
-    instrument `Agent.run()` and `Agent.run_stream()`, respectively. A non-empty dictionary is required for the metadata object to be a shared reference between hooks.
+    The wrappers around `Agent.run()` and `Agent.run_stream()` track each in-flight run on a contextvar stack (see _run_context.py); the tool patches and span
+    helpers read the current agent from there. The request hooks pair each chat span with its model request through the run's `RunContext.metadata` dict
+    (see register_hooks), which stays correct per run and also covers entry points the wrappers don't instrument, such as `Agent.iter()`.
     """
 
     identifier = "pydantic_ai"
