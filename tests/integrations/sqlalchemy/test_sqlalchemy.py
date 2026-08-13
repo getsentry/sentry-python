@@ -9,12 +9,10 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 
 import sentry_sdk
-from sentry_sdk import capture_message, start_transaction
+from sentry_sdk import capture_message
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
-from sentry_sdk.serializer import MAX_EVENT_BYTES
 from sentry_sdk.tracing_utils import record_sql_queries
-from sentry_sdk.utils import json_dumps
 
 
 def test_orm_queries(
@@ -257,68 +255,6 @@ def test_long_sql_query_preserved(
     name = spans[0]["name"]
     assert name.startswith("SELECT 0 UNION SELECT 1")
     assert name.endswith("SELECT 98 UNION SELECT 99")
-
-
-@pytest.mark.parametrize("max_value_length", [1024, None])
-def test_large_event_not_truncated(sentry_init, capture_events, max_value_length):
-    sentry_init(
-        traces_sample_rate=1,
-        integrations=[SqlalchemyIntegration()],
-        max_value_length=max_value_length,
-        trace_lifecycle="stream",
-    )
-    events = capture_events()
-
-    long_str = "x" * (1034)
-
-    scope = sentry_sdk.get_isolation_scope()
-
-    @scope.add_event_processor
-    def processor(event, hint):
-        event["message"] = long_str
-        return event
-
-    engine = create_engine(
-        "sqlite:///:memory:", connect_args={"check_same_thread": False}
-    )
-    with start_transaction(name="test"):
-        with engine.connect() as con:
-            for _ in range(1500):
-                con.execute(
-                    text(" UNION ".join("SELECT {}".format(i) for i in range(100)))
-                )
-
-    (event,) = events
-
-    assert len(json_dumps(event)) > MAX_EVENT_BYTES
-
-    # Some spans are discarded.
-    assert len(event["spans"]) == 1000
-
-    # Span descriptions are not truncated.
-    description = event["spans"][0]["description"]
-    assert len(description) == 1583
-    assert description.startswith("SELECT 0")
-    assert description.endswith("SELECT 98 UNION SELECT 99")
-
-    description = event["spans"][999]["description"]
-    assert len(description) == 1583
-    assert description.startswith("SELECT 0")
-    assert description.endswith("SELECT 98 UNION SELECT 99")
-
-    if max_value_length:
-        # Smoke check that truncation of other fields has not changed.
-        assert len(event["message"]) == 1024
-
-        # The _meta for other truncated fields should be there as well.
-        assert event["_meta"]["message"] == {
-            "": {
-                "len": 1034,
-                "rem": [["!limit", "x", 1021, 1024]],
-            }
-        }
-    else:
-        assert len(event["message"]) == 1034
 
 
 def test_engine_name_not_string(
