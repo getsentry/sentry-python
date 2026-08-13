@@ -306,7 +306,7 @@ async def test_cursor(sentry_init, capture_events) -> None:
         async for record in conn.cursor(
             "SELECT * FROM users WHERE dob > $1", datetime.date(1970, 1, 1)
         ):
-            print(record)
+            pass
 
     await conn.close()
 
@@ -360,11 +360,9 @@ async def test_cursor_manual(sentry_init, capture_events) -> None:
         cur = await conn.cursor(
             "SELECT * FROM users WHERE dob > $1", datetime.date(1970, 1, 1)
         )
-        record = await cur.fetchrow()
-        print(record)
+        await cur.fetchrow()
         while await cur.forward(1):
-            record = await cur.fetchrow()
-            print(record)
+            await cur.fetchrow()
 
     await conn.close()
 
@@ -420,8 +418,8 @@ async def test_prepared_stmt(sentry_init, capture_events) -> None:
 
     stmt = await conn.prepare("SELECT * FROM users WHERE name = $1")
 
-    print(await stmt.fetchval("Bob"))
-    print(await stmt.fetchval("Alice"))
+    await stmt.fetchval("Bob")
+    await stmt.fetchval("Alice")
 
     await conn.close()
 
