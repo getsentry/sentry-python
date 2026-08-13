@@ -1,8 +1,8 @@
 import functools
 import json
 import sys
-import warnings
 from collections.abc import Set
+from contextlib import nullcontext
 from copy import deepcopy
 from json import JSONDecodeError
 from typing import TYPE_CHECKING
@@ -15,11 +15,11 @@ from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     DidNotEnable,
     Integration,
+    _check_minimum_version,
 )
 from sentry_sdk.integrations._asgi_common import _RootPathInPath
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
-    HttpCodeRangeContainer,
     _is_json_content_type,
     request_body_within_bounds,
 )
@@ -37,7 +37,6 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
     has_data_collection_enabled,
-    nullcontext,
     parse_version,
     transaction_from_function,
 )
@@ -51,10 +50,9 @@ if TYPE_CHECKING:
         Dict,
         Optional,
         Tuple,
-        Union,
     )
 
-    from sentry_sdk._types import Event, HttpStatusCodeRange
+    from sentry_sdk._types import Event
 try:
     import starlette
     from starlette import __version__ as STARLETTE_VERSION
@@ -66,19 +64,13 @@ try:
     from starlette.middleware.authentication import (
         AuthenticationMiddleware,
     )
+    from starlette.middleware.exceptions import ExceptionMiddleware
     from starlette.requests import Request
     from starlette.routing import Match
     from starlette.types import ASGIApp, Receive, Send
     from starlette.types import Scope as StarletteScope
 except ImportError:
-    raise DidNotEnable("Starlette is not installed")
-
-try:
-    # Starlette 0.20
-    from starlette.middleware.exceptions import ExceptionMiddleware
-except ImportError:
-    # Startlette 0.19.1
-    from starlette.exceptions import ExceptionMiddleware  # type: ignore
+    raise DidNotEnable("Starlette is not installed or incompatible")
 
 try:
     # Optional dependency of Starlette to parse form data.
@@ -113,7 +105,7 @@ class StarletteIntegration(Integration):
     def __init__(
         self,
         transaction_style: str = "url",
-        failed_request_status_codes: "Union[Set[int], list[HttpStatusCodeRange], None]" = _DEFAULT_FAILED_REQUEST_STATUS_CODES,
+        failed_request_status_codes: "Set[int]" = _DEFAULT_FAILED_REQUEST_STATUS_CODES,
         middleware_spans: bool = False,
         http_methods_to_capture: "tuple[str, ...]" = DEFAULT_HTTP_METHODS_TO_CAPTURE,
     ):
@@ -126,33 +118,14 @@ class StarletteIntegration(Integration):
         self.middleware_spans = middleware_spans
         self.http_methods_to_capture = tuple(map(str.upper, http_methods_to_capture))
 
-        if isinstance(failed_request_status_codes, Set):
-            self.failed_request_status_codes: "Container[int]" = (
-                failed_request_status_codes
-            )
-        else:
-            warnings.warn(
-                "Passing a list or None for failed_request_status_codes is deprecated. "
-                "Please pass a set of int instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
-            if failed_request_status_codes is None:
-                self.failed_request_status_codes = _DEFAULT_FAILED_REQUEST_STATUS_CODES
-            else:
-                self.failed_request_status_codes = HttpCodeRangeContainer(
-                    failed_request_status_codes
-                )
+        self.failed_request_status_codes: "Container[int]" = failed_request_status_codes
 
     @staticmethod
     def setup_once() -> None:
         version = parse_version(STARLETTE_VERSION)
-
+        _check_minimum_version(StarletteIntegration, version)
         if version is None:
-            raise DidNotEnable(
-                "Unparsable Starlette version: {}".format(STARLETTE_VERSION)
-            )
+            return
 
         patch_middlewares()
         # Starlette tolerates both starting with:
@@ -626,8 +599,6 @@ def patch_request_response() -> None:
                     current_scope.transaction.update_active_thread()
 
                 sentry_scope = sentry_sdk.get_isolation_scope()
-                if sentry_scope.profile is not None:
-                    sentry_scope.profile.update_active_thread_id()
 
                 request = args[0]
 

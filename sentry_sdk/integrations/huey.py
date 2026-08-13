@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.api import continue_trace, get_baggage, get_traceparent
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SegmentNameSource, SpanStatus, StreamedSpan
 from sentry_sdk.tracing import (
@@ -21,6 +21,7 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
     has_data_collection_enabled,
+    parse_version,
     reraise,
 )
 
@@ -33,10 +34,11 @@ if TYPE_CHECKING:
     F = TypeVar("F", bound=Callable[..., Any])
 
 try:
+    from huey import __version__ as HUEY_VERSION
     from huey.api import Huey, PeriodicTask, Result, ResultGroup, Task
     from huey.exceptions import CancelExecution, RetryTask, TaskLockedException
 except ImportError:
-    raise DidNotEnable("Huey is not installed")
+    raise DidNotEnable("Huey is not installed or incompatible")
 
 try:
     from huey.api import chord as HueyChord
@@ -55,6 +57,9 @@ class HueyIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        version = parse_version(HUEY_VERSION)
+        _check_minimum_version(HueyIntegration, version)
+
         patch_enqueue()
         patch_execute()
         _register_control_flow_exception(

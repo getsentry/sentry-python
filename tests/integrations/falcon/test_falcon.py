@@ -7,7 +7,6 @@ import pytest
 import sentry_sdk
 from sentry_sdk.integrations.falcon import FalconIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
-from sentry_sdk.utils import parse_version
 
 try:
     import falcon.asgi
@@ -15,9 +14,6 @@ except ImportError:
     pass
 else:
     import falcon.inspect  # We only need this module for the ASGI test
-
-
-FALCON_VERSION = parse_version(falcon.__version__)
 
 
 @pytest.fixture
@@ -64,34 +60,24 @@ def make_client(make_app):
     return inner
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_has_context(
     sentry_init,
-    capture_events,
     capture_items,
     make_client,
-    span_streaming,
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     client = make_client()
-    if span_streaming:
-        items = capture_items("event")
+    items = capture_items("event")
 
-        response = client.simulate_get("/message")
-        assert response.status == falcon.HTTP_200
+    response = client.simulate_get("/message")
+    assert response.status == falcon.HTTP_200
 
-        (event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
+    (event,) = (item.payload for item in items)
 
-        response = client.simulate_get("/message")
-        assert response.status == falcon.HTTP_200
-
-        (event,) = events
     assert event["transaction"] == "/message"  # Falcon URI template
     assert "data" not in event["request"]
     assert event["request"]["url"] == "http://falconframework.org/message"
@@ -106,66 +92,49 @@ def test_has_context(
         ("/message/123456", "path", "/message/123456", "url"),
     ],
 )
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_transaction_style(
     sentry_init,
     make_client,
-    capture_events,
     capture_items,
     url,
     transaction_style,
     expected_transaction,
     expected_source,
-    span_streaming,
 ):
     integration = FalconIntegration(transaction_style=transaction_style)
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     client = make_client()
-    if span_streaming:
-        items = capture_items("event")
-        items = capture_items("event", "span")
+    items = capture_items("event", "span")
 
-        response = client.simulate_get(url)
-        assert response.status == falcon.HTTP_200
+    response = client.simulate_get(url)
+    assert response.status == falcon.HTTP_200
 
-        (event,) = (item.payload for item in items if item.type == "event")
+    (event,) = (item.payload for item in items if item.type == "event")
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        spans = [span for span in spans if span["name"] == expected_transaction]
-        assert len(spans) == 1
-        assert spans[0]["attributes"]["sentry.segment.name.source"] == expected_source
-    else:
-        events = capture_events()
+    sentry_sdk.flush()
 
-        response = client.simulate_get(url)
-        assert response.status == falcon.HTTP_200
-
-        (event, transaction) = events
-
-        assert transaction["transaction"] == expected_transaction
-        assert transaction["transaction_info"] == {"source": expected_source}
+    spans = [item.payload for item in items if item.type == "span"]
+    spans = [span for span in spans if span["name"] == expected_transaction]
+    assert len(spans) == 1
+    assert spans[0]["attributes"]["sentry.segment.name.source"] == expected_source
 
     assert event["transaction"] == expected_transaction
     assert event["transaction_info"] == {"source": expected_source}
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_unhandled_errors(
     sentry_init,
     capture_exceptions,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     class Resource:
@@ -178,45 +147,30 @@ def test_unhandled_errors(
     client = falcon.testing.TestClient(app)
 
     exceptions = capture_exceptions()
-    if span_streaming:
-        items = capture_items("event")
+    items = capture_items("event")
 
-        try:
-            client.simulate_get("/")
-        except ZeroDivisionError:
-            pass
+    try:
+        client.simulate_get("/")
+    except ZeroDivisionError:
+        pass
 
-        (exc,) = exceptions
-        assert isinstance(exc, ZeroDivisionError)
+    (exc,) = exceptions
+    assert isinstance(exc, ZeroDivisionError)
 
-        (event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
+    (event,) = (item.payload for item in items)
 
-        try:
-            client.simulate_get("/")
-        except ZeroDivisionError:
-            pass
-
-        (exc,) = exceptions
-        assert isinstance(exc, ZeroDivisionError)
-
-        (event,) = events
     assert event["exception"]["values"][0]["mechanism"]["type"] == "falcon"
     assert " by zero" in event["exception"]["values"][0]["value"]
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_raised_5xx_errors(
     sentry_init,
     capture_exceptions,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     class Resource:
@@ -229,39 +183,27 @@ def test_raised_5xx_errors(
     client = falcon.testing.TestClient(app)
 
     exceptions = capture_exceptions()
-    if span_streaming:
-        items = capture_items("event")
+    items = capture_items("event")
 
-        client.simulate_get("/")
+    client.simulate_get("/")
 
-        (exc,) = exceptions
-        assert isinstance(exc, falcon.HTTPError)
+    (exc,) = exceptions
+    assert isinstance(exc, falcon.HTTPError)
 
-        (event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
+    (event,) = (item.payload for item in items)
 
-        client.simulate_get("/")
-
-        (exc,) = exceptions
-        assert isinstance(exc, falcon.HTTPError)
-
-        (event,) = events
     assert event["exception"]["values"][0]["mechanism"]["type"] == "falcon"
     assert event["exception"]["values"][0]["type"] == "HTTPError"
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_raised_4xx_errors(
     sentry_init,
     capture_exceptions,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     class Resource:
@@ -272,10 +214,7 @@ def test_raised_4xx_errors(
     app.add_route("/", Resource())
 
     exceptions = capture_exceptions()
-    if span_streaming:
-        events = capture_items("event")
-    else:
-        events = capture_events()
+    events = capture_items("event")
 
     client = falcon.testing.TestClient(app)
     client.simulate_get("/")
@@ -284,13 +223,10 @@ def test_raised_4xx_errors(
     assert len(events) == 0
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_http_status(
     sentry_init,
     capture_exceptions,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     """
     This just demonstrates, that if Falcon raises a HTTPStatus with code 500
@@ -298,7 +234,7 @@ def test_http_status(
     """
     sentry_init(
         integrations=[FalconIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     class Resource:
@@ -311,33 +247,25 @@ def test_http_status(
     client = falcon.testing.TestClient(app)
 
     exceptions = capture_exceptions()
-    if span_streaming:
-        events = capture_items("event")
+    events = capture_items("event")
 
-        client.simulate_get("/")
-    else:
-        events = capture_events()
-
-        client.simulate_get("/")
+    client.simulate_get("/")
 
     assert len(exceptions) == 0
     assert len(events) == 0
 
 
 @pytest.mark.parametrize("max_value_length", [1024, None])
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_falcon_large_json_request(
     sentry_init,
-    capture_events,
     capture_items,
     max_value_length,
-    span_streaming,
 ):
     sentry_init(
         integrations=[FalconIntegration()],
         max_request_body_size="always",
         max_value_length=max_value_length,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     data = {"foo": {"bar": "a" * (1034)}}
@@ -353,20 +281,12 @@ def test_falcon_large_json_request(
 
     client = falcon.testing.TestClient(app)
 
-    if span_streaming:
-        items = capture_items("event")
+    items = capture_items("event")
 
-        response = client.simulate_post("/", json=data)
-        assert response.status == falcon.HTTP_200
+    response = client.simulate_post("/", json=data)
+    assert response.status == falcon.HTTP_200
 
-        (event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
-
-        response = client.simulate_post("/", json=data)
-        assert response.status == falcon.HTTP_200
-
-        (event,) = events
+    (event,) = (item.payload for item in items)
     if max_value_length:
         assert event["_meta"]["request"]["data"]["foo"]["bar"] == {
             "": {
@@ -380,17 +300,14 @@ def test_falcon_large_json_request(
 
 
 @pytest.mark.parametrize("data", [{}, []], ids=["empty-dict", "empty-list"])
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_falcon_empty_json_request(
     sentry_init,
-    capture_events,
     capture_items,
     data,
-    span_streaming,
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     class Resource:
@@ -404,33 +321,22 @@ def test_falcon_empty_json_request(
 
     client = falcon.testing.TestClient(app)
 
-    if span_streaming:
-        items = capture_items("event")
+    items = capture_items("event")
 
-        response = client.simulate_post("/", json=data)
-        assert response.status == falcon.HTTP_200
+    response = client.simulate_post("/", json=data)
+    assert response.status == falcon.HTTP_200
 
-        (event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
-
-        response = client.simulate_post("/", json=data)
-        assert response.status == falcon.HTTP_200
-
-        (event,) = events
+    (event,) = (item.payload for item in items)
     assert event["request"]["data"] == data
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_falcon_raw_data_request(
     sentry_init,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     class Resource:
@@ -443,34 +349,23 @@ def test_falcon_raw_data_request(
 
     client = falcon.testing.TestClient(app)
 
-    if span_streaming:
-        items = capture_items("event")
+    items = capture_items("event")
 
-        response = client.simulate_post("/", body="hi")
-        assert response.status == falcon.HTTP_200
+    response = client.simulate_post("/", body="hi")
+    assert response.status == falcon.HTTP_200
 
-        (event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
-
-        response = client.simulate_post("/", body="hi")
-        assert response.status == falcon.HTTP_200
-
-        (event,) = events
+    (event,) = (item.payload for item in items)
     assert event["request"]["headers"]["Content-Length"] == "2"
     assert event["request"]["data"] == ""
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_logging(
     sentry_init,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[FalconIntegration(), LoggingIntegration(event_level="ERROR")],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     logger = logging.getLogger()
@@ -486,18 +381,11 @@ def test_logging(
 
     client = falcon.testing.TestClient(app)
 
-    if span_streaming:
-        items = capture_items("event")
+    items = capture_items("event")
 
-        client.simulate_get("/")
+    client.simulate_get("/")
 
-        (event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
-
-        client.simulate_get("/")
-
-        (event,) = events
+    (event,) = (item.payload for item in items)
     assert event["level"] == "error"
 
 
@@ -524,16 +412,13 @@ def test_500(sentry_init):
     assert response.json == {"message": "Sentry error."}
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_error_in_errorhandler(
     sentry_init,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     app = falcon.API()
@@ -550,36 +435,25 @@ def test_error_in_errorhandler(
     app.add_error_handler(Exception, http500_handler)
     client = falcon.testing.TestClient(app)
 
-    if span_streaming:
-        items = capture_items("event")
+    items = capture_items("event")
 
-        with pytest.raises(ZeroDivisionError):
-            client.simulate_get("/")
+    with pytest.raises(ZeroDivisionError):
+        client.simulate_get("/")
 
-        (event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
-
-        with pytest.raises(ZeroDivisionError):
-            client.simulate_get("/")
-
-        (event,) = events
+    (event,) = (item.payload for item in items)
 
     last_ex_values = event["exception"]["values"][-1]
     assert last_ex_values["type"] == "ZeroDivisionError"
     assert last_ex_values["stacktrace"]["frames"][-1]["vars"]["ex"] == "ValueError()"
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_bad_request_not_captured(
     sentry_init,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     app = falcon.API()
@@ -592,26 +466,20 @@ def test_bad_request_not_captured(
 
     client = falcon.testing.TestClient(app)
 
-    if span_streaming:
-        events = capture_items("event")
-    else:
-        events = capture_events()
+    events = capture_items("event")
 
     client.simulate_get("/")
 
     assert not events
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_does_not_leak_scope(
     sentry_init,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[FalconIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     app = falcon.API()
@@ -632,10 +500,7 @@ def test_does_not_leak_scope(
 
     client = falcon.testing.TestClient(app)
 
-    if span_streaming:
-        events = capture_items("event")
-    else:
-        events = capture_events()
+    events = capture_items("event")
 
     sentry_sdk.get_isolation_scope().set_tag("request_data", False)
 
@@ -647,11 +512,7 @@ def test_does_not_leak_scope(
     assert not sentry_sdk.get_isolation_scope()._tags["request_data"]
 
 
-@pytest.mark.skipif(
-    not hasattr(falcon, "asgi"), reason="This Falcon version lacks ASGI support."
-)
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_falcon_not_breaking_asgi(sentry_init, span_streaming):
+def test_falcon_not_breaking_asgi(sentry_init):
     """
     This test simply verifies that the Falcon integration does not break ASGI
     Falcon apps.
@@ -661,7 +522,7 @@ def test_falcon_not_breaking_asgi(sentry_init, span_streaming):
     """
     sentry_init(
         integrations=[FalconIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     asgi_app = falcon.asgi.App()
@@ -672,17 +533,10 @@ def test_falcon_not_breaking_asgi(sentry_init, span_streaming):
         pytest.fail("Falcon integration causing errors in ASGI apps.")
 
 
-@pytest.mark.skipif(
-    (FALCON_VERSION or ()) < (3,),
-    reason="The Sentry Falcon integration only supports custom error handlers on Falcon 3+",
-)
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_falcon_custom_error_handler(
     sentry_init,
     make_app,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     """
     When a custom error handler handles what otherwise would have resulted in a 5xx error,
@@ -690,59 +544,43 @@ def test_falcon_custom_error_handler(
     """
     sentry_init(
         integrations=[FalconIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     app = make_app()
     client = falcon.testing.TestClient(app)
 
-    if span_streaming:
-        events = capture_items("event")
-    else:
-        events = capture_events()
+    events = capture_items("event")
 
     client.simulate_get("/custom-error")
 
     assert len(events) == 0
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_span_origin(
     sentry_init,
-    capture_events,
     capture_items,
     make_client,
-    span_streaming,
 ):
     sentry_init(
         integrations=[FalconIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     client = make_client()
 
-    if span_streaming:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        client.simulate_get("/message")
+    client.simulate_get("/message")
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
 
-        assert spans[0]["attributes"]["sentry.origin"] == "auto.http.falcon"
-    else:
-        events = capture_events()
-
-        client.simulate_get("/message")
-
-        (_, event) = events
-
-        assert event["contexts"]["trace"]["origin"] == "auto.http.falcon"
+    assert spans[0]["attributes"]["sentry.origin"] == "auto.http.falcon"
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_falcon_request_media(sentry_init, span_streaming):
+def test_falcon_request_media(sentry_init):
     # test_passed stores whether the test has passed.
     test_passed = False
 
@@ -770,7 +608,7 @@ def test_falcon_request_media(sentry_init, span_streaming):
 
     sentry_init(
         integrations=[FalconIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     try:

@@ -110,7 +110,7 @@ jobs:
       - name: Combine coverage and generate XML
         run: |
           uv sync
-          # relative_files + [tool.coverage.paths] let the 3.6/3.7 container and
+          # relative_files + [tool.coverage.paths] let the 3.7 container and
           # the runner data files merge into one source tree.
           uv run coverage combine .coverage-sentry-*
           uv run coverage xml

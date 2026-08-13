@@ -29,7 +29,6 @@ skip_under_gevent = pytest.mark.skipif(
 import sentry_sdk
 from sentry_sdk import (
     Client,
-    Hub,
     add_breadcrumb,
     capture_message,
     get_isolation_scope,
@@ -42,7 +41,6 @@ from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
 from sentry_sdk.transport import (
     KEEP_ALIVE_SOCKET_OPTIONS,
     AsyncHttpTransport,
-    HttpTransport,
     _parse_rate_limits,
 )
 
@@ -855,24 +853,6 @@ def test_log_item_limits(capturing_server, response_code, item, make_client):
         "reason": "ratelimit_backoff",
         "quantity": expected_lost_bytes,
     } in report["discarded_events"]
-
-
-def test_hub_cls_backwards_compat():
-    class TestCustomHubClass(Hub):
-        pass
-
-    transport = HttpTransport(
-        defaultdict(lambda: None, {"dsn": "https://123abc@example.com/123"})
-    )
-
-    with pytest.deprecated_call():
-        assert transport.hub_cls is Hub
-
-    with pytest.deprecated_call():
-        transport.hub_cls = TestCustomHubClass
-
-    with pytest.deprecated_call():
-        assert transport.hub_cls is TestCustomHubClass
 
 
 @pytest.mark.parametrize("quantity", (1, 2, 10))

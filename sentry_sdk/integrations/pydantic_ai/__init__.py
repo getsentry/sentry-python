@@ -1,6 +1,6 @@
 import functools
 
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.utils import capture_internal_exceptions, parse_version
 
 try:
@@ -156,24 +156,23 @@ class PydanticAIIntegration(Integration):
         - Model requests (AI client calls)
         - Tool executions
         """
-        _patch_agent_run()
-        _patch_tool_execution()
-
-        PydanticAIIntegration.using_request_hooks = False
         try:
             PYDANTIC_AI_VERSION = version("pydantic-ai-slim")
         except PackageNotFoundError:
             return
 
         PYDANTIC_AI_VERSION = parse_version(PYDANTIC_AI_VERSION)
+        _check_minimum_version(PydanticAIIntegration, PYDANTIC_AI_VERSION)
         if PYDANTIC_AI_VERSION is None:
             return
 
+        _patch_agent_run()
+        _patch_tool_execution()
+
+        PydanticAIIntegration.using_request_hooks = False
+
         # ModelRequestContext.model added in https://github.com/pydantic/pydantic-ai/commit/f1260dfe09907f17688eee1646daf898fc428d4c
-        if PYDANTIC_AI_VERSION < (
-            1,
-            73,
-        ):
+        if PYDANTIC_AI_VERSION < (1, 73):
             _patch_graph_nodes()
             return
 

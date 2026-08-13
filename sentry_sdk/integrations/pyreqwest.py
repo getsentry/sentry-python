@@ -4,7 +4,7 @@ from typing import Any, Generator
 import sentry_sdk
 from sentry_sdk import start_span
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME
@@ -21,9 +21,13 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     logger,
     parse_url,
+    parse_version,
 )
 
 try:
+    from pyreqwest import (  # type: ignore[import-not-found]
+        __version__ as PYREQWEST_VERSION,
+    )
     from pyreqwest.client import (  # type: ignore[import-not-found]
         ClientBuilder,
         SyncClientBuilder,
@@ -39,7 +43,7 @@ try:
         SyncResponse,
     )
 except ImportError:
-    raise DidNotEnable("pyreqwest not installed or incompatible version installed")
+    raise DidNotEnable("pyreqwest not installed or incompatible")
 
 
 class PyreqwestIntegration(Integration):
@@ -48,6 +52,9 @@ class PyreqwestIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        version = parse_version(PYREQWEST_VERSION)
+        _check_minimum_version(PyreqwestIntegration, version)
+
         _patch_pyreqwest()
 
 

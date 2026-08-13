@@ -35,7 +35,6 @@ if TYPE_CHECKING:
     from typing import Any, Optional
 
 SANIC_VERSION = tuple(map(int, SANIC_VERSION_RAW.split(".")))
-PERFORMANCE_SUPPORTED = SANIC_VERSION >= (21, 9)
 
 
 @pytest.fixture
@@ -87,7 +86,17 @@ def get_client(app):
         yield app.test_client
 
     if ReusableClient is not None:
-        return ReusableClient(app, port=get_free_port())
+
+        @contextlib.contextmanager
+        def reusable_client(app):
+            client = ReusableClient(app, port=get_free_port())
+            client.__enter__()
+            try:
+                yield client
+            finally:
+                client.__exit__(None, None, None)
+
+        return reusable_client(app)
     else:
         return simple_client(app)
 
@@ -361,9 +370,6 @@ class TransactionTestConfig:
         self.streaming_compatible = streaming_compatible
 
 
-@pytest.mark.skipif(
-    not PERFORMANCE_SUPPORTED, reason="Performance not supported on this Sanic version"
-)
 @pytest.mark.parametrize("send_pii", [True, False])
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize(
@@ -523,9 +529,6 @@ def test_transactions(
         )
 
 
-@pytest.mark.skipif(
-    not PERFORMANCE_SUPPORTED, reason="Performance not supported on this Sanic version"
-)
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_span_origin(sentry_init, app, capture_events, capture_items, span_streaming):
     sentry_init(
@@ -557,9 +560,6 @@ def test_span_origin(sentry_init, app, capture_events, capture_items, span_strea
         assert event["contexts"]["trace"]["origin"] == "auto.http.sanic"
 
 
-@pytest.mark.skipif(
-    not PERFORMANCE_SUPPORTED, reason="Performance not supported on this Sanic version"
-)
 @pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_user_ip_address_on_all_spans(
     sentry_init, app, capture_items, init_kwargs, expect_ip
@@ -601,9 +601,6 @@ def test_user_ip_address_on_all_spans(
         assert "user.ip_address" not in child_span["attributes"]
 
 
-@pytest.mark.skipif(
-    not PERFORMANCE_SUPPORTED, reason="Performance not supported on this Sanic version"
-)
 @pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
 def test_client_address_span_attribute_data_collection(
     sentry_init, app, capture_items, init_kwargs, expect_ip
@@ -711,9 +708,6 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
 ]
 
 
-@pytest.mark.skipif(
-    not PERFORMANCE_SUPPORTED, reason="Performance not supported on this Sanic version"
-)
 @pytest.mark.parametrize(
     "init_kwargs, expected_query", _QUERY_PARAM_DATA_COLLECTION_CASES
 )

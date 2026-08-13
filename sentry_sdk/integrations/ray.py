@@ -11,16 +11,17 @@ from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     event_from_exception,
     logger,
-    package_version,
+    parse_version,
     qualname_from_function,
     reraise,
 )
 
 try:
     import ray  # type: ignore[import-not-found]
+    from ray import __version__ as RAY_VERSION
     from ray import remote
 except ImportError:
-    raise DidNotEnable("Ray not installed.")
+    raise DidNotEnable("Ray not installed or incompatible")
 
 from typing import TYPE_CHECKING
 
@@ -251,7 +252,7 @@ class RayIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        version = package_version("ray")
+        version = parse_version(RAY_VERSION)
         _check_minimum_version(RayIntegration, version)
 
         _patch_ray_remote()

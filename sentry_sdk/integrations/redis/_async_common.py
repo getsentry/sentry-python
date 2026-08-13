@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import Any, Optional, Union
 
-    from redis.asyncio.client import Pipeline, StrictRedis
+    from redis.asyncio.client import Pipeline, Redis
     from redis.asyncio.cluster import ClusterPipeline, RedisCluster
 
     from sentry_sdk.traces import StreamedSpan
@@ -100,7 +100,7 @@ def patch_redis_async_pipeline(
 
 
 def patch_redis_async_client(
-    cls: "Union[type[StrictRedis[Any]], type[RedisCluster[Any]]]",
+    cls: "Union[type[Redis[Any]], type[RedisCluster[Any]]]",
     is_cluster: bool,
     set_db_data_fn: "Callable[[Union[Span, StreamedSpan], Any], None]",
 ) -> None:

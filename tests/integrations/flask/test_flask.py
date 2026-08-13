@@ -20,7 +20,7 @@ from sentry_sdk.traces import SpanStatus
 try:
     from werkzeug.wrappers.request import UnsupportedMediaType
 except ImportError:
-    UnsupportedMediaType = None
+    from werkzeug.exceptions import BadRequest as UnsupportedMediaType
 
 import sentry_sdk
 import sentry_sdk.integrations.flask as flask_sentry

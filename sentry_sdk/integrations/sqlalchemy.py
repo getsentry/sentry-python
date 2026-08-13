@@ -17,7 +17,7 @@ try:
     from sqlalchemy.engine import Engine  # type: ignore
     from sqlalchemy.event import listen  # type: ignore
 except ImportError:
-    raise DidNotEnable("SQLAlchemy not installed.")
+    raise DidNotEnable("SQLAlchemy not installed or incompatible")
 
 from typing import TYPE_CHECKING
 
@@ -31,8 +31,7 @@ class SqlalchemyIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        version = parse_version(SQLALCHEMY_VERSION)
-        _check_minimum_version(SqlalchemyIntegration, version)
+        _check_minimum_version(SqlalchemyIntegration, parse_version(SQLALCHEMY_VERSION))
 
         listen(Engine, "before_cursor_execute", _before_cursor_execute)
         listen(Engine, "after_cursor_execute", _after_cursor_execute)

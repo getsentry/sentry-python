@@ -2,7 +2,7 @@ import uuid
 
 import fakeredis
 import pytest
-from fakeredis import FakeStrictRedis
+from fakeredis import FakeRedis
 
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
@@ -23,7 +23,7 @@ def test_no_cache_basic(sentry_init, capture_events, capture_items, span_streami
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    connection = FakeStrictRedis()
+    connection = FakeRedis()
 
     if span_streaming:
         items = capture_items("span")
@@ -58,7 +58,7 @@ def test_cache_basic(sentry_init, capture_events, capture_items, span_streaming)
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    connection = FakeStrictRedis()
+    connection = FakeRedis()
 
     if span_streaming:
         items = capture_items("span")
@@ -159,7 +159,7 @@ def test_cache_keys(sentry_init, capture_events, capture_items, span_streaming):
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    connection = FakeStrictRedis()
+    connection = FakeRedis()
 
     if span_streaming:
         items = capture_items("span")
@@ -239,7 +239,7 @@ def test_cache_data(sentry_init, capture_events, capture_items, span_streaming):
     # Use a unique host per parametrized run so fakeredis (which shares state
     # keyed by host:port) doesn't leak the SET from a prior run into this one.
     host = f"mycacheserver-{uuid.uuid4().hex}.io"
-    connection = FakeStrictRedis(host=host, port=6378)
+    connection = FakeRedis(host=host, port=6378)
 
     if span_streaming:
         items = capture_items("span")
@@ -389,7 +389,7 @@ def test_cache_prefixes(sentry_init, capture_events, capture_items, span_streami
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    connection = FakeStrictRedis()
+    connection = FakeRedis()
 
     if span_streaming:
         items = capture_items("span")

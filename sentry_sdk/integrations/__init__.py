@@ -1,3 +1,4 @@
+import sys
 from abc import ABC, abstractmethod
 from threading import Lock
 from typing import TYPE_CHECKING
@@ -64,6 +65,11 @@ _DEFAULT_INTEGRATIONS = [
     "sentry_sdk.integrations.threading.ThreadingIntegration",
 ]
 
+if sys.version_info >= (3, 8):
+    _DEFAULT_INTEGRATIONS.append(
+        "sentry_sdk.integrations.unraisablehook.UnraisablehookIntegration"
+    )
+
 _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.aiohttp.AioHttpIntegration",
     "sentry_sdk.integrations.anthropic.AnthropicIntegration",
@@ -104,7 +110,6 @@ _AUTO_ENABLING_INTEGRATIONS = [
     "sentry_sdk.integrations.sqlalchemy.SqlalchemyIntegration",
     "sentry_sdk.integrations.starlette.StarletteIntegration",
     "sentry_sdk.integrations.starlite.StarliteIntegration",
-    "sentry_sdk.integrations.strawberry.StrawberryIntegration",
     "sentry_sdk.integrations.tornado.TornadoIntegration",
 ]
 
@@ -117,7 +122,7 @@ del _generate_default_integrations_iterator
 
 
 _MIN_VERSIONS = {
-    "aiohttp": (3, 4),
+    "aiohttp": (3, 7),
     "aiomysql": (0, 3, 0),
     "anthropic": (0, 16),
     "ariadne": (0, 20),
@@ -126,25 +131,27 @@ _MIN_VERSIONS = {
     "beam": (2, 12),
     "boto3": (1, 16),  # botocore
     "bottle": (0, 12),
-    "celery": (4, 4, 7),
-    "chalice": (1, 16, 0),
+    "celery": (5, 0, 0),
+    "chalice": (1, 22, 0),
     "clickhouse_driver": (0, 2, 0),
     "cohere": (5, 4, 0),
-    "django": (1, 8),
+    "django": (2, 0),
     "dramatiq": (1, 9),
-    "falcon": (1, 4),
-    "fastapi": (0, 79, 0),
-    "flask": (1, 1, 4),
+    "falcon": (3, 0),
+    "fastapi": (0, 85, 0),
+    "flask": (2, 0, 0),
     "gql": (3, 4, 1),
     "graphene": (3, 3),
     "google_genai": (1, 29, 0),  # google-genai
     "grpc": (1, 32, 0),  # grpcio
     "httpx": (0, 16, 0),
     "httpx2": (2, 0, 0),
+    "huey": (2, 0),
     "huggingface_hub": (0, 24, 7),
     "langchain": (0, 1, 0),
     "langgraph": (0, 6, 6),
     "launchdarkly": (9, 8, 0),
+    "litestar": (2, 0, 0),
     "litellm": (1, 77, 5),
     "loguru": (0, 7, 0),
     "mcp": (1, 15, 0),
@@ -153,18 +160,22 @@ _MIN_VERSIONS = {
     "openfeature": (0, 7, 1),
     "pydantic_ai": (1, 0, 0),
     "pymongo": (3, 5, 0),
+    "pyramid": (2, 0),
     "pyreqwest": (0, 11, 6),
-    "quart": (0, 16, 0),
+    "quart": (0, 19, 0),
     "ray": (2, 7, 0),
-    "requests": (2, 0, 0),
-    "rq": (0, 6),
-    "sanic": (0, 8),
-    "sqlalchemy": (1, 2),
-    "starlette": (0, 16),
+    "redis": (4, 2, 0),
+    "requests": (2, 30, 0),
+    "rq": (1, 0),
+    "sanic": (22, 0),
+    "spark": (3, 0),  # pyspark
+    "sqlalchemy": (1, 4),
+    "starlette": (0, 20),
     "starlite": (1, 48),
     "statsig": (0, 55, 3),
     "strawberry": (0, 209, 5),
     "tornado": (6, 0),
+    "trytond_wsgi": (5, 4),
     "typer": (0, 15),
     "unleash": (6, 0, 1),
 }

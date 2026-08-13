@@ -2,7 +2,7 @@ from unittest import mock
 
 import pytest
 import rq
-from fakeredis import FakeStrictRedis
+from fakeredis import FakeRedis
 
 import sentry_sdk
 from sentry_sdk import start_transaction
@@ -63,7 +63,7 @@ def test_basic(
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    queue = rq.Queue(connection=FakeStrictRedis())
+    queue = rq.Queue(connection=FakeRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
 
     if span_streaming:
@@ -129,7 +129,7 @@ def test_job_args_kwargs_data_collection(
         **init_kwargs,
     )
 
-    queue = rq.Queue(connection=FakeStrictRedis())
+    queue = rq.Queue(connection=FakeRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
 
     if span_streaming:
@@ -166,7 +166,7 @@ def test_transport_shutdown(
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    queue = rq.Queue(connection=FakeStrictRedis())
+    queue = rq.Queue(connection=FakeRedis())
     worker = rq.Worker([queue], connection=queue.connection)
 
     if span_streaming:
@@ -211,7 +211,7 @@ def test_transaction_with_error(
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    queue = rq.Queue(connection=FakeStrictRedis())
+    queue = rq.Queue(connection=FakeRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
 
     if span_streaming:
@@ -302,7 +302,7 @@ def test_error_has_trace_context_if_tracing_disabled(
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    queue = rq.Queue(connection=FakeStrictRedis())
+    queue = rq.Queue(connection=FakeRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
 
     if span_streaming:
@@ -336,7 +336,7 @@ def test_tracing_enabled(
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    queue = rq.Queue(connection=FakeStrictRedis())
+    queue = rq.Queue(connection=FakeRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
 
     if span_streaming:
@@ -399,7 +399,7 @@ def test_tracing_disabled(
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    queue = rq.Queue(connection=FakeStrictRedis())
+    queue = rq.Queue(connection=FakeRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
 
     if span_streaming:
@@ -446,7 +446,7 @@ def test_transaction_no_error(
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    queue = rq.Queue(connection=FakeStrictRedis())
+    queue = rq.Queue(connection=FakeRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
 
     if span_streaming:
@@ -509,7 +509,7 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    queue = rq.Queue(connection=FakeStrictRedis())
+    queue = rq.Queue(connection=FakeRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
 
     queue.enqueue(do_trick, "Bodhi", trick="roll over")
@@ -548,7 +548,7 @@ def test_job_with_retries(
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    queue = rq.Queue(connection=FakeStrictRedis())
+    queue = rq.Queue(connection=FakeRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
 
     if span_streaming:
@@ -579,7 +579,7 @@ def test_span_origin(
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    queue = rq.Queue(connection=FakeStrictRedis())
+    queue = rq.Queue(connection=FakeRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
 
     if span_streaming:

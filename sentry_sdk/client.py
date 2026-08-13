@@ -7,6 +7,7 @@ import sys
 import uuid
 import warnings
 from collections.abc import Iterable, Mapping
+from contextvars import ContextVar
 from datetime import datetime, timezone
 from importlib import import_module
 from typing import TYPE_CHECKING, Dict, List, cast, overload
@@ -18,7 +19,6 @@ from sentry_sdk._span_batcher import SpanBatcher
 from sentry_sdk.consts import (
     DEFAULT_MAX_VALUE_LENGTH,
     DEFAULT_OPTIONS,
-    INSTRUMENTER,
     SPANDATA,
     SPANSTATUS,
     VERSION,
@@ -29,15 +29,10 @@ from sentry_sdk.data_collection import (
     _resolve_data_collection,
 )
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
-from sentry_sdk.integrations import _DEFAULT_INTEGRATIONS, setup_integrations
+from sentry_sdk.integrations import setup_integrations
 from sentry_sdk.integrations.dedupe import DedupeIntegration
 from sentry_sdk.monitor import Monitor
 from sentry_sdk.profiler.continuous_profiler import setup_continuous_profiler
-from sentry_sdk.profiler.transaction_profiler import (
-    Profile,
-    has_profiling_enabled,
-    setup_profiler,
-)
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.serializer import serialize
 from sentry_sdk.sessions import SessionFlusher
@@ -51,7 +46,6 @@ from sentry_sdk.transport import (
 )
 from sentry_sdk.utils import (
     AnnotatedValue,
-    ContextVar,
     capture_internal_exceptions,
     current_stacktrace,
     datetime_from_isoformat,
@@ -92,7 +86,7 @@ if TYPE_CHECKING:
 
     I = TypeVar("I", bound=Integration)  # noqa: E741
 
-_client_init_debug = ContextVar("client_init_debug")
+_client_init_debug: "ContextVar[bool]" = ContextVar("client_init_debug")
 
 
 SDK_INFO: "SDKInfo" = {
@@ -335,9 +329,6 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
     if rv["server_name"] is None and hasattr(socket, "gethostname"):
         rv["server_name"] = socket.gethostname()
 
-    if rv["instrumenter"] is None:
-        rv["instrumenter"] = INSTRUMENTER.SENTRY
-
     if rv["project_root"] is None:
         try:
             project_root = os.getcwd()
@@ -345,9 +336,6 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
             project_root = None
 
         rv["project_root"] = project_root
-
-    if rv["enable_tracing"] is True and rv["traces_sample_rate"] is None:
-        rv["traces_sample_rate"] = 1.0
 
     rv["data_collection"] = _resolve_data_collection(rv)
 
@@ -375,13 +363,6 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
     if rv["keep_alive"] is None:
         rv["keep_alive"] = (
             env_to_bool(os.environ.get("SENTRY_KEEP_ALIVE"), strict=True) or False
-        )
-
-    if rv["enable_tracing"] is not None:
-        warnings.warn(
-            "The `enable_tracing` parameter is deprecated. Please use `traces_sample_rate` instead.",
-            DeprecationWarning,
-            stacklevel=2,
         )
 
     if rv["trace_ignore_status_codes"] and has_span_streaming_enabled(rv):
@@ -631,7 +612,6 @@ class _Client(BaseClient):
                 self.options["send_default_pii"] = True
                 self.options["error_sampler"] = sample_all
                 self.options["traces_sampler"] = sample_all
-                self.options["profiles_sampler"] = sample_all
                 # data_collection was resolved in _get_options() before this
                 # spotlight override flipped send_default_pii on. Re-derive it so
                 # data_collection agrees with should_send_default_pii() in
@@ -685,19 +665,6 @@ class _Client(BaseClient):
                     )
                 )
 
-            if self.options["_experiments"].get("otel_powered_performance", False):
-                logger.debug(
-                    "[OTel] Enabling experimental OTel-powered performance monitoring."
-                )
-                self.options["instrumenter"] = INSTRUMENTER.OTEL
-                if (
-                    "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration"
-                    not in _DEFAULT_INTEGRATIONS
-                ):
-                    _DEFAULT_INTEGRATIONS.append(
-                        "sentry_sdk.integrations.opentelemetry.integration.OpenTelemetryIntegration",
-                    )
-
             self.integrations = setup_integrations(
                 self.options["integrations"],
                 with_defaults=self.options["default_integrations"],
@@ -712,20 +679,14 @@ class _Client(BaseClient):
             SDK_INFO["name"] = sdk_name
             logger.debug("Setting SDK name to '%s'", sdk_name)
 
-            if has_profiling_enabled(self.options):
-                try:
-                    setup_profiler(self.options)
-                except Exception as e:
-                    logger.debug("Can not set up profiler. (%s)", e)
-            else:
-                try:
-                    setup_continuous_profiler(
-                        self.options,
-                        sdk_info=SDK_INFO,
-                        capture_func=_capture_envelope,
-                    )
-                except Exception as e:
-                    logger.debug("Can not set up continuous profiler. (%s)", e)
+            try:
+                setup_continuous_profiler(
+                    self.options,
+                    sdk_info=SDK_INFO,
+                    capture_func=_capture_envelope,
+                )
+            except Exception as e:
+                logger.debug("Can not set up continuous profiler. (%s)", e)
 
         finally:
             _client_init_debug.set(old_debug)
@@ -737,7 +698,6 @@ class _Client(BaseClient):
             or self.log_batcher
             or self.metrics_batcher
             or self.span_batcher
-            or has_profiling_enabled(self.options)
             or isinstance(self.transport, HttpTransportCore)
         ):
             # If we have anything on that could spawn a background thread, we
@@ -1125,8 +1085,6 @@ class _Client(BaseClient):
         if not self._should_capture(event, hint, scope):
             return None
 
-        profile = event.pop("profile", None)
-
         event_id = event.get("event_id")
         if event_id is None:
             event["event_id"] = event_id = uuid.uuid4().hex
@@ -1166,9 +1124,6 @@ class _Client(BaseClient):
             headers["trace"] = dynamic_sampling_context
 
         envelope = Envelope(headers=headers)
-
-        if is_transaction and isinstance(profile, Profile):
-            envelope.add_profile(profile.to_json(event_opt, self.options))
 
         if is_transaction and not span_recorder_has_gen_ai_span:
             envelope.add_transaction(event_opt)

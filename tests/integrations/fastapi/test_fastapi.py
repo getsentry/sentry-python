@@ -4,7 +4,6 @@ import logging
 import os
 import threading
 import warnings
-from unittest import mock
 
 import fastapi
 import pytest
@@ -57,7 +56,6 @@ PARSED_FORM = starlette.datastructures.FormData(
 )
 
 from tests.integrations.conftest import parametrize_test_configurable_status_codes
-from tests.integrations.starlette import test_starlette
 
 
 def fastapi_app_factory():
@@ -456,44 +454,6 @@ def test_legacy_setup(
 
     (event,) = events
     assert event["transaction"] == "/message/{message_id}"
-
-
-@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
-@mock.patch("sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0)
-def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, endpoint):
-    sentry_init(
-        traces_sample_rate=1.0,
-        profiles_sample_rate=1.0,
-    )
-    app = fastapi_app_factory()
-    asgi_app = SentryAsgiMiddleware(app)
-
-    envelopes = capture_envelopes()
-
-    client = TestClient(asgi_app)
-    response = client.get(endpoint)
-    assert response.status_code == 200
-
-    data = json.loads(response.content)
-
-    envelopes = [envelope for envelope in envelopes]
-    assert len(envelopes) == 1
-
-    profiles = [item for item in envelopes[0].items if item.type == "profile"]
-    assert len(profiles) == 1
-
-    for item in profiles:
-        transactions = item.payload.json["transactions"]
-        assert len(transactions) == 1
-        assert str(data["active"]) == transactions[0]["active_thread_id"]
-
-    transactions = [item for item in envelopes[0].items if item.type == "transaction"]
-    assert len(transactions) == 1
-
-    for item in transactions:
-        transaction = item.payload.json
-        trace_context = transaction["contexts"]["trace"]
-        assert str(data["active"]) == trace_context["data"]["thread.id"]
 
 
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
@@ -914,48 +874,6 @@ def test_transaction_name_in_middleware(
     assert (
         transaction_event["transaction_info"]["source"] == expected_transaction_source
     )
-
-
-@test_starlette.parametrize_test_configurable_status_codes_deprecated
-def test_configurable_status_codes_deprecated(
-    sentry_init,
-    capture_events,
-    failed_request_status_codes,
-    status_code,
-    expected_error,
-):
-    with pytest.warns(DeprecationWarning):
-        starlette_integration = StarletteIntegration(
-            failed_request_status_codes=failed_request_status_codes
-        )
-
-    with pytest.warns(DeprecationWarning):
-        fast_api_integration = FastApiIntegration(
-            failed_request_status_codes=failed_request_status_codes
-        )
-
-    sentry_init(
-        integrations=[
-            starlette_integration,
-            fast_api_integration,
-        ]
-    )
-
-    events = capture_events()
-
-    app = FastAPI()
-
-    @app.get("/error")
-    async def _error():
-        raise HTTPException(status_code)
-
-    client = TestClient(app)
-    client.get("/error")
-
-    if expected_error:
-        assert len(events) == 1
-    else:
-        assert not events
 
 
 @pytest.mark.skipif(

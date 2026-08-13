@@ -42,7 +42,6 @@ from typing import TYPE_CHECKING, Dict, List, cast
 import certifi
 import urllib3
 
-import sentry_sdk
 from sentry_sdk.consts import EndpointType
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk.utils import (
@@ -233,9 +232,6 @@ class HttpTransportCore(Transport):
         self._last_client_report_sent = time.time()
 
         self._pool = self._make_pool()
-
-        # Backwards compatibility for deprecated `self.hub_class` attribute
-        self._hub_cls = sentry_sdk.Hub
 
         experiments = options.get("_experiments", {})
         compression_level = experiments.get(
@@ -714,27 +710,6 @@ class BaseHttpTransport(HttpTransportCore):
         if timeout > 0:
             self._worker.submit(lambda: self._flush_client_reports(force=True))
             self._worker.flush(timeout, callback)
-
-    @staticmethod
-    def _warn_hub_cls() -> None:
-        """Convenience method to warn users about the deprecation of the `hub_cls` attribute."""
-        warnings.warn(
-            "The `hub_cls` attribute is deprecated and will be removed in a future release.",
-            DeprecationWarning,
-            stacklevel=3,
-        )
-
-    @property
-    def hub_cls(self: "Self") -> "type[sentry_sdk.Hub]":
-        """DEPRECATED: This attribute is deprecated and will be removed in a future release."""
-        HttpTransport._warn_hub_cls()
-        return self._hub_cls
-
-    @hub_cls.setter
-    def hub_cls(self: "Self", value: "type[sentry_sdk.Hub]") -> None:
-        """DEPRECATED: This attribute is deprecated and will be removed in a future release."""
-        HttpTransport._warn_hub_cls()
-        self._hub_cls = value
 
 
 class HttpTransport(BaseHttpTransport):

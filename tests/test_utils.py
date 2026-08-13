@@ -116,20 +116,6 @@ def test_datetime_from_isoformat(input_str, expected_output):
 
 
 @pytest.mark.parametrize(
-    ("input_str", "expected_output"),
-    isoformat_inputs_and_datetime_outputs,
-)
-def test_datetime_from_isoformat_with_py_36_or_lower(input_str, expected_output):
-    """
-    `fromisoformat` was added in Python version 3.7
-    """
-    with mock.patch("sentry_sdk.utils.datetime") as datetime_mocked:
-        datetime_mocked.fromisoformat.side_effect = AttributeError()
-        datetime_mocked.strptime = datetime.strptime
-        assert datetime_from_isoformat(input_str) == expected_output, input_str
-
-
-@pytest.mark.parametrize(
     "env_var_value,strict,expected",
     [
         (None, True, None),

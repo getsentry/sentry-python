@@ -91,7 +91,6 @@ def use_django_caching_with_cluster(settings):
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_cache_spans_disabled_middleware(
     sentry_init,
@@ -134,7 +133,6 @@ def test_cache_spans_disabled_middleware(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_cache_spans_disabled_decorator(
     sentry_init,
@@ -177,7 +175,6 @@ def test_cache_spans_disabled_decorator(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_cache_spans_disabled_templatetag(
     sentry_init,
@@ -220,7 +217,6 @@ def test_cache_spans_disabled_templatetag(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_cache_spans_middleware(
     sentry_init,
@@ -346,7 +342,6 @@ def test_cache_spans_middleware(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_cache_spans_decorator(
     sentry_init,
@@ -446,7 +441,6 @@ def test_cache_spans_decorator(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.skipif(DJANGO_VERSION < (1, 9), reason="Requires Django >= 1.9")
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_cache_spans_templatetag(
     sentry_init,
@@ -1101,7 +1095,6 @@ def test_cache_spans_set_many(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.skipif(DJANGO_VERSION <= (1, 11), reason="Requires Django > 1.11")
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_span_origin_cache(
     sentry_init,

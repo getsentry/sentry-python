@@ -13,14 +13,11 @@ from sentry_sdk.data_collection import (
 )
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
-from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SegmentNameSource, StreamedSpan
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
-    CONTEXTVARS_ERROR_MESSAGE,
-    HAS_REAL_CONTEXTVARS,
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
@@ -46,7 +43,7 @@ try:
     from sanic.handlers import ErrorHandler
     from sanic.router import Router
 except ImportError:
-    raise DidNotEnable("Sanic not installed")
+    raise DidNotEnable("Sanic not installed or incompatible")
 
 old_error_handler_lookup = ErrorHandler.lookup
 old_handle_request = Sanic.handle_request
@@ -79,30 +76,6 @@ class SanicIntegration(Integration):
     def setup_once() -> None:
         SanicIntegration.version = parse_version(SANIC_VERSION)
         _check_minimum_version(SanicIntegration, SanicIntegration.version)
-
-        if not HAS_REAL_CONTEXTVARS:
-            # We better have contextvars or we're going to leak state between
-            # requests.
-            raise DidNotEnable(
-                "The sanic integration for Sentry requires Python 3.7+ "
-                " or the aiocontextvars package." + CONTEXTVARS_ERROR_MESSAGE
-            )
-
-        if SANIC_VERSION.startswith("0.8."):
-            # Sanic 0.8 and older creates a logger named "root" and puts a
-            # stringified version of every exception in there (without exc_info),
-            # which our error deduplication can't detect.
-            #
-            # We explicitly check the version here because it is a very
-            # invasive step to ignore this logger and not necessary in newer
-            # versions at all.
-            #
-            # https://github.com/huge-success/sanic/issues/1332
-            ignore_logger("root")
-
-        if SanicIntegration.version is not None and SanicIntegration.version < (21, 9):
-            _setup_legacy_sanic()
-            return
 
         _setup_sanic()
 
@@ -137,12 +110,6 @@ class SanicRequestExtractor(RequestExtractor):
 
 def _setup_sanic() -> None:
     Sanic._startup = _startup
-    ErrorHandler.lookup = _sentry_error_handler_lookup
-
-
-def _setup_legacy_sanic() -> None:
-    Sanic.handle_request = _legacy_handle_request
-    Router.get = _legacy_router_get
     ErrorHandler.lookup = _sentry_error_handler_lookup
 
 
@@ -241,7 +208,7 @@ async def _context_exit(
         response_status = None if response is None else response.status
 
         # This capture_internal_exceptions block has been intentionally nested here, so that in case an exception
-        # happens while trying to end the transaction, we still attempt to exit the hub.
+        # happens while trying to end the transaction, we still attempt to exit the scope.
         with capture_internal_exceptions():
             span = request.ctx._sentry_root_span
             if isinstance(span, StreamedSpan):
@@ -308,54 +275,6 @@ def _sentry_error_handler_lookup(
                 await _context_exit(request)
 
     return sentry_wrapped_error_handler
-
-
-async def _legacy_handle_request(
-    self: "Any", request: "Request", *args: "Any", **kwargs: "Any"
-) -> "Any":
-    if sentry_sdk.get_client().get_integration(SanicIntegration) is None:
-        return await old_handle_request(self, request, *args, **kwargs)
-
-    weak_request = weakref.ref(request)
-
-    with sentry_sdk.isolation_scope() as scope:
-        scope.clear_breadcrumbs()
-        scope.add_event_processor(_make_request_processor(weak_request))
-
-        response = old_handle_request(self, request, *args, **kwargs)
-        if isawaitable(response):
-            response = await response
-
-        return response
-
-
-def _legacy_router_get(self: "Any", *args: "Union[Any, Request]") -> "Any":
-    rv = old_router_get(self, *args)
-    if sentry_sdk.get_client().get_integration(SanicIntegration) is not None:
-        with capture_internal_exceptions():
-            scope = sentry_sdk.get_isolation_scope()
-            if SanicIntegration.version and SanicIntegration.version >= (21, 3):
-                # Sanic versions above and including 21.3 append the app name to the
-                # route name, and so we need to remove it from Route name so the
-                # transaction name is consistent across all versions
-                sanic_app_name = self.ctx.app.name
-                sanic_route = rv[0].name
-
-                if sanic_route.startswith("%s." % sanic_app_name):
-                    # We add a 1 to the len of the sanic_app_name because there is a dot
-                    # that joins app name and the route name
-                    # Format: app_name.route_name
-                    sanic_route = sanic_route[len(sanic_app_name) + 1 :]
-
-                scope.set_transaction_name(
-                    sanic_route, source=TransactionSource.COMPONENT
-                )
-            else:
-                scope.set_transaction_name(
-                    rv[0].__name__, source=TransactionSource.COMPONENT
-                )
-
-    return rv
 
 
 @ensure_integration_enabled(SanicIntegration)
