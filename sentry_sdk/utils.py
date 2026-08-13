@@ -1314,6 +1314,12 @@ def parse_version(version: str) -> "Optional[Tuple[int, ...]]":
     except (TypeError, ValueError, AttributeError):
         return None
 
+    if len(release) == 2:
+        # Pad out to three digits so that version comparison against a three-part
+        # tuple works as expected (e.g. (0, 1) should be >= than (0, 1, 0) when
+        # it comes to releases, but tuples don't compare that way).
+        release_tuple = (release_tuple[0], release_tuple[1], 0)
+
     return release_tuple
 
 
