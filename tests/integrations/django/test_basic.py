@@ -1152,6 +1152,7 @@ def test_request_body(
     sentry_init,
     client,
     capture_items,
+    span_streaming,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -1195,6 +1196,7 @@ def test_read_request(
     sentry_init,
     client,
     capture_items,
+    span_streaming,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
