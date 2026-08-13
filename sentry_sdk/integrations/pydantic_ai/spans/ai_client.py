@@ -3,12 +3,12 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.ai.utils import (
+    _set_span_data_attribute,
     normalize_message_roles,
     set_data_normalized,
     truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
     should_truncate_gen_ai_input,
@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from pydantic_ai.messages import ModelMessage, ModelResponse, SystemPromptPart
 
     from sentry_sdk import _types
+    from sentry_sdk.traces import StreamedSpan
 
 try:
     from pydantic_ai.messages import (
@@ -115,24 +116,15 @@ def _set_input_messages(
 
     permanent_instructions, current_instructions = _get_system_instructions(messages)
     if len(permanent_instructions) > 0 or len(current_instructions) > 0:
-        if isinstance(span, StreamedSpan):
-            span.set_attribute(
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                json.dumps(
-                    _transform_system_instructions(
-                        permanent_instructions, current_instructions
-                    )
-                ),
-            )
-        else:
-            span.set_data(
-                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-                json.dumps(
-                    _transform_system_instructions(
-                        permanent_instructions, current_instructions
-                    )
-                ),
-            )
+        _set_span_data_attribute(
+            span,
+            SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+            json.dumps(
+                _transform_system_instructions(
+                    permanent_instructions, current_instructions
+                )
+            ),
+        )
 
     try:
         formatted_messages = []
@@ -242,10 +234,10 @@ def _set_output_data(
     if not response:
         return
 
-    set_on_span = (
-        span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
-    )
-    set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)  # type: ignore[arg-type]
+    if response.model_name:
+        _set_span_data_attribute(
+            span, SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name
+        )
 
     try:
         if hasattr(response, "parts"):
@@ -278,7 +270,8 @@ def _set_output_data(
                     parts.append(tool_part)
 
             if parts:
-                set_on_span(
+                _set_span_data_attribute(
+                    span,
                     SPANDATA.GEN_AI_OUTPUT_MESSAGES,
                     json.dumps([{"role": "assistant", "parts": parts}]),
                 )
