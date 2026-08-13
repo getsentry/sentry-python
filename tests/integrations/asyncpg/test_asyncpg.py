@@ -247,6 +247,7 @@ async def test_record_params(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration(record_params=True)],
         _experiments={"record_sql_params": True},
+        trace_lifecycle="stream",
     )
     events = capture_events()
 
@@ -287,6 +288,7 @@ async def test_cursor(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
         _experiments={"record_sql_params": True},
+        trace_lifecycle="stream",
     )
     events = capture_events()
 
@@ -341,6 +343,7 @@ async def test_cursor_manual(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
         _experiments={"record_sql_params": True},
+        trace_lifecycle="stream",
     )
     events = capture_events()
 
@@ -403,6 +406,7 @@ async def test_prepared_stmt(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
         _experiments={"record_sql_params": True},
+        trace_lifecycle="stream",
     )
     events = capture_events()
 
@@ -452,6 +456,7 @@ async def test_connection_pool(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[AsyncPGIntegration()],
         _experiments={"record_sql_params": True},
+        trace_lifecycle="stream",
     )
     events = capture_events()
 
