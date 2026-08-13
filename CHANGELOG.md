@@ -4,25 +4,14 @@
 
 ### New Features ✨
 
-#### Openai Agents
-
-- Support data_collection config for input/output gating by @ericapisani in [#7125](https://github.com/getsentry/sentry-python/pull/7125)
-- Add data_collection controls for invoke_agent spans by @ericapisani in [#7124](https://github.com/getsentry/sentry-python/pull/7124)
-- Gate tool execution span data on data_collection options by @ericapisani in [#7123](https://github.com/getsentry/sentry-python/pull/7123)
-
 #### Other
 
-- (google-genai) Gate prompt/response collection on data_collection option by @ericapisani in [#7139](https://github.com/getsentry/sentry-python/pull/7139)
-- (huggingface_hub) Gate prompt/response collection on data_collection option by @ericapisani in [#7172](https://github.com/getsentry/sentry-python/pull/7172)
-- (langchain) Gate prompt/response collection on data_collection option by @ericapisani in [#7173](https://github.com/getsentry/sentry-python/pull/7173)
-- (mcp) Add MCP data collection gating by @ericapisani in [#7154](https://github.com/getsentry/sentry-python/pull/7154)
 - Set the segment source on the scope for `NoOpStreamedSpan` by @alexander-alderman-webb in [#7163](https://github.com/getsentry/sentry-python/pull/7163)
 - Remove early return for `NoOpStreamedSpan` in `set_transaction_name()` by @alexander-alderman-webb in [#7164](https://github.com/getsentry/sentry-python/pull/7164)
 - Set the segment name on the scope with `NoOpStreamedSpan` by @alexander-alderman-webb in [#7162](https://github.com/getsentry/sentry-python/pull/7162)
 
 ### Bug Fixes 🐛
 
-- (ai) Gate response tool calls on the gen_ai inputs setting by @ericapisani in [#7174](https://github.com/getsentry/sentry-python/pull/7174)
 - (batcher) Add global flush trigger based on the span number by @alexander-alderman-webb in [#7150](https://github.com/getsentry/sentry-python/pull/7150)
 
 ### Internal Changes 🔧
