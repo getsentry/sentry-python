@@ -19,7 +19,11 @@ from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
     should_truncate_gen_ai_input,
 )
-from sentry_sdk.utils import package_version, safe_serialize
+from sentry_sdk.utils import (
+    has_data_collection_enabled,
+    package_version,
+    safe_serialize,
+)
 
 try:
     from langgraph.errors import GraphBubbleUp
@@ -54,6 +58,24 @@ class LanggraphIntegration(Integration):
             Pregel.invoke = _wrap_pregel_invoke(Pregel.invoke)
         if hasattr(Pregel, "ainvoke"):
             Pregel.ainvoke = _wrap_pregel_ainvoke(Pregel.ainvoke)
+
+
+def _should_record_inputs(integration: "LanggraphIntegration") -> bool:
+    client = sentry_sdk.get_client()
+    if has_data_collection_enabled(client.options):
+        return bool(client.options["data_collection"]["gen_ai"]["inputs"])
+
+    # To remove once data collection has been fully rolled out
+    return should_send_default_pii() and integration.include_prompts
+
+
+def _should_record_outputs(integration: "LanggraphIntegration") -> bool:
+    client = sentry_sdk.get_client()
+    if has_data_collection_enabled(client.options):
+        return bool(client.options["data_collection"]["gen_ai"]["outputs"])
+
+    # To remove once data collection has been fully rolled out
+    return should_send_default_pii() and integration.include_prompts
 
 
 def _get_graph_name(graph_obj: "Any") -> "Optional[str]":
@@ -156,7 +178,13 @@ def _wrap_state_graph_compile(f: "Callable[..., Any]") -> "Callable[..., Any]":
                             tools = list(data.tools_by_name.keys())
 
             if tools is not None:
-                span.set_data(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, tools)
+                # Available tools aren't gated on the legacy PII settings, so they're
+                # only gated when data collection has been configured.
+                if has_data_collection_enabled(client.options):
+                    if client.options["data_collection"]["gen_ai"]["inputs"]:
+                        span.set_data(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, tools)
+                else:
+                    span.set_data(SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS, tools)
 
             return compiled_graph
 
@@ -191,18 +219,13 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
                 # Store input messages to later compare with output
                 input_messages = None
-                if (
-                    len(args) > 0
-                    and should_send_default_pii()
-                    and integration.include_prompts
-                ):
+                if len(args) > 0:
                     input_messages = _parse_langgraph_messages(args[0])
-                    if input_messages:
+                    if input_messages and _should_record_inputs(integration):
                         normalized_input_messages = normalize_message_roles(
                             input_messages
                         )
 
-                        client = sentry_sdk.get_client()
                         scope = sentry_sdk.get_current_scope()
                         messages_data = (
                             truncate_and_annotate_messages(
@@ -238,18 +261,13 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
                 # Store input messages to later compare with output
                 input_messages = None
-                if (
-                    len(args) > 0
-                    and should_send_default_pii()
-                    and integration.include_prompts
-                ):
+                if len(args) > 0:
                     input_messages = _parse_langgraph_messages(args[0])
-                    if input_messages:
+                    if input_messages and _should_record_inputs(integration):
                         normalized_input_messages = normalize_message_roles(
                             input_messages
                         )
 
-                        client = sentry_sdk.get_client()
                         scope = sentry_sdk.get_current_scope()
                         messages_data = (
                             truncate_and_annotate_messages(
@@ -302,18 +320,13 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                     span.set_attribute(SPANDATA.GEN_AI_AGENT_NAME, graph_name)
 
                 input_messages = None
-                if (
-                    len(args) > 0
-                    and should_send_default_pii()
-                    and integration.include_prompts
-                ):
+                if len(args) > 0:
                     input_messages = _parse_langgraph_messages(args[0])
-                    if input_messages:
+                    if input_messages and _should_record_inputs(integration):
                         normalized_input_messages = normalize_message_roles(
                             input_messages
                         )
 
-                        client = sentry_sdk.get_client()
                         scope = sentry_sdk.get_current_scope()
                         messages_data = (
                             truncate_and_annotate_messages(
@@ -348,16 +361,11 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
             span.set_data(SPANDATA.GEN_AI_OPERATION_NAME, "invoke_agent")
 
             input_messages = None
-            if (
-                len(args) > 0
-                and should_send_default_pii()
-                and integration.include_prompts
-            ):
+            if len(args) > 0:
                 input_messages = _parse_langgraph_messages(args[0])
-                if input_messages:
+                if input_messages and _should_record_inputs(integration):
                     normalized_input_messages = normalize_message_roles(input_messages)
 
-                    client = sentry_sdk.get_client()
                     scope = sentry_sdk.get_current_scope()
                     messages_data = (
                         truncate_and_annotate_messages(
@@ -497,22 +505,22 @@ def _set_response_attributes(
     _set_usage_data(span, new_messages)
     _set_response_model_name(span, new_messages)
 
-    if not (should_send_default_pii() and integration.include_prompts):
-        return
+    if _should_record_outputs(integration):
+        llm_response_text = _extract_llm_response_text(new_messages)
+        if llm_response_text:
+            set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, llm_response_text)
+        elif new_messages:
+            set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, new_messages)
+        else:
+            set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, result)
 
-    llm_response_text = _extract_llm_response_text(new_messages)
-    if llm_response_text:
-        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, llm_response_text)
-    elif new_messages:
-        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, new_messages)
-    else:
-        set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, result)
-
-    tool_calls = _extract_tool_calls(new_messages)
-    if tool_calls:
-        set_data_normalized(
-            span,
-            SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-            safe_serialize(tool_calls),
-            unpack=False,
-        )
+    # Tool calls are an input to the model, so they're gated on inputs
+    if _should_record_inputs(integration):
+        tool_calls = _extract_tool_calls(new_messages)
+        if tool_calls:
+            set_data_normalized(
+                span,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                safe_serialize(tool_calls),
+                unpack=False,
+            )
