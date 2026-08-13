@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import contextlib
 import re
-from typing import Any, Awaitable, Callable, Iterator, TypeVar, Union
+from typing import Any, Awaitable, Callable, Iterator, TypeVar
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import (
     add_query_source,
     record_sql_queries,
@@ -94,11 +93,6 @@ def _wrap_execute(f: "Callable[..., Awaitable[T]]") -> "Callable[..., Awaitable[
             span_origin=AsyncPGIntegration.origin,
         ) as span:
             res = await f(*args, **kwargs)
-            if isinstance(span, StreamedSpan):
-                with capture_internal_exceptions():
-                    add_query_source(span)
-
-        if not isinstance(span, StreamedSpan):
             with capture_internal_exceptions():
                 add_query_source(span)
 
@@ -117,7 +111,7 @@ def _record(
     params_list: "tuple[Any, ...] | None",
     *,
     executemany: bool = False,
-) -> "Iterator[Union[Span, StreamedSpan]]":
+) -> "Iterator[StreamedSpan]":
     client = sentry_sdk.get_client()
     integration = client.get_integration(AsyncPGIntegration)
     if integration is not None and not integration._record_params:
@@ -151,11 +145,6 @@ def _wrap_connection_method(
 
             res = await f(*args, **kwargs)
 
-            if isinstance(span, StreamedSpan):
-                with capture_internal_exceptions():
-                    add_query_source(span)
-
-        if not isinstance(span, StreamedSpan):
             with capture_internal_exceptions():
                 add_query_source(span)
 
@@ -193,11 +182,6 @@ def _wrap_cursor_method(
             _set_db_data(span, cursor._connection)
             res = await f(*args, **kwargs)
 
-            if isinstance(span, StreamedSpan):
-                with capture_internal_exceptions():
-                    add_query_source(span)
-
-        if not isinstance(span, StreamedSpan):
             with capture_internal_exceptions():
                 add_query_source(span)
 
@@ -247,7 +231,7 @@ def _wrap_connect_addr(
     return _inner
 
 
-def _set_db_data(span: "Union[Span, StreamedSpan]", conn: "Any") -> None:
+def _set_db_data(span: "StreamedSpan", conn: "Any") -> None:
     addr = conn._addr
     database = conn._params.database
     user = conn._params.user
