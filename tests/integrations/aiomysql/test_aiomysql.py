@@ -44,8 +44,8 @@ CRUMBS_CONNECT = {
     "category": "query",
     "data": ApproxDict(
         {
-            "db.name": MYSQL_DB,
-            "db.system": "mysql",
+            "db.namespace": MYSQL_DB,
+            "db.system.name": "mysql",
             "db.user": MYSQL_USER,
             "server.address": MYSQL_HOST,
             "server.port": MYSQL_PORT,
@@ -684,7 +684,7 @@ async def test_connection_pool(sentry_init, capture_events) -> None:
     connect_crumbs = [c for c in crumbs if c.get("message") == "connect"]
     assert len(connect_crumbs) >= pool_size  # One connect span per pooled connection
     for crumb in connect_crumbs:
-        assert crumb["data"]["db.system"] == "mysql"
+        assert crumb["data"]["db.system.name"] == "mysql"
         assert crumb["data"]["server.address"] == MYSQL_HOST
 
 
