@@ -59,69 +59,6 @@ def test_has_context(sentry_init, app, capture_events, get_client):
     assert event["request"]["url"] == "http://localhost/message"
 
 
-@pytest.mark.parametrize(
-    "url,transaction_style,expected_transaction,expected_source",
-    [
-        ("/message", "endpoint", "hi", "component"),
-        ("/message", "url", "/message", "route"),
-        ("/message/123456", "url", "/message/<message_id>", "route"),
-        ("/message-named-route", "endpoint", "hi", "component"),
-    ],
-)
-def test_transaction_style(
-    sentry_init,
-    url,
-    transaction_style,
-    expected_transaction,
-    expected_source,
-    capture_events,
-    get_client,
-):
-    sentry_init(integrations=[BottleIntegration(transaction_style=transaction_style)])
-    events = capture_events()
-
-    client = get_client()
-    response = client.get(url)
-    assert response[1] == "200 OK"
-
-    (event,) = events
-    # We use endswith() because in Python 2.7 it is "test_bottle.hi"
-    # and in later Pythons "test_bottle.app.<locals>.hi"
-    assert event["transaction"].endswith(expected_transaction)
-    assert event["transaction_info"] == {"source": expected_source}
-
-
-@pytest.mark.parametrize("debug", (True, False), ids=["debug", "nodebug"])
-@pytest.mark.parametrize("catchall", (True, False), ids=["catchall", "nocatchall"])
-def test_errors(
-    sentry_init, capture_exceptions, capture_events, app, debug, catchall, get_client
-):
-    sentry_init(integrations=[BottleIntegration()])
-
-    app.catchall = catchall
-    set_debug(mode=debug)
-
-    exceptions = capture_exceptions()
-    events = capture_events()
-
-    @app.route("/")
-    def index():
-        1 / 0
-
-    client = get_client()
-    try:
-        client.get("/")
-    except ZeroDivisionError:
-        pass
-
-    (exc,) = exceptions
-    assert isinstance(exc, ZeroDivisionError)
-
-    (event,) = events
-    assert event["exception"]["values"][0]["mechanism"]["type"] == "bottle"
-    assert event["exception"]["values"][0]["mechanism"]["handled"] is False
-
-
 @pytest.mark.parametrize("max_value_length", [1024, None])
 def test_large_json_request(
     sentry_init, capture_events, app, get_client, max_value_length
@@ -463,117 +400,31 @@ def test_no_exception_on_redirect(sentry_init, capture_events, app, get_client):
     assert not events
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_span_origin(
     sentry_init,
     get_client,
     capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[BottleIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
-    if span_streaming:
-        items = capture_items("span")
-    else:
-        events = capture_events()
+    items = capture_items("span")
 
     client = get_client()
     client.get("/message")
 
-    if span_streaming:
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-        segment = spans[-1]
-        assert segment["is_segment"] is True
-        assert segment["attributes"]["sentry.origin"] == "auto.http.bottle"
-    else:
-        (_, event) = events
-        assert event["contexts"]["trace"]["origin"] == "auto.http.bottle"
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    segment = spans[-1]
+    assert segment["is_segment"] is True
+    assert segment["attributes"]["sentry.origin"] == "auto.http.bottle"
 
 
-@pytest.mark.parametrize("raise_error", [True, False])
-@pytest.mark.parametrize(
-    ("integration_kwargs", "status_code", "should_capture"),
-    (
-        ({}, None, False),
-        ({}, 400, False),
-        ({}, 451, False),  # Highest 4xx status code
-        ({}, 500, True),
-        ({}, 511, True),  # Highest 5xx status code
-        ({"failed_request_status_codes": set()}, 500, False),
-        ({"failed_request_status_codes": set()}, 511, False),
-        ({"failed_request_status_codes": {404, *range(500, 600)}}, 404, True),
-        ({"failed_request_status_codes": {404, *range(500, 600)}}, 500, True),
-        ({"failed_request_status_codes": {404, *range(500, 600)}}, 400, False),
-    ),
-)
-def test_failed_request_status_codes(
-    sentry_init,
-    capture_events,
-    integration_kwargs,
-    status_code,
-    should_capture,
-    raise_error,
-):
-    sentry_init(integrations=[BottleIntegration(**integration_kwargs)])
-    events = capture_events()
-
-    app = Bottle()
-
-    @app.route("/")
-    def handle():
-        if status_code is not None:
-            response = HTTPResponse(status=status_code)
-            if raise_error:
-                raise response
-            else:
-                return response
-        return "OK"
-
-    client = Client(app, Response)
-    response = client.get("/")
-
-    expected_status = 200 if status_code is None else status_code
-    assert response.status_code == expected_status
-
-    if should_capture:
-        (event,) = events
-        assert event["exception"]["values"][0]["type"] == "HTTPResponse"
-    else:
-        assert not events
-
-
-def test_failed_request_status_codes_non_http_exception(sentry_init, capture_events):
-    """
-    If an exception, which is not an instance of HTTPResponse, is raised, it should be captured, even if
-    failed_request_status_codes is empty.
-    """
-    sentry_init(integrations=[BottleIntegration(failed_request_status_codes=set())])
-    events = capture_events()
-
-    app = Bottle()
-
-    @app.route("/")
-    def handle():
-        1 / 0
-
-    client = Client(app, Response)
-
-    try:
-        client.get("/")
-    except ZeroDivisionError:
-        pass
-
-    (event,) = events
-    assert event["exception"]["values"][0]["type"] == "ZeroDivisionError"
-
-
-def test_span_streaming_basic(sentry_init, capture_items):
+def test_basic(sentry_init, capture_items):
     sentry_init(
         integrations=[BottleIntegration()],
         traces_sample_rate=1.0,
@@ -617,7 +468,7 @@ def test_span_streaming_basic(sentry_init, capture_items):
         ("/message-named-route", "endpoint", "hi", "component"),
     ],
 )
-def test_span_streaming_transaction_style(
+def test_transaction_style(
     sentry_init,
     capture_items,
     url,
@@ -662,15 +513,20 @@ def test_span_streaming_transaction_style(
     assert segment["attributes"]["sentry.segment.name.source"] == expected_source
 
 
-def test_span_streaming_with_error(sentry_init, capture_items):
+@pytest.mark.parametrize("debug", (True, False), ids=["debug", "nodebug"])
+@pytest.mark.parametrize("catchall", (True, False), ids=["catchall", "nocatchall"])
+def test_errors(sentry_init, capture_items, debug, catchall):
     sentry_init(
         integrations=[BottleIntegration()],
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
     )
-    items = capture_items("event", "span")
 
     app = Bottle()
+    app.catchall = catchall
+    set_debug(mode=debug)
+
+    items = capture_items("event", "span")
 
     @app.route("/error")
     def error():
@@ -718,7 +574,7 @@ def test_span_streaming_with_error(sentry_init, capture_items):
         (500, "error"),
     ],
 )
-def test_span_streaming_http_error_status(
+def test_http_error_status(
     sentry_init,
     capture_items,
     status_code,
@@ -764,7 +620,7 @@ def test_span_streaming_http_error_status(
         ({"failed_request_status_codes": {404, *range(500, 600)}}, 400, False),
     ),
 )
-def test_span_streaming_failed_request_status_codes(
+def test_failed_request_status_codes(
     sentry_init,
     capture_items,
     integration_kwargs,
