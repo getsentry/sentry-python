@@ -243,7 +243,6 @@ def test_cache_spans_middleware(
         items = capture_items("span")
 
         client.get(reverse("not_cached_view"))
-        client.get(reverse("not_cached_view"))
 
         sentry_sdk.flush()
         spans = [item.payload for item in items]
@@ -265,6 +264,11 @@ def test_cache_spans_middleware(
         )
         assert "cache.hit" not in spans[1]["attributes"]
         assert spans[1]["attributes"]["cache.item_size"] == 2
+
+        client.get(reverse("not_cached_view"))
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
         # second_event - cache.get
         assert spans[4]["attributes"]["sentry.op"] == "cache.get"
         assert spans[4]["name"].startswith("views.decorators.cache.cache_header.")

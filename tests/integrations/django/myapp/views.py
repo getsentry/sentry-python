@@ -50,10 +50,6 @@ try:
         1 / 0
 
     @api_view(["GET"])
-    def rest_hello(request):
-        return HttpResponse("ok")
-
-    @api_view(["GET"])
     def rest_permission_denied_exc(request):
         raise PermissionDenied("bye")
 

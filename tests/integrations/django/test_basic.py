@@ -535,7 +535,6 @@ def test_user_captured(
 def test_materialized_user_captured(
     sentry_init,
     client,
-    capture_events,
     capture_items,
 ):
     sentry_init(
@@ -815,7 +814,6 @@ def test_sql_dict_query_params(
 
 
 @pytest.mark.forked
-@pytest_mark_django_db_decorator()
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_response_trace(
     sentry_init,
@@ -1419,7 +1417,6 @@ def test_request_body(
     assert "" not in event
 
 
-@pytest.mark.xfail
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_read_request(
     sentry_init,
@@ -2496,12 +2493,17 @@ def test_transaction_http_method_custom(
 
         client.get("/nomessage")
         client.options("/nomessage")
-        client.head("/nomessage")
 
         sentry_sdk.flush()
         spans = [item.payload for item in items]
 
         assert spans[2]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "OPTIONS"
+
+        client.head("/nomessage")
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items]
+
         assert spans[5]["attributes"][SPANDATA.HTTP_REQUEST_METHOD] == "HEAD"
     else:
         events = capture_events()

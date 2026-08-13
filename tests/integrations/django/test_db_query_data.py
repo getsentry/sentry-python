@@ -900,7 +900,6 @@ def test_db_span_origin_execute(
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_db_span_origin_executemany(
     sentry_init,
-    client,
     capture_events,
     capture_items,
     span_streaming,

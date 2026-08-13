@@ -4,6 +4,7 @@ import io
 import json
 import os
 import socket
+import threading
 import warnings
 from collections import namedtuple
 from contextlib import contextmanager
@@ -282,11 +283,71 @@ def uninstall_integration():
     return inner
 
 
+def _install_flush_completion_handshake(client: "sentry_sdk.Client") -> None:
+    """Make batcher.flush() wait for the flusher thread to drain.
+
+    Otherwise, test assertions can run before envelopes are captured.
+    The span batcher flushes pending items asynchronously with the main thread.
+    Flushes triggered by segments finishing are asynchronous, and can collect buckets
+    that would have otherwise been flushed synchronously by `sentry_sdk.flush()`.
+    """
+    batcher = client.span_batcher
+    if batcher is None:
+        return
+
+    orig_flush_raw = batcher._flush
+    orig_flush = batcher.flush
+    lock = threading.Lock()
+    drained_count = 0
+    wake = threading.Event()
+
+    def _flush(*args: "Any", **kwargs: "Any") -> "Any":
+        nonlocal drained_count
+        try:
+            return orig_flush_raw(*args, **kwargs)
+        finally:
+            with lock:
+                drained_count += 1
+            wake.set()
+
+    def flush() -> None:
+        nonlocal drained_count
+        # Re-entrancy guard: if `flush()` is invoked from within a drain (e.g. a
+        # custom transport), waiting on the flusher thread would deadlock, because
+        # the flusher is blocked inside our own handler.
+        if getattr(getattr(batcher, "_active", None), "flag", False):
+            orig_flush()
+            return
+
+        # If the background flusher thread was never started (no spans have
+        # been added), there is no thread to drain and the counter will never
+        # advance. Fall back to the original synchronous flush.
+        if batcher._flusher is None or not batcher._flusher.is_alive():
+            orig_flush()
+            return
+
+        with lock:
+            target = drained_count
+
+        batcher._flush_event.set()
+        while True:
+            with lock:
+                if drained_count > target:
+                    break
+            wake.wait()
+            wake.clear()
+        orig_flush()
+
+    object.__setattr__(batcher, "_flush", _flush)
+    object.__setattr__(batcher, "flush", flush)
+
+
 @pytest.fixture
 def sentry_init(request):
     def inner(*a, **kw):
         kw.setdefault("transport", TestTransport())
         client = sentry_sdk.Client(*a, **kw)
+        _install_flush_completion_handshake(client)
         sentry_sdk.get_global_scope().set_client(client)
 
     if request.node.get_closest_marker("forked"):
