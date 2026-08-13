@@ -1126,3 +1126,37 @@ async def test_user_identity_error_event_data_collection(
         assert "id" not in event.get("user", {})
         assert "email" not in event.get("user", {})
         assert "username" not in event.get("user", {})
+
+
+@pytest.mark.parametrize("application", APPS)
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 0), reason="Django ASGI support shipped in 3.0"
+)
+@pytest.mark.parametrize(
+    ("integration_kwargs", "expected_type"),
+    (
+        ({}, None),
+        ({"failed_request_status_codes": {403, *range(500, 600)}}, "PermissionDenied"),
+    ),
+)
+async def test_failed_request_status_codes(
+    sentry_init, capture_events, application, integration_kwargs, expected_type
+):
+    sentry_init(integrations=[DjangoIntegration(**integration_kwargs)])
+    events = capture_events()
+
+    comm = HttpCommunicator(application, "GET", "/permission-denied-exc")
+    response = await comm.get_response()
+    await comm.wait()
+
+    assert response["status"] == 403
+
+    if expected_type is None:
+        assert not events
+    else:
+        (event,) = events
+        (exception,) = event["exception"]["values"]
+        assert exception["type"] == expected_type
+        assert exception["mechanism"]["handled"] is True
+        assert event["transaction"] == "/permission-denied-exc"
