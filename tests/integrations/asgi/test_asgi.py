@@ -670,12 +670,47 @@ async def test_transaction_style(
 
         assert span["name"] == expected_transaction
         assert span["attributes"]["sentry.segment.name.source"] == expected_source
+        assert "http.route" not in span["attributes"]
 
     else:
         (transaction_event,) = events
 
         assert transaction_event["transaction"] == expected_transaction
         assert transaction_event["transaction_info"] == {"source": expected_source}
+
+
+@pytest.mark.asyncio
+async def test_http_route_set_for_route_segment_name(
+    sentry_init,
+    asgi3_app,
+    capture_items,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+    app = SentryAsgiMiddleware(asgi3_app, transaction_style="url")
+
+    class Route:
+        path = "/message/{message_id}"
+
+    scope = {
+        "endpoint": asgi3_app,
+        "route": Route(),
+        "client": ("127.0.0.1", 60457),
+    }
+
+    async with TestClient(app, scope=scope) as client:
+        items = capture_items("span")
+        await client.get("/message/123456")
+
+    sentry_sdk.flush()
+
+    assert len(items) == 1
+    span = items[0].payload
+    assert span["name"] == "/message/{message_id}"
+    assert span["attributes"]["sentry.segment.name.source"] == "route"
+    assert span["attributes"]["http.route"] == "/message/{message_id}"
 
 
 def mock_asgi2_app():
