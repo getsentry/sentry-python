@@ -1218,7 +1218,9 @@ async def test_span_streaming_quart_auth_user_id_data_collection(
     spans = [item.payload for item in items]
     assert len(spans) == 2
 
-    segment = spans[1]
+    (segment,) = (
+        span for span in spans if span["attributes"]["url.path"] == "/message"
+    )
     if expect_user_info:
         assert segment["attributes"]["user.id"] == "42"
     else:
