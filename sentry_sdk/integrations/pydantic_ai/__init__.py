@@ -1,127 +1,9 @@
-import functools
-
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.utils import capture_internal_exceptions, parse_version
 
 try:
     import pydantic_ai  # noqa: F401
-    from pydantic_ai import Agent
 except ImportError:
     raise DidNotEnable("pydantic-ai not installed")
-
-
-from importlib.metadata import PackageNotFoundError, version
-from typing import TYPE_CHECKING
-
-from .patches import (
-    _patch_agent_run,
-    _patch_graph_nodes,
-    _patch_tool_execution,
-)
-from .spans.ai_client import ai_client_span, update_ai_client_span
-
-if TYPE_CHECKING:
-    from typing import Any
-
-    from pydantic_ai import ModelRequestContext, RunContext
-    from pydantic_ai.capabilities import Hooks
-    from pydantic_ai.messages import ModelResponse
-
-
-def register_hooks(hooks: "Hooks") -> None:
-    """
-    Creates hooks for chat model calls and register the hooks by adding the hooks to the `capabilities` argument passed to `Agent.__init__()`.
-
-    The chat span opened in on_request is stored in the run's `RunContext.metadata`
-    dict, which pydantic-ai shares by reference between the hooks of one run. This
-    keeps span pairing correct per run (even for overlapping runs in one task) and
-    covers every entry point that fires request hooks (including `Agent.iter()`,
-    which the Agent.run/run_stream wrappers never see). It requires seeding a
-    metadata dict in `patched_init` below when the user did not provide one.
-    """
-
-    @hooks.on.before_model_request
-    async def on_request(
-        ctx: "RunContext[None]", request_context: "ModelRequestContext"
-    ) -> "ModelRequestContext":
-        run_context_metadata = ctx.metadata
-        if not isinstance(run_context_metadata, dict):
-            return request_context
-
-        span = None
-        with capture_internal_exceptions():
-            span = ai_client_span(
-                messages=request_context.messages,
-                agent=None,
-                model=request_context.model,
-                model_settings=request_context.model_settings,
-            )
-
-        if span is None:
-            return request_context
-
-        run_context_metadata["_sentry_span"] = span
-        span.__enter__()
-
-        return request_context
-
-    @hooks.on.after_model_request
-    async def on_response(
-        ctx: "RunContext[None]",
-        *,
-        request_context: "ModelRequestContext",
-        response: "ModelResponse",
-    ) -> "ModelResponse":
-        run_context_metadata = ctx.metadata
-        if not isinstance(run_context_metadata, dict):
-            return response
-
-        span = run_context_metadata.pop("_sentry_span", None)
-        if span is None:
-            return response
-
-        with capture_internal_exceptions():
-            update_ai_client_span(span, response)
-        span.__exit__(None, None, None)
-
-        return response
-
-    @hooks.on.model_request_error
-    async def on_error(
-        ctx: "RunContext[None]",
-        *,
-        request_context: "ModelRequestContext",
-        error: "Exception",
-    ) -> "ModelResponse":
-        run_context_metadata = ctx.metadata
-
-        if not isinstance(run_context_metadata, dict):
-            raise error
-
-        span = run_context_metadata.pop("_sentry_span", None)
-        if span is None:
-            raise error
-
-        with capture_internal_exceptions():
-            span.__exit__(type(error), error, error.__traceback__)
-
-        raise error
-
-    original_init = Agent.__init__
-
-    @functools.wraps(original_init)
-    def patched_init(self: "Agent[Any, Any]", *args: "Any", **kwargs: "Any") -> None:
-        caps = list(kwargs.get("capabilities") or [])
-        caps.append(hooks)
-        kwargs["capabilities"] = caps
-
-        metadata = kwargs.get("metadata")
-        if metadata is None:
-            kwargs["metadata"] = {}  # Used as shared reference between hooks
-
-        return original_init(self, *args, **kwargs)
-
-    Agent.__init__ = patched_init  # type: ignore[method-assign]
 
 
 class PydanticAIIntegration(Integration):
@@ -131,18 +13,18 @@ class PydanticAIIntegration(Integration):
     2. The user calls `Agent.run()` or `Agent.run_stream()` to start an agent run. The latter can be used to incrementally receive progress.
     3. In a loop, the agent repeatedly calls the model, maintaining a conversation history that includes previous messages and tool results, which is passed to each call.
 
-    Internally, Pydantic AI maintains an execution graph in which ModelRequestNode are responsible for model calls, including retries.
-    Hooks using the decorators provided by `pydantic_ai.capabilities` create and manage spans for model calls when these hooks are available (newer library versions);
-    older versions are instrumented by patching the graph nodes directly (see patches/graph_nodes.py).
-
-    The wrappers around `Agent.run()` and `Agent.run_stream()` track each in-flight run on a contextvar stack (see _run_context.py); the tool patches and span
-    helpers read the current agent from there. The request hooks pair each chat span with its model request through the run's `RunContext.metadata` dict
-    (see register_hooks), which stays correct per run and also covers entry points the wrappers don't instrument, such as `Agent.iter()`.
+    How the integration is put together:
+    - _compat.py resolves the installed pydantic-ai version and every version-dependent decision, once, at import time.
+    - _extract.py is the only module that reads pydantic-ai object internals; it returns plain data structures.
+    - _spans.py creates spans and writes extracted data onto them.
+    - _run_context.py tracks each in-flight run on a contextvar stack; the tool wrapper and span helpers read the current agent from there.
+    - _wrap_agent.py instruments Agent.run / Agent.run_stream (invoke_agent spans, isolation scopes, run tracking).
+    - _wrap_model.py emits chat spans for model requests via one of two backends chosen in _compat: request hooks (>= 1.73), paired per run through RunContext.metadata, or graph-node patching (older versions).
+    - _wrap_tools.py instruments the single ToolManager method all tool calls flow through (execute_tool spans).
     """
 
     identifier = "pydantic_ai"
     origin = f"auto.ai.{identifier}"
-    using_request_hooks = False
 
     def __init__(
         self, include_prompts: bool = True, handled_tool_call_exceptions: bool = True
@@ -169,32 +51,14 @@ class PydanticAIIntegration(Integration):
         - Model requests (AI client calls)
         - Tool executions
         """
+        # Deferred imports keep `import sentry_sdk.integrations.pydantic_ai`
+        # cheap when the integration is never enabled; they are the only
+        # intra-package imports in this module, keeping the import graph
+        # acyclic.
+        from ._wrap_agent import _patch_agent_run
+        from ._wrap_model import install_model_backend
+        from ._wrap_tools import _patch_tool_execution
+
         _patch_agent_run()
         _patch_tool_execution()
-
-        PydanticAIIntegration.using_request_hooks = False
-        try:
-            PYDANTIC_AI_VERSION = version("pydantic-ai-slim")
-        except PackageNotFoundError:
-            return
-
-        PYDANTIC_AI_VERSION = parse_version(PYDANTIC_AI_VERSION)
-        if PYDANTIC_AI_VERSION is None:
-            return
-
-        # ModelRequestContext.model added in https://github.com/pydantic/pydantic-ai/commit/f1260dfe09907f17688eee1646daf898fc428d4c
-        if PYDANTIC_AI_VERSION < (
-            1,
-            73,
-        ):
-            _patch_graph_nodes()
-            return
-
-        try:
-            from pydantic_ai.capabilities import Hooks
-        except ImportError:
-            return
-
-        PydanticAIIntegration.using_request_hooks = True
-        hooks = Hooks()
-        register_hooks(hooks)
+        install_model_backend()

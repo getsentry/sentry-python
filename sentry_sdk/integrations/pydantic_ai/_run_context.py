@@ -46,18 +46,18 @@ def get_is_streaming() -> bool:
 @contextmanager
 def agent_run_scope(agent: "Any", is_streaming: bool = False) -> "Iterator[AgentRun]":
     """Track an agent run on the contextvar stack for the duration of the
-    with block."""
+    with block.
+
+    On exit, exactly this run is removed from the stack (by identity, not a
+    token reset), so streaming runs that exit out of LIFO order or in a
+    different asyncio task never erase other still-active runs.
+    """
     run = AgentRun(agent=agent, is_streaming=is_streaming)
-    token = _agent_run_stack.set(_agent_run_stack.get() + (run,))
+    _agent_run_stack.set(_agent_run_stack.get() + (run,))
     try:
         yield run
     finally:
-        try:
-            _agent_run_stack.reset(token)
-        except (LookupError, ValueError):
-            # A streaming run's context manager can be exited in a different
-            # asyncio task (and therefore a different Context) than it was
-            # entered in, in which case the token cannot be reset. The stack
-            # entry only lives in the entering task's context copy, so there
-            # is nothing to clean up.
-            pass
+        stack = _agent_run_stack.get()
+        new_stack = tuple(r for r in stack if r is not run)
+        if len(new_stack) != len(stack):
+            _agent_run_stack.set(new_stack)
