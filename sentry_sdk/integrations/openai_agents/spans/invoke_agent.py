@@ -20,13 +20,15 @@ from ..consts import SPAN_ORIGIN
 from ..utils import _set_agent_data, _set_usage_data
 
 if TYPE_CHECKING:
-    from typing import Any, Union
+    from typing import Any, Optional, Union
 
     import agents
+    from agents import TResponseInputItem
+    from agents.usage import Usage
 
 
 def invoke_agent_span(
-    context: "agents.RunContextWrapper", agent: "agents.Agent", kwargs: "dict[str, Any]"
+    agent: "agents.Agent", turn_input: "Optional[list[TResponseInputItem]]"
 ) -> "Union[sentry_sdk.tracing.Span, StreamedSpan]":
     client_options = sentry_sdk.get_client().options
     span_streaming = has_span_streaming_enabled(client_options)
@@ -72,12 +74,11 @@ def invoke_agent_span(
                 }
             )
 
-        original_input = kwargs.get("original_input")
-        if original_input is not None:
+        if turn_input is not None:
             message = (
-                original_input
-                if isinstance(original_input, str)
-                else safe_serialize(original_input)
+                turn_input
+                if isinstance(turn_input, str)
+                else safe_serialize(turn_input)
             )
             messages.append(
                 {
@@ -110,13 +111,12 @@ def invoke_agent_span(
 
 def update_invoke_agent_span(
     span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
-    context: "agents.RunContextWrapper",
+    usage: "Optional[Usage]",
     agent: "agents.Agent",
     output: "Any" = None,
 ) -> None:
-    # Add aggregated usage data from context_wrapper
-    if hasattr(context, "usage"):
-        _set_usage_data(span, context.usage)
+    if usage is not None:
+        _set_usage_data(span, usage)
 
     client = sentry_sdk.get_client()
     if has_data_collection_enabled(client.options):
