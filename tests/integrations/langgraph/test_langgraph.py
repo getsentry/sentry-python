@@ -1,4 +1,5 @@
 import asyncio
+import json
 import sys
 from unittest.mock import MagicMock, patch
 
@@ -347,8 +348,6 @@ def test_pregel_invoke(
             ]
 
             if isinstance(request_messages, str):
-                import json
-
                 request_messages = json.loads(request_messages)
             assert len(request_messages) == 2
             assert request_messages[0]["content"] == "Hello, can you help me?"
@@ -363,8 +362,6 @@ def test_pregel_invoke(
             ]
 
             if isinstance(tool_calls_data, str):
-                import json
-
                 tool_calls_data = json.loads(tool_calls_data)
 
             assert len(tool_calls_data) == 1
@@ -411,8 +408,6 @@ def test_pregel_invoke(
             request_messages = invoke_span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
 
             if isinstance(request_messages, str):
-                import json
-
                 request_messages = json.loads(request_messages)
             assert len(request_messages) == 1
             assert request_messages[0]["content"] == "Of course! How can I assist you?"
@@ -424,8 +419,6 @@ def test_pregel_invoke(
             tool_calls_data = invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
 
             if isinstance(tool_calls_data, str):
-                import json
-
                 tool_calls_data = json.loads(tool_calls_data)
 
             assert len(tool_calls_data) == 1
@@ -534,8 +527,6 @@ def test_pregel_ainvoke(
             ]
 
             if isinstance(tool_calls_data, str):
-                import json
-
                 tool_calls_data = json.loads(tool_calls_data)
 
             assert len(tool_calls_data) == 1
@@ -583,8 +574,6 @@ def test_pregel_ainvoke(
             tool_calls_data = invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
 
             if isinstance(tool_calls_data, str):
-                import json
-
                 tool_calls_data = json.loads(tool_calls_data)
 
             assert len(tool_calls_data) == 1
@@ -1917,7 +1906,6 @@ def test_extraction_functions_complex_scenario(
         assert response_text == "Final response"
 
         assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in invoke_span["attributes"]
-        import json
 
         tool_calls_data = invoke_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
     else:
@@ -1941,7 +1929,6 @@ def test_extraction_functions_complex_scenario(
         assert response_text == "Final response"
 
         assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in invoke_span["data"]
-        import json
 
         tool_calls_data = invoke_span["data"][SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
 
@@ -2012,8 +1999,6 @@ def test_langgraph_message_role_mapping(
 
         # If messages were captured, verify role mapping
         if SPANDATA.GEN_AI_REQUEST_MESSAGES in span["attributes"]:
-            import json
-
             stored_messages = json.loads(
                 span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
             )
@@ -2037,8 +2022,6 @@ def test_langgraph_message_role_mapping(
 
         # If messages were captured, verify role mapping
         if SPANDATA.GEN_AI_REQUEST_MESSAGES in span["data"]:
-            import json
-
             stored_messages = json.loads(span["data"][SPANDATA.GEN_AI_REQUEST_MESSAGES])
 
     # Find messages with specific content to verify role mapping
@@ -2065,7 +2048,6 @@ def test_langgraph_message_role_mapping(
 
 def test_langgraph_message_truncation(sentry_init, capture_events):
     """Test that large messages are truncated properly in Langgraph integration."""
-    import json
 
     sentry_init(
         integrations=[LanggraphIntegration(include_prompts=True)],
@@ -2196,7 +2178,7 @@ def _invoke_span_data(items_or_events, span_streaming):
         ),
     ],
 )
-def test_pregel_invoke_gates_request_messages_and_tool_calls_on_inputs_setting(
+def test_pregel_invoke_gates_request_messages_on_inputs_setting(
     sentry_init,
     capture_events,
     capture_items,
@@ -2219,13 +2201,6 @@ def test_pregel_invoke_gates_request_messages_and_tool_calls_on_inputs_setting(
 
     test_state = {"messages": [MockMessage("Hello, can you help me?", name="user")]}
     pregel = MockPregelInstance("test_graph")
-    expected_tool_calls = [
-        {
-            "id": "call_test_123",
-            "type": "function",
-            "function": {"name": "search_tool", "arguments": '{"query": "help"}'},
-        }
-    ]
 
     def original_invoke(self, *args, **kwargs):
         return {
@@ -2234,7 +2209,6 @@ def test_pregel_invoke_gates_request_messages_and_tool_calls_on_inputs_setting(
                 MockMessage(
                     content="I'll help you with that task!",
                     name="assistant",
-                    tool_calls=expected_tool_calls,
                 )
             ]
         }
@@ -2249,10 +2223,8 @@ def test_pregel_invoke_gates_request_messages_and_tool_calls_on_inputs_setting(
 
     if expect_inputs:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in data
-        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in data
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in data
-        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in data
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -2297,7 +2269,7 @@ def test_pregel_invoke_gates_request_messages_and_tool_calls_on_inputs_setting(
         ),
     ],
 )
-def test_pregel_invoke_gates_response_text_on_outputs_setting(
+def test_pregel_invoke_gates_response_text_and_tool_calls_on_outputs_setting(
     sentry_init,
     capture_events,
     capture_items,
@@ -2321,11 +2293,24 @@ def test_pregel_invoke_gates_response_text_on_outputs_setting(
     test_state = {"messages": [MockMessage("Hello, can you help me?", name="user")]}
     pregel = MockPregelInstance("test_graph")
     expected_assistant_response = "I'll help you with that task!"
+    expected_tool_calls = [
+        {
+            "id": "call_test_123",
+            "type": "function",
+            "function": {"name": "search_tool", "arguments": '{"query": "help"}'},
+        }
+    ]
 
     def original_invoke(self, *args, **kwargs):
         return {
             "messages": args[0].get("messages", [])
-            + [MockMessage(content=expected_assistant_response, name="assistant")]
+            + [
+                MockMessage(
+                    content=expected_assistant_response,
+                    name="assistant",
+                    tool_calls=expected_tool_calls,
+                )
+            ]
         }
 
     captured = capture_items("span") if span_streaming else capture_events()
@@ -2338,8 +2323,12 @@ def test_pregel_invoke_gates_response_text_on_outputs_setting(
 
     if expect_outputs:
         assert data[SPANDATA.GEN_AI_RESPONSE_TEXT] == expected_assistant_response
+        assert (
+            json.loads(data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]) == expected_tool_calls
+        )
     else:
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in data
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in data
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -2434,15 +2423,17 @@ def test_pregel_ainvoke_gates_inputs_and_outputs_independently(
 
     if expect_inputs:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES in data
-        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in data
     else:
         assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in data
-        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in data
 
     if expect_outputs:
         assert data[SPANDATA.GEN_AI_RESPONSE_TEXT] == expected_assistant_response
+        assert (
+            json.loads(data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]) == expected_tool_calls
+        )
     else:
         assert SPANDATA.GEN_AI_RESPONSE_TEXT not in data
+        assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in data
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
