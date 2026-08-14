@@ -3841,21 +3841,15 @@ def test_generate_content_data_collection(
         ),
         pytest.param(
             {"gen_ai": {"inputs": True, "outputs": False}},
-            [
-                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
-                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-            ],
-            [],
-            id="gen-ai-inputs-enabled-outputs-disabled-tools-collected",
+            [SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS],
+            [SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS],
+            id="gen-ai-inputs-enabled-outputs-disabled-drops-tool-calls-only",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
-            [],
-            [
-                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
-                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
-            ],
-            id="gen-ai-inputs-disabled-outputs-enabled-tools-not-collected",
+            [SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS],
+            [SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS],
+            id="gen-ai-inputs-disabled-outputs-enabled-drops-available-tools-only",
         ),
         pytest.param(
             {"gen_ai": {}},
