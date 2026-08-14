@@ -507,8 +507,6 @@ def _set_response_attributes(
         else:
             set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, result)
 
-    # Tool calls are an input to the model, so they're gated on inputs
-    if _should_record_inputs(integration):
         tool_calls = _extract_tool_calls(new_messages)
         if tool_calls:
             set_data_normalized(
