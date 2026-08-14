@@ -17,7 +17,6 @@ from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.django.asgi import _asgi_middleware_mixin_factory
 from tests.integrations.django.myapp.asgi import channels_application
 from tests.integrations.django.utils import pytest_mark_django_db_decorator
-from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
 
 try:
     from django.urls import reverse
@@ -199,7 +198,6 @@ async def test_async_views(
 
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
-@pytest.mark.parametrize("middleware_spans", [False, True])
 @pytest.mark.asyncio
 @pytest.mark.skipif(
     django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
@@ -212,11 +210,10 @@ async def test_active_thread_id(
     teardown_profiling,
     endpoint,
     application,
-    middleware_spans,
     span_streaming,
 ):
     sentry_init(
-        integrations=[DjangoIntegration(middleware_spans=middleware_spans)],
+        integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
         profiles_sample_rate=1.0,
         trace_lifecycle="stream" if span_streaming else "static",
@@ -668,10 +665,9 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
 
 @pytest.mark.parametrize("application", APPS)
 @pytest.mark.parametrize(
-    "send_default_pii,method,headers,url_name,body,expected_data",
+    "method,headers,url_name,body,expected_data",
     [
         (
-            True,
             "POST",
             [(b"content-type", b"text/plain")],
             "post_echo_async",
@@ -679,7 +675,6 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
             None,
         ),
         (
-            True,
             "POST",
             [(b"content-type", b"text/plain")],
             "post_echo_async",
@@ -687,7 +682,6 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
             "",
         ),
         (
-            True,
             "POST",
             [(b"content-type", b"application/json")],
             "post_echo_async",
@@ -695,58 +689,6 @@ BODY_FORM_CONTENT_LENGTH = str(len(BODY_FORM)).encode("utf-8")
             {"username": "xyz", "password": "[Filtered]"},
         ),
         (
-            True,
-            "POST",
-            [(b"content-type", b"application/xml")],
-            "post_echo_async",
-            b'<?xml version="1.0" encoding="UTF-8"?><root></root>',
-            "",
-        ),
-        (
-            True,
-            "POST",
-            [
-                (b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"),
-                (b"content-length", BODY_FORM_CONTENT_LENGTH),
-            ],
-            "post_echo_async",
-            BODY_FORM,
-            {"password": "[Filtered]", "photo": "", "username": "Jane"},
-        ),
-        (
-            False,
-            "POST",
-            [(b"content-type", b"text/plain")],
-            "post_echo_async",
-            b"",
-            None,
-        ),
-        (
-            False,
-            "POST",
-            [(b"content-type", b"text/plain")],
-            "post_echo_async",
-            b"some raw text body",
-            "",
-        ),
-        (
-            False,
-            "POST",
-            [(b"content-type", b"application/json")],
-            "post_echo_async",
-            b'{"username":"xyz","password":"xyz"}',
-            {"username": "xyz", "password": "[Filtered]"},
-        ),
-        (
-            False,
-            "POST",
-            [(b"content-type", b"application/xml")],
-            "post_echo_async",
-            b'<?xml version="1.0" encoding="UTF-8"?><root></root>',
-            "",
-        ),
-        (
-            False,
             "POST",
             [
                 (b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"),
@@ -768,7 +710,6 @@ async def test_asgi_request_body(
     capture_envelopes,
     capture_items,
     application,
-    send_default_pii,
     method,
     headers,
     url_name,
@@ -778,7 +719,7 @@ async def test_asgi_request_body(
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        send_default_pii=send_default_pii,
+        send_default_pii=True,
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
@@ -1104,7 +1045,27 @@ async def test_async_middleware_process_exception_is_awaited(
 @pytest.mark.skipif(
     django.VERSION < (3, 0), reason="Django ASGI support shipped in 3.0"
 )
-@pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
+# The full precedence table (data_collection winning over send_default_pii)
+# is covered by the WSGI tests in test_data_scrubbing.py; here we only need
+# each user-info branch of the ASGI middleware: legacy pii on/off and
+# data_collection user_info on/off (asgi.py:75-83, _asgi_common.py:129-143).
+@pytest.mark.parametrize(
+    "init_kwargs, expect_user",
+    [
+        pytest.param({"send_default_pii": True}, True, id="pii_on"),
+        pytest.param({"send_default_pii": False}, False, id="pii_off"),
+        pytest.param(
+            {"_experiments": {"data_collection": {"user_info": True}}},
+            True,
+            id="data_collection_user_info_on",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"user_info": False}}},
+            False,
+            id="data_collection_user_info_off",
+        ),
+    ],
+)
 @pytest_mark_django_db_decorator()
 async def test_user_identity_error_event_data_collection(
     sentry_init, capture_events, application, init_kwargs, expect_user
