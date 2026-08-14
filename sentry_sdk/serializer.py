@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from sentry_sdk.utils import (
     AnnotatedValue,
+    bounded_repr,
     capture_internal_exception,
     disable_capture_event,
     format_timestamp,
@@ -46,6 +47,14 @@ MAX_EVENT_BYTES = 10**6
 MAX_DATABAG_DEPTH = 5
 MAX_DATABAG_BREADTH = 10
 CYCLE_MARKER = "<cyclic>"
+
+# Upper bound on the length of a single object's repr when max_value_length is
+# not set (string truncation is disabled by default, see #6290). This does not
+# shorten string values; it only stops the repr of a large container/dataclass
+# graph from being fully materialized. A value repr larger than the maximum
+# event size would be trimmed away later anyway, so building it is pure waste
+# and, worse, can block the event loop (#6649).
+MAX_REPR_LENGTH = 100_000
 
 
 global_repr_processors: "List[ReprProcessor]" = []
@@ -123,9 +132,18 @@ class _Serializer:
             repr_value = None
             if self.custom_repr is not None:
                 repr_value = self.custom_repr(value)
-            return repr_value or safe_repr(value)
+            return repr_value or bounded_repr(value, self._max_repr_length())
         except Exception:
             return safe_repr(value)
+
+    def _max_repr_length(self) -> int:
+        # Bound how much of an object's repr we build. When the user set
+        # max_value_length, the result is truncated to it anyway, so there is
+        # no point building more than that. Otherwise fall back to a generous
+        # default so that only pathologically large graphs are cut (#6649).
+        if self.max_value_length is not None:
+            return self.max_value_length
+        return MAX_REPR_LENGTH
 
     def _annotate(self, **meta: "Any") -> None:
         while len(self.meta_stack) <= len(self.path):

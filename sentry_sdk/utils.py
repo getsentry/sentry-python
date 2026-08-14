@@ -1,5 +1,6 @@
 import base64
 import copy
+import dataclasses
 import json
 import linecache
 import logging
@@ -544,6 +545,115 @@ def safe_repr(value: "Any") -> str:
         return repr(value)
     except Exception:
         return "<broken repr>"
+
+
+# Maximum recursion depth when building a length-bounded repr of an object
+# graph. Anything deeper is rendered as "...". This mirrors the databag depth
+# limit and guards against pathologically deep (or self-referential) objects.
+_MAX_BOUNDED_REPR_DEPTH = 100
+
+
+class _BoundedReprLimit(Exception):
+    """Raised internally by bounded_repr() once the length budget is spent."""
+
+
+def bounded_repr(value: "Any", max_length: "Optional[int]") -> str:
+    """``repr(value)`` that stops once the output would exceed ``max_length``.
+
+    ``repr()`` of a container or a dataclass walks the whole object graph and
+    builds the entire string up front. When that string is then truncated by
+    the serializer, everything past the limit was built for nothing. For a
+    large graph the cost is significant: FastAPI's ``_IncludedRouter`` is a
+    dataclass whose auto-generated ``__repr__`` recurses through the full
+    router tree, so a single frame local can turn into a multi-megabyte repr
+    that blocks the event loop for hundreds of milliseconds before truncation
+    (getsentry/sentry-python#6649).
+
+    This renders dataclass fields and the standard container types itself and
+    stops as soon as the accumulated output reaches ``max_length``, returning a
+    prefix of ``repr(value)`` followed by ``"..."``. When the full repr fits
+    within ``max_length`` the result is byte-for-byte identical to
+    ``repr(value)``. Leaf values (strings, numbers, arbitrary objects with a
+    custom ``__repr__``, ...) are always rendered in full, so string values are
+    never shortened here; only over-large container/dataclass graphs are cut.
+
+    Objects that are neither dataclasses nor standard containers fall back to
+    ``safe_repr()``.
+    """
+    if max_length is None:
+        return safe_repr(value)
+
+    chunks: "List[str]" = []
+    total = 0
+
+    def emit(text: str) -> None:
+        nonlocal total
+        chunks.append(text)
+        total += len(text)
+
+    def render(obj: "Any", depth: int) -> None:
+        if depth > _MAX_BOUNDED_REPR_DEPTH:
+            emit("...")
+            return
+
+        if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
+            items = (
+                (field.name + "=", getattr(obj, field.name))
+                for field in dataclasses.fields(obj)
+                if field.repr
+            )
+            _render_items(type(obj).__qualname__ + "(", ")", items, depth)
+            return
+
+        obj_type = type(obj)
+        if obj_type is dict:
+            _render_items(
+                "{", "}", ((safe_repr(k) + ": ", v) for k, v in obj.items()), depth
+            )
+        elif obj_type is list:
+            _render_items("[", "]", (("", v) for v in obj), depth)
+        elif obj_type is tuple:
+            if len(obj) == 1:
+                emit("(")
+                render(obj[0], depth + 1)
+                emit(",)")
+            else:
+                _render_items("(", ")", (("", v) for v in obj), depth)
+        elif obj_type is set:
+            if obj:
+                _render_items("{", "}", (("", v) for v in obj), depth)
+            else:
+                emit("set()")
+        elif obj_type is frozenset:
+            if obj:
+                _render_items("frozenset({", "})", (("", v) for v in obj), depth)
+            else:
+                emit("frozenset()")
+        else:
+            emit(safe_repr(obj))
+
+    def _render_items(opening: str, closing: str, items: "Any", depth: int) -> None:
+        emit(opening)
+        first = True
+        for prefix, child in items:
+            if total >= max_length:
+                # The graph is bigger than the budget. Stop here and let the
+                # caller mark the value as truncated. What we have emitted so
+                # far is a literal prefix of repr(value).
+                raise _BoundedReprLimit
+            if not first:
+                emit(", ")
+            first = False
+            emit(prefix)
+            render(child, depth + 1)
+        emit(closing)
+
+    try:
+        render(value, 0)
+    except _BoundedReprLimit:
+        chunks.append("...")
+
+    return "".join(chunks)
 
 
 def filename_for_module(
