@@ -1348,6 +1348,7 @@ def _is_contextvars_broken() -> bool:
     except ImportError:
         pass
 
+    modules_before_import = set(sys.modules.keys())
     try:
         import greenlet
         from eventlet.patcher import is_monkey_patched  # type: ignore
@@ -1364,6 +1365,18 @@ def _is_contextvars_broken() -> bool:
             return True
     except ImportError:
         pass
+    except Exception:
+        # Importing eventlet/greenlet can fail in unexpected ways depending on
+        # which combination of eventlet, greenlet, and other monkeypatched
+        # modules (e.g. dnspython, httpcore) happen to be installed. When that
+        # happens, the partially-imported module can be left behind in
+        # sys.modules, which would make subsequent imports of it silently
+        # reuse the broken module instead of retrying the import. Clean up
+        # any modules that got added during the failed import attempt.
+        # See https://github.com/getsentry/sentry-python/issues/7202.
+        modules_after_import = set(sys.modules.keys())
+        for module_name in modules_after_import - modules_before_import:
+            del sys.modules[module_name]
 
     return False
 

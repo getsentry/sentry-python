@@ -1,5 +1,8 @@
+import builtins
 import random
+import sys
 import time
+import types
 from unittest import mock
 
 import pytest
@@ -50,3 +53,38 @@ def test_leaks(maybe_monkeypatched_threading):
 @mock.patch("sentry_sdk.utils._is_contextvars_broken", return_value=True)
 def test_leaks_when_is_contextvars_broken_is_false(maybe_monkeypatched_threading):
     _run_contextvar_threaded_test()
+
+
+def test_is_contextvars_broken_survives_eventlet_attributeerror(monkeypatch):
+    """
+    Regression test for https://github.com/getsentry/sentry-python/issues/7202
+
+    Importing eventlet/greenlet can raise errors other than ImportError
+    depending on which combination of eventlet, greenlet, and other
+    monkeypatched modules (e.g. dnspython, httpcore) happen to be installed.
+    _is_contextvars_broken() should not crash in that case, and it should not
+    leave a broken partially-imported module behind in sys.modules.
+    """
+    from sentry_sdk import utils
+
+    monkeypatch.delitem(sys.modules, "greenlet", raising=False)
+    monkeypatch.delitem(sys.modules, "eventlet", raising=False)
+    monkeypatch.delitem(sys.modules, "eventlet.patcher", raising=False)
+
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "greenlet":
+            sys.modules["greenlet"] = types.ModuleType("greenlet")
+            raise AttributeError("module 'dns.rdtypes' has no attribute 'ANY'")
+        return real_import(name, *args, **kwargs)
+
+    with mock.patch("builtins.__import__", side_effect=fake_import):
+        with mock.patch(
+            "gevent.monkey.is_object_patched", return_value=False, create=True
+        ):
+            with mock.patch.dict(sys.modules, {"gevent": None}, clear=False):
+                result = utils._is_contextvars_broken()
+
+    assert result is False
+    assert "greenlet" not in sys.modules
