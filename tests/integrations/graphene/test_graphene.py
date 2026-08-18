@@ -441,9 +441,7 @@ def test_graphql_span_data_collection(
     assert graphql_span["parent_span_id"] == flask_segment["span_id"]
 
 
-def test_breadcrumbs_hold_query_information_on_error(
-    sentry_init, capture_items
-):
+def test_breadcrumbs_hold_query_information_on_error(sentry_init, capture_items):
     sentry_init(
         integrations=[
             GrapheneIntegration(),
