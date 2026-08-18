@@ -8208,3 +8208,220 @@ async def test_streaming_responses_api_ttft_async(
 
     assert isinstance(ttft, float)
     assert ttft > 0
+
+
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+def test_responses_api_none_output_does_not_crash(sentry_init, capture_events):
+    """
+    An OpenAI-compatible endpoint may return a response whose `output` is
+    `None` (for example a gateway that already sent `200 OK` and can only
+    report the upstream failure in the body). Instrumenting such a response
+    must not raise into the calling application.
+    """
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        stream_gen_ai_spans=False,
+    )
+    events = capture_events()
+
+    response_with_no_output = Response.construct(
+        id="chat-id",
+        model="response-model-id",
+        object="response",
+        output=None,
+        error={"code": "server_error", "message": "upstream failed"},
+    )
+
+    client = OpenAI(api_key="z")
+    client.responses._post = mock.Mock(return_value=response_with_no_output)
+
+    with start_transaction(name="openai tx"):
+        response = client.responses.create(model="some-model", input="hello")
+
+    # The caller gets the response back and can inspect the real error
+    assert response.output is None
+    assert response.error.message == "upstream failed"
+
+    # The span was still recorded and finished
+    (tx,) = events
+    (span,) = tx["spans"]
+    assert span["op"] == "gen_ai.responses"
+    assert span["data"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "response-model-id"
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+
+
+@pytest.mark.skipif(SKIP_RESPONSES_TESTS, reason="Responses API not available")
+@pytest.mark.asyncio
+async def test_responses_api_none_output_does_not_crash_async(
+    sentry_init, capture_events
+):
+    """Same as the sync test above, for the async client."""
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        stream_gen_ai_spans=False,
+    )
+    events = capture_events()
+
+    response_with_no_output = Response.construct(
+        id="chat-id",
+        model="response-model-id",
+        object="response",
+        output=None,
+        error={"code": "server_error", "message": "upstream failed"},
+    )
+
+    client = AsyncOpenAI(api_key="z")
+    client.responses._post = AsyncMock(return_value=response_with_no_output)
+
+    with start_transaction(name="openai tx"):
+        response = await client.responses.create(model="some-model", input="hello")
+
+    assert response.output is None
+
+    (tx,) = events
+    (span,) = tx["spans"]
+    assert span["op"] == "gen_ai.responses"
+
+
+def test_chat_completion_none_choices_does_not_crash(sentry_init, capture_events):
+    """
+    A Chat Completions response whose `choices` is `None` must not raise into
+    the calling application.
+    """
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        stream_gen_ai_spans=False,
+    )
+    events = capture_events()
+
+    completion_with_no_choices = ChatCompletion.construct(
+        id="chat-id",
+        model="response-model-id",
+        object="chat.completion",
+        choices=None,
+        error={"code": "server_error", "message": "upstream failed"},
+    )
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(return_value=completion_with_no_choices)
+
+    with start_transaction(name="openai tx"):
+        response = client.chat.completions.create(
+            model="some-model", messages=[{"role": "user", "content": "hello"}]
+        )
+
+    assert response.choices is None
+    assert response.error["message"] == "upstream failed"
+
+    (tx,) = events
+    (span,) = tx["spans"]
+    assert span["op"] == "gen_ai.chat"
+    assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["data"]
+
+
+@pytest.mark.tests_internal_exceptions
+def test_instrumentation_output_error_does_not_propagate(
+    sentry_init, capture_events, nonstreaming_chat_completions_model_response
+):
+    """
+    An unexpected error raised while recording response data must be swallowed
+    rather than surfacing inside the user's `create()` call, and the span must
+    still be finished.
+    """
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        stream_gen_ai_spans=False,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
+        )
+    )
+
+    with mock.patch(
+        "sentry_sdk.integrations.openai._calculate_completions_token_usage",
+        side_effect=ValueError("boom"),
+    ):
+        with start_transaction(name="openai tx"):
+            response = client.chat.completions.create(
+                model="some-model", messages=[{"role": "user", "content": "hello"}]
+            )
+
+    # The caller still gets its response
+    assert response.choices[0].message.content == "the model response"
+
+    # The span was still finished, so it is part of the transaction
+    (tx,) = events
+    (span,) = tx["spans"]
+    assert span["op"] == "gen_ai.chat"
+
+
+@pytest.mark.tests_internal_exceptions
+def test_instrumentation_input_error_does_not_propagate(
+    sentry_init, capture_events, nonstreaming_chat_completions_model_response
+):
+    """
+    An unexpected error raised while recording request data must not surface
+    inside the user's `create()` call either.
+    """
+    sentry_init(
+        integrations=[OpenAIIntegration(include_prompts=True)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=True,
+        stream_gen_ai_spans=False,
+    )
+    events = capture_events()
+
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(
+        return_value=nonstreaming_chat_completions_model_response(
+            response_id="chat-id",
+            response_model="gpt-3.5-turbo",
+            message_content="the model response",
+            created=10000000,
+            usage=CompletionUsage(
+                prompt_tokens=20,
+                completion_tokens=10,
+                total_tokens=30,
+            ),
+        )
+    )
+
+    with mock.patch(
+        "sentry_sdk.integrations.openai.normalize_message_roles",
+        side_effect=ValueError("boom"),
+    ):
+        with start_transaction(name="openai tx"):
+            response = client.chat.completions.create(
+                model="some-model", messages=[{"role": "user", "content": "hello"}]
+            )
+
+    assert response.choices[0].message.content == "the model response"
+
+    (tx,) = events
+    (span,) = tx["spans"]
+    assert span["op"] == "gen_ai.chat"
