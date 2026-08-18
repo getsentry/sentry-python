@@ -301,7 +301,7 @@ def _calculate_responses_token_usage(
         if streaming_message_responses is not None:
             for message in streaming_message_responses:
                 output_tokens += count_tokens(message)
-        elif hasattr(response, "output"):
+        elif hasattr(response, "output") and response.output is not None:
             for output_item in response.output:
                 if hasattr(output_item, "content"):
                     for content_item in output_item.content:
@@ -326,6 +326,16 @@ def _calculate_responses_token_usage(
 
 
 def _set_responses_api_input_data(
+    span: "Union[Span, StreamedSpan]",
+    kwargs: "dict[str, Any]",
+    integration: "OpenAIIntegration",
+) -> None:
+    # Instrumentation must never raise into the calling application.
+    with capture_internal_exceptions():
+        _record_responses_api_input_data(span, kwargs, integration)
+
+
+def _record_responses_api_input_data(
     span: "Union[Span, StreamedSpan]",
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
@@ -477,6 +487,16 @@ def _set_completions_api_input_data(
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
 ) -> None:
+    # Instrumentation must never raise into the calling application.
+    with capture_internal_exceptions():
+        _record_completions_api_input_data(span, kwargs, integration)
+
+
+def _record_completions_api_input_data(
+    span: "Union[Span, StreamedSpan]",
+    kwargs: "dict[str, Any]",
+    integration: "OpenAIIntegration",
+) -> None:
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
     )
@@ -598,6 +618,16 @@ def _set_embeddings_input_data(
     kwargs: "dict[str, Any]",
     integration: "OpenAIIntegration",
 ) -> None:
+    # Instrumentation must never raise into the calling application.
+    with capture_internal_exceptions():
+        _record_embeddings_input_data(span, kwargs, integration)
+
+
+def _record_embeddings_input_data(
+    span: "Union[Span, StreamedSpan]",
+    kwargs: "dict[str, Any]",
+    integration: "OpenAIIntegration",
+) -> None:
 
     set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, "embeddings")
 
@@ -666,6 +696,22 @@ def _set_common_output_data(
     integration: "OpenAIIntegration",
     finish_span: bool = True,
 ) -> None:
+    # Instrumentation must never raise into the calling application, so any
+    # error while reading the response is swallowed here. The span is still
+    # finished afterwards so that a failure cannot leak an unfinished span.
+    with capture_internal_exceptions():
+        _record_common_output_data(span, response, input, integration)
+
+    if finish_span:
+        span.__exit__(None, None, None)
+
+
+def _record_common_output_data(
+    span: "Union[Span, StreamedSpan]",
+    response: "Any",
+    input: "Any",
+    integration: "OpenAIIntegration",
+) -> None:
     client = sentry_sdk.get_client()
     if hasattr(response, "model"):
         set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
@@ -701,11 +747,8 @@ def _set_common_output_data(
             count_tokens=integration.count_tokens,
         )
 
-        if finish_span:
-            span.__exit__(None, None, None)
-
     # Responses API
-    elif hasattr(response, "output"):
+    elif hasattr(response, "output") and response.output is not None:
         output_messages: "dict[str, list[Any]]" = {
             "response": [],
             "tool": [],
@@ -775,8 +818,6 @@ def _set_common_output_data(
             count_tokens=integration.count_tokens,
         )
 
-        if finish_span:
-            span.__exit__(None, None, None)
     # Embeddings API (fallback for responses with neither choices nor output)
     else:
         _calculate_completions_token_usage(
@@ -787,8 +828,6 @@ def _set_common_output_data(
             streaming_message_total_token_usage=None,
             count_tokens=integration.count_tokens,
         )
-        if finish_span:
-            span.__exit__(None, None, None)
 
 
 def _new_sync_chat_completion(f: "Any", *args: "Any", **kwargs: "Any") -> "Any":
