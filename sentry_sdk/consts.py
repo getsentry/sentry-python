@@ -74,9 +74,7 @@ if TYPE_CHECKING:
             "transport_num_pools": Optional[int],
             "transport_http2": Optional[bool],
             "transport_async": Optional[bool],
-            "enable_logs": Optional[bool],
             "before_send_log": Optional[Callable[[Log, Hint], Optional[Log]]],
-            "enable_metrics": Optional[bool],
             "before_send_metric": Optional[Callable[[Metric, Hint], Optional[Metric]]],
             "trace_lifecycle": Optional[Literal["static", "stream"]],
             "ignore_spans": Optional[IgnoreSpansConfig],
@@ -1344,10 +1342,8 @@ class ClientConstructor:
         custom_repr: "Optional[Callable[..., Optional[str]]]" = None,
         add_full_stack: bool = DEFAULT_ADD_FULL_STACK,
         max_stack_frames: "Optional[int]" = DEFAULT_MAX_STACK_FRAMES,
-        enable_logs: bool = False,
         before_send_log: "Optional[Callable[[Log, Hint], Optional[Log]]]" = None,
         trace_ignore_status_codes: "AbstractSet[int]" = frozenset(),
-        enable_metrics: bool = True,
         before_send_metric: "Optional[Callable[[Metric, Hint], Optional[Metric]]]" = None,
         before_send_span: "Optional[Callable[[SpanJSON, Hint], Optional[SpanJSON]]]" = None,
         org_id: "Optional[str]" = None,
@@ -1722,10 +1718,6 @@ class ClientConstructor:
         :param auto_session_tracking:
 
         :param spotlight:
-
-
-        :param enable_logs: Set `enable_logs` to True to enable the SDK to emit
-            Sentry logs. Defaults to False.
 
         :param before_send_log: An optional function to modify or filter out logs
             before they're sent to Sentry. Any modifications to the log in this

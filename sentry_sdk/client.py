@@ -628,22 +628,10 @@ class _Client(BaseClient):
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
-            if self.options.get("enable_logs", False) or self.options[
-                "_experiments"
-            ].get("enable_logs", False):
-                logger.warning(
-                    "The enable_logs option has no effect and will be removed in the next major."
-                )
-
             self.log_batcher = LogBatcher(
                 capture_func=_capture_envelope,
                 record_lost_func=_record_lost_event,
             )
-
-            if self.options.get("enable_metrics", True) is False:
-                logger.warning(
-                    "The enable_metrics option has no effect and will be removed in the next major."
-                )
 
             self.metrics_batcher = MetricsBatcher(
                 capture_func=_capture_envelope,
