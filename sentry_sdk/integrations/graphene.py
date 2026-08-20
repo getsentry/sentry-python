@@ -178,4 +178,4 @@ def graphql_span(
     try:
         yield
     finally:
-        _graphql_span.end()  # type: ignore
+        _graphql_span.end()
