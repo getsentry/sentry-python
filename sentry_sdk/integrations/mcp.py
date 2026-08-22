@@ -21,6 +21,8 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    event_from_exception,
     has_data_collection_enabled,
     nullcontext,
     package_version,
@@ -98,6 +100,15 @@ class MCPIntegration(Integration):
 
         if FastMCP is not None:
             _patch_fastmcp()
+
+
+def _capture_exception(exc: "Any") -> None:
+    event, hint = event_from_exception(
+        exc,
+        client_options=sentry_sdk.get_client().options,
+        mechanism={"type": "mcp", "handled": False},
+    )
+    sentry_sdk.capture_event(event, hint=hint)
 
 
 @contextmanager
@@ -394,7 +405,8 @@ async def _tool_handler_wrapper(
                     result = await result
 
             except Exception as e:
-                sentry_sdk.capture_exception(e)
+                with capture_internal_exceptions():
+                    _capture_exception(e)
                 raise
 
             if result is None:
@@ -490,7 +502,8 @@ async def _instrument_v2_tool_call(
                 result = await call_next(ctx)
 
             except Exception as e:
-                sentry_sdk.capture_exception(e)
+                with capture_internal_exceptions():
+                    _capture_exception(e)
                 raise
 
             if not isinstance(result, dict):
@@ -615,7 +628,8 @@ async def _prompt_handler_wrapper(
                     result = await result
 
             except Exception as e:
-                sentry_sdk.capture_exception(e)
+                with capture_internal_exceptions():
+                    _capture_exception(e)
                 raise
 
             if result is None:
@@ -764,7 +778,8 @@ async def _instrument_v2_prompt_get(
             try:
                 result = await call_next(ctx)
             except Exception as e:
-                sentry_sdk.capture_exception(e)
+                with capture_internal_exceptions():
+                    _capture_exception(e)
                 raise
 
             if not isinstance(result, dict):
@@ -919,7 +934,8 @@ async def _resource_handler_wrapper(
                     result = await result
 
             except Exception as e:
-                sentry_sdk.capture_exception(e)
+                with capture_internal_exceptions():
+                    _capture_exception(e)
                 raise
 
     return result
@@ -984,7 +1000,8 @@ async def _instrument_v2_resource_read(
                 result = await call_next(ctx)
 
             except Exception as e:
-                sentry_sdk.capture_exception(e)
+                with capture_internal_exceptions():
+                    _capture_exception(e)
                 raise
 
     return result
