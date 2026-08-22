@@ -3621,6 +3621,8 @@ def test_langchain_error(
 
         error = events[0]
     assert error["level"] == "error"
+    assert error["exception"]["values"][0]["mechanism"]["type"] == "langchain"
+    assert not error["exception"]["values"][0]["mechanism"]["handled"]
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
