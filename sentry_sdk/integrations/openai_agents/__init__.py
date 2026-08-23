@@ -143,6 +143,18 @@ class OpenAIAgentsIntegration(Integration):
 
                 agents.run_internal.run_loop.get_model = new_wrapped_get_model
 
+                if hasattr(run_loop, "get_all_tools"):
+                    original_get_all_tools = run_loop.get_all_tools
+                    @wraps(original_get_all_tools)
+                    async def new_wrapped_get_all_tools(
+                        agent: "agents.Agent", context_wrapper: "agents.RunContextWrapper"
+                    ) -> "list[agents.Tool]":
+                        return await _get_all_tools(
+                            original_get_all_tools, agent, context_wrapper
+                        )
+                    agents.run_internal.run_loop.get_all_tools = new_wrapped_get_all_tools
+
+
             if turn_resolution is not None:
                 original_execute_handoffs = turn_resolution.execute_handoffs
 
