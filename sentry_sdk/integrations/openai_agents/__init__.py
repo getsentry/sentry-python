@@ -143,7 +143,7 @@ class OpenAIAgentsIntegration(Integration):
 
                 agents.run_internal.run_loop.get_model = new_wrapped_get_model
 
-                if hasattr(run_loop, "get_all_tools"):
+                if not use_run_hooks and hasattr(run_loop, "get_all_tools"):
                     original_get_all_tools = run_loop.get_all_tools
                     @wraps(original_get_all_tools)
                     async def new_wrapped_get_all_tools(
