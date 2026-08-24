@@ -1921,20 +1921,22 @@ def test_text_generation_streaming_data_collection(
             False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
             ],
-            [],
+            [
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+            ],
             id="gen-ai-inputs-enabled-outputs-disabled",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
             False,
             False,
-            [],
+            [
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+            ],
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
             ],
             id="gen-ai-outputs-enabled-inputs-disabled",
@@ -2090,11 +2092,11 @@ def test_chat_completion_data_collection_tools(
             False,
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
             ],
             [
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
             ],
             id="gen-ai-inputs-enabled-outputs-disabled",
         ),
@@ -2104,10 +2106,10 @@ def test_chat_completion_data_collection_tools(
             False,
             [
                 SPANDATA.GEN_AI_RESPONSE_TEXT,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
             ],
             [
                 SPANDATA.GEN_AI_REQUEST_MESSAGES,
-                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
             ],
             id="gen-ai-outputs-enabled-inputs-disabled",
