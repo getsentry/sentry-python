@@ -47,6 +47,7 @@ except ImportError:
     AWSHTTPConnection = None  # type: ignore[misc,assignment]
     AWSHTTPSConnection = None  # type: ignore[misc,assignment]
 
+
 class StdlibIntegration(Integration):
     identifier = "stdlib"
 
@@ -78,10 +79,14 @@ def _complete_span(span: "Union[Span, StreamedSpan]") -> None:
         with capture_internal_exceptions():
             add_http_request_source(span)
 
-def _get_wrapped_putheader(original_putheader: "Callable[..., Any]") -> "Callable[..., Any]":
+
+def _get_wrapped_putheader(
+    original_putheader: "Callable[..., Any]",
+) -> "Callable[..., Any]":
     """
     Responsible for adding to `_sentrysdk_signed_headers` to keep track of signed headers.
     """
+
     def putheader(self: "HTTPConnection", header: "Any", *values: "Any") -> "Any":
         rv = original_putheader(self, header, *values)
 
@@ -110,11 +115,15 @@ def _get_wrapped_putheader(original_putheader: "Callable[..., Any]") -> "Callabl
 
     return putheader
 
-def _get_wrapped_endheaders(original_endheaders: "Callable[..., Any]") -> "Callable[..., Any]":
+
+def _get_wrapped_endheaders(
+    original_endheaders: "Callable[..., Any]",
+) -> "Callable[..., Any]":
     """
     Responsible for injecting trace propagation headers, ensuring that the request is not invalidated
     by honoring signed headers.
     """
+
     def endheaders(self: "HTTPConnection", *args: "Any", **kwargs: "Any") -> "Any":
         real_url = getattr(self, "_sentrysdk_trace_url", None)
         span = getattr(self, "_sentrysdk_span", None)
@@ -156,10 +165,13 @@ def _get_wrapped_endheaders(original_endheaders: "Callable[..., Any]") -> "Calla
     return endheaders
 
 
-def _get_wrapped_putrequest(original_putrequest: "Callable[..., Any]") -> "Callable[..., Any]":
+def _get_wrapped_putrequest(
+    original_putrequest: "Callable[..., Any]",
+) -> "Callable[..., Any]":
     """
     Responsible for initializing `_sentrysdk_signed_headers` on the instance.
     """
+
     def putrequest(
         self: "HTTPConnection", method: str, url: str, *args: "Any", **kwargs: "Any"
     ) -> "Any":
@@ -191,14 +203,26 @@ def _patch_aws_connection() -> None:
     Do not edit signed headers when adding trace propagation headers in the `endheaders()` patch.
     """
     if AWSHTTPConnection is not None:
-        AWSHTTPConnection.putheader = _get_wrapped_putheader(AWSHTTPConnection.putheader)  # type: ignore[method-assign]
-        AWSHTTPConnection.endheaders = _get_wrapped_endheaders(AWSHTTPConnection.endheaders)  # type: ignore[method-assign]
-        AWSHTTPConnection.putrequest = _get_wrapped_putrequest(AWSHTTPConnection.putrequest)  # type: ignore[method-assign]
+        AWSHTTPConnection.putheader = _get_wrapped_putheader(
+            AWSHTTPConnection.putheader
+        )  # type: ignore[method-assign]
+        AWSHTTPConnection.endheaders = _get_wrapped_endheaders(
+            AWSHTTPConnection.endheaders
+        )  # type: ignore[method-assign]
+        AWSHTTPConnection.putrequest = _get_wrapped_putrequest(
+            AWSHTTPConnection.putrequest
+        )  # type: ignore[method-assign]
 
     if AWSHTTPSConnection is not None:
-        AWSHTTPSConnection.putheader = _get_wrapped_putheader(AWSHTTPSConnection.putheader)  # type: ignore[method-assign]
-        AWSHTTPSConnection.endheaders = _get_wrapped_endheaders(AWSHTTPSConnection.endheaders)  # type: ignore[method-assign]
-        AWSHTTPSConnection.putrequest = _get_wrapped_putrequest(AWSHTTPSConnection.putrequest)  # type: ignore[method-assign]
+        AWSHTTPSConnection.putheader = _get_wrapped_putheader(
+            AWSHTTPSConnection.putheader
+        )  # type: ignore[method-assign]
+        AWSHTTPSConnection.endheaders = _get_wrapped_endheaders(
+            AWSHTTPSConnection.endheaders
+        )  # type: ignore[method-assign]
+        AWSHTTPSConnection.putrequest = _get_wrapped_putrequest(
+            AWSHTTPSConnection.putrequest
+        )  # type: ignore[method-assign]
 
 
 def _install_httplib() -> None:
@@ -321,7 +345,9 @@ def _install_httplib() -> None:
 
         # If _sentrysdk_request_headers is present, trace propagation headers should
         # be injected in an `endheaders()` patch.
-        if should_propagate_trace(client, real_url) and not hasattr(self, "_sentrysdk_request_headers"):
+        if should_propagate_trace(client, real_url) and not hasattr(
+            self, "_sentrysdk_request_headers"
+        ):
             for (
                 key,
                 value,
