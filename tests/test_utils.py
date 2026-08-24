@@ -18,7 +18,6 @@ from sentry_sdk.utils import (
     env_to_bool,
     exc_info_from_error,
     format_timestamp,
-    _get_aws_sigv4_signed_headers,
     get_current_thread_meta,
     get_default_release,
     get_error_message,
