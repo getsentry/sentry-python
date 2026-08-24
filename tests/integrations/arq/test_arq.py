@@ -10,7 +10,7 @@ from arq.utils import timestamp_ms
 from fakeredis.aioredis import FakeRedis
 
 import sentry_sdk
-from sentry_sdk import get_client, start_transaction
+from sentry_sdk import get_client
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.arq import ArqIntegration
 from tests.integrations.utils import DATA_COLLECTION_QUEUES_CASES
