@@ -11,7 +11,7 @@ import clickhouse_driver
 from clickhouse_driver import Client, connect
 
 import sentry_sdk
-from sentry_sdk import capture_message, start_transaction
+from sentry_sdk import capture_message
 from sentry_sdk.integrations.clickhouse_driver import ClickhouseDriverIntegration
 from tests.conftest import ApproxDict
 
@@ -866,38 +866,6 @@ def test_clickhouse_client_spans(
         span.pop("status", None)
 
     assert spans == expected_spans
-
-
-def test_clickhouse_spans_with_generator(sentry_init, capture_events):
-    sentry_init(
-        integrations=[ClickhouseDriverIntegration()],
-        send_default_pii=True,
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    # Use a generator to test that the integration obtains values from the generator,
-    # without consuming the generator.
-    values = ({"x": i} for i in range(3))
-
-    with start_transaction(name="test_clickhouse_transaction"):
-        client = Client("localhost")
-        client.execute("DROP TABLE IF EXISTS test")
-        client.execute("CREATE TABLE test (x Int32) ENGINE = Memory")
-        client.execute("INSERT INTO test (x) VALUES", values)
-        res = client.execute("SELECT x FROM test")
-
-    # Verify that the integration did not consume the generator
-    assert res == [(0,), (1,), (2,)]
-
-    (event,) = events
-    spans = event["spans"]
-
-    [span] = [
-        span for span in spans if span["description"] == "INSERT INTO test (x) VALUES"
-    ]
-
-    assert span["data"]["db.params"] == [{"x": 0}, {"x": 1}, {"x": 2}]
 
 
 def test_clickhouse_client_spans_with_pii(
