@@ -405,8 +405,9 @@ async def test_error_in_errorhandler(sentry_init, capture_events):
 
     client = app.test_client()
 
-    if QUART_VERSION >= (0, 21, 0):
-        # Exception propagation behavior changed in 0.21.0
+    if QUART_VERSION >= (0, 21, 0) and QUART_VERSION < (0, 22, 0):
+        # Exception propagation behavior changed in 0.21.0, and was reverted
+        # back in 0.22.0
         await client.get("/")
 
         (event,) = events
