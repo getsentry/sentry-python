@@ -20,9 +20,9 @@ from sentry_sdk.tracing_utils import (
 )
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
+    _get_aws_sigv4_signed_headers,
     capture_internal_exceptions,
     ensure_integration_enabled,
-    _get_aws_sigv4_signed_headers,
     is_sentry_url,
     logger,
     parse_url,
@@ -30,7 +30,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, List, Optional, Set, Union
+    from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
     from sentry_sdk._types import Event, Hint
 
@@ -40,6 +40,8 @@ _RUNTIME_CONTEXT: "dict[str, object]" = {
     "version": "%s.%s.%s" % (sys.version_info[:3]),
     "build": sys.version,
 }
+
+_SENTRY_HEADER_NAMES = frozenset((BAGGAGE_HEADER_NAME, "sentry-trace"))
 
 try:
     from botocore.awsrequest import AWSHTTPConnection, AWSHTTPSConnection
@@ -84,14 +86,16 @@ def _get_wrapped_putheader(
     original_putheader: "Callable[..., Any]",
 ) -> "Callable[..., Any]":
     """
-    Responsible for adding to `_sentrysdk_signed_headers` to keep track of signed headers.
+    Responsible for tracking request and signed headers.
     """
 
     def putheader(self: "HTTPConnection", header: "Any", *values: "Any") -> "Any":
         rv = original_putheader(self, header, *values)
 
-        request_header_names = getattr(self, "_sentrysdk_request_headers", None)
-        if request_header_names is None:
+        request_headers: "Optional[Dict[str, Tuple[bool, bool]]]" = getattr(
+            self, "_sentrysdk_request_headers", None
+        )
+        if request_headers is None:
             return rv
 
         if isinstance(header, bytes):
@@ -101,15 +105,21 @@ def _get_wrapped_putheader(
         else:
             return rv
 
-        request_header_names.add(normalized_header)
+        if normalized_header in _SENTRY_HEADER_NAMES:
+            _, is_signed = request_headers.get(normalized_header, (False, False))
+            request_headers[normalized_header] = (True, is_signed)
+
         if normalized_header == "authorization" and values:
-            signed_headers = getattr(self, "_sentrysdk_signed_headers", None)
-            if signed_headers is not None:
-                with capture_internal_exceptions():
-                    authorization = values[0]
-                    if isinstance(authorization, bytes):
-                        authorization = authorization.decode("ascii", "ignore")
-                    signed_headers.update(_get_aws_sigv4_signed_headers(authorization))
+            with capture_internal_exceptions():
+                authorization = values[0]
+                if isinstance(authorization, bytes):
+                    authorization = authorization.decode("ascii", "ignore")
+                for signed_header in _get_aws_sigv4_signed_headers(authorization):
+                    if signed_header in _SENTRY_HEADER_NAMES:
+                        is_present, _ = request_headers.get(
+                            signed_header, (False, False)
+                        )
+                        request_headers[signed_header] = (is_present, True)
 
         return rv
 
@@ -131,36 +141,43 @@ def _get_wrapped_endheaders(
         try:
             if real_url is not None:
                 with capture_internal_exceptions():
-                    existing_headers: "Set[str]" = getattr(
-                        self, "_sentrysdk_request_headers", set()
+                    request_headers: "Optional[Dict[str, Tuple[bool, bool]]]" = getattr(
+                        self, "_sentrysdk_request_headers", {}
                     )
-                    signed_headers: "Set[str]" = getattr(
-                        self, "_sentrysdk_signed_headers", set()
-                    )
-                    signed_headers.update(
-                        _get_aws_sigv4_signed_headers(authorization=None, url=real_url)
-                    )
-
-                    for (
-                        header_name,
-                        header_value,
-                    ) in sentry_sdk.get_current_scope().iter_trace_propagation_headers(
-                        span=span
-                    ):
-                        normalized_header = header_name.lower()
-                        # preserve signed headers and avoid duplicate `sentry-trace`.
-                        if normalized_header in existing_headers and (
-                            normalized_header != BAGGAGE_HEADER_NAME
-                            or normalized_header in signed_headers
+                    if request_headers is not None:
+                        for signed_header in _get_aws_sigv4_signed_headers(
+                            authorization=None, url=real_url
                         ):
-                            continue
+                            if signed_header in _SENTRY_HEADER_NAMES:
+                                is_present, _ = request_headers.get(
+                                    signed_header, (False, False)
+                                )
+                                request_headers[signed_header] = (is_present, True)
 
-                        logger.debug(
-                            "[Tracing] Adding `{key}` header {value} to outgoing request to {real_url}.".format(
-                                key=header_name, value=header_value, real_url=real_url
+                        for (
+                            header_name,
+                            header_value,
+                        ) in sentry_sdk.get_current_scope().iter_trace_propagation_headers(
+                            span=span
+                        ):
+                            normalized_header = header_name.lower()
+                            # preserve signed headers and avoid duplicate `sentry-trace`.
+                            is_present, is_signed = request_headers.get(
+                                normalized_header, (False, False)
                             )
-                        )
-                        self.putheader(header_name, header_value)
+                            if is_present and (
+                                normalized_header != BAGGAGE_HEADER_NAME or is_signed
+                            ):
+                                continue
+
+                            logger.debug(
+                                "[Tracing] Adding `{key}` header {value} to outgoing request to {real_url}.".format(
+                                    key=header_name,
+                                    value=header_value,
+                                    real_url=real_url,
+                                )
+                            )
+                            self.putheader(header_name, header_value)
             return original_endheaders(self, *args, **kwargs)
         finally:
             self._sentrysdk_trace_url = None  # type: ignore[attr-defined]
@@ -172,22 +189,20 @@ def _get_wrapped_putrequest(
     original_putrequest: "Callable[..., Any]",
 ) -> "Callable[..., Any]":
     """
-    Responsible for initializing `_sentrysdk_signed_headers` on the instance.
+    Responsible for initializing request and signed header tracking on the instance.
     """
 
     def putrequest(
         self: "HTTPConnection", method: str, url: str, *args: "Any", **kwargs: "Any"
     ) -> "Any":
-        # track existing headers separately from signed so thatexisting unsigned
-        # baggage header can be extended while signed baggage stays unchanged.
-        self._sentrysdk_request_headers = set()  # type: ignore[attr-defined]
-        self._sentrysdk_signed_headers = set()  # type: ignore[attr-defined]
+        # track which propagation headers are present and signed e.g. {"sentry-trace": (is_present, is_signed)}
+        request_headers: "Optional[Dict[str, Tuple[bool, bool]]]" = {}
+        self._sentrysdk_request_headers = request_headers  # type: ignore[attr-defined]
 
         try:
             rv = original_putrequest(self, method, url, *args, **kwargs)
         except BaseException:
             self._sentrysdk_request_headers = None  # type: ignore[attr-defined]
-            self._sentrysdk_signed_headers = None  # type: ignore[attr-defined]
             raise
 
         return rv
@@ -200,8 +215,9 @@ def _patch_aws_connection() -> None:
     Patch AWS connection classes. These classes provide functions to sign HTTP headers, and subsequently
     injecting trace propagation headers would invalidate the request.
 
-    Detect which signed headers by patching `putheader()`. Record headers on the `_sentrysdk_signed_headers`
-    set on the connection instance. The set is initialized in the `putrequest()` patch.
+    Detect whether propagation headers are present and signed by patching
+    `putheader()`. Store that state in `_sentrysdk_request_headers`, initialized
+    by the `putrequest()` patch.
 
     Do not edit signed headers when adding trace propagation headers in the `endheaders()` patch.
     """

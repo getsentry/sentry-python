@@ -665,6 +665,7 @@ def test_default_release_empty_string():
 
     assert release is None
 
+
 def test_get_default_release_sentry_release_env(monkeypatch):
     monkeypatch.setenv("SENTRY_RELEASE", "sentry-env-release")
     assert get_default_release() == "sentry-env-release"
