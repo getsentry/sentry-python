@@ -1035,7 +1035,7 @@ async def test_span_streaming_quart_auth_user_id(
     spans = [item.payload for item in items]
     assert len(spans) == 2
 
-    segment = spans[1]
+    segment = next(s for s in spans if s["name"] == "hi")
     if send_default_pii and user_id is not None:
         assert segment["attributes"]["user.id"] == user_id
     else:
