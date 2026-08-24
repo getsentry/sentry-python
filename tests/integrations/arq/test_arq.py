@@ -205,7 +205,7 @@ async def test_job_result(init_arq_settings, request, ):
 
     increase.__qualname__ = increase.__name__
 
-    pool, worker = init_fixture_method(span_streaming, [increase])
+    pool, worker = init_fixture_method([increase])
 
     job = await pool.enqueue_job("increase", 3)
 
@@ -237,7 +237,7 @@ async def test_job_retry(
 
     retry_job.__qualname__ = retry_job.__name__
 
-    pool, worker = init_fixture_method(span_streaming, [retry_job])
+    pool, worker = init_fixture_method([retry_job])
 
     job = await pool.enqueue_job("retry_job")
     items = capture_items("span")
@@ -376,7 +376,6 @@ async def test_job_args_kwargs_data_collection(
     division.__qualname__ = division.__name__
 
     pool, worker = init_arq(
-        span_streaming,
         cls_functions=[division],
         init_kwargs=init_kwargs,
     )
@@ -418,7 +417,7 @@ async def test_enqueue_job(
 
     init_fixture_method = request.getfixturevalue(init_arq_settings)
 
-    pool, _ = init_fixture_method(span_streaming, **{source: [dummy_job]})
+    pool, _ = init_fixture_method(**{source: [dummy_job]})
     items = capture_items("span")
 
     with sentry_sdk.traces.start_span(name="custom parent") as span:
@@ -448,7 +447,7 @@ async def test_execute_job_without_integration(
 
     dummy_job.__qualname__ = dummy_job.__name__
 
-    pool, worker = init_fixture_method(span_streaming, [dummy_job])
+    pool, worker = init_fixture_method([dummy_job])
     # remove the integration to trigger the edge case
     get_client().integrations.pop("arq")
 
@@ -476,7 +475,7 @@ async def test_span_origin_producer(
 
     init_fixture_method = request.getfixturevalue(init_arq_settings)
 
-    pool, _ = init_fixture_method(span_streaming, **{source: [dummy_job]})
+    pool, _ = init_fixture_method(**{source: [dummy_job]})
     items = capture_items("span")
 
     with sentry_sdk.traces.start_span(name="custom parent"):
@@ -505,7 +504,7 @@ async def test_span_origin_consumer(
 
     job.__qualname__ = job.__name__
 
-    pool, worker = init_fixture_method(span_streaming, [job])
+    pool, worker = init_fixture_method([job])
     job = await pool.enqueue_job("job")
 
     items = capture_items("span")
