@@ -743,7 +743,11 @@ def _set_common_output_data(
                         span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
                     )
 
-        elif should_send_default_pii() and integration.include_prompts:
+        elif (
+            should_send_default_pii()
+            and integration.include_prompts
+            and isinstance(response.output, Sequence)
+        ):
             for output in response.output:
                 if output.type == "function_call":
                     output_messages["tool"].append(output.dict())
