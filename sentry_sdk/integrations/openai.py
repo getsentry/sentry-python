@@ -301,7 +301,7 @@ def _calculate_responses_token_usage(
         if streaming_message_responses is not None:
             for message in streaming_message_responses:
                 output_tokens += count_tokens(message)
-        elif hasattr(response, "output"):
+        elif hasattr(response, "output") and isinstance(response.output, Sequence):
             for output_item in response.output:
                 if hasattr(output_item, "content"):
                     for content_item in output_item.content:
