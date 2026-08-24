@@ -347,6 +347,8 @@ TEST_SUITE_CONFIG = {
         "package": "openai-agents",
         "deps": {
             "*": ["pytest-asyncio", "httpx"],
+            # https://github.com/openai/openai-python/commit/f16fbbd2bd25dc1ff150b5f78dbd15ff6bab6d91 makes `cache_write_tokens` required.
+            "<=0.18.0": ["openai<2.45"],
         },
         "python": ">=3.10",
     },
