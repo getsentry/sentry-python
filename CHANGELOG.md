@@ -2,47 +2,38 @@
 
 ## 2.68.1
 
-### New Features ✨
+### `enable_logs`
 
-- (django) Add `failed_request_status_codes` by @mgaligniana in [#7140](https://github.com/getsentry/sentry-python/pull/7140)
-- (langgraph) Gate prompt/response collection on data_collection option by @ericapisani in [#7175](https://github.com/getsentry/sentry-python/pull/7175)
-- (litellm) Gate prompt/response collection on data_collection option by @ericapisani in [#7180](https://github.com/getsentry/sentry-python/pull/7180)
-- (tornado) Gate request body collection on data_collection option by @ericapisani in [#7215](https://github.com/getsentry/sentry-python/pull/7215)
-- (wsgi) Gate request body collection on data_collection option by @ericapisani in [#7212](https://github.com/getsentry/sentry-python/pull/7212)
+- (logs) Don't stop sending auto-collected logs when `enable_logs=True` by @sentrivana in [#7237](https://github.com/getsentry/sentry-python/pull/7237)
+
+  If you have `enable_logs` set to `True`, our logging integrations for the standard library logging module as well as Loguru will auto-collect logs and send them to Sentry as Sentry logs by default, preserving old behavior. Turning automatic collection off for a specific integration can still be achieved using the `capture_sentry_logs` integration option.
+
+    ```python
+    import sentry_sdk
+    from sentry_sdk.integrations.logging import LoggingIntegration
+    from sentry_sdk.integrations.loguru import LoguruIntegration
+
+    sentry_sdk.init(
+        enable_logs=True,
+        integrations=[
+            LoggingIntegration(capture_sentry_logs=True),
+            LoguruIntegration(capture_sentry_logs=False),
+        ],
+    )
+    ```
+
+  Please note that the `enable_logs` option is deprecated and will be removed in the next major release. The `sentry_sdk.logger.X` API now works regardless of it, and auto-collection can be opted into via the `capture_sentry_logs` integration-level options, which are `False` by default, unless you have `enable_logs=True`. We've added this compatibility layer to make the transition to a `enable_logs`-free world easier.
 
 ### Bug Fixes 🐛
 
+- (django) Add `failed_request_status_codes` by @mgaligniana in [#7140](https://github.com/getsentry/sentry-python/pull/7140)
 - (anthropic) Gate `gen_ai.response.tool_calls` on outputs, not inputs by @ericapisani in [#7207](https://github.com/getsentry/sentry-python/pull/7207)
 - (google_genai) Gate streaming `gen_ai.response.tool_calls` on outputs, not inputs by @ericapisani in [#7210](https://github.com/getsentry/sentry-python/pull/7210)
 - (langchain) Use `gen_ai.tool.definitions` attribute when data collection is enabled by @ericapisani in [#7204](https://github.com/getsentry/sentry-python/pull/7204)
 - (langgraph,huggingface_hub) Gate `gen_ai.response.tool_calls` on outputs, not inputs by @ericapisani in [#7208](https://github.com/getsentry/sentry-python/pull/7208)
-- (logs) Don't stop sending auto-collected logs when `enable_logs=True` by @sentrivana in [#7237](https://github.com/getsentry/sentry-python/pull/7237)
 - (openai) Gate `gen_ai.response.tool_calls` on outputs, not inputs by @ericapisani in [#7205](https://github.com/getsentry/sentry-python/pull/7205)
 - (openai_agents) Gate `gen_ai.response.tool_calls` on outputs, not inputs by @ericapisani in [#7209](https://github.com/getsentry/sentry-python/pull/7209)
 
-### Internal Changes 🔧
-
-#### Deps
-
-- Lock file maintenance by @renovate in [#7141](https://github.com/getsentry/sentry-python/pull/7141)
-- Update github workflows by @renovate in [#6733](https://github.com/getsentry/sentry-python/pull/6733)
-
-#### Django
-
-- Add tests for data_collection gating of request body by @ericapisani in [#7213](https://github.com/getsentry/sentry-python/pull/7213)
-- Drop span_streaming parametrize where the arm is inert by @ericapisani in [#7157](https://github.com/getsentry/sentry-python/pull/7157)
-
-#### Quart
-
-- Adapt to change in behavior by @sentrivana in [#7232](https://github.com/getsentry/sentry-python/pull/7232)
-- Fix flake caused by flushing the span batcher on segment end by @alexander-alderman-webb in [#7185](https://github.com/getsentry/sentry-python/pull/7185)
-
-#### Other
-
-- (bottle) Add tests for data_collection gating of request body by @ericapisani in [#7217](https://github.com/getsentry/sentry-python/pull/7217)
-- (pydantic_ai) Split prompt gating into separate inputs/outputs controls by @ericapisani in [#7181](https://github.com/getsentry/sentry-python/pull/7181)
-- (pyramid) Add tests for data_collection gating of request body by @ericapisani in [#7218](https://github.com/getsentry/sentry-python/pull/7218)
-- (sanic) Add tests for data_collection gating of request body by @ericapisani in [#7216](https://github.com/getsentry/sentry-python/pull/7216)
 
 ## 2.68.0
 
