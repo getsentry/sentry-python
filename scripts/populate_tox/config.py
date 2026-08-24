@@ -21,7 +21,7 @@ TEST_SUITE_CONFIG = {
     "anthropic": {
         "package": "anthropic",
         "deps": {
-            "*": ["pytest-asyncio"],
+            "*": ["pytest-asyncio", "httpx"],
             "<0.50": ["httpx<0.28.0"],
             # tokenizers dropped Python 3.8 support, but didn't update package metadata.
             # https://github.com/huggingface/tokenizers/commit/f4c9fd7f402fc794df8f1b547a95ee5305f9fe62
@@ -240,7 +240,7 @@ TEST_SUITE_CONFIG = {
         "package": "langchain",
         "integration_name": "langchain",
         "deps": {
-            "*": ["pytest-asyncio", "openai", "tiktoken", "langchain-openai"],
+            "*": ["pytest-asyncio", "openai", "tiktoken", "langchain-openai", "httpx"],
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
             ">=1.0": ["langchain-classic"],
@@ -254,7 +254,7 @@ TEST_SUITE_CONFIG = {
         "package": "langchain",
         "integration_name": "langchain",
         "deps": {
-            "*": ["pytest-asyncio", "openai", "langchain-openai"],
+            "*": ["pytest-asyncio", "openai", "langchain-openai", "httpx"],
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
             ">=1.0": ["langchain-classic"],
@@ -274,7 +274,7 @@ TEST_SUITE_CONFIG = {
     "litellm": {
         "package": "litellm",
         "deps": {
-            "*": ["anthropic", "google-genai", "pytest-asyncio"],
+            "*": ["anthropic", "google-genai", "pytest-asyncio", "httpx"],
         },
         "include": "<=1.96",  # https://github.com/BerriAI/litellm/issues/36384
     },
@@ -314,7 +314,7 @@ TEST_SUITE_CONFIG = {
         "package": "openai",
         "integration_name": "openai",
         "deps": {
-            "*": ["pytest-asyncio", "tiktoken"],
+            "*": ["pytest-asyncio", "tiktoken", "httpx"],
             "<1.55": ["httpx<0.28"],
         },
         "python": {
@@ -326,7 +326,7 @@ TEST_SUITE_CONFIG = {
         "package": "openai",
         "integration_name": "openai",
         "deps": {
-            "*": ["pytest-asyncio"],
+            "*": ["pytest-asyncio", "httpx"],
             "<1.55": ["httpx<0.28"],
         },
         "python": {
@@ -337,7 +337,7 @@ TEST_SUITE_CONFIG = {
     "openai_agents": {
         "package": "openai-agents",
         "deps": {
-            "*": ["pytest-asyncio"],
+            "*": ["pytest-asyncio", "httpx"],
             "<0.18.1": ["openai<2.45.0"],
         },
         "python": ">=3.10",
