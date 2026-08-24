@@ -115,7 +115,7 @@ jobs:
           uv run coverage combine .coverage-sentry-*
           uv run coverage xml
       - name: Report coverage and test results
-        uses: getsentry/codecov-action@66554aa51d8656c657e233a9e98bcb18e95f2c9a # main
+        uses: getsentry/codecov-action@d90e69cdf071dfbb0430159125321dc09c424d4c # main
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           files: coverage.xml
