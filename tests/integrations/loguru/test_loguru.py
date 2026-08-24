@@ -259,6 +259,7 @@ def test_disable_sentry_logs_by_default(
 def test_enable_sentry_logs_if_enable_logs_is_true(
     sentry_init, capture_items, uninstall_integration, request
 ):
+    # This should be removed in the next major.
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
@@ -281,6 +282,7 @@ def test_enable_sentry_logs_if_enable_logs_is_true(
 def test_disable_sentry_logs_if_enable_logs_is_true_but_integration_option_is_false(
     sentry_init, capture_items, uninstall_integration, request
 ):
+    # This should be removed in the next major.
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
