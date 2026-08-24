@@ -1,7 +1,7 @@
 import json
 import sys
 import time
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from functools import wraps
 from typing import TYPE_CHECKING, cast
 
@@ -711,7 +711,9 @@ def _set_common_output_data(
             "tool": [],
         }
 
-        if has_data_collection_enabled(client.options):
+        if has_data_collection_enabled(client.options) and isinstance(
+            response.output, Sequence
+        ):
             record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
 
             if record_outputs:
