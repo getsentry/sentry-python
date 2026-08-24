@@ -256,6 +256,52 @@ def test_disable_sentry_logs_by_default(
     assert len(logs) == 0
 
 
+def test_enable_sentry_logs_if_enable_logs_is_true(
+    sentry_init, capture_items, uninstall_integration, request
+):
+    uninstall_integration("loguru")
+    request.addfinalizer(logger.remove)
+
+    sentry_init(enable_logs=True)
+    items = capture_items("log")
+
+    logger.trace("this is a log")
+    logger.debug("this is a log")
+    logger.info("this is a log")
+    logger.success("this is a log")
+    logger.warning("this is a log")
+    logger.error("this is a log")
+    logger.critical("this is a log")
+
+    sentry_sdk.get_client().flush()
+    logs = [item.payload for item in items]
+    assert len(logs) == 5
+
+
+def test_disable_sentry_logs_if_enable_logs_is_true_but_integration_option_is_false(
+    sentry_init, capture_items, uninstall_integration, request
+):
+    uninstall_integration("loguru")
+    request.addfinalizer(logger.remove)
+
+    sentry_init(
+        enable_logs=True, integrations=[LoguruIntegration(capture_sentry_logs=False)]
+    )
+    items = capture_items("log")
+
+    logger.trace("this is a log")
+    logger.debug("this is a log")
+    logger.info("this is a log")
+    logger.success("this is a log")
+    logger.warning("this is a log")
+    logger.error("this is a log")
+    logger.critical("this is a log")
+
+    sentry_sdk.get_client().flush()
+    logs = [item.payload for item in items]
+    assert not logs
+
+
 def test_disable_sentry_logs_explicitly(
     sentry_init, capture_items, uninstall_integration, request
 ):
