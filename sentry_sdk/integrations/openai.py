@@ -1,7 +1,7 @@
 import json
 import sys
 import time
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from functools import wraps
 from typing import TYPE_CHECKING, cast
 
@@ -301,7 +301,7 @@ def _calculate_responses_token_usage(
         if streaming_message_responses is not None:
             for message in streaming_message_responses:
                 output_tokens += count_tokens(message)
-        elif hasattr(response, "output") and isinstance(response.output, Sequence):
+        elif hasattr(response, "output") and isinstance(response.output, list):
             for output_item in response.output:
                 if hasattr(output_item, "content"):
                     for content_item in output_item.content:
@@ -712,7 +712,7 @@ def _set_common_output_data(
         }
 
         if has_data_collection_enabled(client.options) and isinstance(
-            response.output, Sequence
+            response.output, list
         ):
             record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
 
@@ -746,7 +746,7 @@ def _set_common_output_data(
         elif (
             should_send_default_pii()
             and integration.include_prompts
-            and isinstance(response.output, Sequence)
+            and isinstance(response.output, list)
         ):
             for output in response.output:
                 if output.type == "function_call":
