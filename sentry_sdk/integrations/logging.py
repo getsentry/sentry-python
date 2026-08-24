@@ -19,7 +19,7 @@ from sentry_sdk.utils import (
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
     from logging import LogRecord
-    from typing import Any, Dict, Optional
+    from typing import Any, Dict, Optional, Union
 
 _SENTINEL = object()
 
@@ -116,14 +116,14 @@ def unignore_logger_for_sentry_logs(
 
 class LoggingIntegration(Integration):
     identifier = "logging"
-    capture_sentry_logs: "Optional[bool]" = _SENTINEL
+    capture_sentry_logs: "Optional[Union[bool, object]]" = _SENTINEL
 
     def __init__(
         self,
         level: "Optional[int]" = DEFAULT_LEVEL,
         event_level: "Optional[int]" = DEFAULT_EVENT_LEVEL,
         sentry_logs_level: "Optional[int]" = DEFAULT_LEVEL,
-        capture_sentry_logs: "Optional[bool]" = _SENTINEL,
+        capture_sentry_logs: "Optional[Union[bool, object]]" = _SENTINEL,
     ) -> None:
         LoggingIntegration.capture_sentry_logs = capture_sentry_logs
 

@@ -13,7 +13,7 @@ from sentry_sdk.utils import safe_repr
 
 if TYPE_CHECKING:
     from logging import LogRecord
-    from typing import Any, Optional
+    from typing import Any, Optional, Union
 
 try:
     import loguru
@@ -73,7 +73,7 @@ class LoguruIntegration(Integration):
     breadcrumb_format = DEFAULT_FORMAT
     event_format = DEFAULT_FORMAT
     sentry_logs_level: "Optional[int]" = DEFAULT_LEVEL
-    capture_sentry_logs: "Optional[bool]" = _SENTINEL
+    capture_sentry_logs: "Optional[Union[bool, object]]" = _SENTINEL
 
     def __init__(
         self,
@@ -82,7 +82,7 @@ class LoguruIntegration(Integration):
         breadcrumb_format: "str | loguru.FormatFunction" = DEFAULT_FORMAT,
         event_format: "str | loguru.FormatFunction" = DEFAULT_FORMAT,
         sentry_logs_level: "Optional[int]" = DEFAULT_LEVEL,
-        capture_sentry_logs: "Optional[bool]" = _SENTINEL,
+        capture_sentry_logs: "Optional[Union[bool, object]]" = _SENTINEL,
     ) -> None:
         LoguruIntegration.level = level
         LoguruIntegration.event_level = event_level
