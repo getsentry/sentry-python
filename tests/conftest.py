@@ -1039,7 +1039,7 @@ def select_transactions_with_mcp_spans():
         return [
             transaction
             for transaction in events
-            if transaction["type"] == "transaction"
+            if transaction.get("type") == "transaction"
             and any(
                 span["data"].get("mcp.method.name") == method_name
                 for span in transaction.get("spans", [])
