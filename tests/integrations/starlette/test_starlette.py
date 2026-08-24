@@ -1500,7 +1500,9 @@ def test_active_thread_id_span_streaming(sentry_init, capture_items, endpoint):
 
 
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
-def test_transaction_name_span_streaming(sentry_init, capture_items, endpoint):
+def test_segment_name_is_route_resolved_name_span_streaming(
+    sentry_init, capture_items, endpoint
+):
     sentry_init(
         auto_enabling_integrations=False,
         integrations=[StarletteIntegration(transaction_style="url")],
@@ -1524,7 +1526,9 @@ def test_transaction_name_span_streaming(sentry_init, capture_items, endpoint):
 
 
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
-def test_transaction_name_static(sentry_init, capture_events, endpoint):
+def test_transaction_name_is_route_resolved_name_static(
+    sentry_init, capture_events, endpoint
+):
     sentry_init(
         integrations=[StarletteIntegration(transaction_style="url")],
         traces_sample_rate=1.0,
