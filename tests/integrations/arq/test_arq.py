@@ -548,7 +548,7 @@ async def test_job_concurrency(
     sleepy.__qualname__ = sleepy.__name__
     division.__qualname__ = division.__name__
 
-    pool, worker = init_arq(span_streaming, [sleepy, division])
+    pool, worker = init_arq([sleepy, division])
 
     await pool.enqueue_job(
         "division", _job_id="123", _defer_by=timedelta(milliseconds=10)
