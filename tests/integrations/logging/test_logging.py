@@ -286,7 +286,7 @@ def test_sentry_logs_collection_opt_in_compat_does_not_override_explicit_opt_out
 ):
     # This should be removed in the next major.
     sentry_init(
-        enable_logs=True, integrations=[LoggingIntegration(sentry_logs_level=None)]
+        enable_logs=True, integrations=[LoggingIntegration(capture_sentry_logs=False)]
     )
     items = capture_items("log")
 
