@@ -227,7 +227,6 @@ async def test_job_result(
     "init_arq_settings", ["init_arq", "init_arq_with_dict_settings"]
 )
 async def test_job_retry(
-    capture_events,
     capture_items,
     init_arq_settings,
     request,
@@ -277,7 +276,6 @@ async def test_job_retry(
 )
 @pytest.mark.asyncio
 async def test_job_transaction(
-    capture_events,
     capture_items,
     init_arq_settings,
     source,
@@ -356,7 +354,6 @@ async def test_job_transaction(
 )
 @pytest.mark.asyncio
 async def test_job_args_kwargs_data_collection(
-    capture_events,
     capture_items,
     init_arq,
     init_kwargs,
@@ -399,7 +396,6 @@ async def test_job_args_kwargs_data_collection(
 )
 @pytest.mark.asyncio
 async def test_enqueue_job(
-    capture_events,
     capture_items,
     init_arq_settings,
     source,
@@ -459,7 +455,6 @@ async def test_execute_job_without_integration(
 )
 @pytest.mark.asyncio
 async def test_span_origin_producer(
-    capture_events,
     capture_items,
     init_arq_settings,
     source,
@@ -487,7 +482,6 @@ async def test_span_origin_producer(
     "init_arq_settings", ["init_arq", "init_arq_with_dict_settings"]
 )
 async def test_span_origin_consumer(
-    capture_events,
     capture_items,
     init_arq_settings,
     request,
@@ -520,7 +514,6 @@ async def test_span_origin_consumer(
 
 @pytest.mark.asyncio
 async def test_job_concurrency(
-    capture_events,
     capture_items,
     init_arq,
 ):
