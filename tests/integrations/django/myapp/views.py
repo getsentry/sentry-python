@@ -7,7 +7,12 @@ from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.dispatch import Signal
-from django.http import HttpResponse, HttpResponseNotFound, HttpResponseServerError
+from django.http import (
+    Http404,
+    HttpResponse,
+    HttpResponseNotFound,
+    HttpResponseServerError,
+)
 from django.shortcuts import render
 from django.template import Context, Template
 from django.template.response import TemplateResponse
@@ -22,8 +27,23 @@ from tests.integrations.django.myapp.signals import (
 )
 
 try:
-    from rest_framework.decorators import api_view
+    from rest_framework.authentication import BaseAuthentication
+    from rest_framework.decorators import api_view, authentication_classes
     from rest_framework.response import Response
+
+    class DummyAuthentication(BaseAuthentication):
+        def authenticate(self, request):
+            return None
+
+    @api_view(["GET"])
+    @authentication_classes([DummyAuthentication])
+    def rest_authenticated_hello(request):
+        return HttpResponse("ok")
+
+    @api_view(["GET"])
+    @authentication_classes([])
+    def rest_unauthenticated_hello(request):
+        return HttpResponse("ok")
 
     @api_view(["POST"])
     def rest_framework_exc(request):
@@ -33,10 +53,6 @@ try:
     def rest_framework_read_body_and_exc(request):
         request.data
         1 / 0
-
-    @api_view(["GET"])
-    def rest_hello(request):
-        return HttpResponse("ok")
 
     @api_view(["GET"])
     def rest_permission_denied_exc(request):
@@ -326,6 +342,11 @@ def postgres_insert_orm_atomic_exception(request, *args, **kwargs):
 @csrf_exempt
 def permission_denied_exc(*args, **kwargs):
     raise PermissionDenied("bye")
+
+
+@csrf_exempt
+def http404_exc(*args, **kwargs):
+    raise Http404("bye")
 
 
 def csrf_hello_not_exempt(*args, **kwargs):

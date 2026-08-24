@@ -19,7 +19,11 @@ from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import should_truncate_gen_ai_input
-from sentry_sdk.utils import event_from_exception, safe_serialize
+from sentry_sdk.utils import (
+    event_from_exception,
+    has_data_collection_enabled,
+    safe_serialize,
+)
 
 if TYPE_CHECKING:
     from typing import Any, Union
@@ -114,7 +118,11 @@ def _set_input_data(
     span: "Union[sentry_sdk.tracing.Span, StreamedSpan]",
     get_response_kwargs: "dict[str, Any]",
 ) -> None:
-    if not should_send_default_pii():
+    client = sentry_sdk.get_client()
+    if has_data_collection_enabled(client.options):
+        if not client.options["data_collection"]["gen_ai"]["inputs"]:
+            return
+    elif not should_send_default_pii():
         return
     request_messages = []
 
@@ -182,7 +190,6 @@ def _set_input_data(
                 )
 
     normalized_messages = normalize_message_roles(request_messages)
-    client = sentry_sdk.get_client()
     scope = sentry_sdk.get_current_scope()
     messages_data = (
         truncate_and_annotate_messages(normalized_messages, span, scope)
@@ -201,7 +208,17 @@ def _set_input_data(
 def _set_output_data(
     span: "Union[sentry_sdk.tracing.Span, StreamedSpan]", result: "Any"
 ) -> None:
-    if not should_send_default_pii():
+    client = sentry_sdk.get_client()
+    record_inputs = False
+    record_outputs = False
+    if has_data_collection_enabled(client.options):
+        record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
+        record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
+    elif should_send_default_pii():
+        record_inputs = True
+        record_outputs = True
+
+    if not record_inputs and not record_outputs:
         return
 
     output_messages: "dict[str, list[Any]]" = {
@@ -220,7 +237,7 @@ def _set_output_data(
                     # Unknown output message type, just return the json
                     output_messages["response"].append(output_message.dict())
 
-    if len(output_messages["tool"]) > 0:
+    if record_inputs and len(output_messages["tool"]) > 0:
         if isinstance(span, StreamedSpan):
             span.set_attribute(
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
@@ -232,7 +249,7 @@ def _set_output_data(
                 safe_serialize(output_messages["tool"]),
             )
 
-    if len(output_messages["response"]) > 0:
+    if record_outputs and len(output_messages["response"]) > 0:
         set_data_normalized(
             span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
         )

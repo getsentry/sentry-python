@@ -5,7 +5,11 @@ import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.utils import event_from_exception, safe_serialize
+from sentry_sdk.utils import (
+    event_from_exception,
+    has_data_collection_enabled,
+    safe_serialize,
+)
 
 if TYPE_CHECKING:
     from typing import Any, Optional, Union
@@ -49,11 +53,12 @@ def get_is_streaming() -> bool:
     return False
 
 
-def _should_send_prompts() -> bool:
+def _should_send_prompts_legacy() -> bool:
     """
-    Check if prompts should be sent to Sentry.
+    Check if prompts should be sent to Sentry based on the deprecated
+    ``send_default_pii`` option and the ``include_prompts`` integration setting.
 
-    This checks both send_default_pii and the include_prompts integration setting.
+    TODO: Remove this once `send_default_pii` is deprecated.
     """
     if not should_send_default_pii():
         return False
@@ -67,6 +72,22 @@ def _should_send_prompts() -> bool:
         return False
 
     return getattr(integration, "include_prompts", False)
+
+
+def _should_send_inputs() -> bool:
+    client = sentry_sdk.get_client()
+    if has_data_collection_enabled(client.options):
+        return bool(client.options["data_collection"]["gen_ai"]["inputs"])
+
+    return _should_send_prompts_legacy()
+
+
+def _should_send_outputs() -> bool:
+    client = sentry_sdk.get_client()
+    if has_data_collection_enabled(client.options):
+        return bool(client.options["data_collection"]["gen_ai"]["outputs"])
+
+    return _should_send_prompts_legacy()
 
 
 def _set_agent_data(
@@ -190,6 +211,11 @@ def _set_available_tools(
     """
     if not agent or not hasattr(agent, "_function_toolset"):
         return
+
+    client_options = sentry_sdk.get_client().options
+    if has_data_collection_enabled(client_options):
+        if not client_options["data_collection"]["gen_ai"]["inputs"]:
+            return
 
     try:
         tools = []

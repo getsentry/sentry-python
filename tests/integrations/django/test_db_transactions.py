@@ -617,7 +617,6 @@ def test_db_no_autocommit_execute(
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_db_no_autocommit_executemany(
     sentry_init,
-    client,
     capture_events,
     capture_items,
     span_streaming,
@@ -900,7 +899,6 @@ def test_db_no_autocommit_rollback_execute(
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_db_no_autocommit_rollback_executemany(
     sentry_init,
-    client,
     capture_events,
     capture_items,
     span_streaming,
@@ -1181,7 +1179,6 @@ def test_db_atomic_execute(
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_db_atomic_executemany(
     sentry_init,
-    client,
     capture_events,
     capture_items,
     span_streaming,
@@ -1457,7 +1454,6 @@ def test_db_atomic_rollback_execute(
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_db_atomic_rollback_executemany(
     sentry_init,
-    client,
     capture_events,
     capture_items,
     span_streaming,
@@ -1737,7 +1733,6 @@ def test_db_atomic_execute_exception(
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_db_atomic_executemany_exception(
     sentry_init,
-    client,
     capture_events,
     capture_items,
     span_streaming,

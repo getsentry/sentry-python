@@ -3632,3 +3632,1145 @@ def test_extract_contents_messages_object_with_text_attribute():
     assert len(result) == 1
     assert result[0]["role"] == "user"
     assert result[0]["content"] == [{"text": "Object text", "type": "text"}]
+
+
+DATA_COLLECTION_CHAT_EXPECTED_VALUES = {
+    SPANDATA.GEN_AI_REQUEST_MESSAGES: [{"role": "user", "content": "Tell me a joke"}],
+    SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS: [
+        {"type": "text", "content": "You are a helpful assistant."}
+    ],
+    SPANDATA.GEN_AI_RESPONSE_TEXT: ["Hello! How can I help you today?"],
+}
+
+DATA_COLLECTION_EMBED_EXPECTED_VALUES = {
+    SPANDATA.GEN_AI_EMBEDDINGS_INPUT: [
+        "What is your name?",
+        "What is your favorite color?",
+    ],
+}
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": True}},
+            False,
+            False,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            [],
+            id="gen-ai-inputs-and-outputs-enabled-override-legacy-off",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": False}},
+            True,
+            True,
+            [],
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            id="gen-ai-inputs-and-outputs-disabled-override-legacy-on",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": False}},
+            False,
+            False,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+            ],
+            [
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            id="gen-ai-inputs-enabled-outputs-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": True}},
+            False,
+            False,
+            [
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+            ],
+            id="gen-ai-outputs-enabled-inputs-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {}},
+            False,
+            False,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            [],
+            id="gen-ai-inputs-and-outputs-omitted-default-to-enabled",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            [],
+            id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            True,
+            [],
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            id="no-gen-ai-config-legacy-pii-disabled",
+        ),
+    ],
+)
+def test_generate_content_data_collection(
+    sentry_init,
+    capture_events,
+    capture_items,
+    mock_genai_client,
+    data_collection,
+    send_default_pii,
+    include_prompts,
+    expected_present,
+    expected_absent,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init_kwargs = dict(
+        integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    sentry_init(**sentry_init_kwargs)
+
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
+    streamed = span_streaming or stream_gen_ai_spans
+    captured = capture_items("span") if streamed else capture_events()
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ), start_transaction(name="google_genai"):
+        mock_genai_client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents="Tell me a joke",
+            config=create_test_config(
+                temperature=0.7,
+                max_output_tokens=100,
+                system_instruction="You are a helpful assistant.",
+            ),
+        )
+
+    if streamed:
+        sentry_sdk.flush()
+        spans = [item.payload for item in captured if item.type == "span"]
+        (span,) = [
+            s for s in spans if s["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        ]
+        span_data = span["attributes"]
+    else:
+        (event,) = captured
+        (span,) = [s for s in event["spans"] if s["op"] == OP.GEN_AI_CHAT]
+        span_data = span["data"]
+
+    for key in expected_present:
+        assert key in span_data, f"{key} should have been collected"
+        assert json.loads(span_data[key]) == DATA_COLLECTION_CHAT_EXPECTED_VALUES[key]
+
+    for key in expected_absent:
+        assert key not in span_data, f"{key} should not have been collected"
+
+    # Data collection never gates non-PII attributes
+    assert span_data[SPANDATA.GEN_AI_SYSTEM] == "gcp.gemini"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_TEMPERATURE] == 0.7
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MAX_TOKENS] == 100
+    assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span_data[SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 23
+    assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "STOP"
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize("send_default_pii", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,expected_present,expected_absent",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": True}},
+            [
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+            ],
+            [],
+            id="gen-ai-inputs-and-outputs-enabled-tools-collected",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": False}},
+            [],
+            [
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+            ],
+            id="gen-ai-inputs-and-outputs-disabled-tools-not-collected",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": False}},
+            [
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+            ],
+            [],
+            id="gen-ai-inputs-enabled-outputs-disabled-tools-collected",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": True}},
+            [],
+            [
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+            ],
+            id="gen-ai-inputs-disabled-outputs-enabled-tools-not-collected",
+        ),
+        pytest.param(
+            {"gen_ai": {}},
+            [
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+            ],
+            [],
+            id="gen-ai-inputs-and-outputs-omitted-tools-collected",
+        ),
+        pytest.param(
+            None,
+            [
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+            ],
+            [],
+            id="no-gen-ai-config-tools-collected-regardless-of-pii",
+        ),
+    ],
+)
+def test_generate_content_data_collection_tools(
+    sentry_init,
+    capture_events,
+    capture_items,
+    mock_genai_client,
+    data_collection,
+    send_default_pii,
+    expected_present,
+    expected_absent,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init_kwargs = dict(
+        integrations=[GoogleGenAIIntegration(include_prompts=False)],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    sentry_init(**sentry_init_kwargs)
+
+    # A declaration rather than a Python callable, so that the client does not
+    # automatically call the function and issue a second request
+    weather_tool = genai_types.Tool(
+        function_declarations=[
+            genai_types.FunctionDeclaration(
+                name="get_weather",
+                description="Get the weather for a location",
+            )
+        ]
+    )
+
+    mock_http_response = create_mock_http_response(
+        {
+            "candidates": [
+                {
+                    "content": {
+                        "role": "model",
+                        "parts": [
+                            {"text": "I'll help you with that."},
+                            {
+                                "functionCall": {
+                                    "name": "get_weather",
+                                    "args": {"location": "San Francisco"},
+                                }
+                            },
+                        ],
+                    },
+                    "finishReason": "STOP",
+                }
+            ],
+            "usageMetadata": {
+                "promptTokenCount": 20,
+                "candidatesTokenCount": 30,
+                "totalTokenCount": 50,
+            },
+        }
+    )
+
+    streamed = span_streaming or stream_gen_ai_spans
+    captured = capture_items("span") if streamed else capture_events()
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ), start_transaction(name="google_genai"):
+        mock_genai_client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents="What's the weather?",
+            config=create_test_config(tools=[weather_tool]),
+        )
+
+    if streamed:
+        sentry_sdk.flush()
+        spans = [item.payload for item in captured if item.type == "span"]
+        (span,) = [
+            s for s in spans if s["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        ]
+        span_data = span["attributes"]
+    else:
+        (event,) = captured
+        (span,) = [s for s in event["spans"] if s["op"] == OP.GEN_AI_CHAT]
+        span_data = span["data"]
+
+    for key in expected_present:
+        assert key in span_data, f"{key} should have been collected"
+
+    for key in expected_absent:
+        assert key not in span_data, f"{key} should not have been collected"
+
+    if SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS in expected_present:
+        available_tools = json.loads(span_data[SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS])
+        assert [tool["name"] for tool in available_tools] == ["get_weather"]
+
+    if SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in expected_present:
+        tool_calls = json.loads(span_data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS])
+        assert [tool_call["name"] for tool_call in tool_calls] == ["get_weather"]
+        assert json.loads(tool_calls[0]["arguments"]) == {"location": "San Francisco"}
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": True}},
+            False,
+            False,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            [],
+            id="gen-ai-inputs-and-outputs-enabled-override-legacy-off",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": False}},
+            True,
+            True,
+            [],
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            id="gen-ai-inputs-and-outputs-disabled-override-legacy-on",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": False}},
+            False,
+            False,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+            ],
+            [
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            id="gen-ai-inputs-enabled-outputs-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": True}},
+            False,
+            False,
+            [
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+            ],
+            id="gen-ai-outputs-enabled-inputs-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {}},
+            False,
+            False,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            [],
+            id="gen-ai-inputs-and-outputs-omitted-default-to-enabled",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            [],
+            id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            True,
+            [],
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            id="no-gen-ai-config-legacy-pii-disabled",
+        ),
+    ],
+)
+def test_streaming_generate_content_data_collection(
+    sentry_init,
+    capture_events,
+    capture_items,
+    mock_genai_client,
+    data_collection,
+    send_default_pii,
+    include_prompts,
+    expected_present,
+    expected_absent,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init_kwargs = dict(
+        integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    sentry_init(**sentry_init_kwargs)
+
+    mock_stream = create_mock_streaming_responses(
+        [
+            {
+                "candidates": [
+                    {"content": {"role": "model", "parts": [{"text": "Hello! "}]}}
+                ],
+                "usageMetadata": {
+                    "promptTokenCount": 10,
+                    "candidatesTokenCount": 2,
+                    "totalTokenCount": 12,
+                },
+                "modelVersion": "gemini-1.5-flash",
+            },
+            {
+                "candidates": [
+                    {"content": {"role": "model", "parts": [{"text": "How can I "}]}}
+                ],
+            },
+            {
+                "candidates": [
+                    {
+                        "content": {
+                            "role": "model",
+                            "parts": [{"text": "help you today?"}],
+                        },
+                        "finishReason": "STOP",
+                    }
+                ],
+                "usageMetadata": {
+                    "promptTokenCount": 10,
+                    "candidatesTokenCount": 7,
+                    "totalTokenCount": 25,
+                },
+            },
+        ]
+    )
+
+    streamed = span_streaming or stream_gen_ai_spans
+    captured = capture_items("span") if streamed else capture_events()
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request_streamed", return_value=mock_stream
+    ), start_transaction(name="google_genai"):
+        stream = mock_genai_client.models.generate_content_stream(
+            model="gemini-1.5-flash",
+            contents="Tell me a joke",
+            config=create_test_config(
+                system_instruction="You are a helpful assistant."
+            ),
+        )
+        list(stream)
+
+    if streamed:
+        sentry_sdk.flush()
+        spans = [item.payload for item in captured if item.type == "span"]
+        (span,) = [
+            s for s in spans if s["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        ]
+        span_data = span["attributes"]
+    else:
+        (event,) = captured
+        (span,) = [s for s in event["spans"] if s["op"] == OP.GEN_AI_CHAT]
+        span_data = span["data"]
+
+    for key in expected_present:
+        assert key in span_data, f"{key} should have been collected"
+        assert json.loads(span_data[key]) == DATA_COLLECTION_CHAT_EXPECTED_VALUES[key]
+
+    for key in expected_absent:
+        assert key not in span_data, f"{key} should not have been collected"
+
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_STREAMING] is True
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_FINISH_REASONS] == "STOP"
+    assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
+    assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 25
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize("send_default_pii", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,expected_present,expected_absent",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": True}},
+            [
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+            ],
+            [],
+            id="gen-ai-inputs-and-outputs-enabled-tools-collected",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": False}},
+            [],
+            [
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+            ],
+            id="gen-ai-inputs-and-outputs-disabled-tools-not-collected",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": False}},
+            [
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+            ],
+            [],
+            id="gen-ai-inputs-enabled-outputs-disabled-tools-collected",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": True}},
+            [],
+            [
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+            ],
+            id="gen-ai-inputs-disabled-outputs-enabled-tools-not-collected",
+        ),
+        pytest.param(
+            {"gen_ai": {}},
+            [
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+            ],
+            [],
+            id="gen-ai-inputs-and-outputs-omitted-tools-collected",
+        ),
+        pytest.param(
+            None,
+            [
+                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+            ],
+            [],
+            id="no-gen-ai-config-tools-collected-regardless-of-pii",
+        ),
+    ],
+)
+def test_streaming_generate_content_data_collection_tools(
+    sentry_init,
+    capture_events,
+    capture_items,
+    mock_genai_client,
+    data_collection,
+    send_default_pii,
+    expected_present,
+    expected_absent,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init_kwargs = dict(
+        integrations=[GoogleGenAIIntegration(include_prompts=False)],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    sentry_init(**sentry_init_kwargs)
+
+    weather_tool = genai_types.Tool(
+        function_declarations=[
+            genai_types.FunctionDeclaration(
+                name="get_weather",
+                description="Get the weather for a location",
+            )
+        ]
+    )
+
+    mock_stream = create_mock_streaming_responses(
+        [
+            {
+                "candidates": [
+                    {
+                        "content": {
+                            "role": "model",
+                            "parts": [{"text": "I'll help you with that."}],
+                        }
+                    }
+                ],
+                "modelVersion": "gemini-1.5-flash",
+            },
+            {
+                "candidates": [
+                    {
+                        "content": {
+                            "role": "model",
+                            "parts": [
+                                {
+                                    "functionCall": {
+                                        "name": "get_weather",
+                                        "args": {"location": "San Francisco"},
+                                    }
+                                }
+                            ],
+                        },
+                        "finishReason": "STOP",
+                    }
+                ],
+            },
+        ]
+    )
+
+    streamed = span_streaming or stream_gen_ai_spans
+    captured = capture_items("span") if streamed else capture_events()
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request_streamed", return_value=mock_stream
+    ), start_transaction(name="google_genai"):
+        stream = mock_genai_client.models.generate_content_stream(
+            model="gemini-1.5-flash",
+            contents="What's the weather?",
+            config=create_test_config(tools=[weather_tool]),
+        )
+        list(stream)
+
+    if streamed:
+        sentry_sdk.flush()
+        spans = [item.payload for item in captured if item.type == "span"]
+        (span,) = [
+            s for s in spans if s["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        ]
+        span_data = span["attributes"]
+    else:
+        (event,) = captured
+        (span,) = [s for s in event["spans"] if s["op"] == OP.GEN_AI_CHAT]
+        span_data = span["data"]
+
+    for key in expected_present:
+        assert key in span_data, f"{key} should have been collected"
+
+    for key in expected_absent:
+        assert key not in span_data, f"{key} should not have been collected"
+
+    if SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS in expected_present:
+        available_tools = json.loads(span_data[SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS])
+        assert [tool["name"] for tool in available_tools] == ["get_weather"]
+
+    if SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS in expected_present:
+        tool_calls = json.loads(span_data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS])
+        assert [tool_call["name"] for tool_call in tool_calls] == ["get_weather"]
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": True}},
+            False,
+            False,
+            [
+                SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+            ],
+            [],
+            id="gen-ai-inputs-and-outputs-enabled-override-legacy-off",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": False}},
+            True,
+            True,
+            [],
+            [
+                SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+            ],
+            id="gen-ai-inputs-and-outputs-disabled-override-legacy-on",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": False}},
+            False,
+            False,
+            [
+                SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+            ],
+            [],
+            id="gen-ai-inputs-enabled-outputs-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": True}},
+            False,
+            False,
+            [],
+            [
+                SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+            ],
+            id="gen-ai-outputs-enabled-inputs-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {}},
+            False,
+            False,
+            [
+                SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+            ],
+            [],
+            id="gen-ai-inputs-and-outputs-omitted-default-to-enabled",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            [
+                SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+            ],
+            [],
+            id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            True,
+            [],
+            [
+                SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+            ],
+            id="no-gen-ai-config-legacy-pii-disabled",
+        ),
+    ],
+)
+def test_embed_content_data_collection(
+    sentry_init,
+    capture_events,
+    capture_items,
+    mock_genai_client,
+    data_collection,
+    send_default_pii,
+    include_prompts,
+    expected_present,
+    expected_absent,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init_kwargs = dict(
+        integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    sentry_init(**sentry_init_kwargs)
+
+    mock_http_response = create_mock_http_response(EXAMPLE_EMBED_RESPONSE_JSON)
+    streamed = span_streaming or stream_gen_ai_spans
+    captured = capture_items("span") if streamed else capture_events()
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "request", return_value=mock_http_response
+    ), start_transaction(name="google_genai_embeddings"):
+        mock_genai_client.models.embed_content(
+            model="text-embedding-004",
+            contents=["What is your name?", "What is your favorite color?"],
+        )
+
+    if streamed:
+        sentry_sdk.flush()
+        spans = [item.payload for item in captured if item.type == "span"]
+        (span,) = [
+            s for s in spans if s["attributes"].get("sentry.op") == OP.GEN_AI_EMBEDDINGS
+        ]
+        span_data = span["attributes"]
+    else:
+        (event,) = captured
+        (span,) = [s for s in event["spans"] if s["op"] == OP.GEN_AI_EMBEDDINGS]
+        span_data = span["data"]
+
+    for key in expected_present:
+        assert key in span_data, f"{key} should have been collected"
+        assert json.loads(span_data[key]) == DATA_COLLECTION_EMBED_EXPECTED_VALUES[key]
+
+    for key in expected_absent:
+        assert key not in span_data, f"{key} should not have been collected"
+
+    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-004"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": True}},
+            False,
+            False,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            [],
+            id="gen-ai-inputs-and-outputs-enabled-override-legacy-off",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": False}},
+            True,
+            True,
+            [],
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            id="gen-ai-inputs-and-outputs-disabled-override-legacy-on",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": False}},
+            False,
+            False,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+            ],
+            [
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            id="gen-ai-inputs-enabled-outputs-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": True}},
+            False,
+            False,
+            [
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+            ],
+            id="gen-ai-outputs-enabled-inputs-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {}},
+            False,
+            False,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            [],
+            id="gen-ai-inputs-and-outputs-omitted-default-to-enabled",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            [],
+            id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            True,
+            [],
+            [
+                SPANDATA.GEN_AI_REQUEST_MESSAGES,
+                SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
+                SPANDATA.GEN_AI_RESPONSE_TEXT,
+            ],
+            id="no-gen-ai-config-legacy-pii-disabled",
+        ),
+    ],
+)
+async def test_async_generate_content_data_collection(
+    sentry_init,
+    capture_events,
+    capture_items,
+    mock_genai_client,
+    data_collection,
+    send_default_pii,
+    include_prompts,
+    expected_present,
+    expected_absent,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init_kwargs = dict(
+        integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    sentry_init(**sentry_init_kwargs)
+
+    mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
+    streamed = span_streaming or stream_gen_ai_spans
+    captured = capture_items("span") if streamed else capture_events()
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "async_request", return_value=mock_http_response
+    ), start_transaction(name="google_genai"):
+        await mock_genai_client.aio.models.generate_content(
+            model="gemini-1.5-flash",
+            contents="Tell me a joke",
+            config=create_test_config(
+                system_instruction="You are a helpful assistant."
+            ),
+        )
+
+    if streamed:
+        sentry_sdk.flush()
+        spans = [item.payload for item in captured if item.type == "span"]
+        (span,) = [
+            s for s in spans if s["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
+        ]
+        span_data = span["attributes"]
+    else:
+        (event,) = captured
+        (span,) = [s for s in event["spans"] if s["op"] == OP.GEN_AI_CHAT]
+        span_data = span["data"]
+
+    for key in expected_present:
+        assert key in span_data, f"{key} should have been collected"
+        assert json.loads(span_data[key]) == DATA_COLLECTION_CHAT_EXPECTED_VALUES[key]
+
+    for key in expected_absent:
+        assert key not in span_data, f"{key} should not have been collected"
+
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
+    assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize(
+    "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": True}},
+            False,
+            False,
+            [
+                SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+            ],
+            [],
+            id="gen-ai-inputs-and-outputs-enabled-override-legacy-off",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": False}},
+            True,
+            True,
+            [],
+            [
+                SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+            ],
+            id="gen-ai-inputs-and-outputs-disabled-override-legacy-on",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": False}},
+            False,
+            False,
+            [
+                SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+            ],
+            [],
+            id="gen-ai-inputs-enabled-outputs-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": True}},
+            False,
+            False,
+            [],
+            [
+                SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+            ],
+            id="gen-ai-outputs-enabled-inputs-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {}},
+            False,
+            False,
+            [
+                SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+            ],
+            [],
+            id="gen-ai-inputs-and-outputs-omitted-default-to-enabled",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            [
+                SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+            ],
+            [],
+            id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            True,
+            [],
+            [
+                SPANDATA.GEN_AI_EMBEDDINGS_INPUT,
+            ],
+            id="no-gen-ai-config-legacy-pii-disabled",
+        ),
+    ],
+)
+async def test_async_embed_content_data_collection(
+    sentry_init,
+    capture_events,
+    capture_items,
+    mock_genai_client,
+    data_collection,
+    send_default_pii,
+    include_prompts,
+    expected_present,
+    expected_absent,
+    stream_gen_ai_spans,
+    span_streaming,
+):
+    sentry_init_kwargs = dict(
+        integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    sentry_init(**sentry_init_kwargs)
+
+    mock_http_response = create_mock_http_response(EXAMPLE_EMBED_RESPONSE_JSON)
+    streamed = span_streaming or stream_gen_ai_spans
+    captured = capture_items("span") if streamed else capture_events()
+
+    with mock.patch.object(
+        mock_genai_client._api_client, "async_request", return_value=mock_http_response
+    ), start_transaction(name="google_genai_embeddings"):
+        await mock_genai_client.aio.models.embed_content(
+            model="text-embedding-004",
+            contents=["What is your name?", "What is your favorite color?"],
+        )
+
+    if streamed:
+        sentry_sdk.flush()
+        spans = [item.payload for item in captured if item.type == "span"]
+        (span,) = [
+            s for s in spans if s["attributes"].get("sentry.op") == OP.GEN_AI_EMBEDDINGS
+        ]
+        span_data = span["attributes"]
+    else:
+        (event,) = captured
+        (span,) = [s for s in event["spans"] if s["op"] == OP.GEN_AI_EMBEDDINGS]
+        span_data = span["data"]
+
+    for key in expected_present:
+        assert key in span_data, f"{key} should have been collected"
+        assert json.loads(span_data[key]) == DATA_COLLECTION_EMBED_EXPECTED_VALUES[key]
+
+    for key in expected_absent:
+        assert key not in span_data, f"{key} should not have been collected"
+
+    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-004"

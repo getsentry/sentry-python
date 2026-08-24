@@ -2,13 +2,16 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations.redis.consts import SPAN_ORIGIN
+from sentry_sdk.integrations.redis.consts import (
+    SPAN_ORIGIN,
+)
 from sentry_sdk.integrations.redis.modules.caches import (
     _compile_cache_span_properties,
     _set_cache_data,
 )
 from sentry_sdk.integrations.redis.modules.queries import _compile_db_span_properties
 from sentry_sdk.integrations.redis.utils import (
+    _extract_key,
     _get_safe_command,
     _set_client_data,
     _set_pipeline_data,
@@ -39,8 +42,17 @@ def patch_redis_pipeline(
         if client.get_integration(RedisIntegration) is None:
             return old_execute(self, *args, **kwargs)
 
-        span_streaming = has_span_streaming_enabled(client.options)
+        sentry_sdk.add_breadcrumb(
+            message="redis.pipeline.execute",
+            type="redis",
+            category="redis",
+            data={
+                "redis.is_cluster": is_cluster,
+                "redis.transaction": False if is_cluster else self.transaction,
+            },
+        )
 
+        span_streaming = has_span_streaming_enabled(client.options)
         span: "Union[Span, StreamedSpan]"
         if span_streaming:
             if sentry_sdk.traces.get_current_span() is None:
@@ -102,6 +114,24 @@ def patch_redis_client(
         if integration is None:
             return old_execute_command(self, name, *args, **kwargs)
 
+        db_properties = _compile_db_span_properties(integration, name, args)
+
+        breadcrumb_data = {
+            "redis.is_cluster": is_cluster,
+            "redis.command": name,
+            "db.operation": name,
+        }
+        key = _extract_key(name, args)
+        if key is not None:
+            breadcrumb_data["redis.key"] = key
+
+        sentry_sdk.add_breadcrumb(
+            message=db_properties["description"],
+            type="redis",
+            category="redis",
+            data=breadcrumb_data,
+        )
+
         span_streaming = has_span_streaming_enabled(client.options)
 
         if span_streaming and sentry_sdk.traces.get_current_span() is None:
@@ -138,8 +168,6 @@ def patch_redis_client(
                     origin=SPAN_ORIGIN,
                 )
             cache_span.__enter__()
-
-        db_properties = _compile_db_span_properties(integration, name, args)
 
         additional_db_span_attributes = {}
         with capture_internal_exceptions():

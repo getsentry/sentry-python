@@ -19,7 +19,8 @@ from ..utils import (
     _set_agent_data,
     _set_available_tools,
     _set_model_data,
-    _should_send_prompts,
+    _should_send_inputs,
+    _should_send_outputs,
 )
 from .utils import (
     _serialize_binary_content_item,
@@ -30,10 +31,10 @@ if TYPE_CHECKING:
     from typing import Any, Union
 
 try:
-    from pydantic_ai.messages import BinaryContent, ImageUrl  # type: ignore
+    from pydantic_ai.messages import BinaryContent, ImageUrl
 except ImportError:
-    BinaryContent = None
-    ImageUrl = None
+    BinaryContent = None  # type: ignore[misc,assignment]
+    ImageUrl = None  # type: ignore[misc,assignment]
 
 
 def invoke_agent_span(
@@ -73,7 +74,7 @@ def invoke_agent_span(
     _set_available_tools(span, agent)
 
     # Add user prompt and system prompts if available and prompts are enabled
-    if _should_send_prompts():
+    if _should_send_inputs():
         messages = []
 
         # Add system prompts (both instructions and system_prompt)
@@ -123,9 +124,9 @@ def invoke_agent_span(
                 for item in user_prompt:
                     if isinstance(item, str):
                         content.append({"text": item, "type": "text"})
-                    elif ImageUrl and isinstance(item, ImageUrl):
+                    elif ImageUrl is not None and isinstance(item, ImageUrl):
                         content.append(_serialize_image_url_item(item))
-                    elif BinaryContent and isinstance(item, BinaryContent):
+                    elif BinaryContent is not None and isinstance(item, BinaryContent):
                         content.append(_serialize_binary_content_item(item))
                 if content:
                     messages.append(
@@ -163,7 +164,7 @@ def update_invoke_agent_span(
     output = getattr(result, "output", None)
 
     # Set response text if prompts are enabled
-    if _should_send_prompts() and output:
+    if _should_send_outputs() and output:
         set_data_normalized(
             span, SPANDATA.GEN_AI_RESPONSE_TEXT, str(output), unpack=False
         )

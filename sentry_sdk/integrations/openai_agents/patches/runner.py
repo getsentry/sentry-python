@@ -4,24 +4,130 @@ from functools import wraps
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable
+from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.utils import capture_internal_exceptions, reraise
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    has_data_collection_enabled,
+    reraise,
+)
 
-from ..spans import agent_workflow_span, update_invoke_agent_span
+from ..spans import (
+    agent_workflow_span,
+    execute_tool_span,
+    update_execute_tool_span,
+    update_invoke_agent_span,
+)
 from ..utils import _capture_exception
 
 try:
+    from agents import FunctionTool, RunHooks
     from agents.exceptions import AgentsException
 except ImportError:
     raise DidNotEnable("OpenAI Agents not installed")
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:
     from typing import Any, AsyncIterator, Callable
 
+    from agents import Agent, Tool, ToolContext
 
-def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., Any]":
+
+TContext = TypeVar("TContext")
+
+
+class _SentryRunHooks(RunHooks[TContext]):  # type: ignore[misc]
+    """
+    Responsible for creating and managing Execute Tool spans. These spans are
+    stored on the ToolContext reference that is shared between `on_tool_start()`
+    and `on_tool_end()`
+    """
+
+    async def on_tool_start(
+        self,
+        context: "ToolContext[TContext]",
+        agent: "Agent[TContext]",
+        tool: "Tool",
+    ) -> "None":
+        if not isinstance(tool, FunctionTool):
+            return
+
+        span = execute_tool_span(tool, agent)
+        span.__enter__()
+        context._sentry_execute_tool_span = span
+
+        client = sentry_sdk.get_client()
+        if has_data_collection_enabled(client.options):
+            if not client.options["data_collection"]["gen_ai"]["inputs"]:
+                return
+        elif not should_send_default_pii():
+            return
+
+        if isinstance(span, StreamedSpan):
+            span.set_attribute(SPANDATA.GEN_AI_TOOL_INPUT, context.tool_arguments)
+        else:
+            span.set_data(SPANDATA.GEN_AI_TOOL_INPUT, context.tool_arguments)
+
+    async def on_tool_end(
+        self,
+        context: "ToolContext[TContext]",
+        agent: "Agent[TContext]",
+        tool: "Tool",
+        result: "object",
+    ) -> "None":
+        if not isinstance(tool, FunctionTool):
+            return
+
+        span = getattr(context, "_sentry_execute_tool_span", None)
+        if span is not None:
+            del context._sentry_execute_tool_span
+            update_execute_tool_span(span, agent, tool, result)
+            span.__exit__(None, None, None)
+
+
+def _patch_run_hooks(hooks: "RunHooks[TContext]") -> None:
+    """
+    Patch a RunHooks instance. This is used when the user have themselves provided
+    a RunHooks instance, as only one instance can be passed to `AgentRunner.run()`
+    and `AgentRunner.run_streamed()` functions.
+    """
+    is_already_patched = getattr(hooks, "_sentry_is_patched", False)
+    if is_already_patched:
+        return
+
+    original_on_tool_start = hooks.on_tool_start
+    original_on_tool_end = hooks.on_tool_end
+
+    sentry_hooks = _SentryRunHooks()  # type: ignore[var-annotated]
+
+    @wraps(original_on_tool_start)
+    async def on_tool_start(
+        context: "ToolContext[TContext]", agent: "Agent[TContext]", tool: "Tool"
+    ) -> "None":
+        with capture_internal_exceptions():
+            await sentry_hooks.on_tool_start(context, agent, tool)
+        await original_on_tool_start(context, agent, tool)
+
+    @wraps(original_on_tool_end)
+    async def on_tool_end(
+        context: "ToolContext[TContext]",
+        agent: "Agent[TContext]",
+        tool: "Tool",
+        result: "object",
+    ) -> "None":
+        with capture_internal_exceptions():
+            await sentry_hooks.on_tool_end(context, agent, tool, result)
+        await original_on_tool_end(context, agent, tool, result)
+
+    hooks._sentry_is_patched = True
+    hooks.on_tool_start = on_tool_start
+    hooks.on_tool_end = on_tool_end
+
+
+def _create_run_wrapper(
+    original_func: "Callable[..., Any]", use_run_hooks: "bool"
+) -> "Callable[..., Any]":
     """
     Wraps the agents.Runner.run methods to
     - create and manage a root span for the agent workflow runs.
@@ -33,6 +139,13 @@ def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., A
 
     @wraps(original_func)
     async def wrapper(*args: "Any", **kwargs: "Any") -> "Any":
+        if use_run_hooks:
+            hooks = kwargs.get("hooks")
+            if hooks is not None:
+                _patch_run_hooks(hooks=hooks)
+            else:
+                kwargs["hooks"] = _SentryRunHooks()
+
         # Isolate each workflow so that when agents are run in asyncio tasks they
         # don't touch each other's scopes
         with sentry_sdk.isolation_scope():
@@ -123,7 +236,7 @@ def _create_run_wrapper(original_func: "Callable[..., Any]") -> "Callable[..., A
 
 
 def _create_run_streamed_wrapper(
-    original_func: "Callable[..., Any]",
+    original_func: "Callable[..., Any]", use_run_hooks: "bool"
 ) -> "Callable[..., Any]":
     """
     Wraps the agents.Runner.run_streamed method to
@@ -172,6 +285,14 @@ def _create_run_streamed_wrapper(
             kwargs["starting_agent"] = agent
         else:
             args = (agent, *args[1:])
+
+        if use_run_hooks:
+            sentry_hooks = _SentryRunHooks()  # type: ignore[var-annotated]
+            hooks = kwargs.get("hooks")
+            if hooks is not None:
+                _patch_run_hooks(hooks=hooks)
+            else:
+                kwargs["hooks"] = sentry_hooks
 
         try:
             # Call original function to get RunResultStreaming

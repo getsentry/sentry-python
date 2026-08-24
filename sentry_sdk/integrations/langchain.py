@@ -4,7 +4,7 @@ import sys
 import warnings
 from collections import OrderedDict
 from functools import wraps
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 import sentry_sdk
 from sentry_sdk.ai.utils import (
@@ -24,7 +24,11 @@ from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
     should_truncate_gen_ai_input,
 )
-from sentry_sdk.utils import capture_internal_exceptions, logger
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    has_data_collection_enabled,
+    logger,
+)
 
 if TYPE_CHECKING:
     from typing import (
@@ -44,18 +48,32 @@ if TYPE_CHECKING:
 
 
 try:
-    from langchain_core.agents import AgentFinish
     from langchain_core.callbacks import (
         BaseCallbackHandler,
         BaseCallbackManager,
         Callbacks,
         manager,
     )
-    from langchain_core.messages import BaseMessage
-    from langchain_core.outputs import ChatGeneration, LLMResult
+    from langchain_core.messages import AIMessage, BaseMessage
+    from langchain_core.outputs import (
+        ChatGeneration,
+        ChatGenerationChunk,
+        Generation,
+        GenerationChunk,
+        LLMResult,
+    )
 
 except ImportError:
     raise DidNotEnable("langchain not installed")
+
+
+class TokenUsage(NamedTuple):
+    input_tokens: "Optional[int]"
+    output_tokens: "Optional[int]"
+    total_tokens: "Optional[int]"
+    cache_read: "Optional[int]"
+    cache_creation: "Optional[int]"
+    reasoning: "Optional[int]"
 
 
 try:
@@ -395,13 +413,29 @@ class SentryLangchainCallback(BaseCallbackHandler):
             if ai_system:
                 set_on_span(SPANDATA.GEN_AI_SYSTEM, ai_system)
 
+            client = sentry_sdk.get_client()
+
             for key, attribute in DATA_FIELDS.items():
                 if key in all_params and all_params[key] is not None:
+                    if (
+                        attribute == SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS
+                        and has_data_collection_enabled(client.options)
+                        and not client.options["data_collection"]["gen_ai"]["inputs"]
+                    ):
+                        continue
+
                     set_data_normalized(span, attribute, all_params[key], unpack=False)
 
             _set_tools_on_span(span, all_params.get("tools"))
 
-            if should_send_default_pii() and self.include_prompts:
+            record_inputs = False
+            if has_data_collection_enabled(client.options):
+                record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
+            elif should_send_default_pii() and self.include_prompts:
+                # TODO: Remove this branch once `send_default_pii` is deprecated
+                record_inputs = True
+
+            if record_inputs:
                 normalized_messages = [
                     {
                         "role": GEN_AI_ALLOWED_MESSAGE_ROLES.USER,
@@ -410,7 +444,6 @@ class SentryLangchainCallback(BaseCallbackHandler):
                     for prompt in prompts
                 ]
 
-                client = sentry_sdk.get_client()
                 scope = sentry_sdk.get_current_scope()
                 messages_data = (
                     truncate_and_annotate_messages(normalized_messages, span, scope)
@@ -478,13 +511,29 @@ class SentryLangchainCallback(BaseCallbackHandler):
                     run_name,
                 )
 
+            client = sentry_sdk.get_client()
+
             for key, attribute in DATA_FIELDS.items():
                 if key in all_params and all_params[key] is not None:
+                    if (
+                        attribute == SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS
+                        and has_data_collection_enabled(client.options)
+                        and not client.options["data_collection"]["gen_ai"]["inputs"]
+                    ):
+                        continue
+
                     set_data_normalized(span, attribute, all_params[key], unpack=False)
 
             _set_tools_on_span(span, all_params.get("tools"))
 
-            if should_send_default_pii() and self.include_prompts:
+            record_inputs = False
+            if has_data_collection_enabled(client.options):
+                record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
+            elif should_send_default_pii() and self.include_prompts:
+                # TODO: Remove this branch once `send_default_pii` is deprecated
+                record_inputs = True
+
+            if record_inputs:
                 system_instructions = _get_system_instructions(messages)
                 if len(system_instructions) > 0:
                     set_on_span(
@@ -503,7 +552,6 @@ class SentryLangchainCallback(BaseCallbackHandler):
                         )
                 normalized_messages = normalize_message_roles(normalized_messages)
 
-                client = sentry_sdk.get_client()
                 scope = sentry_sdk.get_current_scope()
                 messages_data = (
                     truncate_and_annotate_messages(normalized_messages, span, scope)
@@ -532,7 +580,16 @@ class SentryLangchainCallback(BaseCallbackHandler):
 
             span = self.span_map[run_id]
 
-            if should_send_default_pii() and self.include_prompts:
+            client = sentry_sdk.get_client()
+
+            record_outputs = False
+            if has_data_collection_enabled(client.options):
+                record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
+            elif should_send_default_pii() and self.include_prompts:
+                # TODO: Remove this branch once `send_default_pii` is deprecated
+                record_outputs = True
+
+            if record_outputs:
                 set_data_normalized(
                     span,
                     SPANDATA.GEN_AI_RESPONSE_TEXT,
@@ -556,6 +613,18 @@ class SentryLangchainCallback(BaseCallbackHandler):
 
             span = self.span_map[run_id]
 
+            client = sentry_sdk.get_client()
+
+            record_inputs = False
+            record_outputs = False
+            if has_data_collection_enabled(client.options):
+                record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
+                record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
+            elif should_send_default_pii() and self.include_prompts:
+                # TODO: Remove this branch once `send_default_pii` is deprecated
+                record_inputs = True
+                record_outputs = True
+
             try:
                 generation = response.generations[0][0]
             except IndexError:
@@ -578,7 +647,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
                 if response_model is not None:
                     set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
 
-                if should_send_default_pii() and self.include_prompts:
+                if record_inputs:
                     tool_calls = getattr(generation.message, "tool_calls", None)
                     if tool_calls is not None and tool_calls != []:
                         set_data_normalized(
@@ -588,7 +657,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
                             unpack=False,
                         )
 
-            if should_send_default_pii() and self.include_prompts:
+            if record_outputs:
                 set_data_normalized(
                     span,
                     SPANDATA.GEN_AI_RESPONSE_TEXT,
@@ -617,26 +686,6 @@ class SentryLangchainCallback(BaseCallbackHandler):
     ) -> "Any":
         """Run when Chat Model errors."""
         self._handle_error(run_id, error)
-
-    def on_agent_finish(
-        self: "SentryLangchainCallback",
-        finish: "AgentFinish",
-        *,
-        run_id: "UUID",
-        **kwargs: "Any",
-    ) -> "Any":
-        with capture_internal_exceptions():
-            if not run_id or run_id not in self.span_map:
-                return
-
-            span = self.span_map[run_id]
-
-            if should_send_default_pii() and self.include_prompts:
-                set_data_normalized(
-                    span, SPANDATA.GEN_AI_RESPONSE_TEXT, finish.return_values.items()
-                )
-
-            self._exit_span(span, run_id)
 
     def on_tool_start(
         self: "SentryLangchainCallback",
@@ -683,7 +732,16 @@ class SentryLangchainCallback(BaseCallbackHandler):
                     run_name,
                 )
 
-            if should_send_default_pii() and self.include_prompts:
+            client = sentry_sdk.get_client()
+
+            record_inputs = False
+            if has_data_collection_enabled(client.options):
+                record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
+            elif should_send_default_pii() and self.include_prompts:
+                # TODO: Remove this branch once `send_default_pii` is deprecated
+                record_inputs = True
+
+            if record_inputs:
                 set_data_normalized(
                     span,
                     SPANDATA.GEN_AI_TOOL_INPUT,
@@ -700,7 +758,16 @@ class SentryLangchainCallback(BaseCallbackHandler):
 
             span = self.span_map[run_id]
 
-            if should_send_default_pii() and self.include_prompts:
+            client = sentry_sdk.get_client()
+
+            record_outputs = False
+            if has_data_collection_enabled(client.options):
+                record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
+            elif should_send_default_pii() and self.include_prompts:
+                # TODO: Remove this branch once `send_default_pii` is deprecated
+                record_outputs = True
+
+            if record_outputs:
                 set_data_normalized(span, SPANDATA.GEN_AI_TOOL_OUTPUT, output)
 
             self._exit_span(span, run_id)
@@ -734,28 +801,66 @@ def _extract_tokens(
 
 
 def _extract_tokens_from_generations(
-    generations: "Any",
-) -> "tuple[Optional[int], Optional[int], Optional[int]]":
+    generations: "list[list[Generation | ChatGeneration | GenerationChunk | ChatGenerationChunk]]",
+) -> "TokenUsage":
     """Extract token usage from response.generations structure."""
-    if not generations:
-        return None, None, None
-
     total_input = 0
     total_output = 0
     total_total = 0
+    total_cache_read = None
+    total_cache_creation = None
+    reasoning = None
 
     for gen_list in generations:
-        for gen in gen_list:
-            token_usage = _get_token_usage(gen)
-            input_tokens, output_tokens, total_tokens = _extract_tokens(token_usage)
-            total_input += input_tokens if input_tokens is not None else 0
-            total_output += output_tokens if output_tokens is not None else 0
-            total_total += total_tokens if total_tokens is not None else 0
+        if not gen_list:
+            continue
 
-    return (
+        token_usage = _get_token_usage(gen_list[0])
+        input_tokens, output_tokens, total_tokens = _extract_tokens(token_usage)
+        total_input += input_tokens if isinstance(input_tokens, int) else 0
+        total_output += output_tokens if isinstance(output_tokens, int) else 0
+        total_total += total_tokens if isinstance(total_tokens, int) else 0
+
+        if not isinstance(gen_list[0], ChatGeneration):
+            continue
+
+        message = gen_list[0].message
+
+        # The property was added in https://github.com/langchain-ai/langchain/commit/fbfed65fb1ccff3eb8477c4f114450537a0510b2
+        if not isinstance(message, AIMessage) or not hasattr(message, "usage_metadata"):
+            continue
+
+        usage_metadata = message.usage_metadata
+
+        if not isinstance(usage_metadata, dict):
+            continue
+
+        input_token_details = usage_metadata.get("input_token_details")
+        if isinstance(input_token_details, dict):
+            if isinstance(input_token_details.get("cache_read"), int):
+                total_cache_read = (total_cache_read or 0) + input_token_details[
+                    "cache_read"
+                ]
+
+            if isinstance(input_token_details.get("cache_creation"), int):
+                total_cache_creation = (
+                    total_cache_creation or 0
+                ) + input_token_details["cache_creation"]
+
+        output_token_details = usage_metadata.get("output_token_details")
+        if not isinstance(output_token_details, dict):
+            continue
+
+        if isinstance(output_token_details.get("reasoning"), int):
+            reasoning = (reasoning or 0) + output_token_details["reasoning"]
+
+    return TokenUsage(
         total_input if total_input > 0 else None,
         total_output if total_output > 0 else None,
         total_total if total_total > 0 else None,
+        total_cache_read,
+        total_cache_creation,
+        reasoning,
     )
 
 
@@ -787,14 +892,36 @@ def _get_token_usage(obj: "Any") -> "Optional[Dict[str, Any]]":
     return None
 
 
-def _record_token_usage(span: "Union[Span, StreamedSpan]", response: "Any") -> None:
+def _record_token_usage(
+    span: "Union[Span, StreamedSpan]", response: "LLMResult"
+) -> None:
+    input_tokens = None
+    output_tokens = None
+    total_tokens = None
+    cache_read_tokens = None
+    cache_creation_tokens = None
+    reasoning = None
+
+    # Legacy that reads provider-specific token information.
     token_usage = _get_token_usage(response)
     if token_usage:
         input_tokens, output_tokens, total_tokens = _extract_tokens(token_usage)
-    else:
-        input_tokens, output_tokens, total_tokens = _extract_tokens_from_generations(
-            response.generations
-        )
+
+    # Prefer provider-agnostic UsageMetadata if available.
+    if response.generations is not None:
+        token_usage = _extract_tokens_from_generations(response.generations)
+        if token_usage.input_tokens is not None:
+            input_tokens = token_usage.input_tokens
+        if token_usage.output_tokens is not None:
+            output_tokens = token_usage.output_tokens
+        if token_usage.total_tokens is not None:
+            total_tokens = token_usage.total_tokens
+        if token_usage.cache_read is not None:
+            cache_read_tokens = token_usage.cache_read
+        if token_usage.cache_creation is not None:
+            cache_creation_tokens = token_usage.cache_creation
+        if token_usage.reasoning is not None:
+            reasoning = token_usage.reasoning
 
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
@@ -808,6 +935,17 @@ def _record_token_usage(span: "Union[Span, StreamedSpan]", response: "Any") -> N
 
     if total_tokens is not None:
         set_on_span(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, total_tokens)
+
+    if cache_read_tokens is not None:
+        set_on_span(SPANDATA.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read_tokens)
+
+    if cache_creation_tokens is not None:
+        set_on_span(
+            SPANDATA.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, cache_creation_tokens
+        )
+
+    if reasoning is not None:
+        set_on_span(SPANDATA.GEN_AI_USAGE_REASONING_OUTPUT_TOKENS, reasoning)
 
 
 def _get_request_data(
@@ -906,15 +1044,24 @@ def _simplify_langchain_tools(tools: "Any") -> "Optional[List[Any]]":
 
 def _set_tools_on_span(span: "Union[Span, StreamedSpan]", tools: "Any") -> None:
     """Set available tools data on a span if tools are provided."""
-    if tools is not None:
-        simplified_tools = _simplify_langchain_tools(tools)
-        if simplified_tools:
-            set_data_normalized(
-                span,
-                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
-                simplified_tools,
-                unpack=False,
-            )
+    if tools is None:
+        return
+
+    client = sentry_sdk.get_client()
+    if has_data_collection_enabled(client.options):
+        if not client.options["data_collection"]["gen_ai"]["inputs"]:
+            return
+
+    # Before data collection was introduced this was set unconditionally, so it
+    # stays that way when data collection is not configured.
+    simplified_tools = _simplify_langchain_tools(tools)
+    if simplified_tools:
+        set_data_normalized(
+            span,
+            SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+            simplified_tools,
+            unpack=False,
+        )
 
 
 def _wrap_configure(f: "Callable[..., Any]") -> "Callable[..., Any]":
@@ -1007,6 +1154,16 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
 
         run_name, tools = _get_request_data(self, args, kwargs)
 
+        record_inputs = False
+        record_outputs = False
+        if has_data_collection_enabled(client.options):
+            record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
+            record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
+        elif should_send_default_pii() and integration.include_prompts:
+            # TODO: Remove this branch once `send_default_pii` is deprecated
+            record_inputs = True
+            record_outputs = True
+
         if has_span_streaming_enabled(client.options):
             with sentry_sdk.traces.start_span(
                 name=f"invoke_agent {run_name}" if run_name else "invoke_agent",
@@ -1026,14 +1183,9 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
                 result = f(self, *args, **kwargs)
 
                 input = result.get("input")
-                if (
-                    input is not None
-                    and should_send_default_pii()
-                    and integration.include_prompts
-                ):
+                if input is not None and record_inputs:
                     normalized_messages = normalize_message_roles([input])
 
-                    client = sentry_sdk.get_client()
                     scope = sentry_sdk.get_current_scope()
                     messages_data = (
                         truncate_and_annotate_messages(normalized_messages, span, scope)
@@ -1049,11 +1201,7 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
                         )
 
                 output = result.get("output")
-                if (
-                    output is not None
-                    and should_send_default_pii()
-                    and integration.include_prompts
-                ):
+                if output is not None and record_outputs:
                     set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
                 return result
@@ -1077,14 +1225,9 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
                 result = f(self, *args, **kwargs)
 
                 input = result.get("input")
-                if (
-                    input is not None
-                    and should_send_default_pii()
-                    and integration.include_prompts
-                ):
+                if input is not None and record_inputs:
                     normalized_messages = normalize_message_roles([input])
 
-                    client = sentry_sdk.get_client()
                     scope = sentry_sdk.get_current_scope()
                     messages_data = (
                         truncate_and_annotate_messages(normalized_messages, span, scope)
@@ -1100,11 +1243,7 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
                         )
 
                 output = result.get("output")
-                if (
-                    output is not None
-                    and should_send_default_pii()
-                    and integration.include_prompts
-                ):
+                if output is not None and record_outputs:
                     set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
                 return result
@@ -1121,6 +1260,16 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
             return f(self, *args, **kwargs)
 
         run_name, tools = _get_request_data(self, args, kwargs)
+
+        record_inputs = False
+        record_outputs = False
+        if has_data_collection_enabled(client.options):
+            record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
+            record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
+        elif should_send_default_pii() and integration.include_prompts:
+            # TODO: Remove this branch once `send_default_pii` is deprecated
+            record_inputs = True
+            record_outputs = True
 
         if has_span_streaming_enabled(client.options):
             span = sentry_sdk.traces.start_span(
@@ -1154,14 +1303,9 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
         _set_tools_on_span(span, tools)
 
         input = args[0].get("input") if len(args) >= 1 else None
-        if (
-            input is not None
-            and should_send_default_pii()
-            and integration.include_prompts
-        ):
+        if input is not None and record_inputs:
             normalized_messages = normalize_message_roles([input])
 
-            client = sentry_sdk.get_client()
             scope = sentry_sdk.get_current_scope()
             messages_data = (
                 truncate_and_annotate_messages(normalized_messages, span, scope)
@@ -1192,11 +1336,7 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
                 except Exception:
                     output = None
 
-                if (
-                    output is not None
-                    and should_send_default_pii()
-                    and integration.include_prompts
-                ):
+                if output is not None and record_outputs:
                     set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
                 span.__exit__(None, None, None)
@@ -1217,11 +1357,7 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
                 except Exception:
                     output = None
 
-                if (
-                    output is not None
-                    and should_send_default_pii()
-                    and integration.include_prompts
-                ):
+                if output is not None and record_outputs:
                     set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, output)
 
                 span.__exit__(None, None, None)
@@ -1274,6 +1410,13 @@ def _wrap_embedding_method(f: "Callable[..., Any]") -> "Callable[..., Any]":
 
         model_name = getattr(self, "model", None) or getattr(self, "model_name", None)
 
+        record_inputs = False
+        if has_data_collection_enabled(client.options):
+            record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
+        elif should_send_default_pii() and integration.include_prompts:
+            # TODO: Remove this branch once `send_default_pii` is deprecated
+            record_inputs = True
+
         if has_span_streaming_enabled(client.options):
             with sentry_sdk.traces.start_span(
                 name=f"embeddings {model_name}" if model_name else "embeddings",
@@ -1286,12 +1429,7 @@ def _wrap_embedding_method(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 if model_name:
                     span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
 
-                # Capture input if PII is allowed
-                if (
-                    should_send_default_pii()
-                    and integration.include_prompts
-                    and len(args) > 0
-                ):
+                if record_inputs and len(args) > 0:
                     input_data = args[0]
                     # Normalize to list format
                     texts = input_data if isinstance(input_data, list) else [input_data]
@@ -1311,12 +1449,7 @@ def _wrap_embedding_method(f: "Callable[..., Any]") -> "Callable[..., Any]":
                 if model_name:
                     span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
 
-                # Capture input if PII is allowed
-                if (
-                    should_send_default_pii()
-                    and integration.include_prompts
-                    and len(args) > 0
-                ):
+                if record_inputs and len(args) > 0:
                     input_data = args[0]
                     # Normalize to list format
                     texts = input_data if isinstance(input_data, list) else [input_data]
@@ -1344,6 +1477,13 @@ def _wrap_async_embedding_method(f: "Callable[..., Any]") -> "Callable[..., Any]
 
         model_name = getattr(self, "model", None) or getattr(self, "model_name", None)
 
+        record_inputs = False
+        if has_data_collection_enabled(client.options):
+            record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
+        elif should_send_default_pii() and integration.include_prompts:
+            # TODO: Remove this branch once `send_default_pii` is deprecated
+            record_inputs = True
+
         if has_span_streaming_enabled(client.options):
             with sentry_sdk.traces.start_span(
                 name=f"embeddings {model_name}" if model_name else "embeddings",
@@ -1356,12 +1496,7 @@ def _wrap_async_embedding_method(f: "Callable[..., Any]") -> "Callable[..., Any]
                 if model_name:
                     span.set_attribute(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
 
-                # Capture input if PII is allowed
-                if (
-                    should_send_default_pii()
-                    and integration.include_prompts
-                    and len(args) > 0
-                ):
+                if record_inputs and len(args) > 0:
                     input_data = args[0]
                     # Normalize to list format
                     texts = input_data if isinstance(input_data, list) else [input_data]
@@ -1381,12 +1516,7 @@ def _wrap_async_embedding_method(f: "Callable[..., Any]") -> "Callable[..., Any]
                 if model_name:
                     span.set_data(SPANDATA.GEN_AI_REQUEST_MODEL, model_name)
 
-                # Capture input if PII is allowed
-                if (
-                    should_send_default_pii()
-                    and integration.include_prompts
-                    and len(args) > 0
-                ):
+                if record_inputs and len(args) > 0:
                     input_data = args[0]
                     # Normalize to list format
                     texts = input_data if isinstance(input_data, list) else [input_data]

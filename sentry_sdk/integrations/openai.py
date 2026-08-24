@@ -371,10 +371,7 @@ def _set_responses_api_input_data(
 
     client_options = sentry_sdk.get_client().options
     if has_data_collection_enabled(client_options):
-        if (
-            integration.include_prompts
-            and client_options["data_collection"]["gen_ai"]["inputs"]
-        ):
+        if client_options["data_collection"]["gen_ai"]["inputs"]:
             tools = kwargs.get("tools")
             if tools is not None and _is_given(tools):
                 set_on_span(
@@ -394,9 +391,6 @@ def _set_responses_api_input_data(
             )
 
     if has_data_collection_enabled(client_options):
-        # This takes precedence over the global data collection settings
-        if not integration.include_prompts:
-            return
         if not client_options["data_collection"]["gen_ai"]["inputs"]:
             return
     elif not should_send_default_pii() or not integration.include_prompts:
@@ -519,10 +513,7 @@ def _set_completions_api_input_data(
 
     client = sentry_sdk.get_client()
     if has_data_collection_enabled(client.options):
-        if (
-            integration.include_prompts
-            and client.options["data_collection"]["gen_ai"]["inputs"]
-        ):
+        if client.options["data_collection"]["gen_ai"]["inputs"]:
             tools = kwargs.get("tools")
             if tools is not None and _is_given(tools):
                 set_on_span(
@@ -546,9 +537,6 @@ def _set_completions_api_input_data(
     )
 
     if has_data_collection_enabled(client.options):
-        # This takes precedence over the global data collection settings
-        if not integration.include_prompts:
-            return
         if not client.options["data_collection"]["gen_ai"]["inputs"]:
             return
     elif not should_send_default_pii() or not integration.include_prompts:
@@ -627,9 +615,6 @@ def _set_embeddings_input_data(
 
     client = sentry_sdk.get_client()
     if has_data_collection_enabled(client.options):
-        # This takes precedence over the global data collection settings
-        if not integration.include_prompts:
-            return
         if not client.options["data_collection"]["gen_ai"]["inputs"]:
             return
     elif not should_send_default_pii() or not integration.include_prompts:
@@ -681,12 +666,24 @@ def _set_common_output_data(
     integration: "OpenAIIntegration",
     finish_span: bool = True,
 ) -> None:
+    client = sentry_sdk.get_client()
     if hasattr(response, "model"):
         set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_MODEL, response.model)
 
     # Chat Completions API
     if hasattr(response, "choices") and response.choices is not None:
-        if should_send_default_pii() and integration.include_prompts:
+        if has_data_collection_enabled(client.options):
+            if client.options["data_collection"]["gen_ai"]["outputs"]:
+                response_text = [
+                    choice.message.model_dump()
+                    for choice in response.choices
+                    if choice.message is not None
+                ]
+                if len(response_text) > 0:
+                    set_data_normalized(
+                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, response_text
+                    )
+        elif should_send_default_pii() and integration.include_prompts:
             response_text = [
                 choice.message.model_dump()
                 for choice in response.choices
@@ -709,12 +706,43 @@ def _set_common_output_data(
 
     # Responses API
     elif hasattr(response, "output"):
-        if should_send_default_pii() and integration.include_prompts:
-            output_messages: "dict[str, list[Any]]" = {
-                "response": [],
-                "tool": [],
-            }
+        output_messages: "dict[str, list[Any]]" = {
+            "response": [],
+            "tool": [],
+        }
 
+        if has_data_collection_enabled(client.options):
+            record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
+            record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
+
+            if record_inputs or record_outputs:
+                for output in response.output:
+                    if output.type == "function_call":
+                        output_messages["tool"].append(output.dict())
+                    elif output.type == "message":
+                        for output_message in output.content:
+                            try:
+                                output_messages["response"].append(output_message.text)
+                            except AttributeError:
+                                # Unknown output message type, just return the json
+                                output_messages["response"].append(
+                                    output_message.dict()
+                                )
+
+                if record_inputs and len(output_messages["tool"]) > 0:
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+                        output_messages["tool"],
+                        unpack=False,
+                    )
+
+                if record_outputs and len(output_messages["response"]) > 0:
+                    set_data_normalized(
+                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
+                    )
+
+        elif should_send_default_pii() and integration.include_prompts:
             for output in response.output:
                 if output.type == "function_call":
                     output_messages["tool"].append(output.dict())
@@ -961,6 +989,7 @@ def _wrap_synchronous_completions_chunk_iterator(
     ttft = None
     data_buf: "list[list[str]]" = []  # one for each choice
     streaming_message_total_token_usage = None
+    client = sentry_sdk.get_client()
 
     for x in old_iterator:
         if isinstance(span, StreamedSpan):
@@ -993,7 +1022,12 @@ def _wrap_synchronous_completions_chunk_iterator(
         all_responses = None
         if len(data_buf) > 0:
             all_responses = ["".join(chunk) for chunk in data_buf]
-            if should_send_default_pii() and integration.include_prompts:
+            if has_data_collection_enabled(client.options):
+                if client.options["data_collection"]["gen_ai"]["outputs"]:
+                    set_data_normalized(
+                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
+                    )
+            elif should_send_default_pii() and integration.include_prompts:
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
 
         _calculate_completions_token_usage(
@@ -1026,6 +1060,7 @@ async def _wrap_asynchronous_completions_chunk_iterator(
     ttft = None
     data_buf: "list[list[str]]" = []  # one for each choice
     streaming_message_total_token_usage = None
+    client = sentry_sdk.get_client()
 
     async for x in old_iterator:
         if isinstance(span, StreamedSpan):
@@ -1058,7 +1093,12 @@ async def _wrap_asynchronous_completions_chunk_iterator(
         all_responses = None
         if len(data_buf) > 0:
             all_responses = ["".join(chunk) for chunk in data_buf]
-            if should_send_default_pii() and integration.include_prompts:
+            if has_data_collection_enabled(client.options):
+                if client.options["data_collection"]["gen_ai"]["outputs"]:
+                    set_data_normalized(
+                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
+                    )
+            elif should_send_default_pii() and integration.include_prompts:
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
 
         _calculate_completions_token_usage(
@@ -1090,6 +1130,7 @@ def _wrap_synchronous_responses_event_iterator(
     """
     ttft = None
     data_buf: "list[list[str]]" = []  # one for each choice
+    client = sentry_sdk.get_client()
 
     count_tokens_manually = True
     for x in old_iterator:
@@ -1125,7 +1166,12 @@ def _wrap_synchronous_responses_event_iterator(
             )
         if len(data_buf) > 0:
             all_responses = ["".join(chunk) for chunk in data_buf]
-            if should_send_default_pii() and integration.include_prompts:
+            if has_data_collection_enabled(client.options):
+                if client.options["data_collection"]["gen_ai"]["outputs"]:
+                    set_data_normalized(
+                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
+                    )
+            elif should_send_default_pii() and integration.include_prompts:
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
 
             if count_tokens_manually:
@@ -1157,6 +1203,7 @@ async def _wrap_asynchronous_responses_event_iterator(
     """
     ttft: "Optional[float]" = None
     data_buf: "list[list[str]]" = []  # one for each choice
+    client = sentry_sdk.get_client()
 
     count_tokens_manually = True
     async for x in old_iterator:
@@ -1192,8 +1239,15 @@ async def _wrap_asynchronous_responses_event_iterator(
             )
         if len(data_buf) > 0:
             all_responses = ["".join(chunk) for chunk in data_buf]
-            if should_send_default_pii() and integration.include_prompts:
+
+            if has_data_collection_enabled(client.options):
+                if client.options["data_collection"]["gen_ai"]["outputs"]:
+                    set_data_normalized(
+                        span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses
+                    )
+            elif should_send_default_pii() and integration.include_prompts:
                 set_data_normalized(span, SPANDATA.GEN_AI_RESPONSE_TEXT, all_responses)
+
             if count_tokens_manually:
                 _calculate_responses_token_usage(
                     input=input,

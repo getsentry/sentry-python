@@ -36,6 +36,7 @@ from sentry_sdk.tracing_utils import (
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
+    has_data_collection_enabled,
     safe_serialize,
 )
 
@@ -887,6 +888,7 @@ def set_span_data_for_request(
     kwargs: "dict[str, Any]",
 ) -> None:
     """Set span data for the request."""
+    client = sentry_sdk.get_client()
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
     )
@@ -898,8 +900,37 @@ def set_span_data_for_request(
 
     config: "Optional[GenerateContentConfig]" = kwargs.get("config")
 
-    # Set input messages/prompts if PII is allowed
-    if should_send_default_pii() and integration.include_prompts:
+    # Set tools if available
+    if config is not None and hasattr(config, "tools"):
+        tools = config.tools
+        if tools:
+            formatted_tools = _format_tools_for_span(tools)
+            if formatted_tools:
+                if has_data_collection_enabled(client.options):
+                    if client.options["data_collection"]["gen_ai"]["inputs"]:
+                        set_data_normalized(
+                            span,
+                            SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                            formatted_tools,
+                            unpack=False,
+                        )
+                else:
+                    # To remove once data collection has been fully rolled out
+                    set_data_normalized(
+                        span,
+                        SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                        formatted_tools,
+                        unpack=False,
+                    )
+
+    record_inputs = False
+    if has_data_collection_enabled(client.options):
+        if client.options["data_collection"]["gen_ai"]["inputs"]:
+            record_inputs = True
+    elif should_send_default_pii() and integration.include_prompts:
+        record_inputs = True
+
+    if record_inputs:
         messages = []
 
         # Add system instruction if present
@@ -951,42 +982,19 @@ def set_span_data_for_request(
             if value is not None:
                 set_on_span(span_key, value)
 
-    # Set tools if available
-    if config is not None and hasattr(config, "tools"):
-        tools = config.tools
-        if tools:
-            formatted_tools = _format_tools_for_span(tools)
-            if formatted_tools:
-                set_data_normalized(
-                    span,
-                    SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
-                    formatted_tools,
-                    unpack=False,
-                )
-
 
 def set_span_data_for_response(
     span: "Union[Span, StreamedSpan]",
     integration: "Any",
     response: "GenerateContentResponse",
 ) -> None:
-    """Set span data for the response."""
     if not response:
         return
 
+    client = sentry_sdk.get_client()
     set_on_span = (
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
     )
-    if should_send_default_pii() and integration.include_prompts:
-        response_texts = _extract_response_text(response)
-        if response_texts:
-            # Format as JSON string array as per documentation
-            set_on_span(SPANDATA.GEN_AI_RESPONSE_TEXT, safe_serialize(response_texts))
-
-    tool_calls = extract_tool_calls(response)
-    if tool_calls:
-        # Tool calls should be JSON serialized
-        set_on_span(SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(tool_calls))
 
     finish_reasons = extract_finish_reasons(response)
     if finish_reasons:
@@ -1022,6 +1030,31 @@ def set_span_data_for_response(
 
     if usage_data["total_tokens"]:
         set_on_span(SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS, usage_data["total_tokens"])
+
+    tool_calls = extract_tool_calls(response)
+    if tool_calls:
+        if has_data_collection_enabled(client.options):
+            if client.options["data_collection"]["gen_ai"]["inputs"]:
+                set_on_span(
+                    SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(tool_calls)
+                )
+        else:
+            # Before data collection was introduced, this was set unconditionally
+            set_on_span(SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS, safe_serialize(tool_calls))
+
+    if has_data_collection_enabled(client.options):
+        if client.options["data_collection"]["gen_ai"]["outputs"]:
+            response_texts = _extract_response_text(response)
+            if response_texts:
+                set_on_span(
+                    SPANDATA.GEN_AI_RESPONSE_TEXT, safe_serialize(response_texts)
+                )
+    elif should_send_default_pii() and integration.include_prompts:
+        # TODO: Delete this block once data collection has been completely rolled out
+        response_texts = _extract_response_text(response)
+        if response_texts:
+            # Format as JSON string array as per documentation
+            set_on_span(SPANDATA.GEN_AI_RESPONSE_TEXT, safe_serialize(response_texts))
 
 
 def prepare_generate_content_args(
@@ -1062,8 +1095,16 @@ def set_span_data_for_embed_request(
     kwargs: "dict[str, Any]",
 ) -> None:
     """Set span data for embedding request."""
-    # Include input contents if PII is allowed
-    if should_send_default_pii() and integration.include_prompts:
+    client = sentry_sdk.get_client()
+
+    record_inputs = False
+    if has_data_collection_enabled(client.options):
+        if client.options["data_collection"]["gen_ai"]["inputs"]:
+            record_inputs = True
+    elif should_send_default_pii() and integration.include_prompts:
+        record_inputs = True
+
+    if record_inputs:
         if contents:
             # For embeddings, contents is typically a list of strings/texts
             input_texts = []
