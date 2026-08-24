@@ -275,7 +275,7 @@ async def test_job_retry(
     "init_arq_settings", ["init_arq", "init_arq_with_dict_settings"]
 )
 @pytest.mark.asyncio
-async def test_job_transaction(
+async def test_worker_jobs(
     capture_items,
     init_arq_settings,
     source,
