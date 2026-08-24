@@ -4,6 +4,7 @@ import os
 import re
 import sys
 from functools import partial
+from io import BytesIO
 from unittest.mock import patch
 
 import pytest
@@ -1189,6 +1190,128 @@ def test_request_body(
     assert event["message"] == "hi"
     assert event["request"]["data"] == {"hey": 42}
     assert "" not in event
+
+
+@pytest.mark.parametrize(
+    "data_collection, expect_body",
+    [
+        pytest.param({}, True, id="data_collection_http_bodies_default"),
+        pytest.param(
+            {"http_bodies": ["incoming_request"]},
+            True,
+            id="data_collection_http_bodies_incoming_request",
+        ),
+        pytest.param(
+            {"http_bodies": ["outgoing_request"]},
+            False,
+            id="data_collection_http_bodies_outgoing_request_only",
+        ),
+        pytest.param(
+            {"http_bodies": []}, False, id="data_collection_http_bodies_empty"
+        ),
+    ],
+)
+def test_request_body_data_collection(
+    sentry_init, client, capture_items, data_collection, expect_body
+):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        _experiments={"data_collection": data_collection},
+    )
+    items = capture_items("event")
+
+    data = {"hey": 42}
+    content, status, headers = unpack_werkzeug_response(
+        client.post(
+            reverse("post_echo"),
+            data=json.dumps(data).encode("utf-8"),
+            content_type="application/json",
+        )
+    )
+    assert status.lower() == "200 ok"
+
+    (event,) = (item.payload for item in items)
+
+    if expect_body:
+        assert event["request"]["data"] == data
+    else:
+        assert "data" not in event["request"]
+
+
+def test_request_body_dropped_with_form_and_files_data_collection(
+    sentry_init, client, capture_items
+):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        max_request_body_size="always",
+        _experiments={"data_collection": {"http_bodies": []}},
+    )
+    items = capture_items("event")
+
+    content, status, headers = unpack_werkzeug_response(
+        client.post(
+            reverse("post_echo"),
+            data={"foo": "bar", "file": (BytesIO(b"hello"), "hello.txt")},
+        )
+    )
+    assert status.lower() == "200 ok"
+
+    (event,) = (item.payload for item in items)
+
+    assert "data" not in event["request"]
+    assert "data" not in event.get("_meta", {}).get("request", {})
+
+
+def test_transaction_request_body_data_collection(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"data_collection": {"http_bodies": []}},
+    )
+    events = capture_events()
+
+    content, status, headers = unpack_werkzeug_response(
+        client.post(
+            reverse("post_echo"),
+            data=json.dumps({"hey": 42}).encode("utf-8"),
+            content_type="application/json",
+        )
+    )
+    assert status.lower() == "200 ok"
+
+    event, transaction_event = events
+
+    assert "data" not in event["request"]
+    assert "data" not in transaction_event["request"]
+
+
+def test_oversized_request_body_not_annotated_data_collection(
+    sentry_init, client, capture_items
+):
+    """
+    The gating happens before the size check, so an oversized body is dropped
+    outright instead of being reported as removed because of the size limit.
+    """
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        max_request_body_size="small",
+        _experiments={"data_collection": {"http_bodies": []}},
+    )
+    items = capture_items("event")
+
+    content, status, headers = unpack_werkzeug_response(
+        client.post(
+            reverse("post_echo"),
+            data=b"a" * 2000,
+            content_type="text/plain",
+        )
+    )
+    assert status.lower() == "200 ok"
+
+    (event,) = (item.payload for item in items)
+
+    assert "data" not in event["request"]
+    assert "data" not in event.get("_meta", {}).get("request", {})
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
