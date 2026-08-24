@@ -4,6 +4,7 @@ import os
 import re
 import sys
 from functools import partial
+from io import BytesIO
 from unittest.mock import patch
 
 import pytest
@@ -1191,6 +1192,128 @@ def test_request_body(
     assert "" not in event
 
 
+@pytest.mark.parametrize(
+    "data_collection, expect_body",
+    [
+        pytest.param({}, True, id="data_collection_http_bodies_default"),
+        pytest.param(
+            {"http_bodies": ["incoming_request"]},
+            True,
+            id="data_collection_http_bodies_incoming_request",
+        ),
+        pytest.param(
+            {"http_bodies": ["outgoing_request"]},
+            False,
+            id="data_collection_http_bodies_outgoing_request_only",
+        ),
+        pytest.param(
+            {"http_bodies": []}, False, id="data_collection_http_bodies_empty"
+        ),
+    ],
+)
+def test_request_body_data_collection(
+    sentry_init, client, capture_items, data_collection, expect_body
+):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        _experiments={"data_collection": data_collection},
+    )
+    items = capture_items("event")
+
+    data = {"hey": 42}
+    content, status, headers = unpack_werkzeug_response(
+        client.post(
+            reverse("post_echo"),
+            data=json.dumps(data).encode("utf-8"),
+            content_type="application/json",
+        )
+    )
+    assert status.lower() == "200 ok"
+
+    (event,) = (item.payload for item in items)
+
+    if expect_body:
+        assert event["request"]["data"] == data
+    else:
+        assert "data" not in event["request"]
+
+
+def test_request_body_dropped_with_form_and_files_data_collection(
+    sentry_init, client, capture_items
+):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        max_request_body_size="always",
+        _experiments={"data_collection": {"http_bodies": []}},
+    )
+    items = capture_items("event")
+
+    content, status, headers = unpack_werkzeug_response(
+        client.post(
+            reverse("post_echo"),
+            data={"foo": "bar", "file": (BytesIO(b"hello"), "hello.txt")},
+        )
+    )
+    assert status.lower() == "200 ok"
+
+    (event,) = (item.payload for item in items)
+
+    assert "data" not in event["request"]
+    assert "data" not in event.get("_meta", {}).get("request", {})
+
+
+def test_transaction_request_body_data_collection(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"data_collection": {"http_bodies": []}},
+    )
+    events = capture_events()
+
+    content, status, headers = unpack_werkzeug_response(
+        client.post(
+            reverse("post_echo"),
+            data=json.dumps({"hey": 42}).encode("utf-8"),
+            content_type="application/json",
+        )
+    )
+    assert status.lower() == "200 ok"
+
+    event, transaction_event = events
+
+    assert "data" not in event["request"]
+    assert "data" not in transaction_event["request"]
+
+
+def test_oversized_request_body_not_annotated_data_collection(
+    sentry_init, client, capture_items
+):
+    """
+    The gating happens before the size check, so an oversized body is dropped
+    outright instead of being reported as removed because of the size limit.
+    """
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        max_request_body_size="small",
+        _experiments={"data_collection": {"http_bodies": []}},
+    )
+    items = capture_items("event")
+
+    content, status, headers = unpack_werkzeug_response(
+        client.post(
+            reverse("post_echo"),
+            data=b"a" * 2000,
+            content_type="text/plain",
+        )
+    )
+    assert status.lower() == "200 ok"
+
+    (event,) = (item.payload for item in items)
+
+    assert "data" not in event["request"]
+    assert "data" not in event.get("_meta", {}).get("request", {})
+
+
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_read_request(
     sentry_init,
@@ -1516,6 +1639,96 @@ def test_does_not_capture_403(
     assert status.lower() == "403 forbidden"
 
     assert not items
+
+
+@pytest.mark.parametrize(
+    ("integration_kwargs", "endpoint", "status", "expected_type"),
+    (
+        # Django only turns exceptions into 4xx responses, so with the default
+        # (the 5xx range) none of them are reported
+        ({}, "permission_denied_exc", "403 forbidden", None),
+        ({}, "http404_exc", "404 not found", None),
+        (
+            {"failed_request_status_codes": set()},
+            "permission_denied_exc",
+            "403 forbidden",
+            None,
+        ),
+        (
+            {"failed_request_status_codes": {403, *range(500, 600)}},
+            "permission_denied_exc",
+            "403 forbidden",
+            "PermissionDenied",
+        ),
+        (
+            {"failed_request_status_codes": {404, *range(500, 600)}},
+            "http404_exc",
+            "404 not found",
+            "Http404",
+        ),
+        # Only the status codes that were opted into are reported
+        (
+            {"failed_request_status_codes": {403}},
+            "http404_exc",
+            "404 not found",
+            None,
+        ),
+    ),
+)
+def test_failed_request_status_codes(
+    sentry_init,
+    client,
+    capture_events,
+    integration_kwargs,
+    endpoint,
+    status,
+    expected_type,
+):
+    sentry_init(integrations=[DjangoIntegration(**integration_kwargs)])
+    events = capture_events()
+
+    _, response_status, _ = unpack_werkzeug_response(client.get(reverse(endpoint)))
+    assert response_status.lower() == status
+
+    # The test app's handler404 captures a message, ignore it here
+    error_events = [event for event in events if "exception" in event]
+
+    if expected_type is None:
+        assert not error_events
+    else:
+        (event,) = error_events
+        (exception,) = event["exception"]["values"]
+        assert exception["type"] == expected_type
+        assert exception["mechanism"]["type"] == "django"
+        assert exception["mechanism"]["handled"] is True
+
+
+@pytest.mark.parametrize(
+    "integration_kwargs",
+    (
+        {},
+        {"failed_request_status_codes": set()},
+        {"failed_request_status_codes": {404}},
+    ),
+)
+def test_failed_request_status_codes_unhandled_exception(
+    sentry_init, client, capture_events, integration_kwargs
+):
+    """
+    Exceptions Django gives up on are always reported, exactly once, no matter how
+    failed_request_status_codes is set.
+    """
+    sentry_init(integrations=[DjangoIntegration(**integration_kwargs)])
+    events = capture_events()
+
+    _, status, _ = unpack_werkzeug_response(client.get(reverse("view_exc")))
+    assert status.lower() == "500 internal server error"
+
+    (event,) = events
+    (exception,) = event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
+    assert exception["mechanism"]["type"] == "django"
+    assert exception["mechanism"]["handled"] is False
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])

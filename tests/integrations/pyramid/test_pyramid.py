@@ -634,3 +634,138 @@ def test_user_id_error_event_data_collection(
         assert event["user"]["id"] == "123-abc"
     else:
         assert "id" not in event.get("user", {})
+
+
+@pytest.mark.parametrize(
+    "data_collection, expect_body",
+    [
+        pytest.param({}, True, id="data_collection_http_bodies_default"),
+        pytest.param(
+            {"http_bodies": ["incoming_request"]},
+            True,
+            id="data_collection_http_bodies_incoming_request",
+        ),
+        pytest.param(
+            {"http_bodies": ["outgoing_request"]},
+            False,
+            id="data_collection_http_bodies_outgoing_request_only",
+        ),
+        pytest.param(
+            {"http_bodies": []}, False, id="data_collection_http_bodies_empty"
+        ),
+    ],
+)
+def test_request_body_data_collection(
+    sentry_init, capture_events, route, get_client, data_collection, expect_body
+):
+    sentry_init(
+        integrations=[PyramidIntegration()],
+        _experiments={"data_collection": data_collection},
+    )
+
+    data = {"foo": "bar"}
+
+    @route("/")
+    def index(request):
+        capture_message("hi")
+        return Response("ok")
+
+    events = capture_events()
+
+    client = get_client()
+    response = client.post("/", content_type="application/json", data=json.dumps(data))
+    assert response[1] == "200 OK"
+
+    (event,) = events
+    if expect_body:
+        assert event["request"]["data"] == data
+    else:
+        assert "data" not in event["request"]
+
+
+def test_request_body_dropped_with_form_and_files_data_collection(
+    sentry_init, capture_events, route, get_client
+):
+    sentry_init(
+        integrations=[PyramidIntegration()],
+        max_request_body_size="always",
+        _experiments={"data_collection": {"http_bodies": []}},
+    )
+
+    data = {
+        "foo": "bar",
+        "file": (BytesIO(b"hello"), "hello.txt"),
+    }
+
+    @route("/")
+    def index(request):
+        capture_message("hi")
+        return Response("ok")
+
+    events = capture_events()
+
+    client = get_client()
+    response = client.post("/", data=data)
+    assert response[1] == "200 OK"
+
+    (event,) = events
+    assert "data" not in event["request"]
+    assert "data" not in event.get("_meta", {}).get("request", {})
+
+
+def test_transaction_request_body_data_collection(
+    sentry_init, capture_events, route, get_client
+):
+    sentry_init(
+        integrations=[PyramidIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"data_collection": {"http_bodies": []}},
+    )
+
+    data = {"username": "sentry-user", "age": "26"}
+
+    @route("/")
+    def index(request):
+        capture_message("hi")
+        return Response("ok")
+
+    events = capture_events()
+
+    client = get_client()
+    response = client.post("/", content_type="application/json", data=json.dumps(data))
+    assert response[1] == "200 OK"
+
+    event, transaction_event = events
+    assert "data" not in event["request"]
+    assert "data" not in transaction_event["request"]
+
+
+def test_oversized_request_body_not_annotated_data_collection(
+    sentry_init, capture_events, route, get_client
+):
+    """
+    The gating happens before the size check, so an oversized body is dropped
+    outright instead of being reported as removed because of the size limit.
+    """
+    sentry_init(
+        integrations=[PyramidIntegration()],
+        max_request_body_size="small",
+        _experiments={"data_collection": {"http_bodies": []}},
+    )
+
+    data = "a" * 2000
+
+    @route("/")
+    def index(request):
+        capture_message("hi")
+        return Response("ok")
+
+    events = capture_events()
+
+    client = get_client()
+    response = client.post("/", data=data)
+    assert response[1] == "200 OK"
+
+    (event,) = events
+    assert "data" not in event["request"]
+    assert "data" not in event.get("_meta", {}).get("request", {})
