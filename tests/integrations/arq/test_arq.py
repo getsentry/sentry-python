@@ -295,7 +295,7 @@ async def test_job_transaction(
 
     functions_key, cron_jobs_key = source
     pool, worker = init_fixture_method(
-        span_streaming, **{functions_key: [division], cron_jobs_key: [cron_job]}
+        **{functions_key: [division], cron_jobs_key: [cron_job]}
     )
 
     job = await pool.enqueue_job("division", 1, b=int(not job_fails))
