@@ -23,7 +23,7 @@ TEST_SUITE_CONFIG = {
     "anthropic": {
         "package": "anthropic",
         "deps": {
-            "*": ["pytest-asyncio"],
+            "*": ["pytest-asyncio", "httpx"],
             "<0.50": ["httpx<0.28.0"],
             # tokenizers dropped Python 3.8 support, but didn't update package metadata.
             # https://github.com/huggingface/tokenizers/commit/f4c9fd7f402fc794df8f1b547a95ee5305f9fe62
