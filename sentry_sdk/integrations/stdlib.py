@@ -10,7 +10,6 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor, should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import (
     EnvironHeaders,
     add_http_breadcrumb,
@@ -28,7 +27,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, List, Optional, Union
+    from typing import Any, Callable, Dict, List, Optional
 
     from sentry_sdk._types import Event, Hint
 
@@ -61,15 +60,10 @@ class StdlibIntegration(Integration):
             return event
 
 
-def _complete_span(span: "Union[Span, StreamedSpan]") -> None:
-    if isinstance(span, StreamedSpan):
-        with capture_internal_exceptions():
-            add_http_request_source(span)
-        span.end()
-    else:
-        span.finish()
-        with capture_internal_exceptions():
-            add_http_request_source(span)
+def _complete_span(span: "StreamedSpan") -> None:
+    with capture_internal_exceptions():
+        add_http_request_source(span)
+    span.end()
 
 
 def _install_httplib() -> None:
@@ -205,14 +199,8 @@ def _install_httplib() -> None:
                 add_http_breadcrumb(status_code, breadcrumb)
             return rv
 
-        if isinstance(span, StreamedSpan):
-            span.status = "error" if status_code >= 400 else "ok"
-            span.set_attribute(SPANDATA.HTTP_STATUS_CODE, status_code)
-        elif isinstance(span, Span):
-            span.set_http_status(status_code)
-            span.set_data("reason", rv.reason)
-            if breadcrumb:
-                breadcrumb["reason"] = rv.reason
+        span.status = "error" if status_code >= 400 else "ok"
+        span.set_attribute(SPANDATA.HTTP_STATUS_CODE, status_code)
 
         # getresponse doesn't include actually reading the response body. This
         # is done in read(). So if the metadata/headers suggest there's a body to
