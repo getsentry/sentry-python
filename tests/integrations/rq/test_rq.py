@@ -50,7 +50,6 @@ def do_trick(dog, trick):
 @pytest.mark.parametrize("send_default_pii", [True, False])
 def test_basic(
     sentry_init,
-    capture_events,
     capture_items,
     send_default_pii,
 ):
@@ -97,7 +96,6 @@ def test_basic(
 )
 def test_job_args_kwargs_data_collection(
     sentry_init,
-    capture_events,
     capture_items,
     init_kwargs,
     expected_args,
@@ -130,7 +128,6 @@ def test_job_args_kwargs_data_collection(
 
 def test_transport_shutdown(
     sentry_init,
-    capture_events_forksafe,
     capture_items_forksafe,
 ):
     sentry_init(
@@ -154,11 +151,9 @@ def test_transport_shutdown(
 
 
 @pytest.mark.parametrize("send_default_pii", [True, False])
-def test_transaction_with_error(
+def test_worker_span_with_error(
     sentry_init,
-    capture_events,
     capture_items,
-    DictionaryContaining,
     send_default_pii,
 ):
     sentry_init(
@@ -206,7 +201,6 @@ def test_transaction_with_error(
 
 def test_error_has_trace_context_if_tracing_disabled(
     sentry_init,
-    capture_events,
     capture_items,
 ):
     sentry_init(
@@ -228,7 +222,6 @@ def test_error_has_trace_context_if_tracing_disabled(
 
 def test_tracing_enabled(
     sentry_init,
-    capture_events,
     capture_items,
 ):
     sentry_init(
@@ -271,7 +264,6 @@ def test_tracing_enabled(
 
 def test_tracing_disabled(
     sentry_init,
-    capture_events,
     capture_items,
 ):
     sentry_init(
@@ -292,11 +284,9 @@ def test_tracing_disabled(
 
 
 @pytest.mark.parametrize("send_default_pii", [True, False])
-def test_transaction_no_error(
+def test_worker_span_no_error(
     sentry_init,
-    capture_events,
     capture_items,
-    DictionaryContaining,
     send_default_pii,
 ):
     sentry_init(
@@ -365,7 +355,6 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
 )
 def test_job_with_retries(
     sentry_init,
-    capture_events,
     capture_items,
 ):
     sentry_init(
@@ -386,7 +375,6 @@ def test_job_with_retries(
 
 def test_span_origin(
     sentry_init,
-    capture_events,
     capture_items,
 ):
     sentry_init(
