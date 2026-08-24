@@ -276,7 +276,6 @@ def test_httplib_misuse(sentry_init, capture_events, request):
             SPANDATA.URL_FULL: "http://localhost:{}/200".format(PORT),
             SPANDATA.HTTP_REQUEST_METHOD: "GET",
             SPANDATA.HTTP_STATUS_CODE: 200,
-            "reason": "OK",
             SPANDATA.URL_FRAGMENT: "",
             SPANDATA.URL_QUERY: "",
         }

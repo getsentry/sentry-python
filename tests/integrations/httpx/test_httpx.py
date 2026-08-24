@@ -573,9 +573,10 @@ def test_omit_url_data_if_parsing_fails(sentry_init, capture_events, httpx_mock)
     (event,) = events
     assert event["breadcrumbs"]["values"][0]["data"] == ApproxDict(
         {
-            SPANDATA.HTTP_REQUEST_METHOD: "GET",
+            SPANDATA.HTTP_METHOD: "GET",
             SPANDATA.HTTP_STATUS_CODE: 200,
             # no url related data
+            "reason": "OK",
         }
     )
 
