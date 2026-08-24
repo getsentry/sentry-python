@@ -21,7 +21,8 @@ from ..utils import (
     _set_agent_data,
     _set_available_tools,
     _set_model_data,
-    _should_send_prompts,
+    _should_send_inputs,
+    _should_send_outputs,
     get_current_agent,
     get_is_streaming,
 )
@@ -107,7 +108,7 @@ def _set_input_messages(
     span: "Union[sentry_sdk.tracing.Span, StreamedSpan]", messages: "Any"
 ) -> None:
     """Set input messages data on a span."""
-    if not _should_send_prompts():
+    if not _should_send_inputs():
         return
 
     if not messages:
@@ -236,8 +237,7 @@ def _set_output_data(
     response: "Optional[ModelResponse]",
 ) -> None:
     """Set output data on a span."""
-    if not _should_send_prompts():
-        return
+    record_outputs = _should_send_outputs()
 
     if not response:
         return
@@ -246,6 +246,9 @@ def _set_output_data(
         span.set_attribute if isinstance(span, StreamedSpan) else span.set_data
     )
     set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response.model_name)  # type: ignore[arg-type]
+
+    if not record_outputs:
+        return
 
     try:
         if hasattr(response, "parts"):
