@@ -16,7 +16,7 @@ import sentry_sdk
 from sentry_sdk import capture_message, continue_trace, start_transaction
 from sentry_sdk.consts import MATCH_ALL, SPANDATA
 from sentry_sdk.integrations.stdlib import StdlibIntegration
-from sentry_sdk.utils import get_aws_sigv4_signed_headers
+from sentry_sdk.utils import _get_aws_sigv4_signed_headers
 from tests.conftest import ApproxDict, create_mock_http_server, get_free_port
 
 PORT = create_mock_http_server()
@@ -788,7 +788,7 @@ def test_outgoing_trace_headers_skip_signed_baggage(
     assert headers.get_all("baggage") == ["vendor=value"]
     # preserves existing `sentry-trace` header.
     assert headers.get_all("sentry-trace") == ["existing-trace"]
-    assert get_aws_sigv4_signed_headers(
+    assert _get_aws_sigv4_signed_headers(
         authorization=headers.get("Authorization", "")
     ) >= {
         "baggage",
@@ -840,7 +840,7 @@ def test_outgoing_trace_headers_skip_query_signed_baggage(
     assert headers["baggage"] == "vendor=value"
     # `sentry-trace` was not signed, so it can be propagated.
     assert len(headers.get_all("sentry-trace")) == 1
-    assert get_aws_sigv4_signed_headers(
+    assert _get_aws_sigv4_signed_headers(
         authorization=headers.get("Authorization", ""),
         url=f"http://127.0.0.1:{server.server_port}{path}",
     ) >= {"baggage", "host"}

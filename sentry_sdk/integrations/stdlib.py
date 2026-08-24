@@ -22,7 +22,7 @@ from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     ensure_integration_enabled,
-    get_aws_sigv4_signed_headers,
+    _get_aws_sigv4_signed_headers,
     is_sentry_url,
     logger,
     parse_url,
@@ -109,7 +109,7 @@ def _get_wrapped_putheader(
                     authorization = values[0]
                     if isinstance(authorization, bytes):
                         authorization = authorization.decode("ascii", "ignore")
-                    signed_headers.update(get_aws_sigv4_signed_headers(authorization))
+                    signed_headers.update(_get_aws_sigv4_signed_headers(authorization))
 
         return rv
 
@@ -138,7 +138,7 @@ def _get_wrapped_endheaders(
                         self, "_sentrysdk_signed_headers", set()
                     )
                     signed_headers.update(
-                        get_aws_sigv4_signed_headers(authorization=None, url=real_url)
+                        _get_aws_sigv4_signed_headers(authorization=None, url=real_url)
                     )
 
                     for (

@@ -1697,7 +1697,7 @@ def parse_url(url: str, sanitize: bool = True) -> "ParsedUrl":
     )
 
 
-def get_aws_sigv4_signed_headers(
+def _get_aws_sigv4_signed_headers(
     authorization: "Optional[str]", url: "Optional[str]" = None
 ) -> "Set[str]":
 
