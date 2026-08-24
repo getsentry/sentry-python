@@ -197,7 +197,10 @@ def init_arq_with_kwarg_settings(sentry_init):
     "init_arq_settings",
     ["init_arq", "init_arq_with_dict_settings", "init_arq_with_kwarg_settings"],
 )
-async def test_job_result(init_arq_settings, request, ):
+async def test_job_result(
+    init_arq_settings,
+    request,
+):
     async def increase(ctx, num):
         return num + 1
 
@@ -228,7 +231,7 @@ async def test_job_retry(
     capture_items,
     init_arq_settings,
     request,
-    ):
+):
     async def retry_job(ctx):
         if ctx["job_try"] < 2:
             raise arq.worker.Retry
@@ -280,7 +283,7 @@ async def test_job_transaction(
     source,
     job_fails,
     request,
-    ):
+):
     async def division(_, a, b=0):
         return a / b
 
@@ -316,24 +319,14 @@ async def test_job_transaction(
         error_func_event = events.pop(0)
         error_cron_event = events.pop(0)
 
-        assert (
-            error_func_event["exception"]["values"][0]["type"]
-            == "ZeroDivisionError"
-        )
-        assert (
-            error_func_event["exception"]["values"][0]["mechanism"]["type"] == "arq"
-        )
+        assert error_func_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
+        assert error_func_event["exception"]["values"][0]["mechanism"]["type"] == "arq"
 
         func_extra = error_func_event["extra"]["arq-job"]
         assert func_extra["task"] == "division"
 
-        assert (
-            error_cron_event["exception"]["values"][0]["type"]
-            == "ZeroDivisionError"
-        )
-        assert (
-            error_cron_event["exception"]["values"][0]["mechanism"]["type"] == "arq"
-        )
+        assert error_cron_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
+        assert error_cron_event["exception"]["values"][0]["mechanism"]["type"] == "arq"
 
         cron_extra = error_cron_event["extra"]["arq-job"]
         assert cron_extra["task"] == "cron:division"
@@ -411,7 +404,7 @@ async def test_enqueue_job(
     init_arq_settings,
     source,
     request,
-    ):
+):
     async def dummy_job(_):
         pass
 
@@ -439,7 +432,9 @@ async def test_enqueue_job(
     "init_arq_settings", ["init_arq", "init_arq_with_dict_settings"]
 )
 async def test_execute_job_without_integration(
-    init_arq_settings, request, ):
+    init_arq_settings,
+    request,
+):
     async def dummy_job(_ctx):
         pass
 
@@ -469,7 +464,7 @@ async def test_span_origin_producer(
     init_arq_settings,
     source,
     request,
-    ):
+):
     async def dummy_job(_):
         pass
 
@@ -496,7 +491,7 @@ async def test_span_origin_consumer(
     capture_items,
     init_arq_settings,
     request,
-    ):
+):
     async def job(ctx):
         pass
 
@@ -528,7 +523,7 @@ async def test_job_concurrency(
     capture_events,
     capture_items,
     init_arq,
-    ):
+):
     """
     10 - division starts
     70 - sleepy starts
