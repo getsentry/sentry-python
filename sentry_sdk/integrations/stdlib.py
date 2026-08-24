@@ -203,26 +203,26 @@ def _patch_aws_connection() -> None:
     Do not edit signed headers when adding trace propagation headers in the `endheaders()` patch.
     """
     if AWSHTTPConnection is not None:
-        AWSHTTPConnection.putheader = _get_wrapped_putheader(
+        AWSHTTPConnection.putheader = _get_wrapped_putheader(  # type: ignore[method-assign]
             AWSHTTPConnection.putheader
-        )  # type: ignore[method-assign]
-        AWSHTTPConnection.endheaders = _get_wrapped_endheaders(
+        )
+        AWSHTTPConnection.endheaders = _get_wrapped_endheaders(  # type: ignore[method-assign]
             AWSHTTPConnection.endheaders
-        )  # type: ignore[method-assign]
-        AWSHTTPConnection.putrequest = _get_wrapped_putrequest(
+        )
+        AWSHTTPConnection.putrequest = _get_wrapped_putrequest(  # type: ignore[method-assign]
             AWSHTTPConnection.putrequest
-        )  # type: ignore[method-assign]
+        )
 
     if AWSHTTPSConnection is not None:
-        AWSHTTPSConnection.putheader = _get_wrapped_putheader(
+        AWSHTTPSConnection.putheader = _get_wrapped_putheader(  # type: ignore[method-assign]
             AWSHTTPSConnection.putheader
-        )  # type: ignore[method-assign]
-        AWSHTTPSConnection.endheaders = _get_wrapped_endheaders(
+        )
+        AWSHTTPSConnection.endheaders = _get_wrapped_endheaders(  # type: ignore[method-assign]
             AWSHTTPSConnection.endheaders
-        )  # type: ignore[method-assign]
-        AWSHTTPSConnection.putrequest = _get_wrapped_putrequest(
+        )
+        AWSHTTPSConnection.putrequest = _get_wrapped_putrequest(  # type: ignore[method-assign]
             AWSHTTPSConnection.putrequest
-        )  # type: ignore[method-assign]
+        )
 
 
 def _install_httplib() -> None:
