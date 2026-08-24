@@ -13,7 +13,7 @@ from sentry_sdk.utils import parse_version, safe_repr
 
 if TYPE_CHECKING:
     from logging import LogRecord
-    from typing import Any, Optional
+    from typing import Any, Optional, Union
 
 try:
     import loguru
@@ -25,6 +25,9 @@ try:
         from loguru import Message
 except ImportError:
     raise DidNotEnable("LOGURU is not installed or incompatible")
+
+
+_SENTINEL = object()
 
 
 class LoggingLevels(enum.IntEnum):
@@ -71,7 +74,7 @@ class LoguruIntegration(Integration):
     breadcrumb_format = DEFAULT_FORMAT
     event_format = DEFAULT_FORMAT
     sentry_logs_level: "Optional[int]" = DEFAULT_LEVEL
-    capture_sentry_logs: "Optional[bool]" = False
+    capture_sentry_logs: "Optional[Union[bool, object]]" = _SENTINEL
 
     def __init__(
         self,
@@ -80,7 +83,7 @@ class LoguruIntegration(Integration):
         breadcrumb_format: "str | loguru.FormatFunction" = DEFAULT_FORMAT,
         event_format: "str | loguru.FormatFunction" = DEFAULT_FORMAT,
         sentry_logs_level: "Optional[int]" = DEFAULT_LEVEL,
-        capture_sentry_logs: "Optional[bool]" = False,
+        capture_sentry_logs: "Optional[Union[bool, object]]" = _SENTINEL,
     ) -> None:
         LoguruIntegration.level = level
         LoguruIntegration.event_level = event_level
@@ -152,7 +155,18 @@ def loguru_sentry_logs_handler(message: "Message") -> None:
     if not client.is_active():
         return
 
-    if not LoguruIntegration.capture_sentry_logs:
+    # TODO: remove this compat hack in the next major. Capture should
+    # only depend on capture_sentry_logs being True.
+    compat_logs_enabled = client.options.get("enable_logs", False) or client.options[
+        "_experiments"
+    ].get("enable_logs", False)
+    should_capture_logs = False
+    if LoguruIntegration.capture_sentry_logs is True:
+        should_capture_logs = True
+    elif LoguruIntegration.capture_sentry_logs is _SENTINEL and compat_logs_enabled:
+        should_capture_logs = True
+
+    if not should_capture_logs:
         return
 
     record = message.record
