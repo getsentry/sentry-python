@@ -92,12 +92,12 @@ def test_crumb_capture(sentry_init, capture_events):
     assert crumb["category"] == "httplib"
     assert crumb["data"] == ApproxDict(
         {
-            "url": url,
-            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.URL_FULL: url,
+            SPANDATA.HTTP_REQUEST_METHOD: "GET",
             SPANDATA.HTTP_STATUS_CODE: 200,
             "reason": "OK",
-            SPANDATA.HTTP_FRAGMENT: "",
-            SPANDATA.HTTP_QUERY: "",
+            SPANDATA.URL_FRAGMENT: "",
+            SPANDATA.URL_QUERY: "",
         }
     )
 
@@ -176,11 +176,11 @@ def test_crumb_capture_client_error(sentry_init, capture_events, status_code, le
 
     assert crumb["data"] == ApproxDict(
         {
-            "url": url,
-            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.URL_FULL: url,
+            SPANDATA.HTTP_REQUEST_METHOD: "GET",
             SPANDATA.HTTP_STATUS_CODE: status_code,
-            SPANDATA.HTTP_FRAGMENT: "",
-            SPANDATA.HTTP_QUERY: "",
+            SPANDATA.URL_FRAGMENT: "",
+            SPANDATA.URL_QUERY: "",
         }
     )
 
@@ -267,13 +267,13 @@ def test_crumb_capture_hint(sentry_init, capture_events):
     assert crumb["category"] == "httplib"
     assert crumb["data"] == ApproxDict(
         {
-            "url": url,
-            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.URL_FULL: url,
+            SPANDATA.HTTP_REQUEST_METHOD: "GET",
             SPANDATA.HTTP_STATUS_CODE: 200,
             "reason": "OK",
             "extra": "foo",
-            SPANDATA.HTTP_FRAGMENT: "",
-            SPANDATA.HTTP_QUERY: "",
+            SPANDATA.URL_FRAGMENT: "",
+            SPANDATA.URL_QUERY: "",
         }
     )
 
@@ -379,19 +379,18 @@ def test_httplib_misuse(sentry_init, capture_events, request):
     assert crumb["category"] == "httplib"
     assert crumb["data"] == ApproxDict(
         {
-            "url": "http://localhost:{}/200".format(PORT),
-            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.URL_FULL: "http://localhost:{}/200".format(PORT),
+            SPANDATA.HTTP_REQUEST_METHOD: "GET",
             SPANDATA.HTTP_STATUS_CODE: 200,
             "reason": "OK",
-            SPANDATA.HTTP_FRAGMENT: "",
-            SPANDATA.HTTP_QUERY: "",
+            SPANDATA.URL_FRAGMENT: "",
+            SPANDATA.URL_QUERY: "",
         }
     )
 
 
 def test_outgoing_trace_headers(
     sentry_init,
-    capture_events,
     capture_items,
 ):
     sentry_init(
@@ -467,7 +466,6 @@ def test_outgoing_trace_headers(
 
 def test_outgoing_trace_headers_head_sdk(
     sentry_init,
-    capture_events,
     capture_items,
 ):
     sentry_init(
@@ -715,7 +713,6 @@ def test_option_trace_propagation_targets(
 
 def test_request_source_disabled(
     sentry_init,
-    capture_events,
     capture_items,
 ):
     sentry_options = {
@@ -750,7 +747,6 @@ def test_request_source_disabled(
 @pytest.mark.parametrize("enable_http_request_source", [None, True])
 def test_request_source_enabled(
     sentry_init,
-    capture_events,
     capture_items,
     enable_http_request_source,
 ):
@@ -787,7 +783,6 @@ def test_request_source_enabled(
 
 def test_request_source(
     sentry_init,
-    capture_events,
     capture_items,
 ):
     sentry_init(
@@ -832,7 +827,6 @@ def test_request_source(
 
 def test_request_source_with_module_in_search_path(
     sentry_init,
-    capture_events,
     capture_items,
 ):
     """
@@ -876,7 +870,6 @@ def test_request_source_with_module_in_search_path(
 
 def test_no_request_source_if_duration_too_short(
     sentry_init,
-    capture_events,
     capture_items,
 ):
     sentry_init(
@@ -919,7 +912,6 @@ def test_no_request_source_if_duration_too_short(
 
 def test_request_source_if_duration_over_threshold(
     sentry_init,
-    capture_events,
     capture_items,
 ):
     sentry_init(
@@ -981,7 +973,6 @@ def test_request_source_if_duration_over_threshold(
 
 def test_span_origin(
     sentry_init,
-    capture_events,
     capture_items,
 ):
     sentry_init(
@@ -1042,7 +1033,6 @@ def test_http_timeout(
 @pytest.mark.parametrize("send_default_pii", [True, False])
 def test_proxy_http_tunnel(
     sentry_init,
-    capture_events,
     capture_items,
     tunnel_port,
     send_default_pii,
@@ -1087,7 +1077,6 @@ def test_proxy_http_tunnel(
 
 def test_chunked_response_span_covers_body_read(
     sentry_init,
-    capture_events,
     capture_items,
 ):
     sentry_init(

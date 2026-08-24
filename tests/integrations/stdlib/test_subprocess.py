@@ -46,7 +46,6 @@ class ImmutableDict(Mapping):
 @pytest.mark.parametrize("with_cwd", [True, False])
 def test_subprocess_basic(
     sentry_init,
-    capture_events,
     capture_items,
     monkeypatch,
     positional_args,
@@ -202,7 +201,6 @@ def test_subprocess_invalid_args(
 
 def test_subprocess_span_origin(
     sentry_init,
-    capture_events,
     capture_items,
 ):
     sentry_init(
