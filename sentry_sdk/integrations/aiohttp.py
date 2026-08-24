@@ -49,7 +49,6 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
-    get_aws_sigv4_signed_headers,
     has_data_collection_enabled,
     logger,
     parse_url,
@@ -457,20 +456,12 @@ def create_trace_config() -> "TraceConfig":
             span = legacy_span
 
         if should_propagate_trace(client, str(params.url)):
-            signed_headers = get_aws_sigv4_signed_headers(
-                authorization=params.headers.get("Authorization", ""),
-                url=str(params.url),
-            )
             for (
                 key,
                 value,
             ) in sentry_sdk.get_current_scope().iter_trace_propagation_headers(
                 span=span
             ):
-                # do not modify a header whose value is already signed.
-                if key.lower() in signed_headers:
-                    continue
-
                 logger.debug(
                     "[Tracing] Adding `{key}` header {value} to outgoing request to {url}.".format(
                         key=key, value=value, url=params.url
