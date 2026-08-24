@@ -249,7 +249,7 @@ TEST_SUITE_CONFIG = {
         "package": "langchain",
         "integration_name": "langchain",
         "deps": {
-            "*": ["pytest-asyncio", "openai", "tiktoken", "langchain-openai"],
+            "*": ["pytest-asyncio", "openai", "tiktoken", "langchain-openai", "httpx"],
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
             ">=1.0": ["langchain-classic"],
@@ -263,7 +263,7 @@ TEST_SUITE_CONFIG = {
         "package": "langchain",
         "integration_name": "langchain",
         "deps": {
-            "*": ["pytest-asyncio", "openai", "langchain-openai"],
+            "*": ["pytest-asyncio", "openai", "langchain-openai", "httpx"],
             "<=0.1": ["httpx<0.28.0"],
             ">=0.3": ["langchain-community"],
             ">=1.0": ["langchain-classic"],
@@ -283,7 +283,7 @@ TEST_SUITE_CONFIG = {
     "litellm": {
         "package": "litellm",
         "deps": {
-            "*": ["anthropic", "google-genai", "pytest-asyncio"],
+            "*": ["anthropic", "google-genai", "pytest-asyncio", "httpx"],
         },
         "include": "<=1.96",  # https://github.com/BerriAI/litellm/issues/36384
     },
@@ -323,7 +323,7 @@ TEST_SUITE_CONFIG = {
         "package": "openai",
         "integration_name": "openai",
         "deps": {
-            "*": ["pytest-asyncio", "tiktoken"],
+            "*": ["pytest-asyncio", "tiktoken", "httpx"],
             "<1.55": ["httpx<0.28"],
         },
         "python": {
@@ -335,7 +335,7 @@ TEST_SUITE_CONFIG = {
         "package": "openai",
         "integration_name": "openai",
         "deps": {
-            "*": ["pytest-asyncio"],
+            "*": ["pytest-asyncio", "httpx"],
             "<1.55": ["httpx<0.28"],
         },
         "python": {
@@ -346,7 +346,7 @@ TEST_SUITE_CONFIG = {
     "openai_agents": {
         "package": "openai-agents",
         "deps": {
-            "*": ["pytest-asyncio"],
+            "*": ["pytest-asyncio", "httpx"],
         },
         "python": ">=3.10",
     },
