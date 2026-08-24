@@ -76,34 +76,8 @@ def create_chunked_server():
 CHUNKED_PORT = create_chunked_server()
 
 
-def test_crumb_capture(sentry_init, capture_events):
-    sentry_init(integrations=[StdlibIntegration()], send_default_pii=True)
-    events = capture_events()
-
-    url = "http://localhost:{}/some/random/url".format(PORT)
-    urlopen(url)
-
-    capture_message("Testing!")
-
-    (event,) = events
-    (crumb,) = event["breadcrumbs"]["values"]
-
-    assert crumb["type"] == "http"
-    assert crumb["category"] == "httplib"
-    assert crumb["data"] == ApproxDict(
-        {
-            SPANDATA.URL_FULL: url,
-            SPANDATA.HTTP_REQUEST_METHOD: "GET",
-            SPANDATA.HTTP_STATUS_CODE: 200,
-            "reason": "OK",
-            SPANDATA.URL_FRAGMENT: "",
-            SPANDATA.URL_QUERY: "",
-        }
-    )
-
-
 @pytest.mark.parametrize("send_default_pii", [True, False])
-def test_crumb_capture_span_streaming(sentry_init, capture_events, send_default_pii):
+def test_crumb_capture(sentry_init, capture_events, send_default_pii):
     sentry_init(
         integrations=[StdlibIntegration()],
         trace_lifecycle="stream",
@@ -151,52 +125,8 @@ def test_crumb_capture_span_streaming(sentry_init, capture_events, send_default_
         (500, "error"),
     ],
 )
-def test_crumb_capture_client_error(sentry_init, capture_events, status_code, level):
-    sentry_init(integrations=[StdlibIntegration()], send_default_pii=True)
-    events = capture_events()
-
-    url = f"http://localhost:{PORT}/status/{status_code}"  # noqa:E231
-    try:
-        urlopen(url)
-    except HTTPError:
-        pass
-
-    capture_message("Testing!")
-
-    (event,) = events
-    (crumb,) = event["breadcrumbs"]["values"]
-
-    assert crumb["type"] == "http"
-    assert crumb["category"] == "httplib"
-
-    if level is None:
-        assert "level" not in crumb
-    else:
-        assert crumb["level"] == level
-
-    assert crumb["data"] == ApproxDict(
-        {
-            SPANDATA.URL_FULL: url,
-            SPANDATA.HTTP_REQUEST_METHOD: "GET",
-            SPANDATA.HTTP_STATUS_CODE: status_code,
-            SPANDATA.URL_FRAGMENT: "",
-            SPANDATA.URL_QUERY: "",
-        }
-    )
-
-
-@pytest.mark.parametrize(
-    "status_code,level",
-    [
-        (200, None),
-        (301, None),
-        (403, "warning"),
-        (405, "warning"),
-        (500, "error"),
-    ],
-)
 @pytest.mark.parametrize("send_default_pii", [True, False])
-def test_crumb_capture_client_error_span_streaming(
+def test_crumb_capture_client_error(
     sentry_init, capture_events, status_code, level, send_default_pii
 ):
     sentry_init(
@@ -244,44 +174,8 @@ def test_crumb_capture_client_error_span_streaming(
         )
 
 
-def test_crumb_capture_hint(sentry_init, capture_events):
-    def before_breadcrumb(crumb, hint):
-        crumb["data"]["extra"] = "foo"
-        return crumb
-
-    sentry_init(
-        integrations=[StdlibIntegration()],
-        before_breadcrumb=before_breadcrumb,
-        send_default_pii=True,
-    )
-    events = capture_events()
-
-    url = "http://localhost:{}/some/random/url".format(PORT)
-    urlopen(url)
-
-    capture_message("Testing!")
-
-    (event,) = events
-    (crumb,) = event["breadcrumbs"]["values"]
-    assert crumb["type"] == "http"
-    assert crumb["category"] == "httplib"
-    assert crumb["data"] == ApproxDict(
-        {
-            SPANDATA.URL_FULL: url,
-            SPANDATA.HTTP_REQUEST_METHOD: "GET",
-            SPANDATA.HTTP_STATUS_CODE: 200,
-            "reason": "OK",
-            "extra": "foo",
-            SPANDATA.URL_FRAGMENT: "",
-            SPANDATA.URL_QUERY: "",
-        }
-    )
-
-
 @pytest.mark.parametrize("send_default_pii", [True, False])
-def test_crumb_capture_hint_span_streaming(
-    sentry_init, capture_events, send_default_pii
-):
+def test_crumb_capture_hint(sentry_init, capture_events, send_default_pii):
     def before_breadcrumb(crumb, hint):
         crumb["data"]["extra"] = "foo"
         return crumb
