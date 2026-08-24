@@ -585,6 +585,7 @@ def test_parse_version(version, expected_result):
             True,
         ),
         ("2.0.1", (1, 1, 2), True),
+        ("1", (1, 0), True),
     ],
 )
 def test_check_minimum_version(monkeypatch, version, min_version, expected_pass):
@@ -593,7 +594,7 @@ def test_check_minimum_version(monkeypatch, version, min_version, expected_pass)
 
     monkeypatch.setattr(sentry_sdk.integrations, "_MIN_VERSIONS", {"test": min_version})
     try:
-        _check_minimum_version(TestIntegration, parse_version(version), min_version)
+        _check_minimum_version(TestIntegration, parse_version(version))
     except DidNotEnable:
         if expected_pass:
             assert False, (
