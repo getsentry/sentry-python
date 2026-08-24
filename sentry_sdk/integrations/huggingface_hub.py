@@ -225,7 +225,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
 
             if tool_calls is not None and len(tool_calls) > 0:
                 if has_data_collection_enabled(client.options):
-                    if client.options["data_collection"]["gen_ai"]["inputs"]:
+                    if client.options["data_collection"]["gen_ai"]["outputs"]:
                         set_data_normalized(
                             span,
                             SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
@@ -402,7 +402,7 @@ def _wrap_huggingface_task(f: "Callable[..., Any]", op: str) -> "Callable[..., A
                         if tool_calls is not None and len(tool_calls) > 0:
                             if has_data_collection_enabled(client.options):
                                 if client.options["data_collection"]["gen_ai"][
-                                    "inputs"
+                                    "outputs"
                                 ]:
                                     set_data_normalized(
                                         span,
