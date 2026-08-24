@@ -26,9 +26,9 @@ def test_crumb_capture(sentry_init, capture_events):
     assert crumb["data"] == ApproxDict(
         {
             "url": url,
-            SPANDATA.HTTP_METHOD: "GET",
-            SPANDATA.HTTP_FRAGMENT: "",
-            SPANDATA.HTTP_QUERY: "",
+            SPANDATA.HTTP_REQUEST_METHOD: "GET",
+            SPANDATA.URL_FRAGMENT: "",
+            SPANDATA.URL_QUERY: "",
             SPANDATA.HTTP_STATUS_CODE: response.status_code,
             "reason": response.reason,
         }
