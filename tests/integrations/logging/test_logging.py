@@ -262,42 +262,6 @@ def test_sentry_logs_collection_opt_in(sentry_init, capture_items, request):
     assert log["attributes"]["sentry.severity_text"] == "warn"
 
 
-def test_sentry_logs_collection_opt_in_compat(sentry_init, capture_items, request):
-    """Automatic logs capture by Sentry logs needs explicit opt-in via enable_logs."""
-    # This should be removed in the next major.
-    sentry_init(enable_logs=True)
-    items = capture_items("log")
-
-    python_logger = logging.Logger("test-logger")
-    python_logger.warning("this is %s a template %s", "1", "2")
-
-    get_client().flush()
-
-    assert len(items) == 1
-
-    log = items[0].payload
-    assert log["attributes"]["sentry.message.template"] == "this is %s a template %s"
-    assert log["attributes"]["sentry.severity_number"] == 13
-    assert log["attributes"]["sentry.severity_text"] == "warn"
-
-
-def test_sentry_logs_collection_opt_in_compat_does_not_override_explicit_opt_out(
-    sentry_init, capture_items, request
-):
-    # This should be removed in the next major.
-    sentry_init(
-        enable_logs=True, integrations=[LoggingIntegration(capture_sentry_logs=False)]
-    )
-    items = capture_items("log")
-
-    python_logger = logging.Logger("test-logger")
-    python_logger.warning("this is %s a template %s", "1", "2")
-
-    get_client().flush()
-
-    assert len(items) == 0
-
-
 def test_ignore_logger(sentry_init, capture_events, request):
     sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
     events = capture_events()

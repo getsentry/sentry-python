@@ -158,18 +158,7 @@ def loguru_sentry_logs_handler(message: "Message") -> None:
     if not client.is_active():
         return
 
-    # TODO: remove this compat hack in the next major. Capture should
-    # only depend on capture_sentry_logs being True.
-    compat_logs_enabled = client.options.get("enable_logs", False) or client.options[
-        "_experiments"
-    ].get("enable_logs", False)
-    should_capture_logs = False
-    if LoguruIntegration.capture_sentry_logs is True:
-        should_capture_logs = True
-    elif LoguruIntegration.capture_sentry_logs is _SENTINEL and compat_logs_enabled:
-        should_capture_logs = True
-
-    if not should_capture_logs:
+    if LoguruIntegration.capture_sentry_logs is not True:
         return
 
     record = message.record

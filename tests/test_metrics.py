@@ -9,21 +9,6 @@ from sentry_sdk import get_client
 from sentry_sdk.consts import SPANDATA, VERSION
 
 
-def test_metrics_enable_metrics_noop(sentry_init, capture_envelopes):
-    # The enable_metrics option has no effect anymore.
-    sentry_init(enable_metrics=False)
-
-    envelopes = capture_envelopes()
-
-    sentry_sdk.metrics.count("test.counter", 1)
-    sentry_sdk.metrics.gauge("test.gauge", 42)
-    sentry_sdk.metrics.distribution("test.distribution", 200)
-
-    sentry_sdk.flush()
-
-    assert envelopes
-
-
 def test_metrics_basics(sentry_init, capture_items):
     sentry_init()
     items = capture_items("trace_metric")
