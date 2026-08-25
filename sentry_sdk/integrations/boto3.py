@@ -169,7 +169,13 @@ def _sentry_before_sign(
             return
 
         def _replace_header(request: "AWSRequest", key: str, value: str) -> None:
-            # HTTPHeaders appends on assignment, so delete existing values first.
+            """
+            Botocore's `HTTPHeaders` inherits from `email.message.Message`, where:
+                headers["foo"] = "old"
+                headers["foo"] = "new"
+            produces two fields: {"foo": "old", "foo": "new"}. So delete existing
+            fields before assigning replacement.
+            """
             if key in request.headers:
                 del request.headers[key]
             request.headers[key] = value

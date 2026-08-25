@@ -8,7 +8,10 @@ from botocore.awsrequest import AWSHTTPConnection
 
 import sentry_sdk
 from sentry_sdk.integrations.stdlib import StdlibIntegration
-from sentry_sdk.utils import _get_aws_sigv4_signed_headers
+from sentry_sdk.utils import (
+    _get_aws_sigv4_signed_headers_from_authorization_header,
+    _get_aws_sigv4_signed_headers_from_url_query_string,
+)
 
 
 @pytest.fixture
@@ -124,8 +127,8 @@ def test_aws_http_connection_skips_signed_baggage(
     assert headers.get_all("baggage") == ["vendor=value"]
     # preserves existing `sentry-trace` header.
     assert headers.get_all("sentry-trace") == ["existing-trace"]
-    assert _get_aws_sigv4_signed_headers(
-        authorization=headers.get("Authorization", "")
+    assert _get_aws_sigv4_signed_headers_from_authorization_header(
+        headers.get("Authorization", "")
     ) >= {
         "baggage",
         "host",
@@ -180,7 +183,6 @@ def test_aws_http_connection_skips_query_signed_baggage(
     sentry_trace_headers = headers.get_all("sentry-trace")
     assert sentry_trace_headers is not None
     assert len(sentry_trace_headers) == 1
-    assert _get_aws_sigv4_signed_headers(
-        authorization=headers.get("Authorization", ""),
-        url=f"http://127.0.0.1:{server.server_port}{path}",
+    assert _get_aws_sigv4_signed_headers_from_url_query_string(
+        f"http://127.0.0.1:{server.server_port}{path}"
     ) >= {"baggage", "host"}

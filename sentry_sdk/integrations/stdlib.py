@@ -10,7 +10,7 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor, should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, Span
+from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, SENTRY_TRACE_HEADER_NAME, Span
 from sentry_sdk.tracing_utils import (
     EnvironHeaders,
     add_http_breadcrumb,
@@ -20,7 +20,8 @@ from sentry_sdk.tracing_utils import (
 )
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
-    _get_aws_sigv4_signed_headers,
+    _get_aws_sigv4_signed_headers_from_authorization_header,
+    _get_aws_sigv4_signed_headers_from_url_query_string,
     capture_internal_exceptions,
     ensure_integration_enabled,
     is_sentry_url,
@@ -41,7 +42,7 @@ _RUNTIME_CONTEXT: "dict[str, object]" = {
     "build": sys.version,
 }
 
-_SENTRY_HEADER_NAMES = frozenset((BAGGAGE_HEADER_NAME, "sentry-trace"))
+_SENTRY_HEADER_NAMES = frozenset((BAGGAGE_HEADER_NAME, SENTRY_TRACE_HEADER_NAME))
 
 try:
     from botocore.awsrequest import AWSHTTPConnection, AWSHTTPSConnection
@@ -86,7 +87,8 @@ def _get_wrapped_putheader(
     original_putheader: "Callable[..., Any]",
 ) -> "Callable[..., Any]":
     """
-    Responsible for tracking request and signed headers.
+    Responsible for tracking which sentry headers are present and whether
+    they are listed in AWS SigV4 `SignedHeaders`.
     """
 
     def putheader(self: "HTTPConnection", header: "Any", *values: "Any") -> "Any":
@@ -113,8 +115,12 @@ def _get_wrapped_putheader(
             with capture_internal_exceptions():
                 authorization = values[0]
                 if isinstance(authorization, bytes):
-                    authorization = authorization.decode("ascii", "ignore")
-                for signed_header in _get_aws_sigv4_signed_headers(authorization):
+                    authorization = authorization.decode("latin-1")
+                for (
+                    signed_header
+                ) in _get_aws_sigv4_signed_headers_from_authorization_header(
+                    authorization
+                ):
                     if signed_header in _SENTRY_HEADER_NAMES:
                         is_present, _ = request_headers.get(
                             signed_header, (False, False)
@@ -145,8 +151,10 @@ def _get_wrapped_endheaders(
                         self, "_sentrysdk_request_headers", {}
                     )
                     if request_headers is not None:
-                        for signed_header in _get_aws_sigv4_signed_headers(
-                            authorization=None, url=real_url
+                        for (
+                            signed_header
+                        ) in _get_aws_sigv4_signed_headers_from_url_query_string(
+                            real_url
                         ):
                             if signed_header in _SENTRY_HEADER_NAMES:
                                 is_present, _ = request_headers.get(
@@ -165,8 +173,8 @@ def _get_wrapped_endheaders(
                             is_present, is_signed = request_headers.get(
                                 normalized_header, (False, False)
                             )
-                            if is_present and (
-                                normalized_header != BAGGAGE_HEADER_NAME or is_signed
+                            if is_signed or (
+                                is_present and normalized_header != BAGGAGE_HEADER_NAME
                             ):
                                 continue
 
