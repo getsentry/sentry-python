@@ -19,6 +19,7 @@ from aiohttp.web_request import Request
 
 import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
+from sentry_sdk._types import OVER_SIZE_LIMIT_SUBSTITUTE
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.aiohttp import (
     AioHttpIntegration,
@@ -129,6 +130,107 @@ async def test_post_body_read(sentry_init, aiohttp_client, capture_events):
     assert request["env"] == {"REMOTE_ADDR": "127.0.0.1"}
     assert request["method"] == "POST"
     assert request["data"] == json.dumps(body)
+
+
+@pytest.mark.parametrize(
+    "data_collection, expect_body",
+    [
+        pytest.param({}, True, id="data_collection_http_bodies_default"),
+        pytest.param(
+            {"http_bodies": ["incoming_request"]},
+            True,
+            id="data_collection_http_bodies_incoming_request",
+        ),
+        pytest.param(
+            {"http_bodies": []}, False, id="data_collection_http_bodies_empty"
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_aiohttp_request_body_data_collection(
+    sentry_init, aiohttp_client, capture_events, data_collection, expect_body
+):
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        _experiments={"data_collection": data_collection},
+    )
+
+    body = {"some": "value"}
+
+    async def hello(request):
+        await request.json()
+        1 / 0
+
+    app = web.Application()
+    app.router.add_post("/", hello)
+
+    events = capture_events()
+
+    client = await aiohttp_client(app)
+    resp = await client.post("/", json=body)
+    assert resp.status == 500
+
+    (event,) = events
+    request = event["request"]
+
+    if expect_body:
+        assert request["data"] == json.dumps(body)
+    else:
+        assert "data" not in request
+
+
+@pytest.mark.parametrize(
+    "data_collection, expect_annotated",
+    [
+        pytest.param(
+            {"http_bodies": ["incoming_request"]},
+            True,
+            id="data_collection_http_bodies_incoming_request",
+        ),
+        pytest.param(
+            {"http_bodies": []}, False, id="data_collection_http_bodies_empty"
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_aiohttp_oversized_request_body_data_collection(
+    sentry_init, aiohttp_client, capture_events, data_collection, expect_annotated
+):
+    """
+    The gating happens before the size check. When bodies are collected, an
+    oversized body is still reported as removed because of the size limit; when
+    they are not, it is dropped outright with no annotation.
+    """
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        max_request_body_size="small",
+        _experiments={"data_collection": data_collection},
+    )
+
+    body = "a" * 2000
+
+    async def hello(request):
+        await request.text()
+        1 / 0
+
+    app = web.Application()
+    app.router.add_post("/", hello)
+
+    events = capture_events()
+
+    client = await aiohttp_client(app)
+    resp = await client.post("/", data=body)
+    assert resp.status == 500
+
+    (event,) = events
+    request_meta = event.get("_meta", {}).get("request", {})
+
+    if expect_annotated:
+        assert event["request"]["data"] == OVER_SIZE_LIMIT_SUBSTITUTE
+        assert request_meta["data"] == {"": {"rem": [["!config", "s"]]}}
+    else:
+        assert "data" not in event["request"]
+        assert "data" not in request_meta
 
 
 @pytest.mark.asyncio
