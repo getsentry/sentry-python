@@ -30,6 +30,9 @@ except ImportError:
 _SENTINEL = object()
 
 
+_SENTINEL = object()
+
+
 class LoggingLevels(enum.IntEnum):
     TRACE = 5
     DEBUG = 10

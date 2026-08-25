@@ -18,7 +18,11 @@ from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
     should_truncate_gen_ai_input,
 )
-from sentry_sdk.utils import event_from_exception, has_data_collection_enabled, package_version
+from sentry_sdk.utils import (
+    event_from_exception,
+    has_data_collection_enabled,
+    package_version,
+)
 
 if TYPE_CHECKING:
     from datetime import datetime
