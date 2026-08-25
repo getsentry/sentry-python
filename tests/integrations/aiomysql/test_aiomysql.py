@@ -20,7 +20,7 @@ import pytest
 import pytest_asyncio
 
 import sentry_sdk
-from sentry_sdk import capture_message, start_transaction
+from sentry_sdk import capture_message
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.aiomysql import AioMySQLIntegration
 from sentry_sdk.tracing_utils import record_sql_queries
@@ -44,8 +44,8 @@ CRUMBS_CONNECT = {
     "category": "query",
     "data": ApproxDict(
         {
-            "db.name": MYSQL_DB,
-            "db.system": "mysql",
+            "db.namespace": MYSQL_DB,
+            "db.system.name": "mysql",
             "db.user": MYSQL_USER,
             "server.address": MYSQL_HOST,
             "server.port": MYSQL_PORT,
@@ -684,629 +684,325 @@ async def test_connection_pool(sentry_init, capture_events) -> None:
     connect_crumbs = [c for c in crumbs if c.get("message") == "connect"]
     assert len(connect_crumbs) >= pool_size  # One connect span per pooled connection
     for crumb in connect_crumbs:
-        assert crumb["data"]["db.system"] == "mysql"
+        assert crumb["data"]["db.system.name"] == "mysql"
         assert crumb["data"]["server.address"] == MYSQL_HOST
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("span_streaming", [True, False])
-async def test_query_source_disabled(
-    sentry_init, capture_events, capture_items, span_streaming
-):
-    sentry_options = {
-        "integrations": [AioMySQLIntegration()],
-        "traces_sample_rate": 1.0,
-        "enable_db_query_source": False,
-        "db_query_source_threshold_ms": 0,
-        "trace_lifecycle": "stream" if span_streaming else "static",
-    }
+async def test_query_source_disabled(sentry_init, capture_items):
+    sentry_init(
+        integrations=[AioMySQLIntegration()],
+        traces_sample_rate=1.0,
+        enable_db_query_source=False,
+        db_query_source_threshold_ms=0,
+        trace_lifecycle="stream",
+    )
 
-    sentry_init(**sentry_options)
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("span")
+    with sentry_sdk.traces.start_span(name="test_segment"):
+        conn = await aiomysql.connect(**_connect_args())
 
-        with sentry_sdk.traces.start_span(name="test_segment"):
-            conn = await aiomysql.connect(**_connect_args())
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
+            )
 
-            async with conn.cursor() as cur:
-                await cur.execute(
-                    "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
-                )
+        conn.close()
 
-            conn.close()
+    sentry_sdk.flush()
 
-        sentry_sdk.flush()
+    spans = [item.payload for item in items]
 
-        spans = [item.payload for item in items]
+    assert len(spans) == 3
 
-        assert len(spans) == 3
+    connect_span = spans[0]
+    insert_span = spans[1]
+    segment = spans[2]
 
-        connect_span = spans[0]
-        insert_span = spans[1]
-        segment = spans[2]
+    assert segment["is_segment"] is True
+    assert connect_span["name"] == "connect"
+    assert insert_span["name"].startswith("INSERT INTO")
 
-        assert segment["is_segment"] is True
-        assert connect_span["name"] == "connect"
-        assert insert_span["name"].startswith("INSERT INTO")
+    data = insert_span.get("attributes", {})
 
-        data = insert_span.get("attributes", {})
-
-        assert "code.line.number" not in data
-        assert "code.namespace" not in data
-        assert "code.file.path" not in data
-        assert "code.function" not in data
-    else:
-        events = capture_events()
-
-        with start_transaction(name="test_transaction", sampled=True):
-            conn = await aiomysql.connect(**_connect_args())
-
-            async with conn.cursor() as cur:
-                await cur.execute(
-                    "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
-                )
-
-            conn.close()
-
-        (event,) = events
-
-        span = event["spans"][-1]
-        assert span["description"].startswith("INSERT INTO")
-        data = span.get("data", {})
-
-        assert SPANDATA.CODE_LINENO not in data
-        assert SPANDATA.CODE_NAMESPACE not in data
-        assert SPANDATA.CODE_FILEPATH not in data
-        assert SPANDATA.CODE_FUNCTION not in data
+    assert "code.line.number" not in data
+    assert "code.namespace" not in data
+    assert "code.file.path" not in data
+    assert "code.function" not in data
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("enable_db_query_source", [None, True])
-@pytest.mark.parametrize("span_streaming", [True, False])
-async def test_query_source_enabled(
-    sentry_init, capture_events, capture_items, enable_db_query_source, span_streaming
-):
+async def test_query_source_enabled(sentry_init, capture_items, enable_db_query_source):
     sentry_options = {
         "integrations": [AioMySQLIntegration()],
         "traces_sample_rate": 1.0,
         "db_query_source_threshold_ms": 0,
-        "trace_lifecycle": "stream" if span_streaming else "static",
+        "trace_lifecycle": "stream",
     }
     if enable_db_query_source is not None:
         sentry_options["enable_db_query_source"] = enable_db_query_source
 
     sentry_init(**sentry_options)
 
-    if span_streaming:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        with sentry_sdk.traces.start_span(name="test_segment"):
-            conn = await aiomysql.connect(**_connect_args())
+    with sentry_sdk.traces.start_span(name="test_segment"):
+        conn = await aiomysql.connect(**_connect_args())
 
-            async with conn.cursor() as cur:
-                await cur.execute(
-                    "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
-                )
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
+            )
 
-            conn.close()
+        conn.close()
 
-        sentry_sdk.flush()
+    sentry_sdk.flush()
 
-        spans = [item.payload for item in items]
+    spans = [item.payload for item in items]
 
-        assert len(spans) == 3
+    assert len(spans) == 3
 
-        connect_span = spans[0]
-        insert_span = spans[1]
-        segment = spans[2]
+    connect_span = spans[0]
+    insert_span = spans[1]
+    segment = spans[2]
 
-        assert segment["is_segment"] is True
-        assert connect_span["name"] == "connect"
-        assert insert_span["name"].startswith("INSERT INTO")
+    assert segment["is_segment"] is True
+    assert connect_span["name"] == "connect"
+    assert insert_span["name"].startswith("INSERT INTO")
 
-        data = insert_span.get("attributes", {})
+    data = insert_span.get("attributes", {})
 
-        assert "code.line.number" in data
-        assert "code.namespace" in data
-        assert "code.file.path" in data
-        assert "code.function" in data
-    else:
-        events = capture_events()
-
-        with start_transaction(name="test_transaction", sampled=True):
-            conn = await aiomysql.connect(**_connect_args())
-
-            async with conn.cursor() as cur:
-                await cur.execute(
-                    "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
-                )
-
-            conn.close()
-
-        (event,) = events
-
-        span = event["spans"][-1]
-        assert span["description"].startswith("INSERT INTO")
-        data = span.get("data", {})
-
-        assert SPANDATA.CODE_LINENO in data
-        assert SPANDATA.CODE_NAMESPACE in data
-        assert SPANDATA.CODE_FILEPATH in data
-        assert SPANDATA.CODE_FUNCTION in data
+    assert "code.line.number" in data
+    assert "code.namespace" in data
+    assert "code.file.path" in data
+    assert "code.function" in data
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("span_streaming", [True, False])
-async def test_query_source(sentry_init, capture_events, capture_items, span_streaming):
+async def test_query_source(sentry_init, capture_items):
     sentry_init(
         integrations=[AioMySQLIntegration()],
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
-    if span_streaming:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        with sentry_sdk.traces.start_span(name="test_segment"):
-            conn = await aiomysql.connect(**_connect_args())
+    with sentry_sdk.traces.start_span(name="test_segment"):
+        conn = await aiomysql.connect(**_connect_args())
 
-            async with conn.cursor() as cur:
-                await cur.execute(
-                    "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
-                )
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
+            )
 
-            conn.close()
+        conn.close()
 
-        sentry_sdk.flush()
+    sentry_sdk.flush()
 
-        spans = [item.payload for item in items]
+    spans = [item.payload for item in items]
 
-        assert len(spans) == 3
+    assert len(spans) == 3
 
-        connect_span = spans[0]
-        insert_span = spans[1]
-        segment = spans[2]
+    connect_span = spans[0]
+    insert_span = spans[1]
+    segment = spans[2]
 
-        assert segment["is_segment"] is True
-        assert connect_span["name"] == "connect"
-        assert insert_span["name"].startswith("INSERT INTO")
+    assert segment["is_segment"] is True
+    assert connect_span["name"] == "connect"
+    assert insert_span["name"].startswith("INSERT INTO")
 
-        data = insert_span.get("attributes", {})
+    data = insert_span.get("attributes", {})
 
-        assert "code.line.number" in data
-        assert "code.namespace" in data
-        assert "code.file.path" in data
-        assert "code.function" in data
+    assert "code.line.number" in data
+    assert "code.namespace" in data
+    assert "code.file.path" in data
+    assert "code.function" in data
 
-        assert type(data.get("code.line.number")) == int
-        assert data.get("code.line.number") > 0
-        assert data.get("code.namespace") == "tests.integrations.aiomysql.test_aiomysql"
-        assert data.get("code.file.path").endswith(
-            "tests/integrations/aiomysql/test_aiomysql.py"
-        )
+    assert type(data.get("code.line.number")) == int
+    assert data.get("code.line.number") > 0
+    assert data.get("code.namespace") == "tests.integrations.aiomysql.test_aiomysql"
+    assert data.get("code.file.path").endswith(
+        "tests/integrations/aiomysql/test_aiomysql.py"
+    )
 
-        is_relative_path = data.get("code.file.path")[0] != os.sep
-        assert is_relative_path
+    is_relative_path = data.get("code.file.path")[0] != os.sep
+    assert is_relative_path
 
-        assert data.get("code.function") == "test_query_source"
-    else:
-        events = capture_events()
-
-        with start_transaction(name="test_transaction", sampled=True):
-            conn = await aiomysql.connect(**_connect_args())
-
-            async with conn.cursor() as cur:
-                await cur.execute(
-                    "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
-                )
-
-            conn.close()
-
-        (event,) = events
-
-        span = event["spans"][-1]
-        assert span["description"].startswith("INSERT INTO")
-
-        data = span.get("data", {})
-
-        assert SPANDATA.CODE_LINENO in data
-        assert SPANDATA.CODE_NAMESPACE in data
-        assert SPANDATA.CODE_FILEPATH in data
-        assert SPANDATA.CODE_FUNCTION in data
-
-        assert type(data.get(SPANDATA.CODE_LINENO)) == int
-        assert data.get(SPANDATA.CODE_LINENO) > 0
-        assert (
-            data.get(SPANDATA.CODE_NAMESPACE)
-            == "tests.integrations.aiomysql.test_aiomysql"
-        )
-        assert data.get(SPANDATA.CODE_FILEPATH).endswith(
-            "tests/integrations/aiomysql/test_aiomysql.py"
-        )
-
-        is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
-        assert is_relative_path
-
-        assert data.get(SPANDATA.CODE_FUNCTION) == "test_query_source"
+    assert data.get("code.function") == "test_query_source"
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("span_streaming", [True, False])
-async def test_no_query_source_if_duration_too_short(
-    sentry_init, capture_events, capture_items, span_streaming
-):
+async def test_no_query_source_if_duration_too_short(sentry_init, capture_items):
     sentry_init(
         integrations=[AioMySQLIntegration()],
         traces_sample_rate=1.0,
         enable_db_query_source=True,
         db_query_source_threshold_ms=100,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
-    if span_streaming:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        @contextmanager
-        def fake_record_sql_queries_streaming(*args, **kwargs):
-            with record_sql_queries(*args, **kwargs) as span:
-                pass
-            span._start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
-            span._end_timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
+    @contextmanager
+    def fake_record_sql_queries_streaming(*args, **kwargs):
+        with record_sql_queries(*args, **kwargs) as span:
+            pass
+        span._start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
+        span._end_timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
+        yield span
+
+    with sentry_sdk.traces.start_span(name="test_segment"):
+        conn = await aiomysql.connect(**_connect_args())
+
+        async with conn.cursor() as cur:
+            with mock.patch(
+                "sentry_sdk.integrations.aiomysql.record_sql_queries",
+                fake_record_sql_queries_streaming,
+            ):
+                await cur.execute(
+                    "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
+                )
+
+        conn.close()
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+
+    assert len(spans) == 3
+
+    connect_span = spans[0]
+    insert_span = spans[1]
+    segment = spans[2]
+
+    assert segment["name"] == "test_segment"
+    assert insert_span["name"].startswith("INSERT INTO")
+    assert connect_span["name"] == "connect"
+    data = insert_span.get("attributes", {})
+
+    assert "code.line.number" not in data
+    assert "code.namespace" not in data
+    assert "code.file.path" not in data
+    assert "code.function" not in data
+
+
+@pytest.mark.asyncio
+async def test_query_source_if_duration_over_threshold(sentry_init, capture_items):
+    sentry_init(
+        integrations=[AioMySQLIntegration()],
+        traces_sample_rate=1.0,
+        enable_db_query_source=True,
+        db_query_source_threshold_ms=100,
+        trace_lifecycle="stream",
+    )
+
+    items = capture_items("span")
+
+    @contextmanager
+    def fake_record_sql_queries_streaming(*args, **kwargs):
+        with record_sql_queries(*args, **kwargs) as span:
+            span._start_timestamp = datetime.datetime(
+                2024, 1, 1, microsecond=0, tzinfo=datetime.timezone.utc
+            )
             yield span
 
-        with sentry_sdk.traces.start_span(name="test_segment"):
-            conn = await aiomysql.connect(**_connect_args())
-
-            async with conn.cursor() as cur:
-                with mock.patch(
-                    "sentry_sdk.integrations.aiomysql.record_sql_queries",
-                    fake_record_sql_queries_streaming,
-                ):
-                    await cur.execute(
-                        "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
-                    )
-
-            conn.close()
-
-        sentry_sdk.flush()
-
-        spans = [item.payload for item in items]
-
-        assert len(spans) == 3
-
-        connect_span = spans[0]
-        insert_span = spans[1]
-        segment = spans[2]
-
-        assert segment["name"] == "test_segment"
-        assert insert_span["name"].startswith("INSERT INTO")
-        assert connect_span["name"] == "connect"
-        data = insert_span.get("attributes", {})
-
-        assert "code.line.number" not in data
-        assert "code.namespace" not in data
-        assert "code.file.path" not in data
-        assert "code.function" not in data
-    else:
-        events = capture_events()
-
-        with start_transaction(name="test_transaction", sampled=True):
-            conn = await aiomysql.connect(**_connect_args())
-
-            @contextmanager
-            def fake_record_sql_queries(*args, **kwargs):
-                with record_sql_queries(*args, **kwargs) as span:
-                    pass
-                span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
-                span.timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
-                yield span
-
-            async with conn.cursor() as cur:
-                with mock.patch(
-                    "sentry_sdk.integrations.aiomysql.record_sql_queries",
-                    fake_record_sql_queries,
-                ):
-                    await cur.execute(
-                        "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
-                    )
-
-            conn.close()
-
-        (event,) = events
-
-        span = event["spans"][-1]
-        assert span["description"].startswith("INSERT INTO")
-
-        data = span.get("data", {})
-
-        assert SPANDATA.CODE_LINENO not in data
-        assert SPANDATA.CODE_NAMESPACE not in data
-        assert SPANDATA.CODE_FILEPATH not in data
-        assert SPANDATA.CODE_FUNCTION not in data
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("span_streaming", [True, False])
-async def test_query_source_if_duration_over_threshold(
-    sentry_init, capture_events, capture_items, span_streaming
-):
-    sentry_init(
-        integrations=[AioMySQLIntegration()],
-        traces_sample_rate=1.0,
-        enable_db_query_source=True,
-        db_query_source_threshold_ms=100,
-        trace_lifecycle="stream" if span_streaming else "static",
-    )
-
-    if span_streaming:
-        items = capture_items("span")
-
-        @contextmanager
-        def fake_record_sql_queries_streaming(*args, **kwargs):
-            with record_sql_queries(*args, **kwargs) as span:
-                span._start_timestamp = datetime.datetime(
-                    2024, 1, 1, microsecond=0, tzinfo=datetime.timezone.utc
-                )
-                yield span
-
-        with sentry_sdk.traces.start_span(name="test_segment"):
-            conn = await aiomysql.connect(**_connect_args())
-
-            async with conn.cursor() as cur:
-                with mock.patch(
-                    "sentry_sdk.integrations.aiomysql.record_sql_queries",
-                    fake_record_sql_queries_streaming,
-                ):
-                    await cur.execute(
-                        "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
-                    )
-
-            conn.close()
-
-        sentry_sdk.flush()
-
-        spans = [item.payload for item in items]
-
-        assert len(spans) == 3
-
-        connect_span = spans[0]
-        insert_span = spans[1]
-        segment = spans[2]
-
-        assert segment["name"] == "test_segment"
-        assert insert_span["name"].startswith("INSERT INTO")
-        assert connect_span["name"] == "connect"
-
-        data = insert_span.get("attributes", {})
-
-        assert "code.line.number" in data
-        assert "code.namespace" in data
-        assert "code.file.path" in data
-        assert "code.function" in data
-
-        assert type(data.get("code.line.number")) == int
-        assert data.get("code.line.number") > 0
-        assert data.get("code.namespace") == "tests.integrations.aiomysql.test_aiomysql"
-        assert data.get("code.file.path").endswith(
-            "tests/integrations/aiomysql/test_aiomysql.py"
-        )
-
-        is_relative_path = data.get("code.file.path")[0] != os.sep
-        assert is_relative_path
-
-        assert (
-            data.get("code.function") == "test_query_source_if_duration_over_threshold"
-        )
-    else:
-        events = capture_events()
-
-        with start_transaction(name="test_transaction", sampled=True):
-            conn = await aiomysql.connect(**_connect_args())
-
-            @contextmanager
-            def fake_record_sql_queries(*args, **kwargs):
-                with record_sql_queries(*args, **kwargs) as span:
-                    pass
-                span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
-                span.timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
-                yield span
-
-            async with conn.cursor() as cur:
-                with mock.patch(
-                    "sentry_sdk.integrations.aiomysql.record_sql_queries",
-                    fake_record_sql_queries,
-                ):
-                    await cur.execute(
-                        "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
-                    )
-
-            conn.close()
-
-        (event,) = events
-
-        span = event["spans"][-1]
-        assert span["description"].startswith("INSERT INTO")
-
-        data = span.get("data", {})
-
-        assert SPANDATA.CODE_LINENO in data
-        assert SPANDATA.CODE_NAMESPACE in data
-        assert SPANDATA.CODE_FILEPATH in data
-        assert SPANDATA.CODE_FUNCTION in data
-
-        assert type(data.get(SPANDATA.CODE_LINENO)) == int
-        assert data.get(SPANDATA.CODE_LINENO) > 0
-        assert (
-            data.get(SPANDATA.CODE_NAMESPACE)
-            == "tests.integrations.aiomysql.test_aiomysql"
-        )
-        assert data.get(SPANDATA.CODE_FILEPATH).endswith(
-            "tests/integrations/aiomysql/test_aiomysql.py"
-        )
-
-        is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
-        assert is_relative_path
-
-        assert (
-            data.get(SPANDATA.CODE_FUNCTION)
-            == "test_query_source_if_duration_over_threshold"
-        )
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("span_streaming", [True, False])
-async def test_span_origin(sentry_init, capture_events, capture_items, span_streaming):
-    sentry_init(
-        integrations=[AioMySQLIntegration()],
-        traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
-    )
-
-    if span_streaming:
-        items = capture_items("span")
-
-        with sentry_sdk.traces.start_span(name="test_segment"):
-            conn = await aiomysql.connect(**_connect_args())
-
-            async with conn.cursor() as cur:
-                await cur.execute("SELECT 1")
-                await cur.execute("SELECT 2")
-
-            conn.close()
-
-        sentry_sdk.flush()
-
-        spans = [item.payload for item in items]
-
-        non_segment_spans = [s for s in spans if not s.get("is_segment")]
-        segment_spans = [s for s in spans if s.get("is_segment")]
-
-        assert len(segment_spans) == 1
-        assert segment_spans[0]["attributes"]["sentry.origin"] == "manual"
-
-        for span in non_segment_spans:
-            assert span["attributes"]["sentry.origin"] == "auto.db.aiomysql"
-    else:
-        events = capture_events()
-
-        with start_transaction(name="test_transaction"):
-            conn = await aiomysql.connect(**_connect_args())
-
-            async with conn.cursor() as cur:
-                await cur.execute("SELECT 1")
-                await cur.execute("SELECT 2")
-
-            conn.close()
-
-        (event,) = events
-
-        assert event["contexts"]["trace"]["origin"] == "manual"
-
-        for span in event["spans"]:
-            assert span["origin"] == "auto.db.aiomysql"
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("span_streaming", [True, False])
-async def test_multiline_query_description_normalized(
-    sentry_init, capture_events, capture_items, span_streaming
-):
-    sentry_init(
-        integrations=[AioMySQLIntegration()],
-        traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
-    )
-
-    if span_streaming:
-        items = capture_items("span")
-
-        with sentry_sdk.traces.start_span(name="test_segment"):
-            conn = await aiomysql.connect(**_connect_args())
-
-            async with conn.cursor() as cur:
+    with sentry_sdk.traces.start_span(name="test_segment"):
+        conn = await aiomysql.connect(**_connect_args())
+
+        async with conn.cursor() as cur:
+            with mock.patch(
+                "sentry_sdk.integrations.aiomysql.record_sql_queries",
+                fake_record_sql_queries_streaming,
+            ):
                 await cur.execute(
-                    """
-                    SELECT
-                        id,
-                        name
-                    FROM
-                        users
-                    WHERE
-                        name = 'Alice'
-                    """
+                    "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
                 )
 
-            conn.close()
+        conn.close()
 
-        sentry_sdk.flush()
+    sentry_sdk.flush()
 
-        spans = [item.payload for item in items]
+    spans = [item.payload for item in items]
 
-        select_spans = [
-            s
-            for s in spans
-            if not s.get("is_segment") and "SELECT" in s.get("name", "")
-        ]
-        assert len(select_spans) == 1
-        assert (
-            select_spans[0]["name"] == "SELECT id, name FROM users WHERE name = 'Alice'"
-        )
-    else:
-        events = capture_events()
+    assert len(spans) == 3
 
-        with start_transaction(name="test_transaction"):
-            conn = await aiomysql.connect(**_connect_args())
+    connect_span = spans[0]
+    insert_span = spans[1]
+    segment = spans[2]
 
-            async with conn.cursor() as cur:
-                await cur.execute(
-                    """
-                    SELECT
-                        id,
-                        name
-                    FROM
-                        users
-                    WHERE
-                        name = 'Alice'
-                    """
-                )
+    assert segment["name"] == "test_segment"
+    assert insert_span["name"].startswith("INSERT INTO")
+    assert connect_span["name"] == "connect"
 
-            conn.close()
+    data = insert_span.get("attributes", {})
 
-        (event,) = events
+    assert "code.line.number" in data
+    assert "code.namespace" in data
+    assert "code.file.path" in data
+    assert "code.function" in data
 
-        spans = [
-            s
-            for s in event["spans"]
-            if s["op"] == "db" and "SELECT" in s.get("description", "")
-        ]
-        assert len(spans) == 1
-        assert (
-            spans[0]["description"] == "SELECT id, name FROM users WHERE name = 'Alice'"
-        )
+    assert type(data.get("code.line.number")) == int
+    assert data.get("code.line.number") > 0
+    assert data.get("code.namespace") == "tests.integrations.aiomysql.test_aiomysql"
+    assert data.get("code.file.path").endswith(
+        "tests/integrations/aiomysql/test_aiomysql.py"
+    )
+
+    is_relative_path = data.get("code.file.path")[0] != os.sep
+    assert is_relative_path
+
+    assert data.get("code.function") == "test_query_source_if_duration_over_threshold"
 
 
 @pytest.mark.asyncio
-async def test_before_send_transaction_sees_normalized_description(
-    sentry_init, capture_events
-):
-    def before_send_transaction(event, hint):
-        for span in event.get("spans", []):
-            desc = span.get("description", "")
-            if "SELECT id, name FROM users" in desc:
-                span["description"] = "filtered"
-        return event
-
+async def test_span_origin(sentry_init, capture_items):
     sentry_init(
         integrations=[AioMySQLIntegration()],
         traces_sample_rate=1.0,
-        before_send_transaction=before_send_transaction,
+        trace_lifecycle="stream",
     )
-    events = capture_events()
 
-    with start_transaction(name="test_transaction"):
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="test_segment"):
+        conn = await aiomysql.connect(**_connect_args())
+
+        async with conn.cursor() as cur:
+            await cur.execute("SELECT 1")
+            await cur.execute("SELECT 2")
+
+        conn.close()
+
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
+
+    non_segment_spans = [s for s in spans if not s.get("is_segment")]
+    segment_spans = [s for s in spans if s.get("is_segment")]
+
+    assert len(segment_spans) == 1
+    assert segment_spans[0]["attributes"]["sentry.origin"] == "manual"
+
+    for span in non_segment_spans:
+        assert span["attributes"]["sentry.origin"] == "auto.db.aiomysql"
+
+
+@pytest.mark.asyncio
+async def test_multiline_query_description_normalized(sentry_init, capture_items):
+    sentry_init(
+        integrations=[AioMySQLIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="test_segment"):
         conn = await aiomysql.connect(**_connect_args())
 
         async with conn.cursor() as cur:
@@ -1317,79 +1013,53 @@ async def test_before_send_transaction_sees_normalized_description(
                     name
                 FROM
                     users
+                WHERE
+                    name = 'Alice'
                 """
             )
 
         conn.close()
 
-    (event,) = events
-    spans = [
-        s
-        for s in event["spans"]
-        if s["op"] == "db" and "filtered" in s.get("description", "")
-    ]
+    sentry_sdk.flush()
 
-    assert len(spans) == 1
-    assert spans[0]["description"] == "filtered"
+    spans = [item.payload for item in items]
+
+    select_spans = [
+        s for s in spans if not s.get("is_segment") and "SELECT" in s.get("name", "")
+    ]
+    assert len(select_spans) == 1
+    assert select_spans[0]["name"] == "SELECT id, name FROM users WHERE name = 'Alice'"
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("span_streaming", [True, False])
-async def test_db_data_on_spans(
-    sentry_init, capture_events, capture_items, span_streaming
-):
+async def test_db_data_on_spans(sentry_init, capture_items):
     """Test that database connection data is properly set on spans."""
     sentry_init(
         integrations=[AioMySQLIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
-    if span_streaming:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        with sentry_sdk.traces.start_span(name="test_segment"):
-            conn = await aiomysql.connect(**_connect_args())
+    with sentry_sdk.traces.start_span(name="test_segment"):
+        conn = await aiomysql.connect(**_connect_args())
 
-            async with conn.cursor() as cur:
-                await cur.execute("SELECT 1")
+        async with conn.cursor() as cur:
+            await cur.execute("SELECT 1")
 
-            conn.close()
+        conn.close()
 
-        sentry_sdk.flush()
+    sentry_sdk.flush()
 
-        spans = [item.payload for item in items]
+    spans = [item.payload for item in items]
 
-        query_span = [
-            s
-            for s in spans
-            if not s.get("is_segment") and "SELECT" in s.get("name", "")
-        ][0]
-        data = query_span.get("attributes", {})
-        assert data.get(SPANDATA.DB_SYSTEM_NAME) == "mysql"
-        assert data.get(SPANDATA.SERVER_ADDRESS) == MYSQL_HOST
-        assert data.get(SPANDATA.SERVER_PORT) == MYSQL_PORT
-        assert data.get(SPANDATA.DB_NAMESPACE) == MYSQL_DB
-        assert data.get(SPANDATA.DB_USER) == MYSQL_USER
-    else:
-        events = capture_events()
-
-        with start_transaction(name="test_transaction"):
-            conn = await aiomysql.connect(**_connect_args())
-
-            async with conn.cursor() as cur:
-                await cur.execute("SELECT 1")
-
-            conn.close()
-
-        (event,) = events
-
-        db_spans = [s for s in event["spans"] if s["op"] == "db"]
-        assert len(db_spans) > 0
-
-        query_span = [s for s in db_spans if "SELECT" in s.get("description", "")][0]
-        assert query_span["data"].get(SPANDATA.DB_SYSTEM) == "mysql"
-        assert query_span["data"].get(SPANDATA.SERVER_ADDRESS) == MYSQL_HOST
-        assert query_span["data"].get(SPANDATA.SERVER_PORT) == MYSQL_PORT
-        assert query_span["data"].get(SPANDATA.DB_NAME) == MYSQL_DB
-        assert query_span["data"].get(SPANDATA.DB_USER) == MYSQL_USER
+    query_span = [
+        s for s in spans if not s.get("is_segment") and "SELECT" in s.get("name", "")
+    ][0]
+    data = query_span.get("attributes", {})
+    assert data.get(SPANDATA.DB_SYSTEM_NAME) == "mysql"
+    assert data.get(SPANDATA.SERVER_ADDRESS) == MYSQL_HOST
+    assert data.get(SPANDATA.SERVER_PORT) == MYSQL_PORT
+    assert data.get(SPANDATA.DB_NAMESPACE) == MYSQL_DB
+    assert data.get(SPANDATA.DB_USER) == MYSQL_USER
