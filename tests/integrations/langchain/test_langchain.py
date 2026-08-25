@@ -3784,6 +3784,10 @@ def failing_tool(word: str) -> int:
     raise ValueError("Tool execution failed")
 
 
+@pytest.mark.skipif(
+    LANGCHAIN_VERSION < (1,),
+    reason="LangChain 1.0+ required (ONE AGENT refactor)",
+)
 def test_langchain_tool_error(
     sentry_init,
     capture_events,
