@@ -9,9 +9,9 @@ from sentry_sdk.consts import VERSION
 from sentry_sdk.integrations.logging import (
     LoggingIntegration,
     ignore_logger,
-    ignore_logger_for_breadcrumbs_and_events,
+    ignore_logger_for_events,
     unignore_logger,
-    unignore_logger_for_breadcrumbs_and_events,
+    unignore_logger_for_events,
 )
 
 other_logger = logging.getLogger("testfoo")
@@ -262,43 +262,39 @@ def test_sentry_logs_collection_opt_in(sentry_init, capture_items, request):
     assert log["attributes"]["sentry.severity_text"] == "warn"
 
 
-def test_ignore_logger_for_breadcrumbs_and_events(sentry_init, capture_events, request):
+def test_ignore_logger_for_events(sentry_init, capture_events, request):
     sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
     events = capture_events()
 
-    ignore_logger_for_breadcrumbs_and_events("testfoo")
-    request.addfinalizer(lambda: unignore_logger_for_breadcrumbs_and_events("testfoo"))
+    ignore_logger_for_events("testfoo")
+    request.addfinalizer(lambda: unignore_logger_for_events("testfoo"))
 
     other_logger.error("hi")
 
     assert not events
 
 
-def test_ignore_logger_for_breadcrumbs_and_events_whitespace_padding(
+def test_ignore_logger_for_events_whitespace_padding(
     sentry_init, capture_events, request
 ):
     """Here we test insensitivity to whitespace padding of ignored loggers"""
     sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
     events = capture_events()
 
-    ignore_logger_for_breadcrumbs_and_events("testfoo")
-    request.addfinalizer(lambda: unignore_logger_for_breadcrumbs_and_events("testfoo"))
+    ignore_logger_for_events("testfoo")
+    request.addfinalizer(lambda: unignore_logger_for_events("testfoo"))
 
     padded_logger = logging.getLogger("       testfoo   ")
     padded_logger.error("hi")
     assert not events
 
 
-def test_ignore_logger_for_breadcrumbs_and_events_wildcard(
-    sentry_init, capture_events, request
-):
+def test_ignore_logger_for_events_wildcard(sentry_init, capture_events, request):
     sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
     events = capture_events()
 
-    ignore_logger_for_breadcrumbs_and_events("testfoo.*")
-    request.addfinalizer(
-        lambda: unignore_logger_for_breadcrumbs_and_events("testfoo.*")
-    )
+    ignore_logger_for_events("testfoo.*")
+    request.addfinalizer(lambda: unignore_logger_for_events("testfoo.*"))
 
     nested_logger = logging.getLogger("testfoo.submodule")
 
@@ -311,15 +307,15 @@ def test_ignore_logger_for_breadcrumbs_and_events_wildcard(
     assert event["logentry"]["formatted"] == "hi"
 
 
-def test_ignore_logger_for_breadcrumbs_and_events_does_not_affect_sentry_logs(
+def test_ignore_logger_for_events_does_not_affect_sentry_logs(
     sentry_init, capture_items, request
 ):
-    """ignore_logger_for_breadcrumbs_and_events should suppress events/breadcrumbs but not Sentry Logs."""
+    """ignore_logger_for_events should suppress events/breadcrumbs but not Sentry Logs."""
     sentry_init(integrations=[LoggingIntegration(capture_sentry_logs=True)])
     items = capture_items("log")
 
-    ignore_logger_for_breadcrumbs_and_events("testfoo")
-    request.addfinalizer(lambda: unignore_logger_for_breadcrumbs_and_events("testfoo"))
+    ignore_logger_for_events("testfoo")
+    request.addfinalizer(lambda: unignore_logger_for_events("testfoo"))
 
     other_logger.error("hi")
     get_client().flush()

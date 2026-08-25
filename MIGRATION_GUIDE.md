@@ -53,8 +53,8 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
   | `event_level` | `event_level` | `INFO` | off | Captures logs of that level and higher as events. |
   | `sentry_logs_level` | `level` | `INFO` | `INFO` | Captures logs of that level and higher as Sentry logs. |
   | `capture_sentry_logs` | removed | `False` | on | Allows to opt out of instrumenting logs as Sentry logs. Use `level` (previously `sentry_logs_level`) to adjust what should be captured instead. |
-  | `ignore_logger` | `ignore_logger_for_breadcrumbs_and_events` | Loggers that match this name will not create breadcrumbs and events. |
-  | `unignore_logger` | `unignore_logger_for_breadcrumbs_and_events` | Loggers that match this name will create breadcrumbs and events again. |
+  | `ignore_logger` | `ignore_logger_for_events` | Loggers that match this name will not create breadcrumbs and events. |
+  | `unignore_logger` | `unignore_logger_for_events` | Loggers that match this name will create breadcrumbs and events again. |
   | `ignore_logger_for_sentry_logs` | `ignore_logger` | Loggers that match this name will not create Sentry logs. |
   | `unignore_logger_for_sentry_logs` | `unignore_logger` | Loggers that match this name will create Sentry logs again. |
 
