@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import inspect
+import json
 import os
 import sys
 
@@ -738,6 +739,166 @@ async def test_asgi_request_body(
         assert "data" not in event["request"]
 
 
+@pytest.mark.parametrize("application", APPS)
+@pytest.mark.parametrize(
+    "data_collection, expect_body",
+    [
+        pytest.param({}, True, id="data_collection_http_bodies_default"),
+        pytest.param(
+            {"http_bodies": ["incoming_request"]},
+            True,
+            id="data_collection_http_bodies_incoming_request",
+        ),
+        pytest.param(
+            {"http_bodies": ["outgoing_request"]},
+            False,
+            id="data_collection_http_bodies_outgoing_request_only",
+        ),
+        pytest.param(
+            {"http_bodies": []}, False, id="data_collection_http_bodies_empty"
+        ),
+    ],
+)
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
+)
+async def test_asgi_request_body_data_collection(
+    sentry_init, capture_events, application, data_collection, expect_body
+):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        _experiments={"data_collection": data_collection},
+    )
+    events = capture_events()
+
+    data = {"hey": 42}
+    comm = HttpCommunicator(
+        application,
+        method="POST",
+        headers=[(b"content-type", b"application/json")],
+        path=reverse("post_echo_async"),
+        body=json.dumps(data).encode("utf-8"),
+    )
+    response = await comm.get_response()
+    await comm.wait()
+
+    assert response["status"] == 200
+
+    (event,) = events
+
+    if expect_body:
+        assert event["request"]["data"] == data
+    else:
+        assert "data" not in event["request"]
+
+
+@pytest.mark.parametrize("application", APPS)
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
+)
+async def test_asgi_request_body_dropped_with_form_and_files_data_collection(
+    sentry_init, capture_events, application
+):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        max_request_body_size="always",
+        _experiments={"data_collection": {"http_bodies": []}},
+    )
+    events = capture_events()
+
+    comm = HttpCommunicator(
+        application,
+        method="POST",
+        headers=[
+            (b"content-type", b"multipart/form-data; boundary=fd721ef49ea403a6"),
+            (b"content-length", BODY_FORM_CONTENT_LENGTH),
+        ],
+        path=reverse("post_echo_async"),
+        body=BODY_FORM,
+    )
+    response = await comm.get_response()
+    await comm.wait()
+
+    assert response["status"] == 200
+
+    (event,) = events
+
+    assert "data" not in event["request"]
+    assert "data" not in event.get("_meta", {}).get("request", {})
+
+
+@pytest.mark.parametrize("application", APPS)
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
+)
+async def test_asgi_transaction_request_body_data_collection(
+    sentry_init, capture_events, application
+):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"data_collection": {"http_bodies": []}},
+    )
+    events = capture_events()
+
+    comm = HttpCommunicator(
+        application,
+        method="POST",
+        headers=[(b"content-type", b"application/json")],
+        path=reverse("post_echo_async"),
+        body=json.dumps({"hey": 42}).encode("utf-8"),
+    )
+    response = await comm.get_response()
+    await comm.wait()
+
+    assert response["status"] == 200
+
+    (event, transaction_event) = events
+
+    assert "data" not in event["request"]
+    assert "data" not in transaction_event["request"]
+
+
+@pytest.mark.parametrize("application", APPS)
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 1), reason="async views have been introduced in Django 3.1"
+)
+async def test_asgi_oversized_request_body_not_annotated_data_collection(
+    sentry_init, capture_events, application
+):
+    """
+    The gating happens before the size check, so an oversized body is dropped
+    outright instead of being reported as removed because of the size limit.
+    """
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        max_request_body_size="small",
+        _experiments={"data_collection": {"http_bodies": []}},
+    )
+    events = capture_events()
+
+    comm = HttpCommunicator(
+        application,
+        method="POST",
+        headers=[(b"content-type", b"text/plain")],
+        path=reverse("post_echo_async"),
+        body=b"a" * 2000,
+    )
+    response = await comm.get_response()
+    await comm.wait()
+
+    assert response["status"] == 200
+
+    (event,) = events
+
+    assert "data" not in event["request"]
+    assert "data" not in event.get("_meta", {}).get("request", {})
+
+
 @pytest.mark.asyncio
 @pytest.mark.skipif(
     sys.version_info >= (3, 12),
@@ -1045,3 +1206,37 @@ async def test_user_identity_error_event_data_collection(
         assert "id" not in event.get("user", {})
         assert "email" not in event.get("user", {})
         assert "username" not in event.get("user", {})
+
+
+@pytest.mark.parametrize("application", APPS)
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    django.VERSION < (3, 0), reason="Django ASGI support shipped in 3.0"
+)
+@pytest.mark.parametrize(
+    ("integration_kwargs", "expected_type"),
+    (
+        ({}, None),
+        ({"failed_request_status_codes": {403, *range(500, 600)}}, "PermissionDenied"),
+    ),
+)
+async def test_failed_request_status_codes(
+    sentry_init, capture_events, application, integration_kwargs, expected_type
+):
+    sentry_init(integrations=[DjangoIntegration(**integration_kwargs)])
+    events = capture_events()
+
+    comm = HttpCommunicator(application, "GET", "/permission-denied-exc")
+    response = await comm.get_response()
+    await comm.wait()
+
+    assert response["status"] == 403
+
+    if expected_type is None:
+        assert not events
+    else:
+        (event,) = events
+        (exception,) = event["exception"]["values"]
+        assert exception["type"] == expected_type
+        assert exception["mechanism"]["handled"] is True
+        assert event["transaction"] == "/permission-denied-exc"

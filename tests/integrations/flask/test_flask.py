@@ -1211,20 +1211,31 @@ def test_transaction_or_segment_http_method_custom(
     response = client.options("/nomessage")
     assert response.status_code == 200
 
-    response = client.head("/nomessage")
-    assert response.status_code == 200
-
     if span_streaming:
         sentry_sdk.flush()
         spans = [i.payload for i in items]
-        assert len(spans) == 2
-        (options_segment, head_segment) = spans
+        (options_segment,) = spans
         assert options_segment["attributes"]["http.request.method"] == "OPTIONS"
+
+        response = client.head("/nomessage")
+        assert response.status_code == 200
+
+        sentry_sdk.flush()
+        spans = [i.payload for i in items]
+        assert len(spans) == 2
+        (_, head_segment) = spans
+
         assert head_segment["attributes"]["http.request.method"] == "HEAD"
     else:
-        assert len(events) == 2
-        (event1, event2) = events
+        (event1,) = events
         assert event1["request"]["method"] == "OPTIONS"
+
+        response = client.head("/nomessage")
+        assert response.status_code == 200
+
+        assert len(events) == 2
+        (_, event2) = events
+
         assert event2["request"]["method"] == "HEAD"
 
 
@@ -1583,3 +1594,145 @@ def test_flask_login_user_identity_span_attributes_data_collection(
         assert "user.id" not in segment.get("attributes", {})
         assert "user.email" not in segment.get("attributes", {})
         assert "user.name" not in segment.get("attributes", {})
+
+
+@pytest.mark.parametrize(
+    "data_collection, expect_body",
+    [
+        pytest.param({}, True, id="data_collection_http_bodies_default"),
+        pytest.param(
+            {"http_bodies": ["incoming_request"]},
+            True,
+            id="data_collection_http_bodies_incoming_request",
+        ),
+        pytest.param(
+            {"http_bodies": ["outgoing_request"]},
+            False,
+            id="data_collection_http_bodies_outgoing_request_only",
+        ),
+        pytest.param(
+            {"http_bodies": []}, False, id="data_collection_http_bodies_empty"
+        ),
+    ],
+)
+def test_flask_request_body_data_collection(
+    sentry_init, capture_events, app, monkeypatch, data_collection, expect_body
+):
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        _experiments={"data_collection": data_collection},
+    )
+    # This test is about request body gating, not user data.
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
+
+    data = {"foo": "bar"}
+
+    @app.route("/", methods=["POST"])
+    def index():
+        capture_message("hi")
+        return "ok"
+
+    events = capture_events()
+
+    client = app.test_client()
+    response = client.post("/", content_type="application/json", data=json.dumps(data))
+    assert response.status_code == 200
+
+    (event,) = events
+    if expect_body:
+        assert event["request"]["data"] == data
+    else:
+        assert "data" not in event["request"]
+
+
+def test_flask_request_body_dropped_with_form_and_files_data_collection(
+    sentry_init, capture_events, app, monkeypatch
+):
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        max_request_body_size="always",
+        _experiments={"data_collection": {"http_bodies": []}},
+    )
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
+
+    data = {
+        "foo": "bar",
+        "file": (BytesIO(b"hello"), "hello.txt"),
+    }
+
+    @app.route("/", methods=["POST"])
+    def index():
+        assert list(request.form) == ["foo"]
+        assert list(request.files) == ["file"]
+        capture_message("hi")
+        return "ok"
+
+    events = capture_events()
+
+    client = app.test_client()
+    response = client.post("/", data=data)
+    assert response.status_code == 200
+
+    (event,) = events
+    assert "data" not in event["request"]
+    assert "data" not in event.get("_meta", {}).get("request", {})
+
+
+def test_flask_transaction_request_body_data_collection(
+    sentry_init, capture_events, app, monkeypatch
+):
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"data_collection": {"http_bodies": []}},
+    )
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
+
+    data = {"username": "sentry-user", "age": "26"}
+
+    @app.route("/", methods=["POST"])
+    def index():
+        capture_message("hi")
+        return "ok"
+
+    events = capture_events()
+
+    client = app.test_client()
+    response = client.post("/", content_type="application/json", data=data)
+    assert response.status_code == 200
+
+    event, transaction_event = events
+    assert "data" not in event["request"]
+    assert "data" not in transaction_event["request"]
+
+
+def test_flask_oversized_request_body_not_annotated_data_collection(
+    sentry_init, capture_events, app, monkeypatch
+):
+    """
+    The gating happens before the size check, so an oversized body is dropped
+    outright instead of being reported as removed because of the size limit.
+    """
+    sentry_init(
+        integrations=[flask_sentry.FlaskIntegration()],
+        max_request_body_size="small",
+        _experiments={"data_collection": {"http_bodies": []}},
+    )
+    monkeypatch.setattr(flask_sentry, "flask_login", None)
+
+    data = "a" * 2000
+
+    @app.route("/", methods=["POST"])
+    def index():
+        capture_message("hi")
+        return "ok"
+
+    events = capture_events()
+
+    client = app.test_client()
+    response = client.post("/", data=data)
+    assert response.status_code == 200
+
+    (event,) = events
+    assert "data" not in event["request"]
+    assert "data" not in event.get("_meta", {}).get("request", {})

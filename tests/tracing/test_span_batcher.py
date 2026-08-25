@@ -18,19 +18,27 @@ def test_envelope_by_trace_id(sentry_init, capture_envelopes, monkeypatch):
 
     envelopes = capture_envelopes()
 
-    sentry_sdk.traces.new_trace()
+    with sentry_sdk.new_scope():
+        sentry_sdk.traces.new_trace()
+        # Keep parent open as its bucket in the batcher would be emptied when it is finished.
+        parent_a = sentry_sdk.traces.start_span(name="parent a")
+        with sentry_sdk.traces.start_span(
+            name="span 1a", parent_span=parent_a
+        ) as span1:
+            trace_id1 = span1.trace_id
+        with sentry_sdk.traces.start_span(name="span 1b", parent_span=parent_a):
+            pass
 
-    with sentry_sdk.traces.start_span(name="span 1a") as span1:
-        trace_id1 = span1.trace_id
-    with sentry_sdk.traces.start_span(name="span 1b"):
-        pass
-
-    sentry_sdk.traces.new_trace()
-
-    with sentry_sdk.traces.start_span(name="span 2a") as span2:
-        trace_id2 = span2.trace_id
-    with sentry_sdk.traces.start_span(name="span 2b"):
-        pass
+    with sentry_sdk.new_scope():
+        sentry_sdk.traces.new_trace()
+        parent_b = sentry_sdk.traces.start_span(name="parent b")
+        # Keep parent open as its bucket in the batcher would be emptied when it is finished.
+        with sentry_sdk.traces.start_span(
+            name="span 2a", parent_span=parent_b
+        ) as span2:
+            trace_id2 = span2.trace_id
+        with sentry_sdk.traces.start_span(name="span 2b", parent_span=parent_b):
+            pass
 
     sentry_sdk.flush()
 
@@ -65,29 +73,30 @@ def test_max_envelope_size(sentry_init, capture_envelopes, monkeypatch):
 
     envelopes = capture_envelopes()
 
-    with sentry_sdk.traces.start_span(name="span 1"):
-        pass
-    with sentry_sdk.traces.start_span(name="span 2"):
-        pass
-    with sentry_sdk.traces.start_span(name="span 3"):
-        pass
-    with sentry_sdk.traces.start_span(name="span 4"):
-        pass
-    with sentry_sdk.traces.start_span(name="span 5"):
-        pass
+    with sentry_sdk.traces.start_span(name="custom parent"):
+        with sentry_sdk.traces.start_span(name="span 1"):
+            pass
+        with sentry_sdk.traces.start_span(name="span 2"):
+            pass
+        with sentry_sdk.traces.start_span(name="span 3"):
+            pass
+        with sentry_sdk.traces.start_span(name="span 4"):
+            pass
+        with sentry_sdk.traces.start_span(name="span 5"):
+            pass
 
-    sentry_sdk.flush()
+        sentry_sdk.flush()
 
-    assert len(envelopes) == 3
+        assert len(envelopes) == 3
 
-    assert len(envelopes[0].items[0].payload.json["items"]) == 2
-    assert envelopes[0].items[0].payload.json["items"][0]["name"] == "span 1"
-    assert envelopes[0].items[0].payload.json["items"][1]["name"] == "span 2"
-    assert len(envelopes[1].items[0].payload.json["items"]) == 2
-    assert envelopes[1].items[0].payload.json["items"][0]["name"] == "span 3"
-    assert envelopes[1].items[0].payload.json["items"][1]["name"] == "span 4"
-    assert len(envelopes[2].items[0].payload.json["items"]) == 1
-    assert envelopes[2].items[0].payload.json["items"][0]["name"] == "span 5"
+        assert len(envelopes[0].items[0].payload.json["items"]) == 2
+        assert envelopes[0].items[0].payload.json["items"][0]["name"] == "span 1"
+        assert envelopes[0].items[0].payload.json["items"][1]["name"] == "span 2"
+        assert len(envelopes[1].items[0].payload.json["items"]) == 2
+        assert envelopes[1].items[0].payload.json["items"][0]["name"] == "span 3"
+        assert envelopes[1].items[0].payload.json["items"][1]["name"] == "span 4"
+        assert len(envelopes[2].items[0].payload.json["items"]) == 1
+        assert envelopes[2].items[0].payload.json["items"][0]["name"] == "span 5"
 
 
 def test_drop_after_max_reached(
@@ -107,22 +116,23 @@ def test_drop_after_max_reached(
     envelopes = capture_envelopes()
     record_lost_event_calls = capture_record_lost_event_calls()
 
-    with sentry_sdk.traces.start_span(name="span 1"):
-        pass
-    with sentry_sdk.traces.start_span(name="span 2"):
-        pass
-    with sentry_sdk.traces.start_span(name="span 3"):
-        pass
+    with sentry_sdk.traces.start_span(name="custom parent"):
+        with sentry_sdk.traces.start_span(name="span 1"):
+            pass
+        with sentry_sdk.traces.start_span(name="span 2"):
+            pass
+        with sentry_sdk.traces.start_span(name="span 3"):
+            pass
 
-    sentry_sdk.flush()
+        sentry_sdk.flush()
 
-    assert len(envelopes) == 1
+        assert len(envelopes) == 1
 
-    assert len(envelopes[0].items[0].payload.json["items"]) == 2
-    assert envelopes[0].items[0].payload.json["items"][0]["name"] == "span 1"
-    assert envelopes[0].items[0].payload.json["items"][1]["name"] == "span 2"
+        assert len(envelopes[0].items[0].payload.json["items"]) == 2
+        assert envelopes[0].items[0].payload.json["items"][0]["name"] == "span 1"
+        assert envelopes[0].items[0].payload.json["items"][1]["name"] == "span 2"
 
-    assert ("queue_overflow", "span", None, 1) in record_lost_event_calls
+        assert ("queue_overflow", "span", None, 1) in record_lost_event_calls
 
 
 def test_drop_isolated_per_bucket(
@@ -140,19 +150,24 @@ def test_drop_isolated_per_bucket(
     envelopes = capture_envelopes()
     record_lost_event_calls = capture_record_lost_event_calls()
 
-    sentry_sdk.traces.new_trace()
-    with sentry_sdk.traces.start_span(name="a1") as span_a:
-        trace_id_a = span_a.trace_id
-    with sentry_sdk.traces.start_span(name="a2"):
-        pass
-    with sentry_sdk.traces.start_span(name="a3"):
-        pass
+    with sentry_sdk.new_scope():
+        # Keep parent open as its bucket in the batcher would be emptied when it is finished.
+        parent_a = sentry_sdk.traces.start_span(name="parent a")
+        with sentry_sdk.traces.start_span(name="a1", parent_span=parent_a) as span_a:
+            trace_id_a = span_a.trace_id
+        with sentry_sdk.traces.start_span(name="a2", parent_span=parent_a):
+            pass
+        with sentry_sdk.traces.start_span(name="a3"):
+            pass
 
-    sentry_sdk.traces.new_trace()
-    with sentry_sdk.traces.start_span(name="b1") as span_b:
-        trace_id_b = span_b.trace_id
-    with sentry_sdk.traces.start_span(name="b2"):
-        pass
+    with sentry_sdk.new_scope():
+        sentry_sdk.traces.new_trace()
+        # Keep parent open as its bucket in the batcher would be emptied when it is finished.
+        parent_b = sentry_sdk.traces.start_span(name="parent b")
+        with sentry_sdk.traces.start_span(name="b1", parent_span=parent_b) as span_b:
+            trace_id_b = span_b.trace_id
+        with sentry_sdk.traces.start_span(name="b2", parent_span=parent_b):
+            pass
 
     sentry_sdk.flush()
 
@@ -185,13 +200,14 @@ def test_length_based_flushing(sentry_init, capture_items, monkeypatch):
 
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="span"):
-        pass
+    with sentry_sdk.traces.start_span(name="custom parent"):
+        with sentry_sdk.traces.start_span(name="span"):
+            pass
 
-    time.sleep(0.1)
+        time.sleep(0.1)
 
-    assert len(items) == 1
-    assert items[0].payload["name"] == "span"
+        assert len(items) == 1
+        assert items[0].payload["name"] == "span"
 
 
 def test_weight_based_flushing(sentry_init, capture_envelopes, monkeypatch):
@@ -208,15 +224,16 @@ def test_weight_based_flushing(sentry_init, capture_envelopes, monkeypatch):
 
     envelopes = capture_envelopes()
 
-    with sentry_sdk.traces.start_span(name="span"):
-        pass
+    with sentry_sdk.traces.start_span(name="custom parent"):
+        with sentry_sdk.traces.start_span(name="span"):
+            pass
 
-    time.sleep(0.1)
+        time.sleep(0.1)
 
-    assert len(envelopes) == 1
+        assert len(envelopes) == 1
 
-    assert len(envelopes[0].items[0].payload.json["items"]) == 1
-    assert envelopes[0].items[0].payload.json["items"][0]["name"] == "span"
+        assert len(envelopes[0].items[0].payload.json["items"]) == 1
+        assert envelopes[0].items[0].payload.json["items"][0]["name"] == "span"
 
 
 def test_weight_based_flushing_by_attribute_size(
@@ -233,27 +250,30 @@ def test_weight_based_flushing_by_attribute_size(
 
     envelopes = capture_envelopes()
 
-    with sentry_sdk.traces.start_span(name="small span") as bare_span:
-        pass
+    with sentry_sdk.traces.start_span(name="custom parent"):
+        with sentry_sdk.traces.start_span(name="small span") as bare_span:
+            pass
 
-    bare_span_size = SpanBatcher._estimate_size(bare_span._to_json())
-    big_attr = "x" * bare_span_size
+        bare_span_size = SpanBatcher._estimate_size(bare_span._to_json())
+        big_attr = "x" * bare_span_size
 
-    monkeypatch.setattr(SpanBatcher, "MAX_BYTES_BEFORE_FLUSH", bare_span_size * 3)
+        monkeypatch.setattr(SpanBatcher, "MAX_BYTES_BEFORE_FLUSH", bare_span_size * 3)
 
-    time.sleep(0.1)
+        time.sleep(0.1)
 
-    # The first span alone is well under the byte limit, so no flush yet.
-    assert len(envelopes) == 0
+        # The first span alone is well under the byte limit, so no flush yet.
+        assert len(envelopes) == 0
 
-    with sentry_sdk.traces.start_span(name="big span", attributes={"big": big_attr}):
-        pass
+        with sentry_sdk.traces.start_span(
+            name="big span", attributes={"big": big_attr}
+        ):
+            pass
 
-    time.sleep(0.1)
+        time.sleep(0.1)
 
-    assert len(envelopes) == 1
-    assert envelopes[0].items[0].payload.json["items"][0]["name"] == "small span"
-    assert envelopes[0].items[0].payload.json["items"][1]["name"] == "big span"
+        assert len(envelopes) == 1
+        assert envelopes[0].items[0].payload.json["items"][0]["name"] == "small span"
+        assert envelopes[0].items[0].payload.json["items"][1]["name"] == "big span"
 
 
 def test_bucket_recreated_after_flush(sentry_init, capture_envelopes, monkeypatch):
@@ -270,37 +290,38 @@ def test_bucket_recreated_after_flush(sentry_init, capture_envelopes, monkeypatc
 
     sentry_sdk.traces.new_trace()
 
-    with sentry_sdk.traces.start_span(name="span 1") as span1:
-        trace_id = span1.trace_id
-    with sentry_sdk.traces.start_span(name="span 2"):
-        pass
+    with sentry_sdk.traces.start_span(name="custom parent"):
+        with sentry_sdk.traces.start_span(name="span 1") as span1:
+            trace_id = span1.trace_id
+        with sentry_sdk.traces.start_span(name="span 2"):
+            pass
 
-    time.sleep(0.1)
+        time.sleep(0.1)
 
-    assert len(envelopes) == 1
+        assert len(envelopes) == 1
 
-    with sentry_sdk.traces.start_span(name="span 3"):
-        pass
-    with sentry_sdk.traces.start_span(name="span 4"):
-        pass
+        with sentry_sdk.traces.start_span(name="span 3"):
+            pass
+        with sentry_sdk.traces.start_span(name="span 4"):
+            pass
 
-    time.sleep(0.1)
+        time.sleep(0.1)
 
-    assert len(envelopes) == 2
+        assert len(envelopes) == 2
 
-    assert envelopes[0].headers["trace"]["trace_id"] == trace_id
-    assert len(envelopes[0].items[0].payload.json["items"]) == 2
-    assert envelopes[0].items[0].payload.json["items"][0]["name"] == "span 1"
-    assert envelopes[0].items[0].payload.json["items"][0]["trace_id"] == trace_id
-    assert envelopes[0].items[0].payload.json["items"][1]["name"] == "span 2"
-    assert envelopes[0].items[0].payload.json["items"][1]["trace_id"] == trace_id
+        assert envelopes[0].headers["trace"]["trace_id"] == trace_id
+        assert len(envelopes[0].items[0].payload.json["items"]) == 2
+        assert envelopes[0].items[0].payload.json["items"][0]["name"] == "span 1"
+        assert envelopes[0].items[0].payload.json["items"][0]["trace_id"] == trace_id
+        assert envelopes[0].items[0].payload.json["items"][1]["name"] == "span 2"
+        assert envelopes[0].items[0].payload.json["items"][1]["trace_id"] == trace_id
 
-    assert envelopes[1].headers["trace"]["trace_id"] == trace_id
-    assert len(envelopes[1].items[0].payload.json["items"]) == 2
-    assert envelopes[1].items[0].payload.json["items"][0]["name"] == "span 3"
-    assert envelopes[1].items[0].payload.json["items"][0]["trace_id"] == trace_id
-    assert envelopes[1].items[0].payload.json["items"][1]["name"] == "span 4"
-    assert envelopes[1].items[0].payload.json["items"][1]["trace_id"] == trace_id
+        assert envelopes[1].headers["trace"]["trace_id"] == trace_id
+        assert len(envelopes[1].items[0].payload.json["items"]) == 2
+        assert envelopes[1].items[0].payload.json["items"][0]["name"] == "span 3"
+        assert envelopes[1].items[0].payload.json["items"][0]["trace_id"] == trace_id
+        assert envelopes[1].items[0].payload.json["items"][1]["name"] == "span 4"
+        assert envelopes[1].items[0].payload.json["items"][1]["trace_id"] == trace_id
 
 
 def test_quiet_buckets_flush_eventually(sentry_init, capture_envelopes, monkeypatch):
@@ -317,15 +338,16 @@ def test_quiet_buckets_flush_eventually(sentry_init, capture_envelopes, monkeypa
 
     envelopes = capture_envelopes()
 
-    with sentry_sdk.traces.start_span(name="span 1"):
-        pass
+    with sentry_sdk.traces.start_span(name="custom parent"):
+        with sentry_sdk.traces.start_span(name="span 1"):
+            pass
 
-    time.sleep(0.3)
+        time.sleep(0.3)
 
-    assert len(envelopes) == 1
+        assert len(envelopes) == 1
 
-    assert len(envelopes[0].items[0].payload.json["items"]) == 1
-    assert envelopes[0].items[0].payload.json["items"][0]["name"] == "span 1"
+        assert len(envelopes[0].items[0].payload.json["items"]) == 1
+        assert envelopes[0].items[0].payload.json["items"][0]["name"] == "span 1"
 
 
 def test_quiet_buckets_flushed_with_busy_neighbors(
@@ -344,17 +366,22 @@ def test_quiet_buckets_flushed_with_busy_neighbors(
 
     sentry_sdk.traces.new_trace()
 
-    with sentry_sdk.traces.start_span(name="span 1") as span1:
-        trace_id1 = span1.trace_id
+    with sentry_sdk.new_scope():
+        # Keep parent open as its bucket in the batcher would be emptied when it is finished.
+        parent_a = sentry_sdk.traces.start_span(name="parent a")
+        with sentry_sdk.traces.start_span(name="span 1", parent_span=parent_a) as span1:
+            trace_id1 = span1.trace_id
 
-    sentry_sdk.traces.new_trace()
+    with sentry_sdk.new_scope():
+        sentry_sdk.traces.new_trace()
+        # Keep parent open as its bucket in the batcher would be emptied when it is finished.
+        parent_b = sentry_sdk.traces.start_span(name="parent b")
+        with sentry_sdk.traces.start_span(name="span 2", parent_span=parent_b) as span2:
+            trace_id2 = span2.trace_id
 
-    with sentry_sdk.traces.start_span(name="span 2") as span2:
-        trace_id2 = span2.trace_id
-
-    for i in range(3, 10):
-        with sentry_sdk.traces.start_span(name=f"span {i}"):
-            pass
+        for i in range(3, 10):
+            with sentry_sdk.traces.start_span(name=f"span {i}", parent_span=parent_b):
+                pass
 
     time.sleep(0.3)
 
@@ -432,6 +459,26 @@ def test_transport_format(sentry_init, capture_envelopes):
         assert value["type"] in ("string", "boolean", "integer", "double", "array")
 
 
+def test_trace_bucket_flushes_when_segment_ends(
+    sentry_init, capture_items, monkeypatch
+):
+    """All currently completed spans in a trace are flushed when the segment is finished."""
+    monkeypatch.setattr(SpanBatcher, "FLUSH_WAIT_TIME", 100000)
+
+    sentry_init(traces_sample_rate=1.0, trace_lifecycle="stream")
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="segment span"):
+        with sentry_sdk.traces.start_span(name="child"):
+            pass
+
+    time.sleep(0.1)
+
+    assert len(items) == 2
+    assert items[0].payload["name"] == "child"
+    assert items[1].payload["name"] == "segment span"
+
+
 @pytest.mark.skipif(
     sys.platform == "win32"
     or not hasattr(os, "fork")
@@ -494,3 +541,34 @@ def test_span_batcher_lock_reset_in_child_after_fork(sentry_init):
     original_lock.release()
     _, status = os.waitpid(pid, 0)
     assert os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0
+
+
+@pytest.mark.tests_internal_exceptions
+def test_flush_loop_swallows_flush_exception():
+    """The flush loop must not let one failed flush kill the flusher thread.
+
+    Regression test for #7138: an unhandled exception inside _flush_loop
+    terminated the daemon flusher thread. After that the span buffer filled up
+    with nothing draining it, and every later span was dropped for the rest of
+    the process lifetime. The loop must swallow the error and keep running.
+
+    Driven synchronously on a bare batcher: _flush raises once and then stops
+    the loop, so _flush_loop returns cleanly on fixed code and propagates the
+    exception on unfixed code.
+    """
+    calls = []
+
+    class ExplodingSpanBatcher(SpanBatcher):
+        def _flush(self, only_pending=False):
+            calls.append(1)
+            self._running = False  # exit the loop after this one iteration
+            raise RuntimeError("boom in flush")
+
+    batcher = ExplodingSpanBatcher(
+        capture_func=lambda envelope: None,
+        record_lost_func=lambda *a, **k: None,
+    )
+    batcher._flush_event.set()  # so the loop's wait() returns at once
+    batcher._flush_loop()
+
+    assert calls == [1]

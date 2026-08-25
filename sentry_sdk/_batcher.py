@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Generic, TypeVar
 
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
-from sentry_sdk.utils import format_timestamp
+from sentry_sdk.utils import capture_internal_exceptions, format_timestamp
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional
@@ -100,7 +100,13 @@ class Batcher(Generic[T]):
         while self._running:
             self._flush_event.wait(self.FLUSH_WAIT_TIME + random.random())
             self._flush_event.clear()
-            self._flush()
+            # A failure to serialize or send one batch must not kill the
+            # flusher thread. If it did, the buffer would keep filling with
+            # nothing draining it, and every later log or metric would be
+            # dropped for the rest of the process lifetime. Swallow and log
+            # the error instead so the loop keeps running.
+            with capture_internal_exceptions():
+                self._flush()
 
     def add(self, item: "T") -> None:
         # Bail out if the current thread is already executing batcher code.

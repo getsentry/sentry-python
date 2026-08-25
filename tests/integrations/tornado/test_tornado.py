@@ -365,6 +365,202 @@ def test_url_query_data_collection_repeated_and_blank_params(
     assert server_span["attributes"]["url.query"] == "a=1&a=2&b="
 
 
+@pytest.mark.parametrize(
+    "data_collection, expect_body",
+    [
+        pytest.param({}, True, id="data_collection_http_bodies_default"),
+        pytest.param(
+            {"http_bodies": ["incoming_request"]},
+            True,
+            id="data_collection_http_bodies_incoming_request",
+        ),
+        pytest.param(
+            {"http_bodies": ["outgoing_request"]},
+            False,
+            id="data_collection_http_bodies_outgoing_request_only",
+        ),
+        pytest.param(
+            {"http_bodies": []}, False, id="data_collection_http_bodies_empty"
+        ),
+    ],
+)
+def test_request_body_data_collection(
+    tornado_testcase, sentry_init, capture_items, data_collection, expect_body
+):
+    sentry_init(
+        integrations=[TornadoIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        _experiments={"data_collection": data_collection},
+    )
+
+    items = capture_items("span")
+
+    client = tornado_testcase(Application([(r"/hi", HelloHandler)]))
+    response = client.fetch("/hi", method="POST", body=b"heyoo")
+    assert response.code == 200
+
+    sentry_sdk.flush()
+
+    (server_span,) = [item.payload for item in items]
+
+    if expect_body:
+        assert server_span["attributes"]["http.request.body.data"] == "heyoo"
+    else:
+        assert "http.request.body.data" not in server_span["attributes"]
+
+
+def test_oversized_request_body_not_annotated_data_collection(
+    tornado_testcase, sentry_init, capture_items
+):
+    """
+    The gating happens before the size check, so an oversized body is dropped
+    outright instead of being reported as removed because of the size limit.
+    """
+    sentry_init(
+        integrations=[TornadoIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        max_request_body_size="small",
+        _experiments={"data_collection": {"http_bodies": []}},
+    )
+
+    items = capture_items("span")
+
+    client = tornado_testcase(Application([(r"/hi", HelloHandler)]))
+    response = client.fetch("/hi", method="POST", body=b"a" * 2000)
+    assert response.code == 200
+
+    sentry_sdk.flush()
+
+    (server_span,) = [item.payload for item in items]
+
+    assert "http.request.body.data" not in server_span["attributes"]
+
+
+@pytest.mark.parametrize(
+    "data_collection, expect_body",
+    [
+        pytest.param({}, True, id="data_collection_http_bodies_default"),
+        pytest.param(
+            {"http_bodies": ["incoming_request"]},
+            True,
+            id="data_collection_http_bodies_incoming_request",
+        ),
+        pytest.param(
+            {"http_bodies": ["outgoing_request"]},
+            False,
+            id="data_collection_http_bodies_outgoing_request_only",
+        ),
+        pytest.param(
+            {"http_bodies": []}, False, id="data_collection_http_bodies_empty"
+        ),
+    ],
+)
+def test_request_body_data_collection_span_streaming(
+    tornado_testcase, sentry_init, capture_items, data_collection, expect_body
+):
+    sentry_init(
+        integrations=[TornadoIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        _experiments={"data_collection": data_collection},
+    )
+
+    items = capture_items("span")
+
+    client = tornado_testcase(Application([(r"/hi", HelloHandler)]))
+    response = client.fetch("/hi", method="POST", body=b"heyoo")
+    assert response.code == 200
+
+    sentry_sdk.flush()
+
+    (server_span,) = [item.payload for item in items]
+
+    if expect_body:
+        assert server_span["attributes"]["http.request.body.data"] == "heyoo"
+    else:
+        assert "http.request.body.data" not in server_span["attributes"]
+
+
+@pytest.mark.parametrize(
+    "data_collection, expect_body",
+    [
+        pytest.param({}, True, id="data_collection_http_bodies_default"),
+        pytest.param(
+            {"http_bodies": ["incoming_request"]},
+            True,
+            id="data_collection_http_bodies_incoming_request",
+        ),
+        pytest.param(
+            {"http_bodies": ["outgoing_request"]},
+            False,
+            id="data_collection_http_bodies_outgoing_request_only",
+        ),
+        pytest.param(
+            {"http_bodies": []}, False, id="data_collection_http_bodies_empty"
+        ),
+    ],
+)
+def test_request_body_data_collection_event_processor(
+    tornado_testcase, sentry_init, capture_events, data_collection, expect_body
+):
+    sentry_init(
+        integrations=[TornadoIntegration()],
+        trace_lifecycle="static",
+        _experiments={"data_collection": data_collection},
+    )
+
+    events = capture_events()
+
+    data = {"hey": 42}
+    client = tornado_testcase(Application([(r"/hi", CrashingHandler)]))
+    response = client.fetch(
+        "/hi",
+        method="POST",
+        body=json.dumps(data),
+        headers={"Content-Type": "application/json"},
+    )
+    assert response.code == 500
+
+    sentry_sdk.flush()
+
+    (event,) = events
+
+    if expect_body:
+        assert event["request"]["data"] == data
+    else:
+        assert "data" not in event["request"]
+
+
+def test_oversized_request_body_not_annotated_data_collection_span_streaming(
+    tornado_testcase, sentry_init, capture_items
+):
+    """
+    The gating happens before the size check, so an oversized body is dropped
+    outright instead of being reported as removed because of the size limit.
+    """
+    sentry_init(
+        integrations=[TornadoIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        max_request_body_size="small",
+        _experiments={"data_collection": {"http_bodies": []}},
+    )
+
+    items = capture_items("span")
+
+    client = tornado_testcase(Application([(r"/hi", HelloHandler)]))
+    response = client.fetch("/hi", method="POST", body=b"a" * 2000)
+    assert response.code == 200
+
+    sentry_sdk.flush()
+
+    (server_span,) = [item.payload for item in items]
+
+    assert "http.request.body.data" not in server_span["attributes"]
+
+
 @pytest.mark.parametrize("send_pii", [True, False])
 @pytest.mark.parametrize(
     "handler,code",

@@ -103,6 +103,11 @@ urlpatterns = [
         name="permission_denied_exc",
     ),
     path(
+        "http404-exc",
+        views.http404_exc,
+        name="http404_exc",
+    ),
+    path(
         "csrf-hello-not-exempt",
         views.csrf_hello_not_exempt,
         name="csrf_hello_not_exempt",
@@ -149,7 +154,6 @@ try:
             name="rest_framework_read_body_and_exc",
         )
     )
-    urlpatterns.append(path("rest-hello", views.rest_hello, name="rest_hello"))
     urlpatterns.append(
         path(
             "rest-authenticated-hello",
