@@ -328,7 +328,7 @@ def test_that_messages_are_captured(broker, worker, capture_events):
         sentry_sdk.capture_message("hi")
 
     dummy_actor.send()
-    broker.join(dummy_actor.queue_name, fail_fast=False)
+    broker.join(dummy_actor.queue_name)
     worker.join()
 
     (event,) = events
