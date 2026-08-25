@@ -18,7 +18,11 @@ from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
     should_truncate_gen_ai_input,
 )
-from sentry_sdk.utils import event_from_exception, package_version
+from sentry_sdk.utils import (
+    event_from_exception,
+    has_data_collection_enabled,
+    package_version,
+)
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -129,7 +133,13 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
     set_data_normalized(span, SPANDATA.GEN_AI_OPERATION_NAME, operation)
 
     # Record input/messages if allowed
-    if should_send_default_pii() and integration.include_prompts:
+    record_inputs = False
+    if has_data_collection_enabled(client.options):
+        record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
+    elif should_send_default_pii() and integration.include_prompts:
+        record_inputs = True
+
+    if record_inputs:
         if operation == "embeddings":
             # For embeddings, look for the 'input' parameter
             embedding_input = kwargs.get("input")
@@ -141,7 +151,6 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
                     if isinstance(embedding_input, list)
                     else [embedding_input]
                 )
-                client = sentry_sdk.get_client()
                 messages_data = (
                     truncate_and_annotate_embedding_inputs(input_list, span, scope)
                     if should_truncate_gen_ai_input(client.options)
@@ -158,7 +167,6 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
             # For chat, look for the 'messages' parameter
             messages = kwargs.get("messages", [])
             if messages:
-                client = sentry_sdk.get_client()
                 scope = sentry_sdk.get_current_scope()
                 messages = _convert_message_parts(messages)
                 messages_data = (
@@ -206,7 +214,8 @@ def _success_callback(
     if span is None:
         return
 
-    integration = sentry_sdk.get_client().get_integration(LiteLLMIntegration)
+    client = sentry_sdk.get_client()
+    integration = client.get_integration(LiteLLMIntegration)
     if integration is None:
         return
 
@@ -218,7 +227,13 @@ def _success_callback(
             )
 
         # Record response content if allowed
-        if should_send_default_pii() and integration.include_prompts:
+        record_outputs = False
+        if has_data_collection_enabled(client.options):
+            record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
+        elif should_send_default_pii() and integration.include_prompts:
+            record_outputs = True
+
+        if record_outputs:
             if hasattr(completion_response, "choices"):
                 response_messages = []
                 for choice in completion_response.choices:

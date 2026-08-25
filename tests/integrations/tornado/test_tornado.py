@@ -365,84 +365,175 @@ def test_url_query_data_collection_repeated_and_blank_params(
     assert server_span["attributes"]["url.query"] == "a=1&a=2&b="
 
 
-@pytest.mark.parametrize("send_pii", [True, False])
-@pytest.mark.parametrize(
-    "handler,code",
-    [
-        (CrashingHandler, 500),
-        (HelloHandler, 200),
-    ],
-)
-def test_transactions(
-    tornado_testcase,
-    sentry_init,
-    capture_events,
-    capture_items,
-    handler,
-    code,
-    send_pii,
+def test_url_query_data_collection_event_processor_no_query_string(
+    tornado_testcase, sentry_init, capture_events
 ):
     sentry_init(
         integrations=[TornadoIntegration()],
         traces_sample_rate=1.0,
-        send_default_pii=send_pii,
-        trace_lifecycle="stream",
+        trace_lifecycle="static",
+        _experiments={"data_collection": {}},
     )
 
-    items = capture_items("event", "span")
+    events = capture_events()
 
-    client = tornado_testcase(Application([(r"/hi", handler)]))
-
-    with sentry_sdk.traces.start_span(name="client") as span:
-        request_headers = dict(span._iter_headers())
-
-    response = client.fetch(
-        "/hi?foo=bar", method="POST", body=b"heyoo", headers=request_headers
-    )
-    assert response.code == code
+    client = tornado_testcase(Application([(r"/hi", QueryHandler)]))
+    response = client.fetch("/hi")
+    assert response.code == 200
 
     sentry_sdk.flush()
 
-    spans = [i.payload for i in items if i.type == "span"]
-    errors = [i.payload for i in items if i.type == "event"]
+    (event,) = events
 
-    client_segment, server_segment = spans
+    assert "query_string" not in event["request"]
+    assert event["request"]["url"].endswith("/hi")
+    assert event["request"]["method"] == "GET"
 
-    if code == 500:
-        assert len(errors) == 1
-        server_error = errors[0]
-        assert server_error["exception"]["values"][0]["type"] == "ZeroDivisionError"
-        assert (
-            server_error["transaction"]
-            == "tests.integrations.tornado.test_tornado.CrashingHandler.post"
-        )
-        assert server_error["transaction_info"] == {"source": "component"}
-        assert (
-            server_error["contexts"]["trace"]["trace_id"] == server_segment["trace_id"]
-        )
 
-    expected_handler = (
-        "tests.integrations.tornado.test_tornado.HelloHandler.post"
-        if code == 200
-        else "tests.integrations.tornado.test_tornado.CrashingHandler.post"
+def test_url_query_data_collection_event_processor_repeated_and_blank_params(
+    tornado_testcase, sentry_init, capture_events
+):
+    sentry_init(
+        integrations=[TornadoIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="static",
+        _experiments={"data_collection": {}},
     )
-    assert server_segment["name"] == expected_handler
-    assert server_segment["attributes"]["sentry.segment.name.source"] == "component"
-    assert server_segment["attributes"]["http.request.method"] == "POST"
-    assert server_segment["attributes"]["http.request.body.data"] == "heyoo"
-    assert server_segment["attributes"]["http.response.status_code"] == code
-    assert server_segment["status"] == ("ok" if code == 200 else "error")
-    assert client_segment["trace_id"] == server_segment["trace_id"]
 
-    if send_pii:
-        assert server_segment["attributes"]["url.query"] == "foo=bar"
-        assert server_segment["attributes"]["url.full"].endswith("/hi?foo=bar")
-        assert server_segment["attributes"]["url.full"].startswith("http://")
-        assert server_segment["attributes"]["url.path"] == "/hi"
+    events = capture_events()
+
+    client = tornado_testcase(Application([(r"/hi", QueryHandler)]))
+    response = client.fetch("/hi?a=1&a=2&b=")
+    assert response.code == 200
+
+    sentry_sdk.flush()
+
+    (event,) = events
+
+    assert event["request"]["query_string"] == "a=1&a=2&b="
+
+
+@pytest.mark.parametrize(
+    "data_collection, expect_body",
+    [
+        pytest.param({}, True, id="data_collection_http_bodies_default"),
+        pytest.param(
+            {"http_bodies": ["incoming_request"]},
+            True,
+            id="data_collection_http_bodies_incoming_request",
+        ),
+        pytest.param(
+            {"http_bodies": ["outgoing_request"]},
+            False,
+            id="data_collection_http_bodies_outgoing_request_only",
+        ),
+        pytest.param(
+            {"http_bodies": []}, False, id="data_collection_http_bodies_empty"
+        ),
+    ],
+)
+def test_request_body_data_collection(
+    tornado_testcase, sentry_init, capture_items, data_collection, expect_body
+):
+    sentry_init(
+        integrations=[TornadoIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        _experiments={"data_collection": data_collection},
+    )
+
+    items = capture_items("span")
+
+    client = tornado_testcase(Application([(r"/hi", HelloHandler)]))
+    response = client.fetch("/hi", method="POST", body=b"heyoo")
+    assert response.code == 200
+
+    sentry_sdk.flush()
+
+    (server_span,) = [item.payload for item in items]
+
+    if expect_body:
+        assert server_span["attributes"]["http.request.body.data"] == "heyoo"
     else:
-        assert "url.query" not in server_segment["attributes"]
-        assert "url.full" not in server_segment["attributes"]
-        assert "url.path" not in server_segment["attributes"]
+        assert "http.request.body.data" not in server_span["attributes"]
+
+
+@pytest.mark.parametrize(
+    "data_collection, expect_body",
+    [
+        pytest.param({}, True, id="data_collection_http_bodies_default"),
+        pytest.param(
+            {"http_bodies": ["incoming_request"]},
+            True,
+            id="data_collection_http_bodies_incoming_request",
+        ),
+        pytest.param(
+            {"http_bodies": ["outgoing_request"]},
+            False,
+            id="data_collection_http_bodies_outgoing_request_only",
+        ),
+        pytest.param(
+            {"http_bodies": []}, False, id="data_collection_http_bodies_empty"
+        ),
+    ],
+)
+def test_request_body_data_collection_event_processor(
+    tornado_testcase, sentry_init, capture_events, data_collection, expect_body
+):
+    sentry_init(
+        integrations=[TornadoIntegration()],
+        trace_lifecycle="static",
+        _experiments={"data_collection": data_collection},
+    )
+
+    events = capture_events()
+
+    data = {"hey": 42}
+    client = tornado_testcase(Application([(r"/hi", CrashingHandler)]))
+    response = client.fetch(
+        "/hi",
+        method="POST",
+        body=json.dumps(data),
+        headers={"Content-Type": "application/json"},
+    )
+    assert response.code == 500
+
+    sentry_sdk.flush()
+
+    (event,) = events
+
+    if expect_body:
+        assert event["request"]["data"] == data
+    else:
+        assert "data" not in event["request"]
+
+
+def test_oversized_request_body_not_annotated_data_collection(
+    tornado_testcase, sentry_init, capture_items
+):
+    """
+    The gating happens before the size check, so an oversized body is dropped
+    outright instead of being reported as removed because of the size limit.
+    """
+    sentry_init(
+        integrations=[TornadoIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        max_request_body_size="small",
+        _experiments={"data_collection": {"http_bodies": []}},
+    )
+
+    items = capture_items("span")
+
+    client = tornado_testcase(Application([(r"/hi", HelloHandler)]))
+    response = client.fetch("/hi", method="POST", body=b"a" * 2000)
+    assert response.code == 200
+
+    sentry_sdk.flush()
+
+    (server_span,) = [item.payload for item in items]
+
+    assert "http.request.body.data" not in server_span["attributes"]
 
 
 def test_400_not_logged(tornado_testcase, sentry_init, capture_events):

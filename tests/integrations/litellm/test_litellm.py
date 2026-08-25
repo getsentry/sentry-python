@@ -3589,3 +3589,261 @@ def test_convert_message_parts_image_url_missing_url():
     converted = _convert_message_parts(messages)
     # Should return item unchanged
     assert converted[0]["content"][0]["type"] == "image_url"
+
+
+@pytest.mark.parametrize(
+    "data_collection, send_default_pii, include_prompts, expected_present, expected_absent",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": True}},
+            False,
+            False,
+            [SPANDATA.GEN_AI_REQUEST_MESSAGES, SPANDATA.GEN_AI_RESPONSE_TEXT],
+            [],
+            id="gen-ai-inputs-and-outputs-enabled-override-legacy-off",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": False}},
+            True,
+            True,
+            [],
+            [SPANDATA.GEN_AI_REQUEST_MESSAGES, SPANDATA.GEN_AI_RESPONSE_TEXT],
+            id="gen-ai-inputs-and-outputs-disabled-override-legacy-on",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": True, "outputs": False}},
+            False,
+            False,
+            [SPANDATA.GEN_AI_REQUEST_MESSAGES],
+            [SPANDATA.GEN_AI_RESPONSE_TEXT],
+            id="gen-ai-inputs-enabled-outputs-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False, "outputs": True}},
+            False,
+            False,
+            [SPANDATA.GEN_AI_RESPONSE_TEXT],
+            [SPANDATA.GEN_AI_REQUEST_MESSAGES],
+            id="gen-ai-outputs-enabled-inputs-disabled",
+        ),
+        pytest.param(
+            {"gen_ai": {}},
+            False,
+            False,
+            [SPANDATA.GEN_AI_REQUEST_MESSAGES, SPANDATA.GEN_AI_RESPONSE_TEXT],
+            [],
+            id="gen-ai-inputs-and-outputs-omitted-default-to-enabled",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            [SPANDATA.GEN_AI_REQUEST_MESSAGES, SPANDATA.GEN_AI_RESPONSE_TEXT],
+            [],
+            id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            True,
+            [],
+            [SPANDATA.GEN_AI_REQUEST_MESSAGES, SPANDATA.GEN_AI_RESPONSE_TEXT],
+            id="no-gen-ai-config-legacy-pii-disabled",
+        ),
+    ],
+)
+def test_chat_completion_data_collection(
+    reset_litellm_executor,
+    sentry_init,
+    capture_events,
+    get_model_response,
+    nonstreaming_chat_completions_model_response,
+    data_collection,
+    send_default_pii,
+    include_prompts,
+    expected_present,
+    expected_absent,
+):
+    sentry_init_kwargs = dict(
+        integrations=[LiteLLMIntegration(include_prompts=include_prompts)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        stream_gen_ai_spans=False,
+        trace_lifecycle="static",
+    )
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    sentry_init(**sentry_init_kwargs)
+
+    messages = [{"role": "user", "content": "Hello!"}]
+
+    client = OpenAI(api_key="test-key")
+
+    model_response = get_model_response(
+        nonstreaming_chat_completions_model_response(
+            response_id="chatcmpl-test",
+            response_model="gpt-3.5-turbo",
+            message_content="Test response",
+            created=1234567890,
+            usage=CompletionUsage(
+                prompt_tokens=10,
+                completion_tokens=20,
+                total_tokens=30,
+            ),
+        ),
+        serialize_pydantic=True,
+        request_headers={"X-Stainless-Raw-Response": "true"},
+    )
+
+    events = capture_events()
+
+    with mock.patch.object(
+        client.completions._client._client,
+        "send",
+        return_value=model_response,
+    ), start_transaction(name="litellm test"):
+        litellm.completion(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            client=client,
+        )
+
+        litellm_utils.executor.shutdown(wait=True)
+
+    (event,) = events
+    (span,) = [
+        x
+        for x in event["spans"]
+        if x["op"] == OP.GEN_AI_CHAT and x["origin"] == "auto.ai.litellm"
+    ]
+    span_data = span["data"]
+
+    for key in expected_present:
+        assert key in span_data, f"{key} should have been collected"
+
+    if SPANDATA.GEN_AI_REQUEST_MESSAGES in expected_present:
+        assert json.loads(span_data[SPANDATA.GEN_AI_REQUEST_MESSAGES]) == messages
+
+    if SPANDATA.GEN_AI_RESPONSE_TEXT in expected_present:
+        response_text = json.loads(span_data[SPANDATA.GEN_AI_RESPONSE_TEXT])
+        assert response_text["role"] == "assistant"
+        assert response_text["content"] == "Test response"
+
+    for key in expected_absent:
+        assert key not in span_data, f"{key} should not have been collected"
+
+    # Data collection never gates non-PII attributes
+    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
+    assert span_data[SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
+    assert span_data[SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
+
+
+@pytest.mark.parametrize(
+    "data_collection, send_default_pii, include_prompts, should_collect_input",
+    [
+        pytest.param(
+            {"gen_ai": {"inputs": True}},
+            False,
+            False,
+            True,
+            id="gen-ai-inputs-enabled-override-legacy-off",
+        ),
+        pytest.param(
+            {"gen_ai": {"inputs": False}},
+            True,
+            True,
+            False,
+            id="gen-ai-inputs-disabled-override-legacy-on",
+        ),
+        pytest.param(
+            {"gen_ai": {}},
+            False,
+            False,
+            True,
+            id="gen-ai-inputs-omitted-default-to-enabled",
+        ),
+        pytest.param(
+            None,
+            True,
+            True,
+            True,
+            id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
+        ),
+        pytest.param(
+            None,
+            False,
+            True,
+            False,
+            id="no-gen-ai-config-legacy-pii-disabled",
+        ),
+    ],
+)
+def test_embeddings_data_collection(
+    sentry_init,
+    capture_events,
+    get_model_response,
+    openai_embedding_model_response,
+    data_collection,
+    send_default_pii,
+    include_prompts,
+    should_collect_input,
+):
+    sentry_init_kwargs = dict(
+        integrations=[LiteLLMIntegration(include_prompts=include_prompts)],
+        disabled_integrations=[StdlibIntegration],
+        traces_sample_rate=1.0,
+        send_default_pii=send_default_pii,
+        stream_gen_ai_spans=False,
+        trace_lifecycle="static",
+    )
+    if data_collection is not None:
+        sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
+
+    sentry_init(**sentry_init_kwargs)
+
+    client = OpenAI(api_key="test-key")
+
+    model_response = get_model_response(
+        openai_embedding_model_response,
+        serialize_pydantic=True,
+        request_headers={"X-Stainless-Raw-Response": "true"},
+    )
+
+    events = capture_events()
+
+    with mock.patch.object(
+        client.embeddings._client._client,
+        "send",
+        return_value=model_response,
+    ):
+        with start_transaction(name="litellm test"):
+            litellm.embedding(
+                model="text-embedding-ada-002",
+                input="Hello, world!",
+                client=client,
+            )
+            # Allow time for callbacks to complete (they may run in separate threads)
+            time.sleep(0.1)
+
+    (event,) = events
+    (span,) = [
+        x
+        for x in event["spans"]
+        if x["op"] == OP.GEN_AI_EMBEDDINGS and x["origin"] == "auto.ai.litellm"
+    ]
+    span_data = span["data"]
+
+    if should_collect_input:
+        assert json.loads(span_data[SPANDATA.GEN_AI_EMBEDDINGS_INPUT]) == [
+            "Hello, world!"
+        ]
+    else:
+        assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in span_data
+
+    # Data collection never gates non-PII attributes
+    assert span_data[SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
+    assert span_data[SPANDATA.GEN_AI_REQUEST_MODEL] == "text-embedding-ada-002"
+    assert span_data[SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 5
