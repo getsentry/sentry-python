@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 
 DEFAULT_LEVEL = logging.INFO
-DEFAULT_EVENT_LEVEL = logging.ERROR
+
 LOGGING_TO_EVENT_LEVEL = {
     logging.NOTSET: "notset",
     logging.DEBUG: "debug",

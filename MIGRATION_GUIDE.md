@@ -48,7 +48,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - When you enable the integration by adding `LoggingIntegration` to your `sentry_sdk.init()`, it'll start capturing Sentry logs. The other features (breadcrumbs, events from logs) can be enabled by providing additional integration options.
 
   | Old name | New name | Old default | New default | Description |
-  | --- | --- | --- |
+  | --- | --- | --- | --- | --- |
   | `level` | `breadcrumb_level` | `INFO` | off | Captures logs of that level and higher as breadcrumbs. |
   | `event_level` | `event_level` | `INFO` | off | Captures logs of that level and higher as events. |
   | `sentry_logs_level` | `level` | `INFO` | `INFO` | Captures logs of that level and higher as Sentry logs. |
