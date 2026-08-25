@@ -541,3 +541,34 @@ def test_span_batcher_lock_reset_in_child_after_fork(sentry_init):
     original_lock.release()
     _, status = os.waitpid(pid, 0)
     assert os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0
+
+
+@pytest.mark.tests_internal_exceptions
+def test_flush_loop_swallows_flush_exception():
+    """The flush loop must not let one failed flush kill the flusher thread.
+
+    Regression test for #7138: an unhandled exception inside _flush_loop
+    terminated the daemon flusher thread. After that the span buffer filled up
+    with nothing draining it, and every later span was dropped for the rest of
+    the process lifetime. The loop must swallow the error and keep running.
+
+    Driven synchronously on a bare batcher: _flush raises once and then stops
+    the loop, so _flush_loop returns cleanly on fixed code and propagates the
+    exception on unfixed code.
+    """
+    calls = []
+
+    class ExplodingSpanBatcher(SpanBatcher):
+        def _flush(self, only_pending=False):
+            calls.append(1)
+            self._running = False  # exit the loop after this one iteration
+            raise RuntimeError("boom in flush")
+
+    batcher = ExplodingSpanBatcher(
+        capture_func=lambda envelope: None,
+        record_lost_func=lambda *a, **k: None,
+    )
+    batcher._flush_event.set()  # so the loop's wait() returns at once
+    batcher._flush_loop()
+
+    assert calls == [1]

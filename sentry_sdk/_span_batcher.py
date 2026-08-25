@@ -9,7 +9,11 @@ from typing import TYPE_CHECKING
 
 from sentry_sdk._batcher import Batcher
 from sentry_sdk.envelope import Envelope, Item, PayloadRef
-from sentry_sdk.utils import format_timestamp, serialize_attribute
+from sentry_sdk.utils import (
+    capture_internal_exceptions,
+    format_timestamp,
+    serialize_attribute,
+)
 
 if TYPE_CHECKING:
     from typing import Any, Callable, Optional
@@ -91,14 +95,19 @@ class SpanBatcher(Batcher["SpanJSON"]):
             self._flush_event.wait(timeout=self.FLUSH_WAIT_TIME + jitter)
             self._flush_event.clear()
 
-            self._flush(only_pending=True)
+            # A failure in one flush must not kill the flusher thread, or the
+            # span buffer would keep filling with nothing draining it and every
+            # later span would be dropped for the rest of the process lifetime.
+            # Swallow and log the error instead so the loop keeps running.
+            with capture_internal_exceptions():
+                self._flush(only_pending=True)
 
-            if (
-                time.monotonic() - self._last_full_flush
-                >= self.FLUSH_WAIT_TIME + jitter
-            ):
-                self._flush()
-                self._last_full_flush = time.monotonic()
+                if (
+                    time.monotonic() - self._last_full_flush
+                    >= self.FLUSH_WAIT_TIME + jitter
+                ):
+                    self._flush()
+                    self._last_full_flush = time.monotonic()
 
     def add(self, span: "SpanJSON") -> None:
         # Bail out if the current thread is already executing batcher code.
