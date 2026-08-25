@@ -1499,6 +1499,51 @@ def test_active_thread_id_span_streaming(sentry_init, capture_items, endpoint):
     assert str(data["active"]) == segments[0]["attributes"]["thread.id"]
 
 
+@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
+def test_segment_name_is_route_resolved_name_span_streaming(
+    sentry_init, capture_items, endpoint
+):
+    sentry_init(
+        auto_enabling_integrations=False,
+        integrations=[StarletteIntegration(transaction_style="url")],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+    app = starlette_app_factory()
+
+    items = capture_items("span")
+
+    client = TestClient(app)
+    response = client.get(endpoint)
+    assert response.status_code == 200
+
+    sentry_sdk.flush()
+
+    segments = [item.payload for item in items if item.payload.get("is_segment")]
+    assert len(segments) == 1
+    assert segments[0]["name"] == endpoint
+    assert segments[0]["attributes"]["sentry.segment.name.source"] == "route"
+
+
+@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
+def test_transaction_name_is_route_resolved_name_static(
+    sentry_init, capture_events, endpoint
+):
+    sentry_init(
+        integrations=[StarletteIntegration(transaction_style="url")],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = TestClient(starlette_app_factory())
+    response = client.get(endpoint)
+    assert response.status_code == 200
+
+    (transaction,) = [e for e in events if e.get("type") == "transaction"]
+    assert transaction["transaction"] == endpoint
+    assert transaction["transaction_info"] == {"source": "route"}
+
+
 def test_original_request_not_scrubbed(sentry_init, capture_events):
     sentry_init(integrations=[StarletteIntegration()])
 

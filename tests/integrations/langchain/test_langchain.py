@@ -6497,10 +6497,10 @@ def test_langchain_text_completion_data_collection(
             False,
             False,
             [
-                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
             ],
-            [],
+            [SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS],
             id="gen-ai-inputs-and-outputs-enabled-tools-collected",
         ),
         pytest.param(
@@ -6509,6 +6509,7 @@ def test_langchain_text_completion_data_collection(
             True,
             [],
             [
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
             ],
@@ -6518,33 +6519,34 @@ def test_langchain_text_completion_data_collection(
             {"gen_ai": {"inputs": True, "outputs": False}},
             False,
             False,
+            [SPANDATA.GEN_AI_TOOL_DEFINITIONS],
             [
+                # REQUEST_AVAILABLE_TOOLS is the legacy value set when data collection is not enabled
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
             ],
-            [],
-            id="gen-ai-inputs-enabled-outputs-disabled-tools-collected",
+            id="gen-ai-inputs-enabled-outputs-disabled-only-tool-definitions-collected",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
             True,
             True,
-            [],
+            [SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS],
             [
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
-                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
             ],
-            id="gen-ai-outputs-enabled-inputs-disabled-tools-not-collected",
+            id="gen-ai-outputs-enabled-inputs-disabled-only-response-tool-calls-collected",
         ),
         pytest.param(
             {"gen_ai": {}},
             False,
             False,
             [
-                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
             ],
-            [],
+            [SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS],
             id="gen-ai-inputs-and-outputs-omitted-default-to-enabled",
         ),
         pytest.param(
@@ -6555,7 +6557,7 @@ def test_langchain_text_completion_data_collection(
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
             ],
-            [],
+            [SPANDATA.GEN_AI_TOOL_DEFINITIONS],
             id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
         ),
         pytest.param(
@@ -6563,7 +6565,10 @@ def test_langchain_text_completion_data_collection(
             False,
             False,
             [SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS],
-            [SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS],
+            [
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+            ],
             id="no-gen-ai-config-available-tools-collected-regardless-of-pii",
         ),
     ],
@@ -6664,16 +6669,14 @@ def test_langchain_data_collection_tools(
     for key in expected_absent:
         assert key not in chat_spans[0], f"{key} should not have been collected"
 
-    # Available tools are gated the same way on every span they are set on
-    available_tools_collected = (
-        SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS in expected_present
-    )
-    assert (
-        SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS in chat_spans[1]
-    ) is available_tools_collected
-    assert (
-        SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS in invoke_agent_span
-    ) is available_tools_collected
+    # Tool definitions are gated the same way on every span they are set on
+    for key in (
+        SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+        SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+    ):
+        collected = key in expected_present
+        assert (key in chat_spans[1]) is collected
+        assert (key in invoke_agent_span) is collected
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])

@@ -301,7 +301,7 @@ def _calculate_responses_token_usage(
         if streaming_message_responses is not None:
             for message in streaming_message_responses:
                 output_tokens += count_tokens(message)
-        elif hasattr(response, "output"):
+        elif hasattr(response, "output") and isinstance(response.output, list):
             for output_item in response.output:
                 if hasattr(output_item, "content"):
                     for content_item in output_item.content:
@@ -711,11 +711,12 @@ def _set_common_output_data(
             "tool": [],
         }
 
-        if has_data_collection_enabled(client.options):
-            record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
+        if has_data_collection_enabled(client.options) and isinstance(
+            response.output, list
+        ):
             record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
 
-            if record_inputs or record_outputs:
+            if record_outputs:
                 for output in response.output:
                     if output.type == "function_call":
                         output_messages["tool"].append(output.dict())
@@ -729,7 +730,7 @@ def _set_common_output_data(
                                     output_message.dict()
                                 )
 
-                if record_inputs and len(output_messages["tool"]) > 0:
+                if len(output_messages["tool"]) > 0:
                     set_data_normalized(
                         span,
                         SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
@@ -742,7 +743,11 @@ def _set_common_output_data(
                         span, SPANDATA.GEN_AI_RESPONSE_TEXT, output_messages["response"]
                     )
 
-        elif should_send_default_pii() and integration.include_prompts:
+        elif (
+            should_send_default_pii()
+            and integration.include_prompts
+            and isinstance(response.output, list)
+        ):
             for output in response.output:
                 if output.type == "function_call":
                     output_messages["tool"].append(output.dict())

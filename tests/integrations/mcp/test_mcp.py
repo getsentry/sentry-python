@@ -70,6 +70,7 @@ from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from starlette.applications import Starlette
 from starlette.responses import Response
 from starlette.routing import Mount, Route
+from starlette.testclient import TestClient
 
 import sentry_sdk
 from sentry_sdk import start_transaction
@@ -100,6 +101,19 @@ def _find_mcp_span(items, method_name=None):
             continue
         return item.payload
     return None
+
+
+def _streamable_http_app(server, *, stateless=False):
+    """Mount a server on the StreamableHTTP transport, stateful or stateless."""
+    session_manager = StreamableHTTPSessionManager(
+        app=server,
+        json_response=True,
+        stateless=stateless,
+    )
+    return Starlette(
+        routes=[Mount("/mcp", app=session_manager.handle_request)],
+        lifespan=lambda app: session_manager.run(),
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -561,6 +575,67 @@ async def test_tool_handler_streamable_http(
         )
     else:
         assert SPANDATA.MCP_TOOL_RESULT_CONTENT not in data
+
+
+@pytest.mark.asyncio
+async def test_tool_handler_stateless_streamable_http(
+    sentry_init,
+    capture_events,
+    select_transactions_with_mcp_spans,
+):
+    """A stateless StreamableHTTP server is still reported as the http transport.
+
+    Such a server issues no session id, so the client sends no
+    `mcp-session-id` header. That says nothing about the transport.
+    """
+    sentry_init(
+        integrations=[MCPIntegration()],
+        traces_sample_rate=1.0,
+    )
+
+    server = Server("test-server")
+
+    if IS_MCP_V2:
+
+        async def test_tool_async(ctx, params):
+            return CallToolResult(content=[TextContent(type="text", text="ok")])
+
+        server.add_request_handler("tools/call", CallToolRequestParams, test_tool_async)
+    else:
+
+        @server.call_tool()
+        async def test_tool_async(tool_name, arguments):
+            return [TextContent(type="text", text="ok")]
+
+    events = capture_events()
+
+    # A stateless server accepts each request on its own, so there is no
+    # handshake to replay and no session id to echo back.
+    with TestClient(_streamable_http_app(server, stateless=True)) as client:
+        response = client.post(
+            "/mcp/",
+            headers={
+                "Accept": "application/json, text/event-stream",
+                "Content-Type": "application/json",
+            },
+            json={
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {"name": "process", "arguments": {}},
+                "id": "req-789",
+            },
+        )
+
+    assert "mcp-session-id" not in response.headers
+
+    transactions = select_transactions_with_mcp_spans(events, method_name="tools/call")
+    assert len(transactions) == 1
+    data = transactions[0]["spans"][0]["data"]
+
+    assert data[SPANDATA.MCP_TRANSPORT] == "http"
+    assert data[SPANDATA.NETWORK_TRANSPORT] == "tcp"
+    assert data[SPANDATA.MCP_REQUEST_ID] == "req-789"
+    assert SPANDATA.MCP_SESSION_ID not in data
 
 
 @pytest.mark.asyncio

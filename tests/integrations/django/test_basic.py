@@ -4,6 +4,7 @@ import os
 import re
 import sys
 from functools import partial
+from io import BytesIO
 from unittest.mock import patch
 
 import pytest
@@ -47,50 +48,34 @@ def client():
     return Client(application)
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_view_exceptions(
     sentry_init,
     client,
     capture_exceptions,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
     exceptions = capture_exceptions()
-    if span_streaming:
-        items = capture_items("event")
-        client.get(reverse("view_exc"))
+    items = capture_items("event")
+    client.get(reverse("view_exc"))
 
-        (error,) = exceptions
-        assert isinstance(error, ZeroDivisionError)
+    (error,) = exceptions
+    assert isinstance(error, ZeroDivisionError)
 
-        (event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
-        client.get(reverse("view_exc"))
-
-        (error,) = exceptions
-        assert isinstance(error, ZeroDivisionError)
-
-        (event,) = events
+    (event,) = (item.payload for item in items)
 
     assert event["exception"]["values"][0]["mechanism"]["type"] == "django"
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_ensures_x_forwarded_header_is_honored_in_sdk_when_enabled_in_django(
     sentry_init,
     client,
     capture_exceptions,
-    capture_events,
     capture_items,
     settings,
-    span_streaming,
 ):
     """
     Test that ensures if django settings.USE_X_FORWARDED_HOST is set to True
@@ -101,37 +86,24 @@ def test_ensures_x_forwarded_header_is_honored_in_sdk_when_enabled_in_django(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
     exceptions = capture_exceptions()
-    if span_streaming:
-        items = capture_items("event")
-        client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"})
+    items = capture_items("event")
+    client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"})
 
-        (error,) = exceptions
-        assert isinstance(error, ZeroDivisionError)
+    (error,) = exceptions
+    assert isinstance(error, ZeroDivisionError)
 
-        (event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
-        client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"})
-
-        (error,) = exceptions
-        assert isinstance(error, ZeroDivisionError)
-
-        (event,) = events
+    (event,) = (item.payload for item in items)
 
     assert event["request"]["url"] == "http://example.com/view-exc"
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_ensures_x_forwarded_header_is_not_honored_when_unenabled_in_django(
     sentry_init,
     client,
     capture_exceptions,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     """
     Test that ensures if django settings.USE_X_FORWARDED_HOST is set to False
@@ -140,23 +112,14 @@ def test_ensures_x_forwarded_header_is_not_honored_when_unenabled_in_django(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
     exceptions = capture_exceptions()
-    if span_streaming:
-        items = capture_items("event")
-        client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"})
+    items = capture_items("event")
+    client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"})
 
-        (error,) = exceptions
-        assert isinstance(error, ZeroDivisionError)
-        (event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
-        client.get(reverse("view_exc"), headers={"X_FORWARDED_HOST": "example.com"})
-
-        (error,) = exceptions
-        assert isinstance(error, ZeroDivisionError)
-        (event,) = events
+    (error,) = exceptions
+    assert isinstance(error, ZeroDivisionError)
+    (event,) = (item.payload for item in items)
 
     assert event["request"]["url"] == "http://localhost/view-exc"
 
@@ -183,43 +146,22 @@ def test_request_captured(
         send_default_pii=True,
         trace_lifecycle="stream" if span_streaming else "static",
     )
-    if span_streaming:
-        items = capture_items("event")
-        content, status, headers = unpack_werkzeug_response(
-            client.get(reverse("message"))
-        )
+    items = capture_items("event")
+    content, status, headers = unpack_werkzeug_response(client.get(reverse("message")))
 
-        assert content == b"ok"
+    assert content == b"ok"
 
-        (event,) = (item.payload for item in items)
+    (event,) = (item.payload for item in items)
 
-        assert event["transaction"] == "/message"
-        assert event["request"] == {
-            "cookies": {},
-            "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
-            "headers": {"Host": "localhost"},
-            "method": "GET",
-            "query_string": "",
-            "url": "http://localhost/message",
-        }
-    else:
-        events = capture_events()
-        content, status, headers = unpack_werkzeug_response(
-            client.get(reverse("message"))
-        )
-
-        assert content == b"ok"
-
-        (event,) = events
-        assert event["transaction"] == "/message"
-        assert event["request"] == {
-            "cookies": {},
-            "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
-            "headers": {"Host": "localhost"},
-            "method": "GET",
-            "query_string": "",
-            "url": "http://localhost/message",
-        }
+    assert event["transaction"] == "/message"
+    assert event["request"] == {
+        "cookies": {},
+        "env": {"SERVER_NAME": "localhost", "SERVER_PORT": "80"},
+        "headers": {"Host": "localhost"},
+        "method": "GET",
+        "query_string": "",
+        "url": "http://localhost/message",
+    }
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -564,39 +506,24 @@ def test_materialized_user_captured(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_queryset_repr(
     sentry_init,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     User.objects.create_user("john", "lennon@thebeatles.com", "johnpassword")
-    if span_streaming:
-        items = capture_items("event")
+    items = capture_items("event")
 
-        try:
-            my_queryset = User.objects.all()  # noqa
-            1 / 0
-        except Exception:
-            capture_exception()
+    try:
+        my_queryset = User.objects.all()  # noqa
+        1 / 0
+    except Exception:
+        capture_exception()
 
-        (event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
-
-        try:
-            my_queryset = User.objects.all()  # noqa
-            1 / 0
-        except Exception:
-            capture_exception()
-
-        (event,) = events
+    (event,) = (item.payload for item in items)
 
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
@@ -608,38 +535,23 @@ def test_queryset_repr(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_context_nested_queryset_repr(
     sentry_init,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
     )
     User.objects.create_user("john", "lennon@thebeatles.com", "johnpassword")
-    if span_streaming:
-        items = capture_items("event")
+    items = capture_items("event")
 
-        try:
-            context = make_context({"entries": User.objects.all()})  # noqa
-            1 / 0
-        except Exception:
-            capture_exception()
+    try:
+        context = make_context({"entries": User.objects.all()})  # noqa
+        1 / 0
+    except Exception:
+        capture_exception()
 
-        (event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
-
-        try:
-            context = make_context({"entries": User.objects.all()})  # noqa
-            1 / 0
-        except Exception:
-            capture_exception()
-
-        (event,) = events
+    (event,) = (item.payload for item in items)
 
     (exception,) = event["exception"]["values"]
     assert exception["type"] == "ZeroDivisionError"
@@ -647,30 +559,19 @@ def test_context_nested_queryset_repr(
     assert "<User: " not in frame["vars"]["context"]
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_custom_error_handler_request_context(
     sentry_init,
     client,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
     )
-    if span_streaming:
-        items = capture_items("event")
-        content, status, headers = unpack_werkzeug_response(client.post("/404"))
-        assert status.lower() == "404 not found"
+    items = capture_items("event")
+    content, status, headers = unpack_werkzeug_response(client.post("/404"))
+    assert status.lower() == "404 not found"
 
-        (event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
-        content, status, headers = unpack_werkzeug_response(client.post("/404"))
-        assert status.lower() == "404 not found"
-
-        (event,) = events
+    (event,) = (item.payload for item in items)
 
     assert event["message"] == "not found"
     assert event["level"] == "error"
@@ -705,13 +606,10 @@ def test_management_command_raises():
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
 @pytest.mark.parametrize("with_integration", [True, False])
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_sql_queries(
     sentry_init,
-    capture_events,
     capture_items,
     with_integration,
-    span_streaming,
 ):
     sentry_init(
         integrations=[DjangoIntegration()] if with_integration else [],
@@ -721,34 +619,19 @@ def test_sql_queries(
 
     from django.db import connection
 
-    if span_streaming:
-        items = capture_items("event")
+    items = capture_items("event")
 
-        sql = connection.cursor()
+    sql = connection.cursor()
 
-        sentry_sdk.get_isolation_scope().clear_breadcrumbs()
+    sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-        with pytest.raises(OperationalError):
-            # table doesn't even exist
-            sql.execute("""SELECT count(*) FROM people_person WHERE foo = %s""", [123])
+    with pytest.raises(OperationalError):
+        # table doesn't even exist
+        sql.execute("""SELECT count(*) FROM people_person WHERE foo = %s""", [123])
 
-        capture_message("HI")
+    capture_message("HI")
 
-        (event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
-
-        sql = connection.cursor()
-
-        sentry_sdk.get_isolation_scope().clear_breadcrumbs()
-
-        with pytest.raises(OperationalError):
-            # table doesn't even exist
-            sql.execute("""SELECT count(*) FROM people_person WHERE foo = %s""", [123])
-
-        capture_message("HI")
-
-        (event,) = events
+    (event,) = (item.payload for item in items)
 
     if with_integration:
         crumb = event["breadcrumbs"]["values"][-1]
@@ -759,12 +642,9 @@ def test_sql_queries(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_sql_dict_query_params(
     sentry_init,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
@@ -779,32 +659,18 @@ def test_sql_dict_query_params(
 
     sql = connections["postgres"].cursor()
 
-    if span_streaming:
-        items = capture_items("event")
-        sentry_sdk.get_isolation_scope().clear_breadcrumbs()
+    items = capture_items("event")
+    sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-        with pytest.raises(ProgrammingError):
-            sql.execute(
-                """SELECT count(*) FROM people_person WHERE foo = %(my_foo)s""",
-                {"my_foo": 10},
-            )
+    with pytest.raises(ProgrammingError):
+        sql.execute(
+            """SELECT count(*) FROM people_person WHERE foo = %(my_foo)s""",
+            {"my_foo": 10},
+        )
 
-        capture_message("HI")
+    capture_message("HI")
 
-        (event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
-        sentry_sdk.get_isolation_scope().clear_breadcrumbs()
-
-        with pytest.raises(ProgrammingError):
-            sql.execute(
-                """SELECT count(*) FROM people_person WHERE foo = %(my_foo)s""",
-                {"my_foo": 10},
-            )
-
-        capture_message("HI")
-
-        (event,) = events
+    (event,) = (item.payload for item in items)
 
     crumb = event["breadcrumbs"]["values"][-1]
     assert crumb["message"] == (
@@ -868,18 +734,14 @@ def test_response_trace(
 )
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_sql_psycopg2_string_composition(
     sentry_init,
-    capture_events,
     capture_items,
     query,
-    span_streaming,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={
             "record_sql_params": True,
         },
@@ -895,24 +757,14 @@ def test_sql_psycopg2_string_composition(
 
     sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-    if span_streaming:
-        items = capture_items("event")
+    items = capture_items("event")
 
-        with pytest.raises(ProgrammingError):
-            sql.execute(query(psycopg2.sql), {"my_param": 10})
+    with pytest.raises(ProgrammingError):
+        sql.execute(query(psycopg2.sql), {"my_param": 10})
 
-        capture_message("HI")
+    capture_message("HI")
 
-        (event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
-
-        with pytest.raises(ProgrammingError):
-            sql.execute(query(psycopg2.sql), {"my_param": 10})
-
-        capture_message("HI")
-
-        (event,) = events
+    (event,) = (item.payload for item in items)
 
     crumb = event["breadcrumbs"]["values"][-1]
     assert crumb["message"] == ('SELECT %(my_param)s FROM "foobar"')
@@ -921,17 +773,13 @@ def test_sql_psycopg2_string_composition(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_sql_psycopg2_placeholders(
     sentry_init,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={
             "record_sql_params": True,
         },
@@ -945,52 +793,26 @@ def test_sql_psycopg2_placeholders(
 
     sql = connections["postgres"].cursor()
 
-    if span_streaming:
-        items = capture_items("event")
-        sentry_sdk.get_isolation_scope().clear_breadcrumbs()
+    items = capture_items("event")
+    sentry_sdk.get_isolation_scope().clear_breadcrumbs()
 
-        with pytest.raises(DataError):
-            names = ["foo", "bar"]
-            identifiers = [psycopg2.sql.Identifier(name) for name in names]
-            placeholders = [
-                psycopg2.sql.Placeholder(var) for var in ["first_var", "second_var"]
-            ]
-            sql.execute("create table my_test_table (foo text, bar date)")
+    with pytest.raises(DataError):
+        names = ["foo", "bar"]
+        identifiers = [psycopg2.sql.Identifier(name) for name in names]
+        placeholders = [
+            psycopg2.sql.Placeholder(var) for var in ["first_var", "second_var"]
+        ]
+        sql.execute("create table my_test_table (foo text, bar date)")
 
-            query = psycopg2.sql.SQL(
-                "insert into my_test_table ({}) values ({})"
-            ).format(
-                psycopg2.sql.SQL(", ").join(identifiers),
-                psycopg2.sql.SQL(", ").join(placeholders),
-            )
-            sql.execute(query, {"first_var": "fizz", "second_var": "not a date"})
+        query = psycopg2.sql.SQL("insert into my_test_table ({}) values ({})").format(
+            psycopg2.sql.SQL(", ").join(identifiers),
+            psycopg2.sql.SQL(", ").join(placeholders),
+        )
+        sql.execute(query, {"first_var": "fizz", "second_var": "not a date"})
 
-        capture_message("HI")
+    capture_message("HI")
 
-        (event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
-        sentry_sdk.get_isolation_scope().clear_breadcrumbs()
-
-        with pytest.raises(DataError):
-            names = ["foo", "bar"]
-            identifiers = [psycopg2.sql.Identifier(name) for name in names]
-            placeholders = [
-                psycopg2.sql.Placeholder(var) for var in ["first_var", "second_var"]
-            ]
-            sql.execute("create table my_test_table (foo text, bar date)")
-
-            query = psycopg2.sql.SQL(
-                "insert into my_test_table ({}) values ({})"
-            ).format(
-                psycopg2.sql.SQL(", ").join(identifiers),
-                psycopg2.sql.SQL(", ").join(placeholders),
-            )
-            sql.execute(query, {"first_var": "fizz", "second_var": "not a date"})
-
-        capture_message("HI")
-
-        (event,) = events
+    (event,) = (item.payload for item in items)
 
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
@@ -1083,12 +905,9 @@ def test_django_connect_trace(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator(transaction=True)
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_django_connect_breadcrumbs(
     sentry_init,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     """
     Verify we record a breadcrumb when opening a new database.
@@ -1096,7 +915,6 @@ def test_django_connect_breadcrumbs(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     from django.db import connections
@@ -1107,24 +925,14 @@ def test_django_connect_breadcrumbs(
     # trigger Django to open a new connection by marking the existing one as None.
     connections["postgres"].connection = None
 
-    if span_streaming:
-        items = capture_items("event")
+    items = capture_items("event")
 
-        cursor = connections["postgres"].cursor()
-        cursor.execute("select 1")
+    cursor = connections["postgres"].cursor()
+    cursor.execute("select 1")
 
-        # trigger recording of event.
-        capture_message("HI")
-        (event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
-
-        cursor = connections["postgres"].cursor()
-        cursor.execute("select 1")
-
-        # trigger recording of event.
-        capture_message("HI")
-        (event,) = events
+    # trigger recording of event.
+    capture_message("HI")
+    (event,) = (item.payload for item in items)
 
     for crumb in event["breadcrumbs"]["values"]:
         del crumb["timestamp"]
@@ -1213,8 +1021,7 @@ def test_db_connection_span_data(
                 )
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_set_db_data_custom_backend(span_streaming):
+def test_set_db_data_custom_backend():
     class DummyBackend:
         # https://github.com/mongodb/mongo-python-driver/blob/6ffae5522c960252b8c9adfe2a19b29ff28187cb/pymongo/collection.py#L126
         def __getattr__(self, attr):
@@ -1345,166 +1152,218 @@ def test_transaction_style_tracing_disabled(
 def test_request_body(
     sentry_init,
     client,
-    capture_events,
     capture_items,
     span_streaming,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
     )
-    if span_streaming:
-        items = capture_items("event")
-        content, status, headers = unpack_werkzeug_response(
-            client.post(reverse("post_echo"), data=b"heyooo", content_type="text/plain")
+    items = capture_items("event")
+    content, status, headers = unpack_werkzeug_response(
+        client.post(reverse("post_echo"), data=b"heyooo", content_type="text/plain")
+    )
+    assert status.lower() == "200 ok"
+    assert content == b"heyooo"
+
+    (event,) = (item.payload for item in items)
+
+    assert event["message"] == "hi"
+    assert event["request"]["data"] == ""
+    assert event["_meta"]["request"]["data"][""] == {
+        "rem": [["!raw", "x"]],
+    }
+
+    del items[:]
+
+    content, status, headers = unpack_werkzeug_response(
+        client.post(
+            reverse("post_echo"),
+            data=b'{"hey": 42}',
+            content_type="application/json",
         )
-        assert status.lower() == "200 ok"
-        assert content == b"heyooo"
+    )
+    assert status.lower() == "200 ok"
+    assert content == b'{"hey": 42}'
 
-        (event,) = (item.payload for item in items)
-
-        assert event["message"] == "hi"
-        assert event["request"]["data"] == ""
-        assert event["_meta"]["request"]["data"][""] == {
-            "rem": [["!raw", "x"]],
-        }
-
-        del items[:]
-
-        content, status, headers = unpack_werkzeug_response(
-            client.post(
-                reverse("post_echo"),
-                data=b'{"hey": 42}',
-                content_type="application/json",
-            )
-        )
-        assert status.lower() == "200 ok"
-        assert content == b'{"hey": 42}'
-
-        (event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
-        content, status, headers = unpack_werkzeug_response(
-            client.post(reverse("post_echo"), data=b"heyooo", content_type="text/plain")
-        )
-        assert status.lower() == "200 ok"
-        assert content == b"heyooo"
-
-        (event,) = events
-
-        assert event["message"] == "hi"
-        assert event["request"]["data"] == ""
-        assert event["_meta"]["request"]["data"][""] == {
-            "rem": [["!raw", "x"]],
-        }
-
-        del events[:]
-
-        content, status, headers = unpack_werkzeug_response(
-            client.post(
-                reverse("post_echo"),
-                data=b'{"hey": 42}',
-                content_type="application/json",
-            )
-        )
-        assert status.lower() == "200 ok"
-        assert content == b'{"hey": 42}'
-
-        (event,) = events
+    (event,) = (item.payload for item in items)
 
     assert event["message"] == "hi"
     assert event["request"]["data"] == {"hey": 42}
     assert "" not in event
 
 
+@pytest.mark.parametrize(
+    "data_collection, expect_body",
+    [
+        pytest.param({}, True, id="data_collection_http_bodies_default"),
+        pytest.param(
+            {"http_bodies": ["incoming_request"]},
+            True,
+            id="data_collection_http_bodies_incoming_request",
+        ),
+        pytest.param(
+            {"http_bodies": ["outgoing_request"]},
+            False,
+            id="data_collection_http_bodies_outgoing_request_only",
+        ),
+        pytest.param(
+            {"http_bodies": []}, False, id="data_collection_http_bodies_empty"
+        ),
+    ],
+)
+def test_request_body_data_collection(
+    sentry_init, client, capture_items, data_collection, expect_body
+):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        _experiments={"data_collection": data_collection},
+    )
+    items = capture_items("event")
+
+    data = {"hey": 42}
+    content, status, headers = unpack_werkzeug_response(
+        client.post(
+            reverse("post_echo"),
+            data=json.dumps(data).encode("utf-8"),
+            content_type="application/json",
+        )
+    )
+    assert status.lower() == "200 ok"
+
+    (event,) = (item.payload for item in items)
+
+    if expect_body:
+        assert event["request"]["data"] == data
+    else:
+        assert "data" not in event["request"]
+
+
+def test_request_body_dropped_with_form_and_files_data_collection(
+    sentry_init, client, capture_items
+):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        max_request_body_size="always",
+        _experiments={"data_collection": {"http_bodies": []}},
+    )
+    items = capture_items("event")
+
+    content, status, headers = unpack_werkzeug_response(
+        client.post(
+            reverse("post_echo"),
+            data={"foo": "bar", "file": (BytesIO(b"hello"), "hello.txt")},
+        )
+    )
+    assert status.lower() == "200 ok"
+
+    (event,) = (item.payload for item in items)
+
+    assert "data" not in event["request"]
+    assert "data" not in event.get("_meta", {}).get("request", {})
+
+
+def test_transaction_request_body_data_collection(sentry_init, client, capture_events):
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=1.0,
+        _experiments={"data_collection": {"http_bodies": []}},
+    )
+    events = capture_events()
+
+    content, status, headers = unpack_werkzeug_response(
+        client.post(
+            reverse("post_echo"),
+            data=json.dumps({"hey": 42}).encode("utf-8"),
+            content_type="application/json",
+        )
+    )
+    assert status.lower() == "200 ok"
+
+    event, transaction_event = events
+
+    assert "data" not in event["request"]
+    assert "data" not in transaction_event["request"]
+
+
+def test_oversized_request_body_not_annotated_data_collection(
+    sentry_init, client, capture_items
+):
+    """
+    The gating happens before the size check, so an oversized body is dropped
+    outright instead of being reported as removed because of the size limit.
+    """
+    sentry_init(
+        integrations=[DjangoIntegration()],
+        max_request_body_size="small",
+        _experiments={"data_collection": {"http_bodies": []}},
+    )
+    items = capture_items("event")
+
+    content, status, headers = unpack_werkzeug_response(
+        client.post(
+            reverse("post_echo"),
+            data=b"a" * 2000,
+            content_type="text/plain",
+        )
+    )
+    assert status.lower() == "200 ok"
+
+    (event,) = (item.payload for item in items)
+
+    assert "data" not in event["request"]
+    assert "data" not in event.get("_meta", {}).get("request", {})
+
+
 @pytest.mark.parametrize("span_streaming", [True, False])
 def test_read_request(
     sentry_init,
     client,
-    capture_events,
     capture_items,
     span_streaming,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
     )
-    if span_streaming:
-        items = capture_items("event")
+    items = capture_items("event")
 
-        content, status, headers = unpack_werkzeug_response(
-            client.post(
-                reverse("read_body_and_view_exc"),
-                data=b'{"hey": 42}',
-                content_type="application/json",
-            )
+    content, status, headers = unpack_werkzeug_response(
+        client.post(
+            reverse("read_body_and_view_exc"),
+            data=b'{"hey": 42}',
+            content_type="application/json",
         )
+    )
 
-        assert status.lower() == "500 internal server error"
+    assert status.lower() == "500 internal server error"
 
-        (event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
-
-        content, status, headers = unpack_werkzeug_response(
-            client.post(
-                reverse("read_body_and_view_exc"),
-                data=b'{"hey": 42}',
-                content_type="application/json",
-            )
-        )
-
-        assert status.lower() == "500 internal server error"
-
-        (event,) = events
+    (event,) = (item.payload for item in items)
 
     assert "data" not in event["request"]
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_request_body_already_read(
     sentry_init,
     client,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
     )
 
     class MockExtractor(DjangoRequestExtractor):
         def raw_data(self):
             raise RawPostDataException
 
-    if span_streaming:
-        items = capture_items("event")
+    items = capture_items("event")
 
-        with patch(
-            "sentry_sdk.integrations.django.DjangoRequestExtractor", MockExtractor
-        ):
-            client.post(
-                reverse("post_echo"),
-                data=b'{"hey": 42}',
-                content_type="application/json",
-            )
+    with patch("sentry_sdk.integrations.django.DjangoRequestExtractor", MockExtractor):
+        client.post(
+            reverse("post_echo"),
+            data=b'{"hey": 42}',
+            content_type="application/json",
+        )
 
-            (event,) = (item.payload for item in items)
-
-    else:
-        events = capture_events()
-
-        with patch(
-            "sentry_sdk.integrations.django.DjangoRequestExtractor", MockExtractor
-        ):
-            client.post(
-                reverse("post_echo"),
-                data=b'{"hey": 42}',
-                content_type="application/json",
-            )
-
-            (event,) = events
+        (event,) = (item.payload for item in items)
 
     assert event["message"] == "hi"
     assert "data" not in event["request"]
@@ -1522,18 +1381,13 @@ def test_template_tracing_meta(
         integrations=[DjangoIntegration()],
         trace_lifecycle="stream" if span_streaming else "static",
     )
-    if span_streaming:
-        items = capture_items("event")
 
-        content, _, _ = unpack_werkzeug_response(client.get(reverse("template_test3")))
-        rendered_meta = content.decode("utf-8")
+    items = capture_items("event")
 
-        events = [item.payload for item in items]
-    else:
-        events = capture_events()
+    content, _, _ = unpack_werkzeug_response(client.get(reverse("template_test3")))
+    rendered_meta = content.decode("utf-8")
 
-        content, _, _ = unpack_werkzeug_response(client.get(reverse("template_test3")))
-        rendered_meta = content.decode("utf-8")
+    events = [item.payload for item in items]
 
     traceparent, baggage = events[0]["message"].split("\n")
     assert traceparent != ""
@@ -1551,37 +1405,23 @@ def test_template_tracing_meta(
 
 
 @pytest.mark.parametrize("with_executing_integration", [[], [ExecutingIntegration()]])
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_template_exception(
     sentry_init,
     client,
-    capture_events,
     capture_items,
     with_executing_integration,
-    span_streaming,
 ):
     sentry_init(
         integrations=[DjangoIntegration()] + with_executing_integration,
-        trace_lifecycle="stream" if span_streaming else "static",
     )
-    if span_streaming:
-        items = capture_items("event")
+    items = capture_items("event")
 
-        content, status, headers = unpack_werkzeug_response(
-            client.get(reverse("template_exc"))
-        )
-        assert status.lower() == "500 internal server error"
+    content, status, headers = unpack_werkzeug_response(
+        client.get(reverse("template_exc"))
+    )
+    assert status.lower() == "500 internal server error"
 
-        (event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
-
-        content, status, headers = unpack_werkzeug_response(
-            client.get(reverse("template_exc"))
-        )
-        assert status.lower() == "500 internal server error"
-
-        (event,) = events
+    (event,) = (item.payload for item in items)
 
     exception = event["exception"]["values"][-1]
     assert exception["type"] == "TemplateSyntaxError"
@@ -1792,20 +1632,103 @@ def test_does_not_capture_403(
         integrations=[DjangoIntegration()],
         trace_lifecycle="stream" if span_streaming else "static",
     )
-    if span_streaming:
-        items = capture_items("event", "transaction", "span")
 
-        _, status, _ = unpack_werkzeug_response(client.get(reverse(endpoint)))
-        assert status.lower() == "403 forbidden"
+    items = capture_items("event", "transaction", "span")
 
-        assert not items
+    _, status, _ = unpack_werkzeug_response(client.get(reverse(endpoint)))
+    assert status.lower() == "403 forbidden"
+
+    assert not items
+
+
+@pytest.mark.parametrize(
+    ("integration_kwargs", "endpoint", "status", "expected_type"),
+    (
+        # Django only turns exceptions into 4xx responses, so with the default
+        # (the 5xx range) none of them are reported
+        ({}, "permission_denied_exc", "403 forbidden", None),
+        ({}, "http404_exc", "404 not found", None),
+        (
+            {"failed_request_status_codes": set()},
+            "permission_denied_exc",
+            "403 forbidden",
+            None,
+        ),
+        (
+            {"failed_request_status_codes": {403, *range(500, 600)}},
+            "permission_denied_exc",
+            "403 forbidden",
+            "PermissionDenied",
+        ),
+        (
+            {"failed_request_status_codes": {404, *range(500, 600)}},
+            "http404_exc",
+            "404 not found",
+            "Http404",
+        ),
+        # Only the status codes that were opted into are reported
+        (
+            {"failed_request_status_codes": {403}},
+            "http404_exc",
+            "404 not found",
+            None,
+        ),
+    ),
+)
+def test_failed_request_status_codes(
+    sentry_init,
+    client,
+    capture_events,
+    integration_kwargs,
+    endpoint,
+    status,
+    expected_type,
+):
+    sentry_init(integrations=[DjangoIntegration(**integration_kwargs)])
+    events = capture_events()
+
+    _, response_status, _ = unpack_werkzeug_response(client.get(reverse(endpoint)))
+    assert response_status.lower() == status
+
+    # The test app's handler404 captures a message, ignore it here
+    error_events = [event for event in events if "exception" in event]
+
+    if expected_type is None:
+        assert not error_events
     else:
-        events = capture_events()
+        (event,) = error_events
+        (exception,) = event["exception"]["values"]
+        assert exception["type"] == expected_type
+        assert exception["mechanism"]["type"] == "django"
+        assert exception["mechanism"]["handled"] is True
 
-        _, status, _ = unpack_werkzeug_response(client.get(reverse(endpoint)))
-        assert status.lower() == "403 forbidden"
 
-        assert not events
+@pytest.mark.parametrize(
+    "integration_kwargs",
+    (
+        {},
+        {"failed_request_status_codes": set()},
+        {"failed_request_status_codes": {404}},
+    ),
+)
+def test_failed_request_status_codes_unhandled_exception(
+    sentry_init, client, capture_events, integration_kwargs
+):
+    """
+    Exceptions Django gives up on are always reported, exactly once, no matter how
+    failed_request_status_codes is set.
+    """
+    sentry_init(integrations=[DjangoIntegration(**integration_kwargs)])
+    events = capture_events()
+
+    _, status, _ = unpack_werkzeug_response(client.get(reverse("view_exc")))
+    assert status.lower() == "500 internal server error"
+
+    (event,) = events
+    (exception,) = event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
+    assert exception["mechanism"]["type"] == "django"
+    assert exception["mechanism"]["handled"] is False
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
