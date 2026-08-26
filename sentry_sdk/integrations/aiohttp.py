@@ -26,6 +26,7 @@ from sentry_sdk.traces import (
     SegmentNameSource,
     SpanStatus,
     StreamedSpan,
+    get_current_span,
 )
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
@@ -324,14 +325,15 @@ class AioHttpIntegration(Integration):
                 return rv
 
             name = None
+            http_route = None
 
             try:
                 if integration.transaction_style == "handler_name":
                     name = transaction_from_function(rv.handler)
                 elif integration.transaction_style == "method_and_path_pattern":
                     route_info = rv.get_info()
-                    pattern = route_info.get("path") or route_info.get("formatter")
-                    name = "{} {}".format(request.method, pattern)
+                    http_route = route_info.get("path") or route_info.get("formatter")
+                    name = "{} {}".format(request.method, http_route)
             except Exception:
                 pass
 
@@ -341,6 +343,13 @@ class AioHttpIntegration(Integration):
                     name,
                     source=SOURCE_FOR_STYLE[integration.transaction_style],
                 )
+                current_span = get_current_span()
+                if (
+                    current_span
+                    and not isinstance(current_span, NoOpStreamedSpan)
+                    and http_route is not None
+                ):
+                    current_span._segment.set_attribute(SPANDATA.HTTP_ROUTE, http_route)
 
             return rv
 

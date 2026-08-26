@@ -880,6 +880,8 @@ def _set_transaction_name_and_source(
     if name is None:
         name = _DEFAULT_TRANSACTION_NAME
         source = TransactionSource.ROUTE
+    elif source == TransactionSource.ROUTE:
+        scope.set_segment_attribute(SPANDATA.HTTP_ROUTE, name)
 
     scope.set_transaction_name(name, source=source)
 

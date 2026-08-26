@@ -1083,6 +1083,10 @@ def test_transaction_style(
 
         assert spans[2]["is_segment"] is True
         assert spans[2]["attributes"]["sentry.segment.name.source"] == expected_source
+        if expected_source == "route":
+            assert spans[2]["attributes"]["http.route"] == expected_transaction
+        else:
+            assert "http.route" not in spans[2]["attributes"]
 
         (event,) = (item.payload for item in items if item.type == "event")
     else:

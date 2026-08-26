@@ -1880,12 +1880,16 @@ async def test_transaction_style_span_streaming(
     assert server_segment["name"] == expected_name
     assert server_segment["is_segment"]
     assert server_segment["attributes"]["sentry.segment.name.source"] == expected_source
+    if expected_source == "route":
+        assert server_segment["attributes"]["http.route"] == "/{var}"
+    else:
+        assert "http.route" not in server_segment["attributes"]
 
 
 @pytest.mark.asyncio
 async def test_server_error_span_streaming(sentry_init, aiohttp_client, capture_items):
     sentry_init(
-        integrations=[AioHttpIntegration()],
+        integrations=[AioHttpIntegration(transaction_style="method_and_path_pattern")],
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
     )
@@ -1894,12 +1898,12 @@ async def test_server_error_span_streaming(sentry_init, aiohttp_client, capture_
         1 / 0
 
     app = web.Application()
-    app.router.add_get("/", hello)
+    app.router.add_get(r"/{var}", hello)
 
     items = capture_items("event", "span")
 
     client = await aiohttp_client(app)
-    resp = await client.get("/")
+    resp = await client.get("/message")
     assert resp.status == 500
 
     sentry_sdk.flush()
@@ -1910,6 +1914,7 @@ async def test_server_error_span_streaming(sentry_init, aiohttp_client, capture_
     error_event = items[0]
     assert error_event.type == "event"
     assert error_event.payload["exception"]["values"][0]["type"] == "ZeroDivisionError"
+    assert error_event.payload["transaction"] == "GET /{var}"
 
     server_span = items[1].payload
 

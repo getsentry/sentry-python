@@ -2,6 +2,7 @@ import functools
 from typing import TYPE_CHECKING
 
 import sentry_sdk
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     DidNotEnable,
@@ -10,8 +11,15 @@ from sentry_sdk.integrations import (
 )
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
-from sentry_sdk.traces import SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE
-from sentry_sdk.tracing import SOURCE_FOR_STYLE as TRANSACTION_SOURCE_FOR_STYLE
+from sentry_sdk.traces import (
+    SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE,
+)
+from sentry_sdk.traces import (
+    SegmentNameSource,
+)
+from sentry_sdk.tracing import (
+    SOURCE_FOR_STYLE as TRANSACTION_SOURCE_FOR_STYLE,
+)
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -181,9 +189,15 @@ def _set_segment_name_and_source(transaction_style: str) -> None:
                 or "bottle request"
             )
 
+        source = SEGMENT_SOURCE_FOR_STYLE[transaction_style]
+        if source == SegmentNameSource.ROUTE:
+            sentry_sdk.get_current_scope().set_segment_attribute(
+                SPANDATA.HTTP_ROUTE, name
+            )
+
         sentry_sdk.get_current_scope().set_transaction_name(
             name,
-            source=SEGMENT_SOURCE_FOR_STYLE[transaction_style],
+            source=source,
         )
     except RuntimeError:
         pass

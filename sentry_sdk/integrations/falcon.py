@@ -1,9 +1,11 @@
 from typing import TYPE_CHECKING
 
 import sentry_sdk
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
+from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.tracing import SOURCE_FOR_STYLE
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -122,7 +124,10 @@ class SentryFalconMiddleware:
         }
         name = name_for_style[integration.transaction_style]
         source = sentry_sdk.traces.SOURCE_FOR_STYLE[integration.transaction_style]
-        sentry_sdk.set_transaction_name(name, source)
+        scope = sentry_sdk.get_current_scope()
+        if source == SegmentNameSource.ROUTE:
+            scope.set_segment_attribute(SPANDATA.HTTP_ROUTE, name)
+        scope.set_transaction_name(name, source)
 
 
 TRANSACTION_STYLE_VALUES = ("uri_template", "path")

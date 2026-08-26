@@ -171,6 +171,10 @@ def test_transaction_style(
         (segment,) = spans
         assert segment["name"] == expected_transaction
         assert segment["attributes"]["sentry.segment.name.source"] == expected_source
+        if expected_source == "route":
+            assert segment["attributes"]["http.route"] == expected_transaction
+        else:
+            assert "http.route" not in segment["attributes"]
     else:
         (_, transaction_event) = events
         assert transaction_event["transaction"] == expected_transaction

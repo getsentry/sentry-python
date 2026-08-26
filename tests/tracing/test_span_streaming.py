@@ -60,6 +60,30 @@ def test_start_span(sentry_init, capture_items):
     assert segment["status"] == "ok"
 
 
+def test_set_segment_attribute(sentry_init, capture_items):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="segment"):
+        with sentry_sdk.traces.start_span(name="child"):
+            # Set from within a child span to prove it targets the segment,
+            # not the active span.
+            sentry_sdk.get_current_scope().set_segment_attribute(
+                "http.route", "/users/{id}"
+            )
+
+    sentry_sdk.get_client().flush()
+    spans = {item.payload["name"]: item.payload for item in items}
+
+    assert spans["segment"]["attributes"]["http.route"] == "/users/{id}"
+    # Unlike scope-wide set_attribute, the child span must not inherit it.
+    assert "http.route" not in spans["child"]["attributes"]
+
+
 def test_start_span_no_context_manager(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,

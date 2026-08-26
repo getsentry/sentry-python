@@ -2053,6 +2053,20 @@ class Scope:
         for attribute, value in attributes.items():
             self.set_attribute(attribute, value)
 
+    def set_segment_attribute(self, key: str, value: "AttributeValue") -> None:
+        """
+        Set an attribute on the active segment span (the root of the trace in
+        this service).
+
+        Unlike :py:meth:`set_attribute`, which applies to all telemetry captured
+        while the scope is active, this sets the attribute on the segment span
+        only.
+
+        This method has no effect outside of span streaming mode.
+        """
+        if isinstance(self._span, StreamedSpan):
+            self._span._segment.set_attribute(key, value)
+
     def remove_attribute(self, attribute: str) -> None:
         """Remove an attribute if set on the scope. No-op if there is no such attribute."""
         try:

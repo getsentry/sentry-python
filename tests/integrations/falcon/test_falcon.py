@@ -140,6 +140,10 @@ def test_transaction_style(
         spans = [span for span in spans if span["name"] == expected_transaction]
         assert len(spans) == 1
         assert spans[0]["attributes"]["sentry.segment.name.source"] == expected_source
+        if expected_source == "route":
+            assert spans[0]["attributes"]["http.route"] == expected_transaction
+        else:
+            assert "http.route" not in spans[0]["attributes"]
     else:
         events = capture_events()
 

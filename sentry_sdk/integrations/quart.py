@@ -5,14 +5,20 @@ from functools import wraps
 from typing import TYPE_CHECKING
 
 import sentry_sdk
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query_string
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE
-from sentry_sdk.traces import StreamedSpan, get_current_span
-from sentry_sdk.tracing import SOURCE_FOR_STYLE as TRANSACTION_SOURCE_FOR_STYLE
+from sentry_sdk.traces import SegmentNameSource, StreamedSpan, get_current_span
+from sentry_sdk.tracing import (
+    SOURCE_FOR_STYLE as TRANSACTION_SOURCE_FOR_STYLE,
+)
+from sentry_sdk.tracing import (
+    TransactionSource,
+)
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -163,8 +169,12 @@ def _set_transaction_name_and_source(
             else TRANSACTION_SOURCE_FOR_STYLE[transaction_style]
         )
 
+        name = name_for_style[transaction_style]
+        if source in (TransactionSource.ROUTE, SegmentNameSource.ROUTE):
+            scope.set_segment_attribute(SPANDATA.HTTP_ROUTE, name)
+
         scope.set_transaction_name(
-            name=name_for_style[transaction_style],
+            name=name,
             source=source,
         )
     except Exception:

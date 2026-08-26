@@ -472,6 +472,8 @@ def _set_transaction_name_and_source(
             source = TransactionSource.URL
         else:
             source = SOURCE_FOR_STYLE[transaction_style]
+            if source == TransactionSource.ROUTE:
+                scope.set_segment_attribute(SPANDATA.HTTP_ROUTE, transaction_name)
 
         scope.set_transaction_name(
             transaction_name,

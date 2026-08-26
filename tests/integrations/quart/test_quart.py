@@ -771,6 +771,10 @@ async def test_span_streaming_transaction_style(
     assert segment["is_segment"] is True
     assert segment["name"] == expected_name
     assert segment["attributes"]["sentry.segment.name.source"] == expected_source
+    if expected_source == "route":
+        assert segment["attributes"]["http.route"] == expected_name
+    else:
+        assert "http.route" not in segment["attributes"]
 
 
 @pytest.mark.asyncio

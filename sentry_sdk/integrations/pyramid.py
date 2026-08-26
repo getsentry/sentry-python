@@ -4,11 +4,17 @@ import sys
 import weakref
 
 import sentry_sdk
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE
+from sentry_sdk.traces import (
+    SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE,
+)
+from sentry_sdk.traces import (
+    SegmentNameSource,
+)
 from sentry_sdk.tracing import SOURCE_FOR_STYLE as TRANSACTION_SOURCE_FOR_STYLE
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
@@ -182,8 +188,12 @@ def _set_transaction_name_and_source(
             if is_span_streaming_enabled
             else TRANSACTION_SOURCE_FOR_STYLE[transaction_style]
         )
+        name = name_for_style[transaction_style]
+        if source == SegmentNameSource.ROUTE:
+            scope.set_segment_attribute(SPANDATA.HTTP_ROUTE, name)
+
         scope.set_transaction_name(
-            name_for_style[transaction_style],
+            name,
             source=source,
         )
     except Exception:
