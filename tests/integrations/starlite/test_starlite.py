@@ -44,7 +44,7 @@ def starlite_app_factory(middleware=None, debug=True, exception_handlers=None):
         return {"status": "ok"}
 
     @post("/body/json")
-    async def body_json(data: "Dict[str, Any]") -> "Dict[str, Any]":
+    async def body_json(data: Dict[str, Any]) -> Dict[str, Any]:
         capture_message("hi")
         return {"status": "ok"}
 
