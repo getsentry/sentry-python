@@ -11,7 +11,7 @@ from sentry_sdk.integrations._wsgi_common import (
     _is_json_content_type,
     request_body_within_bounds,
 )
-from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.utils import (
@@ -46,7 +46,7 @@ class TornadoIntegration(Integration):
     def setup_once() -> None:
         _check_minimum_version(TornadoIntegration, TORNADO_VERSION)
 
-        ignore_logger("tornado.access")
+        ignore_logger_for_events("tornado.access")
 
         old_execute = RequestHandler._execute
 

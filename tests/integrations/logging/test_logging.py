@@ -27,7 +27,11 @@ def reset_level():
 
 @pytest.mark.parametrize("logger", [logger, other_logger])
 def test_event_logging_works_with_many_loggers(sentry_init, capture_events, logger):
-    sentry_init(integrations=[LoggingIntegration(event_level=logging.ERROR)])
+    sentry_init(
+        integrations=[
+            LoggingIntegration(event_level=logging.ERROR, breadcrumb_level=logging.INFO)
+        ]
+    )
     events = capture_events()
 
     logger.info("bread")
@@ -134,7 +138,7 @@ def test_event_logging_level(sentry_init, capture_events):
     assert not events
 
 
-def test_custom_event_level_names(sentry_init, capture_events):
+def test_event_logging_custom_level_names(sentry_init, capture_events):
     levels = {
         logging.DEBUG: "debug",
         logging.INFO: "info",
@@ -344,7 +348,7 @@ def test_ignore_logger_for_events_does_not_affect_sentry_logs(
 
 def test_ignore_logger(sentry_init, capture_envelopes, capture_items, request):
     """ignore_logger should suppress Sentry Logs but not events."""
-    sentry_init(integrations=[LoggingIntegration()])
+    sentry_init(integrations=[LoggingIntegration(event_level=logging.ERROR)])
     envelopes = capture_envelopes()
     items = capture_items("log")
 
@@ -467,7 +471,7 @@ def test_logging_errors(sentry_init, capture_envelopes, capture_items):
     """
     The python logger module should be able to log errors without erroring
     """
-    sentry_init(integrations=[LoggingIntegration()])
+    sentry_init(integrations=[LoggingIntegration(event_level=logging.ERROR)])
     envelopes = capture_envelopes()
     items = capture_items("log")
 

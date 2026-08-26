@@ -37,7 +37,7 @@ from sentry_sdk import (
 from sentry_sdk._compat import PY37, PY38
 from sentry_sdk.envelope import Envelope, Item, PayloadRef, parse_json
 from sentry_sdk.integrations.asyncio import AsyncioIntegration
-from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
+from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger_for_events
 from sentry_sdk.transport import (
     KEEP_ALIVE_SOCKET_OPTIONS,
     AsyncHttpTransport,
@@ -406,11 +406,11 @@ def test_transport_infinite_loop(capturing_server, request, make_client):
     )
 
     # I am not sure why, but "werkzeug" logger makes an INFO log on sending
-    # the message "hi" and does creates an infinite look.
+    # the message "hi" and does creates an infinite loop.
     # Ignoring this for breaking the infinite loop and still we can test
     # that our own log messages (sent from `_IGNORED_LOGGERS`) are not leading
     # to an infinite loop
-    ignore_logger("werkzeug")
+    ignore_logger_for_events("werkzeug")
 
     sentry_sdk.get_global_scope().set_client(client)
     with isolation_scope():

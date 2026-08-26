@@ -11,7 +11,7 @@ from sentry_sdk.integrations import (
     _check_minimum_version,
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
@@ -85,7 +85,7 @@ class LitestarIntegration(Integration):
         # The `LitestarIntegration`` provides an after_exception hook (see `patch_app_init` below) to create a Sentry event
         # from an exception, which ends up being called during step 2 above. However, the Sentry `LoggingIntegration` will
         # by default create a Sentry event from error logs made in step 1 if we do not prevent it from doing so.
-        ignore_logger("litestar")
+        ignore_logger_for_events("litestar")
 
 
 class SentryLitestarASGIMiddleware(SentryAsgiMiddleware):
