@@ -64,7 +64,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The deprecated `@ai_track` decorator was removed.
 - The deprecated `push_scope` and `configure_scope` APIs have been removed. Use `with new_scope():` to push a new scope and `scope = get_current_scope()` to retrieve the current scope instead.
 - Transaction profiling and related code was removed.
-- The `start_profile_session` and `stop_profile_session` were removed in favor of `start_profile` and `stop_profile`, respectively.
+- The `start_profile_session` and `stop_profile_session` were removed in favor of `start_profiler` and `stop_profiler`, respectively.
 - The experimental `continuous_profiling_mode` option was removed. Use the top-level `profiler_mode`, instead.
 - Removed the deprecated Hub class and all uses of hub throughout the SDK in arguments, options, etc. Use a scope instead.
 - The `SentrySpanProcessor`, `SentryPropagator`, `instrumenter`, and associated OpenTelemetry compatibility code was removed along with the `opentelemetry` extra and the `SentryPropagator` entrypoint. Use the `OTLPIntegration` instead.
