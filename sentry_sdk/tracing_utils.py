@@ -1690,16 +1690,7 @@ def _make_sampling_decision(
 def is_ignored_span(name: str, attributes: "Optional[Attributes]") -> bool:
     """Determine if a span fits one of the rules in ignore_spans."""
     client = sentry_sdk.get_client()
-    is_ignored_at_top_level = client.options.get("ignore_spans", None)
-    is_ignored_in_experiment_config = (client.options.get("_experiments") or {}).get(
-        "ignore_spans"
-    )
-
-    ignore_spans = (
-        is_ignored_at_top_level
-        if is_ignored_at_top_level is not None
-        else is_ignored_in_experiment_config
-    )
+    ignore_spans = client.options.get("ignore_spans", None)
 
     if not ignore_spans:
         return False
