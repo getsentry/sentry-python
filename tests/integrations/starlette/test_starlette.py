@@ -27,6 +27,7 @@ from sentry_sdk import capture_message, get_baggage, get_traceparent
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.starlette import (
     StarletteIntegration,
 )
@@ -1506,7 +1507,12 @@ def test_transaction_name_is_route_resolved_name_static(
 
 
 def test_original_request_not_scrubbed(sentry_init, capture_events):
-    sentry_init(integrations=[StarletteIntegration()])
+    sentry_init(
+        integrations=[
+            StarletteIntegration(),
+            LoggingIntegration(event_level=logging.ERROR),
+        ]
+    )
 
     events = capture_events()
 
