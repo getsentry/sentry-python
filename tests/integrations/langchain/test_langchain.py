@@ -3892,7 +3892,7 @@ def test_langchain_callback_manager_with_sentry_callback(sentry_init):
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
     )
-    sentry_callback = SentryLangchainCallback(0, False)
+    sentry_callback = SentryLangchainCallback(False)
     local_manager = BaseCallbackManager(handlers=[sentry_callback])
 
     with mock.patch("sentry_sdk.integrations.langchain.manager") as mock_manager_module:
@@ -3958,7 +3958,7 @@ def test_langchain_callback_list_existing_callback(sentry_init):
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
     )
-    sentry_callback = SentryLangchainCallback(0, False)
+    sentry_callback = SentryLangchainCallback(False)
     local_callbacks = [sentry_callback]
 
     with mock.patch("sentry_sdk.integrations.langchain.manager") as mock_manager_module:
