@@ -562,7 +562,15 @@ async def _wrap_async_handler(
                 if "cookies" in info:
                     request_info["cookies"] = info["cookies"]
                 if "data" in info:
-                    request_info["data"] = info["data"]
+                    attach_request_data = True
+                    if has_data_collection_enabled(client.options):
+                        attach_request_data = (
+                            "incoming_request"
+                            in client.options["data_collection"]["http_bodies"]
+                        )
+
+                    if attach_request_data:
+                        request_info["data"] = info["data"]
             event["request"] = deepcopy(request_info)
 
             return event
@@ -580,14 +588,22 @@ async def _wrap_async_handler(
         current_span = get_current_span()
 
         if type(current_span) is StreamedSpan:
-            request_body = _get_cached_request_body_attribute(
-                client=client, request=request
-            )
-            if request_body:
-                current_span._segment.set_attribute(
-                    SPANDATA.HTTP_REQUEST_BODY_DATA,
-                    request_body,
+            attach_request_data = True
+            if has_data_collection_enabled(client.options):
+                attach_request_data = (
+                    "incoming_request"
+                    in client.options["data_collection"]["http_bodies"]
                 )
+
+            if attach_request_data:
+                request_body = _get_cached_request_body_attribute(
+                    client=client, request=request
+                )
+                if request_body:
+                    current_span._segment.set_attribute(
+                        SPANDATA.HTTP_REQUEST_BODY_DATA,
+                        request_body,
+                    )
 
 
 def patch_request_response() -> None:
