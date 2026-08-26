@@ -988,6 +988,7 @@ async def test_span_origin(sentry_init, capture_items):
     assert len(segment_spans) == 1
     assert segment_spans[0]["attributes"]["sentry.origin"] == "manual"
 
+    assert len(non_segment_spans) == 3
     for span in non_segment_spans:
         assert span["attributes"]["sentry.origin"] == "auto.db.aiomysql"
 
