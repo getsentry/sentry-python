@@ -51,7 +51,6 @@ def test_logging_defaults(sentry_init, capture_events):
 def test_logging_defaults_enabled(sentry_init, capture_items):
     sentry_init(
         integrations=[LoggingIntegration()],
-        default_integrations=False,
     )
 
     items = capture_items()
@@ -132,7 +131,9 @@ def test_event_logging_extra_data(sentry_init, capture_events):
 def test_event_logging_extra_data_integer_keys(sentry_init, capture_events):
     sentry_init(
         integrations=[
-            LoggingIntegration(breadcrumb_level=logging.INFO, event_level=logging.ERROR)
+            LoggingIntegration(
+                breadcrumb_level=logging.INFO, event_level=logging.ERROR
+            ),
         ],
         default_integrations=False,
     )
@@ -159,7 +160,6 @@ def test_event_logging_stack_trace(
         integrations=[
             LoggingIntegration(breadcrumb_level=logging.INFO, event_level=logging.ERROR)
         ],
-        default_integrations=False,
     )
     events = capture_events()
 
@@ -183,7 +183,6 @@ def test_event_logging_level(sentry_init, capture_events):
         integrations=[
             LoggingIntegration(breadcrumb_level=logging.INFO, event_level=logging.ERROR)
         ],
-        default_integrations=False,
     )
     events = capture_events()
 
@@ -225,7 +224,6 @@ def test_event_logging_custom_level_names(sentry_init, capture_events):
         logger.setLevel(logging_level)
         sentry_init(
             integrations=[LoggingIntegration(event_level=logging_level)],
-            default_integrations=False,
         )
         events = capture_events()
 
@@ -244,7 +242,6 @@ def test_event_logging_filters(sentry_init, capture_events):
         integrations=[
             LoggingIntegration(breadcrumb_level=logging.INFO, event_level=logging.ERROR)
         ],
-        default_integrations=False,
     )
     events = capture_events()
 
@@ -270,7 +267,6 @@ def test_event_logging_filters(sentry_init, capture_events):
 def test_event_logging_captured_warnings(sentry_init, capture_events, recwarn):
     sentry_init(
         integrations=[LoggingIntegration(event_level="WARNING")],
-        default_integrations=False,
     )
     events = capture_events()
 
@@ -340,7 +336,6 @@ def test_sentry_logs_collection_opt_in(sentry_init, capture_items, request):
 def test_ignore_logger_for_events(sentry_init, capture_events, request):
     sentry_init(
         integrations=[LoggingIntegration(event_level=logging.DEBUG)],
-        default_integrations=False,
     )
     events = capture_events()
 
@@ -358,7 +353,6 @@ def test_ignore_logger_for_events_whitespace_padding(
     """Here we test insensitivity to whitespace padding of ignored loggers"""
     sentry_init(
         integrations=[LoggingIntegration(event_level=logging.DEBUG)],
-        default_integrations=False,
     )
     events = capture_events()
 
@@ -373,7 +367,6 @@ def test_ignore_logger_for_events_whitespace_padding(
 def test_ignore_logger_for_events_wildcard(sentry_init, capture_events, request):
     sentry_init(
         integrations=[LoggingIntegration(event_level=logging.DEBUG)],
-        default_integrations=False,
     )
     events = capture_events()
 
@@ -434,7 +427,6 @@ def test_event_logging_dictionary_interpolation(sentry_init, capture_events):
     """Here we test an entire dictionary being interpolated into the log message."""
     sentry_init(
         integrations=[LoggingIntegration(event_level=logging.ERROR)],
-        default_integrations=False,
     )
     events = capture_events()
 
@@ -453,7 +445,6 @@ def test_event_logging_dictionary_args(sentry_init, capture_events):
     """Here we test items from a dictionary being interpolated into the log message."""
     sentry_init(
         integrations=[LoggingIntegration(event_level=logging.ERROR)],
-        default_integrations=False,
     )
     events = capture_events()
 
