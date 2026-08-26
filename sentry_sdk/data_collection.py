@@ -191,22 +191,18 @@ def _map_from_send_default_pii(
 def _resolve_explicit(
     d: "dict[str, Any]",
     include_local_variables: bool,
-    include_source_context: bool,
 ) -> "DataCollection":
     """
     Build a fully-resolved ``DataCollection`` from a user-supplied
     ``data_collection`` dict, filling in spec defaults for any omitted or
-    partially-specified field. Frame fields fall back to the legacy
-    ``include_local_variables`` / ``include_source_context`` options when unset.
+    partially-specified field.
     """
     # frame_context_lines accepts an integer or a boolean fallback (spec: True
     # -> platform default of 5, False -> 0). bool is a subclass of int, so
     # coerce explicitly before treating it as a line count.
     frame_context_lines = d.get("frame_context_lines")
     if frame_context_lines is None:
-        frame_context_lines = (
-            _DEFAULT_FRAME_CONTEXT_LINES if include_source_context else 0
-        )
+        frame_context_lines = _DEFAULT_FRAME_CONTEXT_LINES
     elif isinstance(frame_context_lines, bool):
         frame_context_lines = _DEFAULT_FRAME_CONTEXT_LINES if frame_context_lines else 0
 
@@ -324,7 +320,6 @@ def _resolve_data_collection(options: "Dict[str, Any]") -> "DataCollection":
         return _resolve_explicit(
             user_dc,
             include_local_variables,
-            include_source_context,
         )
 
     return _map_from_send_default_pii(

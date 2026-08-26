@@ -1118,8 +1118,8 @@ def test_get_lines_from_file_handle_linecache_errors():
                 "_experiments": {"data_collection": {}},
                 "include_source_context": False,
             },
-            0,
-            id="data_collection-legacy_include_source_context_false",
+            5,
+            id="data_collection-spec_default_overrides_include_source_context_false",
         ),
     ],
 )
