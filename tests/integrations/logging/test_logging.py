@@ -68,13 +68,13 @@ def test_logging_defaults_enabled(sentry_init, capture_items):
     assert len(message["breadcrumbs"]["values"]) == 2
     crumb1, crumb2 = message["breadcrumbs"]["values"]
 
-    crumb1["type"] == "log"
-    crumb1["message"] == "bread"
-    crumb1["data"] == {"foo": 42}
+    assert crumb1["type"] == "log"
+    assert crumb1["message"] == "bread"
+    assert crumb1["data"] == {"foo": 42}
 
-    crumb2["type"] == "log"
-    crumb2["message"] == "lol"
-    crumb2["data"] == {"bar": 69}
+    assert crumb2["type"] == "log"
+    assert crumb2["message"] == "lol"
+    assert crumb2["data"] == {"bar": 69}
 
     assert log1["level"] == "info"
     assert log1["attributes"]["sentry.severity_number"] == 9
