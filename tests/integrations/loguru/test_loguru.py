@@ -99,6 +99,8 @@ def test_levels(
 
     getattr(logger, level.name.lower())("test")
 
+    sentry_sdk.flush()
+
     expected_pattern = (
         r" \| "
         + r"{:9}".format(level.name.upper())
