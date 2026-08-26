@@ -665,6 +665,31 @@ def test_failed_request_status_codes(
         assert len(events) == 0
 
 
+def test_failed_request_status_codes_non_http_exception(sentry_init, capture_events):
+    """
+    If an exception, which is not an instance of HTTPResponse, is raised, it should be captured, even if
+    failed_request_status_codes is empty.
+    """
+    sentry_init(integrations=[BottleIntegration(failed_request_status_codes=set())])
+    events = capture_events()
+
+    app = Bottle()
+
+    @app.route("/")
+    def handle():
+        1 / 0
+
+    client = Client(app, Response)
+
+    try:
+        client.get("/")
+    except ZeroDivisionError:
+        pass
+
+    (event,) = events
+    assert event["exception"]["values"][0]["type"] == "ZeroDivisionError"
+
+
 @pytest.mark.parametrize(
     "data_collection, expect_body",
     [
