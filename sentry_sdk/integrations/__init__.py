@@ -1,5 +1,6 @@
 import sys
 from abc import ABC, abstractmethod
+from itertools import zip_longest
 from threading import Lock
 from typing import TYPE_CHECKING
 
@@ -310,10 +311,17 @@ def _check_minimum_version(
     if min_version is None:
         return
 
-    if version < min_version:
-        raise DidNotEnable(
-            f"Integration only supports {package} {'.'.join(map(str, min_version))} or newer."
-        )
+    # We can't use normal tuple comparison here because the version tuples might
+    # not have the same length, in which case they wouldn't compare as expected.
+    for v, min in zip_longest(version, min_version, fillvalue=0):
+        if v == min:
+            continue
+        elif v < min:
+            raise DidNotEnable(
+                f"Integration only supports {package} {'.'.join(map(str, min_version))} or newer."
+            )
+        elif v > min:
+            return
 
 
 class DidNotEnable(Exception):  # noqa: N818
