@@ -106,34 +106,6 @@ def test_logs_before_send_log(sentry_init, capture_items):
     assert before_log_called is True
 
 
-def test_logs_before_send_log_experimental_option_still_works(
-    sentry_init, capture_items
-):
-    before_log_called = False
-
-    def _before_log(record, hint):
-        nonlocal before_log_called
-        before_log_called = True
-
-        return record
-
-    sentry_init(
-        _experiments={
-            "before_send_log": _before_log,
-        },
-    )
-    items = capture_items("log")
-
-    sentry_sdk.logger.error("This is an error log...")
-
-    get_client().flush()
-    logs = [item.payload for item in items]
-    assert len(logs) == 1
-
-    assert logs[0]["attributes"]["sentry.severity_text"] == "error"
-    assert before_log_called is True
-
-
 @pytest.mark.tests_internal_exceptions
 def test_logs_before_send_log_raises_does_not_crash_application(
     sentry_init, capture_items
