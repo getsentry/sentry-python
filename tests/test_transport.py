@@ -402,7 +402,7 @@ def test_transport_infinite_loop(capturing_server, request, make_client):
     client = make_client(
         debug=True,
         # Make sure we cannot create events from our own logging
-        integrations=[LoggingIntegration(event_level=logging.DEBUG)],
+        integrations=[LoggingIntegration(event_level=logging.DEBUG, level=None)],
     )
 
     # I am not sure why, but "werkzeug" logger makes an INFO log on sending
