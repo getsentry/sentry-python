@@ -64,7 +64,6 @@ if TYPE_CHECKING:
     Experiments = TypedDict(
         "Experiments",
         {
-            "max_spans": Optional[int],
             "max_flags": Optional[int],
             "record_sql_params": Optional[bool],
             "continuous_profiling_auto_start": Optional[bool],
@@ -74,13 +73,7 @@ if TYPE_CHECKING:
             "transport_num_pools": Optional[int],
             "transport_http2": Optional[bool],
             "transport_async": Optional[bool],
-            "before_send_log": Optional[Callable[[Log, Hint], Optional[Log]]],
-            "before_send_metric": Optional[Callable[[Metric, Hint], Optional[Metric]]],
             "trace_lifecycle": Optional[Literal["static", "stream"]],
-            "ignore_spans": Optional[IgnoreSpansConfig],
-            "before_send_span": Optional[
-                Callable[[SpanJSON, Hint], Optional[SpanJSON]]
-            ],
             "data_collection": Optional[DataCollectionUserOptions],
         },
         total=False,
