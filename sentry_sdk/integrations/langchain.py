@@ -1,7 +1,6 @@
 import itertools
 import json
 import sys
-import warnings
 from collections import OrderedDict
 from functools import wraps
 from typing import TYPE_CHECKING, NamedTuple
@@ -236,18 +235,8 @@ class LangchainIntegration(Integration):
     def __init__(
         self: "LangchainIntegration",
         include_prompts: bool = True,
-        max_spans: "Optional[int]" = None,
     ) -> None:
         self.include_prompts = include_prompts
-        self.max_spans = max_spans
-
-        if max_spans is not None:
-            warnings.warn(
-                "The `max_spans` parameter of `LangchainIntegration` is "
-                "deprecated and will be removed in version 3.0 of sentry-sdk.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
 
     @staticmethod
     def setup_once() -> None:
@@ -274,18 +263,9 @@ class LangchainIntegration(Integration):
 class SentryLangchainCallback(BaseCallbackHandler):
     """Callback handler that creates Sentry spans."""
 
-    def __init__(
-        self, max_span_map_size: "Optional[int]", include_prompts: bool
-    ) -> None:
+    def __init__(self, include_prompts: bool) -> None:
         self.span_map: "OrderedDict[UUID, Union[sentry_sdk.tracing.Span, StreamedSpan]]" = OrderedDict()
-        self.max_span_map_size = max_span_map_size
         self.include_prompts = include_prompts
-
-    def gc_span_map(self) -> None:
-        if self.max_span_map_size is not None:
-            while len(self.span_map) > self.max_span_map_size:
-                run_id, span = self.span_map.popitem(last=False)
-                self._exit_span(span, run_id)
 
     def _handle_error(self, run_id: "UUID", error: "Any") -> None:
         is_ignored = isinstance(error, tuple(LangchainIntegration._ignored_exceptions))
@@ -356,7 +336,6 @@ class SentryLangchainCallback(BaseCallbackHandler):
 
         span.__enter__()
         self.span_map[run_id] = span
-        self.gc_span_map()
         return span
 
     def _exit_span(
@@ -1135,7 +1114,6 @@ def _wrap_configure(f: "Callable[..., Any]") -> "Callable[..., Any]":
             for cb in itertools.chain(callbacks_list, inheritable_callbacks_list)
         ):
             sentry_handler = SentryLangchainCallback(
-                integration.max_spans,
                 integration.include_prompts,
             )
             if isinstance(local_callbacks, BaseCallbackManager):

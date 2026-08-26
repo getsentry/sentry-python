@@ -12,13 +12,6 @@ if TYPE_CHECKING:
 
 
 class _InitGuard:
-    _CONTEXT_MANAGER_DEPRECATION_WARNING_MESSAGE = (
-        "Using the return value of sentry_sdk.init as a context manager "
-        "and manually calling the __enter__ and __exit__ methods on the "
-        "return value are deprecated. We are no longer maintaining this "
-        "functionality, and we will remove it in the next major release."
-    )
-
     def __init__(self, client: "sentry_sdk.Client") -> None:
         self._client = client
 
