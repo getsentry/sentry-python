@@ -218,9 +218,7 @@ def test_timeout_error_scope_modified(lambda_client, test_environment):
     (exception,) = error_event["exception"]["values"]
     assert not exception["mechanism"]["handled"]
     assert exception["type"] == "ServerlessTimeoutWarning"
-    assert exception["value"].startswith(
-        "WARNING : Function is expected to get timed out. Configured timeout duration ="
-    )
+    assert exception["value"] == "WARNING: Function is about to time out."
     assert exception["mechanism"]["type"] == "threading"
 
     assert error_event["tags"]["custom_tag"] == "custom_value"

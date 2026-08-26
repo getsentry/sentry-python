@@ -1439,18 +1439,12 @@ class TimeoutThread(threading.Thread):
                 with sentry_sdk.scope.use_scope(self.current_scope):
                     try:
                         raise ServerlessTimeoutWarning(
-                            "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds.".format(
-                                integer_configured_timeout
-                            )
+                            "WARNING: Function is about to time out."
                         )
                     except Exception:
                         reraise(*self._capture_exception())
 
-        raise ServerlessTimeoutWarning(
-            "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds.".format(
-                integer_configured_timeout
-            )
-        )
+        raise ServerlessTimeoutWarning("WARNING: Function is about to time out.")
 
 
 def to_base64(original: str) -> "Optional[str]":
