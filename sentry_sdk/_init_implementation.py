@@ -1,39 +1,13 @@
 import re
-import warnings
 from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.utils import logger, parse_version
 
 if TYPE_CHECKING:
-    from typing import Any, ContextManager, Optional
+    from typing import Any, Optional
 
     import sentry_sdk.consts
-
-
-class _InitGuard:
-    def __init__(self, client: "sentry_sdk.Client") -> None:
-        self._client = client
-
-    def __enter__(self) -> "_InitGuard":
-        warnings.warn(
-            self._CONTEXT_MANAGER_DEPRECATION_WARNING_MESSAGE,
-            stacklevel=2,
-            category=DeprecationWarning,
-        )
-
-        return self
-
-    def __exit__(self, exc_type: "Any", exc_value: "Any", tb: "Any") -> None:
-        warnings.warn(
-            self._CONTEXT_MANAGER_DEPRECATION_WARNING_MESSAGE,
-            stacklevel=2,
-            category=DeprecationWarning,
-        )
-
-        c = self._client
-        if c is not None:
-            c.close()
 
 
 def _check_version_deprecations() -> None:
@@ -64,7 +38,7 @@ def _check_version_deprecations() -> None:
         pass
 
 
-def _init(*args: "Optional[str]", **kwargs: "Any") -> "ContextManager[Any]":
+def _init(*args: "Optional[str]", **kwargs: "Any") -> None:
     """Initializes the SDK and optionally integrations.
 
     This takes the same arguments as the client constructor.
@@ -72,18 +46,15 @@ def _init(*args: "Optional[str]", **kwargs: "Any") -> "ContextManager[Any]":
     client = sentry_sdk.Client(*args, **kwargs)
     sentry_sdk.get_global_scope().set_client(client)
     _check_version_deprecations()
-    rv = _InitGuard(client)
-    return rv
 
 
 if TYPE_CHECKING:
     # Make mypy, PyCharm and other static analyzers think `init` is a type to
     # have nicer autocompletion for params.
     #
-    # Use `ClientConstructor` to define the argument types of `init` and
-    # `ContextManager[Any]` to tell static analyzers about the return type.
+    # Use `ClientConstructor` to define the argument types of `init`.
 
-    class init(sentry_sdk.consts.ClientConstructor, _InitGuard):  # noqa: N801
+    class init(sentry_sdk.consts.ClientConstructor):  # noqa: N801
         pass
 
 else:
