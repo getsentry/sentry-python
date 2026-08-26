@@ -24,6 +24,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     has_data_collection_enabled,
+    parse_version,
     reraise,
 )
 
@@ -36,7 +37,7 @@ if TYPE_CHECKING:
 
 
 try:
-    from celery import VERSION as CELERY_VERSION  # type: ignore
+    from celery import __version__ as CELERY_VERSION  # type: ignore
     from celery.app.task import Task  # type: ignore
     from celery.app.trace import task_has_custom
     from celery.exceptions import (  # type: ignore
@@ -73,7 +74,7 @@ class CeleryIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        _check_minimum_version(CeleryIntegration, CELERY_VERSION)
+        _check_minimum_version(CeleryIntegration, parse_version(CELERY_VERSION))
 
         _patch_build_tracer()
         _patch_task_apply_async()

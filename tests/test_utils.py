@@ -8,7 +8,7 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk._queue import Queue
-from sentry_sdk.integrations import Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.utils import (
     Components,
     Dsn,
@@ -554,6 +554,57 @@ def test_match_regex_list(item, regex_list, expected_result):
 )
 def test_parse_version(version, expected_result):
     assert parse_version(version) == expected_result
+
+
+@pytest.mark.parametrize(
+    "version,min_version,expected_pass",
+    [
+        ("1.0.0", (1, 0, 0), True),
+        ("1.0.1", (2, 0, 0), False),
+        ("1", (1, 0, 2), False),
+        ("1.0", (1, 0, 2), False),
+        ("1.0.1", (1, 0, 2), False),
+        ("1.0.1", (1, 0, 1), True),
+        ("1.0", (2,), False),
+        (
+            "1.0.1",
+            (
+                2,
+                0,
+            ),
+            False,
+        ),
+        ("1.0.1", (2, 0, 0), False),
+        ("2.0", (1,), True),
+        (
+            "2.0.1",
+            (
+                1,
+                1,
+            ),
+            True,
+        ),
+        ("2.0.1", (1, 1, 2), True),
+        ("1", (1, 0), True),
+    ],
+)
+def test_check_minimum_version(monkeypatch, version, min_version, expected_pass):
+    class TestIntegration(Integration):
+        identifier = "test"
+
+    monkeypatch.setattr(sentry_sdk.integrations, "_MIN_VERSIONS", {"test": min_version})
+    try:
+        _check_minimum_version(TestIntegration, parse_version(version))
+    except DidNotEnable:
+        if expected_pass:
+            assert False, (
+                "_check_minimum_version raised DidNotEnable when it shouldn't have"
+            )
+    else:
+        if not expected_pass:
+            assert False, (
+                "_check_minimum_version didn't raise DidNotEnable when it was supposed to"
+            )
 
 
 @pytest.fixture
