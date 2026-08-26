@@ -3821,9 +3821,7 @@ def test_manual_callback_no_duplication(sentry_init):
     )
 
     # Create a manual SentryLangchainCallback
-    manual_callback = SentryLangchainCallback(
-        max_span_map_size=100, include_prompts=False
-    )
+    manual_callback = SentryLangchainCallback(include_prompts=False)
 
     # Create RunnableConfig with the manual callback
     config = RunnableConfig(callbacks=[manual_callback])
@@ -3846,8 +3844,8 @@ def test_manual_callback_no_duplication(sentry_init):
 def test_span_map_is_instance_variable():
     """Test that each SentryLangchainCallback instance has its own span_map."""
     # Create two separate callback instances
-    callback1 = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
-    callback2 = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
+    callback1 = SentryLangchainCallback(include_prompts=True)
+    callback2 = SentryLangchainCallback(include_prompts=True)
 
     # Verify they have different span_map instances
     assert callback1.span_map is not callback2.span_map, (
@@ -4220,7 +4218,7 @@ def test_langchain_message_truncation(sentry_init, capture_events):
     )
     events = capture_events()
 
-    callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
+    callback = SentryLangchainCallback(include_prompts=True)
 
     run_id = "12345678-1234-1234-1234-123456789012"
     serialized = {"_type": "openai-chat", "model_name": "gpt-3.5-turbo"}
@@ -5891,7 +5889,7 @@ def test_langchain_ai_system_detection(
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
+    callback = SentryLangchainCallback(include_prompts=True)
 
     run_id = "test-ai-system-uuid"
     serialized = {"_type": ai_type} if ai_type is not None else {}
@@ -6730,7 +6728,7 @@ def test_langchain_data_collection_request_tool_call_params(
 
     sentry_init(**sentry_init_kwargs)
 
-    callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=False)
+    callback = SentryLangchainCallback(include_prompts=False)
 
     streamed = span_streaming or stream_gen_ai_spans
     captured = capture_items("span") if streamed else capture_events()
