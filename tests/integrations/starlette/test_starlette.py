@@ -1156,11 +1156,8 @@ def test_middleware_spans(sentry_init, capture_events, capture_items, span_strea
 
         idx = 0
         for span in transaction_event["spans"]:
-            if span["op"].startswith("middleware.starlette"):
-                assert (
-                    span["tags"]["starlette.middleware_name"]
-                    == expected_middleware_spans[idx]
-                )
+            if span["op"] == "middleware.starlette":
+                assert span["description"] == expected_middleware_spans[idx]
                 idx += 1
 
 
@@ -1231,47 +1228,47 @@ def test_middleware_callback_spans(
         {
             "op": "middleware.starlette",
             "description": "ServerErrorMiddleware",
-            "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
+            "middleware_name": "ServerErrorMiddleware",
         },
         {
             "op": "middleware.starlette",
             "description": "SampleMiddleware",
-            "tags": {"starlette.middleware_name": "SampleMiddleware"},
+            "middleware_name": "SampleMiddleware",
         },
         {
             "op": "middleware.starlette",
             "description": "ExceptionMiddleware",
-            "tags": {"starlette.middleware_name": "ExceptionMiddleware"},
+            "middleware_name": "ExceptionMiddleware",
         },
         {
             "op": "middleware.starlette.send",
             "description": "SampleMiddleware.__call__.<locals>.do_stuff",
-            "tags": {"starlette.middleware_name": "ExceptionMiddleware"},
+            "middleware_name": "ExceptionMiddleware",
         },
         {
             "op": "middleware.starlette.send",
             "description": "ServerErrorMiddleware.__call__.<locals>._send",
-            "tags": {"starlette.middleware_name": "SampleMiddleware"},
+            "middleware_name": "SampleMiddleware",
         },
         {
             "op": "middleware.starlette.send",
             "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
-            "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
+            "middleware_name": "ServerErrorMiddleware",
         },
         {
             "op": "middleware.starlette.send",
             "description": "SampleMiddleware.__call__.<locals>.do_stuff",
-            "tags": {"starlette.middleware_name": "ExceptionMiddleware"},
+            "middleware_name": "ExceptionMiddleware",
         },
         {
             "op": "middleware.starlette.send",
             "description": "ServerErrorMiddleware.__call__.<locals>._send",
-            "tags": {"starlette.middleware_name": "SampleMiddleware"},
+            "middleware_name": "SampleMiddleware",
         },
         {
             "op": "middleware.starlette.send",
             "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
-            "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
+            "middleware_name": "ServerErrorMiddleware",
         },
     ]
 
@@ -1293,10 +1290,7 @@ def test_middleware_callback_spans(
         for span, exp in zip(middleware_spans, expected):
             assert span["attributes"]["sentry.op"] == exp["op"]
             assert span["name"] == exp["description"]
-            assert (
-                span["attributes"]["middleware.name"]
-                == exp["tags"]["starlette.middleware_name"]
-            )
+            assert span["attributes"]["middleware.name"] == exp["middleware_name"]
     else:
         (_, transaction_event) = events
 
@@ -1304,7 +1298,6 @@ def test_middleware_callback_spans(
         for span in transaction_event["spans"]:
             assert span["op"] == expected[idx]["op"]
             assert span["description"] == expected[idx]["description"]
-            assert span["tags"] == expected[idx]["tags"]
             idx += 1
 
 
@@ -1348,12 +1341,10 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
         {
             "op": "middleware.starlette",
             "description": "ServerErrorMiddleware",
-            "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
         },
         {
             "op": "middleware.starlette",
             "description": "SamplePartialReceiveSendMiddleware",
-            "tags": {"starlette.middleware_name": "SamplePartialReceiveSendMiddleware"},
         },
         {
             "op": "middleware.starlette.receive",
@@ -1362,32 +1353,26 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
                 if STARLETTE_VERSION < (0, 21)
                 else "_TestClientTransport.handle_request.<locals>.receive"
             ),
-            "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
         },
         {
             "op": "middleware.starlette.send",
             "description": "ServerErrorMiddleware.__call__.<locals>._send",
-            "tags": {"starlette.middleware_name": "SamplePartialReceiveSendMiddleware"},
         },
         {
             "op": "middleware.starlette.send",
             "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
-            "tags": {"starlette.middleware_name": "ServerErrorMiddleware"},
         },
         {
             "op": "middleware.starlette",
             "description": "ExceptionMiddleware",
-            "tags": {"starlette.middleware_name": "ExceptionMiddleware"},
         },
         {
             "op": "middleware.starlette.send",
             "description": "functools.partial(<function SamplePartialReceiveSendMiddleware.__call__.<locals>.my_send at ",
-            "tags": {"starlette.middleware_name": "ExceptionMiddleware"},
         },
         {
             "op": "middleware.starlette.send",
             "description": "functools.partial(<function SamplePartialReceiveSendMiddleware.__call__.<locals>.my_send at ",
-            "tags": {"starlette.middleware_name": "ExceptionMiddleware"},
         },
     ]
 
@@ -1395,7 +1380,6 @@ def test_middleware_partial_receive_send(sentry_init, capture_events):
     for span in transaction_event["spans"]:
         assert span["op"] == expected[idx]["op"]
         assert span["description"].startswith(expected[idx]["description"])
-        assert span["tags"] == expected[idx]["tags"]
         idx += 1
 
 
