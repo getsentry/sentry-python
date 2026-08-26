@@ -22,7 +22,10 @@ if TYPE_CHECKING:
     from typing import Any, Dict, Optional
 
 
+# Logs of this severity and above will be captured as Sentry logs
 DEFAULT_LEVEL = logging.INFO
+# Logs of this severity and above will be captured as breadcrumbs
+DEFAULT_LEVEL_FOR_BREADCRUMBS = logging.INFO
 
 LOGGING_TO_EVENT_LEVEL = {
     logging.NOTSET: "notset",
@@ -120,7 +123,7 @@ class LoggingIntegration(Integration):
         self,
         level: "Optional[int]" = DEFAULT_LEVEL,
         event_level: "Optional[int]" = None,
-        breadcrumb_level: "Optional[int]" = None,
+        breadcrumb_level: "Optional[int]" = DEFAULT_LEVEL_FOR_BREADCRUMBS,
     ) -> None:
         """
         Initialize the standard library logging integration.

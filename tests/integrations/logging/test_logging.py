@@ -25,6 +25,69 @@ def reset_level():
     logger.setLevel(logging.DEBUG)
 
 
+def test_logging_defaults(sentry_init, capture_events):
+    sentry_init()
+
+    events = capture_events()
+
+    logger.info("bread", extra=dict(foo=42))
+    logger.critical("lol", extra=dict(bar=69))
+
+    sentry_sdk.capture_message("hello")
+
+    sentry_sdk.flush()
+
+    for event in events:
+        print(event)
+        print()
+
+    # Without adding the integration explicitly, only the message should be
+    # captured (no logs), and it shouldn't have any breadcrumbs
+    assert len(events) == 1
+    (event,) = events
+    assert not event["breadcrumbs"]["values"]
+
+
+def test_logging_defaults_enabled(sentry_init, capture_items):
+    sentry_init(
+        integrations=[LoggingIntegration()],
+        default_integrations=False,
+    )
+
+    items = capture_items()
+
+    logger.info("bread", extra=dict(foo=42))
+    logger.critical("lol", extra=dict(bar=69))
+
+    sentry_sdk.capture_message("hello")
+
+    sentry_sdk.flush()
+
+    assert len(items) == 3
+    message, log1, log2 = [item.payload for item in items]
+
+    assert len(message["breadcrumbs"]["values"]) == 2
+    crumb1, crumb2 = message["breadcrumbs"]["values"]
+
+    crumb1["type"] == "log"
+    crumb1["message"] == "bread"
+    crumb1["data"] == {"foo": 42}
+
+    crumb2["type"] == "log"
+    crumb2["message"] == "lol"
+    crumb2["data"] == {"bar": 69}
+
+    assert log1["level"] == "info"
+    assert log1["attributes"]["sentry.severity_number"] == 9
+    assert log1["attributes"]["sentry.severity_text"] == "info"
+    assert log1["attributes"]["foo"] == 42
+
+    assert log2["level"] == "fatal"
+    assert log2["attributes"]["sentry.severity_number"] == 21
+    assert log2["attributes"]["sentry.severity_text"] == "fatal"
+    assert log2["attributes"]["bar"] == 69
+
+
 @pytest.mark.parametrize("logger", [logger, other_logger])
 def test_event_logging_works_with_many_loggers(sentry_init, capture_events, logger):
     sentry_init(
