@@ -1,8 +1,11 @@
+import logging
+
 import pytest
 
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk.integrations.logging import LoggingIntegration
 
 try:
     from django.tasks import task
@@ -196,7 +199,10 @@ def test_task_error_reporting(
 ):
     """Test that errors in tasks are correctly reported and don't break the span."""
     sentry_init(
-        integrations=[DjangoIntegration()],
+        integrations=[
+            DjangoIntegration(),
+            LoggingIntegration(event_level=logging.ERROR),
+        ],
         traces_sample_rate=1.0,
         trace_lifecycle="stream" if span_streaming else "static",
     )
