@@ -128,7 +128,7 @@ def test_span_origin(sentry_init, app, capture_items, get_client):
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
     )
-    items = capture_items()
+    items = capture_items("span")
 
     @app.route("/something")
     def _(request):
