@@ -2032,4 +2032,4 @@ def deprecation_warning(msg: str) -> None:
 
     For other types of warnings, use logger.warning().
     """
-    warnings.warn(msg, stacklevel=2, category=DeprecationWarning)
+    warnings.warn(msg, stacklevel=3, category=DeprecationWarning)
