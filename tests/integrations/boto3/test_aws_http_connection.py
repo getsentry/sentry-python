@@ -1,7 +1,6 @@
 from http.client import HTTPMessage
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
-from unittest import mock
 
 import pytest
 from botocore.awsrequest import AWSHTTPConnection
@@ -47,9 +46,10 @@ def _request(server, headers, path="/"):
 
 
 @pytest.mark.parametrize("span_streaming", [False, True])
-def test_aws_http_connection_appends_to_unsigned_baggage(
+def test_aws_http_connection_adds_missing_unsigned_propagation_headers(
     sentry_init, local_http_server, span_streaming
 ):
+    """Add missing unsigned `sentry-trace` and `baggage`."""
     sentry_init(
         traces_sample_rate=1.0,
         trace_lifecycle="stream" if span_streaming else "static",
@@ -58,32 +58,31 @@ def test_aws_http_connection_appends_to_unsigned_baggage(
     )
     server, requests = local_http_server
 
-    with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=67):
-        if span_streaming:
-            with sentry_sdk.traces.start_span(name="test"):  # type: ignore[attr-defined]
-                _request(server, [("baggage", "vendor=value")])
-        else:
-            with sentry_sdk.start_transaction(name="test", sampled=True):
-                _request(server, [("baggage", "vendor=value")])
+    if span_streaming:
+        with sentry_sdk.traces.start_span(name="test"):  # type: ignore[attr-defined]
+            _request(server, [])
+    else:
+        with sentry_sdk.start_transaction(name="test", sampled=True):
+            _request(server, [])
 
     headers: HTTPMessage = requests[0]
 
-    # preserve existing unsigned baggage
+    # missing unsigned headers: add `sentry-trace` and `baggage`.
     baggage_headers = headers.get_all("baggage")
     assert baggage_headers is not None
-    assert len(baggage_headers) == 2
-    assert baggage_headers[0] == "vendor=value"
-    assert baggage_headers[1].count("sentry-trace_id=") == 1
-    assert "sentry-sample_rand=0.000067" in baggage_headers[1]
+    assert len(baggage_headers) == 1
+    assert baggage_headers[0].count("sentry-trace_id=") == 1
+
     sentry_trace_headers = headers.get_all("sentry-trace")
     assert sentry_trace_headers is not None
     assert len(sentry_trace_headers) == 1
 
 
 @pytest.mark.parametrize("span_streaming", [False, True])
-def test_aws_http_connection_skips_signed_baggage(
+def test_aws_http_connection_appends_baggage_but_preserves_sentry_trace(
     sentry_init, local_http_server, span_streaming
 ):
+    """Append unsigned `baggage`; leave existing `sentry-trace` as-is."""
     sentry_init(
         traces_sample_rate=1.0,
         trace_lifecycle="stream" if span_streaming else "static",
@@ -92,7 +91,52 @@ def test_aws_http_connection_skips_signed_baggage(
     )
     server, requests = local_http_server
 
-    # simulate AWS SigV4 request that is already signed.
+    if span_streaming:
+        with sentry_sdk.traces.start_span(name="test"):  # type: ignore[attr-defined]
+            _request(
+                server,
+                [
+                    ("baggage", "vendor=value"),
+                    ("sentry-trace", "existing-trace"),
+                ],
+            )
+    else:
+        with sentry_sdk.start_transaction(name="test", sampled=True):
+            _request(
+                server,
+                [
+                    ("baggage", "vendor=value"),
+                    ("sentry-trace", "existing-trace"),
+                ],
+            )
+
+    headers: HTTPMessage = requests[0]
+
+    # unsigned `baggage`: append a second field.
+    baggage_headers = headers.get_all("baggage")
+    assert baggage_headers is not None
+    assert len(baggage_headers) == 2
+    assert baggage_headers[0] == "vendor=value"
+    assert baggage_headers[1].count("sentry-trace_id=") == 1
+
+    # existing `sentry-trace`: leave as-is since it is a single trace context.
+    assert headers.get_all("sentry-trace") == ["existing-trace"]
+
+
+@pytest.mark.parametrize("span_streaming", [False, True])
+def test_aws_http_connection_preserves_signed_propagation_headers(
+    sentry_init, local_http_server, span_streaming
+):
+    """Leave signed `sentry-trace` and `baggage` as-is."""
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+        default_integrations=False,
+        integrations=[StdlibIntegration()],
+    )
+    server, requests = local_http_server
+
+    # both propagation headers are named in `SignedHeaders`.
     authorization = (
         "AWS4-HMAC-SHA256 "
         "Credential=test/20260804/eu-west-1/secretsmanager/aws4_request, "
@@ -123,9 +167,9 @@ def test_aws_http_connection_skips_signed_baggage(
 
     headers: HTTPMessage = requests[0]
 
-    # do not append baggage after SigV4 signs it.
+    # signed `baggage`: leave as-is.
     assert headers.get_all("baggage") == ["vendor=value"]
-    # preserves existing `sentry-trace` header.
+    # signed `sentry-trace`: leave as-is.
     assert headers.get_all("sentry-trace") == ["existing-trace"]
     assert _get_aws_sigv4_signed_headers_from_authorization_header(
         headers.get("Authorization", "")
@@ -137,9 +181,10 @@ def test_aws_http_connection_skips_signed_baggage(
 
 
 @pytest.mark.parametrize("span_streaming", [False, True])
-def test_aws_http_connection_skips_query_signed_baggage(
+def test_aws_http_connection_preserves_query_signed_baggage(
     sentry_init, local_http_server, span_streaming
 ):
+    """Leave query-signed `baggage` as-is; add unsigned `sentry-trace`."""
     sentry_init(
         traces_sample_rate=1.0,
         trace_lifecycle="stream" if span_streaming else "static",
@@ -174,12 +219,9 @@ def test_aws_http_connection_skips_query_signed_baggage(
             )
 
     headers: HTTPMessage = requests[0]
-    # `baggage` is part of X-Amz-SignedHeaders, so may not be modified.
-    baggage_headers = headers.get_all("baggage")
-    assert baggage_headers is not None
-    assert len(baggage_headers) == 1
-    assert headers["baggage"] == "vendor=value"
-    # `sentry-trace` was not signed, so it can be propagated.
+    # query-signed `baggage`: leave as-is.
+    assert headers.get_all("baggage") == ["vendor=value"]
+    # unsigned `sentry-trace`: add it.
     sentry_trace_headers = headers.get_all("sentry-trace")
     assert sentry_trace_headers is not None
     assert len(sentry_trace_headers) == 1

@@ -37,6 +37,7 @@ def _start_server():
 
 @pytest.mark.parametrize("span_streaming", [False, True])
 def test_botocore_merges_propagation_before_sigv4_signing(sentry_init, span_streaming):
+    """Merge `sentry-trace` and `baggage` before SigV4 signs them."""
     sentry_init(
         traces_sample_rate=1.0,
         trace_lifecycle="stream" if span_streaming else "static",
@@ -71,7 +72,7 @@ def test_botocore_merges_propagation_before_sigv4_signing(sentry_init, span_stre
                     header_name
                 )
 
-        # register `before-sign` handler that adds third-party baggage.
+        # inject third-party and stale Sentry members before Sentry merges them.
         client.meta.events.register("before-sign", _inject_third_party_baggage)
         client.meta.events.register_last(
             "before-sign", capture_headers_after_instrumentation
@@ -101,22 +102,22 @@ def test_botocore_merges_propagation_before_sigv4_signing(sentry_init, span_stre
         assert baggage_headers == signed_request_headers["baggage"]
 
         baggage = baggage_headers[0]
-        # preserves third-party baggage.
+        # third-party `baggage` members: leave as-is.
         assert "dd-origin=synthetics" in baggage
         assert "vendor=value" in baggage
-        # add own `sentry-*` baggage.
+        # stale Sentry `baggage` members: replace with current values.
         assert "sentry-trace_id=" in baggage
         assert "sentry-trace_id=stale" not in baggage
-        # replace stale values instead of duplicating them.
+        # each Sentry `baggage` member appears once after merge.
         assert baggage.count("sentry-trace_id=") == 1
         assert baggage.count("sentry-sample_rand=") == 1
 
-        # adds single `sentry-trace` header.
+        # `sentry-trace`: one value.
         sentry_trace_headers = headers.get_all("sentry-trace")
         assert sentry_trace_headers is not None
         assert len(sentry_trace_headers) == 1
         assert sentry_trace_headers == signed_request_headers["sentry-trace"]
-        # both `baggage` and `sentry-trace` are signed.
+        # final `sentry-trace` and `baggage` are named in SignedHeaders.
         signed_headers = _get_aws_sigv4_signed_headers_from_authorization_header(
             headers.get("Authorization", "")
         )
@@ -131,6 +132,7 @@ def test_botocore_merges_propagation_before_sigv4_signing(sentry_init, span_stre
 def test_botocore_without_boto3_integration_preserves_signed_baggage(
     sentry_init, span_streaming
 ):
+    """Leave signed `baggage` as-is; add unsigned `sentry-trace`."""
     sentry_init(
         traces_sample_rate=1.0,
         trace_lifecycle="stream" if span_streaming else "static",
@@ -151,7 +153,7 @@ def test_botocore_without_boto3_integration_preserves_signed_baggage(
         def _inject_signed_baggage(request, **kwargs):
             request.headers.add_header("baggage", "vendor=value")
 
-        # register `before-sign` handler that third-party signed baggage.
+        # inject `baggage` before SigV4; stdlib-only path cannot change signed fields.
         client.meta.events.register("before-sign", _inject_signed_baggage)
 
         if span_streaming:
@@ -171,9 +173,9 @@ def test_botocore_without_boto3_integration_preserves_signed_baggage(
 
         assert response["ResponseMetadata"]["HTTPStatusCode"] == 200
         headers = _AwsRequestHandler.requests[-1]
-        # preserves third-party signed baggage.
+        # signed `baggage`: leave as-is.
         assert headers.get_all("baggage") == ["vendor=value"]
-        # `httplib` still adds single `sentry-trace` header.
+        # unsigned `sentry-trace`: add it.
         assert len(headers.get_all("sentry-trace")) == 1
         signed_headers = _get_aws_sigv4_signed_headers_from_authorization_header(
             headers.get("Authorization", "")
@@ -187,6 +189,7 @@ def test_botocore_without_boto3_integration_preserves_signed_baggage(
 
 
 def test_presigned_urls_do_not_require_sentry_headers(sentry_init):
+    """Do not add or sign `sentry-trace` or `baggage` on a presigned URL."""
     sentry_init(
         traces_sample_rate=1.0,
         default_integrations=False,
@@ -206,9 +209,9 @@ def test_presigned_urls_do_not_require_sentry_headers(sentry_init):
     )
     query = parse_qs(urlparse(url).query)
 
-    # only `host` header is signed.
+    # `SignedHeaders` must not require `sentry-trace` or `baggage`.
     assert query["X-Amz-SignedHeaders"] == ["host"]
     assert _get_aws_sigv4_signed_headers_from_url_query_string(url) == {"host"}
-    # no `sentry-*` or baggage are added.
+    # presigned URL query must not contain `sentry-trace` or `baggage`.
     assert "sentry-trace" not in url
     assert "baggage" not in url
