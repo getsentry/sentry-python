@@ -60,6 +60,34 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
   | `unignore_logger_for_sentry_logs` | `unignore_logger` | n/a | n/a | Loggers that match this name will create Sentry logs again. |
 
 
+### Loguru
+
+- The Loguru logging integration is not auto-enabled by default anymore if you have Loguru installed. To continue using it, add it to the `integrations` list in your `sentry_sdk.init()`:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.loguru import LoguruIntegration
+
+  sentry_sdk.init(
+      integrations=[
+          LoguruIntegration(),
+      ]
+  )
+  ```
+
+- The `level` integration option is now called `breadcrumb_level`.
+- The `sentry_logs_level` integration option is now called `level`.
+- The `capture_sentry_logs` option was removed. Use `level=None` to disable log capture.
+- When you enable the integration by adding `LoguruIntegration` to your `sentry_sdk.init()`, it'll start capturing Sentry logs and breadcrumbs. Creating events from logs can be enabled by providing additional integration options.
+
+  | Old name | New name | Old default | New default | Description |
+  | --- | --- | --- | --- | --- |
+  | `level` | `breadcrumb_level` | `INFO` | `INFO` | Captures logs of that level and higher as breadcrumbs. |
+  | `event_level` | `event_level` | `ERROR` | `None` | Captures logs of that level and higher as events. |
+  | `sentry_logs_level` | `level` | `INFO` | `INFO` | Captures logs of that level and higher as Sentry logs. |
+  | `capture_sentry_logs` | removed | `False` | n/a | Allows to opt out of instrumenting logs as Sentry logs. Use `level` (previously `sentry_logs_level`) to adjust what should be captured instead. |
+
+
 ## Removed
 
 - The SDK no longer supports Python 3.6. The oldest supported version is now 3.7.
