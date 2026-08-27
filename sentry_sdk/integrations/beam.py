@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.integrations import Integration, _check_minimum_version
-from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -39,8 +39,8 @@ class BeamIntegration(Integration):
         version = parse_version(BEAM_VERSION)
         _check_minimum_version(BeamIntegration, version)
 
-        ignore_logger("root")
-        ignore_logger("bundle_processor.create")
+        ignore_logger_for_events("root")
+        ignore_logger_for_events("bundle_processor.create")
 
         function_patches = ["process", "start_bundle", "finish_bundle", "setup"]
         for func_name in function_patches:

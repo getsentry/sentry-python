@@ -4,7 +4,7 @@ import weakref
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
@@ -153,7 +153,7 @@ class RqIntegration(Integration):
 
         Queue.enqueue_job = sentry_patched_enqueue_job
 
-        ignore_logger("rq.worker")
+        ignore_logger_for_events("rq.worker")
 
 
 def _make_event_processor(weak_job: "Callable[[], Job]") -> "EventProcessor":

@@ -18,7 +18,7 @@ from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
     request_body_within_bounds,
 )
-from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.sessions import track_session
 from sentry_sdk.traces import (
@@ -113,7 +113,7 @@ class AioHttpIntegration(Integration):
         # accidentally overwrite a status of "ok" with "error".
         _register_control_flow_exception(HTTPException)
 
-        ignore_logger("aiohttp.server")
+        ignore_logger_for_events("aiohttp.server")
 
         old_handle = Application._handle
 

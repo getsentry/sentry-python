@@ -27,6 +27,7 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.feature_flags import add_feature_flag
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
 from sentry_sdk.utils import parse_version
 
@@ -488,7 +489,11 @@ async def test_original_request_not_scrubbed(
 ):
     sentry_init(
         auto_enabling_integrations=False,  # Ensure httpx is not auto-enabled; its legacy start_span interferes with streaming mode
-        integrations=[StarletteIntegration(), FastApiIntegration()],
+        integrations=[
+            StarletteIntegration(),
+            FastApiIntegration(),
+            LoggingIntegration(event_level=logging.ERROR),
+        ],
         traces_sample_rate=1.0,
         trace_lifecycle="stream" if span_streaming else "static",
     )

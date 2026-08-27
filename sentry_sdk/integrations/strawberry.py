@@ -5,7 +5,7 @@ from inspect import isawaitable
 import sentry_sdk
 from sentry_sdk.consts import OP
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.utils import (
@@ -49,7 +49,7 @@ if TYPE_CHECKING:
     from sentry_sdk._types import Event, EventProcessor
 
 
-ignore_logger("strawberry.execution")
+ignore_logger_for_events("strawberry.execution")
 
 
 class StrawberryIntegration(Integration):

@@ -17,7 +17,7 @@ from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     RequestExtractor,
 )
-from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.scope import add_global_event_processor, should_send_default_pii
 from sentry_sdk.serializer import add_global_repr_processor, add_repr_sequence_type
@@ -156,8 +156,8 @@ class DjangoIntegration(Integration):
         # Patch in our custom middleware.
 
         # logs an error for every 500
-        ignore_logger("django.server")
-        ignore_logger("django.request")
+        ignore_logger_for_events("django.server")
+        ignore_logger_for_events("django.request")
 
         from django.core.handlers.wsgi import WSGIHandler
 
@@ -889,7 +889,7 @@ def install_sql_hook() -> None:
     BaseDatabaseWrapper.connect = connect
     BaseDatabaseWrapper._commit = _commit
     BaseDatabaseWrapper._rollback = _rollback
-    ignore_logger("django.db.backends")
+    ignore_logger_for_events("django.db.backends")
 
 
 def _set_db_data(
