@@ -544,6 +544,7 @@ def _make_request_processor(
         if request is None:
             return event
 
+        client_options = sentry_sdk.get_client().options
         with capture_internal_exceptions():
             request_info = event.setdefault("request", {})
 
@@ -561,7 +562,16 @@ def _make_request_processor(
             # Just attach raw data here if it is within bounds, if available.
             # Unfortunately there's no way to get structured data from aiohttp
             # without awaiting on some coroutine.
-            request_info["data"] = get_aiohttp_request_data(request)
+            if has_data_collection_enabled(client_options):
+                if (
+                    "incoming_request"
+                    in client_options["data_collection"]["http_bodies"]
+                ):
+                    request_info["data"] = get_aiohttp_request_data(request)
+            else:
+                # We never gated this prior to data collection, so it should be attached
+                # when data collection is not enabled.
+                request_info["data"] = get_aiohttp_request_data(request)
 
         return event
 
