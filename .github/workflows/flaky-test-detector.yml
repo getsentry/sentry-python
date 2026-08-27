@@ -108,7 +108,7 @@ jobs:
       # and the repo, and writes the issue body to flaky-issue-body.md.
       - name: Analyze logs and summarize flaky tests
         if: steps.collect.outputs.collected != '0'
-        uses: anthropics/claude-code-action@1f291e1cfe0f5fc21db2aef19af844591600ade7 # v1.0.206
+        uses: anthropics/claude-code-action@70fec183852c4f82f3f1969faed7dd60c5149ca7 # v1.0.207
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ github.token }}
