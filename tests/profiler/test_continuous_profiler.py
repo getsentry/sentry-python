@@ -1,3 +1,5 @@
+import os
+import sys
 import threading
 import time
 from collections import defaultdict
@@ -8,6 +10,7 @@ import pytest
 import sentry_sdk
 from sentry_sdk.consts import VERSION
 from sentry_sdk.profiler.continuous_profiler import (
+    ThreadContinuousScheduler,
     get_profiler_id,
     is_profile_session_sampled,
     setup_continuous_profiler,
@@ -1257,3 +1260,64 @@ def test_continuous_profiler_run_does_not_null_buffer_span_streaming(
         "run() must not set self.buffer = None; "
         "this would destroy buffers created by concurrent ensure_running() calls"
     )
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32"
+    or not hasattr(os, "fork")
+    or not hasattr(os, "register_at_fork"),
+    reason="requires POSIX fork and os.register_at_fork (Python 3.7+)",
+)
+def test_thread_continuous_scheduler_lock_reset_in_child_after_fork():
+    """Regression test for #6165.
+
+    If os.fork() runs while ThreadContinuousScheduler.lock is held, the
+    child inherits the lock locked. The holding thread does not exist in
+    the child, so the lock can never be released and ensure_running
+    deadlocks forever. The after-fork hook must replace the lock with a
+    fresh one in the child, and reset the inherited thread, pid, and
+    buffer so the child starts clean.
+    """
+    scheduler = ThreadContinuousScheduler(
+        frequency=101,
+        options={"profile_lifecycle": "manual", "profile_session_sample_rate": 1.0},
+        sdk_info=mock_sdk_info,
+        capture_func=lambda envelope: None,
+    )
+    scheduler.reset_buffer()
+    scheduler.thread = threading.current_thread()
+    scheduler.pid = os.getpid()
+    scheduler.running = True
+
+    original_lock = scheduler.lock
+    original_buffer = scheduler.buffer
+    assert original_buffer is not None
+
+    original_lock.acquire()
+    pid = os.fork()
+    if pid == 0:
+        # Child: was the lock object replaced and is the new one not
+        # held? Without the fix, lock is `original_lock` inherited
+        # locked, so `replaced` is False. blocking=False guarantees
+        # the child can't hang on a regression.
+        replaced = scheduler.lock is not original_lock
+        unheld = scheduler.lock.acquire(blocking=False)
+        thread_reset = scheduler.thread is None
+        pid_reset = scheduler.pid is None
+        buffer_reset = scheduler.buffer is None
+        running_reset = scheduler.running is False
+        os._exit(
+            0
+            if replaced
+            and unheld
+            and thread_reset
+            and pid_reset
+            and buffer_reset
+            and running_reset
+            else 1
+        )
+
+    original_lock.release()
+    _, status = os.waitpid(pid, 0)
+    assert os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0
+
