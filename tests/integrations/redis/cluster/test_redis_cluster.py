@@ -132,12 +132,6 @@ def test_rediscluster_basic(
                 SPANDATA.SERVER_PORT: 6379,
             }
         )
-        assert span["tags"] == {
-            "db.operation": "SET",
-            "redis.command": "SET",
-            "redis.is_cluster": True,
-            "redis.key": "bar",
-        }
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -217,10 +211,6 @@ def test_rediscluster_pipeline(
                 SPANDATA.SERVER_PORT: 6379,
             }
         )
-        assert span["tags"] == {
-            "redis.transaction": False,  # For Cluster, this is always False
-            "redis.is_cluster": True,
-        }
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])

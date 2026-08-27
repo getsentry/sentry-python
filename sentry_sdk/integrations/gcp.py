@@ -68,7 +68,6 @@ def _wrap_func(func: "F") -> "F":
                         gcp_event, configured_time, initial_time
                     )
                 )
-                scope.set_tag("gcp_region", environ.get("FUNCTION_REGION"))
                 timeout_thread = None
                 if (
                     integration.timeout_warning

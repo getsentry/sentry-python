@@ -230,8 +230,6 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                 name=middleware_name,
                 origin=LitestarIntegration.origin,
             ) as middleware_span:
-                middleware_span.set_tag("litestar.middleware_name", middleware_name)
-
                 # Creating spans for the "receive" callback
                 async def _sentry_receive(
                     *args: "Any", **kwargs: "Any"
@@ -242,8 +240,7 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                         op=OP.MIDDLEWARE_LITESTAR_RECEIVE,
                         name=getattr(receive, "__qualname__", str(receive)),
                         origin=LitestarIntegration.origin,
-                    ) as span:
-                        span.set_tag("litestar.middleware_name", middleware_name)
+                    ):
                         return await receive(*args, **kwargs)
 
                 receive_name = getattr(receive, "__name__", str(receive))
@@ -258,8 +255,7 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                         op=OP.MIDDLEWARE_LITESTAR_SEND,
                         name=getattr(send, "__qualname__", str(send)),
                         origin=LitestarIntegration.origin,
-                    ) as span:
-                        span.set_tag("litestar.middleware_name", middleware_name)
+                    ):
                         return await send(message)
 
                 send_name = getattr(send, "__name__", str(send))

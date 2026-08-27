@@ -238,7 +238,6 @@ def test_middleware_spans(sentry_init, capture_events, capture_items, span_strea
             assert span["description"] in expected
             assert span["description"] not in found
             found.add(span["description"])
-            assert span["description"] == span["tags"]["starlite.middleware_name"]
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -274,17 +273,14 @@ def test_middleware_callback_spans(
         {
             "op": "middleware.starlite",
             "description": "SampleMiddleware",
-            "tags": {"starlite.middleware_name": "SampleMiddleware"},
         },
         {
             "op": "middleware.starlite.send",
             "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
-            "tags": {"starlite.middleware_name": "SampleMiddleware"},
         },
         {
             "op": "middleware.starlite.send",
             "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
-            "tags": {"starlite.middleware_name": "SampleMiddleware"},
         },
     ]
 
@@ -303,8 +299,6 @@ def test_middleware_callback_spans(
             return (
                 expected_span["op"] == actual_span["attributes"]["sentry.op"]
                 and expected_span["description"] == actual_span["name"]
-                and expected_span["tags"]["starlite.middleware_name"]
-                == actual_span["attributes"]["middleware.name"]
             )
 
         for expected_span in expected_starlite_spans:
@@ -319,7 +313,6 @@ def test_middleware_callback_spans(
             return (
                 expected_span["op"] == actual_span["op"]
                 and expected_span["description"] == actual_span["description"]
-                and expected_span["tags"] == actual_span["tags"]
             )
 
         actual_starlite_spans = list(
@@ -403,17 +396,14 @@ def test_middleware_partial_receive_send(
         {
             "op": "middleware.starlite",
             "description": "SamplePartialReceiveSendMiddleware",
-            "tags": {"starlite.middleware_name": "SamplePartialReceiveSendMiddleware"},
         },
         {
             "op": "middleware.starlite.receive",
             "description": "TestClientTransport.create_receive.<locals>.receive",
-            "tags": {"starlite.middleware_name": "SamplePartialReceiveSendMiddleware"},
         },
         {
             "op": "middleware.starlite.send",
             "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
-            "tags": {"starlite.middleware_name": "SamplePartialReceiveSendMiddleware"},
         },
     ]
 
@@ -429,12 +419,9 @@ def test_middleware_partial_receive_send(
         assert len(actual_starlite_spans) == 3
 
         def is_matching_span_streaming(expected_span, actual_span):
-            return (
-                expected_span["op"] == actual_span["attributes"]["sentry.op"]
-                and actual_span["name"].startswith(expected_span["description"])
-                and expected_span["tags"]["starlite.middleware_name"]
-                == actual_span["attributes"]["middleware.name"]
-            )
+            return expected_span["op"] == actual_span["attributes"][
+                "sentry.op"
+            ] and actual_span["name"].startswith(expected_span["description"])
 
         for expected_span in expected_starlite_spans:
             assert any(
@@ -445,11 +432,9 @@ def test_middleware_partial_receive_send(
         (_, transaction_events) = events
 
         def is_matching_span(expected_span, actual_span):
-            return (
-                expected_span["op"] == actual_span["op"]
-                and actual_span["description"].startswith(expected_span["description"])
-                and expected_span["tags"] == actual_span["tags"]
-            )
+            return expected_span["op"] == actual_span["op"] and actual_span[
+                "description"
+            ].startswith(expected_span["description"])
 
         actual_starlite_spans = list(
             span

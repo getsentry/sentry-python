@@ -190,20 +190,13 @@ def _enable_span_for_middleware(
                 origin=StarletteIntegration.origin,
             )
 
-        with _start_middleware_span(
-            op=OP.MIDDLEWARE_STARLETTE, name=middleware_name
-        ) as middleware_span:
-            if not is_span_streaming_enabled:
-                middleware_span.set_tag("starlette.middleware_name", middleware_name)
-
+        with _start_middleware_span(op=OP.MIDDLEWARE_STARLETTE, name=middleware_name):
             # Creating spans for the "receive" callback
             async def _sentry_receive(*args: "Any", **kwargs: "Any") -> "Any":
                 with _start_middleware_span(
                     op=OP.MIDDLEWARE_STARLETTE_RECEIVE,
                     name=getattr(receive, "__qualname__", str(receive)),
-                ) as span:
-                    if not is_span_streaming_enabled:
-                        span.set_tag("starlette.middleware_name", middleware_name)
+                ):
                     return await receive(*args, **kwargs)
 
             receive_name = getattr(receive, "__name__", str(receive))
@@ -215,9 +208,7 @@ def _enable_span_for_middleware(
                 with _start_middleware_span(
                     op=OP.MIDDLEWARE_STARLETTE_SEND,
                     name=getattr(send, "__qualname__", str(send)),
-                ) as span:
-                    if not is_span_streaming_enabled:
-                        span.set_tag("starlette.middleware_name", middleware_name)
+                ):
                     return await send(*args, **kwargs)
 
             send_name = getattr(send, "__name__", str(send))
