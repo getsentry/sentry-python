@@ -530,7 +530,7 @@ def test_request_data_with_data_collection_allowlist(lambda_client, test_environ
               "userArn": "42"
             }
           },
-          "body": null,
+          "body": "{\\"toy\\": \\"tennisball\\"}",
           "isBase64Encoded": false
         }
     """
@@ -560,6 +560,7 @@ def test_request_data_with_data_collection_allowlist(lambda_client, test_environ
         "method": "GET",
         "query_string": {"bonkers": "true"},
         "url": "https://iwsz2c7uwi.execute-api.us-east-1.amazonaws.com/asd",
+        "data": '{"toy": "tennisball"}',
     }
 
 
@@ -588,7 +589,7 @@ def test_request_data_with_data_collection_denylist(lambda_client, test_environm
               "userArn": "42"
             }
           },
-          "body": null,
+          "body": "{\\"toy\\": \\"tennisball\\"}",
           "isBase64Encoded": false
         }
     """
@@ -617,6 +618,7 @@ def test_request_data_with_data_collection_denylist(lambda_client, test_environm
         "method": "GET",
         "query_string": {"bonkers": "true"},
         "url": "https://iwsz2c7uwi.execute-api.us-east-1.amazonaws.com/asd",
+        "data": '{"toy": "tennisball"}',
     }
 
 
@@ -644,7 +646,7 @@ def test_request_data_with_data_collection_off(lambda_client, test_environment):
               "userArn": "42"
             }
           },
-          "body": null,
+          "body": "{\\"toy\\": \\"tennisball\\"}",
           "isBase64Encoded": false
         }
     """
@@ -663,6 +665,7 @@ def test_request_data_with_data_collection_off(lambda_client, test_environment):
         "method": "GET",
         "query_string": {"bonkers": "true"},
         "url": "https://iwsz2c7uwi.execute-api.us-east-1.amazonaws.com/asd",
+        "data": '{"toy": "tennisball"}',
     }
 
 
