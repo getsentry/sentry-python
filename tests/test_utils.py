@@ -492,16 +492,41 @@ def test_warns_on_invalid_sample_rate(rate, StringContaining):  # noqa: N803
 
 
 @pytest.mark.parametrize(
-    "include_source_context",
-    [True, False],
+    "options,include_source_context,expected_source_context",
+    [
+        pytest.param({}, True, True, id="no_data_collection-include_true"),
+        pytest.param({}, False, False, id="no_data_collection-include_false"),
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            False,
+            True,
+            id="data_collection-spec_default_overrides_include_false",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"frame_context_lines": 3}}},
+            True,
+            True,
+            id="data_collection-frame_context_lines_3",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"frame_context_lines": 0}}},
+            True,
+            False,
+            id="data_collection-frame_context_lines_0_overrides_include_true",
+        ),
+    ],
 )
-def test_include_source_context_when_serializing_frame(include_source_context):
+def test_include_source_context_when_serializing_frame(
+    sentry_init, options, include_source_context, expected_source_context
+):
+    sentry_init(**options)
+
     frame = sys._getframe()
     result = serialize_frame(frame, include_source_context=include_source_context)
 
-    assert include_source_context ^ ("pre_context" in result) ^ True
-    assert include_source_context ^ ("context_line" in result) ^ True
-    assert include_source_context ^ ("post_context" in result) ^ True
+    assert ("pre_context" in result) is expected_source_context
+    assert ("context_line" in result) is expected_source_context
+    assert ("post_context" in result) is expected_source_context
 
 
 @pytest.mark.parametrize(
@@ -1067,6 +1092,53 @@ def test_get_lines_from_file_handle_linecache_errors():
     with mock.patch("sentry_sdk.utils.linecache.getlines", fake_getlines):
         result = get_lines_from_file("filename", 10)
         assert result == expected_result
+
+
+@pytest.mark.parametrize(
+    "options,expected_context_lines",
+    [
+        pytest.param({}, 5, id="no_data_collection-defaults_to_5"),
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            5,
+            id="data_collection-spec_default_5",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"frame_context_lines": 3}}},
+            3,
+            id="data_collection-frame_context_lines_3",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"frame_context_lines": 0}}},
+            0,
+            id="data_collection-frame_context_lines_0",
+        ),
+        pytest.param(
+            {
+                "_experiments": {"data_collection": {}},
+                "include_source_context": False,
+            },
+            5,
+            id="data_collection-spec_default_overrides_include_source_context_false",
+        ),
+    ],
+)
+def test_get_lines_from_file_frame_context_lines(
+    sentry_init, options, expected_context_lines
+):
+    source = ["line{}\n".format(i) for i in range(20)]
+
+    sentry_init(**options)
+
+    def fake_getlines(filename):
+        return source
+
+    with mock.patch("sentry_sdk.utils.linecache.getlines", fake_getlines):
+        pre_context, context_line, post_context = get_lines_from_file("filename", 10)
+
+    assert context_line == "line10"
+    assert len(pre_context) == expected_context_lines
+    assert len(post_context) == expected_context_lines
 
 
 def test_safe_serialize_plain_string():

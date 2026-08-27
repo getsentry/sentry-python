@@ -467,7 +467,14 @@ def get_lines_from_file(
     loader: "Optional[Any]" = None,
     module: "Optional[str]" = None,
 ) -> "Tuple[List[Annotated[str]], Optional[Annotated[str]], List[Annotated[str]]]":
+    client_options = sentry_sdk.get_client().options
+
+    # This is the default pre-data collection. Should be removed once data collection
+    # is fully released
     context_lines = 5
+    if has_data_collection_enabled(client_options):
+        context_lines = client_options["data_collection"]["frame_context_lines"]
+
     source = None
     if loader is not None and hasattr(loader, "get_source"):
         try:
@@ -606,6 +613,12 @@ def serialize_frame(
         "module": module,
         "lineno": tb_lineno,
     }
+
+    client_options = sentry_sdk.get_client().options
+    if has_data_collection_enabled(client_options):
+        include_source_context = bool(
+            client_options["data_collection"]["frame_context_lines"]
+        )
 
     if include_source_context:
         rv["pre_context"], rv["context_line"], rv["post_context"] = get_source_context(

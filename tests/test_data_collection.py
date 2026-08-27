@@ -147,8 +147,8 @@ def _get(dc, path):
                 "include_local_variables": False,
                 "include_source_context": False,
             },
-            {"stack_frame_variables": False, "frame_context_lines": 0},
-            id="explicit_frame_fields_fall_back_to_legacy_options",
+            {"stack_frame_variables": False, "frame_context_lines": 5},
+            id="explicit_stack_frame_variables_falls_back_to_legacy_option",
         ),
         pytest.param(
             {
