@@ -121,9 +121,6 @@ def _set_pipeline_data(
     if isinstance(span, StreamedSpan):
         return
 
-    span.set_tag("redis.is_cluster", is_cluster)
-    span.set_tag("redis.transaction", is_transaction)
-
     commands = []
     for i, arg in enumerate(commands_seq):
         if i >= _MAX_NUM_COMMANDS:
@@ -147,18 +144,11 @@ def _set_client_data(
     if isinstance(span, StreamedSpan):
         if name:
             span.set_attribute(SPANDATA.DB_OPERATION_NAME, name)
-    else:
-        span.set_tag("redis.is_cluster", is_cluster)
-        if name:
-            span.set_tag("redis.command", name)
-            span.set_tag(SPANDATA.DB_OPERATION, name)
 
     key = _extract_key(name, args)
     if key is not None:
         if isinstance(span, StreamedSpan):
             span.set_attribute("db.redis.key", key)
-        else:
-            span.set_tag("redis.key", key)
 
 
 def _extract_key(name: str, args: "Any") -> "Optional[str]":

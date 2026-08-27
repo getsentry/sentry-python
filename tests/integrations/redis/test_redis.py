@@ -106,10 +106,6 @@ def test_redis_pipeline(
             "count": 3,
             "first_ten": expected_first_ten,
         }
-        assert span["tags"] == {
-            "redis.transaction": is_transaction,
-            "redis.is_cluster": False,
-        }
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
