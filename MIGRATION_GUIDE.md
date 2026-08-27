@@ -83,6 +83,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - Removed Spotlight integration for Django. See [Spotlight 2.0](https://github.com/getsentry/spotlight/issues/891) for more context.
 - The deprecated parameter `propagate_hub` in `ThreadingIntegration()` was removed.
 - The SDK won't set any tags on its own anymore.
+- The `update_current_span` API was removed.
 
 ## Deprecated
 
