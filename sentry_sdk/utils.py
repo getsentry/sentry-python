@@ -19,6 +19,8 @@ from functools import partial, partialmethod, wraps
 from numbers import Real
 from urllib.parse import parse_qs, unquote, urlencode, urlsplit, urlunsplit
 
+from sentry_sdk.data_collection import _apply_key_value_collection_filtering
+
 try:
     # Python 3.11
     from builtins import BaseExceptionGroup
@@ -586,6 +588,8 @@ def serialize_frame(
     max_value_length: "Optional[int]" = None,
     custom_repr: "Optional[Callable[..., Optional[str]]]" = None,
 ) -> "Dict[str, Any]":
+    from sentry_sdk.serializer import serialize
+
     f_code = getattr(frame, "f_code", None)
     if not f_code:
         abs_path = None
@@ -625,9 +629,30 @@ def serialize_frame(
             frame, tb_lineno, max_value_length
         )
 
-    if include_local_variables:
-        from sentry_sdk.serializer import serialize
+    if has_data_collection_enabled(client_options):
+        dc_stack_frame_vars_config = client_options["data_collection"][
+            "stack_frame_variables"
+        ]
 
+        if isinstance(dc_stack_frame_vars_config, bool):
+            if dc_stack_frame_vars_config:
+                rv["vars"] = serialize(
+                    dict(frame.f_locals), is_vars=True, custom_repr=custom_repr
+                )
+        else:
+            local_variables_to_send = _apply_key_value_collection_filtering(
+                items=dict(frame.f_locals),
+                behaviour=dc_stack_frame_vars_config,
+            )
+
+            if local_variables_to_send:
+                serialized_variables = serialize(
+                    local_variables_to_send, is_vars=True, custom_repr=custom_repr
+                )
+
+                rv["vars"] = serialized_variables
+
+    elif include_local_variables:
         rv["vars"] = serialize(
             dict(frame.f_locals), is_vars=True, custom_repr=custom_repr
         )

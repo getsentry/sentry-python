@@ -194,9 +194,6 @@ def _resolve_explicit(
     ``data_collection`` dict, filling in spec defaults for any omitted or
     partially-specified field.
     """
-    # frame_context_lines accepts an integer or a boolean fallback (spec: True
-    # -> platform default of 5, False -> 0). bool is a subclass of int, so
-    # coerce explicitly before treating it as a line count.
     frame_context_lines = d.get("frame_context_lines")
     if frame_context_lines is None:
         frame_context_lines = _DEFAULT_FRAME_CONTEXT_LINES
@@ -211,10 +208,11 @@ def _resolve_explicit(
     raw_stack_frame_variables = d.get("stack_frame_variables", True)
     stack_frame_variables: "Union[bool, KeyValueCollectionBehaviour]"
 
-    if isinstance(raw_stack_frame_variables, dict):
-        stack_frame_variables = _kvcb_from_value(raw_stack_frame_variables)
-    else:
-        stack_frame_variables = bool(raw_stack_frame_variables)
+    stack_frame_variables = (
+        _kvcb_from_value(raw_stack_frame_variables)
+        if isinstance(raw_stack_frame_variables, dict)
+        else bool(raw_stack_frame_variables)
+    )
 
     # http_bodies: omitted means "all valid types"; [] is the explicit opt-out.
     http_bodies = d.get("http_bodies")
