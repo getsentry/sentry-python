@@ -771,33 +771,6 @@ def test_request_body_dropped_with_form_and_files_data_collection(
     assert "data" not in event.get("_meta", {}).get("request", {})
 
 
-def test_transaction_request_body_data_collection(
-    sentry_init, capture_events, app, get_client
-):
-    sentry_init(
-        integrations=[BottleIntegration()],
-        traces_sample_rate=1.0,
-        _experiments={"data_collection": {"http_bodies": []}},
-    )
-
-    data = {"username": "sentry-user", "age": "26"}
-
-    @app.route("/", method="POST")
-    def index():
-        capture_message("hi")
-        return "ok"
-
-    events = capture_events()
-
-    client = get_client()
-    response = client.post("/", content_type="application/json", data=json.dumps(data))
-    assert response[1] == "200 OK"
-
-    event, transaction_event = events
-    assert "data" not in event["request"]
-    assert "data" not in transaction_event["request"]
-
-
 def test_oversized_request_body_not_annotated_data_collection(
     sentry_init, capture_events, app, get_client
 ):

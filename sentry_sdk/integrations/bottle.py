@@ -11,7 +11,6 @@ from sentry_sdk.integrations import (
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.traces import SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE
-from sentry_sdk.tracing import SOURCE_FOR_STYLE as TRANSACTION_SOURCE_FOR_STYLE
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -187,39 +186,10 @@ def _set_segment_name_and_source(transaction_style: str) -> None:
         pass
 
 
-def _set_transaction_name_and_source(
-    event: "Event", transaction_style: str, request: "Any"
-) -> None:
-    name = ""
-
-    if transaction_style == "url":
-        try:
-            name = request.route.rule or ""
-        except RuntimeError:
-            pass
-
-    elif transaction_style == "endpoint":
-        try:
-            name = (
-                request.route.name
-                or transaction_from_function(request.route.callback)
-                or ""
-            )
-        except RuntimeError:
-            pass
-
-    event["transaction"] = name
-    event["transaction_info"] = {
-        "source": TRANSACTION_SOURCE_FOR_STYLE[transaction_style]
-    }
-
-
 def _make_request_event_processor(
     app: "Bottle", request: "LocalRequest", integration: "BottleIntegration"
 ) -> "EventProcessor":
     def event_processor(event: "Event", hint: "dict[str, Any]") -> "Event":
-        _set_transaction_name_and_source(event, integration.transaction_style, request)
-
         with capture_internal_exceptions():
             BottleRequestExtractor(request).extract_into_event(event)
 
