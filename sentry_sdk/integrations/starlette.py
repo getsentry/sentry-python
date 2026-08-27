@@ -843,21 +843,24 @@ class StarletteRequestExtractor:
             return None
 
 
-def _transaction_name_from_router(scope: "StarletteScope") -> "Optional[str]":
+def _transaction_name_and_source_from_router(
+    scope: "StarletteScope",
+) -> "Tuple[Optional[str], TransactionSource]":
     router = scope.get("router")
     if not router:
-        return None
+        return None, TransactionSource.ROUTE
 
     for route in router.routes:
         match = route.matches(scope)
         if match[0] == Match.FULL:
             try:
-                return route.path
+                return route.path, TransactionSource.ROUTE
             except AttributeError:
-                # routes added via app.host() won't have a path attribute
-                return scope.get("path")
+                # Host routes have no path template, so fall back to the
+                # concrete request path and classify it as a URL.
+                return scope.get("path"), TransactionSource.URL
 
-    return None
+    return None, TransactionSource.ROUTE
 
 
 def _set_transaction_name_and_source(
@@ -872,7 +875,7 @@ def _set_transaction_name_and_source(
             name = transaction_from_function(endpoint) or None
 
     elif transaction_style == "url":
-        name = _transaction_name_from_router(request.scope)
+        name, source = _transaction_name_and_source_from_router(request.scope)
 
     if name is None:
         name = _DEFAULT_TRANSACTION_NAME
@@ -891,7 +894,6 @@ def _get_transaction_from_middleware(
         name = transaction_from_function(app.__class__)
         source = TransactionSource.COMPONENT
     elif integration.transaction_style == "url":
-        name = _transaction_name_from_router(asgi_scope)
-        source = TransactionSource.ROUTE
+        name, source = _transaction_name_and_source_from_router(asgi_scope)
 
     return name, source
