@@ -7,7 +7,6 @@ import os
 import socket
 import ssl
 import time
-import warnings
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -47,6 +46,7 @@ from sentry_sdk.envelope import Envelope, Item, PayloadRef
 from sentry_sdk.utils import (
     Dsn,
     capture_internal_exceptions,
+    deprecation_warning,
     logger,
     mark_sentry_task_internal,
 )
@@ -121,10 +121,8 @@ class Transport(ABC):
         be sent to sentry.
         """
 
-        warnings.warn(
+        deprecation_warning(
             "capture_event is deprecated, please use capture_envelope instead!",
-            DeprecationWarning,
-            stacklevel=2,
         )
 
         envelope = Envelope()
@@ -1209,11 +1207,9 @@ def make_transport(options: "Dict[str, Any]") -> "Optional[Transport]":
     elif isinstance(ref_transport, type) and issubclass(ref_transport, Transport):
         transport_cls = ref_transport
     elif callable(ref_transport):
-        warnings.warn(
+        deprecation_warning(
             "Function transports are deprecated and will be removed in a future release."
             "Please provide a Transport instance or subclass, instead.",
-            DeprecationWarning,
-            stacklevel=2,
         )
         transport = _FunctionTransport(ref_transport)
 

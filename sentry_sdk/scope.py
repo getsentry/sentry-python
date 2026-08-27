@@ -1,7 +1,6 @@
 import os
 import platform
 import sys
-import warnings
 from collections import deque
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -51,6 +50,7 @@ from sentry_sdk.utils import (
     capture_internal_exception,
     capture_internal_exceptions,
     datetime_from_isoformat,
+    deprecation_warning,
     disable_capture_event,
     event_from_exception,
     exc_info_from_error,
@@ -798,10 +798,8 @@ class Scope:
             return None
 
         if isinstance(self._span, StreamedSpan):
-            warnings.warn(
+            deprecation_warning(
                 "Scope.transaction is not available in streaming mode.",
-                DeprecationWarning,
-                stacklevel=2,
             )
             return None
 
@@ -836,10 +834,8 @@ class Scope:
         self._transaction = value
         if self._span:
             if isinstance(self._span, StreamedSpan):
-                warnings.warn(
+                deprecation_warning(
                     "Scope.transaction is not available in streaming mode.",
-                    DeprecationWarning,
-                    stacklevel=2,
                 )
                 return None
 
@@ -868,10 +864,8 @@ class Scope:
     @_attr_setter
     def user(self, value: "Optional[Dict[str, Any]]") -> None:
         """When set a specific user is bound to the scope. Deprecated in favor of set_user."""
-        warnings.warn(
+        deprecation_warning(
             "The `Scope.user` setter is deprecated in favor of `Scope.set_user()`.",
-            DeprecationWarning,
-            stacklevel=2,
         )
         self.set_user(value)
 
@@ -1131,10 +1125,8 @@ class Scope:
         """
         client = self.get_client()
         if has_span_streaming_enabled(client.options):
-            warnings.warn(
+            deprecation_warning(
                 "Scope.start_transaction is not available in streaming mode.",
-                DeprecationWarning,
-                stacklevel=2,
             )
             return NoOpSpan()
 
@@ -1208,18 +1200,14 @@ class Scope:
         """
         client = sentry_sdk.get_client()
         if has_span_streaming_enabled(client.options):
-            warnings.warn(
+            deprecation_warning(
                 "Scope.start_span is not available in streaming mode.",
-                DeprecationWarning,
-                stacklevel=2,
             )
             return NoOpSpan()
 
         if kwargs.get("description") is not None:
-            warnings.warn(
+            deprecation_warning(
                 "The `description` parameter is deprecated. Please use `name` instead.",
-                DeprecationWarning,
-                stacklevel=2,
             )
 
         with new_scope():

@@ -1,5 +1,4 @@
 import sys
-import warnings
 import weakref
 from inspect import isawaitable
 from typing import TYPE_CHECKING
@@ -22,6 +21,7 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
     has_data_collection_enabled,
+    logger,
     parse_version,
     reraise,
 )
@@ -155,9 +155,8 @@ async def _context_enter(request: "Request") -> None:
             isinstance(integration, SanicIntegration)
             and integration._unsampled_statuses
         ):
-            warnings.warn(
+            logger.warning(
                 "The `unsampled_statuses` option of SanicIntegration has no effect when span streaming is enabled.",
-                stacklevel=2,
             )
 
         sentry_sdk.traces.continue_trace(dict(request.headers))

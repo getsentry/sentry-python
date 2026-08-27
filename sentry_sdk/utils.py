@@ -10,6 +10,7 @@ import subprocess
 import sys
 import threading
 import time
+import warnings
 from collections import namedtuple
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -2023,3 +2024,12 @@ def serialize_attribute(val: "AttributeValue") -> "SerializedAttributeValue":
     # Coerce to string if we don't know what to do with the value. This should
     # never happen as we pre-format early in format_attribute, but let's be safe.
     return {"value": safe_repr(val), "type": "string"}
+
+
+def deprecation_warning(msg: str) -> None:
+    """
+    Emit a warnings.warn about a deprecation.
+
+    For other types of warnings, use logger.warning().
+    """
+    warnings.warn(msg, stacklevel=2, category=DeprecationWarning)

@@ -1,7 +1,6 @@
 import itertools
 import json
 import sys
-import warnings
 from collections import OrderedDict
 from functools import wraps
 from typing import TYPE_CHECKING, NamedTuple
@@ -26,6 +25,7 @@ from sentry_sdk.tracing_utils import (
 )
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    deprecation_warning,
     has_data_collection_enabled,
     logger,
     parse_version,
@@ -242,11 +242,9 @@ class LangchainIntegration(Integration):
         self.max_spans = max_spans
 
         if max_spans is not None:
-            warnings.warn(
+            deprecation_warning(
                 "The `max_spans` parameter of `LangchainIntegration` is "
                 "deprecated and will be removed in version 3.0 of sentry-sdk.",
-                DeprecationWarning,
-                stacklevel=2,
             )
 
     @staticmethod

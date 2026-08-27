@@ -1,9 +1,8 @@
 import re
-import warnings
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.utils import logger, parse_version
+from sentry_sdk.utils import deprecation_warning, logger, parse_version
 
 if TYPE_CHECKING:
     from typing import Any, ContextManager, Optional
@@ -23,19 +22,15 @@ class _InitGuard:
         self._client = client
 
     def __enter__(self) -> "_InitGuard":
-        warnings.warn(
+        deprecation_warning(
             self._CONTEXT_MANAGER_DEPRECATION_WARNING_MESSAGE,
-            stacklevel=2,
-            category=DeprecationWarning,
         )
 
         return self
 
     def __exit__(self, exc_type: "Any", exc_value: "Any", tb: "Any") -> None:
-        warnings.warn(
+        deprecation_warning(
             self._CONTEXT_MANAGER_DEPRECATION_WARNING_MESSAGE,
-            stacklevel=2,
-            category=DeprecationWarning,
         )
 
         c = self._client
