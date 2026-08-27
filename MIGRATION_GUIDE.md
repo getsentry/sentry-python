@@ -88,8 +88,13 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - `Baggage.from_options` was removed.
 - `Transport.capture_event` was removed. Use `Transport.capture_envelope` instead.
 - Function transports were removed.
+- The `Scope.trace_propagation_meta` function no longer accepts a `span` as argument.
+- Direct assignment to `Scope.level` was removed. Use `Scope.set_level` instead.
+- Direct assignment to `Scope.user` was removed. Use `Scope.set_user` instead.
+- `Scope.iter_headers` was removed.
 - The SDK won't set any tags on its own anymore.
 - The `update_current_span` API was removed.
+
 
 ## Deprecated
 
