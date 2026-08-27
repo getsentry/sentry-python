@@ -174,7 +174,7 @@ def wrap_async_view(callback: "Any") -> "Any":
         request: "Any", *args: "Any", **kwargs: "Any"
     ) -> "Any":
         client = sentry_sdk.get_client()
-        current_span = sentry_sdk.get_current_span()
+        current_span = sentry_sdk.traces.get_current_span()
         if type(current_span) is StreamedSpan:
             segment = current_span._segment
             segment._update_active_thread()
