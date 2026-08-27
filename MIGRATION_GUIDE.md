@@ -88,6 +88,8 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - `Baggage.from_options` was removed.
 - `Transport.capture_event` was removed. Use `Transport.capture_envelope` instead.
 - Function transports were removed.
+- The SDK won't set any tags on its own anymore.
+- The `update_current_span` API was removed.
 
 ## Deprecated
 

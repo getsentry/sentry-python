@@ -270,7 +270,6 @@ def test_middleware_spans(
             assert span["description"] in expected
             assert span["description"] not in found
             found.add(span["description"])
-            assert span["description"] == span["tags"]["litestar.middleware_name"]
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -359,17 +358,14 @@ def test_middleware_callback_spans(
             {
                 "op": "middleware.litestar",
                 "description": "SampleMiddleware",
-                "tags": {"litestar.middleware_name": "SampleMiddleware"},
             },
             {
                 "op": "middleware.litestar.send",
                 "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
-                "tags": {"litestar.middleware_name": "SampleMiddleware"},
             },
             {
                 "op": "middleware.litestar.send",
                 "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
-                "tags": {"litestar.middleware_name": "SampleMiddleware"},
             },
         ]
 
@@ -377,7 +373,6 @@ def test_middleware_callback_spans(
             return (
                 expected_span["op"] == actual_span["op"]
                 and expected_span["description"] == actual_span["description"]
-                and expected_span["tags"] == actual_span["tags"]
             )
 
         actual_litestar_spans = list(
@@ -518,32 +513,21 @@ def test_middleware_partial_receive_send(
             {
                 "op": "middleware.litestar",
                 "description": "SamplePartialReceiveSendMiddleware",
-                "tags": {
-                    "litestar.middleware_name": "SamplePartialReceiveSendMiddleware"
-                },
             },
             {
                 "op": "middleware.litestar.receive",
                 "description": "TestClientTransport.create_receive.<locals>.receive",
-                "tags": {
-                    "litestar.middleware_name": "SamplePartialReceiveSendMiddleware"
-                },
             },
             {
                 "op": "middleware.litestar.send",
                 "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
-                "tags": {
-                    "litestar.middleware_name": "SamplePartialReceiveSendMiddleware"
-                },
             },
         ]
 
         def is_matching_span(expected_span, actual_span):
-            return (
-                expected_span["op"] == actual_span["op"]
-                and actual_span["description"].startswith(expected_span["description"])
-                and expected_span["tags"] == actual_span["tags"]
-            )
+            return expected_span["op"] == actual_span["op"] and actual_span[
+                "description"
+            ].startswith(expected_span["description"])
 
         actual_litestar_spans = list(
             span

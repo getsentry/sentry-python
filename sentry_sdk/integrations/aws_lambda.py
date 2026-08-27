@@ -121,10 +121,6 @@ def _wrap_handler(handler: "F") -> "F":
                         request_data, aws_context, configured_time
                     )
                 )
-                scope.set_tag("aws_region", aws_region)
-                if batch_size > 1:
-                    scope.set_tag("batch_request", True)
-                    scope.set_tag("batch_size", batch_size)
 
                 # Starting the Timeout thread only if the configured time is greater than Timeout warning
                 # buffer and timeout_warning parameter is set True.

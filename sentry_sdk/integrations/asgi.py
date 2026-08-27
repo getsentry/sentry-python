@@ -299,9 +299,6 @@ class SentryAsgiMiddleware:
                                 origin=self.span_origin,
                             )
 
-                        if transaction:
-                            transaction.set_tag("asgi.type", ty)
-
                         span_ctx = (
                             sentry_sdk.start_transaction(
                                 transaction,
