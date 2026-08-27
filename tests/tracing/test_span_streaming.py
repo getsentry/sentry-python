@@ -1,7 +1,6 @@
 import re
 import sys
 import time
-import warnings
 from unittest import mock
 
 import pytest
@@ -446,20 +445,22 @@ def test_before_send_span_top_level_takes_precedence_over_experiments(
 
 
 def test_before_send_span_warns_without_span_streaming(sentry_init):
-    import warnings
+    from unittest import mock
 
     def before_send_span(span, hint):
         return span
 
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
+    with mock.patch("sentry_sdk.client.logger") as mock_logger:
         sentry_init(
             traces_sample_rate=1.0,
             before_send_span=before_send_span,
         )
 
-    (warning,) = [x for x in w if "before_send_span" in str(x.message)]
-    assert "trace_lifecycle" in str(warning.message)
+    warnings = [
+        c for c in mock_logger.warning.call_args_list if "before_send_span" in str(c)
+    ]
+    assert len(warnings) == 1
+    assert "trace_lifecycle" in str(warnings[0])
 
 
 def test_span_attributes(sentry_init, capture_items):
@@ -2023,13 +2024,11 @@ def test_top_level_trace_lifecycle_takes_precedence_over_experiments(
 
     items = capture_items("span")
 
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        with sentry_sdk.traces.start_span(name="segment") as segment:
-            if streaming_enabled:
-                assert isinstance(segment, StreamedSpan)
-            else:
-                assert isinstance(segment, NoOpStreamedSpan)
+    with sentry_sdk.traces.start_span(name="segment") as segment:
+        if streaming_enabled:
+            assert isinstance(segment, StreamedSpan)
+        else:
+            assert isinstance(segment, NoOpStreamedSpan)
 
     sentry_sdk.get_client().flush()
     spans = [item.payload for item in items]
