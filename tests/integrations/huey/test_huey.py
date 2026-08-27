@@ -75,7 +75,7 @@ def test_task_result(init_huey):
 
 
 @pytest.mark.parametrize("task_fails", [True, False], ids=["error", "success"])
-def test_task_transaction_or_segment(capture_items, init_huey, task_fails):
+def test_task_segment(capture_items, init_huey, task_fails):
     huey = init_huey()
 
     @huey.task()

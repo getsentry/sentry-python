@@ -91,16 +91,14 @@ def patch_enqueue() -> None:
                 }
             return old_enqueue(self, item)
 
-        span_ctx = sentry_sdk.traces.start_span(
+        with sentry_sdk.traces.start_span(
             name=span_name,
             attributes={
                 "sentry.op": OP.QUEUE_SUBMIT_HUEY,
                 "sentry.origin": HueyIntegration.origin,
                 SPANDATA.MESSAGING_DESTINATION_NAME: self.name,
             },
-        )
-
-        with span_ctx:
+        ):
             if not isinstance(item, no_headers_types):
                 # Attach trace propagation data to task kwargs. We do
                 # not do this for periodic tasks, as these don't
