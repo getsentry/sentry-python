@@ -1,8 +1,6 @@
 import re
 from unittest import mock
 
-import pytest
-
 import sentry_sdk
 from sentry_sdk import (
     capture_exception,
@@ -310,19 +308,3 @@ def test_set_tags(sentry_init, capture_events):
         "tag2": "updated",
         "tag3": "new",
     }, "Updating tags with empty dict changed tags"
-
-
-def test_init_context_manager_deprecation():
-    with pytest.warns(DeprecationWarning):
-        with sentry_sdk.init():
-            ...
-
-
-def test_init_enter_deprecation():
-    with pytest.warns(DeprecationWarning):
-        sentry_sdk.init().__enter__()
-
-
-def test_init_exit_deprecation():
-    with pytest.warns(DeprecationWarning):
-        sentry_sdk.init().__exit__(None, None, None)

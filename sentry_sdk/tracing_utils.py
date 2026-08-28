@@ -5,7 +5,6 @@ import os
 import re
 import sys
 import uuid
-import warnings
 from collections.abc import Mapping, MutableMapping
 from datetime import datetime, timedelta, timezone
 from random import Random
@@ -20,6 +19,7 @@ from sentry_sdk.utils import (
     _is_in_project_root,
     _module_in_list,
     capture_internal_exceptions,
+    deprecation_warning,
     filename_for_module,
     has_data_collection_enabled,
     is_sentry_url,
@@ -752,16 +752,6 @@ class Baggage:
         return Baggage(sentry_items, third_party_items, mutable)
 
     @classmethod
-    def from_options(cls, scope: "sentry_sdk.scope.Scope") -> "Optional[Baggage]":
-        """
-        Deprecated: use populate_from_propagation_context
-        """
-        if scope._propagation_context is None:
-            return Baggage({})
-
-        return Baggage.populate_from_propagation_context(scope._propagation_context)
-
-    @classmethod
     def populate_from_propagation_context(
         cls, propagation_context: "PropagationContext"
     ) -> "Baggage":
@@ -1049,10 +1039,8 @@ def create_span_decorator(
                 return await f(*args, **kwargs)
 
             if isinstance(current_span, StreamedSpan):
-                warnings.warn(
+                deprecation_warning(
                     "Use the @sentry_sdk.traces.trace decorator in span streaming mode.",
-                    DeprecationWarning,
-                    stacklevel=2,
                 )
                 return await f(*args, **kwargs)
 
@@ -1094,10 +1082,8 @@ def create_span_decorator(
                 return f(*args, **kwargs)
 
             if isinstance(current_span, StreamedSpan):
-                warnings.warn(
+                deprecation_warning(
                     "Use the @sentry_sdk.traces.trace decorator in span streaming mode.",
-                    DeprecationWarning,
-                    stacklevel=2,
                 )
                 return f(*args, **kwargs)
 
@@ -1155,10 +1141,9 @@ def create_streaming_span_decorator(
         async def async_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
             client = sentry_sdk.get_client()
             if client.is_active() and not has_span_streaming_enabled(client.options):
-                warnings.warn(
+                logger.warning(
                     "Using span streaming API in non-span-streaming mode. Use "
                     "@sentry_sdk.trace instead.",
-                    stacklevel=2,
                 )
 
             span_name = name or qualname_from_function(f) or ""
@@ -1178,10 +1163,9 @@ def create_streaming_span_decorator(
         def sync_wrapper(*args: "Any", **kwargs: "Any") -> "Any":
             client = sentry_sdk.get_client()
             if client.is_active() and not has_span_streaming_enabled(client.options):
-                warnings.warn(
+                logger.warning(
                     "Using span streaming API in non-span-streaming mode. Use "
                     "@sentry_sdk.trace instead.",
-                    stacklevel=2,
                 )
 
             span_name = name or qualname_from_function(f) or ""
