@@ -1,6 +1,6 @@
 import itertools
 from enum import Enum
-from typing import TYPE_CHECKING, Type
+from typing import TYPE_CHECKING
 
 DEFAULT_MAX_VALUE_LENGTH = None
 
@@ -35,6 +35,7 @@ if TYPE_CHECKING:
         Optional,
         Sequence,
         Tuple,
+        Type,
         Union,
     )
 
