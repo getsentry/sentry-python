@@ -2268,3 +2268,41 @@ async def test_client_url_query_data_collection_span_streaming(
         assert "url.query" not in inner_client_span["attributes"]
     else:
         assert inner_client_span["attributes"]["url.query"] == expected_query
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query", _QUERY_PARAM_DATA_COLLECTION_CASES
+)
+async def test_server_url_query_data_collection_event_processor(
+    sentry_init, aiohttp_client, capture_events, init_kwargs, expected_query
+):
+    init_kwargs = dict(init_kwargs)
+    sentry_init(integrations=[AioHttpIntegration()], **init_kwargs)
+
+    async def hello(request):
+        1 / 0
+
+    app = web.Application()
+    app.router.add_get("/", hello)
+
+    events = capture_events()
+
+    client = await aiohttp_client(app)
+    resp = await client.get("/?toy=tennisball&color=red&auth=secret")
+    assert resp.status == 500
+
+    (event,) = events
+
+    host = event["request"]["headers"]["Host"]
+    assert event["request"]["url"] == "http://{host}/".format(host=host)
+    assert event["request"]["method"] == "GET"
+
+    if "data_collection" not in init_kwargs.get("_experiments", {}):
+        assert (
+            event["request"]["query_string"] == "toy=tennisball&color=red&auth=secret"
+        )
+    elif expected_query is None:
+        assert "query_string" not in event["request"]
+    else:
+        assert event["request"]["query_string"] == expected_query

@@ -564,7 +564,21 @@ def _make_request_processor(
                 request.path,
             )
 
-            request_info["query_string"] = request.query_string
+            if has_data_collection_enabled(client_options):
+                if request.query_string:
+                    filtered_query_string = (
+                        _apply_data_collection_filtering_to_query_string(
+                            query_string=request.query_string,
+                            behaviour=client_options["data_collection"][
+                                "url_query_params"
+                            ],
+                        )
+                    )
+                    if filtered_query_string:
+                        request_info["query_string"] = filtered_query_string
+            else:
+                request_info["query_string"] = request.query_string
+
             request_info["method"] = request.method
             request_info["env"] = {"REMOTE_ADDR": request.remote}
             request_info["headers"] = _filter_headers(dict(request.headers))
