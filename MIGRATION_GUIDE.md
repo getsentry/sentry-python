@@ -45,7 +45,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The `level` integration option is now called `breadcrumb_level`.
 - The `sentry_logs_level` integration option is now called `level`.
 - The `capture_sentry_logs` option was removed. Use `level=None` to disable log capture.
-- The `ignore_logger` helper was renamed to `ignore_logger_for_breadcrumbs_and_events`.
+- The `ignore_logger` helper was renamed to `ignore_logger_for_events`.
 - The `ignore_logger_for_sentry_logs` helper was renamed to `ignore_logger`.
 - `SentryHandler` was removed. Use `EventHandler` instead.
 - When you enable the integration by adding `LoggingIntegration` to your `sentry_sdk.init()`, it'll start capturing Sentry logs and breadcrumbs. Creating events from logs can be enabled by providing additional integration options.
