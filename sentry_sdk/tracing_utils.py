@@ -750,16 +750,6 @@ class Baggage:
         return Baggage(sentry_items, third_party_items, mutable)
 
     @classmethod
-    def from_options(cls, scope: "sentry_sdk.scope.Scope") -> "Optional[Baggage]":
-        """
-        Deprecated: use populate_from_propagation_context
-        """
-        if scope._propagation_context is None:
-            return Baggage({})
-
-        return Baggage.populate_from_propagation_context(scope._propagation_context)
-
-    @classmethod
     def populate_from_propagation_context(
         cls, propagation_context: "PropagationContext"
     ) -> "Baggage":

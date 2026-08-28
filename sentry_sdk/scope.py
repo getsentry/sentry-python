@@ -67,7 +67,6 @@ if TYPE_CHECKING:
         Deque,
         Dict,
         Generator,
-        Iterator,
         List,
         Optional,
         ParamSpec,
@@ -572,18 +571,6 @@ class Scope:
             if self._propagation_context is None:
                 self.set_new_propagation_context()
 
-    def get_dynamic_sampling_context(self) -> "Optional[Dict[str, str]]":
-        """
-        Returns the Dynamic Sampling Context from the Propagation Context.
-        If not existing, creates a new one.
-
-        Deprecated: Logic moved to PropagationContext, don't use directly.
-        """
-        if self._propagation_context is None:
-            return None
-
-        return self._propagation_context.dynamic_sampling_context
-
     def get_traceparent(self, *args: "Any", **kwargs: "Any") -> "Optional[str]":
         """
         Returns the Sentry "sentry-trace" header (aka the traceparent) from the
@@ -655,26 +642,12 @@ class Scope:
         Return meta tags which should be injected into HTML templates
         to allow propagation of trace information.
         """
-        span = kwargs.pop("span", None)
-        if span is not None:
-            logger.warning(
-                "The parameter `span` in trace_propagation_meta() is deprecated and will be removed in the future."
-            )
-
         meta = ""
 
         for name, content in self.iter_trace_propagation_headers():
             meta += f'<meta name="{name}" content="{content}">'
 
         return meta
-
-    def iter_headers(self) -> "Iterator[Tuple[str, str]]":
-        """
-        Creates a generator which returns the `sentry-trace` and `baggage` headers from the Propagation Context.
-        Deprecated: use PropagationContext.iter_headers instead.
-        """
-        if self._propagation_context is not None:
-            yield from self._propagation_context.iter_headers()
 
     def iter_trace_propagation_headers(
         self, *args: "Any", **kwargs: "Any"
@@ -758,22 +731,6 @@ class Scope:
         self._attributes: "Attributes" = {}
 
         self._gen_ai_conversation_id: "Optional[str]" = None
-
-    @_attr_setter
-    def level(self, value: "LogLevelStr") -> None:
-        """
-        When set this overrides the level.
-
-        .. deprecated:: 1.0.0
-            Use :func:`set_level` instead.
-
-        :param value: The level to set.
-        """
-        logger.warning(
-            "Deprecated: use .set_level() instead. This will be removed in the future."
-        )
-
-        self._level = value
 
     def set_level(self, value: "LogLevelStr") -> None:
         """
@@ -860,14 +817,6 @@ class Scope:
 
         if source:
             self._transaction_info["source"] = source
-
-    @_attr_setter
-    def user(self, value: "Optional[Dict[str, Any]]") -> None:
-        """When set a specific user is bound to the scope. Deprecated in favor of set_user."""
-        deprecation_warning(
-            "The `Scope.user` setter is deprecated in favor of `Scope.set_user()`.",
-        )
-        self.set_user(value)
 
     def set_user(self, value: "Optional[Dict[str, Any]]") -> None:
         """Sets a user for the scope."""
