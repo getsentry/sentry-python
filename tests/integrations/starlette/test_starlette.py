@@ -1051,6 +1051,31 @@ def test_transaction_style(
     assert event["transaction_info"] == {"source": expected_source}
 
 
+def test_host_route_path_has_url_source(sentry_init, capture_events):
+    sentry_init(
+        integrations=[StarletteIntegration(transaction_style="url")],
+        traces_sample_rate=1.0,
+    )
+
+    async def hosted_endpoint(request):
+        return starlette.responses.JSONResponse({"status": "ok"})
+
+    subapp = starlette.applications.Starlette(
+        routes=[starlette.routing.Route("/users/{user_id}", hosted_endpoint)]
+    )
+    app = starlette.applications.Starlette(
+        routes=[starlette.routing.Host("subapp", subapp)]
+    )
+
+    events = capture_events()
+    client = TestClient(app)
+    client.get("/users/123456", headers={"Host": "subapp"})
+
+    (event,) = events
+    assert event["transaction"].endswith("/users/123456")
+    assert event["transaction_info"] == {"source": "url"}
+
+
 @pytest.mark.parametrize(
     "test_url,expected_error,expected_message",
     [
