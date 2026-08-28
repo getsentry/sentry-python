@@ -9,7 +9,6 @@ sentry_sdk.init(trace_lifecycle="stream").
 
 import sys
 import uuid
-import warnings
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -24,6 +23,7 @@ from sentry_sdk.profiler.continuous_profiler import (
 from sentry_sdk.tracing_utils import Baggage
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    deprecation_warning,
     format_attribute,
     get_current_thread_meta,
     logger,
@@ -170,11 +170,10 @@ def start_span(
 
     client = sentry_sdk.get_client()
     if client.is_active() and not has_span_streaming_enabled(client.options):
-        warnings.warn(
+        logger.warning(
             "Using span streaming API in non-span-streaming mode. Use "
             "sentry_sdk.start_transaction() and sentry_sdk.start_span() "
             "instead.",
-            stacklevel=2,
         )
         return NoOpStreamedSpan()
 
@@ -349,10 +348,8 @@ class StreamedSpan:
         self._end(end_timestamp)
 
     def finish(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
-        warnings.warn(
+        deprecation_warning(
             "span.finish() is deprecated. Use span.end() instead.",
-            stacklevel=2,
-            category=DeprecationWarning,
         )
 
         self.end(end_timestamp)
@@ -718,10 +715,8 @@ class NoOpStreamedSpan(StreamedSpan):
         self._end()
 
     def finish(self, end_timestamp: "Optional[Union[float, datetime]]" = None) -> None:
-        warnings.warn(
+        deprecation_warning(
             "span.finish() is deprecated. Use span.end() instead.",
-            stacklevel=2,
-            category=DeprecationWarning,
         )
 
         self._end()

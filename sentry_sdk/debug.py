@@ -1,6 +1,5 @@
 import logging
 import sys
-import warnings
 from logging import LogRecord
 
 from sentry_sdk import get_client
@@ -27,11 +26,3 @@ def configure_logger() -> None:
     logger.addHandler(_handler)
     logger.setLevel(logging.DEBUG)
     logger.addFilter(_DebugFilter())
-
-
-def configure_debug_hub() -> None:
-    warnings.warn(
-        "configure_debug_hub is deprecated. Please remove calls to it, as it is a no-op.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
