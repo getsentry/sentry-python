@@ -461,7 +461,8 @@ def _install_httplib() -> None:
 
     HTTPConnection.putrequest = putrequest  # type: ignore[method-assign]
     # patch `HTTPConnection.putrequest()` first. urllib3 < 1.25.9 inherits it, so
-    # wrapping AWS classes first would skip URL and span recording.
+    # wrapping AWS classes first would skip URL and span recording. Once boto3-v1.16.63
+    # support is dropped, we won't have to worry about this issue.
     _patch_aws_connection()
     HTTPConnection.getresponse = getresponse  # type: ignore[method-assign]
     HTTPResponse.read = read  # type: ignore[method-assign]

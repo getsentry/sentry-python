@@ -37,7 +37,6 @@ def _start_server():
 
 @pytest.mark.parametrize("span_streaming", [False, True])
 def test_botocore_merges_propagation_before_sigv4_signing(sentry_init, span_streaming):
-    """Merge `sentry-trace` and `baggage` before SigV4 signs them."""
     sentry_init(
         traces_sample_rate=1.0,
         trace_lifecycle="stream" if span_streaming else "static",
