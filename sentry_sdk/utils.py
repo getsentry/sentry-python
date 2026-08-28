@@ -87,6 +87,9 @@ BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 
 FALSY_ENV_VALUES = frozenset(("false", "f", "n", "no", "off", "0"))
 TRUTHY_ENV_VALUES = frozenset(("true", "t", "y", "yes", "on", "1"))
+_AWS_SIGV4_SIGNING_ALGORITHMS = frozenset(
+    ("AWS4-HMAC-SHA256", "AWS4-ECDSA-P256-SHA256")
+)
 
 MAX_STACK_FRAMES = 2000
 """Maximum number of stack frames to send to Sentry.
@@ -1708,6 +1711,40 @@ def parse_url(url: str, sanitize: bool = True) -> "ParsedUrl":
         query=parsed_url.query,  # type: ignore
         fragment=parsed_url.fragment,  # type: ignore
     )
+
+
+def _get_aws_sigv4_signed_headers_from_authorization_header(
+    authorization: str,
+) -> "Set[str]":
+    # only AWS SigV4 authorization has the SignedHeaders parameter.
+    value = authorization.lstrip()
+    algorithm, _, parameters = value.partition(" ")
+    if algorithm not in _AWS_SIGV4_SIGNING_ALGORITHMS:
+        return set()
+
+    for part in parameters.split(","):
+        part = part.strip()
+        if part.startswith("SignedHeaders="):
+            _, _, header_names = part.partition("=")
+            return {header.lower() for header in header_names.split(";") if header}
+
+    return set()
+
+
+def _get_aws_sigv4_signed_headers_from_url_query_string(url: str) -> "Set[str]":
+    query = {
+        key.lower(): values for key, values in parse_qs(urlsplit(url).query).items()
+    }
+    algorithm = query.get("x-amz-algorithm", [""])[0]
+    if algorithm not in _AWS_SIGV4_SIGNING_ALGORITHMS:
+        return set()
+
+    # presigned requests have SignedHeaders in the URL query.
+    return {
+        header.lower()
+        for header in query.get("x-amz-signedheaders", [""])[0].split(";")
+        if header
+    }
 
 
 def is_valid_sample_rate(rate: "Any", source: str) -> bool:

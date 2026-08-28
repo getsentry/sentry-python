@@ -10,7 +10,7 @@ from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import add_global_event_processor, should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing import Span
+from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, SENTRY_TRACE_HEADER_NAME, Span
 from sentry_sdk.tracing_utils import (
     EnvironHeaders,
     add_http_breadcrumb,
@@ -20,6 +20,8 @@ from sentry_sdk.tracing_utils import (
 )
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
+    _get_aws_sigv4_signed_headers_from_authorization_header,
+    _get_aws_sigv4_signed_headers_from_url_query_string,
     capture_internal_exceptions,
     ensure_integration_enabled,
     is_sentry_url,
@@ -29,7 +31,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, List, Optional, Union
+    from typing import Any, Callable, Dict, List, Optional, Set, Union
 
     from sentry_sdk._types import Event, Hint
 
@@ -39,6 +41,14 @@ _RUNTIME_CONTEXT: "dict[str, object]" = {
     "version": "%s.%s.%s" % (sys.version_info[:3]),
     "build": sys.version,
 }
+
+_SENTRY_HEADER_NAMES = frozenset((BAGGAGE_HEADER_NAME, SENTRY_TRACE_HEADER_NAME))
+
+try:
+    from botocore.awsrequest import AWSHTTPConnection, AWSHTTPSConnection
+except ImportError:
+    AWSHTTPConnection = None  # type: ignore[misc,assignment]
+    AWSHTTPSConnection = None  # type: ignore[misc,assignment]
 
 
 class StdlibIntegration(Integration):
@@ -71,6 +81,164 @@ def _complete_span(span: "Union[Span, StreamedSpan]") -> None:
         span.finish()
         with capture_internal_exceptions():
             add_http_request_source(span)
+
+
+def _get_wrapped_putheader(
+    original_putheader: "Callable[..., Any]",
+) -> "Callable[..., Any]":
+    """Record existing `sentry-trace` and SigV4-signed propagation headers to skip."""
+
+    def putheader(self: "HTTPConnection", header: "Any", *values: "Any") -> "Any":
+        rv = original_putheader(self, header, *values)
+
+        headers_to_skip: "Optional[Set[str]]" = getattr(
+            self, "_sentrysdk_headers_to_skip", None
+        )
+        if headers_to_skip is None:
+            return rv
+
+        if isinstance(header, bytes):
+            normalized_header = header.decode("ascii", "ignore").lower()
+        elif isinstance(header, str):
+            normalized_header = header.lower()
+        else:
+            return rv
+
+        # existing `sentry-trace`: skip so it is not duplicated.
+        if normalized_header == SENTRY_TRACE_HEADER_NAME:
+            headers_to_skip.add(normalized_header)
+
+        if normalized_header == "authorization" and values:
+            with capture_internal_exceptions():
+                authorization = values[0]
+                if isinstance(authorization, bytes):
+                    authorization = authorization.decode("latin-1")
+                # `SignedHeaders` lists fields covered by SigV4.
+                signed_headers = (
+                    _get_aws_sigv4_signed_headers_from_authorization_header(
+                        authorization
+                    )
+                )
+                # skip signed `sentry-trace` and `baggage`.
+                headers_to_skip.update(
+                    _SENTRY_HEADER_NAMES.intersection(signed_headers)
+                )
+
+        return rv
+
+    return putheader
+
+
+def _get_wrapped_endheaders(
+    original_endheaders: "Callable[..., Any]",
+) -> "Callable[..., Any]":
+    """
+    Add unsigned propagation headers immediately before sending.
+
+    `sentry-trace`: add if missing; leave an existing or signed value as-is.
+    `baggage`: add if missing; append if unsigned since multiple fields are
+    allowed and combined (https://www.w3.org/TR/baggage/#baggage-http-header-format);
+    leave a signed value as-is since it is part of the SigV4 signature.
+    """
+
+    def endheaders(self: "HTTPConnection", *args: "Any", **kwargs: "Any") -> "Any":
+        real_url = getattr(self, "_sentrysdk_real_url", None)
+        span = getattr(self, "_sentrysdk_span", None)
+
+        try:
+            if real_url is not None:
+                with capture_internal_exceptions():
+                    headers_to_skip = getattr(self, "_sentrysdk_headers_to_skip", None)
+
+                    if headers_to_skip is not None:
+                        # presigned URLs list signed names in the query string.
+                        query_signed_headers = (
+                            _get_aws_sigv4_signed_headers_from_url_query_string(
+                                real_url
+                            )
+                        )
+                        headers_to_skip.update(
+                            _SENTRY_HEADER_NAMES.intersection(query_signed_headers)
+                        )
+
+                        for (
+                            header_name,
+                            header_value,
+                        ) in sentry_sdk.get_current_scope().iter_trace_propagation_headers(
+                            span=span
+                        ):
+                            # skip signed headers and an existing `sentry-trace`.
+                            if header_name.lower() in headers_to_skip:
+                                continue
+
+                            logger.debug(
+                                "[Tracing] Adding `{key}` header {value} to outgoing request to {real_url}.".format(
+                                    key=header_name,
+                                    value=header_value,
+                                    real_url=real_url,
+                                )
+                            )
+                            self.putheader(header_name, header_value)
+            return original_endheaders(self, *args, **kwargs)
+        finally:
+            self._sentrysdk_real_url = None  # type: ignore[attr-defined]
+
+    return endheaders
+
+
+def _get_wrapped_putrequest(
+    original_putrequest: "Callable[..., Any]",
+) -> "Callable[..., Any]":
+    """Start `headers_to_skip` before headers are written."""
+
+    def putrequest(
+        self: "HTTPConnection", method: str, url: str, *args: "Any", **kwargs: "Any"
+    ) -> "Any":
+        # existing `sentry-trace` and SigV4-signed propagation headers are skipped.
+        self._sentrysdk_headers_to_skip = set()  # type: ignore[attr-defined]
+
+        try:
+            rv = original_putrequest(self, method, url, *args, **kwargs)
+        except BaseException:
+            # do not leave partial request state on a reusable connection when
+            # the underlying request setup fails.
+            self._sentrysdk_headers_to_skip = None  # type: ignore[attr-defined]
+            raise
+
+        return rv
+
+    return putrequest
+
+
+def _patch_aws_connection() -> None:
+    """
+    Patch AWS connection classes so trace propagation does not break SigV4.
+
+    Botocore signs the request before headers reach HTTPConnection. Wait until
+    `endheaders()` to add unsigned propagation headers, after `putheader()` has
+    recorded existing `sentry-trace` and signed field names.
+    """
+    if AWSHTTPConnection is not None:
+        AWSHTTPConnection.putheader = _get_wrapped_putheader(  # type: ignore[method-assign]
+            AWSHTTPConnection.putheader
+        )
+        AWSHTTPConnection.endheaders = _get_wrapped_endheaders(  # type: ignore[method-assign]
+            AWSHTTPConnection.endheaders
+        )
+        AWSHTTPConnection.putrequest = _get_wrapped_putrequest(  # type: ignore[method-assign]
+            AWSHTTPConnection.putrequest
+        )
+
+    if AWSHTTPSConnection is not None:
+        AWSHTTPSConnection.putheader = _get_wrapped_putheader(  # type: ignore[method-assign]
+            AWSHTTPSConnection.putheader
+        )
+        AWSHTTPSConnection.endheaders = _get_wrapped_endheaders(  # type: ignore[method-assign]
+            AWSHTTPSConnection.endheaders
+        )
+        AWSHTTPSConnection.putrequest = _get_wrapped_putrequest(  # type: ignore[method-assign]
+            AWSHTTPSConnection.putrequest
+        )
 
 
 def _install_httplib() -> None:
@@ -189,7 +357,11 @@ def _install_httplib() -> None:
 
         rv = real_putrequest(self, method, url, *args, **kwargs)
 
-        if should_propagate_trace(client, real_url):
+        # if `_sentrysdk_headers_to_skip` is set, inject headers in `endheaders()`
+        # after botocore has supplied the final headers.
+        if should_propagate_trace(client, real_url) and not hasattr(
+            self, "_sentrysdk_headers_to_skip"
+        ):
             for (
                 key,
                 value,
@@ -202,6 +374,8 @@ def _install_httplib() -> None:
                     )
                 )
                 self.putheader(key, value)
+        elif should_propagate_trace(client, real_url):
+            self._sentrysdk_real_url = real_url  # type: ignore[attr-defined]
 
         self._sentrysdk_span = span  # type: ignore[attr-defined]
         self._sentrysdk_breadcrumb = breadcrumb  # type: ignore[attr-defined]
@@ -286,6 +460,10 @@ def _install_httplib() -> None:
                 _complete_span(span)
 
     HTTPConnection.putrequest = putrequest  # type: ignore[method-assign]
+    # patch `HTTPConnection.putrequest()` first. urllib3 < 1.25.9 inherits it, so
+    # wrapping AWS classes first would skip URL and span recording. Once boto3-v1.16.63
+    # support is dropped, we won't have to worry about this issue.
+    _patch_aws_connection()
     HTTPConnection.getresponse = getresponse  # type: ignore[method-assign]
     HTTPResponse.read = read  # type: ignore[method-assign]
     HTTPResponse.close = close  # type: ignore[assignment,method-assign]
