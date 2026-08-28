@@ -84,6 +84,7 @@ if TYPE_CHECKING:
     )
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from sentry_sdk.traces import StreamedSpan
+    from sentry_sdk.tracing import Span
 
 
 TRANSACTION_STYLE_VALUES = ("function_name", "url")
@@ -844,7 +845,7 @@ def install_sql_hook() -> None:
 
 
 def _set_db_data(
-    span: "StreamedSpan",
+    span: "Union[Span, StreamedSpan]",
     cursor_or_db: "Any",
     db_operation: "Optional[str]" = None,
 ) -> None:
