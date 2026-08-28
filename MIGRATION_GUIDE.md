@@ -24,6 +24,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The UnraisableHookIntegration is now enabled by default.
 - We now don't suppress chained exceptions in the ASGI and asyncio integrations by default. The related `suppress_asgi_chained_exceptions` experimental option was removed.
 - In the AWS Lambda and GCP integrations, the message of the warning the SDK optionally emits if a function is about to time out has changed.
+- `sentry_sdk.init()` can no longer be used as a context manager.
 
 ### Logging
 
@@ -145,8 +146,18 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The deprecated `propagate_traces` option has been removed. Use `trace_propagation_targets` instead, which gives you more power over trace propagation. Note that only the top-level `init` option was removed; the `propagate_traces` option of the Celery integration remains available.
 - Removed Spotlight integration for Django. See [Spotlight 2.0](https://github.com/getsentry/spotlight/issues/891) for more context.
 - The deprecated parameter `propagate_hub` in `ThreadingIntegration()` was removed.
+- `configure_debug_hub` was removed.
+- The `max_spans` option of the `LangchainIntegration` was removed.
+- `Baggage.from_options` was removed.
+- `Transport.capture_event` was removed. Use `Transport.capture_envelope` instead.
+- Function transports were removed.
+- The `Scope.trace_propagation_meta` function no longer accepts a `span` as argument.
+- Direct assignment to `Scope.level` was removed. Use `Scope.set_level` instead.
+- Direct assignment to `Scope.user` was removed. Use `Scope.set_user` instead.
+- `Scope.iter_headers` was removed.
 - The SDK won't set any tags on its own anymore.
 - The `update_current_span` API was removed.
+
 
 ## Deprecated
 
