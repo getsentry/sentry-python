@@ -1,5 +1,4 @@
 import functools
-import warnings
 from inspect import isawaitable
 
 import sentry_sdk
@@ -13,6 +12,7 @@ from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
     has_data_collection_enabled,
+    logger,
     package_version,
 )
 
@@ -95,9 +95,8 @@ def _patch_schema_init() -> None:
             should_use_async_extension = _guess_if_using_async(extensions)
 
             if should_use_async_extension is None:
-                warnings.warn(
+                logger.warning(
                     "Assuming strawberry is running sync. If not, initialize the integration as StrawberryIntegration(async_execution=True).",
-                    stacklevel=2,
                 )
                 should_use_async_extension = False
 

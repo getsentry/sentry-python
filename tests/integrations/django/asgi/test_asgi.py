@@ -59,6 +59,8 @@ async def test_basic(
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
+    from unittest import mock
+
     import channels  # type: ignore[import-not-found]
 
     if span_streaming:
@@ -70,13 +72,14 @@ async def test_basic(
             and django.VERSION >= (3, 0)
             and django.VERSION < (4, 0)
         ):
-            # We emit a UserWarning for channels 2.x and 3.x on Python 3.8 and older
+            # We log a warning for channels 2.x and 3.x on Python 3.8 and older
             # because the async support was not really good back then and there is a known issue.
-            # See the TreadingIntegration for details.
-            with pytest.warns(UserWarning):
+            # See the ThreadingIntegration for details.
+            with mock.patch("sentry_sdk.integrations.threading.logger") as mock_logger:
                 comm = HttpCommunicator(application, "GET", "/view-exc?test=query")
                 response = await comm.get_response()
                 await comm.wait()
+                mock_logger.warning.assert_called()
         else:
             comm = HttpCommunicator(application, "GET", "/view-exc?test=query")
             response = await comm.get_response()
@@ -111,13 +114,14 @@ async def test_basic(
             and django.VERSION >= (3, 0)
             and django.VERSION < (4, 0)
         ):
-            # We emit a UserWarning for channels 2.x and 3.x on Python 3.8 and older
+            # We log a warning for channels 2.x and 3.x on Python 3.8 and older
             # because the async support was not really good back then and there is a known issue.
-            # See the TreadingIntegration for details.
-            with pytest.warns(UserWarning):
+            # See the ThreadingIntegration for details.
+            with mock.patch("sentry_sdk.integrations.threading.logger") as mock_logger:
                 comm = HttpCommunicator(application, "GET", "/view-exc?test=query")
                 response = await comm.get_response()
                 await comm.wait()
+                mock_logger.warning.assert_called()
         else:
             comm = HttpCommunicator(application, "GET", "/view-exc?test=query")
             response = await comm.get_response()
