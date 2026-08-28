@@ -1,9 +1,12 @@
 from contextlib import contextmanager
-from typing import Any, Generator
+from typing import TYPE_CHECKING, Any, Generator
 
 import sentry_sdk
 from sentry_sdk import start_span
 from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.data_collection import (
+    _apply_data_collection_filtering_to_query_string,
+)
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
@@ -19,9 +22,17 @@ from sentry_sdk.tracing_utils import (
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
+    has_data_collection_enabled,
     logger,
     parse_url,
 )
+
+if TYPE_CHECKING:
+    from typing import Optional
+
+    from sentry_sdk._types import Attributes
+    from sentry_sdk.client import BaseClient
+    from sentry_sdk.utils import ParsedUrl
 
 try:
     from pyreqwest.client import (  # type: ignore[import-not-found]
@@ -86,8 +97,63 @@ def _patch_builder_method(cls: type, method_name: str, middleware: "Any") -> Non
     setattr(cls, method_name, sentry_patched_method)
 
 
+def _get_url_attributes(
+    client: "BaseClient", parsed_url: "Optional[ParsedUrl]"
+) -> "Attributes":
+    attributes: "Attributes" = {}
+    if parsed_url is None:
+        return attributes
+
+    query: "Optional[str]"
+    if has_data_collection_enabled(client.options):
+        query = None
+        if parsed_url.query:
+            query = _apply_data_collection_filtering_to_query_string(
+                query_string=parsed_url.query,
+                behaviour=client.options["data_collection"]["url_query_params"],
+            )
+    elif should_send_default_pii():
+        query = parsed_url.query
+    else:
+        return attributes
+
+    url_full = parsed_url.url
+    if query:
+        attributes[SPANDATA.URL_QUERY] = query
+        url_full += "?" + query
+
+    if parsed_url.fragment:
+        attributes[SPANDATA.URL_FRAGMENT] = parsed_url.fragment
+        url_full += "#" + parsed_url.fragment
+
+    attributes[SPANDATA.URL_FULL] = url_full
+
+    return attributes
+
+
+def _get_breadcrumb_url_data(
+    parsed_url: "Optional[ParsedUrl]", url_attributes: "Attributes"
+) -> "dict[str, Any]":
+    if parsed_url is None or not url_attributes:
+        return {}
+
+    # Legacy spans keep the bare URL in breadcrumbs; only span streaming
+    # reports the full URL
+    url = parsed_url.url
+    if has_span_streaming_enabled(sentry_sdk.get_client().options):
+        url = url_attributes.get(SPANDATA.URL_FULL, url)
+
+    return {
+        "url": url,
+        SPANDATA.HTTP_QUERY: url_attributes.get(SPANDATA.URL_QUERY, ""),
+        SPANDATA.HTTP_FRAGMENT: url_attributes.get(SPANDATA.URL_FRAGMENT, ""),
+    }
+
+
 @contextmanager
-def _sentry_pyreqwest_span(request: "Request") -> "Generator[Any, None, None]":
+def _sentry_pyreqwest_span(
+    request: "Request", url_attributes: "Attributes"
+) -> "Generator[Any, None, None]":
     parsed_url = None
     with capture_internal_exceptions():
         parsed_url = parse_url(str(request.url), sanitize=False)
@@ -107,10 +173,8 @@ def _sentry_pyreqwest_span(request: "Request") -> "Generator[Any, None, None]":
                 SPANDATA.HTTP_REQUEST_METHOD: request.method,
             },
         ) as span:
-            if parsed_url is not None and should_send_default_pii():
-                span.set_attribute(SPANDATA.URL_FULL, parsed_url.url)
-                span.set_attribute(SPANDATA.URL_QUERY, parsed_url.query)
-                span.set_attribute(SPANDATA.URL_FRAGMENT, parsed_url.fragment)
+            for key, value in url_attributes.items():
+                span.set_attribute(key, value)
 
             propagate_trace_headers(client=sentry_sdk.get_client(), request=request)
 
@@ -169,8 +233,10 @@ async def sentry_async_middleware(
         # after the request has been sent
         parsed_url = parse_url(str(request.url), sanitize=False)
 
+    url_attributes = _get_url_attributes(sentry_sdk.get_client(), parsed_url)
+
     response = None
-    with _sentry_pyreqwest_span(request) as span:
+    with _sentry_pyreqwest_span(request, url_attributes) as span:
         response = await next_handler.run(request)
         if isinstance(span, StreamedSpan):
             span.status = "error" if response.status >= 400 else "ok"
@@ -187,14 +253,7 @@ async def sentry_async_middleware(
             SPANDATA.HTTP_STATUS_CODE: response.status,
         }
 
-        if parsed_url and should_send_default_pii():
-            breadcrumb_data.update(
-                {
-                    "url": parsed_url.url,
-                    SPANDATA.HTTP_QUERY: parsed_url.query,
-                    SPANDATA.HTTP_FRAGMENT: parsed_url.fragment,
-                }
-            )
+        breadcrumb_data.update(_get_breadcrumb_url_data(parsed_url, url_attributes))
 
         add_http_breadcrumb(response.status, breadcrumb_data)
 
@@ -214,8 +273,10 @@ def sentry_sync_middleware(
         # after the request has been sent
         parsed_url = parse_url(str(request.url), sanitize=False)
 
+    url_attributes = _get_url_attributes(sentry_sdk.get_client(), parsed_url)
+
     response = None
-    with _sentry_pyreqwest_span(request) as span:
+    with _sentry_pyreqwest_span(request, url_attributes) as span:
         response = next_handler.run(request)
         if isinstance(span, StreamedSpan):
             span.status = "error" if response.status >= 400 else "ok"
@@ -232,14 +293,7 @@ def sentry_sync_middleware(
             SPANDATA.HTTP_STATUS_CODE: response.status,
         }
 
-        if parsed_url and should_send_default_pii():
-            breadcrumb_data.update(
-                {
-                    "url": parsed_url.url,
-                    SPANDATA.HTTP_QUERY: parsed_url.query,
-                    SPANDATA.HTTP_FRAGMENT: parsed_url.fragment,
-                }
-            )
+        breadcrumb_data.update(_get_breadcrumb_url_data(parsed_url, url_attributes))
 
         add_http_breadcrumb(response.status, breadcrumb_data)
 
