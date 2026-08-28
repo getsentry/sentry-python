@@ -40,7 +40,16 @@ from sentry_sdk.utils import (
 
 if TYPE_CHECKING:
     from types import FrameType
-    from typing import Any, Dict, Generator, Iterator, Optional, Tuple, Union
+    from typing import (
+        Any,
+        Dict,
+        Generator,
+        Iterator,
+        Literal,
+        Optional,
+        Tuple,
+        Union,
+    )
 
     from sentry_sdk._types import Attributes
 
@@ -1036,7 +1045,7 @@ def create_span_decorator(
         use cases.
     :type template: :py:class:`sentry_sdk.consts.SPANTEMPLATE`
     """
-    from sentry_sdk.scope import should_send_default_pii
+    is_ai_template = template in _AI_TEMPLATES
 
     def span_decorator(f: "Any") -> "Any":
         """
@@ -1066,7 +1075,8 @@ def create_span_decorator(
             span_op = op or _get_span_op(template)
             function_name = name or qualname_from_function(f) or ""
             span_name = _get_span_name(template, function_name, kwargs)
-            send_pii = should_send_default_pii()
+            collect_inputs = is_ai_template and _should_collect_gen_ai("inputs")
+            collect_outputs = is_ai_template and _should_collect_gen_ai("outputs")
 
             with current_span.start_child(
                 op=span_op,
@@ -1074,12 +1084,12 @@ def create_span_decorator(
             ) as span:
                 span.update_data(attributes or {})
                 _set_input_attributes(
-                    span, template, send_pii, function_name, f, args, kwargs
+                    span, template, collect_inputs, function_name, f, args, kwargs
                 )
 
                 result = await f(*args, **kwargs)
 
-                _set_output_attributes(span, template, send_pii, result)
+                _set_output_attributes(span, template, collect_outputs, result)
 
                 return result
 
@@ -1111,7 +1121,8 @@ def create_span_decorator(
             span_op = op or _get_span_op(template)
             function_name = name or qualname_from_function(f) or ""
             span_name = _get_span_name(template, function_name, kwargs)
-            send_pii = should_send_default_pii()
+            collect_inputs = is_ai_template and _should_collect_gen_ai("inputs")
+            collect_outputs = is_ai_template and _should_collect_gen_ai("outputs")
 
             with current_span.start_child(
                 op=span_op,
@@ -1119,12 +1130,12 @@ def create_span_decorator(
             ) as span:
                 span.update_data(attributes or {})
                 _set_input_attributes(
-                    span, template, send_pii, function_name, f, args, kwargs
+                    span, template, collect_inputs, function_name, f, args, kwargs
                 )
 
                 result = f(*args, **kwargs)
 
-                _set_output_attributes(span, template, send_pii, result)
+                _set_output_attributes(span, template, collect_outputs, result)
 
                 return result
 
@@ -1329,9 +1340,22 @@ def _get_span_op(template: "Union[str, SPANTEMPLATE]") -> str:
     return str(op)
 
 
+_AI_TEMPLATES = frozenset(
+    {SPANTEMPLATE.AI_AGENT, SPANTEMPLATE.AI_CHAT, SPANTEMPLATE.AI_TOOL}
+)
+
+
+def _should_collect_gen_ai(kind: 'Literal["inputs", "outputs"]') -> bool:
+    client = sentry_sdk.get_client()
+    if has_data_collection_enabled(client.options):
+        return bool(client.options["data_collection"]["gen_ai"][kind])
+
+    return client.should_send_default_pii()
+
+
 def _get_input_attributes(
     template: "Union[str, SPANTEMPLATE]",
-    send_pii: bool,
+    collect_inputs: bool,
     args: "tuple[Any, ...]",
     kwargs: "dict[str, Any]",
 ) -> "dict[str, Any]":
@@ -1340,7 +1364,7 @@ def _get_input_attributes(
     """
     attributes: "dict[str, Any]" = {}
 
-    if template in [SPANTEMPLATE.AI_AGENT, SPANTEMPLATE.AI_TOOL, SPANTEMPLATE.AI_CHAT]:
+    if template in _AI_TEMPLATES:
         mapping = {
             "model": (SPANDATA.GEN_AI_REQUEST_MODEL, str),
             "model_name": (SPANDATA.GEN_AI_REQUEST_MODEL, str),
@@ -1360,22 +1384,25 @@ def _get_input_attributes(
                 if value is not None and isinstance(value, data_type):
                     attributes[attribute] = value
 
-        for key, value in list(kwargs.items()):
-            if key == "prompt" and isinstance(value, str):
-                attributes.setdefault(SPANDATA.GEN_AI_REQUEST_MESSAGES, []).append(
-                    {"role": "user", "content": value}
-                )
-                continue
+        # Pre-data collection, prompts were always recorded here, so they stay
+        # ungated until `send_default_pii` is removed.
+        collect_messages = True
+        if has_data_collection_enabled(sentry_sdk.get_client().options):
+            collect_messages = collect_inputs
 
-            if key == "system_prompt" and isinstance(value, str):
-                attributes.setdefault(SPANDATA.GEN_AI_REQUEST_MESSAGES, []).append(
-                    {"role": "system", "content": value}
-                )
+        roles = {"prompt": "user", "system_prompt": "system"}
+
+        for key, value in list(kwargs.items()):
+            if key in roles:
+                if collect_messages and isinstance(value, str):
+                    attributes.setdefault(SPANDATA.GEN_AI_REQUEST_MESSAGES, []).append(
+                        {"role": roles[key], "content": value}
+                    )
                 continue
 
             _set_from_key(key, value)
 
-    if template == SPANTEMPLATE.AI_TOOL and send_pii:
+    if template == SPANTEMPLATE.AI_TOOL and collect_inputs:
         attributes[SPANDATA.GEN_AI_TOOL_INPUT] = safe_repr(
             {"args": args, "kwargs": kwargs}
         )
@@ -1418,14 +1445,14 @@ def _get_usage_attributes(usage: "Any") -> "dict[str, Any]":
 
 
 def _get_output_attributes(
-    template: "Union[str, SPANTEMPLATE]", send_pii: bool, result: "Any"
+    template: "Union[str, SPANTEMPLATE]", collect_outputs: bool, result: "Any"
 ) -> "dict[str, Any]":
     """
     Get output attributes for the given span template.
     """
     attributes: "dict[str, Any]" = {}
 
-    if template in [SPANTEMPLATE.AI_AGENT, SPANTEMPLATE.AI_TOOL, SPANTEMPLATE.AI_CHAT]:
+    if template in _AI_TEMPLATES:
         with capture_internal_exceptions():
             # Usage from result, result.usage, and result.metadata.usage
             usage_candidates = [result]
@@ -1451,7 +1478,7 @@ def _get_output_attributes(
                 attributes[SPANDATA.GEN_AI_RESPONSE_MODEL] = model_name
 
     # Tool output
-    if template == SPANTEMPLATE.AI_TOOL and send_pii:
+    if template == SPANTEMPLATE.AI_TOOL and collect_outputs:
         attributes[SPANDATA.GEN_AI_TOOL_OUTPUT] = safe_repr(result)
 
     return attributes
@@ -1460,7 +1487,7 @@ def _get_output_attributes(
 def _set_input_attributes(
     span: "Span",
     template: "Union[str, SPANTEMPLATE]",
-    send_pii: bool,
+    collect_inputs: bool,
     name: str,
     f: "Any",
     args: "tuple[Any, ...]",
@@ -1471,7 +1498,7 @@ def _set_input_attributes(
 
     :param span: The span to set attributes on.
     :param template: The template to use to set attributes on the span.
-    :param send_pii: Whether to send PII data.
+    :param collect_inputs: Whether gen_ai inputs may be collected.
     :param f: The wrapped function.
     :param args: The arguments to the wrapped function.
     :param kwargs: The keyword arguments to the wrapped function.
@@ -1497,22 +1524,25 @@ def _set_input_attributes(
         if docstring is not None:
             attributes[SPANDATA.GEN_AI_TOOL_DESCRIPTION] = docstring
 
-    attributes.update(_get_input_attributes(template, send_pii, args, kwargs))
+    attributes.update(_get_input_attributes(template, collect_inputs, args, kwargs))
     span.update_data(attributes or {})
 
 
 def _set_output_attributes(
-    span: "Span", template: "Union[str, SPANTEMPLATE]", send_pii: bool, result: "Any"
+    span: "Span",
+    template: "Union[str, SPANTEMPLATE]",
+    collect_outputs: bool,
+    result: "Any",
 ) -> None:
     """
     Set span output attributes based on the given span template.
 
     :param span: The span to set attributes on.
     :param template: The template to use to set attributes on the span.
-    :param send_pii: Whether to send PII data.
+    :param collect_outputs: Whether gen_ai outputs may be collected.
     :param result: The result of the wrapped function.
     """
-    span.update_data(_get_output_attributes(template, send_pii, result) or {})
+    span.update_data(_get_output_attributes(template, collect_outputs, result) or {})
 
 
 def _should_continue_trace(baggage: "Optional[Baggage]") -> bool:
