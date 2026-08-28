@@ -848,6 +848,11 @@ def _set_db_data(
     cursor_or_db: "Any",
     db_operation: "Optional[str]" = None,
 ) -> None:
+    # TODO: remove this once record_sql_queries drops support for old spans
+    from sentry_sdk.traces import StreamedSpan
+
+    if not isinstance(span, StreamedSpan):
+        return
     db = cursor_or_db.db if hasattr(cursor_or_db, "db") else cursor_or_db
     vendor = db.vendor
     span.set_attribute(SPANDATA.DB_SYSTEM_NAME, vendor)

@@ -136,6 +136,8 @@ def record_sql_queries(
     span_op_override_value: "Optional[str]" = None,
 ) -> "Generator[Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan], None, None]":
     # TODO: Bring back capturing of params by default
+    # TODO: Once we drop span streaming from this, remove the hack from django's
+    # _set_db_data
     client = sentry_sdk.get_client()
     if has_data_collection_enabled(client.options):
         if client.options["data_collection"]["database_query_data"]:

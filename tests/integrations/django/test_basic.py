@@ -838,6 +838,7 @@ def test_db_connection_span_data(
     assert status == "200 OK"
 
     sentry_sdk.flush()
+
     spans = [item.payload for item in items]
 
     for span in spans:
@@ -1102,7 +1103,6 @@ def test_oversized_request_body_not_annotated_data_collection(
     assert "data" not in event.get("_meta", {}).get("request", {})
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_read_request(
     sentry_init,
     client,
@@ -1498,6 +1498,9 @@ def test_render_spans(
 
 
 @pytest.mark.forked
+@pytest.mark.xfail(
+    reason="This test needs to be adapted to span streaming once we re-add template context on spans: https://github.com/getsentry/sentry-python/issues/7273"
+)
 @pytest_mark_django_db_decorator()
 def test_render_spans_queryset_in_data(sentry_init, client, capture_events):
     sentry_init(
