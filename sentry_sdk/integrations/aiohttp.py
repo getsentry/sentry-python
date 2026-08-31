@@ -566,7 +566,14 @@ def _make_request_processor(
 
             request_info["query_string"] = request.query_string
             request_info["method"] = request.method
-            request_info["env"] = {"REMOTE_ADDR": request.remote}
+
+            # REMOTE_ADDR was unconditionally set pre-data collection, so it
+            # continues to be set when data collection is not enabled.
+            if (
+                not has_data_collection_enabled(client_options)
+                or client_options["data_collection"]["user_info"]
+            ):
+                request_info["env"] = {"REMOTE_ADDR": request.remote}
             request_info["headers"] = _filter_headers(dict(request.headers))
 
             # Just attach raw data here if it is within bounds, if available.

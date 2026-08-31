@@ -16,7 +16,10 @@ from sentry_sdk import capture_message
 from sentry_sdk.integrations.sanic import SanicIntegration
 from sentry_sdk.tracing import TransactionSource
 from tests.conftest import get_free_port
-from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
+from tests.integrations.utils import (
+    DATA_COLLECTION_REMOTE_ADDR_CASES,
+    DATA_COLLECTION_USER_INFO_CASES,
+)
 
 try:
     from sanic_testing import TestManager
@@ -874,3 +877,24 @@ def test_oversized_request_body_not_annotated_data_collection(
 
     assert "data" not in event["request"]
     assert "data" not in event.get("_meta", {}).get("request", {})
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expect_remote_addr", DATA_COLLECTION_REMOTE_ADDR_CASES
+)
+def test_remote_addr_data_collection(
+    sentry_init, app, capture_events, init_kwargs, expect_remote_addr
+):
+    sentry_init(integrations=[SanicIntegration()], **init_kwargs)
+    events = capture_events()
+
+    c = get_client(app)
+    with c as client:
+        _, response = client.get("/message")
+        assert response.status == 200
+
+    (event,) = events
+    if expect_remote_addr:
+        assert event["request"]["env"] == {"REMOTE_ADDR": ""}
+    else:
+        assert "env" not in event["request"]
