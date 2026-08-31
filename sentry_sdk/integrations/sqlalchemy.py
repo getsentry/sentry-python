@@ -79,8 +79,9 @@ def _after_cursor_execute(
 
     # Record query source immediately before span is finished: accurate end timestamp and before the span is flushed.
     span: "Optional[StreamedSpan]" = getattr(context, "_sentry_sql_span", None)
-    with capture_internal_exceptions():
-        add_query_source(span)
+    if span is not None:
+        with capture_internal_exceptions():
+            add_query_source(span)
 
     if ctx_mgr is not None:
         context._sentry_sql_span_manager = None
