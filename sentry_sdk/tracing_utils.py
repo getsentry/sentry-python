@@ -1045,7 +1045,6 @@ def create_span_decorator(
         use cases.
     :type template: :py:class:`sentry_sdk.consts.SPANTEMPLATE`
     """
-    is_ai_template = template in _AI_TEMPLATES
 
     def span_decorator(f: "Any") -> "Any":
         """
@@ -1075,8 +1074,8 @@ def create_span_decorator(
             span_op = op or _get_span_op(template)
             function_name = name or qualname_from_function(f) or ""
             span_name = _get_span_name(template, function_name, kwargs)
-            collect_inputs = is_ai_template and _should_collect_gen_ai("inputs")
-            collect_outputs = is_ai_template and _should_collect_gen_ai("outputs")
+            collect_inputs = _should_collect_gen_ai("inputs")
+            collect_outputs = _should_collect_gen_ai("outputs")
 
             with current_span.start_child(
                 op=span_op,
@@ -1121,8 +1120,8 @@ def create_span_decorator(
             span_op = op or _get_span_op(template)
             function_name = name or qualname_from_function(f) or ""
             span_name = _get_span_name(template, function_name, kwargs)
-            collect_inputs = is_ai_template and _should_collect_gen_ai("inputs")
-            collect_outputs = is_ai_template and _should_collect_gen_ai("outputs")
+            collect_inputs = _should_collect_gen_ai("inputs")
+            collect_outputs = _should_collect_gen_ai("outputs")
 
             with current_span.start_child(
                 op=span_op,
