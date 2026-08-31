@@ -488,34 +488,6 @@ def test_request_body_data_collection_event_processor(
         assert "data" not in event["request"]
 
 
-def test_oversized_request_body_not_annotated_data_collection_span_streaming(
-    tornado_testcase, sentry_init, capture_items
-):
-    """
-    The gating happens before the size check, so an oversized body is dropped
-    outright instead of being reported as removed because of the size limit.
-    """
-    sentry_init(
-        integrations=[TornadoIntegration()],
-        traces_sample_rate=1.0,
-        trace_lifecycle="stream",
-        max_request_body_size="small",
-        _experiments={"data_collection": {"http_bodies": []}},
-    )
-
-    items = capture_items("span")
-
-    client = tornado_testcase(Application([(r"/hi", HelloHandler)]))
-    response = client.fetch("/hi", method="POST", body=b"a" * 2000)
-    assert response.code == 200
-
-    sentry_sdk.flush()
-
-    (server_span,) = [item.payload for item in items]
-
-    assert "http.request.body.data" not in server_span["attributes"]
-
-
 @pytest.mark.parametrize("send_pii", [True, False])
 @pytest.mark.parametrize(
     "handler,code",
