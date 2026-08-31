@@ -173,12 +173,7 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                 origin=StarliteIntegration.origin,
             )
 
-        with _start_middleware_span(
-            op=OP.MIDDLEWARE_STARLITE, name=middleware_name
-        ) as middleware_span:
-            if not is_span_streaming_enabled:
-                middleware_span.set_tag("starlite.middleware_name", middleware_name)
-
+        with _start_middleware_span(op=OP.MIDDLEWARE_STARLITE, name=middleware_name):
             # Creating spans for the "receive" callback
             async def _sentry_receive(
                 *args: "Any", **kwargs: "Any"
@@ -188,9 +183,7 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                 with _start_middleware_span(
                     op=OP.MIDDLEWARE_STARLITE_RECEIVE,
                     name=getattr(receive, "__qualname__", str(receive)),
-                ) as span:
-                    if not is_span_streaming_enabled:
-                        span.set_tag("starlite.middleware_name", middleware_name)
+                ):
                     return await receive(*args, **kwargs)
 
             receive_name = getattr(receive, "__name__", str(receive))
@@ -204,9 +197,7 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
                 with _start_middleware_span(
                     op=OP.MIDDLEWARE_STARLITE_SEND,
                     name=getattr(send, "__qualname__", str(send)),
-                ) as span:
-                    if not is_span_streaming_enabled:
-                        span.set_tag("starlite.middleware_name", middleware_name)
+                ):
                     return await send(message)
 
             send_name = getattr(send, "__name__", str(send))
@@ -271,6 +262,8 @@ def patch_http_route_handle() -> None:
         def event_processor(event: "Event", _: "Hint") -> "Event":
             request_info = event.get("request", {})
             request_info["content_length"] = len(scope.get("_body", b""))
+            should_attach_request_body = True
+
             if has_data_collection_enabled(client.options):
                 cookies = _apply_key_value_collection_filtering(
                     items=extracted_request_data["cookies"],
@@ -278,9 +271,15 @@ def patch_http_route_handle() -> None:
                 )
                 if cookies:
                     request_info["cookies"] = cookies
+
+                should_attach_request_body = (
+                    "incoming_request"
+                    in client.options["data_collection"]["http_bodies"]
+                )
             elif should_send_default_pii():
                 request_info["cookies"] = extracted_request_data["cookies"]
-            if request_data is not None:
+
+            if request_data is not None and should_attach_request_body:
                 request_info["data"] = request_data
 
             event["request"] = deepcopy(request_info)

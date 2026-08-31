@@ -1,0 +1,199 @@
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from threading import Thread
+from urllib.parse import parse_qs, urlparse
+
+import boto3
+from botocore.config import Config
+
+import sentry_sdk
+from sentry_sdk.integrations.boto3 import Boto3Integration
+from sentry_sdk.integrations.stdlib import StdlibIntegration
+from sentry_sdk.utils import (
+    _get_aws_sigv4_signed_headers_from_authorization_header,
+    _get_aws_sigv4_signed_headers_from_url_query_string,
+)
+
+
+class _AwsRequestHandler(BaseHTTPRequestHandler):
+    requests = []
+
+    def do_HEAD(self):
+        self.__class__.requests.append(self.headers)
+        self.send_response(200)
+        self.end_headers()
+
+    def log_message(self, format, *args):
+        pass
+
+
+def _start_server():
+    _AwsRequestHandler.requests = []
+    server = HTTPServer(("127.0.0.1", 0), _AwsRequestHandler)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server, thread
+
+
+def test_botocore_merges_propagation_before_sigv4_signing(
+    sentry_init,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        default_integrations=False,
+        integrations=[Boto3Integration(), StdlibIntegration()],
+    )
+
+    server, thread = _start_server()
+
+    try:
+        client = boto3.client(  # type: ignore[attr-defined]
+            "s3",
+            # connect to mock AWS server.
+            endpoint_url=f"http://127.0.0.1:{server.server_port}",
+            aws_access_key_id="test-access-key",
+            aws_secret_access_key="test-secret-key",
+            config=Config(signature_version="v4"),
+        )
+
+        def _inject_third_party_baggage(request, **kwargs):
+            request.headers.add_header(
+                "baggage",
+                "dd-origin=synthetics,sentry-trace_id=stale,sentry-sample_rand=0.100000",
+            )
+            request.headers.add_header("baggage", "vendor=value")
+
+        signed_request_headers = {}
+
+        def capture_headers_after_instrumentation(request, **kwargs):
+            for header_name in ("baggage", "sentry-trace"):
+                signed_request_headers[header_name] = request.headers.get_all(
+                    header_name
+                )
+
+        # inject third-party and stale Sentry members before Sentry merges them.
+        client.meta.events.register("before-sign", _inject_third_party_baggage)
+        client.meta.events.register_last(
+            "before-sign", capture_headers_after_instrumentation
+        )
+        with sentry_sdk.traces.start_span(  # type: ignore[attr-defined]
+            name="incoming"
+        ):
+            response = client.head_object(
+                Bucket="example-bucket",
+                Key="example-key",
+            )
+
+        assert response["ResponseMetadata"]["HTTPStatusCode"] == 200
+        headers = _AwsRequestHandler.requests[-1]
+
+        baggage_headers = headers.get_all("baggage")
+        assert baggage_headers is not None
+        assert len(baggage_headers) == 1
+        assert baggage_headers == signed_request_headers["baggage"]
+
+        baggage = baggage_headers[0]
+        # third-party `baggage` members: leave as-is.
+        assert "dd-origin=synthetics" in baggage
+        assert "vendor=value" in baggage
+        # stale Sentry `baggage` members: replace with current values.
+        assert "sentry-trace_id=" in baggage
+        assert "sentry-trace_id=stale" not in baggage
+        # each Sentry `baggage` member appears once after merge.
+        assert baggage.count("sentry-trace_id=") == 1
+        assert baggage.count("sentry-sample_rand=") == 1
+
+        # `sentry-trace`: one value.
+        sentry_trace_headers = headers.get_all("sentry-trace")
+        assert sentry_trace_headers is not None
+        assert len(sentry_trace_headers) == 1
+        assert sentry_trace_headers == signed_request_headers["sentry-trace"]
+        # final `sentry-trace` and `baggage` are named in SignedHeaders.
+        signed_headers = _get_aws_sigv4_signed_headers_from_authorization_header(
+            headers.get("Authorization", "")
+        )
+        assert signed_headers >= {"baggage", "sentry-trace"}
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()
+
+
+def test_botocore_without_boto3_integration_preserves_signed_baggage(
+    sentry_init,
+):
+    """Leave signed `baggage` as-is; add unsigned `sentry-trace`."""
+    sentry_init(
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        default_integrations=False,
+        integrations=[StdlibIntegration()],
+    )
+
+    server, thread = _start_server()
+    try:
+        client = boto3.client(  # type: ignore[attr-defined]
+            "s3",
+            endpoint_url=f"http://127.0.0.1:{server.server_port}",
+            aws_access_key_id="test-access-key",
+            aws_secret_access_key="test-secret-key",
+            config=Config(signature_version="v4"),
+        )
+
+        def _inject_signed_baggage(request, **kwargs):
+            request.headers.add_header("baggage", "vendor=value")
+
+        # inject `baggage` before SigV4; stdlib-only path cannot change signed fields.
+        client.meta.events.register("before-sign", _inject_signed_baggage)
+        with sentry_sdk.traces.start_span(  # type: ignore[attr-defined]
+            name="incoming"
+        ):
+            response = client.head_object(
+                Bucket="example-bucket",
+                Key="example-key",
+            )
+
+        assert response["ResponseMetadata"]["HTTPStatusCode"] == 200
+        headers = _AwsRequestHandler.requests[-1]
+        # signed `baggage`: leave as-is.
+        assert headers.get_all("baggage") == ["vendor=value"]
+        # unsigned `sentry-trace`: add it.
+        assert len(headers.get_all("sentry-trace")) == 1
+        signed_headers = _get_aws_sigv4_signed_headers_from_authorization_header(
+            headers.get("Authorization", "")
+        )
+        assert "baggage" in signed_headers
+        assert "sentry-trace" not in signed_headers
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()
+
+
+def test_presigned_urls_do_not_require_sentry_headers(sentry_init):
+    """Do not add or sign `sentry-trace` or `baggage` on a presigned URL."""
+    sentry_init(
+        traces_sample_rate=1.0,
+        default_integrations=False,
+        integrations=[Boto3Integration(), StdlibIntegration()],
+    )
+    client = boto3.client(  # type: ignore[attr-defined]
+        "s3",
+        aws_access_key_id="test-access-key",
+        aws_secret_access_key="test-secret-key",
+        config=Config(signature_version="s3v4"),
+    )
+
+    url = client.generate_presigned_url(
+        "get_object",
+        Params={"Bucket": "example-bucket", "Key": "example-key"},
+        ExpiresIn=60,
+    )
+    query = parse_qs(urlparse(url).query)
+
+    # `SignedHeaders` must not require `sentry-trace` or `baggage`.
+    assert query["X-Amz-SignedHeaders"] == ["host"]
+    assert _get_aws_sigv4_signed_headers_from_url_query_string(url) == {"host"}
+    # presigned URL query must not contain `sentry-trace` or `baggage`.
+    assert "sentry-trace" not in url
+    assert "baggage" not in url

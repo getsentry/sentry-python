@@ -5,7 +5,6 @@ import random
 import socket
 import sys
 import uuid
-import warnings
 from collections.abc import Iterable, Mapping
 from contextvars import ContextVar
 from datetime import datetime, timezone
@@ -348,9 +347,8 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
             else rv["send_default_pii"]
         )
     elif has_data_collection_enabled(rv) and rv["event_scrubber"]:
-        warnings.warn(
+        logger.warning(
             "Event scrubbers are not enabled when data collection configuration is provided. Ignoring event_scrubber...",
-            stacklevel=2,
         )
         rv["event_scrubber"] = None
 
@@ -366,21 +364,18 @@ def _get_options(*args: "Optional[str]", **kwargs: "Any") -> "Dict[str, Any]":
         )
 
     if rv["trace_ignore_status_codes"] and has_span_streaming_enabled(rv):
-        warnings.warn(
+        logger.warning(
             "The `trace_ignore_status_codes` parameter is ignored in span streaming mode.",
-            stacklevel=2,
         )
 
     if rv["ignore_spans"] and not has_span_streaming_enabled(rv):
-        warnings.warn(
+        logger.warning(
             "The `ignore_spans` parameter only works when `trace_lifecycle` is set to `stream`.",
-            stacklevel=2,
         )
 
     if rv["before_send_span"] and not has_span_streaming_enabled(rv):
-        warnings.warn(
+        logger.warning(
             "The `before_send_span` parameter only works when `trace_lifecycle` is set to `stream`.",
-            stacklevel=2,
         )
 
     return rv
@@ -628,22 +623,10 @@ class _Client(BaseClient):
 
             self.session_flusher = SessionFlusher(capture_func=_capture_envelope)
 
-            if self.options.get("enable_logs", False) or self.options[
-                "_experiments"
-            ].get("enable_logs", False):
-                logger.warning(
-                    "The enable_logs option has no effect and will be removed in the next major."
-                )
-
             self.log_batcher = LogBatcher(
                 capture_func=_capture_envelope,
                 record_lost_func=_record_lost_event,
             )
-
-            if self.options.get("enable_metrics", True) is False:
-                logger.warning(
-                    "The enable_metrics option has no effect and will be removed in the next major."
-                )
 
             self.metrics_batcher = MetricsBatcher(
                 capture_func=_capture_envelope,
@@ -1346,9 +1329,8 @@ class _Client(BaseClient):
         """
         if self.transport is not None:
             if self._has_async_transport():
-                warnings.warn(
+                logger.warning(
                     "close() used with AsyncHttpTransport. Use close_async() instead.",
-                    stacklevel=2,
                 )
                 self._flush_components()
             else:
@@ -1393,9 +1375,8 @@ class _Client(BaseClient):
         """
         if self.transport is not None:
             if self._has_async_transport():
-                warnings.warn(
+                logger.warning(
                     "flush() used with AsyncHttpTransport. Use flush_async() instead.",
-                    stacklevel=2,
                 )
                 return
             if timeout is None:

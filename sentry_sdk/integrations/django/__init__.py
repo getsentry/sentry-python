@@ -1,3 +1,4 @@
+import functools
 import inspect
 import sys
 import threading
@@ -6,20 +7,23 @@ from importlib import import_module
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA, SPANNAME
-from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
+from sentry_sdk.integrations import (
+    _DEFAULT_FAILED_REQUEST_STATUS_CODES,
+    DidNotEnable,
+    Integration,
+    _check_minimum_version,
+)
 from sentry_sdk.integrations._wsgi_common import (
     DEFAULT_HTTP_METHODS_TO_CAPTURE,
     RequestExtractor,
 )
-from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
 from sentry_sdk.scope import add_global_event_processor, should_send_default_pii
 from sentry_sdk.serializer import add_global_repr_processor, add_repr_sequence_type
-from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
 from sentry_sdk.tracing_utils import (
     add_query_source,
-    has_span_streaming_enabled,
     record_sql_queries,
 )
 from sentry_sdk.utils import (
@@ -63,6 +67,7 @@ from sentry_sdk.integrations.django.transactions import LEGACY_RESOLVER
 from sentry_sdk.integrations.django.views import patch_views
 
 if TYPE_CHECKING:
+    from collections.abc import Set
     from typing import Any, Callable, Dict, List, Optional, Union
 
     from django.core.handlers.wsgi import WSGIRequest
@@ -70,7 +75,13 @@ if TYPE_CHECKING:
     from django.http.response import HttpResponse
     from django.utils.datastructures import MultiValueDict
 
-    from sentry_sdk._types import Event, EventProcessor, Hint, NotImplementedType
+    from sentry_sdk._types import (
+        Event,
+        EventProcessor,
+        ExcInfo,
+        Hint,
+        NotImplementedType,
+    )
     from sentry_sdk.integrations.wsgi import _ScopedResponse
     from sentry_sdk.traces import StreamedSpan
     from sentry_sdk.tracing import Span
@@ -88,6 +99,11 @@ class DjangoIntegration(Integration):
     :param signals_spans: Whether to create spans for signals. Defaults to `True`.
     :param signals_denylist: A list of signals to ignore when creating spans.
     :param cache_spans: Whether to create spans for cache operations. Defaults to `False`.
+    :param failed_request_status_codes: Which HTTP error responses to report to Sentry.
+        Django answers some exceptions itself instead of failing: `raise Http404` gets
+        the user a 404 page, `PermissionDenied` a 403. Those are reported only if their
+        status code is in this set, which defaults to the 5xx range. Exceptions Django
+        gives up on end in a 500 and are always reported.
     """
 
     identifier = "django"
@@ -109,6 +125,8 @@ class DjangoIntegration(Integration):
         db_transaction_spans: bool = False,
         signals_denylist: "Optional[list[signals.Signal]]" = None,
         http_methods_to_capture: "tuple[str, ...]" = DEFAULT_HTTP_METHODS_TO_CAPTURE,
+        *,
+        failed_request_status_codes: "Set[int]" = _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     ) -> None:
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
@@ -126,6 +144,8 @@ class DjangoIntegration(Integration):
 
         self.http_methods_to_capture = tuple(map(str.upper, http_methods_to_capture))
 
+        self.failed_request_status_codes = failed_request_status_codes
+
     @staticmethod
     def setup_once() -> None:
         _check_minimum_version(DjangoIntegration, DJANGO_VERSION)
@@ -134,8 +154,8 @@ class DjangoIntegration(Integration):
         # Patch in our custom middleware.
 
         # logs an error for every 500
-        ignore_logger("django.server")
-        ignore_logger("django.request")
+        ignore_logger_for_events("django.server")
+        ignore_logger_for_events("django.request")
 
         from django.core.handlers.wsgi import WSGIHandler
 
@@ -170,6 +190,8 @@ class DjangoIntegration(Integration):
         _patch_get_response()
 
         _patch_django_asgi_handler()
+
+        _patch_response_for_exception()
 
         signals.got_request_exception.connect(_got_request_exception)
 
@@ -326,27 +348,21 @@ def _patch_drf() -> None:
                     integration = client.get_integration(DjangoIntegration)
                     # Nothing to time if there are no authenticators configured
                     # for this view.
-                    if integration is None or not getattr(self, "authenticators", None):
+                    if (
+                        integration is None
+                        or not getattr(self, "authenticators", None)
+                        or sentry_sdk.traces.get_current_span() is None
+                    ):
                         return old_drf_authenticate(self)
 
-                    if has_span_streaming_enabled(client.options):
-                        if sentry_sdk.traces.get_current_span() is None:
-                            return old_drf_authenticate(self)
-                        with sentry_sdk.traces.start_span(
-                            name="authenticate",
-                            attributes={
-                                "sentry.op": OP.VIEW_AUTHENTICATE,
-                                "sentry.origin": DjangoIntegration.origin,
-                            },
-                        ):
-                            return old_drf_authenticate(self)
-                    else:
-                        with sentry_sdk.start_span(
-                            op=OP.VIEW_AUTHENTICATE,
-                            name="authenticate",
-                            origin=DjangoIntegration.origin,
-                        ):
-                            return old_drf_authenticate(self)
+                    with sentry_sdk.traces.start_span(
+                        name="authenticate",
+                        attributes={
+                            "sentry.op": OP.VIEW_AUTHENTICATE,
+                            "sentry.origin": DjangoIntegration.origin,
+                        },
+                    ):
+                        return old_drf_authenticate(self)
 
                 Request._authenticate = sentry_patched_drf_authenticate
 
@@ -489,13 +505,11 @@ def _after_get_response(request: "WSGIRequest") -> None:
         scope = sentry_sdk.get_current_scope()
         _attempt_resolve_again(request, scope, integration.transaction_style)
 
-    span_streaming = has_span_streaming_enabled(client.options)
-    if span_streaming:
-        if has_data_collection_enabled(client.options):
-            if client.options["data_collection"]["user_info"]:
-                _get_user_from_request_and_set_on_scope(request)
-        elif should_send_default_pii():
+    if has_data_collection_enabled(client.options):
+        if client.options["data_collection"]["user_info"]:
             _get_user_from_request_and_set_on_scope(request)
+    elif should_send_default_pii():
+        _get_user_from_request_and_set_on_scope(request)
 
 
 def _patch_get_response() -> None:
@@ -561,16 +575,87 @@ def _got_request_exception(request: "WSGIRequest" = None, **kwargs: "Any") -> No
     if integration is None:
         return
 
+    # Record that this exception is reported, so `_patch_response_for_exception`
+    # doesn't report it a second time.
+    with capture_internal_exceptions():
+        request._sentry_exception_reported = True
+
+    _capture_exception(sys.exc_info(), request, integration, handled=False)
+
+
+def _capture_exception(
+    exc_info: "Union[BaseException, ExcInfo]",
+    request: "Optional[WSGIRequest]",
+    integration: "DjangoIntegration",
+    handled: bool,
+) -> None:
     if request is not None and integration.transaction_style == "url":
         scope = sentry_sdk.get_current_scope()
         _attempt_resolve_again(request, scope, integration.transaction_style)
 
     event, hint = event_from_exception(
-        sys.exc_info(),
-        client_options=client.options,
-        mechanism={"type": "django", "handled": False},
+        exc_info,
+        client_options=sentry_sdk.get_client().options,
+        mechanism={"type": "django", "handled": handled},
     )
     sentry_sdk.capture_event(event, hint=hint)
+
+
+def _patch_response_for_exception() -> None:
+    """
+    Report the errors Django answers itself.
+
+    Django deals with every exception in one function, which boils down to:
+
+        if isinstance(exc, Http404):             return <404 page>
+        if isinstance(exc, PermissionDenied):    return <403 page>
+        if isinstance(exc, SuspiciousOperation): return <400 page>
+        got_request_exception.send(...)          # Django gives up
+        return <500 page>
+
+    We only ever listened to that signal, so we heard about the exceptions Django
+    gives up on and about nothing else. Wrapping the function lets us see the rest
+    too, along with the status code Django picked for them.
+    """
+    try:
+        from django.core.handlers import exception as exception_handler
+    except ImportError:
+        # Django < 1.10 does this in `BaseHandler`, nothing to patch here
+        return
+
+    old_response_for_exception = getattr(
+        exception_handler, "response_for_exception", None
+    )
+    if old_response_for_exception is None:
+        return
+
+    @functools.wraps(old_response_for_exception)
+    def sentry_patched_response_for_exception(
+        request: "WSGIRequest", exc: Exception
+    ) -> "HttpResponse":
+        integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
+        if integration is None:
+            return old_response_for_exception(request, exc)
+
+        # Clear the flag before delegating. The same request can reach this
+        # function twice: first when the view raises, then again if a middleware
+        # raises while handing the response back out. Without the reset, the
+        # first exception would keep the second one from being reported.
+        with capture_internal_exceptions():
+            request._sentry_exception_reported = False
+
+        response = old_response_for_exception(request, exc)
+
+        # The flag is set when Django gives up on the exception and fires
+        # `got_request_exception`, which means we reported it already.
+        if not getattr(request, "_sentry_exception_reported", False):
+            status_code = getattr(response, "status_code", None)
+            if status_code in integration.failed_request_status_codes:
+                _capture_exception(exc, request, integration, handled=True)
+
+        return response
+
+    exception_handler.response_for_exception = sentry_patched_response_for_exception
 
 
 class DjangoRequestExtractor(RequestExtractor):
@@ -670,11 +755,6 @@ def install_sql_hook() -> None:
             _set_db_data(span, self)
             result = real_execute(self, sql, params)
 
-            if isinstance(span, StreamedSpan):
-                with capture_internal_exceptions():
-                    add_query_source(span)
-
-        if not isinstance(span, StreamedSpan):
             with capture_internal_exceptions():
                 add_query_source(span)
 
@@ -696,11 +776,6 @@ def install_sql_hook() -> None:
 
             result = real_executemany(self, sql, param_list)
 
-            if isinstance(span, StreamedSpan):
-                with capture_internal_exceptions():
-                    add_query_source(span)
-
-        if not isinstance(span, StreamedSpan):
             with capture_internal_exceptions():
                 add_query_source(span)
 
@@ -711,27 +786,17 @@ def install_sql_hook() -> None:
         with capture_internal_exceptions():
             sentry_sdk.add_breadcrumb(message="connect", category="query")
 
-        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-        if span_streaming:
-            if sentry_sdk.traces.get_current_span() is None:
-                return real_connect(self)
-            with sentry_sdk.traces.start_span(
-                name="connect",
-                attributes={
-                    "sentry.op": OP.DB,
-                    "sentry.origin": DjangoIntegration.origin_db,
-                },
-            ) as span:
-                _set_db_data(span, self)
-                return real_connect(self)
-        else:
-            with sentry_sdk.start_span(
-                op=OP.DB,
-                name="connect",
-                origin=DjangoIntegration.origin_db,
-            ) as span:
-                _set_db_data(span, self)
-                return real_connect(self)
+        if sentry_sdk.traces.get_current_span() is None:
+            return real_connect(self)
+        with sentry_sdk.traces.start_span(
+            name="connect",
+            attributes={
+                "sentry.op": OP.DB,
+                "sentry.origin": DjangoIntegration.origin_db,
+            },
+        ) as span:
+            _set_db_data(span, self)
+            return real_connect(self)
 
     def _commit(self: "BaseDatabaseWrapper") -> None:
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
@@ -739,27 +804,18 @@ def install_sql_hook() -> None:
         if integration is None or not integration.db_transaction_spans:
             return real_commit(self)
 
-        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-        if span_streaming:
-            if sentry_sdk.traces.get_current_span() is None:
-                return real_commit(self)
-            with sentry_sdk.traces.start_span(
-                name=SPANNAME.DB_COMMIT,
-                attributes={
-                    "sentry.op": OP.DB,
-                    "sentry.origin": DjangoIntegration.origin_db,
-                },
-            ) as span:
-                _set_db_data(span, self, SPANNAME.DB_COMMIT)
-                return real_commit(self)
-        else:
-            with sentry_sdk.start_span(
-                op=OP.DB,
-                name=SPANNAME.DB_COMMIT,
-                origin=DjangoIntegration.origin_db,
-            ) as span:
-                _set_db_data(span, self, SPANNAME.DB_COMMIT)
-                return real_commit(self)
+        if sentry_sdk.traces.get_current_span() is None:
+            return real_commit(self)
+
+        with sentry_sdk.traces.start_span(
+            name=SPANNAME.DB_COMMIT,
+            attributes={
+                "sentry.op": OP.DB,
+                "sentry.origin": DjangoIntegration.origin_db,
+            },
+        ) as span:
+            _set_db_data(span, self, SPANNAME.DB_COMMIT)
+            return real_commit(self)
 
     def _rollback(self: "BaseDatabaseWrapper") -> None:
         integration = sentry_sdk.get_client().get_integration(DjangoIntegration)
@@ -767,34 +823,25 @@ def install_sql_hook() -> None:
         if integration is None or not integration.db_transaction_spans:
             return real_rollback(self)
 
-        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-        if span_streaming:
-            if sentry_sdk.traces.get_current_span() is None:
-                return real_rollback(self)
-            with sentry_sdk.traces.start_span(
-                name=SPANNAME.DB_ROLLBACK,
-                attributes={
-                    "sentry.op": OP.DB,
-                    "sentry.origin": DjangoIntegration.origin_db,
-                },
-            ) as span:
-                _set_db_data(span, self, SPANNAME.DB_ROLLBACK)
-                return real_rollback(self)
-        else:
-            with sentry_sdk.start_span(
-                op=OP.DB,
-                name=SPANNAME.DB_ROLLBACK,
-                origin=DjangoIntegration.origin_db,
-            ) as span:
-                _set_db_data(span, self, SPANNAME.DB_ROLLBACK)
-                return real_rollback(self)
+        if sentry_sdk.traces.get_current_span() is None:
+            return real_rollback(self)
+
+        with sentry_sdk.traces.start_span(
+            name=SPANNAME.DB_ROLLBACK,
+            attributes={
+                "sentry.op": OP.DB,
+                "sentry.origin": DjangoIntegration.origin_db,
+            },
+        ) as span:
+            _set_db_data(span, self, SPANNAME.DB_ROLLBACK)
+            return real_rollback(self)
 
     CursorWrapper.execute = execute
     CursorWrapper.executemany = executemany
     BaseDatabaseWrapper.connect = connect
     BaseDatabaseWrapper._commit = _commit
     BaseDatabaseWrapper._rollback = _rollback
-    ignore_logger("django.db.backends")
+    ignore_logger_for_events("django.db.backends")
 
 
 def _set_db_data(
@@ -802,18 +849,17 @@ def _set_db_data(
     cursor_or_db: "Any",
     db_operation: "Optional[str]" = None,
 ) -> None:
+    # TODO: remove this once record_sql_queries drops support for old spans
+    from sentry_sdk.traces import StreamedSpan
+
+    if not isinstance(span, StreamedSpan):
+        return
     db = cursor_or_db.db if hasattr(cursor_or_db, "db") else cursor_or_db
     vendor = db.vendor
-    if isinstance(span, StreamedSpan):
-        span.set_attribute(SPANDATA.DB_SYSTEM_NAME, vendor)
+    span.set_attribute(SPANDATA.DB_SYSTEM_NAME, vendor)
 
-        if db_operation is not None:
-            span.set_attribute(SPANDATA.DB_OPERATION_NAME, db_operation)
-    else:
-        span.set_data(SPANDATA.DB_SYSTEM, vendor)
-
-        if db_operation is not None:
-            span.set_data(SPANDATA.DB_OPERATION, db_operation)
+    if db_operation is not None:
+        span.set_attribute(SPANDATA.DB_OPERATION_NAME, db_operation)
 
     # Some custom backends override `__getattr__`, making it look like `cursor_or_db`
     # actually has a `connection` and the `connection` has a `get_dsn_parameters`
@@ -846,28 +892,20 @@ def _set_db_data(
 
     db_name = connection_params.get("dbname") or connection_params.get("database")
 
-    if isinstance(span, StreamedSpan):
-        if db_name is not None:
-            span.set_attribute(SPANDATA.DB_NAMESPACE, db_name)
-
-        set_on_span = span.set_attribute
-    else:
-        if db_name is not None:
-            span.set_data(SPANDATA.DB_NAME, db_name)
-
-        set_on_span = span.set_data
+    if db_name is not None:
+        span.set_attribute(SPANDATA.DB_NAMESPACE, db_name)
 
     server_address = connection_params.get("host")
     if server_address is not None:
-        set_on_span(SPANDATA.SERVER_ADDRESS, server_address)
+        span.set_attribute(SPANDATA.SERVER_ADDRESS, server_address)
 
     server_port = connection_params.get("port")
     if server_port is not None:
-        set_on_span(SPANDATA.SERVER_PORT, str(server_port))
+        span.set_attribute(SPANDATA.SERVER_PORT, str(server_port))
 
     server_socket_address = connection_params.get("unix_socket")
     if server_socket_address is not None:
-        set_on_span(SPANDATA.SERVER_SOCKET_ADDRESS, server_socket_address)
+        span.set_attribute(SPANDATA.SERVER_SOCKET_ADDRESS, server_socket_address)
 
 
 def add_template_context_repr_sequence() -> None:

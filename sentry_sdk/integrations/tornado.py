@@ -11,7 +11,7 @@ from sentry_sdk.integrations._wsgi_common import (
     _is_json_content_type,
     request_body_within_bounds,
 )
-from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.utils import (
@@ -46,7 +46,7 @@ class TornadoIntegration(Integration):
     def setup_once() -> None:
         _check_minimum_version(TornadoIntegration, TORNADO_VERSION)
 
-        ignore_logger("tornado.access")
+        ignore_logger_for_events("tornado.access")
 
         old_execute = RequestHandler._execute
 
@@ -185,11 +185,22 @@ def _get_request_attributes(request: "Any") -> "Dict[str, Any]":
     if request.protocol:
         attributes[SPANDATA.NETWORK_PROTOCOL_NAME] = request.protocol
 
-    with capture_internal_exceptions():
-        raw_data = _get_tornado_request_data(request)
-        body_data = raw_data.value if isinstance(raw_data, AnnotatedValue) else raw_data
-        if body_data is not None:
-            attributes[SPANDATA.HTTP_REQUEST_BODY_DATA] = body_data
+    # The request data was unconditionally set pre-data collection which is
+    # why we're defaulting to True
+    record_incoming_request_data = True
+    if has_data_collection_enabled(client_options):
+        record_incoming_request_data = (
+            "incoming_request" in client_options["data_collection"]["http_bodies"]
+        )
+
+    if record_incoming_request_data:
+        with capture_internal_exceptions():
+            raw_data = _get_tornado_request_data(request)
+            body_data = (
+                raw_data.value if isinstance(raw_data, AnnotatedValue) else raw_data
+            )
+            if body_data is not None:
+                attributes[SPANDATA.HTTP_REQUEST_BODY_DATA] = body_data
 
     return attributes
 

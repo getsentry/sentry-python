@@ -128,23 +128,18 @@ def test_cache_basic(sentry_init, capture_events, capture_items, span_streaming)
 
         # no cache support for hget command
         assert spans[0]["op"] == "db.redis"
-        assert spans[0]["tags"]["redis.command"] == "HGET"
 
         assert spans[1]["op"] == "cache.get"
         assert spans[2]["op"] == "db.redis"
-        assert spans[2]["tags"]["redis.command"] == "GET"
 
         assert spans[3]["op"] == "cache.put"
         assert spans[4]["op"] == "db.redis"
-        assert spans[4]["tags"]["redis.command"] == "SET"
 
         assert spans[5]["op"] == "cache.put"
         assert spans[6]["op"] == "db.redis"
-        assert spans[6]["tags"]["redis.command"] == "SETEX"
 
         assert spans[7]["op"] == "cache.get"
         assert spans[8]["op"] == "db.redis"
-        assert spans[8]["tags"]["redis.command"] == "MGET"
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])

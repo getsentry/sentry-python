@@ -67,27 +67,24 @@ class LoguruIntegration(Integration):
     identifier = "loguru"
 
     level: "Optional[int]" = DEFAULT_LEVEL
-    event_level: "Optional[int]" = DEFAULT_EVENT_LEVEL
-    breadcrumb_format = DEFAULT_FORMAT
     event_format = DEFAULT_FORMAT
-    sentry_logs_level: "Optional[int]" = DEFAULT_LEVEL
-    capture_sentry_logs: "Optional[bool]" = False
+    event_level: "Optional[int]" = None
+    breadcrumb_level: "Optional[int]" = DEFAULT_LEVEL
+    breadcrumb_format = DEFAULT_FORMAT
 
     def __init__(
         self,
         level: "Optional[int]" = DEFAULT_LEVEL,
-        event_level: "Optional[int]" = DEFAULT_EVENT_LEVEL,
-        breadcrumb_format: "str | loguru.FormatFunction" = DEFAULT_FORMAT,
+        event_level: "Optional[int]" = None,
         event_format: "str | loguru.FormatFunction" = DEFAULT_FORMAT,
-        sentry_logs_level: "Optional[int]" = DEFAULT_LEVEL,
-        capture_sentry_logs: "Optional[bool]" = False,
+        breadcrumb_format: "str | loguru.FormatFunction" = DEFAULT_FORMAT,
+        breadcrumb_level: "Optional[int]" = DEFAULT_LEVEL,
     ) -> None:
         LoguruIntegration.level = level
         LoguruIntegration.event_level = event_level
-        LoguruIntegration.breadcrumb_format = breadcrumb_format
         LoguruIntegration.event_format = event_format
-        LoguruIntegration.sentry_logs_level = sentry_logs_level
-        LoguruIntegration.capture_sentry_logs = capture_sentry_logs
+        LoguruIntegration.breadcrumb_level = breadcrumb_level
+        LoguruIntegration.breadcrumb_format = breadcrumb_format
 
     @staticmethod
     def setup_once() -> None:
@@ -96,9 +93,8 @@ class LoguruIntegration(Integration):
 
         if LoguruIntegration.level is not None:
             logger.add(
-                LoguruBreadcrumbHandler(level=LoguruIntegration.level),
+                loguru_handler,
                 level=LoguruIntegration.level,
-                format=LoguruIntegration.breadcrumb_format,
             )
 
         if LoguruIntegration.event_level is not None:
@@ -108,10 +104,11 @@ class LoguruIntegration(Integration):
                 format=LoguruIntegration.event_format,
             )
 
-        if LoguruIntegration.sentry_logs_level is not None:
+        if LoguruIntegration.breadcrumb_level is not None:
             logger.add(
-                loguru_sentry_logs_handler,
-                level=LoguruIntegration.sentry_logs_level,
+                LoguruBreadcrumbHandler(level=LoguruIntegration.breadcrumb_level),
+                level=LoguruIntegration.breadcrumb_level,
+                format=LoguruIntegration.breadcrumb_format,
             )
 
 
@@ -145,22 +142,16 @@ class LoguruBreadcrumbHandler(_LoguruBaseHandler, BreadcrumbHandler):
     pass
 
 
-def loguru_sentry_logs_handler(message: "Message") -> None:
+def loguru_handler(message: "Message") -> None:
     # This is intentionally a callable sink instead of a standard logging handler
     # since otherwise we wouldn't get direct access to message.record
     client = sentry_sdk.get_client()
     if not client.is_active():
         return
 
-    if not LoguruIntegration.capture_sentry_logs:
-        return
-
     record = message.record
 
-    if (
-        LoguruIntegration.sentry_logs_level is None
-        or record["level"].no < LoguruIntegration.sentry_logs_level
-    ):
+    if LoguruIntegration.level is None or record["level"].no < LoguruIntegration.level:
         return
 
     otel_severity_number, otel_severity_text = _log_level_to_otel(

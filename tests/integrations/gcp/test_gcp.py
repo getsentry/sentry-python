@@ -231,10 +231,7 @@ def test_timeout_error(run_cloud_function):
     (exception,) = envelope_items[0]["exception"]["values"]
 
     assert exception["type"] == "ServerlessTimeoutWarning"
-    assert (
-        exception["value"]
-        == "WARNING : Function is expected to get timed out. Configured timeout duration = 3 seconds."
-    )
+    assert exception["value"] == "WARNING: Function is about to time out."
     assert exception["mechanism"]["type"] == "threading"
     assert not exception["mechanism"]["handled"]
 
@@ -953,3 +950,110 @@ def test_query_string_data_collection_span_streaming(
         assert "url.query" not in attrs
     else:
         assert attrs["url.query"] == expected_span
+
+
+# Each case is (send_default_pii, data_collection, expected_data, expected_meta).
+# ``send_default_pii`` / ``data_collection`` of None means the option is omitted;
+# ``expected_data`` of None means the body is not attached to the event at all.
+@pytest.mark.parametrize(
+    "send_default_pii, data_collection, expected_data, expected_meta",
+    [
+        pytest.param(
+            True,
+            None,
+            '{"toy": "tennisball"}',
+            None,
+            id="send_default_pii_true_attaches_body",
+        ),
+        pytest.param(
+            False,
+            None,
+            "",
+            {"": {"rem": [["!raw", "x"]]}},
+            id="send_default_pii_false_annotates_body_as_raw",
+        ),
+        pytest.param(
+            None,
+            {},
+            '{"toy": "tennisball"}',
+            None,
+            id="http_bodies_default_attaches_body",
+        ),
+        pytest.param(
+            None,
+            {"http_bodies": ["incoming_request"]},
+            '{"toy": "tennisball"}',
+            None,
+            id="http_bodies_incoming_request_attaches_body",
+        ),
+        pytest.param(
+            None,
+            {"http_bodies": []},
+            None,
+            None,
+            id="http_bodies_empty_omits_body",
+        ),
+        pytest.param(
+            False,
+            {"http_bodies": ["incoming_request"]},
+            '{"toy": "tennisball"}',
+            None,
+            id="http_bodies_incoming_request_attaches_body_despite_send_default_pii_false",
+        ),
+        pytest.param(
+            True,
+            {"http_bodies": []},
+            None,
+            None,
+            id="http_bodies_empty_omits_body_despite_send_default_pii_true",
+        ),
+    ],
+)
+def test_request_body_data_collection_event_processor(
+    run_cloud_function,
+    send_default_pii,
+    data_collection,
+    expected_data,
+    expected_meta,
+):
+    init_kwargs = _build_init_kwargs(send_default_pii, data_collection)
+    envelope_items, _, _ = run_cloud_function(
+        dedent(
+            """
+        functionhandler = None
+
+        from collections import namedtuple
+        GCPEvent = namedtuple("GCPEvent", ["headers", "method", "data"])
+        event = GCPEvent(
+            headers={},
+            method="POST",
+            data=b'{"toy": "tennisball"}',
+        )
+
+        def cloud_function(functionhandler, event):
+            raise Exception("something went wrong")
+        """
+        )
+        + FUNCTIONS_PRELUDE
+        + dedent(
+            """
+        init_sdk(%s)
+        gcp_functions.worker_v1.FunctionHandler.invoke_user_function(functionhandler, event)
+        """
+            % init_kwargs
+        )
+    )
+
+    sentry_event = envelope_items[0]
+    request = sentry_event["request"]
+
+    if expected_data is None:
+        assert "data" not in request
+    else:
+        assert request["data"] == expected_data
+
+    request_meta = sentry_event.get("_meta", {}).get("request", {})
+    if expected_meta is None:
+        assert "data" not in request_meta
+    else:
+        assert request_meta["data"] == expected_meta

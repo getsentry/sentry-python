@@ -64,7 +64,6 @@ if TYPE_CHECKING:
     Experiments = TypedDict(
         "Experiments",
         {
-            "max_spans": Optional[int],
             "max_flags": Optional[int],
             "record_sql_params": Optional[bool],
             "continuous_profiling_auto_start": Optional[bool],
@@ -74,15 +73,7 @@ if TYPE_CHECKING:
             "transport_num_pools": Optional[int],
             "transport_http2": Optional[bool],
             "transport_async": Optional[bool],
-            "enable_logs": Optional[bool],
-            "before_send_log": Optional[Callable[[Log, Hint], Optional[Log]]],
-            "enable_metrics": Optional[bool],
-            "before_send_metric": Optional[Callable[[Metric, Hint], Optional[Metric]]],
             "trace_lifecycle": Optional[Literal["static", "stream"]],
-            "ignore_spans": Optional[IgnoreSpansConfig],
-            "before_send_span": Optional[
-                Callable[[SpanJSON, Hint], Optional[SpanJSON]]
-            ],
             "data_collection": Optional[DataCollectionUserOptions],
         },
         total=False,
@@ -1295,7 +1286,7 @@ class ClientConstructor:
         in_app_exclude: "List[str]" = [],  # noqa: B006
         default_integrations: bool = True,
         dist: "Optional[str]" = None,
-        transport: "Optional[Union[sentry_sdk.transport.Transport, Type[sentry_sdk.transport.Transport], Callable[[Event], None]]]" = None,
+        transport: "Optional[Union[sentry_sdk.transport.Transport, Type[sentry_sdk.transport.Transport], None]]" = None,
         transport_queue_size: int = DEFAULT_QUEUE_SIZE,
         sample_rate: float = 1.0,
         send_default_pii: "Optional[bool]" = None,
@@ -1344,10 +1335,8 @@ class ClientConstructor:
         custom_repr: "Optional[Callable[..., Optional[str]]]" = None,
         add_full_stack: bool = DEFAULT_ADD_FULL_STACK,
         max_stack_frames: "Optional[int]" = DEFAULT_MAX_STACK_FRAMES,
-        enable_logs: bool = False,
         before_send_log: "Optional[Callable[[Log, Hint], Optional[Log]]]" = None,
         trace_ignore_status_codes: "AbstractSet[int]" = frozenset(),
-        enable_metrics: bool = True,
         before_send_metric: "Optional[Callable[[Metric, Hint], Optional[Metric]]]" = None,
         before_send_span: "Optional[Callable[[SpanJSON, Hint], Optional[SpanJSON]]]" = None,
         org_id: "Optional[str]" = None,
@@ -1723,10 +1712,6 @@ class ClientConstructor:
 
         :param spotlight:
 
-
-        :param enable_logs: Set `enable_logs` to True to enable the SDK to emit
-            Sentry logs. Defaults to False.
-
         :param before_send_log: An optional function to modify or filter out logs
             before they're sent to Sentry. Any modifications to the log in this
             function will be retained. If the function returns None, the log will
@@ -1811,4 +1796,4 @@ DEFAULT_OPTIONS = _get_default_options()
 del _get_default_options
 
 
-VERSION = "2.68.0"
+VERSION = "2.68.1"

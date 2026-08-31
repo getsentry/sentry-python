@@ -9,21 +9,6 @@ from sentry_sdk import get_client
 from sentry_sdk.consts import SPANDATA, VERSION
 
 
-def test_metrics_enable_metrics_noop(sentry_init, capture_envelopes):
-    # The enable_metrics option has no effect anymore.
-    sentry_init(enable_metrics=False)
-
-    envelopes = capture_envelopes()
-
-    sentry_sdk.metrics.count("test.counter", 1)
-    sentry_sdk.metrics.gauge("test.gauge", 42)
-    sentry_sdk.metrics.distribution("test.distribution", 200)
-
-    sentry_sdk.flush()
-
-    assert envelopes
-
-
 def test_metrics_basics(sentry_init, capture_items):
     sentry_init()
     items = capture_items("trace_metric")
@@ -53,22 +38,6 @@ def test_metrics_basics(sentry_init, capture_items):
     assert metrics[2]["type"] == "distribution"
     assert metrics[2]["value"] == 200.0
     assert metrics[2]["unit"] == "second"
-
-
-def test_metrics_experimental_option(sentry_init, capture_items):
-    sentry_init()
-    items = capture_items("trace_metric")
-
-    sentry_sdk.metrics.count("test.counter", 5)
-
-    get_client().flush()
-
-    metrics = [item.payload for item in items]
-    assert len(metrics) == 1
-
-    assert metrics[0]["name"] == "test.counter"
-    assert metrics[0]["type"] == "counter"
-    assert metrics[0]["value"] == 5.0
 
 
 def test_metrics_with_attributes(sentry_init, capture_items):
@@ -212,47 +181,6 @@ def test_metrics_before_send(sentry_init, capture_items):
 
     sentry_init(
         before_send_metric=_before_metric,
-    )
-    items = capture_items("trace_metric")
-
-    sentry_sdk.metrics.count("test.skip", 1)
-    sentry_sdk.metrics.count("test.keep", 1)
-
-    get_client().flush()
-
-    metrics = [item.payload for item in items]
-    assert len(metrics) == 1
-    assert metrics[0]["name"] == "test.keep"
-    assert before_metric_called
-
-
-def test_metrics_experimental_before_send(sentry_init, capture_items):
-    before_metric_called = False
-
-    def _before_metric(record, hint):
-        nonlocal before_metric_called
-
-        assert set(record.keys()) == {
-            "timestamp",
-            "trace_id",
-            "span_id",
-            "name",
-            "type",
-            "value",
-            "unit",
-            "attributes",
-        }
-
-        if record["name"] == "test.skip":
-            return None
-
-        before_metric_called = True
-        return record
-
-    sentry_init(
-        _experiments={
-            "before_send_metric": _before_metric,
-        },
     )
     items = capture_items("trace_metric")
 

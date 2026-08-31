@@ -1,5 +1,4 @@
 import sys
-import warnings
 from concurrent.futures import Future, ThreadPoolExecutor
 from functools import wraps
 from threading import Thread, current_thread
@@ -11,6 +10,7 @@ from sentry_sdk.scope import use_isolation_scope, use_scope
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
+    logger,
     reraise,
 )
 
@@ -62,12 +62,11 @@ class ThreadingIntegration(Integration):
 
             if integration.propagate_scope:
                 if is_async_emulated_with_threads:
-                    warnings.warn(
+                    logger.warning(
                         "There is a known issue with Django channels 2.x and 3.x when using Python 3.8 or older. "
                         "(Async support is emulated using threads and some Sentry data may be leaked between those threads.) "
                         "Please either upgrade to Django channels 4.0+, use Django's async features "
                         "available in Django 3.1+ instead of Django channels, or upgrade to Python 3.9+.",
-                        stacklevel=2,
                     )
                     isolation_scope = sentry_sdk.get_isolation_scope()
                     current_scope = sentry_sdk.get_current_scope()

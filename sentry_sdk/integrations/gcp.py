@@ -68,7 +68,6 @@ def _wrap_func(func: "F") -> "F":
                         gcp_event, configured_time, initial_time
                     )
                 )
-                scope.set_tag("gcp_region", environ.get("FUNCTION_REGION"))
                 timeout_thread = None
                 if (
                     integration.timeout_warning
@@ -246,9 +245,10 @@ def _make_request_event_processor(
         if hasattr(gcp_event, "method"):
             request["method"] = gcp_event.method
 
+        client_options = sentry_sdk.get_client().options
+
         if hasattr(gcp_event, "query_string"):
             query_string = gcp_event.query_string.decode("utf-8", errors="replace")
-            client_options = sentry_sdk.get_client().options
             if has_data_collection_enabled(client_options):
                 if query_string:
                     filtered_qs = _apply_data_collection_filtering_to_query_string(
@@ -263,11 +263,16 @@ def _make_request_event_processor(
         if hasattr(gcp_event, "headers"):
             request["headers"] = _filter_headers(gcp_event.headers)
 
-        if should_send_default_pii():
-            if hasattr(gcp_event, "data"):
+        if hasattr(gcp_event, "data"):
+            if has_data_collection_enabled(client_options):
+                if (
+                    "incoming_request"
+                    in client_options["data_collection"]["http_bodies"]
+                ):
+                    request["data"] = gcp_event.data
+            elif should_send_default_pii():
                 request["data"] = gcp_event.data
-        else:
-            if hasattr(gcp_event, "data"):
+            else:
                 # Unfortunately couldn't find a way to get structured body from GCP
                 # event. Meaning every body is unstructured to us.
                 request["data"] = AnnotatedValue.removed_because_raw_data()

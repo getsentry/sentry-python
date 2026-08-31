@@ -4,7 +4,7 @@ import functools
 from typing import Any
 
 import pytest
-from litestar import Controller, Litestar, get
+from litestar import Controller, Litestar, get, post
 from litestar.exceptions import HTTPException
 from litestar.logging.config import LoggingConfig
 from litestar.middleware import AbstractMiddleware
@@ -15,7 +15,6 @@ from litestar.testing import TestClient
 
 import sentry_sdk
 from sentry_sdk import capture_message
-from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.integrations.litestar import LitestarIntegration
 from tests.conftest import ApproxDict
 from tests.integrations.conftest import parametrize_test_configurable_status_codes
@@ -49,6 +48,11 @@ def litestar_app_factory(middleware=None, debug=True, exception_handlers=None):
         capture_message("hi")
         return {"status": "ok"}
 
+    @post("/body/json")
+    async def body_json(data: "dict[str, Any]") -> "dict[str, Any]":
+        capture_message("hi")
+        return {"status": "ok"}
+
     logging_config = LoggingConfig()
 
     app = Litestar(
@@ -57,6 +61,7 @@ def litestar_app_factory(middleware=None, debug=True, exception_handlers=None):
             custom_error,
             message,
             message_with_id,
+            body_json,
             MyController,
         ],
         debug=debug,
@@ -91,51 +96,34 @@ def litestar_app_factory(middleware=None, debug=True, exception_handlers=None):
         ),
     ],
 )
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_catch_exceptions(
     sentry_init,
     capture_exceptions,
-    capture_events,
     capture_items,
     test_url,
     expected_error,
     expected_message,
     expected_tx_name,
-    span_streaming,
 ):
     sentry_init(
         integrations=[LitestarIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
     litestar_app = litestar_app_factory()
     client = TestClient(litestar_app)
     exceptions = capture_exceptions()
-    if span_streaming:
-        items = capture_items("event")
+    items = capture_items("event")
 
-        try:
-            client.get(test_url)
-        except Exception:
-            pass
+    try:
+        client.get(test_url)
+    except Exception:
+        pass
 
-        (exc,) = exceptions
-        assert isinstance(exc, expected_error)
-        assert str(exc) == expected_message
+    (exc,) = exceptions
+    assert isinstance(exc, expected_error)
+    assert str(exc) == expected_message
 
-        (event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
-
-        try:
-            client.get(test_url)
-        except Exception:
-            pass
-
-        (exc,) = exceptions
-        assert isinstance(exc, expected_error)
-        assert str(exc) == expected_message
-
-        (event,) = events
+    (event,) = (item.payload for item in items)
     assert expected_tx_name in event["transaction"]
     assert event["exception"]["values"][0]["mechanism"]["type"] == "litestar"
 
@@ -157,61 +145,42 @@ def test_catch_exceptions(
         ),
     ],
 )
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_transaction_name_and_source(
+def test_segment_name_and_source(
     sentry_init,
-    capture_events,
     test_url,
     expected_tx_name,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
     litestar_app = litestar_app_factory()
     client = TestClient(litestar_app)
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("span")
+    try:
+        client.get(test_url)
+    except Exception:
+        pass
 
-        try:
-            client.get(test_url)
-        except Exception:
-            pass
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-
-        spans = [span for span in spans if expected_tx_name in span["name"]]
-        assert len(spans) == 1
-        assert spans[0]["attributes"]["sentry.segment.name.source"] == "component"
-    else:
-        events = capture_events()
-
-        try:
-            client.get(test_url)
-        except Exception:
-            pass
-
-        (_, transaction) = events
-        assert expected_tx_name in transaction["transaction"]
-        assert transaction["transaction_info"] == {"source": "component"}
+    spans = [span for span in spans if expected_tx_name in span["name"]]
+    assert len(spans) == 1
+    assert spans[0]["attributes"]["sentry.segment.name.source"] == "component"
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_middleware_spans(
     sentry_init,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     logging_config = LoggingMiddlewareConfig()
@@ -228,57 +197,32 @@ def test_middleware_spans(
     client = TestClient(
         litestar_app, raise_server_exceptions=False, base_url="http://testserver.local"
     )
-    if span_streaming:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        client.get("/message")
+    client.get("/message")
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
 
-        expected = {"SessionMiddleware", "LoggingMiddleware", "RateLimitMiddleware"}
-        found = set()
+    expected = {"SessionMiddleware", "LoggingMiddleware", "RateLimitMiddleware"}
+    found = set()
 
-        litestar_spans = (
-            span
-            for span in spans
-            if span["attributes"]["sentry.op"] == "middleware.litestar"
-        )
+    litestar_spans = (
+        span
+        for span in spans
+        if span["attributes"]["sentry.op"] == "middleware.litestar"
+    )
 
-        for span in litestar_spans:
-            assert span["name"] in expected
-            assert span["name"] not in found
-            found.add(span["name"])
-            assert span["name"] == span["attributes"]["middleware.name"]
-    else:
-        events = capture_events()
-
-        client.get("/message")
-
-        (_, transaction_event) = events
-
-        expected = {"SessionMiddleware", "LoggingMiddleware", "RateLimitMiddleware"}
-        found = set()
-
-        litestar_spans = (
-            span
-            for span in transaction_event["spans"]
-            if span["op"] == "middleware.litestar"
-        )
-
-        for span in litestar_spans:
-            assert span["description"] in expected
-            assert span["description"] not in found
-            found.add(span["description"])
-            assert span["description"] == span["tags"]["litestar.middleware_name"]
+    for span in litestar_spans:
+        assert span["name"] in expected
+        assert span["name"] not in found
+        found.add(span["name"])
+        assert span["name"] == span["attributes"]["middleware.name"]
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_middleware_callback_spans(
     sentry_init,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     class SampleMiddleware(AbstractMiddleware):
         async def __call__(self, scope, receive, send) -> None:
@@ -293,98 +237,60 @@ def test_middleware_callback_spans(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     litestar_app = litestar_app_factory(middleware=[SampleMiddleware])
     client = TestClient(litestar_app, raise_server_exceptions=False)
-    if span_streaming:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        client.get("/message")
+    client.get("/message")
 
-        spans = [item.payload for item in items]
+    spans = [item.payload for item in items]
 
-        expected_litestar_spans = [
-            {
-                "name": "SampleMiddleware",
-                "attributes": ApproxDict(
-                    {
-                        "middleware.name": "SampleMiddleware",
-                        "sentry.op": "middleware.litestar",
-                    },
-                ),
-            },
-            {
-                "name": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
-                "attributes": ApproxDict(
-                    {
-                        "middleware.name": "SampleMiddleware",
-                        "sentry.op": "middleware.litestar.send",
-                    }
-                ),
-            },
-            {
-                "name": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
-                "attributes": ApproxDict(
-                    {
-                        "middleware.name": "SampleMiddleware",
-                        "sentry.op": "middleware.litestar.send",
-                    }
-                ),
-            },
-        ]
+    expected_litestar_spans = [
+        {
+            "name": "SampleMiddleware",
+            "attributes": ApproxDict(
+                {
+                    "middleware.name": "SampleMiddleware",
+                    "sentry.op": "middleware.litestar",
+                },
+            ),
+        },
+        {
+            "name": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
+            "attributes": ApproxDict(
+                {
+                    "middleware.name": "SampleMiddleware",
+                    "sentry.op": "middleware.litestar.send",
+                }
+            ),
+        },
+        {
+            "name": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
+            "attributes": ApproxDict(
+                {
+                    "middleware.name": "SampleMiddleware",
+                    "sentry.op": "middleware.litestar.send",
+                }
+            ),
+        },
+    ]
 
-        def is_matching_span(expected_span, actual_span):
-            return (
-                expected_span["name"] == actual_span["name"]
-                and expected_span["attributes"] == actual_span["attributes"]
-            )
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-        actual_litestar_spans = list(
-            span
-            for span in spans
-            if "middleware.litestar" in span["attributes"].get("sentry.op")
+    def is_matching_span(expected_span, actual_span):
+        return (
+            expected_span["name"] == actual_span["name"]
+            and expected_span["attributes"] == actual_span["attributes"]
         )
-    else:
-        events = capture_events()
 
-        client.get("/message")
-
-        (_, transaction_events) = events
-
-        expected_litestar_spans = [
-            {
-                "op": "middleware.litestar",
-                "description": "SampleMiddleware",
-                "tags": {"litestar.middleware_name": "SampleMiddleware"},
-            },
-            {
-                "op": "middleware.litestar.send",
-                "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
-                "tags": {"litestar.middleware_name": "SampleMiddleware"},
-            },
-            {
-                "op": "middleware.litestar.send",
-                "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
-                "tags": {"litestar.middleware_name": "SampleMiddleware"},
-            },
-        ]
-
-        def is_matching_span(expected_span, actual_span):
-            return (
-                expected_span["op"] == actual_span["op"]
-                and expected_span["description"] == actual_span["description"]
-                and expected_span["tags"] == actual_span["tags"]
-            )
-
-        actual_litestar_spans = list(
-            span
-            for span in transaction_events["spans"]
-            if "middleware.litestar" in span["op"]
-        )
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    actual_litestar_spans = list(
+        span
+        for span in spans
+        if "middleware.litestar" in span["attributes"].get("sentry.op")
+    )
 
     assert len(actual_litestar_spans) == 3
 
@@ -395,8 +301,9 @@ def test_middleware_callback_spans(
         )
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_middleware_receive_send(sentry_init, capture_items, span_streaming):
+def test_middleware_receive_send(
+    sentry_init,
+):
     class SampleReceiveSendMiddleware(AbstractMiddleware):
         async def __call__(self, scope, receive, send):
             message = await receive()
@@ -411,7 +318,7 @@ def test_middleware_receive_send(sentry_init, capture_items, span_streaming):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
     litestar_app = litestar_app_factory(middleware=[SampleReceiveSendMiddleware])
 
@@ -420,12 +327,9 @@ def test_middleware_receive_send(sentry_init, capture_items, span_streaming):
     client.get("/message")
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_middleware_partial_receive_send(
     sentry_init,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     class SamplePartialReceiveSendMiddleware(AbstractMiddleware):
         async def __call__(self, scope, receive, send):
@@ -450,106 +354,60 @@ def test_middleware_partial_receive_send(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[LitestarIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     litestar_app = litestar_app_factory(middleware=[SamplePartialReceiveSendMiddleware])
     client = TestClient(litestar_app, raise_server_exceptions=False)
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("span")
+    # See SamplePartialReceiveSendMiddleware.__call__ above for assertions of correct behavior
+    client.get("/message")
 
-        # See SamplePartialReceiveSendMiddleware.__call__ above for assertions of correct behavior
-        client.get("/message")
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
+    expected_litestar_spans = [
+        {
+            "name": "SamplePartialReceiveSendMiddleware",
+            "attributes": ApproxDict(
+                {
+                    "middleware.name": "SamplePartialReceiveSendMiddleware",
+                    "sentry.op": "middleware.litestar",
+                }
+            ),
+        },
+        {
+            "name": "TestClientTransport.create_receive.<locals>.receive",
+            "attributes": ApproxDict(
+                {
+                    "middleware.name": "SamplePartialReceiveSendMiddleware",
+                    "sentry.op": "middleware.litestar.receive",
+                }
+            ),
+        },
+        {
+            "name": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
+            "attributes": ApproxDict(
+                {
+                    "middleware.name": "SamplePartialReceiveSendMiddleware",
+                    "sentry.op": "middleware.litestar.send",
+                }
+            ),
+        },
+    ]
 
-        expected_litestar_spans = [
-            {
-                "name": "SamplePartialReceiveSendMiddleware",
-                "attributes": ApproxDict(
-                    {
-                        "middleware.name": "SamplePartialReceiveSendMiddleware",
-                        "sentry.op": "middleware.litestar",
-                    }
-                ),
-            },
-            {
-                "name": "TestClientTransport.create_receive.<locals>.receive",
-                "attributes": ApproxDict(
-                    {
-                        "middleware.name": "SamplePartialReceiveSendMiddleware",
-                        "sentry.op": "middleware.litestar.receive",
-                    }
-                ),
-            },
-            {
-                "name": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
-                "attributes": ApproxDict(
-                    {
-                        "middleware.name": "SamplePartialReceiveSendMiddleware",
-                        "sentry.op": "middleware.litestar.send",
-                    }
-                ),
-            },
-        ]
-
-        def is_matching_span(expected_span, actual_span):
-            return (
-                actual_span["name"].startswith(expected_span["name"])
-                and expected_span["attributes"] == actual_span["attributes"]
-            )
-
-        actual_litestar_spans = list(
-            span
-            for span in spans
-            if "middleware.litestar" in span["attributes"].get("sentry.op")
+    def is_matching_span(expected_span, actual_span):
+        return (
+            actual_span["name"].startswith(expected_span["name"])
+            and expected_span["attributes"] == actual_span["attributes"]
         )
-    else:
-        events = capture_events()
 
-        # See SamplePartialReceiveSendMiddleware.__call__ above for assertions of correct behavior
-        client.get("/message")
-
-        (_, transaction_events) = events
-
-        expected_litestar_spans = [
-            {
-                "op": "middleware.litestar",
-                "description": "SamplePartialReceiveSendMiddleware",
-                "tags": {
-                    "litestar.middleware_name": "SamplePartialReceiveSendMiddleware"
-                },
-            },
-            {
-                "op": "middleware.litestar.receive",
-                "description": "TestClientTransport.create_receive.<locals>.receive",
-                "tags": {
-                    "litestar.middleware_name": "SamplePartialReceiveSendMiddleware"
-                },
-            },
-            {
-                "op": "middleware.litestar.send",
-                "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
-                "tags": {
-                    "litestar.middleware_name": "SamplePartialReceiveSendMiddleware"
-                },
-            },
-        ]
-
-        def is_matching_span(expected_span, actual_span):
-            return (
-                expected_span["op"] == actual_span["op"]
-                and actual_span["description"].startswith(expected_span["description"])
-                and expected_span["tags"] == actual_span["tags"]
-            )
-
-        actual_litestar_spans = list(
-            span
-            for span in transaction_events["spans"]
-            if "middleware.litestar" in span["op"]
-        )
+    actual_litestar_spans = list(
+        span
+        for span in spans
+        if "middleware.litestar" in span["attributes"].get("sentry.op")
+    )
     assert len(actual_litestar_spans) == 3
 
     for expected_span in expected_litestar_spans:
@@ -559,17 +417,14 @@ def test_middleware_partial_receive_send(
         )
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_span_origin(
     sentry_init,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[LitestarIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     logging_config = LoggingMiddlewareConfig()
@@ -586,40 +441,26 @@ def test_span_origin(
     client = TestClient(
         litestar_app, raise_server_exceptions=False, base_url="http://testserver.local"
     )
-    if span_streaming:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        client.get("/message")
+    client.get("/message")
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
 
-        for span in spans:
-            if span["attributes"]["sentry.origin"] == "auto.http.httpx":
-                continue
-            assert span["attributes"]["sentry.origin"] == "auto.http.litestar"
-    else:
-        events = capture_events()
-
-        client.get("/message")
-
-        (_, event) = events
-
-        assert event["contexts"]["trace"]["origin"] == "auto.http.litestar"
-        for span in event["spans"]:
-            assert span["origin"] == "auto.http.litestar"
+    for span in spans:
+        if span["attributes"]["sentry.origin"] == "auto.http.httpx":
+            continue
+        assert span["attributes"]["sentry.origin"] == "auto.http.litestar"
 
 
 @pytest.mark.parametrize("init_kwargs, expect_user", DATA_COLLECTION_USER_INFO_CASES)
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_litestar_scope_user_on_exception_event(
     sentry_init,
     capture_exceptions,
-    capture_events,
     capture_items,
     init_kwargs,
     expect_user,
-    span_streaming,
 ):
     class TestUserMiddleware(AbstractMiddleware):
         async def __call__(self, scope, receive, send):
@@ -632,36 +473,23 @@ def test_litestar_scope_user_on_exception_event(
 
     sentry_init(
         integrations=[LitestarIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
         **init_kwargs,
     )
 
     litestar_app = litestar_app_factory(middleware=[TestUserMiddleware])
     client = TestClient(litestar_app)
     exceptions = capture_exceptions()
-    if span_streaming:
-        items = capture_items("event")
+    items = capture_items("event")
 
-        # This request intentionally raises an exception
-        try:
-            client.get("/some_url")
-        except Exception:
-            pass
+    # This request intentionally raises an exception
+    try:
+        client.get("/some_url")
+    except Exception:
+        pass
 
-        assert len(exceptions) == 1
-        (event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
-
-        # This request intentionally raises an exception
-        try:
-            client.get("/some_url")
-        except Exception:
-            pass
-
-        assert len(exceptions) == 1
-        assert len(events) == 1
-        (event,) = events
+    assert len(exceptions) == 1
+    (event,) = (item.payload for item in items)
 
     if expect_user:
         assert "user" in event
@@ -677,142 +505,13 @@ def test_litestar_scope_user_on_exception_event(
 COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
 
 
-@pytest.mark.parametrize(
-    "init_kwargs, expected_cookies",
-    [
-        pytest.param(
-            {"send_default_pii": True},
-            {
-                "jwt": "tokenval",
-                "theme": "dark",
-                "lang": "en",
-                "identity": "alice",
-            },
-            id="send_default_pii_true",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            None,
-            id="send_default_pii_false",
-        ),
-        pytest.param(
-            {},
-            None,
-            id="defaults",
-        ),
-        pytest.param(
-            {"_experiments": {"data_collection": {"cookies": {"mode": "off"}}}},
-            None,
-            id="data_collection_off",
-        ),
-        pytest.param(
-            {"_experiments": {"data_collection": {"cookies": {"mode": "denylist"}}}},
-            {
-                "jwt": SENSITIVE_DATA_SUBSTITUTE,
-                "theme": "dark",
-                "lang": "en",
-                "identity": SENSITIVE_DATA_SUBSTITUTE,
-            },
-            id="data_collection_denylist_default",
-        ),
-        pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "cookies": {"mode": "denylist", "terms": ["theme"]}
-                    }
-                }
-            },
-            {
-                "jwt": SENSITIVE_DATA_SUBSTITUTE,
-                "theme": SENSITIVE_DATA_SUBSTITUTE,
-                "lang": "en",
-                "identity": SENSITIVE_DATA_SUBSTITUTE,
-            },
-            id="data_collection_denylist_custom_terms",
-        ),
-        pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "cookies": {"mode": "allowlist", "terms": ["theme"]}
-                    }
-                }
-            },
-            {
-                "jwt": SENSITIVE_DATA_SUBSTITUTE,
-                "theme": "dark",
-                "lang": SENSITIVE_DATA_SUBSTITUTE,
-                "identity": SENSITIVE_DATA_SUBSTITUTE,
-            },
-            id="data_collection_allowlist",
-        ),
-        pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "cookies": {"mode": "allowlist", "terms": ["identity"]}
-                    }
-                }
-            },
-            {
-                "jwt": SENSITIVE_DATA_SUBSTITUTE,
-                "theme": SENSITIVE_DATA_SUBSTITUTE,
-                "lang": SENSITIVE_DATA_SUBSTITUTE,
-                "identity": SENSITIVE_DATA_SUBSTITUTE,
-            },
-            id="data_collection_allowlist_sensitive_term",
-        ),
-        pytest.param(
-            {
-                "send_default_pii": False,
-                "_experiments": {"data_collection": {"cookies": {"mode": "denylist"}}},
-            },
-            {
-                "jwt": SENSITIVE_DATA_SUBSTITUTE,
-                "theme": "dark",
-                "lang": "en",
-                "identity": SENSITIVE_DATA_SUBSTITUTE,
-            },
-            id="data_collection_wins_over_send_default_pii",
-        ),
-    ],
-)
-def test_cookie_data_collection(
-    sentry_init, capture_events, init_kwargs, expected_cookies
-):
-    sentry_init(
-        traces_sample_rate=1.0,
-        integrations=[LitestarIntegration()],
-        **init_kwargs,
-    )
-
-    litestar_app = litestar_app_factory()
-    events = capture_events()
-
-    client = TestClient(litestar_app)
-    client.get("/message", headers={"cookie": COOKIE_HEADER})
-
-    (event, transaction_event) = events
-
-    if expected_cookies is None:
-        assert "cookies" not in event["request"]
-        assert "cookies" not in transaction_event["request"]
-    else:
-        assert event["request"]["cookies"] == expected_cookies
-        assert transaction_event["request"]["cookies"] == expected_cookies
-
-
 @parametrize_test_configurable_status_codes
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_configurable_status_codes_handler(
     sentry_init,
-    capture_events,
     capture_items,
     failed_request_status_codes,
     status_code,
     expected_error,
-    span_streaming,
 ):
     integration_kwargs = (
         {"failed_request_status_codes": failed_request_status_codes}
@@ -821,7 +520,7 @@ def test_configurable_status_codes_handler(
     )
     sentry_init(
         integrations=[LitestarIntegration(**integration_kwargs)],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     @get("/error")
@@ -830,31 +529,22 @@ def test_configurable_status_codes_handler(
 
     app = Litestar([error])
     client = TestClient(app)
+    items = capture_items("event")
 
-    if span_streaming:
-        items = capture_items("event")
+    client.get("/error")
 
-        client.get("/error")
-
-        events = [item.payload for item in items]
-    else:
-        events = capture_events()
-
-        client.get("/error")
+    events = [item.payload for item in items]
 
     assert len(events) == int(expected_error)
 
 
 @parametrize_test_configurable_status_codes
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_configurable_status_codes_middleware(
     sentry_init,
-    capture_events,
     capture_items,
     failed_request_status_codes,
     status_code,
     expected_error,
-    span_streaming,
 ):
     integration_kwargs = (
         {"failed_request_status_codes": failed_request_status_codes}
@@ -864,7 +554,7 @@ def test_configurable_status_codes_middleware(
 
     sentry_init(
         integrations=[LitestarIntegration(**integration_kwargs)],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     def create_raising_middleware(app):
@@ -878,31 +568,22 @@ def test_configurable_status_codes_middleware(
 
     app = Litestar([error], middleware=[create_raising_middleware])
     client = TestClient(app)
+    items = capture_items("event")
 
-    if span_streaming:
-        items = capture_items("event")
+    client.get("/error")
 
-        client.get("/error")
-
-        events = [item.payload for item in items]
-    else:
-        events = capture_events()
-
-        client.get("/error")
+    events = [item.payload for item in items]
 
     assert len(events) == int(expected_error)
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_catch_non_http_exceptions_in_middleware(
     sentry_init,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[LitestarIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     def create_raising_middleware(app):
@@ -916,23 +597,14 @@ def test_catch_non_http_exceptions_in_middleware(
 
     app = Litestar([error], middleware=[create_raising_middleware])
     client = TestClient(app)
+    items = capture_items("event")
 
-    if span_streaming:
-        items = capture_items("event")
+    try:
+        client.get("/error")
+    except RuntimeError:
+        pass
 
-        try:
-            client.get("/error")
-        except RuntimeError:
-            pass
-
-        events = [item.payload for item in items]
-    else:
-        events = capture_events()
-
-        try:
-            client.get("/error")
-        except RuntimeError:
-            pass
+    events = [item.payload for item in items]
 
     assert len(events) == 1
     event_exception = events[0]["exception"]["values"][0]

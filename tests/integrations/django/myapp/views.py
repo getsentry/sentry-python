@@ -7,7 +7,12 @@ from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.dispatch import Signal
-from django.http import HttpResponse, HttpResponseNotFound, HttpResponseServerError
+from django.http import (
+    Http404,
+    HttpResponse,
+    HttpResponseNotFound,
+    HttpResponseServerError,
+)
 from django.shortcuts import render
 from django.template import Context, Template
 from django.template.response import TemplateResponse
@@ -337,6 +342,11 @@ def postgres_insert_orm_atomic_exception(request, *args, **kwargs):
 @csrf_exempt
 def permission_denied_exc(*args, **kwargs):
     raise PermissionDenied("bye")
+
+
+@csrf_exempt
+def http404_exc(*args, **kwargs):
+    raise Http404("bye")
 
 
 def csrf_hello_not_exempt(*args, **kwargs):

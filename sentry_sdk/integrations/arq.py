@@ -3,10 +3,9 @@ import sys
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SegmentNameSource
-from sentry_sdk.tracing import Transaction, TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
@@ -65,7 +64,7 @@ class ArqIntegration(Integration):
 
         _register_control_flow_exception(ARQ_CONTROL_FLOW_EXCEPTIONS)  # type: ignore
 
-        ignore_logger("arq.worker")
+        ignore_logger_for_events("arq.worker")
 
 
 def patch_enqueue_job() -> None:
@@ -79,21 +78,15 @@ def patch_enqueue_job() -> None:
         if client.get_integration(ArqIntegration) is None:
             return await old_enqueue_job(self, function, *args, **kwargs)
 
-        if has_span_streaming_enabled(client.options):
-            if sentry_sdk.traces.get_current_span() is None:
-                return await old_enqueue_job(self, function, *args, **kwargs)
+        if sentry_sdk.traces.get_current_span() is None:
+            return await old_enqueue_job(self, function, *args, **kwargs)
 
-            with sentry_sdk.traces.start_span(
-                name=function,
-                attributes={
-                    "sentry.op": OP.QUEUE_SUBMIT_ARQ,
-                    "sentry.origin": ArqIntegration.origin,
-                },
-            ):
-                return await old_enqueue_job(self, function, *args, **kwargs)
-
-        with sentry_sdk.start_span(
-            op=OP.QUEUE_SUBMIT_ARQ, name=function, origin=ArqIntegration.origin
+        with sentry_sdk.traces.start_span(
+            name=function,
+            attributes={
+                "sentry.op": OP.QUEUE_SUBMIT_ARQ,
+                "sentry.origin": ArqIntegration.origin,
+            },
         ):
             return await old_enqueue_job(self, function, *args, **kwargs)
 
@@ -113,34 +106,20 @@ def patch_run_job() -> None:
             scope._name = "arq"
             scope.clear_breadcrumbs()
 
-            if has_span_streaming_enabled(client.options):
-                with sentry_sdk.traces.start_span(
-                    name="unknown arq task",
-                    attributes={
-                        "sentry.op": OP.QUEUE_TASK_ARQ,
-                        "sentry.origin": ArqIntegration.origin,
-                        "sentry.segment.name.source": SegmentNameSource.TASK,
-                        SPANDATA.MESSAGING_MESSAGE_ID: job_id,
-                    },
-                    parent_span=None,
-                ) as span:
-                    if self.queue_name is not None:
-                        span.set_attribute(
-                            SPANDATA.MESSAGING_DESTINATION_NAME, self.queue_name
-                        )
-                    return await old_run_job(self, job_id, score)
-
-            transaction = Transaction(
+            with sentry_sdk.traces.start_span(
                 name="unknown arq task",
-                status="ok",
-                op=OP.QUEUE_TASK_ARQ,
-                source=TransactionSource.TASK,
-                origin=ArqIntegration.origin,
-            )
-
-            with sentry_sdk.start_transaction(transaction) as span:
+                attributes={
+                    "sentry.op": OP.QUEUE_TASK_ARQ,
+                    "sentry.origin": ArqIntegration.origin,
+                    "sentry.segment.name.source": SegmentNameSource.TASK,
+                    SPANDATA.MESSAGING_MESSAGE_ID: job_id,
+                },
+                parent_span=None,
+            ) as span:
                 if self.queue_name is not None:
-                    span.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, self.queue_name)
+                    span.set_attribute(
+                        SPANDATA.MESSAGING_DESTINATION_NAME, self.queue_name
+                    )
                 return await old_run_job(self, job_id, score)
 
     Worker.run_job = _sentry_run_job

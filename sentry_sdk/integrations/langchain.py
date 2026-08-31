@@ -1,7 +1,6 @@
 import itertools
 import json
 import sys
-import warnings
 from collections import OrderedDict
 from functools import wraps
 from typing import TYPE_CHECKING, NamedTuple
@@ -149,6 +148,7 @@ def _get_ai_system(all_params: "Dict[str, Any]") -> "Optional[str]":
 
 DATA_FIELDS = {
     "frequency_penalty": SPANDATA.GEN_AI_REQUEST_FREQUENCY_PENALTY,
+    # "function_call" is an OpenAI convention for the now-legacy Chat Completions API field
     "function_call": SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
     "max_tokens": SPANDATA.GEN_AI_REQUEST_MAX_TOKENS,
     "presence_penalty": SPANDATA.GEN_AI_REQUEST_PRESENCE_PENALTY,
@@ -235,18 +235,8 @@ class LangchainIntegration(Integration):
     def __init__(
         self: "LangchainIntegration",
         include_prompts: bool = True,
-        max_spans: "Optional[int]" = None,
     ) -> None:
         self.include_prompts = include_prompts
-        self.max_spans = max_spans
-
-        if max_spans is not None:
-            warnings.warn(
-                "The `max_spans` parameter of `LangchainIntegration` is "
-                "deprecated and will be removed in version 3.0 of sentry-sdk.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
 
     @staticmethod
     def setup_once() -> None:
@@ -273,18 +263,9 @@ class LangchainIntegration(Integration):
 class SentryLangchainCallback(BaseCallbackHandler):
     """Callback handler that creates Sentry spans."""
 
-    def __init__(
-        self, max_span_map_size: "Optional[int]", include_prompts: bool
-    ) -> None:
+    def __init__(self, include_prompts: bool) -> None:
         self.span_map: "OrderedDict[UUID, Union[sentry_sdk.tracing.Span, StreamedSpan]]" = OrderedDict()
-        self.max_span_map_size = max_span_map_size
         self.include_prompts = include_prompts
-
-    def gc_span_map(self) -> None:
-        if self.max_span_map_size is not None:
-            while len(self.span_map) > self.max_span_map_size:
-                run_id, span = self.span_map.popitem(last=False)
-                self._exit_span(span, run_id)
 
     def _handle_error(self, run_id: "UUID", error: "Any") -> None:
         is_ignored = isinstance(error, tuple(LangchainIntegration._ignored_exceptions))
@@ -355,7 +336,6 @@ class SentryLangchainCallback(BaseCallbackHandler):
 
         span.__enter__()
         self.span_map[run_id] = span
-        self.gc_span_map()
         return span
 
     def _exit_span(
@@ -422,6 +402,12 @@ class SentryLangchainCallback(BaseCallbackHandler):
 
             for key, attribute in DATA_FIELDS.items():
                 if key in all_params and all_params[key] is not None:
+                    # This is correctly gated on "inputs" at the moment because the
+                    # "on_llm_start" method is the start of a request.
+                    #
+                    # TODO: GEN_AI_RESPONSE_TOOL_CALLS will need to be
+                    # transitioned to non-deprecated tool call attributes
+
                     if (
                         attribute == SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS
                         and has_data_collection_enabled(client.options)
@@ -521,6 +507,11 @@ class SentryLangchainCallback(BaseCallbackHandler):
             for key, attribute in DATA_FIELDS.items():
                 if key in all_params and all_params[key] is not None:
                     if (
+                        # This is correctly gated on "inputs" at the moment because the
+                        # "on_chat_model_start" method is the start of a request.
+                        #
+                        # TODO: GEN_AI_RESPONSE_TOOL_CALLS will need to be
+                        # transitioned to non-deprecated tool call attributes
                         attribute == SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS
                         and has_data_collection_enabled(client.options)
                         and not client.options["data_collection"]["gen_ai"]["inputs"]
@@ -620,14 +611,11 @@ class SentryLangchainCallback(BaseCallbackHandler):
 
             client = sentry_sdk.get_client()
 
-            record_inputs = False
             record_outputs = False
             if has_data_collection_enabled(client.options):
-                record_inputs = client.options["data_collection"]["gen_ai"]["inputs"]
                 record_outputs = client.options["data_collection"]["gen_ai"]["outputs"]
             elif should_send_default_pii() and self.include_prompts:
                 # TODO: Remove this branch once `send_default_pii` is deprecated
-                record_inputs = True
                 record_outputs = True
 
             try:
@@ -652,7 +640,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
                 if response_model is not None:
                     set_on_span(SPANDATA.GEN_AI_RESPONSE_MODEL, response_model)
 
-                if record_inputs:
+                if record_outputs:
                     tool_calls = getattr(generation.message, "tool_calls", None)
                     if tool_calls is not None and tool_calls != []:
                         set_data_normalized(
@@ -1053,17 +1041,19 @@ def _set_tools_on_span(span: "Union[Span, StreamedSpan]", tools: "Any") -> None:
         return
 
     client = sentry_sdk.get_client()
+    attribute_name = SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS
     if has_data_collection_enabled(client.options):
         if not client.options["data_collection"]["gen_ai"]["inputs"]:
             return
-
+        else:
+            attribute_name = SPANDATA.GEN_AI_TOOL_DEFINITIONS
     # Before data collection was introduced this was set unconditionally, so it
     # stays that way when data collection is not configured.
     simplified_tools = _simplify_langchain_tools(tools)
     if simplified_tools:
         set_data_normalized(
             span,
-            SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+            attribute_name,
             simplified_tools,
             unpack=False,
         )
@@ -1124,7 +1114,6 @@ def _wrap_configure(f: "Callable[..., Any]") -> "Callable[..., Any]":
             for cb in itertools.chain(callbacks_list, inheritable_callbacks_list)
         ):
             sentry_handler = SentryLangchainCallback(
-                integration.max_spans,
                 integration.include_prompts,
             )
             if isinstance(local_callbacks, BaseCallbackManager):

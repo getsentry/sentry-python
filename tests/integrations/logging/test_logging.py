@@ -4,14 +4,15 @@ from unittest import mock
 
 import pytest
 
+import sentry_sdk
 from sentry_sdk import get_client
 from sentry_sdk.consts import VERSION
 from sentry_sdk.integrations.logging import (
     LoggingIntegration,
     ignore_logger,
-    ignore_logger_for_sentry_logs,
+    ignore_logger_for_events,
     unignore_logger,
-    unignore_logger_for_sentry_logs,
+    unignore_logger_for_events,
 )
 
 other_logger = logging.getLogger("testfoo")
@@ -24,9 +25,75 @@ def reset_level():
     logger.setLevel(logging.DEBUG)
 
 
+def test_logging_defaults(sentry_init, capture_events):
+    sentry_init()
+
+    events = capture_events()
+
+    logger.info("bread", extra=dict(foo=42))
+    logger.critical("lol", extra=dict(bar=69))
+
+    sentry_sdk.capture_message("hello")
+
+    sentry_sdk.flush()
+
+    for event in events:
+        print(event)
+        print()
+
+    # Without adding the integration explicitly, only the message should be
+    # captured (no logs), and it shouldn't have any breadcrumbs
+    assert len(events) == 1
+    (event,) = events
+    assert not event["breadcrumbs"]["values"]
+
+
+def test_logging_defaults_enabled(sentry_init, capture_items):
+    sentry_init(
+        integrations=[LoggingIntegration()],
+    )
+
+    items = capture_items()
+
+    logger.info("bread", extra=dict(foo=42))
+    logger.critical("lol", extra=dict(bar=69))
+
+    sentry_sdk.capture_message("hello")
+
+    sentry_sdk.flush()
+
+    assert len(items) == 3
+    message, log1, log2 = [item.payload for item in items]
+
+    assert len(message["breadcrumbs"]["values"]) == 2
+    crumb1, crumb2 = message["breadcrumbs"]["values"]
+
+    assert crumb1["type"] == "log"
+    assert crumb1["message"] == "bread"
+    assert crumb1["data"] == {"foo": 42}
+
+    assert crumb2["type"] == "log"
+    assert crumb2["message"] == "lol"
+    assert crumb2["data"] == {"bar": 69}
+
+    assert log1["level"] == "info"
+    assert log1["attributes"]["sentry.severity_number"] == 9
+    assert log1["attributes"]["sentry.severity_text"] == "info"
+    assert log1["attributes"]["foo"] == 42
+
+    assert log2["level"] == "fatal"
+    assert log2["attributes"]["sentry.severity_number"] == 21
+    assert log2["attributes"]["sentry.severity_text"] == "fatal"
+    assert log2["attributes"]["bar"] == 69
+
+
 @pytest.mark.parametrize("logger", [logger, other_logger])
-def test_logging_works_with_many_loggers(sentry_init, capture_events, logger):
-    sentry_init(integrations=[LoggingIntegration(event_level="ERROR")])
+def test_event_logging_works_with_many_loggers(sentry_init, capture_events, logger):
+    sentry_init(
+        integrations=[
+            LoggingIntegration(event_level=logging.ERROR, breadcrumb_level=logging.INFO)
+        ]
+    )
     events = capture_events()
 
     logger.info("bread")
@@ -39,28 +106,13 @@ def test_logging_works_with_many_loggers(sentry_init, capture_events, logger):
     assert any(crumb["message"] == "bread" for crumb in event["breadcrumbs"]["values"])
 
 
-@pytest.mark.parametrize("integrations", [None, [], [LoggingIntegration()]])
-@pytest.mark.parametrize(
-    "kwargs", [{"exc_info": None}, {}, {"exc_info": 0}, {"exc_info": False}]
-)
-def test_logging_defaults(integrations, sentry_init, capture_events, kwargs):
-    sentry_init(integrations=integrations)
-    events = capture_events()
-
-    logger.info("bread")
-    logger.critical("LOL", **kwargs)
-    (event,) = events
-
-    assert event["level"] == "fatal"
-    assert any(crumb["message"] == "bread" for crumb in event["breadcrumbs"]["values"])
-    assert not any(
-        crumb["message"] == "LOL" for crumb in event["breadcrumbs"]["values"]
+def test_event_logging_extra_data(sentry_init, capture_events):
+    sentry_init(
+        integrations=[
+            LoggingIntegration(breadcrumb_level=logging.INFO, event_level=logging.ERROR)
+        ],
+        default_integrations=False,
     )
-    assert "threads" not in event
-
-
-def test_logging_extra_data(sentry_init, capture_events):
-    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
     events = capture_events()
 
     logger.info("bread", extra=dict(foo=42))
@@ -76,8 +128,15 @@ def test_logging_extra_data(sentry_init, capture_events):
     )
 
 
-def test_logging_extra_data_integer_keys(sentry_init, capture_events):
-    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+def test_event_logging_extra_data_integer_keys(sentry_init, capture_events):
+    sentry_init(
+        integrations=[
+            LoggingIntegration(
+                breadcrumb_level=logging.INFO, event_level=logging.ERROR
+            ),
+        ],
+        default_integrations=False,
+    )
     events = capture_events()
 
     logger.critical("integer in extra keys", extra={1: 1})
@@ -94,8 +153,14 @@ def test_logging_extra_data_integer_keys(sentry_init, capture_events):
         pytest.param({"stack_info": True}, id="stack_info"),
     ),
 )
-def test_logging_stack_trace(sentry_init, capture_events, enable_stack_trace_kwarg):
-    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+def test_event_logging_stack_trace(
+    sentry_init, capture_events, enable_stack_trace_kwarg
+):
+    sentry_init(
+        integrations=[
+            LoggingIntegration(breadcrumb_level=logging.INFO, event_level=logging.ERROR)
+        ],
+    )
     events = capture_events()
 
     logger.error("first", **enable_stack_trace_kwarg)
@@ -113,8 +178,12 @@ def test_logging_stack_trace(sentry_init, capture_events, enable_stack_trace_kwa
     assert "threads" not in event_without
 
 
-def test_logging_level(sentry_init, capture_events):
-    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+def test_event_logging_level(sentry_init, capture_events):
+    sentry_init(
+        integrations=[
+            LoggingIntegration(breadcrumb_level=logging.INFO, event_level=logging.ERROR)
+        ],
+    )
     events = capture_events()
 
     logger.setLevel(logging.WARNING)
@@ -131,7 +200,7 @@ def test_logging_level(sentry_init, capture_events):
     assert not events
 
 
-def test_custom_log_level_names(sentry_init, capture_events):
+def test_event_logging_custom_level_names(sentry_init, capture_events):
     levels = {
         logging.DEBUG: "debug",
         logging.INFO: "info",
@@ -155,7 +224,6 @@ def test_custom_log_level_names(sentry_init, capture_events):
         logger.setLevel(logging_level)
         sentry_init(
             integrations=[LoggingIntegration(event_level=logging_level)],
-            default_integrations=False,
         )
         events = capture_events()
 
@@ -169,8 +237,12 @@ def test_custom_log_level_names(sentry_init, capture_events):
         del events[:]
 
 
-def test_logging_filters(sentry_init, capture_events):
-    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+def test_event_logging_filters(sentry_init, capture_events):
+    sentry_init(
+        integrations=[
+            LoggingIntegration(breadcrumb_level=logging.INFO, event_level=logging.ERROR)
+        ],
+    )
     events = capture_events()
 
     should_log = False
@@ -192,10 +264,9 @@ def test_logging_filters(sentry_init, capture_events):
     assert event["logentry"]["formatted"] == "hi"
 
 
-def test_logging_captured_warnings(sentry_init, capture_events, recwarn):
+def test_event_logging_captured_warnings(sentry_init, capture_events, recwarn):
     sentry_init(
         integrations=[LoggingIntegration(event_level="WARNING")],
-        default_integrations=False,
     )
     events = capture_events()
 
@@ -232,27 +303,27 @@ def test_logging_captured_warnings(sentry_init, capture_events, recwarn):
 
 
 def test_sentry_logs_collection_off_by_default(sentry_init, capture_items, request):
-    """Automatic logs capture by Sentry logs needs explicit opt-in via capture_sentry_logs."""
+    """Automatic logs capture by Sentry logs needs explicit opt-in to the integration."""
     sentry_init()
     items = capture_items("log")
 
     python_logger = logging.Logger("test-logger")
     python_logger.warning("this is %s a template %s", "1", "2")
 
-    get_client().flush()
+    sentry_sdk.flush()
 
     assert not items
 
 
 def test_sentry_logs_collection_opt_in(sentry_init, capture_items, request):
-    """Automatic logs capture by Sentry logs needs explicit opt-in via capture_sentry_logs."""
-    sentry_init(integrations=[LoggingIntegration(capture_sentry_logs=True)])
+    """Automatic logs capture by Sentry logs needs explicit opt-in to the integration."""
+    sentry_init(integrations=[LoggingIntegration()])
     items = capture_items("log")
 
     python_logger = logging.Logger("test-logger")
     python_logger.warning("this is %s a template %s", "1", "2")
 
-    get_client().flush()
+    sentry_sdk.flush()
 
     assert len(items) == 1
 
@@ -262,37 +333,45 @@ def test_sentry_logs_collection_opt_in(sentry_init, capture_items, request):
     assert log["attributes"]["sentry.severity_text"] == "warn"
 
 
-def test_ignore_logger(sentry_init, capture_events, request):
-    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+def test_ignore_logger_for_events(sentry_init, capture_events, request):
+    sentry_init(
+        integrations=[LoggingIntegration(event_level=logging.DEBUG)],
+    )
     events = capture_events()
 
-    ignore_logger("testfoo")
-    request.addfinalizer(lambda: unignore_logger("testfoo"))
+    ignore_logger_for_events("testfoo")
+    request.addfinalizer(lambda: unignore_logger_for_events("testfoo"))
 
     other_logger.error("hi")
 
     assert not events
 
 
-def test_ignore_logger_whitespace_padding(sentry_init, capture_events, request):
+def test_ignore_logger_for_events_whitespace_padding(
+    sentry_init, capture_events, request
+):
     """Here we test insensitivity to whitespace padding of ignored loggers"""
-    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    sentry_init(
+        integrations=[LoggingIntegration(event_level=logging.DEBUG)],
+    )
     events = capture_events()
 
-    ignore_logger("testfoo")
-    request.addfinalizer(lambda: unignore_logger("testfoo"))
+    ignore_logger_for_events("testfoo")
+    request.addfinalizer(lambda: unignore_logger_for_events("testfoo"))
 
     padded_logger = logging.getLogger("       testfoo   ")
     padded_logger.error("hi")
     assert not events
 
 
-def test_ignore_logger_wildcard(sentry_init, capture_events, request):
-    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+def test_ignore_logger_for_events_wildcard(sentry_init, capture_events, request):
+    sentry_init(
+        integrations=[LoggingIntegration(event_level=logging.DEBUG)],
+    )
     events = capture_events()
 
-    ignore_logger("testfoo.*")
-    request.addfinalizer(lambda: unignore_logger("testfoo.*"))
+    ignore_logger_for_events("testfoo.*")
+    request.addfinalizer(lambda: unignore_logger_for_events("testfoo.*"))
 
     nested_logger = logging.getLogger("testfoo.submodule")
 
@@ -305,13 +384,15 @@ def test_ignore_logger_wildcard(sentry_init, capture_events, request):
     assert event["logentry"]["formatted"] == "hi"
 
 
-def test_ignore_logger_does_not_affect_sentry_logs(sentry_init, capture_items, request):
-    """ignore_logger should suppress events/breadcrumbs but not Sentry Logs."""
-    sentry_init(integrations=[LoggingIntegration(capture_sentry_logs=True)])
+def test_ignore_logger_for_events_does_not_affect_sentry_logs(
+    sentry_init, capture_items, request
+):
+    """ignore_logger_for_events should suppress events/breadcrumbs but not Sentry Logs."""
+    sentry_init(integrations=[LoggingIntegration(event_level=logging.DEBUG)])
     items = capture_items("log")
 
-    ignore_logger("testfoo")
-    request.addfinalizer(lambda: unignore_logger("testfoo"))
+    ignore_logger_for_events("testfoo")
+    request.addfinalizer(lambda: unignore_logger_for_events("testfoo"))
 
     other_logger.error("hi")
     get_client().flush()
@@ -321,19 +402,17 @@ def test_ignore_logger_does_not_affect_sentry_logs(sentry_init, capture_items, r
     assert logs[0]["body"] == "hi"
 
 
-def test_ignore_logger_for_sentry_logs(
-    sentry_init, capture_envelopes, capture_items, request
-):
-    """ignore_logger_for_sentry_logs should suppress Sentry Logs but not events."""
-    sentry_init(integrations=[LoggingIntegration(capture_sentry_logs=True)])
+def test_ignore_logger(sentry_init, capture_envelopes, capture_items, request):
+    """ignore_logger should suppress Sentry Logs but not events."""
+    sentry_init(integrations=[LoggingIntegration(event_level=logging.ERROR)])
     envelopes = capture_envelopes()
     items = capture_items("log")
 
-    ignore_logger_for_sentry_logs("testfoo")
-    request.addfinalizer(lambda: unignore_logger_for_sentry_logs("testfoo"))
+    ignore_logger("testfoo")
+    request.addfinalizer(lambda: unignore_logger("testfoo"))
 
     other_logger.error("hi")
-    get_client().flush()
+    sentry_sdk.flush()
 
     # Event should still be captured
     event_envelopes = [e for e in envelopes if e.items[0].type == "event"]
@@ -344,9 +423,11 @@ def test_ignore_logger_for_sentry_logs(
     assert len(logs) == 0
 
 
-def test_logging_dictionary_interpolation(sentry_init, capture_events):
+def test_event_logging_dictionary_interpolation(sentry_init, capture_events):
     """Here we test an entire dictionary being interpolated into the log message."""
-    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    sentry_init(
+        integrations=[LoggingIntegration(event_level=logging.ERROR)],
+    )
     events = capture_events()
 
     logger.error("this is a log with a dictionary %s", {"foo": "bar"})
@@ -360,9 +441,11 @@ def test_logging_dictionary_interpolation(sentry_init, capture_events):
     assert event["logentry"]["params"] == {"foo": "bar"}
 
 
-def test_logging_dictionary_args(sentry_init, capture_events):
+def test_event_logging_dictionary_args(sentry_init, capture_events):
     """Here we test items from a dictionary being interpolated into the log message."""
-    sentry_init(integrations=[LoggingIntegration()], default_integrations=False)
+    sentry_init(
+        integrations=[LoggingIntegration(event_level=logging.ERROR)],
+    )
     events = capture_events()
 
     logger.error(
@@ -386,13 +469,13 @@ def test_sentry_logs_warning(sentry_init, capture_items):
     """
     The python logger module should create 'warn' sentry logs if the flag is on.
     """
-    sentry_init(integrations=[LoggingIntegration(capture_sentry_logs=True)])
+    sentry_init(integrations=[LoggingIntegration()])
     items = capture_items("log")
 
     python_logger = logging.Logger("test-logger")
     python_logger.warning("this is %s a template %s", "1", "2")
 
-    get_client().flush()
+    sentry_sdk.flush()
     logs = [item.payload for item in items]
     attrs = logs[0]["attributes"]
     assert attrs["sentry.message.template"] == "this is %s a template %s"
@@ -411,12 +494,12 @@ def test_sentry_logs_debug(sentry_init, capture_envelopes):
     """
     The python logger module should not create 'debug' sentry logs if the flag is on by default
     """
-    sentry_init(integrations=[LoggingIntegration(capture_sentry_logs=True)])
+    sentry_init(integrations=[LoggingIntegration()])
     envelopes = capture_envelopes()
 
     python_logger = logging.Logger("test-logger")
     python_logger.debug("this is %s a template %s", "1", "2")
-    get_client().flush()
+    sentry_sdk.flush()
 
     assert len(envelopes) == 0
 
@@ -426,18 +509,14 @@ def test_no_log_infinite_loop(sentry_init, capture_envelopes):
     If 'debug' mode is true, and you set a low log level in the logging integration, there should be no infinite loops.
     """
     sentry_init(
-        integrations=[
-            LoggingIntegration(
-                capture_sentry_logs=True, sentry_logs_level=logging.DEBUG
-            )
-        ],
+        integrations=[LoggingIntegration(level=logging.DEBUG)],
         debug=True,
     )
     envelopes = capture_envelopes()
 
     python_logger = logging.Logger("test-logger")
     python_logger.debug("this is %s a template %s", "1", "2")
-    get_client().flush()
+    sentry_sdk.flush()
 
     assert len(envelopes) == 1
 
@@ -446,14 +525,15 @@ def test_logging_errors(sentry_init, capture_envelopes, capture_items):
     """
     The python logger module should be able to log errors without erroring
     """
-    sentry_init(integrations=[LoggingIntegration(capture_sentry_logs=True)])
+    sentry_init(integrations=[LoggingIntegration(event_level=logging.ERROR)])
     envelopes = capture_envelopes()
     items = capture_items("log")
 
     python_logger = logging.Logger("test-logger")
     python_logger.error(Exception("test exc 1"))
     python_logger.error("error is %s", Exception("test exc 2"))
-    get_client().flush()
+
+    sentry_sdk.flush()
 
     error_event_1 = envelopes[0].items[0].payload.json
     assert error_event_1["level"] == "error"
@@ -482,7 +562,7 @@ def test_log_strips_project_root(sentry_init, capture_items):
     """
     sentry_init(
         project_root="/custom/test",
-        integrations=[LoggingIntegration(capture_sentry_logs=True)],
+        integrations=[LoggingIntegration()],
     )
     items = capture_items("log")
 
@@ -498,7 +578,7 @@ def test_log_strips_project_root(sentry_init, capture_items):
             exc_info=None,
         )
     )
-    get_client().flush()
+    sentry_sdk.flush()
 
     logs = [item.payload for item in items]
     assert len(logs) == 1
@@ -510,7 +590,7 @@ def test_logger_with_all_attributes(sentry_init, capture_items):
     """
     The python logger should be able to log all attributes, including extra data.
     """
-    sentry_init(integrations=[LoggingIntegration(capture_sentry_logs=True)])
+    sentry_init(integrations=[LoggingIntegration()])
     items = capture_items("log")
 
     python_logger = logging.Logger("test-logger")
@@ -519,7 +599,7 @@ def test_logger_with_all_attributes(sentry_init, capture_items):
         1,
         extra={"foo": "bar", "numeric": 42, "more_complex": {"nested": "data"}},
     )
-    get_client().flush()
+    sentry_sdk.flush()
 
     logs = [item.payload for item in items]
 
@@ -587,7 +667,7 @@ def test_sentry_logs_named_parameters(sentry_init, capture_items):
     """
     The python logger module should capture named parameters from dictionary arguments in Sentry logs.
     """
-    sentry_init(integrations=[LoggingIntegration(capture_sentry_logs=True)])
+    sentry_init(integrations=[LoggingIntegration()])
     items = capture_items("log")
 
     python_logger = logging.Logger("test-logger")
@@ -602,7 +682,7 @@ def test_sentry_logs_named_parameters(sentry_init, capture_items):
         },
     )
 
-    get_client().flush()
+    sentry_sdk.flush()
     logs = [item.payload for item in items]
 
     assert len(logs) == 1
@@ -632,7 +712,7 @@ def test_sentry_logs_named_parameters_complex_values(sentry_init, capture_items)
     """
     The python logger module should handle complex values in named parameters using safe_repr.
     """
-    sentry_init(integrations=[LoggingIntegration(capture_sentry_logs=True)])
+    sentry_init(integrations=[LoggingIntegration()])
     items = capture_items("log")
 
     python_logger = logging.Logger("test-logger")
@@ -645,7 +725,7 @@ def test_sentry_logs_named_parameters_complex_values(sentry_init, capture_items)
         },
     )
 
-    get_client().flush()
+    sentry_sdk.flush()
     logs = [item.payload for item in items]
 
     assert len(logs) == 1
@@ -666,13 +746,13 @@ def test_sentry_logs_no_parameters_no_template(sentry_init, capture_items):
     """
     There shouldn't be a template if there are no parameters.
     """
-    sentry_init(integrations=[LoggingIntegration(capture_sentry_logs=True)])
+    sentry_init(integrations=[LoggingIntegration()])
     items = capture_items("log")
 
     python_logger = logging.Logger("test-logger")
     python_logger.warning("Warning about something without any parameters.")
 
-    get_client().flush()
+    sentry_sdk.flush()
     logs = [item.payload for item in items]
 
     assert len(logs) == 1

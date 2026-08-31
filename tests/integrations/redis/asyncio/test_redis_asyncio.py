@@ -113,10 +113,6 @@ async def test_async_redis_pipeline(
                 SPANDATA.SERVER_PORT: 6379,
             }
         )
-        assert span["tags"] == {
-            "redis.transaction": is_transaction,
-            "redis.is_cluster": False,
-        }
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
