@@ -3,22 +3,18 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.data_collection import (
-    _apply_data_collection_filtering_to_query_string,
-)
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, Span
 from sentry_sdk.tracing_utils import (
     add_http_breadcrumb,
     add_sentry_baggage_to_headers,
+    get_url_attributes,
     has_span_streaming_enabled,
     should_propagate_trace,
 )
 from sentry_sdk.utils import (
     capture_internal_exceptions,
-    has_data_collection_enabled,
     parse_url,
     parse_version,
 )
@@ -28,9 +24,6 @@ if TYPE_CHECKING:
 
     from botocore.model import ServiceId
 
-    from sentry_sdk._types import Attributes
-    from sentry_sdk.client import BaseClient as SentryClient
-    from sentry_sdk.utils import ParsedUrl
 
 try:
     from botocore import __version__ as BOTOCORE_VERSION
@@ -70,40 +63,6 @@ class Boto3Integration(Integration):
         BaseClient.__init__ = sentry_patched_init  # type: ignore
 
 
-def _get_url_attributes(
-    client: "SentryClient", parsed_url: "Optional[ParsedUrl]"
-) -> "Attributes":
-    attributes: "Attributes" = {}
-    if parsed_url is None:
-        return attributes
-
-    query: "Optional[str]"
-    if has_data_collection_enabled(client.options):
-        query = None
-        if parsed_url.query:
-            query = _apply_data_collection_filtering_to_query_string(
-                query_string=parsed_url.query,
-                behaviour=client.options["data_collection"]["url_query_params"],
-            )
-    elif should_send_default_pii():
-        query = parsed_url.query
-    else:
-        return attributes
-
-    url_full = parsed_url.url
-    if query:
-        attributes[SPANDATA.URL_QUERY] = query
-        url_full += "?" + query
-
-    if parsed_url.fragment:
-        attributes[SPANDATA.URL_FRAGMENT] = parsed_url.fragment
-        url_full += "#" + parsed_url.fragment
-
-    attributes[SPANDATA.URL_FULL] = url_full
-
-    return attributes
-
-
 def _sentry_request_created(
     service_id: "ServiceId", request: "AWSRequest", operation_name: str, **kwargs: "Any"
 ) -> None:
@@ -123,7 +82,7 @@ def _sentry_request_created(
     is_span_streaming_enabled = has_span_streaming_enabled(client.options)
     span: "Union[Span, StreamedSpan, None]" = None
     if is_span_streaming_enabled:
-        url_attributes = _get_url_attributes(client, parsed_url)
+        url_attributes = get_url_attributes(client, parsed_url)
         breadcrumb.update(url_attributes)
 
         if request.method is not None:

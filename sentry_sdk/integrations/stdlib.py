@@ -8,13 +8,14 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import Integration
-from sentry_sdk.scope import add_global_event_processor, should_send_default_pii
+from sentry_sdk.scope import add_global_event_processor
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, SENTRY_TRACE_HEADER_NAME, Span
 from sentry_sdk.tracing_utils import (
     EnvironHeaders,
     add_http_breadcrumb,
     add_http_request_source,
+    get_url_attributes,
     has_span_streaming_enabled,
     should_propagate_trace,
 )
@@ -285,15 +286,10 @@ def _install_httplib() -> None:
         breadcrumb: "dict[str, Any]" = {}
 
         if span_streaming:
+            url_attributes = get_url_attributes(client, parsed_url)
+
             breadcrumb[SPANDATA.HTTP_REQUEST_METHOD] = method
-            if parsed_url is not None and should_send_default_pii():
-                breadcrumb.update(
-                    {
-                        SPANDATA.URL_FRAGMENT: parsed_url.fragment,
-                        SPANDATA.URL_FULL: parsed_url.url,
-                        SPANDATA.URL_QUERY: parsed_url.query,
-                    }
-                )
+            breadcrumb.update(url_attributes)
 
             if sentry_sdk.traces.get_current_span() is not None:
                 span = sentry_sdk.traces.start_span(
@@ -309,10 +305,8 @@ def _install_httplib() -> None:
                     },
                 )
 
-                if parsed_url is not None and should_send_default_pii():
-                    span.set_attribute(SPANDATA.URL_FRAGMENT, parsed_url.fragment)
-                    span.set_attribute(SPANDATA.URL_FULL, parsed_url.url)
-                    span.set_attribute(SPANDATA.URL_QUERY, parsed_url.query)
+                for key, value in url_attributes.items():
+                    span.set_attribute(key, value)
 
                 set_on_span = span.set_attribute
 
