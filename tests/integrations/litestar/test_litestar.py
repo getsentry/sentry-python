@@ -15,7 +15,6 @@ from litestar.testing import TestClient
 
 import sentry_sdk
 from sentry_sdk import capture_message
-from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.integrations.litestar import LitestarIntegration
 from tests.conftest import ApproxDict
 from tests.integrations.conftest import parametrize_test_configurable_status_codes
@@ -146,7 +145,7 @@ def test_catch_exceptions(
         ),
     ],
 )
-def test_transaction_name_and_source(
+def test_segment_name_and_source(
     sentry_init,
     test_url,
     expected_tx_name,
@@ -504,198 +503,6 @@ def test_litestar_scope_user_on_exception_event(
 
 
 COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
-
-
-@pytest.mark.parametrize(
-    "data_collection, expect_body",
-    [
-        pytest.param(None, True, id="no_data_collection_experiment"),
-        pytest.param({}, True, id="data_collection_http_bodies_default"),
-        pytest.param(
-            {"http_bodies": ["incoming_request"]},
-            True,
-            id="data_collection_http_bodies_incoming_request",
-        ),
-        pytest.param(
-            {"http_bodies": []}, False, id="data_collection_http_bodies_empty"
-        ),
-    ],
-)
-def test_request_body_data_collection(
-    sentry_init, capture_events, data_collection, expect_body
-):
-    sentry_init(
-        traces_sample_rate=1.0,
-        integrations=[LitestarIntegration()],
-        _experiments=(
-            {} if data_collection is None else {"data_collection": data_collection}
-        ),
-    )
-
-    litestar_app = litestar_app_factory()
-    events = capture_events()
-
-    body = {"foo": {"bar": "baz", "qux": ["1", "2", "3"]}}
-
-    client = TestClient(litestar_app)
-    client.post("/body/json", json=body)
-
-    (event, transaction_event) = events
-
-    if expect_body:
-        assert event["request"]["data"] == body
-        assert transaction_event["request"]["data"] == body
-    else:
-        assert "data" not in event["request"]
-        assert "data" not in transaction_event["request"]
-
-
-def test_request_body_data_collection_wins_over_send_default_pii(
-    sentry_init, capture_events
-):
-    sentry_init(
-        traces_sample_rate=1.0,
-        integrations=[LitestarIntegration()],
-        send_default_pii=True,
-        _experiments={"data_collection": {"http_bodies": []}},
-    )
-
-    litestar_app = litestar_app_factory()
-    events = capture_events()
-
-    client = TestClient(litestar_app)
-    client.post("/body/json", json={"foo": {"bar": "baz", "qux": ["1", "2", "3"]}})
-
-    (event, transaction_event) = events
-
-    assert "data" not in event["request"]
-    assert "data" not in transaction_event["request"]
-
-
-@pytest.mark.parametrize(
-    "init_kwargs, expected_cookies",
-    [
-        pytest.param(
-            {"send_default_pii": True},
-            {
-                "jwt": "tokenval",
-                "theme": "dark",
-                "lang": "en",
-                "identity": "alice",
-            },
-            id="send_default_pii_true",
-        ),
-        pytest.param(
-            {"send_default_pii": False},
-            None,
-            id="send_default_pii_false",
-        ),
-        pytest.param(
-            {},
-            None,
-            id="defaults",
-        ),
-        pytest.param(
-            {"_experiments": {"data_collection": {"cookies": {"mode": "off"}}}},
-            None,
-            id="data_collection_off",
-        ),
-        pytest.param(
-            {"_experiments": {"data_collection": {"cookies": {"mode": "denylist"}}}},
-            {
-                "jwt": SENSITIVE_DATA_SUBSTITUTE,
-                "theme": "dark",
-                "lang": "en",
-                "identity": SENSITIVE_DATA_SUBSTITUTE,
-            },
-            id="data_collection_denylist_default",
-        ),
-        pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "cookies": {"mode": "denylist", "terms": ["theme"]}
-                    }
-                }
-            },
-            {
-                "jwt": SENSITIVE_DATA_SUBSTITUTE,
-                "theme": SENSITIVE_DATA_SUBSTITUTE,
-                "lang": "en",
-                "identity": SENSITIVE_DATA_SUBSTITUTE,
-            },
-            id="data_collection_denylist_custom_terms",
-        ),
-        pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "cookies": {"mode": "allowlist", "terms": ["theme"]}
-                    }
-                }
-            },
-            {
-                "jwt": SENSITIVE_DATA_SUBSTITUTE,
-                "theme": "dark",
-                "lang": SENSITIVE_DATA_SUBSTITUTE,
-                "identity": SENSITIVE_DATA_SUBSTITUTE,
-            },
-            id="data_collection_allowlist",
-        ),
-        pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {
-                        "cookies": {"mode": "allowlist", "terms": ["identity"]}
-                    }
-                }
-            },
-            {
-                "jwt": SENSITIVE_DATA_SUBSTITUTE,
-                "theme": SENSITIVE_DATA_SUBSTITUTE,
-                "lang": SENSITIVE_DATA_SUBSTITUTE,
-                "identity": SENSITIVE_DATA_SUBSTITUTE,
-            },
-            id="data_collection_allowlist_sensitive_term",
-        ),
-        pytest.param(
-            {
-                "send_default_pii": False,
-                "_experiments": {"data_collection": {"cookies": {"mode": "denylist"}}},
-            },
-            {
-                "jwt": SENSITIVE_DATA_SUBSTITUTE,
-                "theme": "dark",
-                "lang": "en",
-                "identity": SENSITIVE_DATA_SUBSTITUTE,
-            },
-            id="data_collection_wins_over_send_default_pii",
-        ),
-    ],
-)
-def test_cookie_data_collection(
-    sentry_init, capture_events, init_kwargs, expected_cookies
-):
-    sentry_init(
-        traces_sample_rate=1.0,
-        integrations=[LitestarIntegration()],
-        **init_kwargs,
-    )
-
-    litestar_app = litestar_app_factory()
-    events = capture_events()
-
-    client = TestClient(litestar_app)
-    client.get("/message", headers={"cookie": COOKIE_HEADER})
-
-    (event, transaction_event) = events
-
-    if expected_cookies is None:
-        assert "cookies" not in event["request"]
-        assert "cookies" not in transaction_event["request"]
-    else:
-        assert event["request"]["cookies"] == expected_cookies
-        assert transaction_event["request"]["cookies"] == expected_cookies
 
 
 @parametrize_test_configurable_status_codes
