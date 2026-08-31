@@ -22,9 +22,6 @@ from sentry_sdk.integrations.logging import ignore_logger
 from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.sessions import track_session
 from sentry_sdk.traces import (
-    SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE,
-)
-from sentry_sdk.traces import (
     NoOpStreamedSpan,
     SegmentNameSource,
     SpanStatus,
@@ -339,21 +336,11 @@ class AioHttpIntegration(Integration):
                 pass
 
             if name is not None:
-                current_span = sentry_sdk.get_current_span()
-                if isinstance(current_span, StreamedSpan) and not isinstance(
-                    current_span, NoOpStreamedSpan
-                ):
-                    current_span._segment.name = name
-                    current_span._segment.set_attribute(
-                        "sentry.segment.name.source",
-                        SEGMENT_SOURCE_FOR_STYLE[integration.transaction_style].value,
-                    )
-                else:
-                    current_scope = sentry_sdk.get_current_scope()
-                    current_scope.set_transaction_name(
-                        name,
-                        source=SOURCE_FOR_STYLE[integration.transaction_style],
-                    )
+                current_scope = sentry_sdk.get_current_scope()
+                current_scope.set_transaction_name(
+                    name,
+                    source=SOURCE_FOR_STYLE[integration.transaction_style],
+                )
 
             return rv
 
