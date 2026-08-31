@@ -136,11 +136,12 @@ async def sentry_async_middleware(
     response = None
     with _sentry_pyreqwest_span(request) as span:
         response = await next_handler.run(request)
-        span.status = "error" if response.status >= 400 else "ok"
-        span.set_attribute(
-            SPANDATA.HTTP_STATUS_CODE,
-            response.status,
-        )
+        if span is not None:
+            span.status = "error" if response.status >= 400 else "ok"
+            span.set_attribute(
+                SPANDATA.HTTP_STATUS_CODE,
+                response.status,
+            )
 
     if response is not None:
         breadcrumb_data = {
@@ -178,11 +179,12 @@ def sentry_sync_middleware(
     response = None
     with _sentry_pyreqwest_span(request) as span:
         response = next_handler.run(request)
-        span.status = "error" if response.status >= 400 else "ok"
-        span.set_attribute(
-            SPANDATA.HTTP_STATUS_CODE,
-            response.status,
-        )
+        if span is not None:
+            span.status = "error" if response.status >= 400 else "ok"
+            span.set_attribute(
+                SPANDATA.HTTP_STATUS_CODE,
+                response.status,
+            )
 
     if response is not None:
         breadcrumb_data = {
