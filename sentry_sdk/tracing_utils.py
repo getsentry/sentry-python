@@ -134,10 +134,8 @@ def record_sql_queries(
     record_cursor_repr: bool = False,
     span_origin: str = "manual",
     span_op_override_value: "Optional[str]" = None,
-) -> "Generator[Union[sentry_sdk.tracing.Span, sentry_sdk.traces.StreamedSpan], None, None]":
+) -> "Generator[sentry_sdk.traces.StreamedSpan, None, None]":
     # TODO: Bring back capturing of params by default
-    # TODO: Once we drop span streaming from this, remove the hack from django's
-    # _set_db_data
     client = sentry_sdk.get_client()
     if has_data_collection_enabled(client.options):
         if client.options["data_collection"]["database_query_data"]:
@@ -176,31 +174,19 @@ def record_sql_queries(
     with capture_internal_exceptions():
         sentry_sdk.add_breadcrumb(message=query, category="query", data=data)
 
-    if has_span_streaming_enabled(client.options):
-        additional_attributes = {}
-        if query is not None:
-            additional_attributes["db.query.text"] = query
+    additional_attributes = {}
+    if query is not None:
+        additional_attributes["db.query.text"] = query
 
-        with sentry_sdk.traces.start_span(
-            name="<unknown SQL query>" if query is None else query,
-            attributes={
-                "sentry.origin": span_origin,
-                "sentry.op": span_op_override_value
-                if span_op_override_value
-                else OP.DB,
-                **additional_attributes,
-            },
-        ) as span:
-            yield span
-    else:
-        with sentry_sdk.start_span(
-            op=span_op_override_value if span_op_override_value is not None else OP.DB,
-            name=query,
-            origin=span_origin,
-        ) as span:
-            for k, v in data.items():
-                span.set_data(k, v)
-            yield span
+    with sentry_sdk.traces.start_span(
+        name="<unknown SQL query>" if query is None else query,
+        attributes={
+            "sentry.origin": span_origin,
+            "sentry.op": span_op_override_value if span_op_override_value else OP.DB,
+            **additional_attributes,
+        },
+    ) as span:
+        yield span
 
 
 def add_http_breadcrumb(status_code: "Optional[int]", data: "dict[str, Any]") -> None:
