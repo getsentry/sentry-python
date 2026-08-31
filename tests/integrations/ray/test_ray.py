@@ -362,7 +362,7 @@ def test_tracing_in_ray_actors(
     # Only the manual "example actor execution" span is recorded.
     assert len(client_spans) == 1
 
-    # Transaction are not yet created when executing ray actors (actors are not supported yet)
+    # Spans are not yet created when executing ray actors (actors are not supported yet)
     # Only the manual "example actor execution" span is recorded.
     assert len(worker_spans) == 1
 
