@@ -2268,7 +2268,10 @@ async def test_invoke_agent_with_instructions(
             ]
             assert json.loads(system_instructions) == [
                 {"type": "text", "content": "System prompt"},
-                {"type": "text", "content": f"Instruction 1{instructions_separator}Instruction 2"},
+                {
+                    "type": "text",
+                    "content": f"Instruction 1{instructions_separator}Instruction 2",
+                },
             ]
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span["attributes"]
@@ -2291,7 +2294,10 @@ async def test_invoke_agent_with_instructions(
             system_instructions = chat_span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
             assert json.loads(system_instructions) == [
                 {"type": "text", "content": "System prompt"},
-                {"type": "text", "content": f"Instruction 1{instructions_separator}Instruction 2"},
+                {
+                    "type": "text",
+                    "content": f"Instruction 1{instructions_separator}Instruction 2",
+                },
             ]
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span["data"]
