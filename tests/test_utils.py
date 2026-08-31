@@ -515,6 +515,255 @@ def test_include_source_context_when_serializing_frame(
     assert ("post_context" in result) is expected_source_context
 
 
+def _frame_with_locals():
+    safe_value = "not sensitive"  # noqa: F841
+    password = "ada123"  # noqa: F841
+    api_key = "abc123"  # noqa: F841
+    nickname = "Beans"  # noqa: F841
+    return sys._getframe()
+
+
+@pytest.mark.parametrize(
+    "data_collection,include_local_variables,expected_vars",
+    [
+        pytest.param(
+            {"stack_frame_variables": True},
+            False,
+            True,
+            id="data_collection_stack_frame_variables_true_overrides_include_false",
+        ),
+        pytest.param(
+            {"stack_frame_variables": False},
+            True,
+            False,
+            id="data_collection_stack_frame_variables_false_overrides_include_true",
+        ),
+        pytest.param(
+            {},
+            False,
+            True,
+            id="data_collection_stack_frame_variables_spec_default_is_true",
+        ),
+    ],
+)
+def test_stack_frame_variables_bool_when_serializing_frame(
+    sentry_init, data_collection, include_local_variables, expected_vars
+):
+    sentry_init(_experiments={"data_collection": data_collection})
+
+    result = serialize_frame(
+        _frame_with_locals(), include_local_variables=include_local_variables
+    )
+
+    assert ("vars" in result) is expected_vars
+
+
+def test_stack_frame_variables_true_does_not_filter_sensitive_locals(sentry_init):
+    sentry_init(_experiments={"data_collection": {"stack_frame_variables": True}})
+
+    result = serialize_frame(_frame_with_locals())
+
+    assert result["vars"]["safe_value"] == "'not sensitive'"
+    assert result["vars"]["password"] == "'ada123'"
+
+
+@pytest.mark.parametrize(
+    "behaviour,expected_vars",
+    [
+        pytest.param(
+            {"mode": "denylist"},
+            {
+                "safe_value": "'not sensitive'",
+                "password": "'[Filtered]'",
+                "api_key": "'[Filtered]'",
+                "nickname": "'Beans'",
+            },
+            id="data_collection_stack_frame_variables_denylist_builtin_terms_only",
+        ),
+        pytest.param(
+            {"mode": "denylist", "terms": ["nickname"]},
+            {
+                "safe_value": "'not sensitive'",
+                "password": "'[Filtered]'",
+                "api_key": "'[Filtered]'",
+                "nickname": "'[Filtered]'",
+            },
+            id="data_collection_stack_frame_variables_denylist_user_terms",
+        ),
+        pytest.param(
+            {"mode": "allowlist", "terms": ["safe"]},
+            {
+                "safe_value": "'not sensitive'",
+                "password": "'[Filtered]'",
+                "api_key": "'[Filtered]'",
+                "nickname": "'[Filtered]'",
+            },
+            id="data_collection_stack_frame_variables_allowlist_user_terms",
+        ),
+        pytest.param(
+            {"mode": "allowlist", "terms": ["safe", "api_key"]},
+            {
+                "safe_value": "'not sensitive'",
+                "password": "'[Filtered]'",
+                "api_key": "'[Filtered]'",
+                "nickname": "'[Filtered]'",
+            },
+            id="data_collection_stack_frame_variables_allowlist_cannot_allow_sensitive_term",
+        ),
+    ],
+)
+def test_stack_frame_variables_filtering_when_serializing_frame(
+    sentry_init, behaviour, expected_vars
+):
+    sentry_init(_experiments={"data_collection": {"stack_frame_variables": behaviour}})
+
+    result = serialize_frame(_frame_with_locals())
+
+    assert result["vars"] == expected_vars
+
+
+def test_stack_frame_variables_off_omits_vars(sentry_init):
+    sentry_init(
+        _experiments={"data_collection": {"stack_frame_variables": {"mode": "off"}}}
+    )
+
+    result = serialize_frame(_frame_with_locals())
+
+    assert "vars" not in result
+
+
+def test_stack_frame_variables_omits_vars_when_frame_has_no_locals(sentry_init):
+    def _frame_without_locals():
+        return sys._getframe()
+
+    sentry_init(
+        _experiments={
+            "data_collection": {"stack_frame_variables": {"mode": "denylist"}}
+        }
+    )
+
+    result = serialize_frame(_frame_without_locals())
+
+    assert "vars" not in result
+
+
+def test_stack_frame_variables_filtering_uses_custom_repr(sentry_init):
+    sentry_init(
+        _experiments={
+            "data_collection": {"stack_frame_variables": {"mode": "denylist"}}
+        }
+    )
+
+    def custom_repr(value):
+        return "CUSTOM" if value == "not sensitive" else None
+
+    result = serialize_frame(_frame_with_locals(), custom_repr=custom_repr)
+
+    assert result["vars"]["safe_value"] == "CUSTOM"
+    assert result["vars"]["password"] == "'[Filtered]'"
+
+
+@pytest.mark.parametrize(
+    "options,include_local_variables,expected_vars",
+    [
+        pytest.param(
+            {},
+            True,
+            True,
+            id="no_data_collection-include_local_variables_true",
+        ),
+        pytest.param(
+            {},
+            False,
+            False,
+            id="no_data_collection-include_local_variables_false",
+        ),
+    ],
+)
+def test_include_local_variables_when_data_collection_is_unset(
+    sentry_init, options, include_local_variables, expected_vars
+):
+    sentry_init(**options)
+
+    result = serialize_frame(
+        _frame_with_locals(), include_local_variables=include_local_variables
+    )
+
+    assert ("vars" in result) is expected_vars
+
+
+def test_data_collection_stack_frame_variables_overrides_include_local_variables_option(
+    sentry_init, capture_events
+):
+    sentry_init(
+        include_local_variables=False,
+        _experiments={"data_collection": {"stack_frame_variables": True}},
+    )
+    events = capture_events()
+
+    def raise_with_locals():
+        safe_value = "not sensitive"  # noqa: F841
+        raise ValueError("boom")
+
+    try:
+        raise_with_locals()
+    except ValueError:
+        sentry_sdk.capture_exception()
+
+    (event,) = events
+    frame = event["exception"]["values"][0]["stacktrace"]["frames"][-1]
+    assert frame["vars"]["safe_value"] == "'not sensitive'"
+
+
+def test_data_collection_stack_frame_variables_filtering_applies_to_captured_exception(
+    sentry_init, capture_events
+):
+    sentry_init(
+        _experiments={
+            "data_collection": {
+                "stack_frame_variables": {"mode": "denylist", "terms": ["nickname"]}
+            }
+        }
+    )
+    events = capture_events()
+
+    def raise_with_locals():
+        safe_value = "not sensitive"  # noqa: F841
+        password = "hunter2"  # noqa: F841
+        nickname = "Bugsy"  # noqa: F841
+        raise ValueError("boom")
+
+    try:
+        raise_with_locals()
+    except ValueError:
+        sentry_sdk.capture_exception()
+
+    (event,) = events
+    frame = event["exception"]["values"][0]["stacktrace"]["frames"][-1]
+
+    assert frame["vars"]["safe_value"] == "'not sensitive'"
+    assert frame["vars"]["password"] == "'[Filtered]'"
+    assert frame["vars"]["nickname"] == "'[Filtered]'"
+
+
+def test_serialize_frame_variables_serializer_failure(sentry_init):
+    sentry_init(
+        _experiments={
+            "data_collection": {
+                "stack_frame_variables": {"mode": "denylist", "terms": ["password"]}
+            }
+        }
+    )
+
+    failure_message = "<failed to serialize, use init(debug=True) to see error logs>"
+
+    frame = sys._getframe()
+    with mock.patch("sentry_sdk.serializer.serialize", return_value=failure_message):
+        result = serialize_frame(frame)
+
+    assert result["vars"] == failure_message
+
+
 @pytest.mark.parametrize(
     "item,regex_list,expected_result",
     [
