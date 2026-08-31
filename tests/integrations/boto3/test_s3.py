@@ -125,7 +125,7 @@ def test_streaming(
             "sentry.sdk.version": mock.ANY,
             "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "custom parent",
-            "server.address": mock.ANY,
+            SPANDATA.DEVICE_NAME: mock.ANY,
             "thread.id": mock.ANY,
             "thread.name": mock.ANY,
         }
@@ -283,7 +283,7 @@ def test_omit_url_data_if_parsing_fails(
                         "sentry.sdk.version": mock.ANY,
                         "sentry.segment.id": mock.ANY,
                         "sentry.segment.name": "custom parent",
-                        "server.address": mock.ANY,
+                        SPANDATA.DEVICE_NAME: mock.ANY,
                         "thread.id": mock.ANY,
                         "thread.name": mock.ANY,
                     }

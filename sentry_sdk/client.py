@@ -232,7 +232,7 @@ def _serialized_v1_span_to_serialized_v2_span(
     if "environment" in event:
         attributes["sentry.environment"] = event["environment"]
     if "server_name" in event:
-        attributes["server.address"] = event["server_name"]
+        attributes[SPANDATA.DEVICE_NAME] = event["server_name"]
     if "transaction" in event:
         attributes["sentry.segment.name"] = event["transaction"]
 
