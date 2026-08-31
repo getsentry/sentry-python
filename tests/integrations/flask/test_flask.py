@@ -90,7 +90,6 @@ def test_has_context(sentry_init, app, capture_events):
     assert event["request"]["url"] == "http://localhost/message"
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize(
     "url,transaction_style,expected_transaction,expected_source",
     [
@@ -119,26 +118,19 @@ def test_transaction_or_segment_style(
         trace_lifecycle="stream",
     )
 
-    if span_streaming:
-        items = capture_items("span")
-    else:
-        events = capture_events()
+    items = capture_items("span")
 
     client = app.test_client()
     response = client.get(url)
     assert response.status_code == 200
 
-    if span_streaming:
-        sentry_sdk.flush()
-        spans = [i.payload for i in items]
-        assert len(spans) == 1
-        (segment,) = spans
-        assert segment["name"] == expected_transaction
-        assert segment["attributes"]["sentry.segment.name.source"] == expected_source
-    else:
-        (_, event) = events
-        assert event["transaction"] == expected_transaction
-        assert event["transaction_info"] == {"source": expected_source}
+    sentry_sdk.flush()
+
+    spans = [i.payload for i in items]
+    assert len(spans) == 1
+    (segment,) = spans
+    assert segment["name"] == expected_transaction
+    assert segment["attributes"]["sentry.segment.name.source"] == expected_source
 
 
 @pytest.mark.parametrize("debug", (True, False))
@@ -442,47 +434,6 @@ def test_flask_medium_formdata_request(
         assert len(event["request"]["data"]["foo"]) == 1024
     else:
         assert len(event["request"]["data"]["foo"]) == 1034
-
-
-def test_flask_formdata_request_appear_transaction_body(
-    sentry_init, capture_events, app
-):
-    """
-    Test that ensures that transaction request data contains body, even if no exception was raised
-    """
-    sentry_init(
-        integrations=[flask_sentry.FlaskIntegration()],
-        traces_sample_rate=1.0,
-        trace_lifecycle="stream",
-    )
-
-    data = {"username": "sentry-user", "age": "26"}
-
-    @app.route("/", methods=["POST"])
-    def index():
-        assert request.form["username"] == data["username"]
-        assert request.form["age"] == data["age"]
-        assert not request.get_data()
-        try:
-            assert not request.get_json()
-        except UnsupportedMediaType:
-            # flask/werkzeug 3
-            pass
-        set_tag("view", "yes")
-        capture_message("hi")
-        return "ok"
-
-    events = capture_events()
-
-    client = app.test_client()
-    response = client.post("/", data=data)
-    assert response.status_code == 200
-
-    event, transaction_event = events
-
-    assert "request" in transaction_event
-    assert "data" in transaction_event["request"]
-    assert transaction_event["request"]["data"] == data
 
 
 @pytest.mark.parametrize("input_char", ["a", b"a"])
@@ -1049,7 +1000,7 @@ def test_span_origin(sentry_init, app, capture_events, capture_items):
     assert segment["attributes"]["sentry.origin"] == "auto.http.flask"
 
 
-def test_transaction_or_segment_http_method_default(
+def test_segment_http_method_default(
     sentry_init,
     app,
     capture_events,
@@ -1084,7 +1035,7 @@ def test_transaction_or_segment_http_method_default(
     assert segment["attributes"]["http.request.method"] == "GET"
 
 
-def test_transaction_or_segment_http_method_custom(
+def test_segment_http_method_custom(
     sentry_init,
     app,
     capture_events,
