@@ -21,6 +21,9 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA, SPANTEMPLATE
+from sentry_sdk.data_collection import (
+    _apply_data_collection_filtering_to_query_string,
+)
 from sentry_sdk.utils import (
     _is_external_source,
     _is_in_project_root,
@@ -43,6 +46,8 @@ if TYPE_CHECKING:
     from typing import Any, Dict, Generator, Iterator, Optional, Tuple, Union
 
     from sentry_sdk._types import Attributes
+    from sentry_sdk.client import BaseClient
+    from sentry_sdk.utils import ParsedUrl
 
 
 SENTRY_TRACE_REGEX = re.compile(
@@ -223,6 +228,46 @@ def add_http_breadcrumb(status_code: "Optional[int]", data: "dict[str, Any]") ->
         kwargs["level"] = level
 
     sentry_sdk.add_breadcrumb(**kwargs)
+
+
+def get_url_attributes(
+    client: "BaseClient", parsed_url: "Optional[ParsedUrl]"
+) -> "Attributes":
+    """Build the `url.*` span attributes for an outgoing HTTP request.
+
+    The query string is only included when the user has opted into collecting
+    it, either through `data_collection` (in which case the configured
+    filtering is applied) or through the legacy `send_default_pii`.
+    """
+    attributes: "Attributes" = {}
+    if parsed_url is None:
+        return attributes
+
+    query: "Optional[str]"
+    if has_data_collection_enabled(client.options):
+        query = None
+        if parsed_url.query:
+            query = _apply_data_collection_filtering_to_query_string(
+                query_string=parsed_url.query,
+                behaviour=client.options["data_collection"]["url_query_params"],
+            )
+    elif client.should_send_default_pii():
+        query = parsed_url.query
+    else:
+        return attributes
+
+    url_full = parsed_url.url
+    if query:
+        attributes[SPANDATA.URL_QUERY] = query
+        url_full += "?" + query
+
+    if parsed_url.fragment:
+        attributes[SPANDATA.URL_FRAGMENT] = parsed_url.fragment
+        url_full += "#" + parsed_url.fragment
+
+    attributes[SPANDATA.URL_FULL] = url_full
+
+    return attributes
 
 
 def _get_frame_module_abs_path(frame: "FrameType") -> "Optional[str]":

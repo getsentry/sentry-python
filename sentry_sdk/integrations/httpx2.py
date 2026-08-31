@@ -2,14 +2,11 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.data_collection import (
-    _apply_data_collection_filtering_to_query_string,
-)
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing_utils import (
     add_http_breadcrumb,
     add_http_request_source,
+    get_url_attributes,
     has_span_streaming_enabled,
     propagate_trace_headers,
 )
@@ -17,16 +14,13 @@ from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     ensure_integration_enabled,
-    has_data_collection_enabled,
     parse_url,
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Optional
+    from typing import Any
 
     from sentry_sdk._types import Attributes
-    from sentry_sdk.client import BaseClient
-    from sentry_sdk.utils import ParsedUrl
 
 
 try:
@@ -51,45 +45,6 @@ class Httpx2Integration(Integration):
         _install_httpx2_async_client()
 
 
-def _get_url_attributes(
-    client: "BaseClient", parsed_url: "Optional[ParsedUrl]"
-) -> "Attributes":
-    attributes: "Attributes" = {}
-    if parsed_url is None:
-        return attributes
-
-    url_full = parsed_url.url
-
-    if has_data_collection_enabled(client.options):
-        if parsed_url.query:
-            filtered_query = _apply_data_collection_filtering_to_query_string(
-                query_string=parsed_url.query,
-                behaviour=client.options["data_collection"]["url_query_params"],
-            )
-            if filtered_query:
-                attributes["url.query"] = filtered_query
-                url_full += "?" + filtered_query
-
-        if parsed_url.fragment:
-            attributes["url.fragment"] = parsed_url.fragment
-            url_full += "#" + parsed_url.fragment
-
-        attributes["url.full"] = url_full
-
-    elif should_send_default_pii():
-        if parsed_url.query:
-            attributes["url.query"] = parsed_url.query
-            url_full += "?" + parsed_url.query
-
-        if parsed_url.fragment:
-            attributes["url.fragment"] = parsed_url.fragment
-            url_full += "#" + parsed_url.fragment
-
-        attributes["url.full"] = url_full
-
-    return attributes
-
-
 def _install_httpx2_client() -> None:
     real_send = Client.send
 
@@ -109,7 +64,7 @@ def _install_httpx2_client() -> None:
                 propagate_trace_headers(client, request)
                 return real_send(self, request, **kwargs)
 
-            url_attributes = _get_url_attributes(client, parsed_url)
+            url_attributes = get_url_attributes(client, parsed_url)
 
             with sentry_sdk.traces.start_span(
                 name="%s %s"
@@ -218,7 +173,7 @@ def _install_httpx2_async_client() -> None:
                 propagate_trace_headers(client, request)
                 return await real_send(self, request, **kwargs)
 
-            url_attributes = _get_url_attributes(client, parsed_url)
+            url_attributes = get_url_attributes(client, parsed_url)
 
             with sentry_sdk.traces.start_span(
                 name="%s %s"
