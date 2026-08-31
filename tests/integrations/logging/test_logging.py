@@ -5,7 +5,7 @@ from unittest import mock
 import pytest
 
 from sentry_sdk import get_client
-from sentry_sdk.consts import VERSION
+from sentry_sdk.consts import SPANDATA, VERSION
 from sentry_sdk.integrations.logging import (
     LoggingIntegration,
     ignore_logger,
@@ -572,9 +572,9 @@ def test_logger_with_all_attributes(sentry_init, capture_items):
     assert isinstance(attributes["sentry.release"], str)
     del attributes["sentry.release"]
 
-    assert "server.address" in attributes
-    assert isinstance(attributes["server.address"], str)
-    del attributes["server.address"]
+    assert SPANDATA.DEVICE_NAME in attributes
+    assert isinstance(attributes[SPANDATA.DEVICE_NAME], str)
+    del attributes[SPANDATA.DEVICE_NAME]
 
     assert "thread.id" in attributes
     assert isinstance(attributes["thread.id"], int)

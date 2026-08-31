@@ -8,7 +8,7 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk import start_span, start_transaction
-from sentry_sdk.consts import OP
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.grpc import GRPCIntegration
 from sentry_sdk.integrations.grpc.client import ClientInterceptor
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
@@ -316,7 +316,7 @@ def test_grpc_client_starts_span(
                 "sentry.sdk.version": mock.ANY,
                 "sentry.segment.id": mock.ANY,
                 "sentry.segment.name": "custom parent",
-                "server.address": mock.ANY,
+                SPANDATA.DEVICE_NAME: mock.ANY,
                 "thread.id": mock.ANY,
                 "thread.name": mock.ANY,
                 "rpc.response.status_code": "OK",
@@ -400,7 +400,7 @@ def test_grpc_client_unary_stream_starts_span(
                 "sentry.sdk.version": mock.ANY,
                 "sentry.segment.id": mock.ANY,
                 "sentry.segment.name": "custom parent",
-                "server.address": mock.ANY,
+                SPANDATA.DEVICE_NAME: mock.ANY,
                 "thread.id": mock.ANY,
                 "thread.name": mock.ANY,
             }
@@ -494,7 +494,7 @@ def test_grpc_client_other_interceptor(
                 "sentry.sdk.version": mock.ANY,
                 "sentry.segment.id": mock.ANY,
                 "sentry.segment.name": "custom parent",
-                "server.address": mock.ANY,
+                SPANDATA.DEVICE_NAME: mock.ANY,
                 "thread.id": mock.ANY,
                 "thread.name": mock.ANY,
                 "rpc.response.status_code": "OK",
