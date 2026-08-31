@@ -2021,9 +2021,7 @@ def get_before_send_log(
     if options is None:
         return None
 
-    return options.get("before_send_log") or options["_experiments"].get(
-        "before_send_log"
-    )
+    return options.get("before_send_log")
 
 
 def get_before_send_metric(
@@ -2032,9 +2030,7 @@ def get_before_send_metric(
     if options is None:
         return None
 
-    return options.get("before_send_metric") or options["_experiments"].get(
-        "before_send_metric"
-    )
+    return options.get("before_send_metric")
 
 
 def get_before_send_span(
@@ -2043,9 +2039,7 @@ def get_before_send_span(
     if options is None:
         return None
 
-    return options.get("before_send_span") or options["_experiments"].get(
-        "before_send_span"
-    )
+    return options.get("before_send_span")
 
 
 def format_attribute(val: "Any") -> "AttributeValue":
