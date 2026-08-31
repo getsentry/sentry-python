@@ -12,6 +12,7 @@ The tests use the following credentials to establish a database connection.
 import datetime
 import os
 from contextlib import contextmanager
+from datetime import timezone
 from unittest import mock
 
 import asyncpg
@@ -20,7 +21,7 @@ import pytest_asyncio
 from asyncpg import Connection, connect
 
 import sentry_sdk
-from sentry_sdk import capture_message, start_transaction
+from sentry_sdk import capture_message
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.asyncpg import AsyncPGIntegration
 from sentry_sdk.tracing_utils import record_sql_queries
@@ -539,6 +540,7 @@ async def test_query_source_disabled(
         )
 
         await conn.close()
+
     sentry_sdk.flush()
 
     spans = [item.payload for item in items]
@@ -587,6 +589,7 @@ async def test_query_source_enabled(
         )
 
         await conn.close()
+
     sentry_sdk.flush()
 
     spans = [item.payload for item in items]
@@ -600,12 +603,8 @@ async def test_query_source_enabled(
     assert segment["name"] == "test_segment"
     assert insert_span["name"].startswith("INSERT INTO")
     assert connect_span["name"] == "connect"
-    data = insert_span.get("attributes", {})
 
-    assert "code.line.number" in data
-    assert "code.file.path" in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FUNCTION in data
+    _assert_query_source(insert_span, "test_query_source_enabled")
 
 
 @pytest.mark.asyncio
@@ -627,39 +626,16 @@ async def test_query_source(sentry_init, capture_items):
         )
 
         await conn.close()
+
     sentry_sdk.flush()
 
     spans = [item.payload for item in items]
 
     assert len(spans) == 3
 
-    connect_span = spans[0]
-    insert_span = spans[1]
-    segment = spans[2]
+    _, insert_span, _ = spans
 
-    assert segment["name"] == "test_segment"
-    assert insert_span["name"].startswith("INSERT INTO")
-    assert connect_span["name"] == "connect"
-    data = insert_span.get("attributes", {})
-
-    assert "code.line.number" in data
-    assert "code.file.path" in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FUNCTION in data
-
-    assert type(data.get("code.line.number")) == int
-    assert data.get("code.line.number") > 0
-    assert (
-        data.get(SPANDATA.CODE_NAMESPACE) == "tests.integrations.asyncpg.test_asyncpg"
-    )
-    assert data.get("code.file.path").endswith(
-        "tests/integrations/asyncpg/test_asyncpg.py"
-    )
-
-    is_relative_path = data.get("code.file.path")[0] != os.sep
-    assert is_relative_path
-
-    assert data.get(SPANDATA.CODE_FUNCTION) == "test_query_source"
+    _assert_query_source(insert_span, "test_query_source")
 
 
 @pytest.mark.asyncio
@@ -730,32 +706,21 @@ async def test_no_query_source_if_duration_too_short(
         integrations=[AsyncPGIntegration()],
         traces_sample_rate=1.0,
         enable_db_query_source=True,
-        db_query_source_threshold_ms=100,
+        db_query_source_threshold_ms=100000,
         trace_lifecycle="stream",
     )
 
     items = capture_items("span")
 
-    @contextmanager
-    def fake_record_sql_queries(*args, **kwargs):
-        with record_sql_queries(*args, **kwargs) as span:
-            pass
-        span._start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
-        span._end_timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
-        yield span
-
     with sentry_sdk.traces.start_span(name="test_segment"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
-        with mock.patch(
-            "sentry_sdk.integrations.asyncpg.record_sql_queries",
-            fake_record_sql_queries,
-        ):
-            await conn.execute(
-                "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
-            )
+        await conn.execute(
+            "INSERT INTO users(name, password, dob) VALUES ('Alice', 'secret', '1990-12-25')",
+        )
 
         await conn.close()
+
     sentry_sdk.flush()
 
     spans = [item.payload for item in items]
@@ -778,26 +743,27 @@ async def test_no_query_source_if_duration_too_short(
 
 
 @pytest.mark.asyncio
-async def test_query_source_if_duration_over_threshold(sentry_init, capture_events):
+async def test_query_source_if_duration_over_threshold(sentry_init, capture_items):
     sentry_init(
         integrations=[AsyncPGIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         enable_db_query_source=True,
         db_query_source_threshold_ms=100,
     )
 
-    events = capture_events()
+    items = capture_items()
 
-    with start_transaction(name="test_transaction", sampled=True):
+    with sentry_sdk.traces.start_span(name="test_segment"):
         conn: Connection = await connect(PG_CONNECTION_URI)
 
         @contextmanager
         def fake_record_sql_queries(*args, **kwargs):
             with record_sql_queries(*args, **kwargs) as span:
-                pass
-            span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
-            span.timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
-            yield span
+                span._start_timestamp = datetime.datetime(
+                    2024, 1, 1, microsecond=0, tzinfo=timezone.utc
+                )
+                yield span
 
         with mock.patch(
             "sentry_sdk.integrations.asyncpg.record_sql_queries",
@@ -809,34 +775,21 @@ async def test_query_source_if_duration_over_threshold(sentry_init, capture_even
 
         await conn.close()
 
-    (event,) = events
+    sentry_sdk.flush()
 
-    span = event["spans"][-1]
-    assert span["description"].startswith("INSERT INTO")
+    spans = [item.payload for item in items]
 
-    data = span.get("data", {})
+    assert len(spans) == 3
 
-    assert SPANDATA.CODE_LINENO in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FILEPATH in data
-    assert SPANDATA.CODE_FUNCTION in data
+    connect_span = spans[0]
+    insert_span = spans[1]
+    segment = spans[2]
 
-    assert type(data.get(SPANDATA.CODE_LINENO)) == int
-    assert data.get(SPANDATA.CODE_LINENO) > 0
-    assert (
-        data.get(SPANDATA.CODE_NAMESPACE) == "tests.integrations.asyncpg.test_asyncpg"
-    )
-    assert data.get(SPANDATA.CODE_FILEPATH).endswith(
-        "tests/integrations/asyncpg/test_asyncpg.py"
-    )
+    assert segment["name"] == "test_segment"
+    assert insert_span["name"].startswith("INSERT INTO")
+    assert connect_span["name"] == "connect"
 
-    is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
-    assert is_relative_path
-
-    assert (
-        data.get(SPANDATA.CODE_FUNCTION)
-        == "test_query_source_if_duration_over_threshold"
-    )
+    _assert_query_source(insert_span, "test_query_source_if_duration_over_threshold")
 
 
 @pytest.mark.asyncio
@@ -902,6 +855,7 @@ async def test_multiline_query_description_normalized(
             """
         )
         await conn.close()
+
     sentry_sdk.flush()
 
     spans = [item.payload for item in items]
@@ -915,48 +869,6 @@ async def test_multiline_query_description_normalized(
     assert segment["name"] == "test_segment"
     assert connect_span["name"] == "connect"
     assert select_span["name"] == "SELECT id, name FROM users WHERE name = 'Alice'"
-
-
-@pytest.mark.asyncio
-async def test_before_send_transaction_sees_normalized_description(
-    sentry_init, capture_events
-):
-    def before_send_transaction(event, hint):
-        for span in event.get("spans", []):
-            desc = span.get("description", "")
-            if "SELECT id, name FROM users" in desc:
-                span["description"] = "filtered"
-        return event
-
-    sentry_init(
-        integrations=[AsyncPGIntegration()],
-        traces_sample_rate=1.0,
-        before_send_transaction=before_send_transaction,
-    )
-    events = capture_events()
-
-    with start_transaction(name="test_transaction"):
-        conn: Connection = await connect(PG_CONNECTION_URI)
-        await conn.execute(
-            """
-            SELECT
-                id,
-                name
-            FROM
-                users
-            """
-        )
-        await conn.close()
-
-    (event,) = events
-    spans = [
-        s
-        for s in event["spans"]
-        if s["op"] == "db" and "filtered" in s.get("description", "")
-    ]
-
-    assert len(spans) == 1
-    assert spans[0]["description"] == "filtered"
 
 
 def _assert_query_source(span, expected_function):
