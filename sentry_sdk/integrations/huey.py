@@ -3,17 +3,15 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.api import continue_trace, get_baggage, get_traceparent
-from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
+from sentry_sdk.api import get_baggage, get_traceparent
+from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SegmentNameSource, SpanStatus, StreamedSpan
 from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
-    TransactionSource,
 )
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     _register_control_flow_exception,
@@ -81,15 +79,11 @@ def patch_enqueue() -> None:
         else:
             span_name = item.name
 
-        is_span_streaming_enabled = has_span_streaming_enabled(
-            sentry_sdk.get_client().options
-        )
-
         no_headers_types = (PeriodicTask,) + tuple(
             t for t in [HueyGroup, HueyChord] if t is not None
         )
 
-        if is_span_streaming_enabled and sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.traces.get_current_span() is None:
             if not isinstance(item, no_headers_types):
                 item.kwargs["sentry_headers"] = {
                     BAGGAGE_HEADER_NAME: get_baggage(),
@@ -97,24 +91,14 @@ def patch_enqueue() -> None:
                 }
             return old_enqueue(self, item)
 
-        if is_span_streaming_enabled:
-            span_ctx = sentry_sdk.traces.start_span(
-                name=span_name,
-                attributes={
-                    "sentry.op": OP.QUEUE_SUBMIT_HUEY,
-                    "sentry.origin": HueyIntegration.origin,
-                    SPANDATA.MESSAGING_DESTINATION_NAME: self.name,
-                },
-            )
-        else:
-            span_ctx = sentry_sdk.start_span(
-                op=OP.QUEUE_SUBMIT_HUEY,
-                name=span_name,
-                origin=HueyIntegration.origin,
-            )
-            span_ctx.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, self.name)
-
-        with span_ctx:
+        with sentry_sdk.traces.start_span(
+            name=span_name,
+            attributes={
+                "sentry.op": OP.QUEUE_SUBMIT_HUEY,
+                "sentry.origin": HueyIntegration.origin,
+                SPANDATA.MESSAGING_DESTINATION_NAME: self.name,
+            },
+        ):
             if not isinstance(item, no_headers_types):
                 # Attach trace propagation data to task kwargs. We do
                 # not do this for periodic tasks, as these don't
@@ -166,20 +150,12 @@ def _make_event_processor(task: "Any") -> "EventProcessor":
 
 def _capture_exception(exc_info: "ExcInfo") -> None:
     scope = sentry_sdk.get_current_scope()
-    is_span_streaming_enabled = has_span_streaming_enabled(
-        sentry_sdk.get_client().options
-    )
-
     if exc_info[0] in HUEY_CONTROL_FLOW_EXCEPTIONS:
-        if not is_span_streaming_enabled:
-            scope.transaction.set_status(SPANSTATUS.ABORTED)
-        elif type(scope._span) is StreamedSpan:
+        if type(scope._span) is StreamedSpan:
             scope._span._segment.status = SpanStatus.OK
         return
 
-    if not is_span_streaming_enabled:
-        scope.transaction.set_status(SPANSTATUS.INTERNAL_ERROR)
-    elif type(scope._span) is StreamedSpan:
+    if type(scope._span) is StreamedSpan:
         scope._span._segment.status = SpanStatus.ERROR
 
     event, hint = event_from_exception(
@@ -219,38 +195,22 @@ def patch_execute() -> None:
                 scope.add_event_processor(_make_event_processor(task))
 
             sentry_headers = task.kwargs.pop("sentry_headers", None)
-            is_span_streaming_enabled = has_span_streaming_enabled(
-                sentry_sdk.get_client().options
+            headers = sentry_headers or {}
+            sentry_sdk.traces.continue_trace(headers)
+            span_ctx = sentry_sdk.traces.start_span(
+                name=task.name,
+                attributes={
+                    "sentry.op": OP.QUEUE_TASK_HUEY,
+                    "sentry.origin": HueyIntegration.origin,
+                    "sentry.segment.name.source": SegmentNameSource.TASK,
+                    SPANDATA.MESSAGING_DESTINATION_NAME: self.name,
+                    "messaging.message.id": task.id,
+                    "messaging.message.system": "huey",
+                    "messaging.message.retry.count": (task.default_retries or 0)
+                    - task.retries,
+                },
+                parent_span=None,
             )
-
-            if is_span_streaming_enabled:
-                headers = sentry_headers or {}
-                sentry_sdk.traces.continue_trace(headers)
-                span_ctx = sentry_sdk.traces.start_span(
-                    name=task.name,
-                    attributes={
-                        "sentry.op": OP.QUEUE_TASK_HUEY,
-                        "sentry.origin": HueyIntegration.origin,
-                        "sentry.segment.name.source": SegmentNameSource.TASK,
-                        SPANDATA.MESSAGING_DESTINATION_NAME: self.name,
-                        "messaging.message.id": task.id,
-                        "messaging.message.system": "huey",
-                        "messaging.message.retry.count": (task.default_retries or 0)
-                        - task.retries,
-                    },
-                    parent_span=None,
-                )
-            else:
-                transaction = continue_trace(
-                    sentry_headers or {},
-                    name=task.name,
-                    op=OP.QUEUE_TASK_HUEY,
-                    source=TransactionSource.TASK,
-                    origin=HueyIntegration.origin,
-                )
-                transaction.set_status(SPANSTATUS.OK)
-                span_ctx = sentry_sdk.start_transaction(transaction)
-                span_ctx.set_data(SPANDATA.MESSAGING_DESTINATION_NAME, self.name)
 
             if not getattr(task, "_sentry_is_patched", False):
                 task.execute = _wrap_task_execute(task.execute)
