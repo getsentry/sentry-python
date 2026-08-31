@@ -11,7 +11,7 @@ from sentry_sdk.integrations import (
     _check_minimum_version,
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
@@ -85,7 +85,7 @@ class LitestarIntegration(Integration):
         # The `LitestarIntegration`` provides an after_exception hook (see `patch_app_init` below) to create a Sentry event
         # from an exception, which ends up being called during step 2 above. However, the Sentry `LoggingIntegration` will
         # by default create a Sentry event from error logs made in step 1 if we do not prevent it from doing so.
-        ignore_logger("litestar")
+        ignore_logger_for_events("litestar")
 
 
 class SentryLitestarASGIMiddleware(SentryAsgiMiddleware):
@@ -321,6 +321,8 @@ def patch_http_route_handle() -> None:
         def event_processor(event: "Event", _: "Hint") -> "Event":
             request_info = event.get("request", {})
             request_info["content_length"] = len(scope.get("_body", b""))
+            should_attach_request_body = True
+
             if has_data_collection_enabled(client.options):
                 cookies = _apply_key_value_collection_filtering(
                     items=extracted_request_data["cookies"],
@@ -328,9 +330,15 @@ def patch_http_route_handle() -> None:
                 )
                 if cookies:
                     request_info["cookies"] = cookies
+
+                should_attach_request_body = (
+                    "incoming_request"
+                    in client.options["data_collection"]["http_bodies"]
+                )
             elif should_send_default_pii():
                 request_info["cookies"] = extracted_request_data["cookies"]
-            if request_data is not None:
+
+            if request_data is not None and should_attach_request_body:
                 request_info["data"] = request_data
 
             event["request"] = deepcopy(request_info)

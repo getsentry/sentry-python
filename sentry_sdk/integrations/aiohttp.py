@@ -18,7 +18,7 @@ from sentry_sdk.integrations._wsgi_common import (
     _filter_headers,
     request_body_within_bounds,
 )
-from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.sessions import track_session
 from sentry_sdk.traces import (
@@ -113,7 +113,7 @@ class AioHttpIntegration(Integration):
         # accidentally overwrite a status of "ok" with "error".
         _register_control_flow_exception(HTTPException)
 
-        ignore_logger("aiohttp.server")
+        ignore_logger_for_events("aiohttp.server")
 
         old_handle = Application._handle
 
@@ -544,6 +544,7 @@ def _make_request_processor(
         if request is None:
             return event
 
+        client_options = sentry_sdk.get_client().options
         with capture_internal_exceptions():
             request_info = event.setdefault("request", {})
 
@@ -561,7 +562,16 @@ def _make_request_processor(
             # Just attach raw data here if it is within bounds, if available.
             # Unfortunately there's no way to get structured data from aiohttp
             # without awaiting on some coroutine.
-            request_info["data"] = get_aiohttp_request_data(request)
+            if has_data_collection_enabled(client_options):
+                if (
+                    "incoming_request"
+                    in client_options["data_collection"]["http_bodies"]
+                ):
+                    request_info["data"] = get_aiohttp_request_data(request)
+            else:
+                # We never gated this prior to data collection, so it should be attached
+                # when data collection is not enabled.
+                request_info["data"] = get_aiohttp_request_data(request)
 
         return event
 

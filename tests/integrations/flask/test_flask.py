@@ -338,7 +338,10 @@ def test_flask_large_json_request(sentry_init, capture_events, app, max_value_le
 
 def test_flask_session_tracking(sentry_init, capture_envelopes, app):
     sentry_init(
-        integrations=[flask_sentry.FlaskIntegration()],
+        integrations=[
+            flask_sentry.FlaskIntegration(),
+            LoggingIntegration(level=None, event_level=logging.ERROR),
+        ],
         release="demo-release",
     )
 
@@ -1017,7 +1020,12 @@ def test_dont_override_sentry_trace_context(sentry_init, app):
 
 
 def test_request_not_modified_by_reference(sentry_init, capture_events, app):
-    sentry_init(integrations=[flask_sentry.FlaskIntegration()])
+    sentry_init(
+        integrations=[
+            flask_sentry.FlaskIntegration(),
+            LoggingIntegration(event_level=logging.ERROR),
+        ]
+    )
 
     @app.route("/", methods=["POST"])
     def index():

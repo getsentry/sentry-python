@@ -262,6 +262,8 @@ def patch_http_route_handle() -> None:
         def event_processor(event: "Event", _: "Hint") -> "Event":
             request_info = event.get("request", {})
             request_info["content_length"] = len(scope.get("_body", b""))
+            should_attach_request_body = True
+
             if has_data_collection_enabled(client.options):
                 cookies = _apply_key_value_collection_filtering(
                     items=extracted_request_data["cookies"],
@@ -269,9 +271,15 @@ def patch_http_route_handle() -> None:
                 )
                 if cookies:
                     request_info["cookies"] = cookies
+
+                should_attach_request_body = (
+                    "incoming_request"
+                    in client.options["data_collection"]["http_bodies"]
+                )
             elif should_send_default_pii():
                 request_info["cookies"] = extracted_request_data["cookies"]
-            if request_data is not None:
+
+            if request_data is not None and should_attach_request_body:
                 request_info["data"] = request_data
 
             event["request"] = deepcopy(request_info)

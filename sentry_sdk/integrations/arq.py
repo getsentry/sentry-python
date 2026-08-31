@@ -3,7 +3,7 @@ import sys
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA, SPANSTATUS
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
@@ -64,7 +64,7 @@ class ArqIntegration(Integration):
 
         _register_control_flow_exception(ARQ_CONTROL_FLOW_EXCEPTIONS)  # type: ignore
 
-        ignore_logger("arq.worker")
+        ignore_logger_for_events("arq.worker")
 
 
 def patch_enqueue_job() -> None:

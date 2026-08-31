@@ -1286,7 +1286,7 @@ class ClientConstructor:
         in_app_exclude: "List[str]" = [],  # noqa: B006
         default_integrations: bool = True,
         dist: "Optional[str]" = None,
-        transport: "Optional[Union[sentry_sdk.transport.Transport, Type[sentry_sdk.transport.Transport], Callable[[Event], None]]]" = None,
+        transport: "Optional[Union[sentry_sdk.transport.Transport, Type[sentry_sdk.transport.Transport], None]]" = None,
         transport_queue_size: int = DEFAULT_QUEUE_SIZE,
         sample_rate: float = 1.0,
         send_default_pii: "Optional[bool]" = None,

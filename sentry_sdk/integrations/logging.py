@@ -19,12 +19,14 @@ from sentry_sdk.utils import (
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
     from logging import LogRecord
-    from typing import Any, Dict, Optional, Union
+    from typing import Any, Dict, Optional
 
-_SENTINEL = object()
 
+# Logs of this severity and above will be captured as Sentry logs
 DEFAULT_LEVEL = logging.INFO
-DEFAULT_EVENT_LEVEL = logging.ERROR
+# Logs of this severity and above will be captured as breadcrumbs
+DEFAULT_LEVEL_FOR_BREADCRUMBS = logging.INFO
+
 LOGGING_TO_EVENT_LEVEL = {
     logging.NOTSET: "notset",
     logging.DEBUG: "debug",
@@ -56,7 +58,7 @@ SEVERITY_TO_OTEL_SEVERITY = {
 # Events/breadcrumbs and Sentry Logs have separate ignore lists so that
 # framework loggers silenced for events (e.g. django.server) can still be
 # captured as Sentry Logs.
-_IGNORED_LOGGERS = set(
+_IGNORED_LOGGERS_EVENTS = set(
     ["sentry_sdk.errors", "urllib3.connectionpool", "urllib3.connection"]
 )
 
@@ -65,7 +67,7 @@ _IGNORED_LOGGERS_SENTRY_LOGS = set(
 )
 
 
-def ignore_logger(
+def ignore_logger_for_events(
     name: str,
 ) -> None:
     """This disables recording (both in breadcrumbs and as events) calls to
@@ -74,14 +76,14 @@ def ignore_logger(
     to users as a way to quiet spammy loggers.
 
     This does **not** affect Sentry Logs — use
-    :py:func:`ignore_logger_for_sentry_logs` for that.
+    :py:func:`ignore_logger` for that.
 
     :param name: The name of the logger to ignore (same string you would pass to ``logging.getLogger``).
     """
-    _IGNORED_LOGGERS.add(name)
+    _IGNORED_LOGGERS_EVENTS.add(name)
 
 
-def ignore_logger_for_sentry_logs(
+def ignore_logger(
     name: str,
 ) -> None:
     """This disables recording as Sentry Logs calls to a logger of a
@@ -92,21 +94,21 @@ def ignore_logger_for_sentry_logs(
     _IGNORED_LOGGERS_SENTRY_LOGS.add(name)
 
 
-def unignore_logger(
+def unignore_logger_for_events(
     name: str,
 ) -> None:
-    """Reverts a previous :py:func:`ignore_logger` call, re-enabling
+    """Reverts a previous :py:func:`ignore_logger_for_events` call, re-enabling
     recording of breadcrumbs and events for the named logger.
 
     :param name: The name of the logger to unignore.
     """
-    _IGNORED_LOGGERS.discard(name)
+    _IGNORED_LOGGERS_EVENTS.discard(name)
 
 
-def unignore_logger_for_sentry_logs(
+def unignore_logger(
     name: str,
 ) -> None:
-    """Reverts a previous :py:func:`ignore_logger_for_sentry_logs` call,
+    """Reverts a previous :py:func:`ignore_logger` call,
     re-enabling recording of Sentry Logs for the named logger.
 
     :param name: The name of the logger to unignore.
@@ -116,46 +118,56 @@ def unignore_logger_for_sentry_logs(
 
 class LoggingIntegration(Integration):
     identifier = "logging"
-    capture_sentry_logs: "Optional[Union[bool, object]]" = _SENTINEL
 
     def __init__(
         self,
         level: "Optional[int]" = DEFAULT_LEVEL,
-        event_level: "Optional[int]" = DEFAULT_EVENT_LEVEL,
-        sentry_logs_level: "Optional[int]" = DEFAULT_LEVEL,
-        capture_sentry_logs: "Optional[Union[bool, object]]" = _SENTINEL,
+        event_level: "Optional[int]" = None,
+        breadcrumb_level: "Optional[int]" = DEFAULT_LEVEL_FOR_BREADCRUMBS,
     ) -> None:
-        LoggingIntegration.capture_sentry_logs = capture_sentry_logs
+        """
+        Initialize the standard library logging integration.
 
-        self._handler = None
+        - `level`: Logs with severity of this level and above will be captured
+          as Sentry logs.
+        - `event_level`: Logs with severity of this level and above will be
+          captured as Sentry events.
+        - `breadcrumb_level`: Logs with this severity and above will be captured
+          as breadcrumbs.
+        """
+        self._logs_handler = None
+        self._event_handler = None
         self._breadcrumb_handler = None
-        self._sentry_logs_handler = None
 
         if level is not None:
-            self._breadcrumb_handler = BreadcrumbHandler(level=level)
-
-        if sentry_logs_level is not None:
-            self._sentry_logs_handler = SentryLogsHandler(level=sentry_logs_level)
+            self._logs_handler = LogsHandler(level=level)
 
         if event_level is not None:
-            self._handler = EventHandler(level=event_level)
+            self._event_handler = EventHandler(level=event_level)
 
-    def _handle_record(self, record: "LogRecord") -> None:
-        if self._handler is not None and record.levelno >= self._handler.level:
-            self._handler.handle(record)
+        if breadcrumb_level is not None:
+            self._breadcrumb_handler = BreadcrumbHandler(level=breadcrumb_level)
 
+    def _handle_logs_record(self, record: "LogRecord") -> None:
+        if (
+            self._logs_handler is not None
+            and record.levelno >= self._logs_handler.level
+        ):
+            self._logs_handler.handle(record)
+
+    def _handle_event_record(self, record: "LogRecord") -> None:
+        if (
+            self._event_handler is not None
+            and record.levelno >= self._event_handler.level
+        ):
+            self._event_handler.handle(record)
+
+    def _handle_breadcrumb_record(self, record: "LogRecord") -> None:
         if (
             self._breadcrumb_handler is not None
             and record.levelno >= self._breadcrumb_handler.level
         ):
             self._breadcrumb_handler.handle(record)
-
-    def _handle_sentry_logs_record(self, record: "LogRecord") -> None:
-        if (
-            self._sentry_logs_handler is not None
-            and record.levelno >= self._sentry_logs_handler.level
-        ):
-            self._sentry_logs_handler.handle(record)
 
     @staticmethod
     def setup_once() -> None:
@@ -164,7 +176,7 @@ class LoggingIntegration(Integration):
         def sentry_patched_callhandlers(self: "Any", record: "LogRecord") -> "Any":
             # keeping a local reference because the
             # global might be discarded on shutdown
-            ignored_loggers = _IGNORED_LOGGERS
+            ignored_loggers_events = _IGNORED_LOGGERS_EVENTS
             ignored_loggers_sentry_logs = _IGNORED_LOGGERS_SENTRY_LOGS
 
             try:
@@ -177,7 +189,8 @@ class LoggingIntegration(Integration):
                 name = record.name.strip()
 
                 handle_events = (
-                    ignored_loggers is not None and name not in ignored_loggers
+                    ignored_loggers_events is not None
+                    and name not in ignored_loggers_events
                 )
                 handle_sentry_logs = (
                     ignored_loggers_sentry_logs is not None
@@ -189,10 +202,11 @@ class LoggingIntegration(Integration):
                         LoggingIntegration
                     )
                     if integration is not None:
-                        if handle_events:
-                            integration._handle_record(record)
                         if handle_sentry_logs:
-                            integration._handle_sentry_logs_record(record)
+                            integration._handle_logs_record(record)
+                        if handle_events:
+                            integration._handle_event_record(record)
+                            integration._handle_breadcrumb_record(record)
 
         logging.Logger.callHandlers = sentry_patched_callhandlers  # type: ignore
 
@@ -244,14 +258,12 @@ class _BaseHandler(logging.Handler):
 
 class EventHandler(_BaseHandler):
     """
-    A logging handler that emits Sentry events for each log record
-
-    Note that you do not have to use this class if the logging integration is enabled, which it is by default.
+    A logging handler that emits Sentry events for each log record.
     """
 
     def _can_record(self, record: "LogRecord") -> bool:
         """Prevents ignored loggers from recording"""
-        for logger in _IGNORED_LOGGERS:
+        for logger in _IGNORED_LOGGERS_EVENTS:
             if fnmatch(record.name.strip(), logger):
                 return False
         return True
@@ -337,20 +349,14 @@ class EventHandler(_BaseHandler):
         sentry_sdk.capture_event(event, hint=hint)
 
 
-# Legacy name
-SentryHandler = EventHandler
-
-
 class BreadcrumbHandler(_BaseHandler):
     """
     A logging handler that records breadcrumbs for each log record.
-
-    Note that you do not have to use this class if the logging integration is enabled, which it is by default.
     """
 
     def _can_record(self, record: "LogRecord") -> bool:
         """Prevents ignored loggers from recording"""
-        for logger in _IGNORED_LOGGERS:
+        for logger in _IGNORED_LOGGERS_EVENTS:
             if fnmatch(record.name.strip(), logger):
                 return False
         return True
@@ -379,11 +385,9 @@ class BreadcrumbHandler(_BaseHandler):
         }
 
 
-class SentryLogsHandler(_BaseHandler):
+class LogsHandler(_BaseHandler):
     """
     A logging handler that records Sentry logs for each Python log record.
-
-    Note that you do not have to use this class if the LoggingIntegration's capture_sentry_logs option is enabled.
     """
 
     def _can_record(self, record: "LogRecord") -> bool:
@@ -401,9 +405,6 @@ class SentryLogsHandler(_BaseHandler):
 
             client = sentry_sdk.get_client()
             if not client.is_active():
-                return
-
-            if LoggingIntegration.capture_sentry_logs is not True:
                 return
 
             self._capture_log_from_record(client, record)

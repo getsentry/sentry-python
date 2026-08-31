@@ -9,10 +9,10 @@ import sentry_sdk
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA, SPANSTATUS
 from sentry_sdk.integrations.dramatiq import DramatiqIntegration
-from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.tracing import Transaction, TransactionSource
 
-ignore_logger("dramatiq.worker.WorkerThread")
+ignore_logger_for_events("dramatiq.worker.WorkerThread")
 
 
 @pytest.fixture(scope="function")
@@ -453,6 +453,75 @@ def test_that_message_data_is_added_as_request(
     assert request_data["options"]["max_retries"] == 0
     assert uuid.UUID(request_data["message_id"])
     assert isinstance(request_data["message_timestamp"], int)
+
+
+@pytest.mark.parametrize(
+    "broker,expect_message_data",
+    [
+        pytest.param({}, True, id="data_collection_not_enabled"),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"http_bodies": ["incoming_request"]}
+                }
+            },
+            True,
+            id="data_collection_http_bodies_incoming_request",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"http_bodies": []}}},
+            False,
+            id="data_collection_http_bodies_empty",
+        ),
+    ],
+    indirect=["broker"],
+)
+def test_that_message_data_is_gated_by_data_collection(
+    broker, worker, capture_events, expect_message_data
+):
+    events = capture_events()
+
+    @dramatiq.actor(max_retries=0)
+    def dummy_actor(x, y):
+        return x / y
+
+    dummy_actor.send_with_options(args=(1, 0), max_retries=0)
+    broker.join(dummy_actor.queue_name, fail_fast=False)
+    worker.join()
+
+    (event,) = events
+    dramatiq_context = event["contexts"]["dramatiq"]
+
+    if expect_message_data:
+        assert dramatiq_context["data"]["actor_name"] == "dummy_actor"
+        assert dramatiq_context["data"]["args"] == [1, 0]
+    else:
+        assert "data" not in dramatiq_context
+
+
+@pytest.mark.parametrize(
+    "broker",
+    [{"_experiments": {"data_collection": {"http_bodies": []}}}],
+    indirect=True,
+)
+def test_that_dramatiq_context_type_is_set_regardless_of_data_collection(
+    broker, worker, capture_events
+):
+    events = capture_events()
+
+    @dramatiq.actor(max_retries=0)
+    def dummy_actor(x, y):
+        return x / y
+
+    dummy_actor.send_with_options(args=(1, 0), max_retries=0)
+    broker.join(dummy_actor.queue_name, fail_fast=False)
+    worker.join()
+
+    (event,) = events
+    dramatiq_context = event["contexts"]["dramatiq"]
+
+    assert dramatiq_context["type"] == "dramatiq"
+    assert "data" not in dramatiq_context
 
 
 @pytest.mark.parametrize(
