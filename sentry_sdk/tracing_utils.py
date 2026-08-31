@@ -46,7 +46,6 @@ if TYPE_CHECKING:
     from typing import Any, Dict, Generator, Iterator, Optional, Tuple, Union
 
     from sentry_sdk._types import Attributes
-    from sentry_sdk.client import BaseClient
     from sentry_sdk.utils import ParsedUrl
 
 
@@ -231,7 +230,7 @@ def add_http_breadcrumb(status_code: "Optional[int]", data: "dict[str, Any]") ->
 
 
 def get_url_attributes(
-    client: "BaseClient", parsed_url: "Optional[ParsedUrl]"
+    client: "sentry_sdk.client.BaseClient", parsed_url: "Optional[ParsedUrl]"
 ) -> "Attributes":
     """Build the `url.*` span attributes for an outgoing HTTP request.
 
