@@ -39,11 +39,12 @@ if TYPE_CHECKING:
 
 # ``http_bodies`` defaults to this (collect everything the
 # platform supports); an empty list is the explicit opt-out.
-# response bodyies are not included here because we don't
-# currently capture them (as of Jul 7 2026)
+# ``incoming_response`` is not included here because we don't
+# currently capture incoming response bodies.
 _ALL_HTTP_BODY_TYPES = [
     "incoming_request",
     "outgoing_request",
+    "outgoing_response",
 ]
 
 # Default number of source lines captured above and below a stack frame.
