@@ -10,6 +10,8 @@ from unittest import mock
 
 import pytest
 
+from sentry_sdk.consts import SPANDATA
+
 try:
     import httpcore
 except (ImportError, ModuleNotFoundError):
@@ -750,7 +752,7 @@ def test_complex_limits_without_data_category(
                                     "value": "info",
                                     "type": "string",
                                 },
-                                "server.address": {
+                                SPANDATA.DEVICE_NAME: {
                                     "value": "test-server",
                                     "type": "string",
                                 },
@@ -780,7 +782,7 @@ def test_complex_limits_without_data_category(
                                     "value": "2.45.0",
                                     "type": "string",
                                 },
-                                "server.address": {
+                                SPANDATA.DEVICE_NAME: {
                                     "value": "test-server",
                                     "type": "string",
                                 },

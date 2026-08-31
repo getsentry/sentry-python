@@ -561,7 +561,7 @@ def test_transport_format(sentry_init, capture_envelopes):
                         "type": "string",
                         "value": "warn",
                     },
-                    "server.address": {
+                    SPANDATA.DEVICE_NAME: {
                         "type": "string",
                         "value": "test-server",
                     },
@@ -647,7 +647,7 @@ def test_batcher_drops_logs(sentry_init, monkeypatch):
                             "type": "string",
                             "value": "info",
                         },
-                        "server.address": {
+                        SPANDATA.DEVICE_NAME: {
                             "type": "string",
                             "value": "test-server",
                         },

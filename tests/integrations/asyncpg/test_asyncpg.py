@@ -51,7 +51,7 @@ CRUMBS_CONNECT = {
             "db.system": "postgresql",
             "db.user": PG_USER,
             "db.driver.name": "asyncpg",
-            "server.address": PG_HOST,
+            SPANDATA.DEVICE_NAME: PG_HOST,
             "server.port": PG_PORT,
         }
     ),
@@ -68,7 +68,7 @@ CRUMBS_CONNECT_STREAMING = {
             "db.namespace": PG_NAME,
             "db.user": PG_USER,
             "db.driver.name": "asyncpg",
-            "server.address": PG_HOST,
+            SPANDATA.DEVICE_NAME: PG_HOST,
             "server.port": PG_PORT,
         }
     ),
