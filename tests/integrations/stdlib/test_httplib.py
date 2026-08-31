@@ -418,7 +418,7 @@ def test_outgoing_trace_headers_head_sdk(
     assert request_headers["baggage"] == expected_outgoing_baggage
 
 
-def test_outgoing_trace_headers_span_streaming_no_current_span(sentry_init):
+def test_outgoing_trace_headers_no_current_span(sentry_init):
     """
     With span streaming enabled and no active span, trace propagation headers
     should still be attached to outgoing requests, propagated from the scope's
