@@ -28,23 +28,6 @@ def test_logs_enabled_by_default(sentry_init, capture_envelopes):
     assert envelopes
 
 
-def test_enable_logs_noop(sentry_init, capture_envelopes):
-    sentry_init(enable_logs=False)
-
-    envelopes = capture_envelopes()
-
-    sentry_sdk.logger.trace("This is a 'trace' log.")
-    sentry_sdk.logger.debug("This is a 'debug' log...")
-    sentry_sdk.logger.info("This is a 'info' log...")
-    sentry_sdk.logger.warning("This is a 'warning' log...")
-    sentry_sdk.logger.error("This is a 'error' log...")
-    sentry_sdk.logger.fatal("This is a 'fatal' log...")
-
-    sentry_sdk.flush()
-
-    assert envelopes
-
-
 def test_logs_basics(sentry_init, capture_items):
     sentry_init()
     items = capture_items("log")
@@ -120,34 +103,6 @@ def test_logs_before_send_log(sentry_init, capture_items):
     assert logs[1]["attributes"]["sentry.severity_text"] == "debug"
     assert logs[2]["attributes"]["sentry.severity_text"] == "info"
     assert logs[3]["attributes"]["sentry.severity_text"] == "warn"
-    assert before_log_called is True
-
-
-def test_logs_before_send_log_experimental_option_still_works(
-    sentry_init, capture_items
-):
-    before_log_called = False
-
-    def _before_log(record, hint):
-        nonlocal before_log_called
-        before_log_called = True
-
-        return record
-
-    sentry_init(
-        _experiments={
-            "before_send_log": _before_log,
-        },
-    )
-    items = capture_items("log")
-
-    sentry_sdk.logger.error("This is an error log...")
-
-    get_client().flush()
-    logs = [item.payload for item in items]
-    assert len(logs) == 1
-
-    assert logs[0]["attributes"]["sentry.severity_text"] == "error"
     assert before_log_called is True
 
 
@@ -892,3 +847,36 @@ def test_log_batcher_lock_reset_in_child_after_fork(sentry_init):
     original_lock.release()
     _, status = os.waitpid(pid, 0)
     assert os.WIFEXITED(status) and os.WEXITSTATUS(status) == 0
+
+
+@pytest.mark.tests_internal_exceptions
+def test_flush_loop_swallows_flush_exception():
+    """The flush loop must not let one failed flush kill the flusher thread.
+
+    Regression test for #7138: an unhandled exception inside _flush_loop
+    terminated the daemon flusher thread. After that logs silently stopped
+    being delivered and eventually got dropped at the queue cap. The loop must
+    swallow the error and keep running.
+
+    Driven synchronously on a bare batcher: _flush raises once and then stops
+    the loop, so _flush_loop returns cleanly on fixed code and propagates the
+    exception on unfixed code.
+    """
+    from sentry_sdk._batcher import Batcher
+
+    calls = []
+
+    class ExplodingBatcher(Batcher):
+        def _flush(self):
+            calls.append(1)
+            self._running = False  # exit the loop after this one iteration
+            raise RuntimeError("boom in flush")
+
+    batcher = ExplodingBatcher(
+        capture_func=lambda envelope: None,
+        record_lost_func=lambda *a, **k: None,
+    )
+    batcher._flush_event.set()  # so the loop's wait() returns at once
+    batcher._flush_loop()
+
+    assert calls == [1]

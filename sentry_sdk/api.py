@@ -1,13 +1,10 @@
 import inspect
-import warnings
 from typing import TYPE_CHECKING
 
 from sentry_sdk import Client, tracing_utils
 from sentry_sdk._init_implementation import init
 from sentry_sdk.crons import monitor
 from sentry_sdk.scope import Scope, isolation_scope, new_scope
-from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.traces import get_current_span as _get_current_streamed_span
 from sentry_sdk.tracing import NoOpSpan, Transaction, trace
 
 if TYPE_CHECKING:
@@ -34,7 +31,6 @@ if TYPE_CHECKING:
         SamplingContext,
     )
     from sentry_sdk.client import BaseClient
-    from sentry_sdk.traces import StreamedSpan
     from sentry_sdk.tracing import Span, TransactionKwargs
 
     T = TypeVar("T")
@@ -83,7 +79,6 @@ __all__ = [
     "start_session",
     "end_session",
     "set_transaction_name",
-    "update_current_span",
 ]
 
 
@@ -381,96 +376,3 @@ def end_session() -> None:
 @scopemethod
 def set_transaction_name(name: str, source: "Optional[str]" = None) -> None:
     return get_current_scope().set_transaction_name(name, source)
-
-
-def update_current_span(
-    op: "Optional[str]" = None,
-    name: "Optional[str]" = None,
-    attributes: "Optional[dict[str, Union[str, int, float, bool]]]" = None,
-    data: "Optional[dict[str, Any]]" = None,
-) -> None:
-    """
-    Update the current active span with the provided parameters.
-
-    This function allows you to modify properties of the currently active span.
-    If no span is currently active, this function will do nothing.
-
-    :param op: The operation name for the span. This is a high-level description
-        of what the span represents (e.g., "http.client", "db.query").
-        You can use predefined constants from :py:class:`sentry_sdk.consts.OP`
-        or provide your own string. If not provided, the span's operation will
-        remain unchanged.
-    :type op: str or None
-
-    :param name: The human-readable name/description for the span. This provides
-        more specific details about what the span represents (e.g., "GET /api/users",
-        "SELECT * FROM users"). If not provided, the span's name will remain unchanged.
-    :type name: str or None
-
-    :param data: A dictionary of key-value pairs to add as data to the span. This
-        data will be merged with any existing span data. If not provided,
-        no data will be added.
-
-        .. deprecated:: 2.35.0
-            Use ``attributes`` instead. The ``data`` parameter will be removed
-            in a future version.
-    :type data: dict[str, Union[str, int, float, bool]] or None
-
-    :param attributes: A dictionary of key-value pairs to add as attributes to the span.
-        Attribute values must be strings, integers, floats, or booleans. These
-        attributes will be merged with any existing span data. If not provided,
-        no attributes will be added.
-    :type attributes: dict[str, Union[str, int, float, bool]] or None
-
-    :returns: None
-
-    .. versionadded:: 2.35.0
-
-    Example::
-
-        import sentry_sdk
-        from sentry_sdk.consts import OP
-
-        sentry_sdk.update_current_span(
-            op=OP.FUNCTION,
-            name="process_user_data",
-            attributes={"user_id": 123, "batch_size": 50}
-        )
-    """
-    if isinstance(_get_current_streamed_span(), StreamedSpan):
-        warnings.warn(
-            "The `update_current_span` API isn't available in streaming mode. "
-            "Retrieve the current span with get_current_span() and use its API "
-            "directly.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return
-
-    current_span = get_current_span()
-
-    if current_span is None:
-        return
-
-    if op is not None:
-        current_span.op = op
-
-    if name is not None:
-        # internally it is still description
-        current_span.description = name
-
-    if data is not None and attributes is not None:
-        raise ValueError(
-            "Cannot provide both `data` and `attributes`. Please use only `attributes`."
-        )
-
-    if data is not None:
-        warnings.warn(
-            "The `data` parameter is deprecated. Please use `attributes` instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        attributes = data
-
-    if attributes is not None:
-        current_span.update_data(attributes)

@@ -19,7 +19,8 @@ from ..utils import (
     _set_agent_data,
     _set_available_tools,
     _set_model_data,
-    _should_send_prompts,
+    _should_send_inputs,
+    _should_send_outputs,
 )
 from .utils import (
     _serialize_binary_content_item,
@@ -73,7 +74,7 @@ def invoke_agent_span(
     _set_available_tools(span, agent)
 
     # Add user prompt and system prompts if available and prompts are enabled
-    if _should_send_prompts():
+    if _should_send_inputs():
         messages = []
 
         # Add system prompts (both instructions and system_prompt)
@@ -163,7 +164,7 @@ def update_invoke_agent_span(
     output = getattr(result, "output", None)
 
     # Set response text if prompts are enabled
-    if _should_send_prompts() and output:
+    if _should_send_outputs() and output:
         set_data_normalized(
             span, SPANDATA.GEN_AI_RESPONSE_TEXT, str(output), unpack=False
         )

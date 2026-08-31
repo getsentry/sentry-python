@@ -10,6 +10,7 @@ import subprocess
 import sys
 import threading
 import time
+import warnings
 from collections import namedtuple
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -18,6 +19,8 @@ from decimal import Decimal
 from functools import partial, partialmethod, wraps
 from numbers import Real
 from urllib.parse import parse_qs, unquote, urlencode, urlsplit, urlunsplit
+
+from sentry_sdk.data_collection import _apply_key_value_collection_filtering
 
 try:
     # Python 3.11
@@ -87,6 +90,9 @@ BASE64_ALPHABET = re.compile(r"^[a-zA-Z0-9/+=]*$")
 
 FALSY_ENV_VALUES = frozenset(("false", "f", "n", "no", "off", "0"))
 TRUTHY_ENV_VALUES = frozenset(("true", "t", "y", "yes", "on", "1"))
+_AWS_SIGV4_SIGNING_ALGORITHMS = frozenset(
+    ("AWS4-HMAC-SHA256", "AWS4-ECDSA-P256-SHA256")
+)
 
 MAX_STACK_FRAMES = 2000
 """Maximum number of stack frames to send to Sentry.
@@ -468,7 +474,14 @@ def get_lines_from_file(
     loader: "Optional[Any]" = None,
     module: "Optional[str]" = None,
 ) -> "Tuple[List[Annotated[str]], Optional[Annotated[str]], List[Annotated[str]]]":
+    client_options = sentry_sdk.get_client().options
+
+    # This is the default pre-data collection. Should be removed once data collection
+    # is fully released
     context_lines = 5
+    if has_data_collection_enabled(client_options):
+        context_lines = client_options["data_collection"]["frame_context_lines"]
+
     source = None
     if loader is not None and hasattr(loader, "get_source"):
         try:
@@ -580,6 +593,8 @@ def serialize_frame(
     max_value_length: "Optional[int]" = None,
     custom_repr: "Optional[Callable[..., Optional[str]]]" = None,
 ) -> "Dict[str, Any]":
+    from sentry_sdk.serializer import serialize
+
     f_code = getattr(frame, "f_code", None)
     if not f_code:
         abs_path = None
@@ -608,14 +623,41 @@ def serialize_frame(
         "lineno": tb_lineno,
     }
 
+    client_options = sentry_sdk.get_client().options
+    if has_data_collection_enabled(client_options):
+        include_source_context = bool(
+            client_options["data_collection"]["frame_context_lines"]
+        )
+
     if include_source_context:
         rv["pre_context"], rv["context_line"], rv["post_context"] = get_source_context(
             frame, tb_lineno, max_value_length
         )
 
-    if include_local_variables:
-        from sentry_sdk.serializer import serialize
+    if has_data_collection_enabled(client_options):
+        dc_stack_frame_vars_config = client_options["data_collection"][
+            "stack_frame_variables"
+        ]
 
+        if isinstance(dc_stack_frame_vars_config, bool):
+            if dc_stack_frame_vars_config:
+                rv["vars"] = serialize(
+                    dict(frame.f_locals), is_vars=True, custom_repr=custom_repr
+                )
+        else:
+            local_variables_to_send = _apply_key_value_collection_filtering(
+                items=dict(frame.f_locals),
+                behaviour=dc_stack_frame_vars_config,
+            )
+
+            if local_variables_to_send:
+                serialized_variables = serialize(
+                    local_variables_to_send, is_vars=True, custom_repr=custom_repr
+                )
+
+                rv["vars"] = serialized_variables
+
+    elif include_local_variables:
         rv["vars"] = serialize(
             dict(frame.f_locals), is_vars=True, custom_repr=custom_repr
         )
@@ -1427,30 +1469,18 @@ class TimeoutThread(threading.Thread):
         if self._stop_event.is_set():
             return
 
-        integer_configured_timeout = int(self.configured_timeout)
-
-        # Setting up the exact integer value of configured time(in seconds)
-        if integer_configured_timeout < self.configured_timeout:
-            integer_configured_timeout = integer_configured_timeout + 1
-
         # Raising Exception after timeout duration is reached
         if self.isolation_scope is not None and self.current_scope is not None:
             with sentry_sdk.scope.use_isolation_scope(self.isolation_scope):
                 with sentry_sdk.scope.use_scope(self.current_scope):
                     try:
                         raise ServerlessTimeoutWarning(
-                            "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds.".format(
-                                integer_configured_timeout
-                            )
+                            "WARNING: Function is about to time out."
                         )
                     except Exception:
                         reraise(*self._capture_exception())
 
-        raise ServerlessTimeoutWarning(
-            "WARNING : Function is expected to get timed out. Configured timeout duration = {} seconds.".format(
-                integer_configured_timeout
-            )
-        )
+        raise ServerlessTimeoutWarning("WARNING: Function is about to time out.")
 
 
 def to_base64(original: str) -> "Optional[str]":
@@ -1569,6 +1599,40 @@ def parse_url(url: str, sanitize: bool = True) -> "ParsedUrl":
         query=parsed_url.query,  # type: ignore
         fragment=parsed_url.fragment,  # type: ignore
     )
+
+
+def _get_aws_sigv4_signed_headers_from_authorization_header(
+    authorization: str,
+) -> "Set[str]":
+    # only AWS SigV4 authorization has the SignedHeaders parameter.
+    value = authorization.lstrip()
+    algorithm, _, parameters = value.partition(" ")
+    if algorithm not in _AWS_SIGV4_SIGNING_ALGORITHMS:
+        return set()
+
+    for part in parameters.split(","):
+        part = part.strip()
+        if part.startswith("SignedHeaders="):
+            _, _, header_names = part.partition("=")
+            return {header.lower() for header in header_names.split(";") if header}
+
+    return set()
+
+
+def _get_aws_sigv4_signed_headers_from_url_query_string(url: str) -> "Set[str]":
+    query = {
+        key.lower(): values for key, values in parse_qs(urlsplit(url).query).items()
+    }
+    algorithm = query.get("x-amz-algorithm", [""])[0]
+    if algorithm not in _AWS_SIGV4_SIGNING_ALGORITHMS:
+        return set()
+
+    # presigned requests have SignedHeaders in the URL query.
+    return {
+        header.lower()
+        for header in query.get("x-amz-signedheaders", [""])[0].split(";")
+        if header
+    }
 
 
 def is_valid_sample_rate(rate: "Any", source: str) -> bool:
@@ -1957,9 +2021,7 @@ def get_before_send_log(
     if options is None:
         return None
 
-    return options.get("before_send_log") or options["_experiments"].get(
-        "before_send_log"
-    )
+    return options.get("before_send_log")
 
 
 def get_before_send_metric(
@@ -1968,9 +2030,7 @@ def get_before_send_metric(
     if options is None:
         return None
 
-    return options.get("before_send_metric") or options["_experiments"].get(
-        "before_send_metric"
-    )
+    return options.get("before_send_metric")
 
 
 def get_before_send_span(
@@ -1979,9 +2039,7 @@ def get_before_send_span(
     if options is None:
         return None
 
-    return options.get("before_send_span") or options["_experiments"].get(
-        "before_send_span"
-    )
+    return options.get("before_send_span")
 
 
 def format_attribute(val: "Any") -> "AttributeValue":
@@ -2035,3 +2093,12 @@ def serialize_attribute(val: "AttributeValue") -> "SerializedAttributeValue":
     # Coerce to string if we don't know what to do with the value. This should
     # never happen as we pre-format early in format_attribute, but let's be safe.
     return {"value": safe_repr(val), "type": "string"}
+
+
+def deprecation_warning(msg: str) -> None:
+    """
+    Emit a warnings.warn about a deprecation.
+
+    For other types of warnings, use logger.warning().
+    """
+    warnings.warn(msg, stacklevel=3, category=DeprecationWarning)

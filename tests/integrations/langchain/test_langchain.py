@@ -3821,9 +3821,7 @@ def test_manual_callback_no_duplication(sentry_init):
     )
 
     # Create a manual SentryLangchainCallback
-    manual_callback = SentryLangchainCallback(
-        max_span_map_size=100, include_prompts=False
-    )
+    manual_callback = SentryLangchainCallback(include_prompts=False)
 
     # Create RunnableConfig with the manual callback
     config = RunnableConfig(callbacks=[manual_callback])
@@ -3846,8 +3844,8 @@ def test_manual_callback_no_duplication(sentry_init):
 def test_span_map_is_instance_variable():
     """Test that each SentryLangchainCallback instance has its own span_map."""
     # Create two separate callback instances
-    callback1 = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
-    callback2 = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
+    callback1 = SentryLangchainCallback(include_prompts=True)
+    callback2 = SentryLangchainCallback(include_prompts=True)
 
     # Verify they have different span_map instances
     assert callback1.span_map is not callback2.span_map, (
@@ -3894,7 +3892,7 @@ def test_langchain_callback_manager_with_sentry_callback(sentry_init):
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
     )
-    sentry_callback = SentryLangchainCallback(0, False)
+    sentry_callback = SentryLangchainCallback(False)
     local_manager = BaseCallbackManager(handlers=[sentry_callback])
 
     with mock.patch("sentry_sdk.integrations.langchain.manager") as mock_manager_module:
@@ -3960,7 +3958,7 @@ def test_langchain_callback_list_existing_callback(sentry_init):
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
     )
-    sentry_callback = SentryLangchainCallback(0, False)
+    sentry_callback = SentryLangchainCallback(False)
     local_callbacks = [sentry_callback]
 
     with mock.patch("sentry_sdk.integrations.langchain.manager") as mock_manager_module:
@@ -4220,7 +4218,7 @@ def test_langchain_message_truncation(sentry_init, capture_events):
     )
     events = capture_events()
 
-    callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
+    callback = SentryLangchainCallback(include_prompts=True)
 
     run_id = "12345678-1234-1234-1234-123456789012"
     serialized = {"_type": "openai-chat", "model_name": "gpt-3.5-turbo"}
@@ -5891,7 +5889,7 @@ def test_langchain_ai_system_detection(
         trace_lifecycle="stream" if span_streaming else "static",
     )
 
-    callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=True)
+    callback = SentryLangchainCallback(include_prompts=True)
 
     run_id = "test-ai-system-uuid"
     serialized = {"_type": ai_type} if ai_type is not None else {}
@@ -6497,10 +6495,10 @@ def test_langchain_text_completion_data_collection(
             False,
             False,
             [
-                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
             ],
-            [],
+            [SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS],
             id="gen-ai-inputs-and-outputs-enabled-tools-collected",
         ),
         pytest.param(
@@ -6509,6 +6507,7 @@ def test_langchain_text_completion_data_collection(
             True,
             [],
             [
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
             ],
@@ -6518,33 +6517,34 @@ def test_langchain_text_completion_data_collection(
             {"gen_ai": {"inputs": True, "outputs": False}},
             False,
             False,
+            [SPANDATA.GEN_AI_TOOL_DEFINITIONS],
             [
+                # REQUEST_AVAILABLE_TOOLS is the legacy value set when data collection is not enabled
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
             ],
-            [],
-            id="gen-ai-inputs-enabled-outputs-disabled-tools-collected",
+            id="gen-ai-inputs-enabled-outputs-disabled-only-tool-definitions-collected",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": True}},
             True,
             True,
-            [],
+            [SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS],
             [
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
-                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
             ],
-            id="gen-ai-outputs-enabled-inputs-disabled-tools-not-collected",
+            id="gen-ai-outputs-enabled-inputs-disabled-only-response-tool-calls-collected",
         ),
         pytest.param(
             {"gen_ai": {}},
             False,
             False,
             [
-                SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
             ],
-            [],
+            [SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS],
             id="gen-ai-inputs-and-outputs-omitted-default-to-enabled",
         ),
         pytest.param(
@@ -6555,7 +6555,7 @@ def test_langchain_text_completion_data_collection(
                 SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
                 SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
             ],
-            [],
+            [SPANDATA.GEN_AI_TOOL_DEFINITIONS],
             id="no-gen-ai-config-legacy-pii-and-include-prompts-enabled",
         ),
         pytest.param(
@@ -6563,7 +6563,10 @@ def test_langchain_text_completion_data_collection(
             False,
             False,
             [SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS],
-            [SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS],
+            [
+                SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+                SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS,
+            ],
             id="no-gen-ai-config-available-tools-collected-regardless-of-pii",
         ),
     ],
@@ -6664,16 +6667,14 @@ def test_langchain_data_collection_tools(
     for key in expected_absent:
         assert key not in chat_spans[0], f"{key} should not have been collected"
 
-    # Available tools are gated the same way on every span they are set on
-    available_tools_collected = (
-        SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS in expected_present
-    )
-    assert (
-        SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS in chat_spans[1]
-    ) is available_tools_collected
-    assert (
-        SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS in invoke_agent_span
-    ) is available_tools_collected
+    # Tool definitions are gated the same way on every span they are set on
+    for key in (
+        SPANDATA.GEN_AI_TOOL_DEFINITIONS,
+        SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS,
+    ):
+        collected = key in expected_present
+        assert (key in chat_spans[1]) is collected
+        assert (key in invoke_agent_span) is collected
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -6727,7 +6728,7 @@ def test_langchain_data_collection_request_tool_call_params(
 
     sentry_init(**sentry_init_kwargs)
 
-    callback = SentryLangchainCallback(max_span_map_size=100, include_prompts=False)
+    callback = SentryLangchainCallback(include_prompts=False)
 
     streamed = span_streaming or stream_gen_ai_spans
     captured = capture_items("span") if streamed else capture_events()

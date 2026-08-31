@@ -121,10 +121,6 @@ def _wrap_handler(handler: "F") -> "F":
                         request_data, aws_context, configured_time
                     )
                 )
-                scope.set_tag("aws_region", aws_region)
-                if batch_size > 1:
-                    scope.set_tag("batch_request", True)
-                    scope.set_tag("batch_size", batch_size)
 
                 # Starting the Timeout thread only if the configured time is greater than Timeout warning
                 # buffer and timeout_warning parameter is set True.
@@ -419,6 +415,11 @@ def _make_request_event_processor(
                 ip = identity.get("sourceIp")
                 if ip is not None:
                     user_info.setdefault("ip_address", ip)
+
+            if "incoming_request" in client_options["data_collection"]["http_bodies"]:
+                if "body" in aws_event:
+                    request["data"] = aws_event.get("body", "")
+
         elif should_send_default_pii():
             user_info = sentry_event.setdefault("user", {})
 

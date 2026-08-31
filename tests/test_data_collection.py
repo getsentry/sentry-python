@@ -12,6 +12,32 @@ def test_kvcb_invalid_mode():
         sentry_sdk.init(_experiments={"data_collection": {"cookies": {"mode": "nope"}}})  # type: ignore Purposely ignoring to test invalid option
 
 
+def test_stack_frame_variables_invalid_mode():
+    with pytest.raises(ValueError):
+        sentry_sdk.init(
+            _experiments={
+                "data_collection": {"stack_frame_variables": {"mode": "nope"}}
+            }
+        )
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["3", -1, [1], 2.5],
+    ids=[
+        "frame_context_lines_string",
+        "frame_context_lines_negative",
+        "frame_context_lines_list",
+        "frame_context_lines_float",
+    ],
+)
+def test_frame_context_lines_invalid_value(value):
+    with pytest.raises(ValueError):
+        sentry_sdk.init(
+            _experiments={"data_collection": {"frame_context_lines": value}}
+        )
+
+
 def test_kvcb_from_dict_defaults_mode():
     sentry_sdk.init(
         _experiments={
@@ -147,8 +173,8 @@ def _get(dc, path):
                 "include_local_variables": False,
                 "include_source_context": False,
             },
-            {"stack_frame_variables": False, "frame_context_lines": 0},
-            id="explicit_frame_fields_fall_back_to_legacy_options",
+            {"stack_frame_variables": True, "frame_context_lines": 5},
+            id="explicit_data_collection_ignores_legacy_include_local_variables",
         ),
         pytest.param(
             {
@@ -247,6 +273,85 @@ def _get(dc, path):
             {"_experiments": {"data_collection": {"frame_context_lines": 0}}},
             {"frame_context_lines": 0},
             id="frame_context_lines_bool_fallback_0",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"stack_frame_variables": True}}},
+            {"stack_frame_variables": True},
+            id="stack_frame_variables_explicit_true",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"stack_frame_variables": False}}},
+            {"stack_frame_variables": False},
+            id="stack_frame_variables_explicit_false",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "stack_frame_variables": {
+                            "mode": "allowlist",
+                            "terms": ["order_id"],
+                        }
+                    }
+                }
+            },
+            {
+                "stack_frame_variables": {
+                    "mode": "allowlist",
+                    "terms": ["order_id"],
+                }
+            },
+            id="stack_frame_variables_allowlist_dict",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "stack_frame_variables": {"terms": ["order_id"]}
+                    }
+                }
+            },
+            {
+                "stack_frame_variables": {
+                    "mode": "denylist",
+                    "terms": ["order_id"],
+                }
+            },
+            id="stack_frame_variables_dict_defaults_mode_to_denylist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"stack_frame_variables": {"mode": "off"}}
+                }
+            },
+            {"stack_frame_variables": {"mode": "off"}},
+            id="stack_frame_variables_off_dict_omits_terms",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"stack_frame_variables": "yes"}}},
+            {"stack_frame_variables": True},
+            id="stack_frame_variables_non_bool_truthy_coerces_to_true",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"stack_frame_variables": ""}}},
+            {"stack_frame_variables": False},
+            id="stack_frame_variables_non_bool_falsy_coerces_to_false",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {"frame_context_lines": None}}},
+            {"frame_context_lines": 5},
+            id="frame_context_lines_none_falls_back_to_spec_default",
+        ),
+        pytest.param(
+            {"include_local_variables": False, "include_source_context": False},
+            {"stack_frame_variables": False, "frame_context_lines": 0},
+            id="legacy_include_local_variables_off_disables_stack_frame_variables",
+        ),
+        pytest.param(
+            {"include_local_variables": True, "include_source_context": True},
+            {"stack_frame_variables": True, "frame_context_lines": 5},
+            id="legacy_include_local_variables_on_enables_stack_frame_variables",
         ),
     ],
 )

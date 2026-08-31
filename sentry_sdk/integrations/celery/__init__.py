@@ -14,7 +14,7 @@ from sentry_sdk.integrations.celery.beat import (
     _setup_celery_beat_signals,
 )
 from sentry_sdk.integrations.celery.utils import _now_seconds_since_epoch
-from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.traces import SegmentNameSource, StreamedSpan, get_current_span
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, Span, TransactionSource
@@ -24,6 +24,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     has_data_collection_enabled,
+    parse_version,
     reraise,
 )
 
@@ -36,7 +37,7 @@ if TYPE_CHECKING:
 
 
 try:
-    from celery import VERSION as CELERY_VERSION  # type: ignore
+    from celery import __version__ as CELERY_VERSION  # type: ignore
     from celery.app.task import Task  # type: ignore
     from celery.app.trace import task_has_custom
     from celery.exceptions import (  # type: ignore
@@ -73,7 +74,7 @@ class CeleryIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        _check_minimum_version(CeleryIntegration, CELERY_VERSION)
+        _check_minimum_version(CeleryIntegration, parse_version(CELERY_VERSION))
 
         _patch_build_tracer()
         _patch_task_apply_async()
@@ -84,12 +85,12 @@ class CeleryIntegration(Integration):
         # This logger logs every status of every task that ran on the worker.
         # Meaning that every task's breadcrumbs are full of stuff like "Task
         # <foo> raised unexpected <bar>".
-        ignore_logger("celery.worker.job")
-        ignore_logger("celery.app.trace")
+        ignore_logger_for_events("celery.worker.job")
+        ignore_logger_for_events("celery.app.trace")
 
         # This is stdout/err redirected to a logger, can't deal with this
         # (need event_level=logging.WARN to reproduce)
-        ignore_logger("celery.redirected")
+        ignore_logger_for_events("celery.redirected")
 
 
 def _set_status(status: str) -> None:

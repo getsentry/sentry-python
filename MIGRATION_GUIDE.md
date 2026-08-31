@@ -23,6 +23,72 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 
 - The UnraisableHookIntegration is now enabled by default.
 - We now don't suppress chained exceptions in the ASGI and asyncio integrations by default. The related `suppress_asgi_chained_exceptions` experimental option was removed.
+- In the AWS Lambda and GCP integrations, the message of the warning the SDK optionally emits if a function is about to time out has changed.
+- We changed the way we emit warnings. Deprecations will from now on be always emitted using `warnings.warn()`, while all other warnings will be emitted using `logger.warning()`.
+- `sentry_sdk.init()` can no longer be used as a context manager.
+
+### Logging
+
+- The standard library logging integration is not auto-enabled by default anymore. To continue using it, add it to the `integrations` list in your `sentry_sdk.init()`:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.logging import LoggingIntegration
+
+  sentry_sdk.init(
+      integrations=[
+          LoggingIntegration(),
+      ]
+  )
+  ```
+
+- The `level` integration option is now called `breadcrumb_level`.
+- The `sentry_logs_level` integration option is now called `level`.
+- The `capture_sentry_logs` option was removed. Use `level=None` to disable log capture.
+- The `ignore_logger` helper was renamed to `ignore_logger_for_events`.
+- The `ignore_logger_for_sentry_logs` helper was renamed to `ignore_logger`.
+- `SentryHandler` was removed. Use `EventHandler` instead.
+- When you enable the integration by adding `LoggingIntegration` to your `sentry_sdk.init()`, it'll start capturing Sentry logs and breadcrumbs. Creating events from logs can be enabled by providing additional integration options.
+
+  | Old name | New name | Old default | New default | Description |
+  | --- | --- | --- | --- | --- |
+  | `level` | `breadcrumb_level` | `INFO` | `INFO` | Captures logs of that level and higher as breadcrumbs. |
+  | `event_level` | `event_level` | `ERROR` | `None` | Captures logs of that level and higher as events. |
+  | `sentry_logs_level` | `level` | `INFO` | `INFO` | Captures logs of that level and higher as Sentry logs. |
+  | `capture_sentry_logs` | removed | `False` | n/a | Allows to opt out of instrumenting logs as Sentry logs. Use `level` (previously `sentry_logs_level`) to adjust what should be captured instead. |
+  | `ignore_logger` | `ignore_logger_for_events` | n/a | n/a | Loggers that match this name will not create breadcrumbs and events. |
+  | `unignore_logger` | `unignore_logger_for_events` | n/a | n/a | Loggers that match this name will create breadcrumbs and events again. |
+  | `ignore_logger_for_sentry_logs` | `ignore_logger` | n/a | n/a | Loggers that match this name will not create Sentry logs. |
+  | `unignore_logger_for_sentry_logs` | `unignore_logger` | n/a | n/a | Loggers that match this name will create Sentry logs again. |
+
+
+### Loguru
+
+- The Loguru logging integration is not auto-enabled by default anymore if you have Loguru installed. To continue using it, add it to the `integrations` list in your `sentry_sdk.init()`:
+
+  ```python
+  import sentry_sdk
+  from sentry_sdk.integrations.loguru import LoguruIntegration
+
+  sentry_sdk.init(
+      integrations=[
+          LoguruIntegration(),
+      ]
+  )
+  ```
+
+- The `level` integration option is now called `breadcrumb_level`.
+- The `sentry_logs_level` integration option is now called `level`.
+- The `capture_sentry_logs` option was removed. Use `level=None` to disable log capture.
+- When you enable the integration by adding `LoguruIntegration` to your `sentry_sdk.init()`, it'll start capturing Sentry logs and breadcrumbs. Creating events from logs can be enabled by providing additional integration options.
+
+  | Old name | New name | Old default | New default | Description |
+  | --- | --- | --- | --- | --- |
+  | `level` | `breadcrumb_level` | `INFO` | `INFO` | Captures logs of that level and higher as breadcrumbs. |
+  | `event_level` | `event_level` | `ERROR` | `None` | Captures logs of that level and higher as events. |
+  | `sentry_logs_level` | `level` | `INFO` | `INFO` | Captures logs of that level and higher as Sentry logs. |
+  | `capture_sentry_logs` | removed | `False` | n/a | Allows to opt out of instrumenting logs as Sentry logs. Use `level` (previously `sentry_logs_level`) to adjust what should be captured instead. |
+
 
 ## Removed
 
@@ -41,14 +107,21 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - Dropped support for rq below 1.0.
 - Dropped support for Quart below 0.19.
 - Dropped support for Sanic below 22.0.
+- Dropped support for Celery below 5.0.
+- Dropped support for SQLAlchemy below 1.4.
+- Dropped support for Huey below 2.0.
+- Dropped support for Litestar below 2.0.
+- Dropped support for PySpark below 3.0.
 - Dropped support for redis-py below 4.2.
 - Removed the RedisIntegration `max_data_size` option.
 - Removed the possibility to supply a specific client to the LaunchDarklyIntegration.
 - The `enable_tracing` option was removed. Use `traces_sample_rate=1.0` instead.
+- The `enable_logs` option was removed. Using Sentry's logging API now works without requiring setting `enable_logs=True`.
+- The `enable_metrics` option was removed.
 - The deprecated `@ai_track` decorator was removed.
 - The deprecated `push_scope` and `configure_scope` APIs have been removed. Use `with new_scope():` to push a new scope and `scope = get_current_scope()` to retrieve the current scope instead.
 - Transaction profiling and related code was removed.
-- The `start_profile_session` and `stop_profile_session` were removed in favor of `start_profile` and `stop_profile`, respectively.
+- The `start_profile_session` and `stop_profile_session` were removed in favor of `start_profiler` and `stop_profiler`, respectively.
 - The experimental `continuous_profiling_mode` option was removed. Use the top-level `profiler_mode`, instead.
 - Removed the deprecated Hub class and all uses of hub throughout the SDK in arguments, options, etc. Use a scope instead.
 - The `SentrySpanProcessor`, `SentryPropagator`, `instrumenter`, and associated OpenTelemetry compatibility code was removed along with the `opentelemetry` extra and the `SentryPropagator` entrypoint. Use the `OTLPIntegration` instead.
@@ -59,6 +132,24 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - The `failed_request_status_codes` integration option now only supports a set of integers as input. Lists of integers or containers of integers are no longer supported.
 - The deprecated `propagate_traces` option has been removed. Use `trace_propagation_targets` instead, which gives you more power over trace propagation. Note that only the top-level `init` option was removed; the `propagate_traces` option of the Celery integration remains available.
 - Removed Spotlight integration for Django. See [Spotlight 2.0](https://github.com/getsentry/spotlight/issues/891) for more context.
+- The deprecated parameter `propagate_hub` in `ThreadingIntegration()` was removed.
+- The experimental `max_spans` option was removed.
+- The experimental `before_send_log` option was removed. Use the top-level `before_send_log` instead.
+- The experimental `before_send_metric` option was removed. Use the top-level `before_send_metric` instead.
+- The experimental `ignore_spans` option was removed. Use the top-level `ignore_spans` instead.
+- The experimental `before_send_span` option was removed. Use the top-level `before_send_span` instead.
+- `configure_debug_hub` was removed.
+- The `max_spans` option of the `LangchainIntegration` was removed.
+- `Baggage.from_options` was removed.
+- `Transport.capture_event` was removed. Use `Transport.capture_envelope` instead.
+- Function transports were removed.
+- The `Scope.trace_propagation_meta` function no longer accepts a `span` as argument.
+- Direct assignment to `Scope.level` was removed. Use `Scope.set_level` instead.
+- Direct assignment to `Scope.user` was removed. Use `Scope.set_user` instead.
+- `Scope.iter_headers` was removed.
+- The SDK won't set any tags on its own anymore.
+- The `update_current_span` API was removed.
+
 
 ## Deprecated
 

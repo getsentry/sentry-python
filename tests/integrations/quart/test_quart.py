@@ -405,8 +405,9 @@ async def test_error_in_errorhandler(sentry_init, capture_events):
 
     client = app.test_client()
 
-    if QUART_VERSION >= (0, 21, 0):
-        # Exception propagation behavior changed in 0.21.0
+    if QUART_VERSION >= (0, 21, 0) and QUART_VERSION < (0, 22, 0):
+        # Exception propagation behavior changed in 0.21.0, and was reverted
+        # back in 0.22.0
         await client.get("/")
 
         (event,) = events
@@ -1034,7 +1035,7 @@ async def test_span_streaming_quart_auth_user_id(
     spans = [item.payload for item in items]
     assert len(spans) == 2
 
-    segment = spans[1]
+    segment = next(s for s in spans if s["name"] == "hi")
     if send_default_pii and user_id is not None:
         assert segment["attributes"]["user.id"] == user_id
     else:

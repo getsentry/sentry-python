@@ -1,5 +1,4 @@
 import uuid
-import warnings
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import TYPE_CHECKING, cast
@@ -9,6 +8,7 @@ from sentry_sdk.consts import SPANDATA, SPANSTATUS, SPANTEMPLATE
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    deprecation_warning,
     get_current_thread_meta,
     is_valid_sample_rate,
     logger,
@@ -417,10 +417,8 @@ class Span:
         inherited from the current span/transaction.
         """
         if kwargs.get("description") is not None:
-            warnings.warn(
+            deprecation_warning(
                 "The `description` parameter is deprecated. Please use `name` instead.",
-                DeprecationWarning,
-                stacklevel=2,
             )
 
         kwargs.setdefault("sampled", self.sampled)

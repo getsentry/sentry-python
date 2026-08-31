@@ -4,7 +4,7 @@ import sentry_sdk
 from sentry_sdk import capture_event, get_client
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import request_body_within_bounds
-from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -45,7 +45,7 @@ class AriadneIntegration(Integration):
         version = package_version("ariadne")
         _check_minimum_version(AriadneIntegration, version)
 
-        ignore_logger("ariadne")
+        ignore_logger_for_events("ariadne")
 
         _patch_graphql()
 

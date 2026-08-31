@@ -22,17 +22,15 @@ def client():
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_scrub_django_session_cookies_removed(
     sentry_init,
     client,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=False,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
     items = capture_items("event")
     werkzeug_set_cookie(client, "localhost", "sessionid", "123")
@@ -46,17 +44,15 @@ def test_scrub_django_session_cookies_removed(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_scrub_django_session_cookies_filtered(
     sentry_init,
     client,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
     items = capture_items("event")
     werkzeug_set_cookie(client, "localhost", "sessionid", "123")
@@ -74,13 +70,11 @@ def test_scrub_django_session_cookies_filtered(
 
 @pytest.mark.forked
 @pytest_mark_django_db_decorator()
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_scrub_django_custom_session_cookies_filtered(
     sentry_init,
     client,
     capture_items,
     settings,
-    span_streaming,
 ):
     settings.SESSION_COOKIE_NAME = "my_sess"
     settings.CSRF_COOKIE_NAME = "csrf_secret"
@@ -88,7 +82,7 @@ def test_scrub_django_custom_session_cookies_filtered(
     sentry_init(
         integrations=[DjangoIntegration()],
         send_default_pii=True,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
     items = capture_items("event")
     werkzeug_set_cookie(client, "localhost", "my_sess", "123")
