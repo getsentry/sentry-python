@@ -392,7 +392,7 @@ class Scope:
 
         server_name = options.get("server_name")
         if server_name:
-            self.set_attribute(SPANDATA.SERVER_ADDRESS, server_name)
+            self.set_attribute(SPANDATA.DEVICE_NAME, server_name)
 
         environment = options.get("environment")
         if environment:

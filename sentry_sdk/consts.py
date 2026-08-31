@@ -539,6 +539,12 @@ class SPANDATA:
     Example: my_user
     """
 
+    DEVICE_NAME = "device.name"
+    """
+    The name of the device. On mobile, this is the user-assigned device name. On servers and desktops, this is typically the hostname.
+    Example: "localhost"
+    """
+
     GEN_AI_AGENT_NAME = "gen_ai.agent.name"
     """
     The name of the agent being used.
