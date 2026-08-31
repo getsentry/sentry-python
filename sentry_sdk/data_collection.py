@@ -26,7 +26,6 @@ from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Union, cas
 from urllib.parse import parse_qs, urlencode
 
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
-from sentry_sdk.utils import deprecation_warning
 
 if TYPE_CHECKING:
     from sentry_sdk._types import (
@@ -293,6 +292,8 @@ def _resolve_data_collection(options: "Dict[str, Any]") -> "DataCollection":
 
     ``data_collection`` must be a plain ``dict``.
     """
+    from sentry_sdk.utils import deprecation_warning
+
     user_dc = options.get("_experiments", {}).get("data_collection")
     send_default_pii = options.get("send_default_pii")
 
