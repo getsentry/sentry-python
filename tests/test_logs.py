@@ -211,7 +211,7 @@ def test_logs_attributes(sentry_init, capture_items):
     if sentry_sdk.get_client().options.get("release") is not None:
         assert "sentry.release" in logs[0]["attributes"]
     assert logs[0]["attributes"]["sentry.message.parameter.my_var"] == "some value"
-    assert logs[0]["attributes"][SPANDATA.SERVER_ADDRESS] == "test-server"
+    assert logs[0]["attributes"][SPANDATA.DEVICE_NAME] == "test-server"
     assert logs[0]["attributes"]["sentry.sdk.name"].startswith("sentry.python")
     assert logs[0]["attributes"]["sentry.sdk.version"] == VERSION
 

@@ -89,7 +89,7 @@ def test_metrics_with_attributes(sentry_init, capture_items):
     assert metrics[0]["attributes"]["sentry.release"] == "1.0.0"
     assert metrics[0]["attributes"]["sentry.environment"] == "test"
 
-    assert metrics[0]["attributes"][SPANDATA.SERVER_ADDRESS] == "test-server"
+    assert metrics[0]["attributes"][SPANDATA.DEVICE_NAME] == "test-server"
     assert metrics[0]["attributes"]["sentry.sdk.name"].startswith("sentry.python")
     assert metrics[0]["attributes"]["sentry.sdk.version"] == VERSION
 
