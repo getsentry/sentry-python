@@ -108,35 +108,6 @@ def test_crumb_capture_client_error(
 
 @pytest.mark.tests_internal_exceptions
 def test_omit_url_data_if_parsing_fails(sentry_init, capture_events):
-    sentry_init(integrations=[StdlibIntegration()])
-
-    events = capture_events()
-
-    url = f"http://localhost:{PORT}/ok"  # noqa:E231
-
-    with mock.patch(
-        "sentry_sdk.integrations.stdlib.parse_url",
-        side_effect=ValueError,
-    ):
-        response = requests.get(url)
-
-    capture_message("Testing!")
-
-    (event,) = events
-    assert event["breadcrumbs"]["values"][0]["data"] == ApproxDict(
-        {
-            SPANDATA.HTTP_REQUEST_METHOD: "GET",
-            SPANDATA.HTTP_STATUS_CODE: response.status_code,
-            # no url related data
-        }
-    )
-    assert "url" not in event["breadcrumbs"]["values"][0]["data"]
-    assert SPANDATA.HTTP_FRAGMENT not in event["breadcrumbs"]["values"][0]["data"]
-    assert SPANDATA.HTTP_QUERY not in event["breadcrumbs"]["values"][0]["data"]
-
-
-@pytest.mark.tests_internal_exceptions
-def test_omit_url_data_if_parsing_fails_span_streaming(sentry_init, capture_events):
     sentry_init(
         integrations=[StdlibIntegration()],
         trace_lifecycle="stream",
