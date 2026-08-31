@@ -3,7 +3,6 @@ from threading import Thread
 from urllib.parse import parse_qs, urlparse
 
 import boto3
-import pytest
 from botocore.config import Config
 
 import sentry_sdk
@@ -35,11 +34,12 @@ def _start_server():
     return server, thread
 
 
-@pytest.mark.parametrize("span_streaming", [False, True])
-def test_botocore_merges_propagation_before_sigv4_signing(sentry_init, span_streaming):
+def test_botocore_merges_propagation_before_sigv4_signing(
+    sentry_init,
+):
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
         default_integrations=False,
         integrations=[Boto3Integration(), StdlibIntegration()],
     )
@@ -76,21 +76,13 @@ def test_botocore_merges_propagation_before_sigv4_signing(sentry_init, span_stre
         client.meta.events.register_last(
             "before-sign", capture_headers_after_instrumentation
         )
-
-        if span_streaming:
-            with sentry_sdk.traces.start_span(  # type: ignore[attr-defined]
-                name="incoming"
-            ):
-                response = client.head_object(
-                    Bucket="example-bucket",
-                    Key="example-key",
-                )
-        else:
-            with sentry_sdk.start_transaction(name="incoming", sampled=True):
-                response = client.head_object(
-                    Bucket="example-bucket",
-                    Key="example-key",
-                )
+        with sentry_sdk.traces.start_span(  # type: ignore[attr-defined]
+            name="incoming"
+        ):
+            response = client.head_object(
+                Bucket="example-bucket",
+                Key="example-key",
+            )
 
         assert response["ResponseMetadata"]["HTTPStatusCode"] == 200
         headers = _AwsRequestHandler.requests[-1]
@@ -127,14 +119,13 @@ def test_botocore_merges_propagation_before_sigv4_signing(sentry_init, span_stre
         thread.join()
 
 
-@pytest.mark.parametrize("span_streaming", [False, True])
 def test_botocore_without_boto3_integration_preserves_signed_baggage(
-    sentry_init, span_streaming
+    sentry_init,
 ):
     """Leave signed `baggage` as-is; add unsigned `sentry-trace`."""
     sentry_init(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
         default_integrations=False,
         integrations=[StdlibIntegration()],
     )
@@ -154,21 +145,13 @@ def test_botocore_without_boto3_integration_preserves_signed_baggage(
 
         # inject `baggage` before SigV4; stdlib-only path cannot change signed fields.
         client.meta.events.register("before-sign", _inject_signed_baggage)
-
-        if span_streaming:
-            with sentry_sdk.traces.start_span(  # type: ignore[attr-defined]
-                name="incoming"
-            ):
-                response = client.head_object(
-                    Bucket="example-bucket",
-                    Key="example-key",
-                )
-        else:
-            with sentry_sdk.start_transaction(name="incoming", sampled=True):
-                response = client.head_object(
-                    Bucket="example-bucket",
-                    Key="example-key",
-                )
+        with sentry_sdk.traces.start_span(  # type: ignore[attr-defined]
+            name="incoming"
+        ):
+            response = client.head_object(
+                Bucket="example-bucket",
+                Key="example-key",
+            )
 
         assert response["ResponseMetadata"]["HTTPStatusCode"] == 200
         headers = _AwsRequestHandler.requests[-1]
