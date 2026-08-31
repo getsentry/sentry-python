@@ -6,7 +6,7 @@ from loguru import logger
 from loguru._recattrs import RecordFile, RecordLevel
 
 import sentry_sdk
-from sentry_sdk.consts import SPANDATA, VERSION
+from sentry_sdk.consts import VERSION
 from sentry_sdk.integrations.loguru import LoggingLevels, LoguruIntegration
 
 logger.remove(0)  # don't print to console
@@ -507,9 +507,9 @@ def test_logger_with_all_attributes(
     assert isinstance(attributes["sentry.release"], str)
     del attributes["sentry.release"]
 
-    assert SPANDATA.DEVICE_NAME in attributes
-    assert isinstance(attributes[SPANDATA.DEVICE_NAME], str)
-    del attributes[SPANDATA.DEVICE_NAME]
+    assert "server.address" in attributes
+    assert isinstance(attributes["server.address"], str)
+    del attributes["server.address"]
 
     assert "thread.id" in attributes
     assert isinstance(attributes["thread.id"], int)

@@ -4,7 +4,6 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk import start_transaction
-from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.socket import SocketIntegration
 from tests.conftest import ApproxDict, create_mock_http_server
 
@@ -31,7 +30,7 @@ def test_getaddrinfo_trace(sentry_init, capture_events, capture_items, span_stre
         assert dns_span["attributes"]["sentry.op"] == "socket.dns"
         assert dns_span["attributes"]["sentry.origin"] == "auto.socket.socket"
         assert dns_span["name"] == f"localhost:{PORT}"  # noqa: E231
-        assert dns_span["attributes"][SPANDATA.DEVICE_NAME] == "localhost"
+        assert dns_span["attributes"]["server.address"] == "localhost"
         assert dns_span["attributes"]["server.port"] == PORT
     else:
         events = capture_events()
@@ -77,12 +76,12 @@ def test_create_connection_trace(
 
         assert connect_span["attributes"]["sentry.op"] == "socket.connection"
         assert connect_span["name"] == f"localhost:{PORT}"  # noqa: E231
-        assert connect_span["attributes"][SPANDATA.DEVICE_NAME] == "localhost"
+        assert connect_span["attributes"]["server.address"] == "localhost"
         assert connect_span["attributes"]["server.port"] == PORT
 
         assert dns_span["attributes"]["sentry.op"] == "socket.dns"
         assert dns_span["name"] == f"localhost:{PORT}"  # noqa: E231
-        assert dns_span["attributes"][SPANDATA.DEVICE_NAME] == "localhost"
+        assert dns_span["attributes"]["server.address"] == "localhost"
         assert dns_span["attributes"]["server.port"] == PORT
     else:
         events = capture_events()

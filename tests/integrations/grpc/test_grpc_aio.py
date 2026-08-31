@@ -8,7 +8,7 @@ import pytest_asyncio
 
 import sentry_sdk
 from sentry_sdk import start_span, start_transaction
-from sentry_sdk.consts import OP, SPANDATA
+from sentry_sdk.consts import OP
 from sentry_sdk.integrations.grpc import GRPCIntegration
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from tests.conftest import ApproxDict
@@ -341,7 +341,7 @@ async def test_grpc_client_starts_span(
                 "sentry.sdk.version": mock.ANY,
                 "sentry.segment.id": mock.ANY,
                 "sentry.segment.name": "custom parent",
-                SPANDATA.DEVICE_NAME: mock.ANY,
+                "server.address": mock.ANY,
                 "thread.id": mock.ANY,
                 "thread.name": mock.ANY,
                 "rpc.response.status_code": "OK",
@@ -416,7 +416,7 @@ async def test_grpc_client_unary_stream_starts_span(
                 "sentry.sdk.version": mock.ANY,
                 "sentry.segment.id": mock.ANY,
                 "sentry.segment.name": "custom parent",
-                SPANDATA.DEVICE_NAME: mock.ANY,
+                "server.address": mock.ANY,
                 "thread.id": mock.ANY,
                 "thread.name": mock.ANY,
             }

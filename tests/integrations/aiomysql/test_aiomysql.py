@@ -47,7 +47,7 @@ CRUMBS_CONNECT = {
             "db.name": MYSQL_DB,
             "db.system": "mysql",
             "db.user": MYSQL_USER,
-            SPANDATA.DEVICE_NAME: MYSQL_HOST,
+            "server.address": MYSQL_HOST,
             "server.port": MYSQL_PORT,
         }
     ),
@@ -685,7 +685,7 @@ async def test_connection_pool(sentry_init, capture_events) -> None:
     assert len(connect_crumbs) >= pool_size  # One connect span per pooled connection
     for crumb in connect_crumbs:
         assert crumb["data"]["db.system"] == "mysql"
-        assert crumb["data"][SPANDATA.DEVICE_NAME] == MYSQL_HOST
+        assert crumb["data"]["server.address"] == MYSQL_HOST
 
 
 @pytest.mark.asyncio
