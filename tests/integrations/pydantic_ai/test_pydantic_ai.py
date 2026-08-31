@@ -2228,7 +2228,6 @@ async def test_invoke_agent_with_instructions(
     """
     from pydantic_ai import Agent
 
-    # Create agent with instructions (can be string or list) and system prompt
     agent = Agent(
         "test",
         name="test_instructions",
