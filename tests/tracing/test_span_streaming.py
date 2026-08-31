@@ -7,6 +7,7 @@ from unittest import mock
 import pytest
 
 import sentry_sdk
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.traces import (
     NoOpStreamedSpan,
@@ -1848,7 +1849,7 @@ def test_default_attributes(sentry_init, capture_envelopes):
         "sentry.segment.name": {"value": "test", "type": "string"},
         "sentry.sdk.name": {"value": "sentry.python", "type": "string"},
         "sentry.sdk.version": {"value": mock.ANY, "type": "string"},
-        "server.address": {"value": "test-server", "type": "string"},
+        SPANDATA.DEVICE_NAME: {"value": "test-server", "type": "string"},
         "sentry.environment": {"value": "production", "type": "string"},
         "sentry.platform": {"value": "python", "type": "string"},
         "sentry.release": {"value": "1.0.0", "type": "string"},

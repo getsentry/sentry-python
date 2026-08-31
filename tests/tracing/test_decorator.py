@@ -4,7 +4,7 @@ from unittest import mock
 import pytest
 
 import sentry_sdk
-from sentry_sdk.consts import SPANTEMPLATE
+from sentry_sdk.consts import SPANDATA, SPANTEMPLATE
 from sentry_sdk.tracing_utils import create_span_decorator
 from sentry_sdk.utils import logger
 from tests.conftest import patch_start_tracing_child
@@ -449,7 +449,7 @@ def test_span_templates_ai_dicts(
             "sentry.sdk.version": mock.ANY,
             "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "test-transaction",
-            "server.address": mock.ANY,
+            SPANDATA.DEVICE_NAME: mock.ANY,
             "thread.id": mock.ANY,
             "thread.name": mock.ANY,
         }
@@ -474,7 +474,7 @@ def test_span_templates_ai_dicts(
             "sentry.sdk.version": mock.ANY,
             "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "test-transaction",
-            "server.address": mock.ANY,
+            SPANDATA.DEVICE_NAME: mock.ANY,
             "thread.id": mock.ANY,
             "thread.name": mock.ANY,
         }
@@ -505,7 +505,7 @@ def test_span_templates_ai_dicts(
             "sentry.sdk.version": mock.ANY,
             "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "test-transaction",
-            "server.address": mock.ANY,
+            SPANDATA.DEVICE_NAME: mock.ANY,
             "thread.id": mock.ANY,
             "thread.name": mock.ANY,
         }
@@ -650,7 +650,7 @@ def test_span_templates_ai_objects(
             "sentry.sdk.version": mock.ANY,
             "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "test-transaction",
-            "server.address": mock.ANY,
+            SPANDATA.DEVICE_NAME: mock.ANY,
             "thread.id": mock.ANY,
             "thread.name": mock.ANY,
         }
@@ -676,7 +676,7 @@ def test_span_templates_ai_objects(
             "sentry.sdk.version": mock.ANY,
             "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "test-transaction",
-            "server.address": mock.ANY,
+            SPANDATA.DEVICE_NAME: mock.ANY,
             "thread.id": mock.ANY,
             "thread.name": mock.ANY,
         }
@@ -706,7 +706,7 @@ def test_span_templates_ai_objects(
             "sentry.sdk.version": mock.ANY,
             "sentry.segment.id": mock.ANY,
             "sentry.segment.name": "test-transaction",
-            "server.address": mock.ANY,
+            SPANDATA.DEVICE_NAME: mock.ANY,
             "thread.id": mock.ANY,
             "thread.name": mock.ANY,
         }

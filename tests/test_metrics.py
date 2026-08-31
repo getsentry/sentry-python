@@ -342,7 +342,7 @@ def test_transport_format(sentry_init, capture_envelopes):
                         "type": "string",
                         "value": VERSION,
                     },
-                    "server.address": {
+                    SPANDATA.DEVICE_NAME: {
                         "type": "string",
                         "value": "test-server",
                     },
