@@ -608,28 +608,29 @@ def extract_tool_calls(
 
     # Extract from candidates, sometimes tool calls are nested under the content.parts object
     candidates = getattr(response, "candidates", [])
-    for candidate in candidates:
-        if not hasattr(candidate, "content") or not getattr(
-            candidate.content, "parts", []
-        ):
-            continue
+    if response is not None:
+        for candidate in candidates:
+            if not hasattr(candidate, "content") or not getattr(
+                candidate.content, "parts", []
+            ):
+                continue
 
-        if candidate.content is None or candidate.content.parts is None:
-            continue
+            if candidate.content is None or candidate.content.parts is None:
+                continue
 
-        for part in candidate.content.parts:
-            if getattr(part, "function_call", None):
-                function_call = part.function_call
-                tool_call = {
-                    "name": getattr(function_call, "name", None),
-                    "type": "function_call",
-                }
+            for part in candidate.content.parts:
+                if getattr(part, "function_call", None):
+                    function_call = part.function_call
+                    tool_call = {
+                        "name": getattr(function_call, "name", None),
+                        "type": "function_call",
+                    }
 
-                # Extract arguments if available
-                if getattr(function_call, "args", None):
-                    tool_call["arguments"] = safe_serialize(function_call.args)
+                    # Extract arguments if available
+                    if getattr(function_call, "args", None):
+                        tool_call["arguments"] = safe_serialize(function_call.args)
 
-                tool_calls.append(tool_call)
+                    tool_calls.append(tool_call)
 
     # Extract from automatic_function_calling_history
     # This is the history of tool calls made by the model
