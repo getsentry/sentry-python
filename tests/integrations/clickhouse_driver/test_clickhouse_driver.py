@@ -21,9 +21,13 @@ if clickhouse_driver.VERSION < (0, 2, 6):
     EXPECT_PARAMS_IN_SELECT = False
 
 
-def test_clickhouse_client_breadcrumbs(sentry_init, capture_events) -> None:
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_clickhouse_client_breadcrumbs(
+    sentry_init, capture_events, span_streaming
+) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
+        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={"record_sql_params": True},
     )
     events = capture_events()
@@ -127,10 +131,14 @@ def test_clickhouse_client_breadcrumbs(sentry_init, capture_events) -> None:
     assert actual_query_breadcrumbs == expected_breadcrumbs
 
 
-def test_clickhouse_client_breadcrumbs_with_pii(sentry_init, capture_events) -> None:
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_clickhouse_client_breadcrumbs_with_pii(
+    sentry_init, capture_events, span_streaming
+) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         send_default_pii=True,
+        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={"record_sql_params": True},
     )
     events = capture_events()
@@ -229,11 +237,13 @@ def test_clickhouse_client_breadcrumbs_with_pii(sentry_init, capture_events) -> 
     assert event["breadcrumbs"]["values"] == expected_breadcrumbs
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 def test_clickhouse_client_breadcrumbs_with_data_collection(
-    sentry_init, capture_events
+    sentry_init, capture_events, span_streaming
 ) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
+        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={"data_collection": {"database_query_data": True}},
     )
     events = capture_events()
@@ -332,11 +342,13 @@ def test_clickhouse_client_breadcrumbs_with_data_collection(
     assert event["breadcrumbs"]["values"] == expected_breadcrumbs
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 def test_clickhouse_client_breadcrumbs_with_data_collection_disabled(
-    sentry_init, capture_events
+    sentry_init, capture_events, span_streaming
 ) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
+        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={"data_collection": {"database_query_data": False}},
     )
     events = capture_events()
@@ -431,12 +443,14 @@ def test_clickhouse_client_breadcrumbs_with_data_collection_disabled(
         assert "db.result" not in crumb["data"]
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 def test_clickhouse_client_breadcrumbs_data_collection_overrides_pii(
-    sentry_init, capture_events
+    sentry_init, capture_events, span_streaming
 ) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         send_default_pii=True,
+        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={"data_collection": {"database_query_data": False}},
     )
     events = capture_events()
@@ -531,11 +545,13 @@ def test_clickhouse_client_breadcrumbs_data_collection_overrides_pii(
         assert "db.result" not in crumb["data"]
 
 
+@pytest.mark.parametrize("span_streaming", [True, False])
 def test_clickhouse_client_breadcrumbs_with_data_collection_default(
-    sentry_init, capture_events
+    sentry_init, capture_events, span_streaming
 ) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
+        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={"data_collection": {}},
     )
     events = capture_events()

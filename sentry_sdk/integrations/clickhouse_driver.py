@@ -95,6 +95,19 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
                         SPANDATA.DB_QUERY_TEXT: str(query),
                     },
                 )
+
+            sentry_sdk.get_isolation_scope().add_breadcrumb(
+                message=query,
+                category="query",
+                data={
+                    SPANDATA.DB_SYSTEM: "clickhouse",
+                    SPANDATA.DB_NAME: connection.database,
+                    SPANDATA.DB_DRIVER_NAME: "clickhouse-driver",
+                    SPANDATA.SERVER_ADDRESS: connection.host,
+                    SPANDATA.SERVER_PORT: connection.port,
+                    SPANDATA.DB_USER: connection.user,
+                },
+            )
         else:
             span = sentry_sdk.start_span(
                 op=OP.DB,
