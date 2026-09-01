@@ -84,6 +84,17 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
         query_id = args[2] if len(args) > 2 else kwargs.get("query_id")
         params = args[3] if len(args) > 3 else kwargs.get("params")
 
+        connection._query = query
+        connection._breadcrumb_data = {
+            SPANDATA.DB_SYSTEM: "clickhouse",
+            SPANDATA.DB_NAME: connection.database,
+            SPANDATA.DB_DRIVER_NAME: "clickhouse-driver",
+            SPANDATA.SERVER_ADDRESS: connection.host,
+            SPANDATA.SERVER_PORT: connection.port,
+            SPANDATA.DB_USER: connection.user,
+            "db.params": params,
+        }
+
         if has_span_streaming_enabled(client.options):
             span = None
             if sentry_sdk.traces.get_current_span() is not None:
@@ -95,16 +106,6 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
                         SPANDATA.DB_QUERY_TEXT: str(query),
                     },
                 )
-
-            connection._query = query
-            connection._breadcrumb_data = {
-                SPANDATA.DB_SYSTEM: "clickhouse",
-                SPANDATA.DB_NAME: connection.database,
-                SPANDATA.DB_DRIVER_NAME: "clickhouse-driver",
-                SPANDATA.SERVER_ADDRESS: connection.host,
-                SPANDATA.SERVER_PORT: connection.port,
-                SPANDATA.DB_USER: connection.user,
-            }
         else:
             span = sentry_sdk.start_span(
                 op=OP.DB,
