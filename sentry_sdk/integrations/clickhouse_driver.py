@@ -96,8 +96,8 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
                     },
                 )
 
-            connection._query = query  # type: ignore[attr-defined]
-            connection._breadcrumb_data = {  # type: ignore[attr-defined]
+            connection._query = query
+            connection._breadcrumb_data = {
                 SPANDATA.DB_SYSTEM: "clickhouse",
                 SPANDATA.DB_NAME: connection.database,
                 SPANDATA.DB_DRIVER_NAME: "clickhouse-driver",
@@ -124,7 +124,7 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
                 elif should_send_default_pii():
                     span.set_data("db.params", params)
 
-        connection._sentry_span = span  # type: ignore[attr-defined]
+        connection._sentry_span = span
 
         if span is not None:
             _set_db_data(span, connection)
@@ -140,17 +140,17 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
 def _wrap_end(f: "Callable[P, T]") -> "Callable[P, T]":
     def _inner_end(*args: "P.args", **kwargs: "P.kwargs") -> "T":
         res = f(*args, **kwargs)
-        instance = args[0]
-        span = getattr(instance.connection, "_sentry_span", None)  # type: ignore[attr-defined]
+        instance: "Client" = args[0]
+        span = getattr(instance.connection, "_sentry_span", None)
 
         if span is None:
             return res
 
         if isinstance(span, StreamedSpan):
-            query = getattr(instance.connection, "_query", None)  # type: ignore[attr-defined]
+            query = getattr(instance.connection, "_query", None)
             breadcrumb_data: "Optional[dict[str, Any]]" = getattr(
                 instance.connection, "_breadcrumb_data", None
-            )  # type: ignore[attr-defined]
+            )
 
             if query is not None and breadcrumb_data is not None:
                 sentry_sdk.get_isolation_scope().add_breadcrumb(
