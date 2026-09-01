@@ -236,10 +236,6 @@ def test_clickhouse_client_breadcrumbs_span_streaming(
 
     assert actual_query_breadcrumbs == expected_breadcrumbs
 
-    # In span streaming mode, db.params is never present
-    for crumb in actual_query_breadcrumbs:
-        assert "db.params" not in crumb["data"]
-
 
 def test_clickhouse_client_breadcrumbs_with_pii(sentry_init, capture_events) -> None:
     sentry_init(
@@ -343,7 +339,7 @@ def test_clickhouse_client_breadcrumbs_with_pii(sentry_init, capture_events) -> 
     assert event["breadcrumbs"]["values"] == expected_breadcrumbs
 
 
-def test_clickhouse_client_breadcrumbs_span_streaming_with_pii(
+def test_clickhouse_client_breadcrumbs_with_pii_span_streaming(
     sentry_init, capture_events
 ) -> None:
     sentry_init(
@@ -442,10 +438,6 @@ def test_clickhouse_client_breadcrumbs_span_streaming_with_pii(
         crumb.pop("timestamp", None)
 
     assert event["breadcrumbs"]["values"] == expected_breadcrumbs
-
-    # In span streaming mode, db.params is never present
-    for crumb in event["breadcrumbs"]["values"]:
-        assert "db.params" not in crumb["data"]
 
 
 def test_clickhouse_client_breadcrumbs_with_data_collection(
@@ -551,7 +543,7 @@ def test_clickhouse_client_breadcrumbs_with_data_collection(
     assert event["breadcrumbs"]["values"] == expected_breadcrumbs
 
 
-def test_clickhouse_client_breadcrumbs_span_streaming_with_data_collection(
+def test_clickhouse_client_breadcrumbs_with_data_collection_span_streaming(
     sentry_init, capture_events
 ) -> None:
     sentry_init(
@@ -649,10 +641,6 @@ def test_clickhouse_client_breadcrumbs_span_streaming_with_data_collection(
         crumb.pop("timestamp", None)
 
     assert event["breadcrumbs"]["values"] == expected_breadcrumbs
-
-    # In span streaming mode, db.params is never present
-    for crumb in event["breadcrumbs"]["values"]:
-        assert "db.params" not in crumb["data"]
 
 
 def test_clickhouse_client_breadcrumbs_with_data_collection_disabled(
@@ -754,7 +742,7 @@ def test_clickhouse_client_breadcrumbs_with_data_collection_disabled(
         assert "db.result" not in crumb["data"]
 
 
-def test_clickhouse_client_breadcrumbs_span_streaming_with_data_collection_disabled(
+def test_clickhouse_client_breadcrumbs_with_data_collection_disabled_span_streaming(
     sentry_init, capture_events
 ) -> None:
     sentry_init(
@@ -852,10 +840,6 @@ def test_clickhouse_client_breadcrumbs_span_streaming_with_data_collection_disab
         crumb.pop("timestamp", None)
 
     assert event["breadcrumbs"]["values"] == expected_breadcrumbs
-
-    # In span streaming mode, db.params is never present
-    for crumb in event["breadcrumbs"]["values"]:
-        assert "db.params" not in crumb["data"]
 
 
 def test_clickhouse_client_breadcrumbs_data_collection_overrides_pii(
@@ -958,7 +942,7 @@ def test_clickhouse_client_breadcrumbs_data_collection_overrides_pii(
         assert "db.result" not in crumb["data"]
 
 
-def test_clickhouse_client_breadcrumbs_span_streaming_data_collection_overrides_pii(
+def test_clickhouse_client_breadcrumbs_data_collection_overrides_pii_span_streaming(
     sentry_init, capture_events
 ) -> None:
     sentry_init(
@@ -1057,10 +1041,6 @@ def test_clickhouse_client_breadcrumbs_span_streaming_data_collection_overrides_
         crumb.pop("timestamp", None)
 
     assert event["breadcrumbs"]["values"] == expected_breadcrumbs
-
-    # In span streaming mode, db.params is never present
-    for crumb in event["breadcrumbs"]["values"]:
-        assert "db.params" not in crumb["data"]
 
 
 def test_clickhouse_client_breadcrumbs_with_data_collection_default(
@@ -1166,7 +1146,7 @@ def test_clickhouse_client_breadcrumbs_with_data_collection_default(
     assert event["breadcrumbs"]["values"] == expected_breadcrumbs
 
 
-def test_clickhouse_client_breadcrumbs_span_streaming_with_data_collection_default(
+def test_clickhouse_client_breadcrumbs_with_data_collection_default_span_streaming(
     sentry_init, capture_events
 ) -> None:
     sentry_init(
@@ -1264,10 +1244,6 @@ def test_clickhouse_client_breadcrumbs_span_streaming_with_data_collection_defau
         crumb.pop("timestamp", None)
 
     assert event["breadcrumbs"]["values"] == expected_breadcrumbs
-
-    # In span streaming mode, db.params is never present
-    for crumb in event["breadcrumbs"]["values"]:
-        assert "db.params" not in crumb["data"]
 
 
 def test_clickhouse_client_span_streaming_with_data_collection(
@@ -2174,10 +2150,6 @@ def test_clickhouse_dbapi_breadcrumbs_span_streaming(
 
     assert event["breadcrumbs"]["values"] == expected_breadcrumbs
 
-    # In span streaming mode, db.params is never present
-    for crumb in event["breadcrumbs"]["values"]:
-        assert "db.params" not in crumb["data"]
-
 
 def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> None:
     sentry_init(
@@ -2282,7 +2254,7 @@ def test_clickhouse_dbapi_breadcrumbs_with_pii(sentry_init, capture_events) -> N
     assert event["breadcrumbs"]["values"] == expected_breadcrumbs
 
 
-def test_clickhouse_dbapi_breadcrumbs_span_streaming_with_pii(
+def test_clickhouse_dbapi_breadcrumbs_with_pii_span_streaming(
     sentry_init, capture_events
 ) -> None:
     sentry_init(
@@ -2382,10 +2354,6 @@ def test_clickhouse_dbapi_breadcrumbs_span_streaming_with_pii(
         crumb.pop("timestamp", None)
 
     assert event["breadcrumbs"]["values"] == expected_breadcrumbs
-
-    # In span streaming mode, db.params is never present
-    for crumb in event["breadcrumbs"]["values"]:
-        assert "db.params" not in crumb["data"]
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
