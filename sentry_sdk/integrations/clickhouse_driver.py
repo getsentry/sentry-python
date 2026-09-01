@@ -8,7 +8,7 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
-from sentry_sdk.utils import has_data_collection_enabled
+from sentry_sdk.utils import capture_internal_exceptions, has_data_collection_enabled
 
 # Hack to get new Python features working in older versions
 # without introducing a hard dependency on `typing_extensions`
@@ -179,6 +179,11 @@ def _wrap_end(f: "Callable[P, T]") -> "Callable[P, T]":
                         span.set_data("db.result", res)
                 elif should_send_default_pii():
                     span.set_data("db.result", res)
+
+            with capture_internal_exceptions():
+                span.scope.add_breadcrumb(
+                    message=span._data.pop("query"), category="query", data=span._data
+                )
 
             span.finish()
 
