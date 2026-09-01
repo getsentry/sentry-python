@@ -22,6 +22,7 @@ if TYPE_CHECKING:
         Metric,
         MonitorConfig,
         SamplingContext,
+        SpanJSON,
     )
 else:
     from typing import Any
@@ -36,6 +37,7 @@ else:
     Log = Any
     MonitorConfig = Any
     SamplingContext = Any
+    SpanJSON = Any
     Metric = Any
 
 
@@ -48,5 +50,6 @@ __all__ = (
     "Log",
     "MonitorConfig",
     "SamplingContext",
+    "SpanJSON",
     "Metric",
 )
