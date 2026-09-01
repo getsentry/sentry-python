@@ -160,12 +160,15 @@ def _wrap_end(f: "Callable[P, T]") -> "Callable[P, T]":
 
         if query is not None and breadcrumb_data is not None:
             client_options = sentry_sdk.get_client().options
-            if (
-                has_data_collection_enabled(client_options)
-                and client_options["data_collection"]["database_query_data"]
-            ) or (
-                not has_data_collection_enabled(client_options)
-                and should_send_default_pii()
+            if res is not None and (
+                (
+                    has_data_collection_enabled(client_options)
+                    and client_options["data_collection"]["database_query_data"]
+                )
+                or (
+                    not has_data_collection_enabled(client_options)
+                    and should_send_default_pii()
+                )
             ):
                 breadcrumb_data = {"db.result": res, **breadcrumb_data}
 
@@ -237,6 +240,9 @@ def _wrap_send_data() -> None:
                         data = wrapped_generator()
 
                     span.set_data("db.params", db_params)
+                    breadcrumb_data = getattr(self.connection, "_breadcrumb_data", None)
+                    if breadcrumb_data is not None:
+                        breadcrumb_data["db.params"] = db_params
             elif should_send_default_pii():
                 db_params = span._data.get("db.params", [])
 
@@ -258,6 +264,9 @@ def _wrap_send_data() -> None:
                     data = wrapped_generator()
 
                 span.set_data("db.params", db_params)
+                breadcrumb_data = getattr(self.connection, "_breadcrumb_data", None)
+                if breadcrumb_data is not None:
+                    breadcrumb_data["db.params"] = db_params
 
         return original_send_data(
             self, sample_block, data, types_check, columnar, *args, **kwargs
