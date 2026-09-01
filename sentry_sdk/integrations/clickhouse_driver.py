@@ -89,12 +89,18 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
         breadcrumb_data = {
             SPANDATA.DB_SYSTEM: "clickhouse",
             SPANDATA.DB_NAME: connection.database,
-            SPANDATA.DB_DRIVER_NAME: "clickhouse-driver",
             SPANDATA.SERVER_ADDRESS: connection.host,
             SPANDATA.SERVER_PORT: connection.port,
             SPANDATA.DB_USER: connection.user,
         }
-        if params:
+        if params and (
+            (
+                has_data_collection_enabled(client.options)
+                and client.options["data_collection"]["database_query_data"]
+            )
+            or not has_data_collection_enabled(client.options)
+            and should_send_default_pii()
+        ):
             breadcrumb_data["db.params"] = params
 
         connection._breadcrumb_data = breadcrumb_data
@@ -157,7 +163,9 @@ def _wrap_end(f: "Callable[P, T]") -> "Callable[P, T]":
             if (
                 has_data_collection_enabled(client_options)
                 and client_options["data_collection"]["database_query_data"]
-                or should_send_default_pii()
+            ) or (
+                not has_data_collection_enabled(client_options)
+                and should_send_default_pii()
             ):
                 breadcrumb_data = {"db.result": res, **breadcrumb_data}
 
