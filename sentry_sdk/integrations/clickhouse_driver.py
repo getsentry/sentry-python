@@ -8,7 +8,7 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
-from sentry_sdk.utils import capture_internal_exceptions, has_data_collection_enabled
+from sentry_sdk.utils import has_data_collection_enabled
 
 # Hack to get new Python features working in older versions
 # without introducing a hard dependency on `typing_extensions`
@@ -141,24 +141,33 @@ def _wrap_end(f: "Callable[P, T]") -> "Callable[P, T]":
     def _inner_end(*args: "P.args", **kwargs: "P.kwargs") -> "T":
         res = f(*args, **kwargs)
         instance: "Client" = args[0]
+
+        query = getattr(instance.connection, "_query", None)
+        breadcrumb_data: "Optional[dict[str, Any]]" = getattr(
+            instance.connection, "_breadcrumb_data", None
+        )
+
+        if query is not None and breadcrumb_data is not None:
+            client_options = sentry_sdk.get_client().options
+            if (
+                has_data_collection_enabled(client_options)
+                and client_options["data_collection"]["database_query_data"]
+                or should_send_default_pii()
+            ):
+                breadcrumb_data = {"db.result": res, **breadcrumb_data}
+
+            sentry_sdk.get_isolation_scope().add_breadcrumb(
+                message=query,
+                category="query",
+                data={"db.result": res, **breadcrumb_data},
+            )
+
         span = getattr(instance.connection, "_sentry_span", None)
 
         if span is None:
             return res
 
         if isinstance(span, StreamedSpan):
-            query = getattr(instance.connection, "_query", None)
-            breadcrumb_data: "Optional[dict[str, Any]]" = getattr(
-                instance.connection, "_breadcrumb_data", None
-            )
-
-            if query is not None and breadcrumb_data is not None:
-                sentry_sdk.get_isolation_scope().add_breadcrumb(
-                    message=query,
-                    category="query",
-                    data={"db.result": res, **breadcrumb_data},
-                )
-
             span.end()
         else:
             if res is not None:
@@ -168,11 +177,6 @@ def _wrap_end(f: "Callable[P, T]") -> "Callable[P, T]":
                         span.set_data("db.result", res)
                 elif should_send_default_pii():
                     span.set_data("db.result", res)
-
-            with capture_internal_exceptions():
-                span.scope.add_breadcrumb(
-                    message=span._data.pop("query"), category="query", data=span._data
-                )
 
             span.finish()
 
