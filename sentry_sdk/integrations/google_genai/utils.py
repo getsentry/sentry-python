@@ -45,6 +45,7 @@ from .consts import GEN_AI_SYSTEM, ORIGIN, TOOL_ATTRIBUTES_MAP
 
 if TYPE_CHECKING:
     from google.genai.types import (
+        ContentDict,
         ContentListUnion,
         ContentUnion,
         ContentUnionDict,
@@ -53,7 +54,6 @@ if TYPE_CHECKING:
         Model,
         Tool,
         ToolUnion,
-        ContentDict,
     )
 
     from sentry_sdk._types import TextPart
@@ -633,7 +633,9 @@ def extract_tool_calls(
 
     # Extract from automatic_function_calling_history
     # This is the history of tool calls made by the model
-    automatic_function_calling_history = getattr(response, "automatic_function_calling_history", None)
+    automatic_function_calling_history = getattr(
+        response, "automatic_function_calling_history", None
+    )
     if automatic_function_calling_history is None:
         return tool_calls if tool_calls else None
 
