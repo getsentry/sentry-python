@@ -293,7 +293,9 @@ class SentryAsgiMiddleware:
                                 attributes=attributes,
                                 parent_span=None,
                             )
-                            sentry_scope.get_current_scope()._server_segment_span = segment
+                            sentry_scope.get_current_scope()._server_segment_span = (
+                                segment
+                            )
 
                         span_ctx = segment or nullcontext()
 
