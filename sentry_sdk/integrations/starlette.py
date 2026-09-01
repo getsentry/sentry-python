@@ -562,7 +562,15 @@ async def _wrap_async_handler(
                 if "cookies" in info:
                     request_info["cookies"] = info["cookies"]
                 if "data" in info:
-                    request_info["data"] = info["data"]
+                    attach_request_data = True
+                    if has_data_collection_enabled(client.options):
+                        attach_request_data = (
+                            "incoming_request"
+                            in client.options["data_collection"]["http_bodies"]
+                        )
+
+                    if attach_request_data:
+                        request_info["data"] = info["data"]
             event["request"] = deepcopy(request_info)
 
             return event
@@ -580,14 +588,22 @@ async def _wrap_async_handler(
         current_span = get_current_span()
 
         if type(current_span) is StreamedSpan:
-            request_body = _get_cached_request_body_attribute(
-                client=client, request=request
-            )
-            if request_body:
-                current_span._segment.set_attribute(
-                    SPANDATA.HTTP_REQUEST_BODY_DATA,
-                    request_body,
+            attach_request_data = True
+            if has_data_collection_enabled(client.options):
+                attach_request_data = (
+                    "incoming_request"
+                    in client.options["data_collection"]["http_bodies"]
                 )
+
+            if attach_request_data:
+                request_body = _get_cached_request_body_attribute(
+                    client=client, request=request
+                )
+                if request_body:
+                    current_span._segment.set_attribute(
+                        SPANDATA.HTTP_REQUEST_BODY_DATA,
+                        request_body,
+                    )
 
 
 def patch_request_response() -> None:
@@ -632,7 +648,7 @@ def patch_request_response() -> None:
                 request = args[0]
 
                 _set_transaction_name_and_source(
-                    sentry_scope, integration.transaction_style, request
+                    current_scope, integration.transaction_style, request
                 )
 
                 extractor = StarletteRequestExtractor(request)
@@ -827,21 +843,24 @@ class StarletteRequestExtractor:
             return None
 
 
-def _transaction_name_from_router(scope: "StarletteScope") -> "Optional[str]":
+def _transaction_name_and_source_from_router(
+    scope: "StarletteScope",
+) -> "Tuple[Optional[str], TransactionSource]":
     router = scope.get("router")
     if not router:
-        return None
+        return None, TransactionSource.ROUTE
 
     for route in router.routes:
         match = route.matches(scope)
         if match[0] == Match.FULL:
             try:
-                return route.path
+                return route.path, TransactionSource.ROUTE
             except AttributeError:
-                # routes added via app.host() won't have a path attribute
-                return scope.get("path")
+                # Host routes have no path template, so fall back to the
+                # concrete request path and classify it as a URL.
+                return scope.get("path"), TransactionSource.URL
 
-    return None
+    return None, TransactionSource.ROUTE
 
 
 def _set_transaction_name_and_source(
@@ -856,7 +875,7 @@ def _set_transaction_name_and_source(
             name = transaction_from_function(endpoint) or None
 
     elif transaction_style == "url":
-        name = _transaction_name_from_router(request.scope)
+        name, source = _transaction_name_and_source_from_router(request.scope)
 
     if name is None:
         name = _DEFAULT_TRANSACTION_NAME
@@ -875,7 +894,6 @@ def _get_transaction_from_middleware(
         name = transaction_from_function(app.__class__)
         source = TransactionSource.COMPONENT
     elif integration.transaction_style == "url":
-        name = _transaction_name_from_router(asgi_scope)
-        source = TransactionSource.ROUTE
+        name, source = _transaction_name_and_source_from_router(asgi_scope)
 
     return name, source

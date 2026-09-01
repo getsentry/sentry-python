@@ -162,7 +162,7 @@ def _get_request_context_data(
                 # SSE transport uses query parameter
                 mcp_transport = "sse"
                 session_id = request.query_params.get("session_id")
-            elif hasattr(request, "headers") and request.headers.get("mcp-session-id"):
+            elif hasattr(request, "headers"):
                 # StreamableHTTP transport uses header
                 mcp_transport = "http"
                 session_id = request.headers.get("mcp-session-id")

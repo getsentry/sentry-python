@@ -98,7 +98,7 @@ def test_sync_client_spans(
         if send_default_pii:
             assert (
                 span["attributes"]["url.full"]
-                == f"http://localhost:{server_port}/hello"
+                == f"http://localhost:{server_port}/hello?q=test#frag"
             )
             assert span["attributes"][SPANDATA.URL_QUERY] == "q=test"
             assert span["attributes"][SPANDATA.URL_FRAGMENT] == "frag"
@@ -1000,7 +1000,11 @@ def test_crumb_capture(
         "extra": "foo",
     }
     if send_default_pii:
-        expected["url"] = f"http://localhost:{server_port}/hello"
+        expected["url"] = (
+            f"http://localhost:{server_port}/hello?q=test#frag"
+            if span_streaming
+            else f"http://localhost:{server_port}/hello"
+        )
         expected[SPANDATA.HTTP_QUERY] = "q=test"
         expected[SPANDATA.HTTP_FRAGMENT] = "frag"
 
@@ -1091,7 +1095,7 @@ async def test_async_crumb_capture_span_streaming(
         SPANDATA.HTTP_STATUS_CODE: 200,
     }
     if send_default_pii:
-        expected["url"] = f"http://localhost:{server_port}/hello"
+        expected["url"] = f"http://localhost:{server_port}/hello?q=test#frag"
         expected[SPANDATA.HTTP_QUERY] = "q=test"
         expected[SPANDATA.HTTP_FRAGMENT] = "frag"
 
@@ -1198,3 +1202,795 @@ def test_crumb_capture_client_error_span_streaming(
             SPANDATA.HTTP_STATUS_CODE: status_code,
         }
     )
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query",
+    [
+        pytest.param(
+            {"send_default_pii": True},
+            "toy=tennisball&color=red&auth=secret",
+            id="send_default_pii_true",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            None,
+            id="send_default_pii_false",
+        ),
+        pytest.param(
+            {},
+            None,
+            id="defaults",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "denylist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
+            id="data_collection_denylist_custom_terms",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
+                    }
+                }
+            },
+            "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            id="data_collection_allowlist_sensitive_term",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            None,
+            id="data_collection_off",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": True,
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                },
+            },
+            None,
+            id="data_collection_wins_over_send_default_pii",
+        ),
+    ],
+)
+def test_url_query_data_collection_span_streaming_sync(
+    sentry_init,
+    capture_items,
+    server_port,
+    init_kwargs,
+    expected_query,
+):
+    sentry_init(
+        integrations=[PyreqwestIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+
+    items = capture_items("span")
+
+    url = f"http://localhost:{server_port}/hello?toy=tennisball&color=red&auth=secret#frag"
+
+    with sentry_sdk.traces.start_span(name="custom parent"):
+        client = SyncClientBuilder().build()
+        response = client.get(url).build().send()
+        assert response.status == 200
+
+    sentry_sdk.flush()
+
+    span = [item.payload for item in items][0]
+
+    if expected_query is None:
+        assert SPANDATA.URL_QUERY not in span["attributes"]
+    else:
+        assert span["attributes"][SPANDATA.URL_QUERY] == expected_query
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query",
+    [
+        pytest.param(
+            {"send_default_pii": True},
+            "toy=tennisball&color=red&auth=secret",
+            id="send_default_pii_true",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            None,
+            id="send_default_pii_false",
+        ),
+        pytest.param(
+            {},
+            None,
+            id="defaults",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "denylist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
+            id="data_collection_denylist_custom_terms",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
+                    }
+                }
+            },
+            "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            id="data_collection_allowlist_sensitive_term",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            None,
+            id="data_collection_off",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": True,
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                },
+            },
+            None,
+            id="data_collection_wins_over_send_default_pii",
+        ),
+    ],
+)
+async def test_url_query_data_collection_span_streaming_async(
+    sentry_init,
+    capture_items,
+    server_port,
+    init_kwargs,
+    expected_query,
+):
+    sentry_init(
+        integrations=[PyreqwestIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+
+    items = capture_items("span")
+
+    url = f"http://localhost:{server_port}/hello?toy=tennisball&color=red&auth=secret#frag"
+
+    async with ClientBuilder().build() as client:
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            response = await client.get(url).build().send()
+            assert response.status == 200
+
+    sentry_sdk.flush()
+
+    span = [item.payload for item in items][0]
+
+    if expected_query is None:
+        assert SPANDATA.URL_QUERY not in span["attributes"]
+    else:
+        assert span["attributes"][SPANDATA.URL_QUERY] == expected_query
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_suffix",
+    [
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "?toy=tennisball&color=red&auth=%5BFiltered%5D#frag",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "?toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {"send_default_pii": True},
+            "?toy=tennisball&color=red&auth=secret#frag",
+            id="send_default_pii_true",
+        ),
+    ],
+)
+def test_url_full_reassembly_span_streaming_sync(
+    sentry_init,
+    capture_items,
+    server_port,
+    init_kwargs,
+    expected_suffix,
+):
+    sentry_init(
+        integrations=[PyreqwestIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+
+    items = capture_items("span")
+
+    base_url = f"http://localhost:{server_port}/hello"
+    url = f"{base_url}?toy=tennisball&color=red&auth=secret#frag"
+
+    with sentry_sdk.traces.start_span(name="custom parent"):
+        client = SyncClientBuilder().build()
+        response = client.get(url).build().send()
+        assert response.status == 200
+
+    sentry_sdk.flush()
+
+    span = [item.payload for item in items][0]
+
+    assert span["attributes"][SPANDATA.URL_FULL] == base_url + expected_suffix
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "init_kwargs, expected_suffix",
+    [
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "?toy=tennisball&color=red&auth=%5BFiltered%5D#frag",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "?toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {"send_default_pii": True},
+            "?toy=tennisball&color=red&auth=secret#frag",
+            id="send_default_pii_true",
+        ),
+    ],
+)
+async def test_url_full_reassembly_span_streaming_async(
+    sentry_init,
+    capture_items,
+    server_port,
+    init_kwargs,
+    expected_suffix,
+):
+    sentry_init(
+        integrations=[PyreqwestIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+
+    items = capture_items("span")
+
+    base_url = f"http://localhost:{server_port}/hello"
+    url = f"{base_url}?toy=tennisball&color=red&auth=secret#frag"
+
+    async with ClientBuilder().build() as client:
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            response = await client.get(url).build().send()
+            assert response.status == 200
+
+    sentry_sdk.flush()
+
+    span = [item.payload for item in items][0]
+
+    assert span["attributes"][SPANDATA.URL_FULL] == base_url + expected_suffix
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_suffix",
+    [
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            "#frag",
+            id="data_collection_off",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": True,
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                },
+            },
+            "#frag",
+            id="data_collection_wins_over_send_default_pii",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            None,
+            id="send_default_pii_false",
+        ),
+    ],
+)
+def test_url_query_params_off_keeps_bare_url_span_streaming_sync(
+    sentry_init,
+    capture_items,
+    server_port,
+    init_kwargs,
+    expected_suffix,
+):
+    sentry_init(
+        integrations=[PyreqwestIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+
+    items = capture_items("span")
+
+    base_url = f"http://localhost:{server_port}/hello"
+    url = f"{base_url}?toy=tennisball&color=red&auth=secret#frag"
+
+    with sentry_sdk.traces.start_span(name="custom parent"):
+        client = SyncClientBuilder().build()
+        response = client.get(url).build().send()
+        assert response.status == 200
+
+    sentry_sdk.flush()
+
+    span = [item.payload for item in items][0]
+
+    assert SPANDATA.URL_QUERY not in span["attributes"]
+
+    if expected_suffix is None:
+        assert SPANDATA.URL_FULL not in span["attributes"]
+        assert SPANDATA.URL_FRAGMENT not in span["attributes"]
+    else:
+        assert span["attributes"][SPANDATA.URL_FULL] == base_url + expected_suffix
+        assert span["attributes"][SPANDATA.URL_FRAGMENT] == "frag"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "init_kwargs, expected_suffix",
+    [
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            "#frag",
+            id="data_collection_off",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": True,
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                },
+            },
+            "#frag",
+            id="data_collection_wins_over_send_default_pii",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            None,
+            id="send_default_pii_false",
+        ),
+    ],
+)
+async def test_url_query_params_off_keeps_bare_url_span_streaming_async(
+    sentry_init,
+    capture_items,
+    server_port,
+    init_kwargs,
+    expected_suffix,
+):
+    sentry_init(
+        integrations=[PyreqwestIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+
+    items = capture_items("span")
+
+    base_url = f"http://localhost:{server_port}/hello"
+    url = f"{base_url}?toy=tennisball&color=red&auth=secret#frag"
+
+    async with ClientBuilder().build() as client:
+        with sentry_sdk.traces.start_span(name="custom parent"):
+            response = await client.get(url).build().send()
+            assert response.status == 200
+
+    sentry_sdk.flush()
+
+    span = [item.payload for item in items][0]
+
+    assert SPANDATA.URL_QUERY not in span["attributes"]
+
+    if expected_suffix is None:
+        assert SPANDATA.URL_FULL not in span["attributes"]
+        assert SPANDATA.URL_FRAGMENT not in span["attributes"]
+    else:
+        assert span["attributes"][SPANDATA.URL_FULL] == base_url + expected_suffix
+        assert span["attributes"][SPANDATA.URL_FRAGMENT] == "frag"
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query",
+    [
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            "",
+            id="data_collection_off",
+        ),
+    ],
+)
+def test_crumb_url_query_data_collection_sync(
+    sentry_init,
+    capture_events,
+    server_port,
+    init_kwargs,
+    expected_query,
+):
+    sentry_init(
+        integrations=[PyreqwestIntegration()],
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+
+    base_url = f"http://localhost:{server_port}/hello"
+    url = f"{base_url}?toy=tennisball&color=red&auth=secret#frag"
+
+    events = capture_events()
+
+    with sentry_sdk.traces.start_span(name="segment"):
+        client = SyncClientBuilder().build()
+        response = client.get(url).build().send()
+        assert response.status == 200
+
+        capture_message("Testing!")
+
+    (event,) = events
+
+    crumb = event["breadcrumbs"]["values"][0]
+
+    expected_url = base_url
+    if expected_query:
+        expected_url += "?" + expected_query
+    expected_url += "#frag"
+
+    assert crumb["data"]["url"] == expected_url
+    assert crumb["data"][SPANDATA.HTTP_QUERY] == expected_query
+    assert crumb["data"][SPANDATA.HTTP_FRAGMENT] == "frag"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query",
+    [
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            "",
+            id="data_collection_off",
+        ),
+    ],
+)
+async def test_crumb_url_query_data_collection_async(
+    sentry_init,
+    capture_events,
+    server_port,
+    init_kwargs,
+    expected_query,
+):
+    sentry_init(
+        integrations=[PyreqwestIntegration()],
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+
+    base_url = f"http://localhost:{server_port}/hello"
+    url = f"{base_url}?toy=tennisball&color=red&auth=secret#frag"
+
+    events = capture_events()
+
+    with sentry_sdk.traces.start_span(name="segment"):
+        async with ClientBuilder().build() as client:
+            response = await client.get(url).build().send()
+            assert response.status == 200
+
+            capture_message("Testing!")
+
+    (event,) = events
+
+    crumb = event["breadcrumbs"]["values"][0]
+
+    expected_url = base_url
+    if expected_query:
+        expected_url += "?" + expected_query
+    expected_url += "#frag"
+
+    assert crumb["data"]["url"] == expected_url
+    assert crumb["data"][SPANDATA.HTTP_QUERY] == expected_query
+    assert crumb["data"][SPANDATA.HTTP_FRAGMENT] == "frag"
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query",
+    [
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            "",
+            id="data_collection_off",
+        ),
+    ],
+)
+def test_crumb_url_query_data_collection_legacy_sync(
+    sentry_init,
+    capture_events,
+    server_port,
+    init_kwargs,
+    expected_query,
+):
+    """
+    Legacy (non span streaming) breadcrumbs report the bare URL, but the query
+    is still filtered according to the data collection configuration. Remove
+    when we've dropped transaction support and have fully migrated to span
+    streaming.
+    """
+    sentry_init(integrations=[PyreqwestIntegration()], **init_kwargs)
+
+    base_url = f"http://localhost:{server_port}/hello"
+    url = f"{base_url}?toy=tennisball&color=red&auth=secret#frag"
+
+    events = capture_events()
+
+    client = SyncClientBuilder().build()
+    response = client.get(url).build().send()
+    assert response.status == 200
+
+    capture_message("Testing!")
+
+    (event,) = events
+
+    crumb = event["breadcrumbs"]["values"][0]
+
+    assert crumb["data"]["url"] == base_url
+    assert crumb["data"][SPANDATA.HTTP_QUERY] == expected_query
+    assert crumb["data"][SPANDATA.HTTP_FRAGMENT] == "frag"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query",
+    [
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            "",
+            id="data_collection_off",
+        ),
+    ],
+)
+async def test_crumb_url_query_data_collection_legacy_async(
+    sentry_init,
+    capture_events,
+    server_port,
+    init_kwargs,
+    expected_query,
+):
+    """
+    Legacy (non span streaming) breadcrumbs report the bare URL, but the query
+    is still filtered according to the data collection configuration. Remove
+    when we've dropped transaction support and have fully migrated to span
+    streaming.
+    """
+    sentry_init(integrations=[PyreqwestIntegration()], **init_kwargs)
+
+    base_url = f"http://localhost:{server_port}/hello"
+    url = f"{base_url}?toy=tennisball&color=red&auth=secret#frag"
+
+    events = capture_events()
+
+    sentry_sdk.get_isolation_scope()
+
+    with sentry_sdk.start_transaction():
+        async with ClientBuilder().build() as client:
+            response = await client.get(url).build().send()
+            assert response.status == 200
+
+        capture_message("Testing!")
+
+    event = next(e for e in events if e.get("breadcrumbs"))
+
+    crumb = event["breadcrumbs"]["values"][0]
+
+    assert crumb["data"]["url"] == base_url
+    assert crumb["data"][SPANDATA.HTTP_QUERY] == expected_query
+    assert crumb["data"][SPANDATA.HTTP_FRAGMENT] == "frag"
+
+
+@pytest.mark.tests_internal_exceptions
+def test_omit_url_data_if_parsing_fails_span_streaming(
+    sentry_init,
+    capture_events,
+    capture_items,
+    server_port,
+):
+    sentry_init(
+        integrations=[PyreqwestIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        _experiments={"data_collection": {}},
+    )
+
+    items = capture_items("span")
+
+    url = f"http://localhost:{server_port}/hello?toy=tennisball&color=red&auth=secret#frag"
+
+    events = capture_events()
+
+    with sentry_sdk.traces.start_span(name="segment"):
+        with mock.patch(
+            "sentry_sdk.integrations.pyreqwest.parse_url",
+            side_effect=ValueError,
+        ):
+            client = SyncClientBuilder().build()
+            response = client.get(url).build().send()
+            assert response.status == 200
+
+        capture_message("Testing!")
+
+    (event,) = events
+
+    sentry_sdk.flush()
+
+    span = [item.payload for item in items][0]
+
+    assert SPANDATA.URL_FULL not in span["attributes"]
+    assert SPANDATA.URL_QUERY not in span["attributes"]
+    assert SPANDATA.URL_FRAGMENT not in span["attributes"]
+
+    crumb = event["breadcrumbs"]["values"][0]
+
+    assert "url" not in crumb["data"]
+    assert SPANDATA.HTTP_QUERY not in crumb["data"]
+    assert SPANDATA.HTTP_FRAGMENT not in crumb["data"]

@@ -511,6 +511,119 @@ async def test_request_body_too_big(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [True, False])
+async def test_formdata_request_body_data_collection_http_bodies_empty(
+    sentry_init, capture_events, capture_items, span_streaming
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        max_request_body_size="always",
+        integrations=[StarletteIntegration()],
+        trace_lifecycle="stream" if span_streaming else "static",
+        _experiments={"data_collection": {"http_bodies": []}},
+    )
+
+    starlette_app = starlette_app_factory()
+    client = TestClient(starlette_app)
+
+    headers = {"content-type": "multipart/form-data; boundary=fd721ef49ea403a6"}
+
+    if span_streaming:
+        items = capture_items("event", "span")
+
+        client.post("/body/form", data=BODY_FORM.encode("utf-8"), headers=headers)
+
+        (event,) = (item.payload for item in items if item.type == "event")
+        assert "data" not in event["request"]
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        server_span = next(
+            span for span in spans if span["attributes"]["sentry.op"] == "http.server"
+        )
+        assert SPANDATA.HTTP_REQUEST_BODY_DATA not in server_span["attributes"]
+    else:
+        events = capture_events()
+
+        client.post("/body/form", data=BODY_FORM.encode("utf-8"), headers=headers)
+
+        (event, _) = events
+        assert "data" not in event["request"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("span_streaming", [True, False])
+@pytest.mark.parametrize(
+    "data_collection, expect_body",
+    [
+        pytest.param(None, True, id="no_data_collection_experiment"),
+        pytest.param({}, True, id="data_collection_http_bodies_default"),
+        pytest.param(
+            {"http_bodies": ["incoming_request"]},
+            True,
+            id="data_collection_http_bodies_incoming_request",
+        ),
+        pytest.param(
+            {"http_bodies": []}, False, id="data_collection_http_bodies_empty"
+        ),
+    ],
+)
+async def test_request_body_data_collection(
+    sentry_init,
+    capture_events,
+    capture_items,
+    span_streaming,
+    data_collection,
+    expect_body,
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[StarletteIntegration()],
+        trace_lifecycle="stream" if span_streaming else "static",
+        _experiments=(
+            {} if data_collection is None else {"data_collection": data_collection}
+        ),
+    )
+
+    starlette_app = starlette_app_factory()
+    client = TestClient(starlette_app)
+
+    if span_streaming:
+        items = capture_items("event", "span")
+
+        client.post("/body/json", json=BODY_JSON)
+
+        (event,) = (item.payload for item in items if item.type == "event")
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        server_span = next(
+            span for span in spans if span["attributes"]["sentry.op"] == "http.server"
+        )
+
+        if expect_body:
+            assert event["request"]["data"] == BODY_JSON
+            assert (
+                json.loads(server_span["attributes"][SPANDATA.HTTP_REQUEST_BODY_DATA])
+                == BODY_JSON
+            )
+        else:
+            assert "data" not in event["request"]
+            assert SPANDATA.HTTP_REQUEST_BODY_DATA not in server_span["attributes"]
+    else:
+        events = capture_events()
+
+        client.post("/body/json", json=BODY_JSON)
+
+        (event, _) = events
+
+        if expect_body:
+            assert event["request"]["data"] == BODY_JSON
+        else:
+            assert "data" not in event["request"]
+
+
+@pytest.mark.asyncio
 async def test_request_info_no_pii(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
@@ -936,6 +1049,31 @@ def test_transaction_style(
     (event,) = events
     assert event["transaction"] == expected_transaction
     assert event["transaction_info"] == {"source": expected_source}
+
+
+def test_host_route_path_has_url_source(sentry_init, capture_events):
+    sentry_init(
+        integrations=[StarletteIntegration(transaction_style="url")],
+        traces_sample_rate=1.0,
+    )
+
+    async def hosted_endpoint(request):
+        return starlette.responses.JSONResponse({"status": "ok"})
+
+    subapp = starlette.applications.Starlette(
+        routes=[starlette.routing.Route("/users/{user_id}", hosted_endpoint)]
+    )
+    app = starlette.applications.Starlette(
+        routes=[starlette.routing.Host("subapp", subapp)]
+    )
+
+    events = capture_events()
+    client = TestClient(app)
+    client.get("/users/123456", headers={"Host": "subapp"})
+
+    (event,) = events
+    assert event["transaction"].endswith("/users/123456")
+    assert event["transaction_info"] == {"source": "url"}
 
 
 @pytest.mark.parametrize(
@@ -1497,6 +1635,51 @@ def test_active_thread_id_span_streaming(sentry_init, capture_items, endpoint):
     segments = [item.payload for item in items if item.payload.get("is_segment")]
     assert len(segments) == 1
     assert str(data["active"]) == segments[0]["attributes"]["thread.id"]
+
+
+@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
+def test_segment_name_is_route_resolved_name_span_streaming(
+    sentry_init, capture_items, endpoint
+):
+    sentry_init(
+        auto_enabling_integrations=False,
+        integrations=[StarletteIntegration(transaction_style="url")],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+    app = starlette_app_factory()
+
+    items = capture_items("span")
+
+    client = TestClient(app)
+    response = client.get(endpoint)
+    assert response.status_code == 200
+
+    sentry_sdk.flush()
+
+    segments = [item.payload for item in items if item.payload.get("is_segment")]
+    assert len(segments) == 1
+    assert segments[0]["name"] == endpoint
+    assert segments[0]["attributes"]["sentry.segment.name.source"] == "route"
+
+
+@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
+def test_transaction_name_is_route_resolved_name_static(
+    sentry_init, capture_events, endpoint
+):
+    sentry_init(
+        integrations=[StarletteIntegration(transaction_style="url")],
+        traces_sample_rate=1.0,
+    )
+    events = capture_events()
+
+    client = TestClient(starlette_app_factory())
+    response = client.get(endpoint)
+    assert response.status_code == 200
+
+    (transaction,) = [e for e in events if e.get("type") == "transaction"]
+    assert transaction["transaction"] == endpoint
+    assert transaction["transaction_info"] == {"source": "route"}
 
 
 def test_original_request_not_scrubbed(sentry_init, capture_events):

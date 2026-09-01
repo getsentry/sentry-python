@@ -23,14 +23,12 @@ Resolution precedence (see :func:`_resolve_data_collection`):
 """
 
 import warnings
-from typing import TYPE_CHECKING, List, Mapping, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Union, cast
 from urllib.parse import parse_qs, urlencode
 
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 
 if TYPE_CHECKING:
-    from typing import Any, Dict
-
     from sentry_sdk._types import (
         DataCollection,
         GenAICollectionBehaviour,
@@ -41,11 +39,12 @@ if TYPE_CHECKING:
 
 # ``http_bodies`` defaults to this (collect everything the
 # platform supports); an empty list is the explicit opt-out.
-# response bodyies are not included here because we don't
-# currently capture them (as of Jul 7 2026)
+# ``incoming_response`` is not included here because we don't
+# currently capture incoming response bodies.
 _ALL_HTTP_BODY_TYPES = [
     "incoming_request",
     "outgoing_request",
+    "outgoing_response",
 ]
 
 # Default number of source lines captured above and below a stack frame.
@@ -190,29 +189,31 @@ def _map_from_send_default_pii(
 
 def _resolve_explicit(
     d: "dict[str, Any]",
-    include_local_variables: bool,
-    include_source_context: bool,
 ) -> "DataCollection":
     """
     Build a fully-resolved ``DataCollection`` from a user-supplied
     ``data_collection`` dict, filling in spec defaults for any omitted or
-    partially-specified field. Frame fields fall back to the legacy
-    ``include_local_variables`` / ``include_source_context`` options when unset.
+    partially-specified field.
     """
-    # frame_context_lines accepts an integer or a boolean fallback (spec: True
-    # -> platform default of 5, False -> 0). bool is a subclass of int, so
-    # coerce explicitly before treating it as a line count.
     frame_context_lines = d.get("frame_context_lines")
     if frame_context_lines is None:
-        frame_context_lines = (
-            _DEFAULT_FRAME_CONTEXT_LINES if include_source_context else 0
-        )
+        frame_context_lines = _DEFAULT_FRAME_CONTEXT_LINES
     elif isinstance(frame_context_lines, bool):
         frame_context_lines = _DEFAULT_FRAME_CONTEXT_LINES if frame_context_lines else 0
+    else:
+        if not isinstance(frame_context_lines, int) or frame_context_lines < 0:
+            raise ValueError(
+                "Invalid `frame_context_lines` value: Must be 0 or greater."
+            )
 
-    stack_frame_variables = d.get("stack_frame_variables")
-    if stack_frame_variables is None:
-        stack_frame_variables = include_local_variables
+    raw_stack_frame_variables = d.get("stack_frame_variables", True)
+    stack_frame_variables: "Union[bool, KeyValueCollectionBehaviour]"
+
+    stack_frame_variables = (
+        _kvcb_from_value(raw_stack_frame_variables)
+        if isinstance(raw_stack_frame_variables, dict)
+        else bool(raw_stack_frame_variables)
+    )
 
     # http_bodies: omitted means "all valid types"; [] is the explicit opt-out.
     http_bodies = d.get("http_bodies")
@@ -323,8 +324,6 @@ def _resolve_data_collection(options: "Dict[str, Any]") -> "DataCollection":
             )
         return _resolve_explicit(
             user_dc,
-            include_local_variables,
-            include_source_context,
         )
 
     return _map_from_send_default_pii(
