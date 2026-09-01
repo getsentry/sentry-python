@@ -88,6 +88,7 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
 
         breadcrumb_data = {
             SPANDATA.DB_SYSTEM: "clickhouse",
+            SPANDATA.DB_DRIVER_NAME: "clickhouse-driver",
             SPANDATA.DB_NAME: connection.database,
             SPANDATA.SERVER_ADDRESS: connection.host,
             SPANDATA.SERVER_PORT: connection.port,
