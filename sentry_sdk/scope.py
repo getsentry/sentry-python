@@ -254,7 +254,7 @@ class Scope:
         self._error_processors: "List[ErrorProcessor]" = []
 
         self._name: "Optional[str]" = None
-        self._http_route: "Optional[str]" = None 
+        self._http_route: "Optional[str]" = None
         self._propagation_context: "Optional[PropagationContext]" = None
         self._n_breadcrumbs_truncated: int = 0
         self._gen_ai_original_message_count: "Dict[str, int]" = {}
