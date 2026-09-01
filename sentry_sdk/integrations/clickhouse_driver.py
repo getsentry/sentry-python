@@ -85,15 +85,19 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
         params = args[3] if len(args) > 3 else kwargs.get("params")
 
         connection._query = query
-        connection._breadcrumb_data = {
+
+        breadcrumb_data = {
             SPANDATA.DB_SYSTEM: "clickhouse",
             SPANDATA.DB_NAME: connection.database,
             SPANDATA.DB_DRIVER_NAME: "clickhouse-driver",
             SPANDATA.SERVER_ADDRESS: connection.host,
             SPANDATA.SERVER_PORT: connection.port,
             SPANDATA.DB_USER: connection.user,
-            "db.params": params,
         }
+        if params:
+            breadcrumb_data["db.params"] = params
+
+        connection._breadcrumb_data = breadcrumb_data
 
         if has_span_streaming_enabled(client.options):
             span = None
@@ -160,7 +164,7 @@ def _wrap_end(f: "Callable[P, T]") -> "Callable[P, T]":
             sentry_sdk.get_isolation_scope().add_breadcrumb(
                 message=query,
                 category="query",
-                data={"db.result": res, **breadcrumb_data},
+                data=breadcrumb_data,
             )
 
         span = getattr(instance.connection, "_sentry_span", None)
