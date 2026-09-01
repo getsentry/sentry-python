@@ -281,6 +281,7 @@ class SentryAsgiMiddleware:
                                     attributes=attributes,
                                     parent_span=None,
                                 )
+                                sentry_scope.get_current_scope()._server_segment_span = segment
                         else:
                             sentry_sdk.traces.new_trace()
 
@@ -292,6 +293,7 @@ class SentryAsgiMiddleware:
                                 attributes=attributes,
                                 parent_span=None,
                             )
+                            sentry_scope.get_current_scope()._server_segment_span = segment
 
                         span_ctx = segment or nullcontext()
 
@@ -412,9 +414,6 @@ class SentryAsgiMiddleware:
                                         span.set_attribute(
                                             "sentry.segment.name.source", source
                                         )
-                                http_route = sentry_scope._http_route
-                                if http_route is not None:
-                                    span.set_attribute(SPANDATA.HTTP_ROUTE, http_route)
         finally:
             _asgi_middleware_applied.set(False)
 

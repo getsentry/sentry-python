@@ -79,7 +79,9 @@ def _set_transaction_name_and_source(
                 if path is not None:
                     name = path
 
-            sentry_sdk.get_isolation_scope()._http_route = name
+            server_span = sentry_sdk.get_current_scope()._server_segment_span
+            if server_span is not None:
+                server_span.set_attribute(SPANDATA.HTTP_ROUTE, name)
 
     if not name:
         name = _DEFAULT_TRANSACTION_NAME

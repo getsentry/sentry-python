@@ -230,6 +230,7 @@ class Scope:
         "_error_processors",
         "_should_capture",
         "_span",
+        "_server_segment_span",
         "_session",
         "_attachments",
         "_force_auto_session_tracking",
@@ -240,7 +241,6 @@ class Scope:
         "_last_event_id",
         "_flags",
         "_attributes",
-        "_http_route",
     )
 
     def __init__(
@@ -254,10 +254,11 @@ class Scope:
         self._error_processors: "List[ErrorProcessor]" = []
 
         self._name: "Optional[str]" = None
-        self._http_route: "Optional[str]" = None
         self._propagation_context: "Optional[PropagationContext]" = None
         self._n_breadcrumbs_truncated: int = 0
         self._gen_ai_original_message_count: "Dict[str, int]" = {}
+
+        self._server_segment_span: "Optional[StreamedSpan]" = None
 
         self.client: "sentry_sdk.client.BaseClient" = NonRecordingClient()
 
@@ -280,7 +281,6 @@ class Scope:
         rv.client = self.client
         rv._level = self._level
         rv._name = self._name
-        rv._http_route = self._http_route
         rv._fingerprint = self._fingerprint
         rv._transaction = self._transaction
         rv._transaction_info = self._transaction_info.copy()
@@ -299,6 +299,7 @@ class Scope:
 
         rv._should_capture = self._should_capture
         rv._span = self._span
+        rv._server_segment_span = self._server_segment_span
         rv._session = self._session
         rv._force_auto_session_tracking = self._force_auto_session_tracking
         rv._attachments = self._attachments.copy()
