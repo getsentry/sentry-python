@@ -79,7 +79,7 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
         if client.get_integration(ClickhouseDriverIntegration) is None:
             return f(*args, **kwargs)
 
-        connection = args[0]
+        connection: "Connection" = args[0]
         query = args[1]
         query_id = args[2] if len(args) > 2 else kwargs.get("query_id")
         params = args[3] if len(args) > 3 else kwargs.get("params")
