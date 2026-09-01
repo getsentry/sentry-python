@@ -79,7 +79,7 @@ def _set_transaction_name_and_source(
                 if path is not None:
                     name = path
 
-            scope._http_route = route
+            sentry_sdk.get_isolation_scope()._http_route = name
 
     if not name:
         name = _DEFAULT_TRANSACTION_NAME

@@ -412,7 +412,7 @@ class SentryAsgiMiddleware:
                                         span.set_attribute(
                                             "sentry.segment.name.source", source
                                         )
-                                http_route = getattr(sentry_sdk.get_current_scope(), "_http_route", None)
+                                http_route = sentry_scope._http_route
                                 if http_route is not None:
                                     span.set_attribute(SPANDATA.HTTP_ROUTE, http_route)
         finally:
