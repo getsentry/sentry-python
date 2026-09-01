@@ -84,28 +84,6 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
         query_id = args[2] if len(args) > 2 else kwargs.get("query_id")
         params = args[3] if len(args) > 3 else kwargs.get("params")
 
-        connection._query = query
-
-        breadcrumb_data = {
-            SPANDATA.DB_SYSTEM: "clickhouse",
-            SPANDATA.DB_DRIVER_NAME: "clickhouse-driver",
-            SPANDATA.DB_NAME: connection.database,
-            SPANDATA.SERVER_ADDRESS: connection.host,
-            SPANDATA.SERVER_PORT: connection.port,
-            SPANDATA.DB_USER: connection.user,
-        }
-        if params and (
-            (
-                has_data_collection_enabled(client.options)
-                and client.options["data_collection"]["database_query_data"]
-            )
-            or not has_data_collection_enabled(client.options)
-            and should_send_default_pii()
-        ):
-            breadcrumb_data["db.params"] = params
-
-        connection._breadcrumb_data = breadcrumb_data
-
         if has_span_streaming_enabled(client.options):
             span = None
             if sentry_sdk.traces.get_current_span() is not None:
@@ -117,6 +95,16 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
                         SPANDATA.DB_QUERY_TEXT: str(query),
                     },
                 )
+
+            connection._query = query
+            connection._breadcrumb_data = {
+                SPANDATA.DB_SYSTEM: "clickhouse",
+                SPANDATA.DB_NAME: connection.database,
+                SPANDATA.DB_DRIVER_NAME: "clickhouse-driver",
+                SPANDATA.SERVER_ADDRESS: connection.host,
+                SPANDATA.SERVER_PORT: connection.port,
+                SPANDATA.DB_USER: connection.user,
+            }
         else:
             span = sentry_sdk.start_span(
                 op=OP.DB,
@@ -161,22 +149,19 @@ def _wrap_end(f: "Callable[P, T]") -> "Callable[P, T]":
 
         if query is not None and breadcrumb_data is not None:
             client_options = sentry_sdk.get_client().options
-            if res is not None and (
-                (
-                    has_data_collection_enabled(client_options)
-                    and client_options["data_collection"]["database_query_data"]
-                )
-                or (
-                    not has_data_collection_enabled(client_options)
-                    and should_send_default_pii()
-                )
+            if (
+                has_data_collection_enabled(client_options)
+                and client_options["data_collection"]["database_query_data"]
+            ) or (
+                not has_data_collection_enabled(client_options)
+                and should_send_default_pii()
             ):
                 breadcrumb_data = {"db.result": res, **breadcrumb_data}
 
             sentry_sdk.get_isolation_scope().add_breadcrumb(
                 message=query,
                 category="query",
-                data=breadcrumb_data,
+                data={"db.result": res, **breadcrumb_data},
             )
 
         span = getattr(instance.connection, "_sentry_span", None)
@@ -241,9 +226,6 @@ def _wrap_send_data() -> None:
                         data = wrapped_generator()
 
                     span.set_data("db.params", db_params)
-                    breadcrumb_data = getattr(self.connection, "_breadcrumb_data", None)
-                    if breadcrumb_data is not None:
-                        breadcrumb_data["db.params"] = db_params
             elif should_send_default_pii():
                 db_params = span._data.get("db.params", [])
 
@@ -265,9 +247,6 @@ def _wrap_send_data() -> None:
                     data = wrapped_generator()
 
                 span.set_data("db.params", db_params)
-                breadcrumb_data = getattr(self.connection, "_breadcrumb_data", None)
-                if breadcrumb_data is not None:
-                    breadcrumb_data["db.params"] = db_params
 
         return original_send_data(
             self, sample_block, data, types_check, columnar, *args, **kwargs

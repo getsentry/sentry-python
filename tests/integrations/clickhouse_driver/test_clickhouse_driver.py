@@ -131,14 +131,10 @@ def test_clickhouse_client_breadcrumbs(
     assert actual_query_breadcrumbs == expected_breadcrumbs
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_clickhouse_client_breadcrumbs_with_pii(
-    sentry_init, capture_events, span_streaming
-) -> None:
+def test_clickhouse_client_breadcrumbs_with_pii(sentry_init, capture_events) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         send_default_pii=True,
-        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={"record_sql_params": True},
     )
     events = capture_events()
@@ -237,13 +233,11 @@ def test_clickhouse_client_breadcrumbs_with_pii(
     assert event["breadcrumbs"]["values"] == expected_breadcrumbs
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_clickhouse_client_breadcrumbs_with_data_collection(
-    sentry_init, capture_events, span_streaming
+    sentry_init, capture_events
 ) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={"data_collection": {"database_query_data": True}},
     )
     events = capture_events()
@@ -342,13 +336,11 @@ def test_clickhouse_client_breadcrumbs_with_data_collection(
     assert event["breadcrumbs"]["values"] == expected_breadcrumbs
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_clickhouse_client_breadcrumbs_with_data_collection_disabled(
-    sentry_init, capture_events, span_streaming
+    sentry_init, capture_events
 ) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={"data_collection": {"database_query_data": False}},
     )
     events = capture_events()
@@ -443,14 +435,12 @@ def test_clickhouse_client_breadcrumbs_with_data_collection_disabled(
         assert "db.result" not in crumb["data"]
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_clickhouse_client_breadcrumbs_data_collection_overrides_pii(
-    sentry_init, capture_events, span_streaming
+    sentry_init, capture_events
 ) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
         send_default_pii=True,
-        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={"data_collection": {"database_query_data": False}},
     )
     events = capture_events()
@@ -545,13 +535,11 @@ def test_clickhouse_client_breadcrumbs_data_collection_overrides_pii(
         assert "db.result" not in crumb["data"]
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_clickhouse_client_breadcrumbs_with_data_collection_default(
-    sentry_init, capture_events, span_streaming
+    sentry_init, capture_events
 ) -> None:
     sentry_init(
         integrations=[ClickhouseDriverIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
         _experiments={"data_collection": {}},
     )
     events = capture_events()
@@ -2046,3 +2034,383 @@ def test_span_origin(
 
         assert event["contexts"]["trace"]["origin"] == "manual"
         assert event["spans"][0]["origin"] == "auto.db.clickhouse_driver"
+
+
+# ---- Span-first (streaming) breadcrumb tests ----
+# These mirror the breadcrumb tests above but specifically target the
+# span-first code path (trace_lifecycle="stream").  In span-first mode
+# breadcrumbs are emitted from the dedicated breadcrumb_data dict set on
+# the connection, NOT derived from the span.  db.params and db.result are
+# never attached to breadcrumbs in this mode.
+
+
+def test_clickhouse_client_breadcrumbs_span_streaming(
+    sentry_init, capture_events
+) -> None:
+    sentry_init(
+        integrations=[ClickhouseDriverIntegration()],
+        trace_lifecycle="stream",
+    )
+    events = capture_events()
+
+    client = Client("localhost")
+    client.execute("DROP TABLE IF EXISTS test")
+    client.execute("CREATE TABLE test (x Int32) ENGINE = Memory")
+    client.execute("INSERT INTO test (x) VALUES", [{"x": 100}])
+    client.execute("INSERT INTO test (x) VALUES", [[170], [200]])
+
+    res = client.execute("SELECT sum(x) FROM test WHERE x > %(minv)i", {"minv": 150})
+    assert res[0][0] == 370
+
+    capture_message("hi")
+
+    (event,) = events
+
+    expected_base = {
+        "db.system": "clickhouse",
+        "db.driver.name": "clickhouse-driver",
+        "db.name": "",
+        "db.user": "default",
+        "server.address": "localhost",
+        "server.port": 9000,
+    }
+
+    expected_breadcrumbs = [
+        {
+            "category": "query",
+            "data": {**expected_base},
+            "message": "DROP TABLE IF EXISTS test",
+            "type": "default",
+        },
+        {
+            "category": "query",
+            "data": {**expected_base},
+            "message": "CREATE TABLE test (x Int32) ENGINE = Memory",
+            "type": "default",
+        },
+        {
+            "category": "query",
+            "data": {**expected_base},
+            "message": "INSERT INTO test (x) VALUES",
+            "type": "default",
+        },
+        {
+            "category": "query",
+            "data": {**expected_base},
+            "message": "INSERT INTO test (x) VALUES",
+            "type": "default",
+        },
+        {
+            "category": "query",
+            "data": {**expected_base},
+            "message": "SELECT sum(x) FROM test WHERE x > 150",
+            "type": "default",
+        },
+    ]
+
+    for crumb in expected_breadcrumbs:
+        crumb["data"] = ApproxDict(crumb["data"])
+
+    for crumb in event["breadcrumbs"]["values"]:
+        crumb.pop("timestamp", None)
+
+    actual_query_breadcrumbs = [
+        breadcrumb
+        for breadcrumb in event["breadcrumbs"]["values"]
+        if breadcrumb["category"] == "query"
+    ]
+
+    assert actual_query_breadcrumbs == expected_breadcrumbs
+
+    # Span-first breadcrumbs never carry db.params
+    for crumb in actual_query_breadcrumbs:
+        assert "db.params" not in crumb["data"]
+
+
+@pytest.mark.parametrize("send_default_pii", [True, False])
+def test_clickhouse_client_breadcrumbs_span_streaming_with_pii(
+    sentry_init, capture_events, send_default_pii
+) -> None:
+    sentry_init(
+        integrations=[ClickhouseDriverIntegration()],
+        send_default_pii=send_default_pii,
+        trace_lifecycle="stream",
+    )
+    events = capture_events()
+
+    client = Client("localhost")
+    client.execute("DROP TABLE IF EXISTS test")
+    client.execute("CREATE TABLE test (x Int32) ENGINE = Memory")
+    client.execute("INSERT INTO test (x) VALUES", [{"x": 100}])
+    client.execute("INSERT INTO test (x) VALUES", [[170], [200]])
+
+    res = client.execute("SELECT sum(x) FROM test WHERE x > %(minv)i", {"minv": 150})
+    assert res[0][0] == 370
+
+    capture_message("hi")
+
+    (event,) = events
+
+    expected_base = {
+        "db.system": "clickhouse",
+        "db.driver.name": "clickhouse-driver",
+        "db.name": "",
+        "db.user": "default",
+        "server.address": "localhost",
+        "server.port": 9000,
+    }
+
+    actual_query_breadcrumbs = [
+        crumb
+        for crumb in event["breadcrumbs"]["values"]
+        if crumb["category"] == "query"
+    ]
+
+    assert len(actual_query_breadcrumbs) == 5
+
+    for crumb in actual_query_breadcrumbs:
+        crumb.pop("timestamp", None)
+        assert crumb["type"] == "default"
+        assert crumb["category"] == "query"
+        assert crumb["data"] == ApproxDict(expected_base)
+
+    assert actual_query_breadcrumbs[0]["message"] == "DROP TABLE IF EXISTS test"
+    assert (
+        actual_query_breadcrumbs[1]["message"]
+        == "CREATE TABLE test (x Int32) ENGINE = Memory"
+    )
+    assert actual_query_breadcrumbs[2]["message"] == "INSERT INTO test (x) VALUES"
+    assert actual_query_breadcrumbs[3]["message"] == "INSERT INTO test (x) VALUES"
+    assert (
+        actual_query_breadcrumbs[4]["message"]
+        == "SELECT sum(x) FROM test WHERE x > 150"
+    )
+
+    # Span-first breadcrumbs never carry db.params regardless of PII setting
+    for crumb in actual_query_breadcrumbs:
+        assert "db.params" not in crumb["data"]
+
+
+@pytest.mark.parametrize(
+    "data_collection_setting",
+    [
+        pytest.param({"database_query_data": True}, id="enabled"),
+        pytest.param({"database_query_data": False}, id="disabled"),
+        pytest.param({}, id="default"),
+    ],
+)
+def test_clickhouse_client_breadcrumbs_span_streaming_data_collection(
+    sentry_init, capture_events, data_collection_setting
+) -> None:
+    sentry_init(
+        integrations=[ClickhouseDriverIntegration()],
+        trace_lifecycle="stream",
+        _experiments={"data_collection": data_collection_setting},
+    )
+    events = capture_events()
+
+    client = Client("localhost")
+    client.execute("DROP TABLE IF EXISTS test")
+    client.execute("CREATE TABLE test (x Int32) ENGINE = Memory")
+    client.execute("INSERT INTO test (x) VALUES", [{"x": 100}])
+    client.execute("INSERT INTO test (x) VALUES", [[170], [200]])
+
+    res = client.execute("SELECT sum(x) FROM test WHERE x > %(minv)i", {"minv": 150})
+    assert res[0][0] == 370
+
+    capture_message("hi")
+
+    (event,) = events
+
+    expected_base = {
+        "db.system": "clickhouse",
+        "db.driver.name": "clickhouse-driver",
+        "db.name": "",
+        "db.user": "default",
+        "server.address": "localhost",
+        "server.port": 9000,
+    }
+
+    actual_query_breadcrumbs = [
+        crumb
+        for crumb in event["breadcrumbs"]["values"]
+        if crumb["category"] == "query"
+    ]
+
+    assert len(actual_query_breadcrumbs) == 5
+
+    for crumb in actual_query_breadcrumbs:
+        crumb.pop("timestamp", None)
+        assert crumb["data"] == ApproxDict(expected_base)
+
+    # Span-first breadcrumbs never carry db.params regardless of data_collection
+    for crumb in actual_query_breadcrumbs:
+        assert "db.params" not in crumb["data"]
+
+
+def test_clickhouse_client_breadcrumbs_span_streaming_data_collection_overrides_pii(
+    sentry_init, capture_events
+) -> None:
+    """data_collection disabled takes precedence over send_default_pii=True."""
+    sentry_init(
+        integrations=[ClickhouseDriverIntegration()],
+        send_default_pii=True,
+        trace_lifecycle="stream",
+        _experiments={"data_collection": {"database_query_data": False}},
+    )
+    events = capture_events()
+
+    client = Client("localhost")
+    client.execute("DROP TABLE IF EXISTS test")
+    client.execute("CREATE TABLE test (x Int32) ENGINE = Memory")
+    client.execute("INSERT INTO test (x) VALUES", [{"x": 100}])
+    client.execute("INSERT INTO test (x) VALUES", [[170], [200]])
+
+    res = client.execute("SELECT sum(x) FROM test WHERE x > %(minv)i", {"minv": 150})
+    assert res[0][0] == 370
+
+    capture_message("hi")
+
+    (event,) = events
+
+    actual_query_breadcrumbs = [
+        crumb
+        for crumb in event["breadcrumbs"]["values"]
+        if crumb["category"] == "query"
+    ]
+
+    assert len(actual_query_breadcrumbs) == 5
+
+    for crumb in actual_query_breadcrumbs:
+        assert "db.params" not in crumb["data"]
+
+
+def test_clickhouse_dbapi_breadcrumbs_span_streaming(
+    sentry_init, capture_events
+) -> None:
+    sentry_init(
+        integrations=[ClickhouseDriverIntegration()],
+        trace_lifecycle="stream",
+    )
+    events = capture_events()
+
+    conn = connect("clickhouse://localhost")
+    cursor = conn.cursor()
+    cursor.execute("DROP TABLE IF EXISTS test")
+    cursor.execute("CREATE TABLE test (x Int32) ENGINE = Memory")
+    cursor.executemany("INSERT INTO test (x) VALUES", [{"x": 100}])
+    cursor.executemany("INSERT INTO test (x) VALUES", [[170], [200]])
+    cursor.execute("SELECT sum(x) FROM test WHERE x > %(minv)i", {"minv": 150})
+    res = cursor.fetchall()
+
+    assert res[0][0] == 370
+
+    capture_message("hi")
+
+    (event,) = events
+
+    expected_base = {
+        "db.system": "clickhouse",
+        "db.driver.name": "clickhouse-driver",
+        "db.name": "",
+        "db.user": "default",
+        "server.address": "localhost",
+        "server.port": 9000,
+    }
+
+    expected_breadcrumbs = [
+        {
+            "category": "query",
+            "data": {**expected_base},
+            "message": "DROP TABLE IF EXISTS test",
+            "type": "default",
+        },
+        {
+            "category": "query",
+            "data": {**expected_base},
+            "message": "CREATE TABLE test (x Int32) ENGINE = Memory",
+            "type": "default",
+        },
+        {
+            "category": "query",
+            "data": {**expected_base},
+            "message": "INSERT INTO test (x) VALUES",
+            "type": "default",
+        },
+        {
+            "category": "query",
+            "data": {**expected_base},
+            "message": "INSERT INTO test (x) VALUES",
+            "type": "default",
+        },
+        {
+            "category": "query",
+            "data": {**expected_base},
+            "message": "SELECT sum(x) FROM test WHERE x > 150",
+            "type": "default",
+        },
+    ]
+
+    for crumb in expected_breadcrumbs:
+        crumb["data"] = ApproxDict(crumb["data"])
+
+    for crumb in event["breadcrumbs"]["values"]:
+        crumb.pop("timestamp", None)
+
+    assert event["breadcrumbs"]["values"] == expected_breadcrumbs
+
+    # Span-first breadcrumbs never carry db.params
+    for crumb in event["breadcrumbs"]["values"]:
+        assert "db.params" not in crumb["data"]
+
+
+@pytest.mark.parametrize("send_default_pii", [True, False])
+def test_clickhouse_dbapi_breadcrumbs_span_streaming_with_pii(
+    sentry_init, capture_events, send_default_pii
+) -> None:
+    sentry_init(
+        integrations=[ClickhouseDriverIntegration()],
+        send_default_pii=send_default_pii,
+        trace_lifecycle="stream",
+    )
+    events = capture_events()
+
+    conn = connect("clickhouse://localhost")
+    cursor = conn.cursor()
+    cursor.execute("DROP TABLE IF EXISTS test")
+    cursor.execute("CREATE TABLE test (x Int32) ENGINE = Memory")
+    cursor.executemany("INSERT INTO test (x) VALUES", [{"x": 100}])
+    cursor.executemany("INSERT INTO test (x) VALUES", [[170], [200]])
+    cursor.execute("SELECT sum(x) FROM test WHERE x > %(minv)i", {"minv": 150})
+    res = cursor.fetchall()
+
+    assert res[0][0] == 370
+
+    capture_message("hi")
+
+    (event,) = events
+
+    expected_base = {
+        "db.system": "clickhouse",
+        "db.driver.name": "clickhouse-driver",
+        "db.name": "",
+        "db.user": "default",
+        "server.address": "localhost",
+        "server.port": 9000,
+    }
+
+    actual_query_breadcrumbs = [
+        crumb
+        for crumb in event["breadcrumbs"]["values"]
+        if crumb["category"] == "query"
+    ]
+
+    assert len(actual_query_breadcrumbs) == 5
+
+    for crumb in actual_query_breadcrumbs:
+        crumb.pop("timestamp", None)
+        assert crumb["data"] == ApproxDict(expected_base)
+
+    # Span-first breadcrumbs never carry db.params regardless of PII setting
+    for crumb in actual_query_breadcrumbs:
+        assert "db.params" not in crumb["data"]
