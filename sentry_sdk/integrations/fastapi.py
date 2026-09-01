@@ -79,6 +79,8 @@ def _set_transaction_name_and_source(
                 if path is not None:
                     name = path
 
+            scope._http_route = route
+
     if not name:
         name = _DEFAULT_TRANSACTION_NAME
         source = TransactionSource.ROUTE

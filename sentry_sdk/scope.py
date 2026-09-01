@@ -240,6 +240,7 @@ class Scope:
         "_last_event_id",
         "_flags",
         "_attributes",
+        "_http_route",
     )
 
     def __init__(
