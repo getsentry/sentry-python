@@ -2228,15 +2228,15 @@ async def test_invoke_agent_with_instructions(
     """
     from pydantic_ai import Agent
 
-    # Create agent with instructions (can be string or list)
     agent = Agent(
         "test",
         name="test_instructions",
+        instructions=["Instruction 1", "Instruction 2"],
+        system_prompt="System prompt",
     )
 
-    # Add instructions via _instructions attribute (internal API)
-    agent._instructions = ["Instruction 1", "Instruction 2"]
-    agent._system_prompts = ["System prompt"]
+    # pydantic-ai >=2.36.0 joins multiple instructions with a blank line, earlier versions with a single newline
+    instructions_separator = "\n\n" if PYDANTIC_AI_VERSION >= (2, 36) else "\n"
 
     sentry_init(
         integrations=[PydanticAIIntegration(include_prompts=include_prompts)],
@@ -2268,7 +2268,10 @@ async def test_invoke_agent_with_instructions(
             ]
             assert json.loads(system_instructions) == [
                 {"type": "text", "content": "System prompt"},
-                {"type": "text", "content": "Instruction 1\nInstruction 2"},
+                {
+                    "type": "text",
+                    "content": f"Instruction 1{instructions_separator}Instruction 2",
+                },
             ]
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span["attributes"]
@@ -2291,7 +2294,10 @@ async def test_invoke_agent_with_instructions(
             system_instructions = chat_span["data"][SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS]
             assert json.loads(system_instructions) == [
                 {"type": "text", "content": "System prompt"},
-                {"type": "text", "content": "Instruction 1\nInstruction 2"},
+                {
+                    "type": "text",
+                    "content": f"Instruction 1{instructions_separator}Instruction 2",
+                },
             ]
         else:
             assert SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS not in chat_span["data"]
