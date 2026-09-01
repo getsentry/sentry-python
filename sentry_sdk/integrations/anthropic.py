@@ -49,7 +49,6 @@ try:
         AsyncMessageStreamManager,
         MessageStream,
         MessageStreamManager,
-        ParsedMessageStreamEvent,
     )
     from anthropic.resources import AsyncMessages, Messages
     from anthropic.types import (
@@ -78,6 +77,7 @@ if TYPE_CHECKING:
         Union,
     )
 
+    from anthropic.lib.streaming import ParsedMessageStreamEvent
     from anthropic.types import (
         MessageParam,
         ModelParam,
