@@ -4,12 +4,12 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import BAGGAGE_HEADER_NAME, Span
 from sentry_sdk.tracing_utils import (
     add_http_breadcrumb,
     add_sentry_baggage_to_headers,
+    get_url_attributes,
     has_span_streaming_enabled,
     should_propagate_trace,
 )
@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from typing import Any, Dict, Optional, Type, Union
 
     from botocore.model import ServiceId
+
 
 try:
     from botocore import __version__ as BOTOCORE_VERSION
@@ -81,14 +82,8 @@ def _sentry_request_created(
     is_span_streaming_enabled = has_span_streaming_enabled(client.options)
     span: "Union[Span, StreamedSpan, None]" = None
     if is_span_streaming_enabled:
-        if parsed_url and should_send_default_pii():
-            breadcrumb.update(
-                {
-                    SPANDATA.URL_FULL: parsed_url.url,
-                    SPANDATA.URL_QUERY: parsed_url.query,
-                    SPANDATA.URL_FRAGMENT: parsed_url.fragment,
-                }
-            )
+        url_attributes = get_url_attributes(client, parsed_url)
+        breadcrumb.update(url_attributes)
 
         if request.method is not None:
             breadcrumb[SPANDATA.HTTP_REQUEST_METHOD] = request.method
@@ -102,14 +97,7 @@ def _sentry_request_created(
                     SPANDATA.RPC_METHOD: f"{service_id}/{operation_name}",
                 },
             )
-            if parsed_url and should_send_default_pii():
-                span.set_attributes(
-                    {
-                        SPANDATA.URL_FULL: parsed_url.url,
-                        SPANDATA.URL_QUERY: parsed_url.query,
-                        SPANDATA.URL_FRAGMENT: parsed_url.fragment,
-                    }
-                )
+            span.set_attributes(url_attributes)
 
             if request.method is not None:
                 span.set_attribute(SPANDATA.HTTP_REQUEST_METHOD, request.method)

@@ -59,8 +59,6 @@ def test_crumb_capture_span_streaming(sentry_init, capture_events, send_default_
             {
                 SPANDATA.URL_FULL: url,
                 SPANDATA.HTTP_REQUEST_METHOD: "GET",
-                SPANDATA.URL_FRAGMENT: "",
-                SPANDATA.URL_QUERY: "",
                 SPANDATA.HTTP_STATUS_CODE: response.status_code,
             }
         )
@@ -169,8 +167,6 @@ def test_crumb_capture_client_error_span_streaming(
             {
                 SPANDATA.URL_FULL: url,
                 SPANDATA.HTTP_REQUEST_METHOD: "GET",
-                SPANDATA.URL_FRAGMENT: "",
-                SPANDATA.URL_QUERY: "",
                 SPANDATA.HTTP_STATUS_CODE: response.status_code,
             }
         )
