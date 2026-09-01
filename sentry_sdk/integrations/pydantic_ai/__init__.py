@@ -1,7 +1,7 @@
 import functools
 
 from sentry_sdk.integrations import DidNotEnable, Integration
-from sentry_sdk.utils import capture_internal_exceptions, parse_version
+from sentry_sdk.utils import parse_version
 
 try:
     import pydantic_ai  # noqa: F401
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from typing import Any
 
     from pydantic_ai import ModelRequestContext, RunContext
-    from pydantic_ai.capabilities import Hooks
+    from pydantic_ai.capabilities import Hooks, WrapModelRequestHandler
     from pydantic_ai.messages import ModelResponse
 
 
@@ -33,66 +33,23 @@ def register_hooks(hooks: "Hooks") -> None:
     Creates hooks for chat model calls and register the hooks by adding the hooks to the `capabilities` argument passed to `Agent.__init__()`.
     """
 
-    @hooks.on.before_model_request
-    async def on_request(
-        ctx: "RunContext[None]", request_context: "ModelRequestContext"
-    ) -> "ModelRequestContext":
-        run_context_metadata = ctx.metadata
-        if not isinstance(run_context_metadata, dict):
-            return request_context
-
-        span = ai_client_span(
+    @hooks.on.model_request
+    async def on_model_request(
+        ctx: "RunContext[None]",
+        *,
+        request_context: "ModelRequestContext",
+        handler: "WrapModelRequestHandler",
+    ) -> "ModelResponse":
+        with ai_client_span(
             messages=request_context.messages,
             agent=None,
             model=request_context.model,
             model_settings=request_context.model_settings,
-        )
+        ) as span:
+            response = await handler(request_context)
 
-        run_context_metadata["_sentry_span"] = span
-        span.__enter__()
-
-        return request_context
-
-    @hooks.on.after_model_request
-    async def on_response(
-        ctx: "RunContext[None]",
-        *,
-        request_context: "ModelRequestContext",
-        response: "ModelResponse",
-    ) -> "ModelResponse":
-        run_context_metadata = ctx.metadata
-        if not isinstance(run_context_metadata, dict):
+            update_ai_client_span(span, response)
             return response
-
-        span = run_context_metadata.pop("_sentry_span", None)
-        if span is None:
-            return response
-
-        update_ai_client_span(span, response)
-        span.__exit__(None, None, None)
-
-        return response
-
-    @hooks.on.model_request_error
-    async def on_error(
-        ctx: "RunContext[None]",
-        *,
-        request_context: "ModelRequestContext",
-        error: "Exception",
-    ) -> "ModelResponse":
-        run_context_metadata = ctx.metadata
-
-        if not isinstance(run_context_metadata, dict):
-            raise error
-
-        span = run_context_metadata.pop("_sentry_span", None)
-        if span is None:
-            raise error
-
-        with capture_internal_exceptions():
-            span.__exit__(type(error), error, error.__traceback__)
-
-        raise error
 
     original_init = Agent.__init__
 
@@ -101,10 +58,6 @@ def register_hooks(hooks: "Hooks") -> None:
         caps = list(kwargs.get("capabilities") or [])
         caps.append(hooks)
         kwargs["capabilities"] = caps
-
-        metadata = kwargs.get("metadata")
-        if metadata is None:
-            kwargs["metadata"] = {}  # Used as shared reference between hooks
 
         return original_init(self, *args, **kwargs)
 
@@ -129,7 +82,6 @@ class PydanticAIIntegration(Integration):
 
     identifier = "pydantic_ai"
     origin = f"auto.ai.{identifier}"
-    using_request_hooks = False
 
     def __init__(
         self, include_prompts: bool = True, handled_tool_call_exceptions: bool = True
@@ -159,7 +111,6 @@ class PydanticAIIntegration(Integration):
         _patch_agent_run()
         _patch_tool_execution()
 
-        PydanticAIIntegration.using_request_hooks = False
         try:
             PYDANTIC_AI_VERSION = version("pydantic-ai-slim")
         except PackageNotFoundError:
@@ -182,6 +133,5 @@ class PydanticAIIntegration(Integration):
         except ImportError:
             return
 
-        PydanticAIIntegration.using_request_hooks = True
         hooks = Hooks()
         register_hooks(hooks)
