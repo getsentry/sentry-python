@@ -15,7 +15,7 @@ from sentry_sdk.utils import capture_internal_exceptions, has_data_collection_en
 # from: https://stackoverflow.com/a/71944042/300572
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from typing import Any, Callable, ParamSpec, Union
+    from typing import Any, Callable, Optional, ParamSpec, Union
 else:
     # Fake ParamSpec
     class ParamSpec:
@@ -96,18 +96,15 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
                     },
                 )
 
-            sentry_sdk.get_isolation_scope().add_breadcrumb(
-                message=query,
-                category="query",
-                data={
-                    SPANDATA.DB_SYSTEM: "clickhouse",
-                    SPANDATA.DB_NAME: connection.database,
-                    SPANDATA.DB_DRIVER_NAME: "clickhouse-driver",
-                    SPANDATA.SERVER_ADDRESS: connection.host,
-                    SPANDATA.SERVER_PORT: connection.port,
-                    SPANDATA.DB_USER: connection.user,
-                },
-            )
+            connection._query = query  # type: ignore[attr-defined]
+            connection._breadcrumb_data = {  # type: ignore[attr-defined]
+                SPANDATA.DB_SYSTEM: "clickhouse",
+                SPANDATA.DB_NAME: connection.database,
+                SPANDATA.DB_DRIVER_NAME: "clickhouse-driver",
+                SPANDATA.SERVER_ADDRESS: connection.host,
+                SPANDATA.SERVER_PORT: connection.port,
+                SPANDATA.DB_USER: connection.user,
+            }
         else:
             span = sentry_sdk.start_span(
                 op=OP.DB,
@@ -150,6 +147,18 @@ def _wrap_end(f: "Callable[P, T]") -> "Callable[P, T]":
             return res
 
         if isinstance(span, StreamedSpan):
+            query = getattr(instance.connection, "_query", None)  # type: ignore[attr-defined]
+            breadcrumb_data: "Optional[dict[str, Any]]" = getattr(
+                instance.connection, "_breadcrumb_data", None
+            )  # type: ignore[attr-defined]
+
+            if query is not None and breadcrumb_data is not None:
+                sentry_sdk.get_isolation_scope().add_breadcrumb(
+                    message=query,
+                    category="query",
+                    data={"db.result": res, **breadcrumb_data},
+                )
+
             span.end()
         else:
             if res is not None:
