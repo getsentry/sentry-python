@@ -400,7 +400,7 @@ TEST_SUITE_CONFIG = {
         "package": "quart",
         "deps": {
             "*": ["quart-auth", "pytest-asyncio", "pytest-forked", "Werkzeug"],
-            ">=0.19": ["quart-flask-patch"],
+            ">=0.19,<0.23": ["quart-flask-patch"],
             "<0.19": [
                 "blinker<1.6",
                 "jinja2<3.1.0",
