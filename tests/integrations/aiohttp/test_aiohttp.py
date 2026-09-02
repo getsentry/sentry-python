@@ -27,7 +27,10 @@ from sentry_sdk.integrations.aiohttp import (
 )
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 from tests.conftest import ApproxDict
-from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
+from tests.integrations.utils import (
+    DATA_COLLECTION_REMOTE_ADDR_CASES,
+    DATA_COLLECTION_USER_INFO_CASES,
+)
 
 
 @pytest.mark.asyncio
@@ -2268,3 +2271,70 @@ async def test_client_url_query_data_collection_span_streaming(
         assert "url.query" not in inner_client_span["attributes"]
     else:
         assert inner_client_span["attributes"]["url.query"] == expected_query
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query", _QUERY_PARAM_DATA_COLLECTION_CASES
+)
+async def test_server_url_query_data_collection_event_processor(
+    sentry_init, aiohttp_client, capture_events, init_kwargs, expected_query
+):
+    init_kwargs = dict(init_kwargs)
+    sentry_init(integrations=[AioHttpIntegration()], **init_kwargs)
+
+    async def hello(request):
+        1 / 0
+
+    app = web.Application()
+    app.router.add_get("/", hello)
+
+    events = capture_events()
+
+    client = await aiohttp_client(app)
+    resp = await client.get("/?toy=tennisball&color=red&auth=secret")
+    assert resp.status == 500
+
+    (event,) = events
+
+    host = event["request"]["headers"]["Host"]
+    assert event["request"]["url"] == "http://{host}/".format(host=host)
+    assert event["request"]["method"] == "GET"
+
+    if "data_collection" not in init_kwargs.get("_experiments", {}):
+        assert (
+            event["request"]["query_string"] == "toy=tennisball&color=red&auth=secret"
+        )
+    elif expected_query is None:
+        assert "query_string" not in event["request"]
+    else:
+        assert event["request"]["query_string"] == expected_query
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "init_kwargs, expect_remote_addr", DATA_COLLECTION_REMOTE_ADDR_CASES
+)
+async def test_remote_addr_data_collection(
+    sentry_init, aiohttp_client, capture_events, init_kwargs, expect_remote_addr
+):
+    sentry_init(integrations=[AioHttpIntegration()], **init_kwargs)
+
+    async def hello(request):
+        capture_message("hi")
+        return web.Response(text="hello")
+
+    app = web.Application()
+    app.router.add_get("/", hello)
+
+    events = capture_events()
+
+    client = await aiohttp_client(app)
+    resp = await client.get("/")
+    assert resp.status == 200
+
+    (event,) = events
+    if expect_remote_addr:
+        assert event["request"]["env"] == {"REMOTE_ADDR": "127.0.0.1"}
+    else:
+        assert "env" not in event["request"]

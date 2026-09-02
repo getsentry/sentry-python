@@ -8,7 +8,10 @@ import sentry_sdk
 from sentry_sdk import capture_message
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
 from sentry_sdk.integrations.tornado import TornadoIntegration
-from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
+from tests.integrations.utils import (
+    DATA_COLLECTION_REMOTE_ADDR_CASES,
+    DATA_COLLECTION_USER_INFO_CASES,
+)
 
 
 @pytest.fixture
@@ -930,3 +933,23 @@ def test_client_address_span_attribute_data_collection(
         assert server_span["attributes"]["client.address"] == "127.0.0.1"
     else:
         assert "client.address" not in server_span["attributes"]
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expect_remote_addr", DATA_COLLECTION_REMOTE_ADDR_CASES
+)
+def test_remote_addr_data_collection(
+    tornado_testcase, sentry_init, capture_events, init_kwargs, expect_remote_addr
+):
+    sentry_init(integrations=[TornadoIntegration()], **init_kwargs)
+    events = capture_events()
+    client = tornado_testcase(Application([(r"/hi", CrashingHandler)]))
+
+    response = client.fetch("/hi")
+    assert response.code == 500
+
+    (event,) = events
+    if expect_remote_addr:
+        assert event["request"]["env"] == {"REMOTE_ADDR": "127.0.0.1"}
+    else:
+        assert "env" not in event["request"]

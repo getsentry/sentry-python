@@ -20,6 +20,7 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
+    has_data_collection_enabled,
     parse_version,
     reraise,
 )
@@ -92,6 +93,14 @@ class CohereIntegration(Integration):
         BaseCohere.chat = _wrap_chat(BaseCohere.chat, streaming=False)
         Client.embed = _wrap_embed(Client.embed)
         BaseCohere.chat_stream = _wrap_chat(BaseCohere.chat_stream, streaming=True)
+
+
+def _should_record(integration: "CohereIntegration", category: str) -> bool:
+    client = sentry_sdk.get_client()
+    if has_data_collection_enabled(client.options):
+        return bool(client.options["data_collection"]["gen_ai"][category])
+
+    return should_send_default_pii() and integration.include_prompts
 
 
 def _capture_exception(exc: "Any") -> None:
@@ -190,7 +199,7 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
             reraise(*exc_info)
 
         with capture_internal_exceptions():
-            if should_send_default_pii() and integration.include_prompts:
+            if _should_record(integration, "inputs"):
                 set_data_normalized(
                     span,
                     SPANDATA.AI_INPUT_MESSAGES,
@@ -226,8 +235,7 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
                                 collect_chat_response_fields(
                                     span,
                                     x.response,
-                                    include_pii=should_send_default_pii()
-                                    and integration.include_prompts,
+                                    include_pii=_should_record(integration, "outputs"),
                                 )
                             yield x
                     _end_span(span)
@@ -237,8 +245,7 @@ def _wrap_chat(f: "Callable[..., Any]", streaming: bool) -> "Callable[..., Any]"
                 collect_chat_response_fields(
                     span,
                     res,
-                    include_pii=should_send_default_pii()
-                    and integration.include_prompts,
+                    include_pii=_should_record(integration, "outputs"),
                 )
                 _end_span(span)
             else:
@@ -276,9 +283,7 @@ def _wrap_embed(f: "Callable[..., Any]") -> "Callable[..., Any]":
             )
 
         with span_ctx as span:
-            if "texts" in kwargs and (
-                should_send_default_pii() and integration.include_prompts
-            ):
+            if "texts" in kwargs and _should_record(integration, "inputs"):
                 if isinstance(kwargs["texts"], str):
                     set_data_normalized(span, SPANDATA.AI_TEXTS, [kwargs["texts"]])
                 elif (

@@ -52,20 +52,20 @@ class GoogleGenAIIntegration(Integration):
         _check_minimum_version(GoogleGenAIIntegration, version)
 
         # Patch sync methods
-        Models.generate_content = _wrap_generate_content(Models.generate_content)
-        Models.generate_content_stream = _wrap_generate_content_stream(
+        Models.generate_content = _wrap_generate_content(Models.generate_content)  # type: ignore[method-assign]
+        Models.generate_content_stream = _wrap_generate_content_stream(  # type: ignore[method-assign]
             Models.generate_content_stream
         )
-        Models.embed_content = _wrap_embed_content(Models.embed_content)
+        Models.embed_content = _wrap_embed_content(Models.embed_content)  # type: ignore[method-assign]
 
         # Patch async methods
-        AsyncModels.generate_content = _wrap_async_generate_content(
+        AsyncModels.generate_content = _wrap_async_generate_content(  # type: ignore[method-assign]
             AsyncModels.generate_content
         )
-        AsyncModels.generate_content_stream = _wrap_async_generate_content_stream(
+        AsyncModels.generate_content_stream = _wrap_async_generate_content_stream(  # type: ignore[method-assign]
             AsyncModels.generate_content_stream
         )
-        AsyncModels.embed_content = _wrap_async_embed_content(AsyncModels.embed_content)
+        AsyncModels.embed_content = _wrap_async_embed_content(AsyncModels.embed_content)  # type: ignore[method-assign]
 
 
 def _wrap_generate_content_stream(f: "Callable[..., Any]") -> "Callable[..., Any]":

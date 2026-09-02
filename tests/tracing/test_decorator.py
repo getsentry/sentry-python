@@ -814,17 +814,9 @@ def test_span_templates_ai_pii(
         with sentry_sdk.start_transaction(name="test-transaction"):
             my_agent(22, 33, arg1=44, arg2=55)
 
-        (_, tool_span, _) = (item.payload for item in items)
-
-        if send_default_pii:
-            assert (
-                tool_span["attributes"]["gen_ai.tool.input"]
-                == "{'args': (1, 2), 'kwargs': {'tool_arg1': '3', 'tool_arg2': '4'}}"
-            )
-            assert tool_span["attributes"]["gen_ai.tool.output"] == "'tool_output'"
-        else:
-            assert "gen_ai.tool.input" not in tool_span["attributes"]
-            assert "gen_ai.tool.output" not in tool_span["attributes"]
+        (_, tool_span, chat_span) = (item.payload for item in items)
+        tool_data = tool_span["attributes"]
+        chat_data = chat_span["attributes"]
     else:
         events = capture_events()
 
@@ -832,14 +824,102 @@ def test_span_templates_ai_pii(
             my_agent(22, 33, arg1=44, arg2=55)
 
         (event,) = events
-        (_, tool_span, _) = event["spans"]
+        (_, tool_span, chat_span) = event["spans"]
+        tool_data = tool_span["data"]
+        chat_data = chat_span["data"]
 
-        if send_default_pii:
-            assert (
-                tool_span["data"]["gen_ai.tool.input"]
-                == "{'args': (1, 2), 'kwargs': {'tool_arg1': '3', 'tool_arg2': '4'}}"
-            )
-            assert tool_span["data"]["gen_ai.tool.output"] == "'tool_output'"
-        else:
-            assert "gen_ai.tool.input" not in tool_span["data"]
-            assert "gen_ai.tool.output" not in tool_span["data"]
+    if send_default_pii:
+        assert (
+            tool_data["gen_ai.tool.input"]
+            == "{'args': (1, 2), 'kwargs': {'tool_arg1': '3', 'tool_arg2': '4'}}"
+        )
+        assert tool_data["gen_ai.tool.output"] == "'tool_output'"
+    else:
+        assert "gen_ai.tool.input" not in tool_data
+        assert "gen_ai.tool.output" not in tool_data
+
+    # Without `data_collection`, prompts are recorded regardless of `send_default_pii`.
+    assert chat_data["gen_ai.request.messages"] == (
+        "[{'role': 'user', 'content': 'What is the weather in Tokyo?'}, "
+        "{'role': 'system', 'content': 'You are a helpful assistant that can answer "
+        "questions about the weather.'}]"
+    )
+
+
+@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
+@pytest.mark.parametrize("collect_outputs", [True, False])
+@pytest.mark.parametrize("collect_inputs", [True, False])
+def test_span_templates_ai_data_collection(
+    sentry_init,
+    capture_events,
+    capture_items,
+    collect_inputs,
+    collect_outputs,
+    stream_gen_ai_spans,
+):
+    @sentry_sdk.trace(template=SPANTEMPLATE.AI_TOOL)
+    def my_tool(arg1, arg2, **kwargs):
+        """This is a tool function."""
+        return "tool_output"
+
+    @sentry_sdk.trace(template=SPANTEMPLATE.AI_CHAT)
+    def my_chat(model=None, **kwargs):
+        return "chat_output"
+
+    @sentry_sdk.trace(template=SPANTEMPLATE.AI_AGENT)
+    def my_agent(*args, **kwargs):
+        my_tool(1, 2, tool_arg1="3", tool_arg2="4")
+        my_chat(
+            model="my-gpt-4o-mini",
+            prompt="What is the weather in Tokyo?",
+            system_prompt="You are a helpful assistant.",
+        )
+        return "agent_output"
+
+    sentry_init(
+        traces_sample_rate=1.0,
+        stream_gen_ai_spans=stream_gen_ai_spans,
+        _experiments={
+            "data_collection": {
+                "gen_ai": {"inputs": collect_inputs, "outputs": collect_outputs}
+            }
+        },
+    )
+
+    if stream_gen_ai_spans:
+        items = capture_items("span")
+
+        with sentry_sdk.start_transaction(name="test-transaction"):
+            my_agent(22, 33, arg1=44, arg2=55)
+
+        (_, tool_span, chat_span) = (item.payload for item in items)
+        tool_data = tool_span["attributes"]
+        chat_data = chat_span["attributes"]
+    else:
+        events = capture_events()
+
+        with sentry_sdk.start_transaction(name="test-transaction"):
+            my_agent(22, 33, arg1=44, arg2=55)
+
+        (event,) = events
+        (_, tool_span, chat_span) = event["spans"]
+        tool_data = tool_span["data"]
+        chat_data = chat_span["data"]
+
+    if collect_inputs:
+        assert (
+            tool_data["gen_ai.tool.input"]
+            == "{'args': (1, 2), 'kwargs': {'tool_arg1': '3', 'tool_arg2': '4'}}"
+        )
+        assert chat_data["gen_ai.request.messages"] == (
+            "[{'role': 'user', 'content': 'What is the weather in Tokyo?'}, "
+            "{'role': 'system', 'content': 'You are a helpful assistant.'}]"
+        )
+    else:
+        assert "gen_ai.tool.input" not in tool_data
+        assert "gen_ai.request.messages" not in chat_data
+
+    if collect_outputs:
+        assert tool_data["gen_ai.tool.output"] == "'tool_output'"
+    else:
+        assert "gen_ai.tool.output" not in tool_data

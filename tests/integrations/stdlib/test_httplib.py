@@ -102,8 +102,6 @@ def test_crumb_capture(sentry_init, capture_events, send_default_pii):
                 SPANDATA.URL_FULL: url,
                 SPANDATA.HTTP_REQUEST_METHOD: "GET",
                 SPANDATA.HTTP_STATUS_CODE: 200,
-                SPANDATA.URL_FRAGMENT: "",
-                SPANDATA.URL_QUERY: "",
             }
         )
     else:
@@ -161,8 +159,6 @@ def test_crumb_capture_client_error(
                 SPANDATA.URL_FULL: url,
                 SPANDATA.HTTP_REQUEST_METHOD: "GET",
                 SPANDATA.HTTP_STATUS_CODE: status_code,
-                SPANDATA.URL_FRAGMENT: "",
-                SPANDATA.URL_QUERY: "",
             }
         )
     else:
@@ -205,8 +201,6 @@ def test_crumb_capture_hint(sentry_init, capture_events, send_default_pii):
                 SPANDATA.HTTP_REQUEST_METHOD: "GET",
                 SPANDATA.HTTP_STATUS_CODE: 200,
                 "extra": "foo",
-                SPANDATA.URL_FRAGMENT: "",
-                SPANDATA.URL_QUERY: "",
             }
         )
     else:
@@ -276,8 +270,6 @@ def test_httplib_misuse(sentry_init, capture_events, request):
             SPANDATA.URL_FULL: "http://localhost:{}/200".format(PORT),
             SPANDATA.HTTP_REQUEST_METHOD: "GET",
             SPANDATA.HTTP_STATUS_CODE: 200,
-            SPANDATA.URL_FRAGMENT: "",
-            SPANDATA.URL_QUERY: "",
         }
     )
 
@@ -960,7 +952,7 @@ def test_proxy_http_tunnel(
     if send_default_pii:
         assert (
             span["attributes"][SPANDATA.URL_FULL]
-            == f"http://api.example.com{port_modifier}/foo"
+            == f"http://api.example.com{port_modifier}/foo?bar=1"
         )
         assert span["attributes"][SPANDATA.URL_QUERY] == "bar=1"
     else:
@@ -991,3 +983,239 @@ def test_chunked_response_span_covers_body_read(
 
     duration = http_span["end_timestamp"] - http_span["start_timestamp"]
     assert duration >= min_expected_duration
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query",
+    [
+        pytest.param(
+            {"send_default_pii": True},
+            "toy=tennisball&color=red&auth=secret",
+            id="send_default_pii_true",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            None,
+            id="send_default_pii_false",
+        ),
+        pytest.param(
+            {},
+            None,
+            id="defaults",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "denylist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
+            id="data_collection_denylist_custom_terms",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
+                    }
+                }
+            },
+            "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            id="data_collection_allowlist_sensitive_term",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            None,
+            id="data_collection_off",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": True,
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                },
+            },
+            None,
+            id="data_collection_wins_over_send_default_pii",
+        ),
+    ],
+)
+def test_url_query_data_collection(
+    sentry_init, capture_items, init_kwargs, expected_query
+):
+    sentry_init(
+        integrations=[StdlibIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="custom parent"):
+        conn = HTTPConnection("localhost", PORT)
+        conn.request(
+            "GET", "/some/random/url?toy=tennisball&color=red&auth=secret#frag"
+        )
+        conn.getresponse()
+
+    sentry_sdk.flush()
+
+    (span,) = (
+        item.payload
+        for item in items
+        if item.payload["attributes"].get("sentry.origin") == "auto.http.stdlib.httplib"
+    )
+
+    if expected_query is None:
+        assert SPANDATA.URL_QUERY not in span["attributes"]
+    else:
+        assert span["attributes"][SPANDATA.URL_QUERY] == expected_query
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_suffix",
+    [
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "?toy=tennisball&color=red&auth=%5BFiltered%5D#frag",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "?toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {"send_default_pii": True},
+            "?toy=tennisball&color=red&auth=secret#frag",
+            id="send_default_pii_true",
+        ),
+    ],
+)
+def test_url_full_reassembly(sentry_init, capture_items, init_kwargs, expected_suffix):
+    sentry_init(
+        integrations=[StdlibIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+
+    items = capture_items("span")
+
+    with sentry_sdk.traces.start_span(name="custom parent"):
+        conn = HTTPConnection("localhost", PORT)
+        conn.request(
+            "GET", "/some/random/url?toy=tennisball&color=red&auth=secret#frag"
+        )
+        conn.getresponse()
+
+    sentry_sdk.flush()
+
+    (span,) = (
+        item.payload
+        for item in items
+        if item.payload["attributes"].get("sentry.origin") == "auto.http.stdlib.httplib"
+    )
+
+    base_url = "http://localhost:{}/some/random/url".format(PORT)
+    assert span["attributes"][SPANDATA.URL_FULL] == base_url + expected_suffix
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query, expects_url",
+    [
+        pytest.param(
+            {"send_default_pii": True},
+            "toy=tennisball&color=red&auth=secret",
+            True,
+            id="send_default_pii_true",
+        ),
+        pytest.param(
+            {},
+            None,
+            False,
+            id="defaults",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
+            True,
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            None,
+            True,
+            id="data_collection_off",
+        ),
+    ],
+)
+def test_crumb_url_query_data_collection(
+    sentry_init, capture_events, init_kwargs, expected_query, expects_url
+):
+    sentry_init(
+        integrations=[StdlibIntegration()],
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+    events = capture_events()
+
+    conn = HTTPConnection("localhost", PORT)
+    conn.request("GET", "/some/random/url?toy=tennisball&color=red&auth=secret#frag")
+    conn.getresponse()
+
+    capture_message("Testing!")
+
+    (event,) = events
+    (crumb,) = event["breadcrumbs"]["values"]
+
+    base_url = "http://localhost:{}/some/random/url".format(PORT)
+
+    if not expects_url:
+        assert SPANDATA.URL_QUERY not in crumb["data"]
+        assert SPANDATA.URL_FULL not in crumb["data"]
+        return
+
+    assert crumb["data"][SPANDATA.URL_FRAGMENT] == "frag"
+
+    if expected_query is None:
+        assert SPANDATA.URL_QUERY not in crumb["data"]
+        assert crumb["data"][SPANDATA.URL_FULL] == f"{base_url}#frag"
+    else:
+        assert crumb["data"][SPANDATA.URL_QUERY] == expected_query
+        assert (
+            crumb["data"][SPANDATA.URL_FULL] == f"{base_url}?{expected_query}#frag"  # noqa: E231
+        )

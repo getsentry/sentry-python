@@ -22,9 +22,6 @@ from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.scope import Scope, should_send_default_pii
 from sentry_sdk.sessions import track_session
 from sentry_sdk.traces import (
-    SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE,
-)
-from sentry_sdk.traces import (
     NoOpStreamedSpan,
     SegmentNameSource,
     SpanStatus,
@@ -329,21 +326,11 @@ class AioHttpIntegration(Integration):
                 pass
 
             if name is not None:
-                current_span = sentry_sdk.get_current_span()
-                if isinstance(current_span, StreamedSpan) and not isinstance(
-                    current_span, NoOpStreamedSpan
-                ):
-                    current_span._segment.name = name
-                    current_span._segment.set_attribute(
-                        "sentry.segment.name.source",
-                        SEGMENT_SOURCE_FOR_STYLE[integration.transaction_style].value,
-                    )
-                else:
-                    current_scope = sentry_sdk.get_current_scope()
-                    current_scope.set_transaction_name(
-                        name,
-                        source=SOURCE_FOR_STYLE[integration.transaction_style],
-                    )
+                current_scope = sentry_sdk.get_current_scope()
+                current_scope.set_transaction_name(
+                    name,
+                    source=SOURCE_FOR_STYLE[integration.transaction_style],
+                )
 
             return rv
 
@@ -554,9 +541,30 @@ def _make_request_processor(
                 request.path,
             )
 
-            request_info["query_string"] = request.query_string
+            if has_data_collection_enabled(client_options):
+                if request.query_string:
+                    filtered_query_string = (
+                        _apply_data_collection_filtering_to_query_string(
+                            query_string=request.query_string,
+                            behaviour=client_options["data_collection"][
+                                "url_query_params"
+                            ],
+                        )
+                    )
+                    if filtered_query_string:
+                        request_info["query_string"] = filtered_query_string
+            else:
+                request_info["query_string"] = request.query_string
+
             request_info["method"] = request.method
-            request_info["env"] = {"REMOTE_ADDR": request.remote}
+
+            # REMOTE_ADDR was unconditionally set pre-data collection, so it
+            # continues to be set when data collection is not enabled.
+            if (
+                not has_data_collection_enabled(client_options)
+                or client_options["data_collection"]["user_info"]
+            ):
+                request_info["env"] = {"REMOTE_ADDR": request.remote}
             request_info["headers"] = _filter_headers(dict(request.headers))
 
             # Just attach raw data here if it is within bounds, if available.

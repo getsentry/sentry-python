@@ -34,8 +34,6 @@ def test_crumb_capture(sentry_init, capture_events, send_default_pii):
             {
                 SPANDATA.URL_FULL: url,
                 SPANDATA.HTTP_REQUEST_METHOD: "GET",
-                SPANDATA.URL_FRAGMENT: "",
-                SPANDATA.URL_QUERY: "",
                 SPANDATA.HTTP_STATUS_CODE: response.status_code,
             }
         )
@@ -92,8 +90,6 @@ def test_crumb_capture_client_error(
             {
                 SPANDATA.URL_FULL: url,
                 SPANDATA.HTTP_REQUEST_METHOD: "GET",
-                SPANDATA.URL_FRAGMENT: "",
-                SPANDATA.URL_QUERY: "",
                 SPANDATA.HTTP_STATUS_CODE: response.status_code,
             }
         )

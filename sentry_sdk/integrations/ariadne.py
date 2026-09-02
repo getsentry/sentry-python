@@ -176,8 +176,17 @@ def _make_response_event_processor(response: "Dict[str, Any]") -> "EventProcesso
     """Add response data to the event's response context."""
 
     def inner(event: "Event", hint: "dict[str, Any]") -> "Event":
+        client_options = sentry_sdk.get_client().options
         with capture_internal_exceptions():
-            if should_send_default_pii() and response.get("errors"):
+            if has_data_collection_enabled(client_options):
+                collect_response = (
+                    "outgoing_response"
+                    in client_options["data_collection"]["http_bodies"]
+                )
+            else:
+                collect_response = should_send_default_pii()
+
+            if collect_response and response.get("errors"):
                 contexts = event.setdefault("contexts", {})
                 contexts["response"] = {
                     "data": response,

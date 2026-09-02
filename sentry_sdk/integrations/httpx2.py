@@ -3,10 +3,10 @@ from typing import TYPE_CHECKING
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
-from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing_utils import (
     add_http_breadcrumb,
     add_http_request_source,
+    get_url_attributes,
     has_span_streaming_enabled,
     propagate_trace_headers,
 )
@@ -62,11 +62,14 @@ def _install_httpx2_client() -> None:
         with capture_internal_exceptions():
             parsed_url = parse_url(str(request.url), sanitize=False)
 
+        url_attributes: "Attributes" = {}
+
         if is_span_streaming_enabled:
             if sentry_sdk.traces.get_current_span() is None:
                 propagate_trace_headers(client, request)
-
                 return real_send(self, request, **kwargs)
+
+            url_attributes = get_url_attributes(client, parsed_url)
 
             with sentry_sdk.traces.start_span(
                 name="%s %s"
@@ -80,20 +83,7 @@ def _install_httpx2_client() -> None:
                     "http.request.method": request.method,
                 },
             ) as streamed_span:
-                attributes: "Attributes" = {}
-
-                if parsed_url is not None and should_send_default_pii():
-                    url_full = parsed_url.url
-                    if parsed_url.query:
-                        url_full += "?" + parsed_url.query
-                    if parsed_url.fragment:
-                        url_full += "#" + parsed_url.fragment
-
-                    attributes["url.full"] = url_full
-                    if parsed_url.query:
-                        attributes["url.query"] = parsed_url.query
-                    if parsed_url.fragment:
-                        attributes["url.fragment"] = parsed_url.fragment
+                attributes: "Attributes" = dict(url_attributes)
 
                 propagate_trace_headers(client, request)
 
@@ -140,14 +130,24 @@ def _install_httpx2_client() -> None:
             SPANDATA.HTTP_STATUS_CODE: rv.status_code,
             "reason": rv.reason_phrase,
         }
-        if parsed_url and (not is_span_streaming_enabled or should_send_default_pii()):
-            breadcrumb_data.update(
-                {
-                    "url": parsed_url.url,
-                    SPANDATA.HTTP_QUERY: parsed_url.query,
-                    SPANDATA.HTTP_FRAGMENT: parsed_url.fragment,
-                }
-            )
+
+        if parsed_url:
+            if not is_span_streaming_enabled:
+                breadcrumb_data.update(
+                    {
+                        "url": parsed_url.url,
+                        SPANDATA.HTTP_QUERY: parsed_url.query,
+                        SPANDATA.HTTP_FRAGMENT: parsed_url.fragment,
+                    }
+                )
+            elif url_attributes:
+                breadcrumb_data.update(
+                    {
+                        "url": url_attributes.get("url.full", parsed_url.url),
+                        SPANDATA.HTTP_QUERY: url_attributes.get("url.query", ""),
+                        SPANDATA.HTTP_FRAGMENT: url_attributes.get("url.fragment", ""),
+                    }
+                )
 
         add_http_breadcrumb(rv.status_code, breadcrumb_data)
 
@@ -171,11 +171,14 @@ def _install_httpx2_async_client() -> None:
         with capture_internal_exceptions():
             parsed_url = parse_url(str(request.url), sanitize=False)
 
+        url_attributes: "Attributes" = {}
+
         if is_span_streaming_enabled:
             if sentry_sdk.traces.get_current_span() is None:
                 propagate_trace_headers(client, request)
-
                 return await real_send(self, request, **kwargs)
+
+            url_attributes = get_url_attributes(client, parsed_url)
 
             with sentry_sdk.traces.start_span(
                 name="%s %s"
@@ -189,20 +192,7 @@ def _install_httpx2_async_client() -> None:
                     "http.request.method": request.method,
                 },
             ) as streamed_span:
-                attributes: "Attributes" = {}
-
-                if parsed_url is not None and should_send_default_pii():
-                    url_full = parsed_url.url
-                    if parsed_url.query:
-                        url_full += "?" + parsed_url.query
-                    if parsed_url.fragment:
-                        url_full += "#" + parsed_url.fragment
-
-                    attributes["url.full"] = url_full
-                    if parsed_url.query:
-                        attributes["url.query"] = parsed_url.query
-                    if parsed_url.fragment:
-                        attributes["url.fragment"] = parsed_url.fragment
+                attributes: "Attributes" = dict(url_attributes)
 
                 propagate_trace_headers(client, request)
 
@@ -249,14 +239,23 @@ def _install_httpx2_async_client() -> None:
             SPANDATA.HTTP_STATUS_CODE: rv.status_code,
             "reason": rv.reason_phrase,
         }
-        if parsed_url and (not is_span_streaming_enabled or should_send_default_pii()):
-            breadcrumb_data.update(
-                {
-                    "url": parsed_url.url,
-                    SPANDATA.HTTP_QUERY: parsed_url.query,
-                    SPANDATA.HTTP_FRAGMENT: parsed_url.fragment,
-                }
-            )
+        if parsed_url:
+            if not is_span_streaming_enabled:
+                breadcrumb_data.update(
+                    {
+                        "url": parsed_url.url,
+                        SPANDATA.HTTP_QUERY: parsed_url.query,
+                        SPANDATA.HTTP_FRAGMENT: parsed_url.fragment,
+                    }
+                )
+            elif url_attributes:
+                breadcrumb_data.update(
+                    {
+                        "url": url_attributes.get("url.full", parsed_url.url),
+                        SPANDATA.HTTP_QUERY: url_attributes.get("url.query", ""),
+                        SPANDATA.HTTP_FRAGMENT: url_attributes.get("url.fragment", ""),
+                    }
+                )
 
         add_http_breadcrumb(rv.status_code, breadcrumb_data)
 

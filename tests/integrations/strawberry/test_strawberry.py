@@ -352,6 +352,50 @@ def test_event_processor_data_collection(
 
 
 @pytest.mark.parametrize(
+    "http_bodies,expect_response",
+    [
+        pytest.param(None, True, id="http_bodies_default"),
+        pytest.param(["outgoing_response"], True, id="outgoing_response"),
+        pytest.param(["incoming_request"], False, id="incoming_request_only"),
+        pytest.param([], False, id="http_bodies_off"),
+    ],
+)
+@parameterize_strawberry_test
+def test_response_data_collection(
+    request,
+    sentry_init,
+    capture_events,
+    client_factory,
+    async_execution,
+    framework_integrations,
+    http_bodies,
+    expect_response,
+):
+    data_collection = {} if http_bodies is None else {"http_bodies": http_bodies}
+    sentry_init(
+        integrations=[StrawberryIntegration(async_execution=async_execution)]
+        + framework_integrations,
+        _experiments={"data_collection": data_collection},
+    )
+    events = capture_events()
+
+    schema = strawberry.Schema(Query)
+
+    client_factory = request.getfixturevalue(client_factory)
+    client = client_factory(schema)
+
+    client.post(
+        "/graphql",
+        json={"query": "query ErrorQuery { error }", "operationName": "ErrorQuery"},
+    )
+
+    assert len(events) == 1
+    (error_event,) = events
+
+    assert ("response" in error_event["contexts"]) == expect_response
+
+
+@pytest.mark.parametrize(
     "data_collection,expect_query,expect_variables",
     [
         pytest.param(
