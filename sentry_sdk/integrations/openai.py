@@ -437,7 +437,6 @@ def _set_responses_api_input_data(
         )
 
     system_instructions = _get_system_instructions_responses(messages)
-    # Deliberate use of function accepting completions API type because of shared structure
     instructions_text_parts += _transform_system_instructions_responses(
         system_instructions
     )
