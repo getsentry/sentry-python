@@ -1453,8 +1453,8 @@ async def test_data_collection_outputs(
                 {
                     "role": "system",
                     "content": [
-                        {"type": "text", "text": "You are a helpful assistant."},
-                        {"type": "text", "text": "Be concise and clear."},
+                        {"type": "input_text", "text": "You are a helpful assistant."},
+                        {"type": "input_text", "text": "Be concise and clear."},
                     ],
                 },
                 {
@@ -1494,8 +1494,8 @@ async def test_data_collection_outputs(
                     "type": "message",
                     "role": "system",
                     "content": [
-                        {"type": "text", "text": "You are a helpful assistant."},
-                        {"type": "text", "text": "Be concise and clear."},
+                        {"type": "input_text", "text": "You are a helpful assistant."},
+                        {"type": "input_text", "text": "Be concise and clear."},
                     ],
                 },
                 {
@@ -2160,8 +2160,8 @@ def test_agent_invocation_span_sync_no_pii(
                 {
                     "role": "system",
                     "content": [
-                        {"type": "text", "text": "You are a helpful assistant."},
-                        {"type": "text", "text": "Be concise and clear."},
+                        {"type": "input_text", "text": "You are a helpful assistant."},
+                        {"type": "input_text", "text": "Be concise and clear."},
                     ],
                 },
                 {
@@ -2201,8 +2201,8 @@ def test_agent_invocation_span_sync_no_pii(
                     "type": "message",
                     "role": "system",
                     "content": [
-                        {"type": "text", "text": "You are a helpful assistant."},
-                        {"type": "text", "text": "Be concise and clear."},
+                        {"type": "input_text", "text": "You are a helpful assistant."},
+                        {"type": "input_text", "text": "Be concise and clear."},
                     ],
                 },
                 {
