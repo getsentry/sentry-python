@@ -707,7 +707,7 @@ async def test_cookie_data_collection(
     ],
 )
 def test_query_string_data_collection(
-    sentry_init, capture_events, init_kwargs, expected_query_string
+    sentry_init, capture_items, init_kwargs, expected_query_string
 ):
     sentry_init(
         traces_sample_rate=1.0,
@@ -717,17 +717,29 @@ def test_query_string_data_collection(
     )
 
     starlette_app = starlette_app_factory()
-    events = capture_events()
+    items = capture_items("event", "span")
 
     client = TestClient(starlette_app)
     client.get("/message?" + QUERY_STRING)
 
+    sentry_sdk.flush()
+
+    events = [item.payload for item in items if item.type == "event"]
     (event,) = events
+
+    segments = [
+        item.payload
+        for item in items
+        if item.type == "span" and item.payload.get("is_segment")
+    ]
+    assert len(segments) == 1
 
     if expected_query_string is None:
         assert "query_string" not in event["request"]
+        assert SPANDATA.HTTP_QUERY not in segments[0]["attributes"]
     else:
         assert event["request"]["query_string"] == expected_query_string
+        assert segments[0]["attributes"][SPANDATA.HTTP_QUERY] == expected_query_string
 
 
 @pytest.mark.parametrize(
@@ -919,7 +931,6 @@ def test_transaction_style(
 
 def test_host_route_path_has_url_source(sentry_init, capture_items):
     sentry_init(
-        auto_enabling_integrations=False,
         integrations=[StarletteIntegration(transaction_style="url")],
         traces_sample_rate=1.0,
         trace_lifecycle="stream",
@@ -1302,7 +1313,6 @@ def test_middleware_partial_receive_send(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration()],
-        auto_enabling_integrations=False,
         trace_lifecycle="stream",
     )
     starlette_app = starlette_app_factory(
@@ -1321,18 +1331,26 @@ def test_middleware_partial_receive_send(sentry_init, capture_items):
     segment = items.pop().payload
     middleware_spans = [item.payload for item in items]
 
-    # In span-first, the `middleware.starlette.send` ops appear first,
-    # so the list needs to be reversed for the assertions below
-    middleware_spans.reverse()
-
     expected = [
         {
-            "op": "middleware.starlette",
-            "description": "ServerErrorMiddleware",
+            "op": "middleware.starlette.send",
+            "description": "functools.partial(<function SamplePartialReceiveSendMiddleware.__call__.<locals>.my_send at ",
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "functools.partial(<function SamplePartialReceiveSendMiddleware.__call__.<locals>.my_send at ",
         },
         {
             "op": "middleware.starlette",
-            "description": "SamplePartialReceiveSendMiddleware",
+            "description": "ExceptionMiddleware",
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
+        },
+        {
+            "op": "middleware.starlette.send",
+            "description": "ServerErrorMiddleware.__call__.<locals>._send",
         },
         {
             "op": "middleware.starlette.receive",
@@ -1343,24 +1361,12 @@ def test_middleware_partial_receive_send(sentry_init, capture_items):
             ),
         },
         {
-            "op": "middleware.starlette.send",
-            "description": "ServerErrorMiddleware.__call__.<locals>._send",
-        },
-        {
-            "op": "middleware.starlette.send",
-            "description": "SentryAsgiMiddleware._run_app.<locals>._sentry_wrapped_send",
+            "op": "middleware.starlette",
+            "description": "SamplePartialReceiveSendMiddleware",
         },
         {
             "op": "middleware.starlette",
-            "description": "ExceptionMiddleware",
-        },
-        {
-            "op": "middleware.starlette.send",
-            "description": "functools.partial(<function SamplePartialReceiveSendMiddleware.__call__.<locals>.my_send at ",
-        },
-        {
-            "op": "middleware.starlette.send",
-            "description": "functools.partial(<function SamplePartialReceiveSendMiddleware.__call__.<locals>.my_send at ",
+            "description": "ServerErrorMiddleware",
         },
     ]
 
