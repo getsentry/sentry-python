@@ -233,6 +233,7 @@ class AioHttpIntegration(Integration):
                             },
                             parent_span=None,
                         )
+                        scope.get_current_scope()._server_segment_span = span_ctx
                     else:
                         transaction = continue_trace(
                             headers,
@@ -323,14 +324,19 @@ class AioHttpIntegration(Integration):
             if integration is None:
                 return rv
 
+            route_info = rv.get_info()
+            pattern = route_info.get("path") or route_info.get("formatter")
+
+            server_span = sentry_sdk.get_current_scope()._server_segment_span
+            if server_span is not None:
+                server_span.set_attribute(SPANDATA.HTTP_ROUTE, pattern)
+
             name = None
 
             try:
                 if integration.transaction_style == "handler_name":
                     name = transaction_from_function(rv.handler)
                 elif integration.transaction_style == "method_and_path_pattern":
-                    route_info = rv.get_info()
-                    pattern = route_info.get("path") or route_info.get("formatter")
                     name = "{} {}".format(request.method, pattern)
             except Exception:
                 pass
