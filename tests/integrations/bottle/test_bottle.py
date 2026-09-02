@@ -10,6 +10,7 @@ from werkzeug.wrappers import Response
 
 import sentry_sdk
 from sentry_sdk import capture_message
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.bottle import BottleIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
@@ -660,6 +661,32 @@ def test_span_streaming_transaction_style(
 
     assert segment["name"].endswith(expected_name)
     assert segment["attributes"]["sentry.segment.name.source"] == expected_source
+
+
+def test_http_route(
+    sentry_init,
+    capture_items,
+):
+    sentry_init(
+        integrations=[BottleIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+    items = capture_items("span")
+
+    app = Bottle()
+
+    @app.route("/message/<message_id>")
+    def hi_with_id(message_id):
+        return "ok"
+
+    client = Client(app)
+    client.get("/message/123456")
+
+    sentry_sdk.flush()
+
+    (segment,) = (item.payload for item in items if item.payload.get("is_segment"))
+    assert segment["attributes"][SPANDATA.HTTP_ROUTE] == "/message/<message_id>"
 
 
 def test_span_streaming_with_error(sentry_init, capture_items):
