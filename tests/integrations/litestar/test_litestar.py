@@ -4,7 +4,7 @@ import functools
 from typing import Any
 
 import pytest
-from litestar import Controller, Litestar, get
+from litestar import Controller, Litestar, get, post
 from litestar.exceptions import HTTPException
 from litestar.logging.config import LoggingConfig
 from litestar.middleware import AbstractMiddleware
@@ -49,6 +49,11 @@ def litestar_app_factory(middleware=None, debug=True, exception_handlers=None):
         capture_message("hi")
         return {"status": "ok"}
 
+    @post("/body/json")
+    async def body_json(data: "dict[str, Any]") -> "dict[str, Any]":
+        capture_message("hi")
+        return {"status": "ok"}
+
     logging_config = LoggingConfig()
 
     app = Litestar(
@@ -57,6 +62,7 @@ def litestar_app_factory(middleware=None, debug=True, exception_handlers=None):
             custom_error,
             message,
             message_with_id,
+            body_json,
             MyController,
         ],
         debug=debug,
@@ -675,6 +681,72 @@ def test_litestar_scope_user_on_exception_event(
 
 
 COOKIE_HEADER = "jwt=tokenval; theme=dark; lang=en; identity=alice"
+
+
+@pytest.mark.parametrize(
+    "data_collection, expect_body",
+    [
+        pytest.param(None, True, id="no_data_collection_experiment"),
+        pytest.param({}, True, id="data_collection_http_bodies_default"),
+        pytest.param(
+            {"http_bodies": ["incoming_request"]},
+            True,
+            id="data_collection_http_bodies_incoming_request",
+        ),
+        pytest.param(
+            {"http_bodies": []}, False, id="data_collection_http_bodies_empty"
+        ),
+    ],
+)
+def test_request_body_data_collection(
+    sentry_init, capture_events, data_collection, expect_body
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[LitestarIntegration()],
+        _experiments=(
+            {} if data_collection is None else {"data_collection": data_collection}
+        ),
+    )
+
+    litestar_app = litestar_app_factory()
+    events = capture_events()
+
+    body = {"foo": {"bar": "baz", "qux": ["1", "2", "3"]}}
+
+    client = TestClient(litestar_app)
+    client.post("/body/json", json=body)
+
+    (event, transaction_event) = events
+
+    if expect_body:
+        assert event["request"]["data"] == body
+        assert transaction_event["request"]["data"] == body
+    else:
+        assert "data" not in event["request"]
+        assert "data" not in transaction_event["request"]
+
+
+def test_request_body_data_collection_wins_over_send_default_pii(
+    sentry_init, capture_events
+):
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[LitestarIntegration()],
+        send_default_pii=True,
+        _experiments={"data_collection": {"http_bodies": []}},
+    )
+
+    litestar_app = litestar_app_factory()
+    events = capture_events()
+
+    client = TestClient(litestar_app)
+    client.post("/body/json", json={"foo": {"bar": "baz", "qux": ["1", "2", "3"]}})
+
+    (event, transaction_event) = events
+
+    assert "data" not in event["request"]
+    assert "data" not in transaction_event["request"]
 
 
 @pytest.mark.parametrize(

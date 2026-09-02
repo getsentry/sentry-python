@@ -453,6 +453,11 @@ def _make_request_event_processor(
                 ip = identity.get("sourceIp")
                 if ip is not None:
                     user_info.setdefault("ip_address", ip)
+
+            if "incoming_request" in client_options["data_collection"]["http_bodies"]:
+                if "body" in aws_event:
+                    request["data"] = aws_event.get("body", "")
+
         elif should_send_default_pii():
             user_info = sentry_event.setdefault("user", {})
 

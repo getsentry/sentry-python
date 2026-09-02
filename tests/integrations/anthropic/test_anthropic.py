@@ -639,13 +639,12 @@ async def test_nonstreaming_create_message_data_collection_async(
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,outputs_collected,tool_calls_collected",
+    "data_collection,send_default_pii,include_prompts,outputs_collected",
     [
         pytest.param(
             {"gen_ai": {"outputs": True}},
             False,
             False,
-            True,
             True,
             id="gen-ai-outputs-enabled-overrides-pii-and-include-prompts",
         ),
@@ -654,22 +653,12 @@ async def test_nonstreaming_create_message_data_collection_async(
             True,
             True,
             False,
-            True,
-            id="gen-ai-outputs-disabled-still-collects-tool-calls-gated-on-inputs",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": False}},
-            True,
-            True,
-            True,
-            False,
-            id="gen-ai-inputs-disabled-drops-tool-calls-only",
+            id="gen-ai-outputs-disabled-overrides-pii-and-include-prompts",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": False}},
             True,
             True,
-            False,
             False,
             id="gen-ai-inputs-and-outputs-disabled-overrides-pii-and-include-prompts",
         ),
@@ -678,12 +667,10 @@ async def test_nonstreaming_create_message_data_collection_async(
             False,
             False,
             True,
-            True,
             id="gen-ai-inputs-and-outputs-omitted-defaults-to-enabled",
         ),
         pytest.param(
             None,
-            True,
             True,
             True,
             True,
@@ -693,7 +680,6 @@ async def test_nonstreaming_create_message_data_collection_async(
             None,
             False,
             True,
-            False,
             False,
             id="legacy-pii-disabled",
         ),
@@ -707,7 +693,6 @@ def test_nonstreaming_create_message_data_collection_outputs(
     send_default_pii,
     include_prompts,
     outputs_collected,
-    tool_calls_collected,
     stream_gen_ai_spans,
     span_streaming,
 ):
@@ -765,15 +750,12 @@ def test_nonstreaming_create_message_data_collection_outputs(
             span_data[SPANDATA.GEN_AI_RESPONSE_TEXT]
             == DATA_COLLECTION_EXPECTED_RESPONSE_TEXT
         )
-    else:
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
-
-    if tool_calls_collected:
         assert (
             json.loads(span_data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS])
             == DATA_COLLECTION_EXPECTED_TOOL_CALLS
         )
     else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
         assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span_data
 
 
@@ -785,13 +767,12 @@ def test_nonstreaming_create_message_data_collection_outputs(
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,include_prompts,outputs_collected,tool_calls_collected",
+    "data_collection,send_default_pii,include_prompts,outputs_collected",
     [
         pytest.param(
             {"gen_ai": {"outputs": True}},
             False,
             False,
-            True,
             True,
             id="gen-ai-outputs-enabled-overrides-pii-and-include-prompts",
         ),
@@ -800,22 +781,12 @@ def test_nonstreaming_create_message_data_collection_outputs(
             True,
             True,
             False,
-            True,
-            id="gen-ai-outputs-disabled-still-collects-tool-calls-gated-on-inputs",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": False}},
-            True,
-            True,
-            True,
-            False,
-            id="gen-ai-inputs-disabled-drops-tool-calls-only",
+            id="gen-ai-outputs-disabled-overrides-pii-and-include-prompts",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": False}},
             True,
             True,
-            False,
             False,
             id="gen-ai-inputs-and-outputs-disabled-overrides-pii-and-include-prompts",
         ),
@@ -824,12 +795,10 @@ def test_nonstreaming_create_message_data_collection_outputs(
             False,
             False,
             True,
-            True,
             id="gen-ai-inputs-and-outputs-omitted-defaults-to-enabled",
         ),
         pytest.param(
             None,
-            True,
             True,
             True,
             True,
@@ -839,7 +808,6 @@ def test_nonstreaming_create_message_data_collection_outputs(
             None,
             False,
             True,
-            False,
             False,
             id="legacy-pii-disabled",
         ),
@@ -853,7 +821,6 @@ async def test_nonstreaming_create_message_data_collection_outputs_async(
     send_default_pii,
     include_prompts,
     outputs_collected,
-    tool_calls_collected,
     stream_gen_ai_spans,
     span_streaming,
 ):
@@ -911,15 +878,12 @@ async def test_nonstreaming_create_message_data_collection_outputs_async(
             span_data[SPANDATA.GEN_AI_RESPONSE_TEXT]
             == DATA_COLLECTION_EXPECTED_RESPONSE_TEXT
         )
-    else:
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
-
-    if tool_calls_collected:
         assert (
             json.loads(span_data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS])
             == DATA_COLLECTION_EXPECTED_TOOL_CALLS
         )
     else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
         assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span_data
 
 

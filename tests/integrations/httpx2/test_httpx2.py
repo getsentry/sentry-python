@@ -2228,3 +2228,732 @@ async def test_http_url_attributes_pii_disabled_span_streaming_async(
     assert "url.query" not in http_span["attributes"]
     assert "url.fragment" not in http_span["attributes"]
     assert http_span["attributes"]["http.response.status_code"] == 200
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query",
+    [
+        pytest.param(
+            {"send_default_pii": True},
+            "toy=tennisball&color=red&auth=secret",
+            id="send_default_pii_true",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            None,
+            id="send_default_pii_false",
+        ),
+        pytest.param(
+            {},
+            None,
+            id="defaults",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "denylist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
+            id="data_collection_denylist_custom_terms",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
+                    }
+                }
+            },
+            "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            id="data_collection_allowlist_sensitive_term",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            None,
+            id="data_collection_off",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": True,
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                },
+            },
+            None,
+            id="data_collection_wins_over_send_default_pii",
+        ),
+    ],
+)
+def test_url_query_data_collection_span_streaming_sync(
+    sentry_init, capture_items, httpx2_mock, init_kwargs, expected_query
+):
+    httpx2_mock.add_response()
+
+    sentry_init(
+        integrations=[Httpx2Integration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+
+    items = capture_items("span")
+
+    url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
+
+    with sentry_sdk.traces.start_span(name="test"):
+        httpx2.Client().get(url)
+
+    sentry_sdk.flush()
+
+    http_span = _get_http_client_span(items)
+
+    if expected_query is None:
+        assert "url.query" not in http_span["attributes"]
+    else:
+        assert http_span["attributes"]["url.query"] == expected_query
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query",
+    [
+        pytest.param(
+            {"send_default_pii": True},
+            "toy=tennisball&color=red&auth=secret",
+            id="send_default_pii_true",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            None,
+            id="send_default_pii_false",
+        ),
+        pytest.param(
+            {},
+            None,
+            id="defaults",
+        ),
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "denylist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "toy=%5BFiltered%5D&color=red&auth=%5BFiltered%5D",
+            id="data_collection_denylist_custom_terms",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["auth"]}
+                    }
+                }
+            },
+            "toy=%5BFiltered%5D&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            id="data_collection_allowlist_sensitive_term",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            None,
+            id="data_collection_off",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": True,
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                },
+            },
+            None,
+            id="data_collection_wins_over_send_default_pii",
+        ),
+    ],
+)
+async def test_url_query_data_collection_span_streaming_async(
+    sentry_init, capture_items, httpx2_mock, init_kwargs, expected_query
+):
+    httpx2_mock.add_response()
+
+    sentry_init(
+        integrations=[Httpx2Integration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+
+    items = capture_items("span")
+
+    url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
+
+    with sentry_sdk.traces.start_span(name="test"):
+        await httpx2.AsyncClient().get(url)
+
+    sentry_sdk.flush()
+
+    http_span = _get_http_client_span(items)
+
+    if expected_query is None:
+        assert "url.query" not in http_span["attributes"]
+    else:
+        assert http_span["attributes"]["url.query"] == expected_query
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_url_full",
+    [
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "http://example.com/?toy=tennisball&color=red&auth=%5BFiltered%5D#frag",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "http://example.com/?toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
+            id="data_collection_allowlist",
+        ),
+    ],
+)
+def test_url_full_reassembly_span_streaming_sync(
+    sentry_init, capture_items, httpx2_mock, init_kwargs, expected_url_full
+):
+    httpx2_mock.add_response()
+
+    sentry_init(
+        integrations=[Httpx2Integration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+
+    items = capture_items("span")
+
+    url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
+
+    with sentry_sdk.traces.start_span(name="test"):
+        httpx2.Client().get(url)
+
+    sentry_sdk.flush()
+
+    http_span = _get_http_client_span(items)
+
+    assert http_span["attributes"]["url.full"] == expected_url_full
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "init_kwargs, expected_url_full",
+    [
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "http://example.com/?toy=tennisball&color=red&auth=%5BFiltered%5D#frag",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "http://example.com/?toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
+            id="data_collection_allowlist",
+        ),
+    ],
+)
+async def test_url_full_reassembly_span_streaming_async(
+    sentry_init, capture_items, httpx2_mock, init_kwargs, expected_url_full
+):
+    httpx2_mock.add_response()
+
+    sentry_init(
+        integrations=[Httpx2Integration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+
+    items = capture_items("span")
+
+    url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
+
+    with sentry_sdk.traces.start_span(name="test"):
+        await httpx2.AsyncClient().get(url)
+
+    sentry_sdk.flush()
+
+    http_span = _get_http_client_span(items)
+
+    assert http_span["attributes"]["url.full"] == expected_url_full
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_url_full",
+    [
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            "http://example.com/#frag",
+            id="data_collection_off",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": True,
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                },
+            },
+            "http://example.com/#frag",
+            id="data_collection_wins_over_send_default_pii",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            None,
+            id="send_default_pii_false",
+        ),
+    ],
+)
+def test_url_query_params_off_keeps_bare_url_span_streaming_sync(
+    sentry_init, capture_items, httpx2_mock, init_kwargs, expected_url_full
+):
+    httpx2_mock.add_response()
+
+    sentry_init(
+        integrations=[Httpx2Integration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+
+    items = capture_items("span")
+
+    url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
+
+    with sentry_sdk.traces.start_span(name="test"):
+        httpx2.Client().get(url)
+
+    sentry_sdk.flush()
+
+    http_span = _get_http_client_span(items)
+
+    assert "url.query" not in http_span["attributes"]
+
+    if expected_url_full is None:
+        assert "url.full" not in http_span["attributes"]
+        assert "url.fragment" not in http_span["attributes"]
+    else:
+        assert http_span["attributes"]["url.full"] == expected_url_full
+        assert http_span["attributes"]["url.fragment"] == "frag"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "init_kwargs, expected_url_full",
+    [
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            "http://example.com/#frag",
+            id="data_collection_off",
+        ),
+        pytest.param(
+            {
+                "send_default_pii": True,
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                },
+            },
+            "http://example.com/#frag",
+            id="data_collection_wins_over_send_default_pii",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            None,
+            id="send_default_pii_false",
+        ),
+    ],
+)
+async def test_url_query_params_off_keeps_bare_url_span_streaming_async(
+    sentry_init, capture_items, httpx2_mock, init_kwargs, expected_url_full
+):
+    httpx2_mock.add_response()
+
+    sentry_init(
+        integrations=[Httpx2Integration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+
+    items = capture_items("span")
+
+    url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
+
+    with sentry_sdk.traces.start_span(name="test"):
+        await httpx2.AsyncClient().get(url)
+
+    sentry_sdk.flush()
+
+    http_span = _get_http_client_span(items)
+
+    assert "url.query" not in http_span["attributes"]
+
+    if expected_url_full is None:
+        assert "url.full" not in http_span["attributes"]
+        assert "url.fragment" not in http_span["attributes"]
+    else:
+        assert http_span["attributes"]["url.full"] == expected_url_full
+        assert http_span["attributes"]["url.fragment"] == "frag"
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expected_url, expected_query, expected_fragment",
+    [
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "http://example.com/?toy=tennisball&color=red&auth=%5BFiltered%5D#frag",
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
+            "frag",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "http://example.com/?toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            "frag",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            "http://example.com/#frag",
+            "",
+            "frag",
+            id="data_collection_off",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            None,
+            None,
+            None,
+            id="send_default_pii_false",
+        ),
+    ],
+)
+def test_crumb_url_query_data_collection_span_streaming_sync(
+    sentry_init,
+    capture_events,
+    httpx2_mock,
+    init_kwargs,
+    expected_url,
+    expected_query,
+    expected_fragment,
+):
+    httpx2_mock.add_response()
+
+    sentry_init(
+        integrations=[Httpx2Integration()],
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+
+    url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
+
+    with sentry_sdk.traces.start_span(name="segment"):
+        events = capture_events()
+
+        httpx2.Client().get(url)
+        capture_message("Testing!")
+
+        (event,) = events
+
+    crumb = event["breadcrumbs"]["values"][0]
+
+    if expected_url is None:
+        assert "url" not in crumb["data"]
+        assert SPANDATA.HTTP_QUERY not in crumb["data"]
+        assert SPANDATA.HTTP_FRAGMENT not in crumb["data"]
+    else:
+        assert crumb["data"]["url"] == expected_url
+        assert crumb["data"][SPANDATA.HTTP_QUERY] == expected_query
+        assert crumb["data"][SPANDATA.HTTP_FRAGMENT] == expected_fragment
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "init_kwargs, expected_url, expected_query, expected_fragment",
+    [
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            "http://example.com/?toy=tennisball&color=red&auth=%5BFiltered%5D#frag",
+            "toy=tennisball&color=red&auth=%5BFiltered%5D",
+            "frag",
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {
+                        "url_query_params": {"mode": "allowlist", "terms": ["toy"]}
+                    }
+                }
+            },
+            "http://example.com/?toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D#frag",
+            "toy=tennisball&color=%5BFiltered%5D&auth=%5BFiltered%5D",
+            "frag",
+            id="data_collection_allowlist",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            "http://example.com/#frag",
+            "",
+            "frag",
+            id="data_collection_off",
+        ),
+        pytest.param(
+            {"send_default_pii": False},
+            None,
+            None,
+            None,
+            id="send_default_pii_false",
+        ),
+    ],
+)
+async def test_crumb_url_query_data_collection_span_streaming_async(
+    sentry_init,
+    capture_events,
+    httpx2_mock,
+    init_kwargs,
+    expected_url,
+    expected_query,
+    expected_fragment,
+):
+    httpx2_mock.add_response()
+
+    sentry_init(
+        integrations=[Httpx2Integration()],
+        trace_lifecycle="stream",
+        **init_kwargs,
+    )
+
+    url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
+
+    with sentry_sdk.traces.start_span(name="segment"):
+        events = capture_events()
+
+        await httpx2.AsyncClient().get(url)
+        capture_message("Testing!")
+
+        (event,) = events
+
+    crumb = event["breadcrumbs"]["values"][0]
+
+    if expected_url is None:
+        assert "url" not in crumb["data"]
+        assert SPANDATA.HTTP_QUERY not in crumb["data"]
+        assert SPANDATA.HTTP_FRAGMENT not in crumb["data"]
+    else:
+        assert crumb["data"]["url"] == expected_url
+        assert crumb["data"][SPANDATA.HTTP_QUERY] == expected_query
+        assert crumb["data"][SPANDATA.HTTP_FRAGMENT] == expected_fragment
+
+
+@pytest.mark.parametrize(
+    "init_kwargs",
+    [
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            id="data_collection_off",
+        ),
+    ],
+)
+def test_crumb_url_query_unfiltered_legacy_sync(
+    sentry_init, capture_events, httpx2_mock, init_kwargs
+):
+    """
+    Behaviour that existed prior to data collection and span streaming.
+    Remove when we've dropped transaction support and have fully migrated
+    to span streaming.
+    """
+    httpx2_mock.add_response()
+
+    sentry_init(integrations=[Httpx2Integration()], **init_kwargs)
+
+    url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
+
+    events = capture_events()
+
+    httpx2.Client().get(url)
+    capture_message("Testing!")
+
+    (event,) = events
+
+    crumb = event["breadcrumbs"]["values"][0]
+
+    assert crumb["data"]["url"] == "http://example.com/"
+    assert crumb["data"][SPANDATA.HTTP_QUERY] == "toy=tennisball&color=red&auth=secret"
+    assert crumb["data"][SPANDATA.HTTP_FRAGMENT] == "frag"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "init_kwargs",
+    [
+        pytest.param(
+            {"_experiments": {"data_collection": {}}},
+            id="data_collection_denylist_default",
+        ),
+        pytest.param(
+            {
+                "_experiments": {
+                    "data_collection": {"url_query_params": {"mode": "off"}}
+                }
+            },
+            id="data_collection_off",
+        ),
+    ],
+)
+async def test_crumb_url_query_unfiltered_legacy_async(
+    sentry_init, capture_events, httpx2_mock, init_kwargs
+):
+    httpx2_mock.add_response()
+
+    sentry_init(integrations=[Httpx2Integration()], **init_kwargs)
+
+    url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
+
+    events = capture_events()
+
+    await httpx2.AsyncClient().get(url)
+    capture_message("Testing!")
+
+    (event,) = events
+
+    crumb = event["breadcrumbs"]["values"][0]
+
+    assert crumb["data"]["url"] == "http://example.com/"
+    assert crumb["data"][SPANDATA.HTTP_QUERY] == "toy=tennisball&color=red&auth=secret"
+    assert crumb["data"][SPANDATA.HTTP_FRAGMENT] == "frag"
+
+
+@pytest.mark.tests_internal_exceptions
+def test_omit_url_data_if_parsing_fails_span_streaming(
+    sentry_init, capture_events, capture_items, httpx2_mock
+):
+    httpx2_mock.add_response()
+
+    sentry_init(
+        integrations=[Httpx2Integration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        _experiments={"data_collection": {}},
+    )
+
+    items = capture_items("span")
+
+    url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
+
+    with sentry_sdk.traces.start_span(name="segment"):
+        events = capture_events()
+
+        with mock.patch(
+            "sentry_sdk.integrations.httpx2.parse_url",
+            side_effect=ValueError,
+        ):
+            httpx2.Client().get(url)
+
+        capture_message("Testing!")
+
+        (event,) = events
+
+    sentry_sdk.flush()
+
+    http_span = _get_http_client_span(items)
+
+    assert "url.full" not in http_span["attributes"]
+    assert "url.query" not in http_span["attributes"]
+    assert "url.fragment" not in http_span["attributes"]
+
+    crumb = event["breadcrumbs"]["values"][0]
+
+    assert "url" not in crumb["data"]
+    assert SPANDATA.HTTP_QUERY not in crumb["data"]
+    assert SPANDATA.HTTP_FRAGMENT not in crumb["data"]

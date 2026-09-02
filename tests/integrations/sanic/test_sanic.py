@@ -16,7 +16,10 @@ from sentry_sdk import capture_message
 from sentry_sdk.integrations.sanic import SanicIntegration
 from sentry_sdk.tracing import TransactionSource
 from tests.conftest import get_free_port
-from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
+from tests.integrations.utils import (
+    DATA_COLLECTION_REMOTE_ADDR_CASES,
+    DATA_COLLECTION_USER_INFO_CASES,
+)
 
 try:
     from sanic_testing import TestManager
@@ -794,3 +797,104 @@ def test_url_query_data_collection_event_processor(
         assert "query_string" not in event["request"]
     else:
         assert event["request"]["query_string"] == expected_query
+
+
+@pytest.mark.parametrize(
+    "data_collection, expect_body",
+    [
+        pytest.param({}, True, id="data_collection_http_bodies_default"),
+        pytest.param(
+            {"http_bodies": ["incoming_request"]},
+            True,
+            id="data_collection_http_bodies_incoming_request",
+        ),
+        pytest.param(
+            {"http_bodies": ["outgoing_request"]},
+            False,
+            id="data_collection_http_bodies_outgoing_request_only",
+        ),
+        pytest.param(
+            {"http_bodies": []}, False, id="data_collection_http_bodies_empty"
+        ),
+    ],
+)
+def test_request_body_data_collection_event_processor(
+    sentry_init, app, capture_events, data_collection, expect_body
+):
+    sentry_init(
+        integrations=[SanicIntegration()],
+        _experiments={"data_collection": data_collection},
+    )
+
+    data = {"hey": 42}
+
+    @app.route("/body", methods=["POST"])
+    def body_handler(request):
+        capture_message("hi")
+        return response.text("ok")
+
+    events = capture_events()
+
+    c = get_client(app)
+    with c as client:
+        _, http_response = client.post("/body", json=data)
+        assert http_response.status == 200
+
+    (event,) = events
+
+    if expect_body:
+        assert event["request"]["data"] == data
+    else:
+        assert "data" not in event["request"]
+
+
+def test_oversized_request_body_not_annotated_data_collection(
+    sentry_init, app, capture_events
+):
+    """
+    The gating happens before the size check, so an oversized body is dropped
+    outright instead of being reported as removed because of the size limit.
+    """
+    sentry_init(
+        integrations=[SanicIntegration()],
+        max_request_body_size="small",
+        _experiments={"data_collection": {"http_bodies": []}},
+    )
+
+    @app.route("/oversized", methods=["POST"])
+    def oversized_handler(request):
+        capture_message("hi")
+        return response.text("ok")
+
+    events = capture_events()
+
+    c = get_client(app)
+    with c as client:
+        _, http_response = client.post("/oversized", data="a" * 2000)
+        assert http_response.status == 200
+
+    (event,) = events
+
+    assert "data" not in event["request"]
+    assert "data" not in event.get("_meta", {}).get("request", {})
+
+
+@pytest.mark.parametrize(
+    "init_kwargs, expect_remote_addr", DATA_COLLECTION_REMOTE_ADDR_CASES
+)
+def test_remote_addr_data_collection(
+    sentry_init, app, capture_events, init_kwargs, expect_remote_addr
+):
+    sentry_init(integrations=[SanicIntegration()], **init_kwargs)
+    events = capture_events()
+
+    c = get_client(app)
+    with c as client:
+        _, response = client.get("/message")
+        assert response.status == 200
+
+    (event,) = events
+    if expect_remote_addr:
+        assert event["request"]["env"] == {"REMOTE_ADDR": ""}
+    else:
+        assert "env" not in event["request"]
