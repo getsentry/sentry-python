@@ -5466,8 +5466,8 @@ def test_ai_client_span_responses_tool_definitions(
                 {
                     "role": "system",
                     "content": [
-                        {"type": "text", "text": "You are a helpful assistant."},
-                        {"type": "text", "text": "Be concise and clear."},
+                        {"type": "input_text", "text": "You are a helpful assistant."},
+                        {"type": "input_text", "text": "Be concise and clear."},
                     ],
                 },
                 {
@@ -5499,8 +5499,8 @@ def test_ai_client_span_responses_tool_definitions(
                     "type": "message",
                     "role": "system",
                     "content": [
-                        {"type": "text", "text": "You are a helpful assistant."},
-                        {"type": "text", "text": "Be concise and clear."},
+                        {"type": "input_text", "text": "You are a helpful assistant."},
+                        {"type": "input_text", "text": "Be concise and clear."},
                     ],
                 },
                 {
@@ -6609,8 +6609,8 @@ def test_error_in_responses_api(
                 {
                     "role": "system",
                     "content": [
-                        {"type": "text", "text": "You are a helpful assistant."},
-                        {"type": "text", "text": "Be concise and clear."},
+                        {"type": "input_text", "text": "You are a helpful assistant."},
+                        {"type": "input_text", "text": "Be concise and clear."},
                     ],
                 },
                 {
@@ -6642,8 +6642,8 @@ def test_error_in_responses_api(
                     "type": "message",
                     "role": "system",
                     "content": [
-                        {"type": "text", "text": "You are a helpful assistant."},
-                        {"type": "text", "text": "Be concise and clear."},
+                        {"type": "input_text", "text": "You are a helpful assistant."},
+                        {"type": "input_text", "text": "Be concise and clear."},
                     ],
                 },
                 {
@@ -6924,8 +6924,8 @@ async def test_ai_client_span_responses_async_api(
                 {
                     "role": "system",
                     "content": [
-                        {"type": "text", "text": "You are a helpful assistant."},
-                        {"type": "text", "text": "Be concise and clear."},
+                        {"type": "input_text", "text": "You are a helpful assistant."},
+                        {"type": "input_text", "text": "Be concise and clear."},
                     ],
                 },
                 {
@@ -6957,8 +6957,8 @@ async def test_ai_client_span_responses_async_api(
                     "type": "message",
                     "role": "system",
                     "content": [
-                        {"type": "text", "text": "You are a helpful assistant."},
-                        {"type": "text", "text": "Be concise and clear."},
+                        {"type": "input_text", "text": "You are a helpful assistant."},
+                        {"type": "input_text", "text": "Be concise and clear."},
                     ],
                 },
                 {
