@@ -5,6 +5,7 @@ import falcon.testing
 import pytest
 
 import sentry_sdk
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.falcon import FalconIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.utils import parse_version
@@ -173,7 +174,7 @@ def test_http_route(
 
     sentry_sdk.flush()
     (segment,) = [item.payload for item in items if item.payload.get("is_segment")]
-    assert segment["attributes"]["http.route"] == "/message/{message_id:int}"
+    assert segment["attributes"][SPANDATA.HTTP_ROUTE] == "/message/{message_id:int}"
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
