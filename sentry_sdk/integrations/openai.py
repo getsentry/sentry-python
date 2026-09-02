@@ -74,7 +74,6 @@ if TYPE_CHECKING:
     from openai._types import SequenceNotStr
     from openai.types import CompletionUsage
     from openai.types.responses import (
-        Response,
         ResponseInputParam,
         ResponseStreamEvent,
     )
@@ -112,6 +111,7 @@ RESPONSES_API_ENABLED = True
 try:
     # responses API support was introduced in v1.66.0
     from openai.resources.responses import AsyncResponses, Responses
+    from openai.types.responses import Response, ResponseTextDeltaEvent
     from openai.types.responses.response_completed_event import ResponseCompletedEvent
 except ImportError:
     RESPONSES_API_ENABLED = False
@@ -1161,14 +1161,14 @@ def _wrap_synchronous_responses_event_iterator(
     count_tokens_manually = True
     for x in old_iterator:
         with capture_internal_exceptions():
-            if hasattr(x, "delta"):
+            if isinstance(x, ResponseTextDeltaEvent):
                 if start_time is not None and ttft is None:
                     ttft = time.perf_counter() - start_time
                 if len(data_buf) == 0:
                     data_buf.append([])
                 data_buf[0].append(x.delta or "")
 
-            if isinstance(x, ResponseCompletedEvent):
+            elif isinstance(x, ResponseCompletedEvent):
                 if isinstance(span, StreamedSpan):
                     span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, x.response.model)
                 else:
@@ -1234,14 +1234,14 @@ async def _wrap_asynchronous_responses_event_iterator(
     count_tokens_manually = True
     async for x in old_iterator:
         with capture_internal_exceptions():
-            if hasattr(x, "delta"):
+            if isinstance(x, ResponseTextDeltaEvent):
                 if start_time is not None and ttft is None:
                     ttft = time.perf_counter() - start_time
                 if len(data_buf) == 0:
                     data_buf.append([])
-                data_buf[0].append(str(x.delta) or "")
+                data_buf[0].append(x.delta or "")
 
-            if isinstance(x, ResponseCompletedEvent):
+            elif isinstance(x, ResponseCompletedEvent):
                 if isinstance(span, StreamedSpan):
                     span.set_attribute(SPANDATA.GEN_AI_RESPONSE_MODEL, x.response.model)
                 else:
