@@ -19,7 +19,7 @@ except ImportError:
 
 try:
     import httpcore
-except ImportError:
+except (ImportError, AttributeError):
     httpcore = None  # type: ignore[assignment,unused-ignore]
 
 try:

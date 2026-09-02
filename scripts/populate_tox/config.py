@@ -93,7 +93,7 @@ TEST_SUITE_CONFIG = {
     },
     "cohere": {
         "package": "cohere",
-        "python": ">=3.9",
+        "python": ">=3.9,<3.15",
     },
     "django": {
         "package": "django",
@@ -266,6 +266,7 @@ TEST_SUITE_CONFIG = {
     },
     "langgraph": {
         "package": "langgraph",
+        "python": "<3.15",
     },
     "launchdarkly": {
         "package": "launchdarkly-server-sdk",
@@ -496,6 +497,7 @@ TEST_SUITE_CONFIG = {
             "*": ["typing_extensions"],
         },
         "num_versions": 2,
+        "python": "<3.15",
     },
     "strawberry": {
         "package": "strawberry-graphql[fastapi,flask]",
