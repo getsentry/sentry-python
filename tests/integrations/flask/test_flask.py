@@ -159,7 +159,7 @@ def test_http_route(
     sentry_sdk.flush()
 
     (segment,) = (item.payload for item in items if item.payload.get("is_segment"))
-    assert segment["attributes"]["http.route"] == "/message/<int:message_id>"
+    assert segment["attributes"][SPANDATA.HTTP_ROUTE] == "/message/<int:message_id>"
 
 
 @pytest.mark.parametrize("debug", (True, False))
