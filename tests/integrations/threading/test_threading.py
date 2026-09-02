@@ -1,4 +1,5 @@
 import sys
+import time
 from concurrent import futures
 from textwrap import dedent
 from threading import Thread
@@ -162,6 +163,7 @@ def test_spans_from_multiple_threads(
         for t in threads:
             t.join()
 
+    time.sleep(0.1)
     sentry_sdk.flush()
 
     spans = [item.payload for item in items]
