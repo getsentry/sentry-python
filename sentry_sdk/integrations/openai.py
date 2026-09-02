@@ -74,6 +74,7 @@ if TYPE_CHECKING:
     from openai._types import SequenceNotStr
     from openai.types import CompletionUsage
     from openai.types.responses import (
+        Response,
         ResponseInputParam,
         ResponseStreamEvent,
     )
@@ -98,7 +99,6 @@ try:
     from openai.resources.chat.completions import AsyncCompletions, Completions
     from openai.types import CreateEmbeddingResponse
     from openai.types.chat import ChatCompletion
-    from openai.types.responses import Response
 
     if TYPE_CHECKING:
         from openai.types.chat import (
@@ -714,7 +714,9 @@ def _set_common_output_data(
             span.__exit__(None, None, None)
 
     # Responses API
-    elif isinstance(response, Response):
+    elif hasattr(response, "output"):
+        response = cast("Response", response)
+
         output_messages: "dict[str, list[Any]]" = {
             "response": [],
             "tool": [],
@@ -1164,7 +1166,7 @@ def _wrap_synchronous_responses_event_iterator(
                     ttft = time.perf_counter() - start_time
                 if len(data_buf) == 0:
                     data_buf.append([])
-                data_buf[0].append(str(x.delta) or "")
+                data_buf[0].append(x.delta or "")
 
             if isinstance(x, ResponseCompletedEvent):
                 if isinstance(span, StreamedSpan):
