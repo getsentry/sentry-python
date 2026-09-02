@@ -129,27 +129,31 @@ def test_scope_data_not_leaked_in_threads(sentry_init, propagate_scope):
     ids=["propagate_scope=True", "propagate_scope=False"],
 )
 def test_spans_from_multiple_threads(
-    sentry_init, capture_events, render_span_tree, propagate_scope
+    sentry_init, capture_items, render_span_tree, propagate_scope
 ):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[ThreadingIntegration(propagate_scope=propagate_scope)],
         trace_lifecycle="stream",
     )
-    events = capture_events()
+    items = capture_items("span")
 
     def do_some_work(number):
-        with sentry_sdk.start_span(
-            op=f"inner-run-{number}", name=f"Thread: child-{number}"
+        with sentry_sdk.traces.start_span(
+            name=f"Thread: child-{number}",
+            attributes={"sentry.op": f"inner-run-{number}"},
         ):
             pass
 
     threads = []
 
-    with sentry_sdk.start_transaction(op="outer-trx"):
+    with sentry_sdk.traces.start_span(
+        name="<unlabeled span>", attributes={"sentry.op": "outer-trx"}
+    ):
         for number in range(5):
-            with sentry_sdk.start_span(
-                op=f"outer-submit-{number}", name="Thread: main"
+            with sentry_sdk.traces.start_span(
+                name="Thread: main",
+                attributes={"sentry.op": f"outer-submit-{number}"},
             ):
                 t = Thread(target=do_some_work, args=(number,))
                 t.start()
@@ -158,37 +162,37 @@ def test_spans_from_multiple_threads(
         for t in threads:
             t.join()
 
-    (event,) = events
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
 
     # Free-threaded builds set thread_inherit_context to True, otherwise thread_inherit_context is False
     if propagate_scope or getattr(sys.flags, "thread_inherit_context", None):
-        assert event["type"] == "transaction"
-        assert render_span_tree(event["spans"], event["contexts"]["trace"]) == dedent(
+        assert render_span_tree(spans) == dedent(
             """\
-            - op="outer-trx": description=null
-              - op="outer-submit-0": description="Thread: main"
-                - op="inner-run-0": description="Thread: child-0"
-              - op="outer-submit-1": description="Thread: main"
-                - op="inner-run-1": description="Thread: child-1"
-              - op="outer-submit-2": description="Thread: main"
-                - op="inner-run-2": description="Thread: child-2"
-              - op="outer-submit-3": description="Thread: main"
-                - op="inner-run-3": description="Thread: child-3"
-              - op="outer-submit-4": description="Thread: main"
-                - op="inner-run-4": description="Thread: child-4"\
+            - sentry.op="outer-trx": name="<unlabeled span>"
+              - sentry.op="outer-submit-0": name="Thread: main"
+                - sentry.op="inner-run-0": name="Thread: child-0"
+              - sentry.op="outer-submit-1": name="Thread: main"
+                - sentry.op="inner-run-1": name="Thread: child-1"
+              - sentry.op="outer-submit-2": name="Thread: main"
+                - sentry.op="inner-run-2": name="Thread: child-2"
+              - sentry.op="outer-submit-3": name="Thread: main"
+                - sentry.op="inner-run-3": name="Thread: child-3"
+              - sentry.op="outer-submit-4": name="Thread: main"
+                - sentry.op="inner-run-4": name="Thread: child-4"\
 """
         )
 
     elif not propagate_scope:
-        assert event["type"] == "transaction"
-        assert render_span_tree(event["spans"], event["contexts"]["trace"]) == dedent(
+        assert render_span_tree(spans) == dedent(
             """\
-            - op="outer-trx": description=null
-              - op="outer-submit-0": description="Thread: main"
-              - op="outer-submit-1": description="Thread: main"
-              - op="outer-submit-2": description="Thread: main"
-              - op="outer-submit-3": description="Thread: main"
-              - op="outer-submit-4": description="Thread: main"\
+            - sentry.op="outer-trx": name="<unlabeled span>"
+              - sentry.op="outer-submit-0": name="Thread: main"
+              - sentry.op="outer-submit-1": name="Thread: main"
+              - sentry.op="outer-submit-2": name="Thread: main"
+              - sentry.op="outer-submit-3": name="Thread: main"
+              - sentry.op="outer-submit-4": name="Thread: main"\
 """
         )
 
@@ -199,60 +203,64 @@ def test_spans_from_multiple_threads(
     ids=["propagate_scope=True", "propagate_scope=False"],
 )
 def test_spans_from_threadpool(
-    sentry_init, capture_events, render_span_tree, propagate_scope
+    sentry_init, capture_items, render_span_tree, propagate_scope
 ):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[ThreadingIntegration(propagate_scope=propagate_scope)],
         trace_lifecycle="stream",
     )
-    events = capture_events()
+    items = capture_items("span")
 
     def do_some_work(number):
-        with sentry_sdk.start_span(
-            op=f"inner-run-{number}", name=f"Thread: child-{number}"
+        with sentry_sdk.traces.start_span(
+            name=f"Thread: child-{number}",
+            attributes={"sentry.op": f"inner-run-{number}"},
         ):
             pass
 
-    with sentry_sdk.start_transaction(op="outer-trx"):
+    with sentry_sdk.traces.start_span(
+        name="<unlabeled span>", attributes={"sentry.op": "outer-trx"}
+    ):
         with futures.ThreadPoolExecutor(max_workers=1) as executor:
             for number in range(5):
-                with sentry_sdk.start_span(
-                    op=f"outer-submit-{number}", name="Thread: main"
+                with sentry_sdk.traces.start_span(
+                    name="Thread: main",
+                    attributes={"sentry.op": f"outer-submit-{number}"},
                 ):
                     future = executor.submit(do_some_work, number)
                     future.result()
 
-    (event,) = events
+    sentry_sdk.flush()
+
+    spans = [item.payload for item in items]
 
     # Free-threaded builds set thread_inherit_context to True, otherwise thread_inherit_context is False
     if propagate_scope or getattr(sys.flags, "thread_inherit_context", None):
-        assert event["type"] == "transaction"
-        assert render_span_tree(event["spans"], event["contexts"]["trace"]) == dedent(
+        assert render_span_tree(spans) == dedent(
             """\
-            - op="outer-trx": description=null
-              - op="outer-submit-0": description="Thread: main"
-                - op="inner-run-0": description="Thread: child-0"
-              - op="outer-submit-1": description="Thread: main"
-                - op="inner-run-1": description="Thread: child-1"
-              - op="outer-submit-2": description="Thread: main"
-                - op="inner-run-2": description="Thread: child-2"
-              - op="outer-submit-3": description="Thread: main"
-                - op="inner-run-3": description="Thread: child-3"
-              - op="outer-submit-4": description="Thread: main"
-                - op="inner-run-4": description="Thread: child-4"\
+            - sentry.op="outer-trx": name="<unlabeled span>"
+              - sentry.op="outer-submit-0": name="Thread: main"
+                - sentry.op="inner-run-0": name="Thread: child-0"
+              - sentry.op="outer-submit-1": name="Thread: main"
+                - sentry.op="inner-run-1": name="Thread: child-1"
+              - sentry.op="outer-submit-2": name="Thread: main"
+                - sentry.op="inner-run-2": name="Thread: child-2"
+              - sentry.op="outer-submit-3": name="Thread: main"
+                - sentry.op="inner-run-3": name="Thread: child-3"
+              - sentry.op="outer-submit-4": name="Thread: main"
+                - sentry.op="inner-run-4": name="Thread: child-4"\
 """
         )
 
     elif not propagate_scope:
-        assert event["type"] == "transaction"
-        assert render_span_tree(event["spans"], event["contexts"]["trace"]) == dedent(
+        assert render_span_tree(spans) == dedent(
             """\
-            - op="outer-trx": description=null
-              - op="outer-submit-0": description="Thread: main"
-              - op="outer-submit-1": description="Thread: main"
-              - op="outer-submit-2": description="Thread: main"
-              - op="outer-submit-3": description="Thread: main"
-              - op="outer-submit-4": description="Thread: main"\
+            - sentry.op="outer-trx": name="<unlabeled span>"
+              - sentry.op="outer-submit-0": name="Thread: main"
+              - sentry.op="outer-submit-1": name="Thread: main"
+              - sentry.op="outer-submit-2": name="Thread: main"
+              - sentry.op="outer-submit-3": name="Thread: main"
+              - sentry.op="outer-submit-4": name="Thread: main"\
 """
         )
