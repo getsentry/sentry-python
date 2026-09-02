@@ -74,7 +74,6 @@ if TYPE_CHECKING:
     from openai._types import SequenceNotStr
     from openai.types import CompletionUsage
     from openai.types.responses import (
-        Response,
         ResponseInputParam,
         ResponseStreamEvent,
     )
@@ -99,6 +98,7 @@ try:
     from openai.resources.chat.completions import AsyncCompletions, Completions
     from openai.types import CreateEmbeddingResponse
     from openai.types.chat import ChatCompletion
+    from openai.types.responses import Response
 
     if TYPE_CHECKING:
         from openai.types.chat import (
