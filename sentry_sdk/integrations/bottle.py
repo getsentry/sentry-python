@@ -107,9 +107,14 @@ class BottleIntegration(Integration):
 
             server_span = sentry_sdk.get_current_scope()._server_segment_span
             if server_span is not None:
-                server_span.set_attribute(
-                    SPANDATA.HTTP_ROUTE, bottle_request.route.rule
-                )
+                route_path = None
+                try:
+                    route_path = bottle_request.route.rule
+                except RuntimeError:
+                    pass
+
+                if route_path is not None:
+                    server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
 
             if has_span_streaming_enabled(sentry_sdk.get_client().options):
                 _set_segment_name_and_source(
