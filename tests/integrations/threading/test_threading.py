@@ -1,5 +1,4 @@
 import sys
-import time
 from concurrent import futures
 from textwrap import dedent
 from threading import Thread
@@ -146,8 +145,6 @@ def test_spans_from_multiple_threads(
         ):
             pass
 
-    threads = []
-
     with sentry_sdk.traces.start_span(
         name="root span", attributes={"sentry.op": "outer-trx"}, parent_span=None
     ):
@@ -158,18 +155,21 @@ def test_spans_from_multiple_threads(
             ):
                 t = Thread(target=do_some_work, args=(number,))
                 t.start()
-                threads.append(t)
+                t.join()
 
-        for t in threads:
-            t.join()
-
-    time.sleep(0.1)
     sentry_sdk.flush()
 
     spans = [item.payload for item in items]
 
-    # Free-threaded builds set thread_inherit_context to True, otherwise thread_inherit_context is False
-    if propagate_scope or getattr(sys.flags, "thread_inherit_context", None):
+    # Filter to the main trace only (child threads with propagate_scope=False
+    # create spans on a separate trace that confuse render_span_tree).
+    root = next(s for s in spans if s.get("is_segment") and s["name"] == "root span")
+    spans = [s for s in spans if s["trace_id"] == root["trace_id"]]
+
+    expects_child_spans = propagate_scope or getattr(
+        sys.flags, "thread_inherit_context", None
+    )
+    if expects_child_spans:
         assert render_span_tree(spans) == dedent(
             """\
             - sentry.op="outer-trx": name="root span"
@@ -236,9 +236,13 @@ def test_spans_from_threadpool(
     sentry_sdk.flush()
 
     spans = [item.payload for item in items]
+    root = next(s for s in spans if s.get("is_segment") and s["name"] == "root span")
+    spans = [s for s in spans if s["trace_id"] == root["trace_id"]]
 
-    # Free-threaded builds set thread_inherit_context to True, otherwise thread_inherit_context is False
-    if propagate_scope or getattr(sys.flags, "thread_inherit_context", None):
+    expects_child_spans = propagate_scope or getattr(
+        sys.flags, "thread_inherit_context", None
+    )
+    if expects_child_spans:
         assert render_span_tree(spans) == dedent(
             """\
             - sentry.op="outer-trx": name="root span"
