@@ -5980,39 +5980,22 @@ def _collect_responses_span_data(
 @pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
-    "data_collection,send_default_pii,expect_output,expect_tool_calls",
+    "data_collection,send_default_pii,expect_output",
     [
         pytest.param(
             {"gen_ai": {"outputs": True}},
             False,
             True,
-            True,
             id="gen-ai-outputs-enabled-overrides-pii-disabled",
-        ),
-        pytest.param(
-            {"gen_ai": {"outputs": False}},
-            True,
-            False,
-            True,
-            id="gen-ai-outputs-disabled-still-collects-tool-calls-gated-on-inputs",
-        ),
-        pytest.param(
-            {"gen_ai": {"inputs": False}},
-            True,
-            True,
-            False,
-            id="gen-ai-inputs-disabled-drops-tool-calls-only",
         ),
         pytest.param(
             {},
             False,
             True,
-            True,
             id="gen-ai-omitted-defaults-to-enabled",
         ),
         pytest.param(
             {"gen_ai": {"inputs": False, "outputs": False}},
-            False,
             False,
             False,
             id="gen-ai-inputs-and-outputs-disabled-and-pii-disabled",
@@ -6021,12 +6004,10 @@ def _collect_responses_span_data(
             None,
             False,
             False,
-            False,
             id="no-gen-ai-data-collection-falls-back-to-send-default-pii",
         ),
         pytest.param(
             None,
-            True,
             True,
             True,
             id="no-gen-ai-data-collection-pii-enabled-collects",
@@ -6041,7 +6022,6 @@ def test_responses_api_data_collection_outputs(
     data_collection,
     send_default_pii,
     expect_output,
-    expect_tool_calls,
     stream_gen_ai_spans,
     span_streaming,
 ):
@@ -6088,12 +6068,9 @@ def test_responses_api_data_collection_outputs(
 
     if expect_output:
         assert "the model response" in span_data[SPANDATA.GEN_AI_RESPONSE_TEXT]
-    else:
-        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
-
-    if expect_tool_calls:
         assert "get_current_weather" in span_data[SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS]
     else:
+        assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span_data
         assert SPANDATA.GEN_AI_RESPONSE_TOOL_CALLS not in span_data
 
 

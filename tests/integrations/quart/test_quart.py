@@ -92,6 +92,10 @@ def integration_enabled_params(request):
     sys.version_info >= (3, 14),
     reason="quart_flask_patch not working on 3.14 (yet?)",
 )
+@pytest.mark.skipif(
+    QUART_VERSION >= (0, 23),
+    reason="quart_flask_patch is incompatible with quart>=0.23 RequestContext changes",
+)
 async def test_quart_flask_patch(sentry_init, capture_events, reset_integrations):
     # This testcase is forked because `import quart_flask_patch` needs to run
     # before anything else Quart-related is imported (since it monkeypatches
@@ -407,14 +411,37 @@ async def test_error_in_errorhandler(sentry_init, capture_events):
 
     client = app.test_client()
 
-    if QUART_VERSION >= (0, 21, 0):
-        # Exception propagation behavior changed in 0.21.0
+    if QUART_VERSION >= (0, 21, 0) and QUART_VERSION < (0, 22, 0):
+        # Exception propagation behavior changed in 0.21.0, and was reverted
+        # back in 0.22.0
         await client.get("/")
 
         (event,) = events
 
         (exception,) = event["exception"]["values"]
         assert exception["type"] == "ValueError"
+
+    elif QUART_VERSION >= (0, 23):
+        # Starting in 0.23 (db05772), Quart runs request handling inside an
+        # asyncio.TaskGroup, so the ZeroDivisionError propagates wrapped
+        # in an ExceptionGroup instead of bare.
+        with pytest.raises(ExceptionGroup) as exc_info:  # noqa: F821
+            await client.get("/")
+
+        (exception,) = exc_info.value.exceptions
+        assert isinstance(exception, ZeroDivisionError)
+
+        event1, event2 = events
+
+        (exception,) = event1["exception"]["values"]
+        assert exception["type"] == "ValueError"
+
+        # event2's exception chain is [ValueError, ZeroDivisionError,
+        # ExceptionGroup]: the ValueError that triggered the errorhandler,
+        # the ZeroDivisionError raised inside it, and the ExceptionGroup
+        # Quart's TaskGroup wraps them in.
+        exception_types = [e["type"] for e in event2["exception"]["values"]]
+        assert exception_types == ["ValueError", "ZeroDivisionError", "ExceptionGroup"]
 
     else:
         with pytest.raises(ZeroDivisionError):
@@ -1112,7 +1139,7 @@ async def test_span_streaming_quart_auth_user_id(
     spans = [item.payload for item in items]
     assert len(spans) == 2
 
-    segment = spans[1]
+    segment = next(s for s in spans if s["name"] == "hi")
     if send_default_pii and user_id is not None:
         assert segment["attributes"]["user.id"] == user_id
     else:

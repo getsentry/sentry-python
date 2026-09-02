@@ -19,6 +19,7 @@ from aiohttp.web_request import Request
 
 import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
+from sentry_sdk._types import OVER_SIZE_LIMIT_SUBSTITUTE
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.aiohttp import (
     AioHttpIntegration,
@@ -26,7 +27,10 @@ from sentry_sdk.integrations.aiohttp import (
 )
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 from tests.conftest import ApproxDict
-from tests.integrations.utils import DATA_COLLECTION_USER_INFO_CASES
+from tests.integrations.utils import (
+    DATA_COLLECTION_REMOTE_ADDR_CASES,
+    DATA_COLLECTION_USER_INFO_CASES,
+)
 
 
 @pytest.mark.asyncio
@@ -129,6 +133,107 @@ async def test_post_body_read(sentry_init, aiohttp_client, capture_events):
     assert request["env"] == {"REMOTE_ADDR": "127.0.0.1"}
     assert request["method"] == "POST"
     assert request["data"] == json.dumps(body)
+
+
+@pytest.mark.parametrize(
+    "data_collection, expect_body",
+    [
+        pytest.param({}, True, id="data_collection_http_bodies_default"),
+        pytest.param(
+            {"http_bodies": ["incoming_request"]},
+            True,
+            id="data_collection_http_bodies_incoming_request",
+        ),
+        pytest.param(
+            {"http_bodies": []}, False, id="data_collection_http_bodies_empty"
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_aiohttp_request_body_data_collection(
+    sentry_init, aiohttp_client, capture_events, data_collection, expect_body
+):
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        _experiments={"data_collection": data_collection},
+    )
+
+    body = {"some": "value"}
+
+    async def hello(request):
+        await request.json()
+        1 / 0
+
+    app = web.Application()
+    app.router.add_post("/", hello)
+
+    events = capture_events()
+
+    client = await aiohttp_client(app)
+    resp = await client.post("/", json=body)
+    assert resp.status == 500
+
+    (event,) = events
+    request = event["request"]
+
+    if expect_body:
+        assert request["data"] == json.dumps(body)
+    else:
+        assert "data" not in request
+
+
+@pytest.mark.parametrize(
+    "data_collection, expect_annotated",
+    [
+        pytest.param(
+            {"http_bodies": ["incoming_request"]},
+            True,
+            id="data_collection_http_bodies_incoming_request",
+        ),
+        pytest.param(
+            {"http_bodies": []}, False, id="data_collection_http_bodies_empty"
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_aiohttp_oversized_request_body_data_collection(
+    sentry_init, aiohttp_client, capture_events, data_collection, expect_annotated
+):
+    """
+    The gating happens before the size check. When bodies are collected, an
+    oversized body is still reported as removed because of the size limit; when
+    they are not, it is dropped outright with no annotation.
+    """
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        max_request_body_size="small",
+        _experiments={"data_collection": data_collection},
+    )
+
+    body = "a" * 2000
+
+    async def hello(request):
+        await request.text()
+        1 / 0
+
+    app = web.Application()
+    app.router.add_post("/", hello)
+
+    events = capture_events()
+
+    client = await aiohttp_client(app)
+    resp = await client.post("/", data=body)
+    assert resp.status == 500
+
+    (event,) = events
+    request_meta = event.get("_meta", {}).get("request", {})
+
+    if expect_annotated:
+        assert event["request"]["data"] == OVER_SIZE_LIMIT_SUBSTITUTE
+        assert request_meta["data"] == {"": {"rem": [["!config", "s"]]}}
+    else:
+        assert "data" not in event["request"]
+        assert "data" not in request_meta
 
 
 @pytest.mark.asyncio
@@ -2166,3 +2271,70 @@ async def test_client_url_query_data_collection_span_streaming(
         assert "url.query" not in inner_client_span["attributes"]
     else:
         assert inner_client_span["attributes"]["url.query"] == expected_query
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "init_kwargs, expected_query", _QUERY_PARAM_DATA_COLLECTION_CASES
+)
+async def test_server_url_query_data_collection_event_processor(
+    sentry_init, aiohttp_client, capture_events, init_kwargs, expected_query
+):
+    init_kwargs = dict(init_kwargs)
+    sentry_init(integrations=[AioHttpIntegration()], **init_kwargs)
+
+    async def hello(request):
+        1 / 0
+
+    app = web.Application()
+    app.router.add_get("/", hello)
+
+    events = capture_events()
+
+    client = await aiohttp_client(app)
+    resp = await client.get("/?toy=tennisball&color=red&auth=secret")
+    assert resp.status == 500
+
+    (event,) = events
+
+    host = event["request"]["headers"]["Host"]
+    assert event["request"]["url"] == "http://{host}/".format(host=host)
+    assert event["request"]["method"] == "GET"
+
+    if "data_collection" not in init_kwargs.get("_experiments", {}):
+        assert (
+            event["request"]["query_string"] == "toy=tennisball&color=red&auth=secret"
+        )
+    elif expected_query is None:
+        assert "query_string" not in event["request"]
+    else:
+        assert event["request"]["query_string"] == expected_query
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "init_kwargs, expect_remote_addr", DATA_COLLECTION_REMOTE_ADDR_CASES
+)
+async def test_remote_addr_data_collection(
+    sentry_init, aiohttp_client, capture_events, init_kwargs, expect_remote_addr
+):
+    sentry_init(integrations=[AioHttpIntegration()], **init_kwargs)
+
+    async def hello(request):
+        capture_message("hi")
+        return web.Response(text="hello")
+
+    app = web.Application()
+    app.router.add_get("/", hello)
+
+    events = capture_events()
+
+    client = await aiohttp_client(app)
+    resp = await client.get("/")
+    assert resp.status == 200
+
+    (event,) = events
+    if expect_remote_addr:
+        assert event["request"]["env"] == {"REMOTE_ADDR": "127.0.0.1"}
+    else:
+        assert "env" not in event["request"]

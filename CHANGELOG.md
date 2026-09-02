@@ -1,5 +1,40 @@
 # Changelog
 
+## 2.68.1
+
+### `enable_logs`
+
+- (logs) Don't stop sending auto-collected logs when `enable_logs=True` by @sentrivana in [#7237](https://github.com/getsentry/sentry-python/pull/7237)
+
+  If you have `enable_logs` set to `True`, our logging integrations for the standard library logging module as well as Loguru will auto-collect logs and send them to Sentry as Sentry logs by default, preserving old behavior. Turning automatic collection off for a specific integration can still be achieved using the `capture_sentry_logs` integration option.
+
+    ```python
+    import sentry_sdk
+    from sentry_sdk.integrations.logging import LoggingIntegration
+    from sentry_sdk.integrations.loguru import LoguruIntegration
+
+    sentry_sdk.init(
+        enable_logs=True,
+        integrations=[
+            LoggingIntegration(capture_sentry_logs=True),
+            LoguruIntegration(capture_sentry_logs=False),
+        ],
+    )
+    ```
+
+  Please note that the `enable_logs` option is deprecated and will be removed in the next major release. The `sentry_sdk.logger.X` API now works regardless of it, and auto-collection can be opted into via the `capture_sentry_logs` integration-level options, which are `False` by default, unless you have `enable_logs=True`. We've added this compatibility layer to make the transition to a `enable_logs`-free world easier.
+
+### Bug Fixes 🐛
+
+- (django) Add `failed_request_status_codes` by @mgaligniana in [#7140](https://github.com/getsentry/sentry-python/pull/7140)
+- (anthropic) Gate `gen_ai.response.tool_calls` on outputs, not inputs by @ericapisani in [#7207](https://github.com/getsentry/sentry-python/pull/7207)
+- (google_genai) Gate streaming `gen_ai.response.tool_calls` on outputs, not inputs by @ericapisani in [#7210](https://github.com/getsentry/sentry-python/pull/7210)
+- (langchain) Use `gen_ai.tool.definitions` attribute when data collection is enabled by @ericapisani in [#7204](https://github.com/getsentry/sentry-python/pull/7204)
+- (langgraph,huggingface_hub) Gate `gen_ai.response.tool_calls` on outputs, not inputs by @ericapisani in [#7208](https://github.com/getsentry/sentry-python/pull/7208)
+- (openai) Gate `gen_ai.response.tool_calls` on outputs, not inputs by @ericapisani in [#7205](https://github.com/getsentry/sentry-python/pull/7205)
+- (openai_agents) Gate `gen_ai.response.tool_calls` on outputs, not inputs by @ericapisani in [#7209](https://github.com/getsentry/sentry-python/pull/7209)
+
+
 ## 2.68.0
 
 ### Important

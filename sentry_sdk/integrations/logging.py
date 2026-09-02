@@ -19,7 +19,9 @@ from sentry_sdk.utils import (
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
     from logging import LogRecord
-    from typing import Any, Dict, Optional
+    from typing import Any, Dict, Optional, Union
+
+_SENTINEL = object()
 
 DEFAULT_LEVEL = logging.INFO
 DEFAULT_EVENT_LEVEL = logging.ERROR
@@ -114,14 +116,14 @@ def unignore_logger_for_sentry_logs(
 
 class LoggingIntegration(Integration):
     identifier = "logging"
-    capture_sentry_logs: "Optional[bool]" = False
+    capture_sentry_logs: "Optional[Union[bool, object]]" = _SENTINEL
 
     def __init__(
         self,
         level: "Optional[int]" = DEFAULT_LEVEL,
         event_level: "Optional[int]" = DEFAULT_EVENT_LEVEL,
         sentry_logs_level: "Optional[int]" = DEFAULT_LEVEL,
-        capture_sentry_logs: "Optional[bool]" = False,
+        capture_sentry_logs: "Optional[Union[bool, object]]" = _SENTINEL,
     ) -> None:
         LoggingIntegration.capture_sentry_logs = capture_sentry_logs
 
@@ -401,7 +403,21 @@ class SentryLogsHandler(_BaseHandler):
             if not client.is_active():
                 return
 
-            if not LoggingIntegration.capture_sentry_logs:
+            # TODO: remove this compat hack in the next major. Capture should
+            # only depend on capture_sentry_logs being True.
+            compat_logs_enabled = client.options.get(
+                "enable_logs", False
+            ) or client.options["_experiments"].get("enable_logs", False)
+            should_capture_logs = False
+            if LoggingIntegration.capture_sentry_logs is True:
+                should_capture_logs = True
+            elif (
+                LoggingIntegration.capture_sentry_logs is _SENTINEL
+                and compat_logs_enabled
+            ):
+                should_capture_logs = True
+
+            if not should_capture_logs:
                 return
 
             self._capture_log_from_record(client, record)

@@ -243,11 +243,22 @@ def _get_request_attributes(request: "Any") -> "Dict[str, Any]":
     if request.protocol:
         attributes[SPANDATA.NETWORK_PROTOCOL_NAME] = request.protocol
 
-    with capture_internal_exceptions():
-        raw_data = _get_tornado_request_data(request)
-        body_data = raw_data.value if isinstance(raw_data, AnnotatedValue) else raw_data
-        if body_data is not None:
-            attributes[SPANDATA.HTTP_REQUEST_BODY_DATA] = body_data
+    # The request data was unconditionally set pre-data collection which is
+    # why we're defaulting to True
+    record_incoming_request_data = True
+    if has_data_collection_enabled(client_options):
+        record_incoming_request_data = (
+            "incoming_request" in client_options["data_collection"]["http_bodies"]
+        )
+
+    if record_incoming_request_data:
+        with capture_internal_exceptions():
+            raw_data = _get_tornado_request_data(request)
+            body_data = (
+                raw_data.value if isinstance(raw_data, AnnotatedValue) else raw_data
+            )
+            if body_data is not None:
+                attributes[SPANDATA.HTTP_REQUEST_BODY_DATA] = body_data
 
     return attributes
 
@@ -319,7 +330,14 @@ def _make_event_processor(
                 request_info["query_string"] = request.query
 
             request_info["method"] = request.method
-            request_info["env"] = {"REMOTE_ADDR": request.remote_ip}
+
+            # REMOTE_ADDR was unconditionally set pre-data collection, so it
+            # continues to be set when data collection is not enabled.
+            if (
+                not has_data_collection_enabled(client_options)
+                or client_options["data_collection"]["user_info"]
+            ):
+                request_info["env"] = {"REMOTE_ADDR": request.remote_ip}
             request_info["headers"] = _filter_headers(dict(request.headers))
 
         if has_data_collection_enabled(client_options):

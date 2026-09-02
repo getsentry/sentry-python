@@ -74,6 +74,8 @@ typing = [
     "pydantic-ai-slim>=2.23.0",
     "langchain-core>=1.5.3",
     "huggingface-hub>=1.26.1",
+    "anthropic>=1.2.0",
+    "google-genai>=2.21.0",
     "openai>=3.7.0",
 ]
 test = [

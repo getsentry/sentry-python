@@ -188,7 +188,7 @@ if TYPE_CHECKING:
         gen_ai: "GenAICollectionUserOptions"
         database_query_data: bool
         queues: bool
-        stack_frame_variables: bool
+        stack_frame_variables: "Union[bool, KeyValueCollectionBehaviour]"
         frame_context_lines: int
 
     class DataCollection(TypedDict):
@@ -202,7 +202,7 @@ if TYPE_CHECKING:
         gen_ai: "GenAICollectionBehaviour"
         database_query_data: bool
         queues: bool
-        stack_frame_variables: bool
+        stack_frame_variables: "Union[bool, KeyValueCollectionBehaviour]"
         frame_context_lines: int
 
     # "critical" is an alias of "fatal" recognized by Relay
