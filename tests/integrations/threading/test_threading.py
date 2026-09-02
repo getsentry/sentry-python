@@ -148,7 +148,7 @@ def test_spans_from_multiple_threads(
     threads = []
 
     with sentry_sdk.traces.start_span(
-        name="<unlabeled span>", attributes={"sentry.op": "outer-trx"}
+        name="root span", attributes={"sentry.op": "outer-trx"}, parent_span=None
     ):
         for number in range(5):
             with sentry_sdk.traces.start_span(
@@ -170,7 +170,7 @@ def test_spans_from_multiple_threads(
     if propagate_scope or getattr(sys.flags, "thread_inherit_context", None):
         assert render_span_tree(spans) == dedent(
             """\
-            - sentry.op="outer-trx": name="<unlabeled span>"
+            - sentry.op="outer-trx": name="root span"
               - sentry.op="outer-submit-0": name="Thread: main"
                 - sentry.op="inner-run-0": name="Thread: child-0"
               - sentry.op="outer-submit-1": name="Thread: main"
@@ -187,7 +187,7 @@ def test_spans_from_multiple_threads(
     elif not propagate_scope:
         assert render_span_tree(spans) == dedent(
             """\
-            - sentry.op="outer-trx": name="<unlabeled span>"
+            - sentry.op="outer-trx": name="root span"
               - sentry.op="outer-submit-0": name="Thread: main"
               - sentry.op="outer-submit-1": name="Thread: main"
               - sentry.op="outer-submit-2": name="Thread: main"
@@ -220,7 +220,7 @@ def test_spans_from_threadpool(
             pass
 
     with sentry_sdk.traces.start_span(
-        name="<unlabeled span>", attributes={"sentry.op": "outer-trx"}
+        name="root span", attributes={"sentry.op": "outer-trx"}, parent_span=None
     ):
         with futures.ThreadPoolExecutor(max_workers=1) as executor:
             for number in range(5):
@@ -239,7 +239,7 @@ def test_spans_from_threadpool(
     if propagate_scope or getattr(sys.flags, "thread_inherit_context", None):
         assert render_span_tree(spans) == dedent(
             """\
-            - sentry.op="outer-trx": name="<unlabeled span>"
+            - sentry.op="outer-trx": name="root span"
               - sentry.op="outer-submit-0": name="Thread: main"
                 - sentry.op="inner-run-0": name="Thread: child-0"
               - sentry.op="outer-submit-1": name="Thread: main"
@@ -256,7 +256,7 @@ def test_spans_from_threadpool(
     elif not propagate_scope:
         assert render_span_tree(spans) == dedent(
             """\
-            - sentry.op="outer-trx": name="<unlabeled span>"
+            - sentry.op="outer-trx": name="root span"
               - sentry.op="outer-submit-0": name="Thread: main"
               - sentry.op="outer-submit-1": name="Thread: main"
               - sentry.op="outer-submit-2": name="Thread: main"
