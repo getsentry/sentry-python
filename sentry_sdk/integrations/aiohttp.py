@@ -328,7 +328,7 @@ class AioHttpIntegration(Integration):
             pattern = route_info.get("path") or route_info.get("formatter")
 
             server_span = sentry_sdk.get_current_scope()._server_segment_span
-            if server_span is not None:
+            if server_span is not None and pattern is not None:
                 server_span.set_attribute(SPANDATA.HTTP_ROUTE, pattern)
 
             name = None
