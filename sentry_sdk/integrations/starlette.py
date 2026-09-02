@@ -25,12 +25,11 @@ from sentry_sdk.integrations._wsgi_common import (
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import StreamedSpan, get_current_span
+from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import (
     SOURCE_FOR_STYLE,
     TransactionSource,
 )
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     AnnotatedValue,
     capture_internal_exceptions,
@@ -170,24 +169,18 @@ def _enable_span_for_middleware(
             return await old_call(app, scope, receive, send, **kwargs)
 
         middleware_name = app.__class__.__name__
-        is_span_streaming_enabled = has_span_streaming_enabled(client.options)
 
         def _start_middleware_span(op: str, name: str) -> "Any":
-            if is_span_streaming_enabled:
-                if sentry_sdk.traces.get_current_span() is None:
-                    return nullcontext()
-                return sentry_sdk.traces.start_span(
-                    name=name,
-                    attributes={
-                        "sentry.op": op,
-                        "sentry.origin": StarletteIntegration.origin,
-                        "middleware.name": middleware_name,
-                    },
-                )
-            return sentry_sdk.start_span(
-                op=op,
+            if sentry_sdk.traces.get_current_span() is None:
+                return nullcontext()
+
+            return sentry_sdk.traces.start_span(
                 name=name,
-                origin=StarletteIntegration.origin,
+                attributes={
+                    "sentry.op": op,
+                    "sentry.origin": StarletteIntegration.origin,
+                    "middleware.name": middleware_name,
+                },
             )
 
         with _start_middleware_span(op=OP.MIDDLEWARE_STARLETTE, name=middleware_name):
@@ -549,7 +542,7 @@ async def _wrap_async_handler(
     try:
         return await handler(*args, **kwargs)
     finally:
-        current_span = get_current_span()
+        current_span = sentry_sdk.traces.get_current_span()
 
         if type(current_span) is StreamedSpan:
             attach_request_data = True
@@ -594,23 +587,19 @@ def patch_request_response() -> None:
                 if integration is None:
                     return old_func(*args, **kwargs)
 
-                current_scope = sentry_sdk.get_current_scope()
+                current_span = sentry_sdk.traces.get_current_span()
 
-                span_streaming = has_span_streaming_enabled(client.options)
-                if span_streaming:
-                    current_span = current_scope.streamed_span
-
-                    if type(current_span) is StreamedSpan:
-                        current_span._segment._update_active_thread()
-                elif current_scope.transaction is not None:
-                    current_scope.transaction.update_active_thread()
+                if type(current_span) is StreamedSpan:
+                    current_span._segment._update_active_thread()
 
                 sentry_scope = sentry_sdk.get_isolation_scope()
 
                 request = args[0]
 
                 _set_transaction_name_and_source(
-                    current_scope, integration.transaction_style, request
+                    sentry_sdk.get_current_scope(),
+                    integration.transaction_style,
+                    request,
                 )
 
                 extractor = StarletteRequestExtractor(request)
