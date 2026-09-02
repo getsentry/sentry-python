@@ -7,8 +7,7 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
-from sentry_sdk.utils import capture_internal_exceptions, has_data_collection_enabled
+from sentry_sdk.utils import has_data_collection_enabled
 
 # Hack to get new Python features working in older versions
 # without introducing a hard dependency on `typing_extensions`
@@ -81,38 +80,18 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
 
         connection = args[0]
         query = args[1]
-        query_id = args[2] if len(args) > 2 else kwargs.get("query_id")
-        params = args[3] if len(args) > 3 else kwargs.get("params")
 
-        if has_span_streaming_enabled(client.options):
-            span = None
-            if sentry_sdk.traces.get_current_span() is not None:
-                span = sentry_sdk.traces.start_span(
-                    name=query,  # type: ignore
-                    attributes={
-                        "sentry.op": OP.DB,
-                        "sentry.origin": ClickhouseDriverIntegration.origin,
-                        SPANDATA.DB_QUERY_TEXT: str(query),
-                    },
-                )
-        else:
-            span = sentry_sdk.start_span(
-                op=OP.DB,
-                name=query,
-                origin=ClickhouseDriverIntegration.origin,
-            )
+        if sentry_sdk.traces.get_current_span() is None:
+            return f(*args, **kwargs)
 
-            span.set_data("query", query)
-
-            if query_id:
-                span.set_data("db.query_id", query_id)
-
-            if params:
-                if has_data_collection_enabled(client.options):
-                    if client.options["data_collection"]["database_query_data"]:
-                        span.set_data("db.params", params)
-                elif should_send_default_pii():
-                    span.set_data("db.params", params)
+        span = sentry_sdk.traces.start_span(
+            name=query,  # type: ignore
+            attributes={
+                "sentry.op": OP.DB,
+                "sentry.origin": ClickhouseDriverIntegration.origin,
+                SPANDATA.DB_QUERY_TEXT: str(query),
+            },
+        )
 
         connection._sentry_span = span  # type: ignore[attr-defined]
 
@@ -136,23 +115,7 @@ def _wrap_end(f: "Callable[P, T]") -> "Callable[P, T]":
         if span is None:
             return res
 
-        if isinstance(span, StreamedSpan):
-            span.end()
-        else:
-            if res is not None:
-                client_options = sentry_sdk.get_client().options
-                if has_data_collection_enabled(client_options):
-                    if client_options["data_collection"]["database_query_data"]:
-                        span.set_data("db.result", res)
-                elif should_send_default_pii():
-                    span.set_data("db.result", res)
-
-            with capture_internal_exceptions():
-                span.scope.add_breadcrumb(
-                    message=span._data.pop("query"), category="query", data=span._data
-                )
-
-            span.finish()
+        span.end()
 
         return res
 
