@@ -98,27 +98,24 @@ def test_has_context(
 
 
 @pytest.mark.parametrize(
-    "url,transaction_style,expected_transaction,expected_source",
+    "url,expected_transaction,expected_source",
     [
-        ("/message", "uri_template", "/message", "route"),
-        ("/message", "path", "/message", "url"),
-        ("/message/123456", "uri_template", "/message/{message_id:int}", "route"),
-        ("/message/123456", "path", "/message/123456", "url"),
+        ("/message", "/message", "route"),
+        ("/message/123456", "/message/{message_id:int}", "route"),
     ],
 )
 @pytest.mark.parametrize("span_streaming", [True, False])
-def test_transaction_style(
+def test_transaction_style_uri_template(
     sentry_init,
     make_client,
     capture_events,
     capture_items,
     url,
-    transaction_style,
     expected_transaction,
     expected_source,
     span_streaming,
 ):
-    integration = FalconIntegration(transaction_style=transaction_style)
+    integration = FalconIntegration(transaction_style="uri_template")
     sentry_init(
         integrations=[integration],
         traces_sample_rate=1.0,
@@ -140,6 +137,64 @@ def test_transaction_style(
         spans = [span for span in spans if span["name"] == expected_transaction]
         assert len(spans) == 1
         assert spans[0]["attributes"]["sentry.segment.name.source"] == expected_source
+        assert spans[0]["attributes"]["http.route"] == expected_transaction
+    else:
+        events = capture_events()
+
+        response = client.simulate_get(url)
+        assert response.status == falcon.HTTP_200
+
+        (event, transaction) = events
+
+        assert transaction["transaction"] == expected_transaction
+        assert transaction["transaction_info"] == {"source": expected_source}
+
+    assert event["transaction"] == expected_transaction
+    assert event["transaction_info"] == {"source": expected_source}
+
+
+@pytest.mark.parametrize(
+    "url,expected_transaction,expected_source,expected_route",
+    [
+        ("/message", "/message", "url", "/message"),
+        ("/message/123456", "/message/123456", "url", "/message/{message_id:int}"),
+    ],
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_http_route(
+    sentry_init,
+    make_client,
+    capture_events,
+    capture_items,
+    url,
+    expected_transaction,
+    expected_source,
+    expected_route,
+    span_streaming,
+):
+    integration = FalconIntegration(transaction_style="path")
+    sentry_init(
+        integrations=[integration],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream" if span_streaming else "static",
+    )
+
+    client = make_client()
+    if span_streaming:
+        items = capture_items("event")
+        items = capture_items("event", "span")
+
+        response = client.simulate_get(url)
+        assert response.status == falcon.HTTP_200
+
+        (event,) = (item.payload for item in items if item.type == "event")
+
+        sentry_sdk.flush()
+        spans = [item.payload for item in items if item.type == "span"]
+        spans = [span for span in spans if span["name"] == expected_transaction]
+        assert len(spans) == 1
+        assert spans[0]["attributes"]["sentry.segment.name.source"] == expected_source
+        assert spans[0]["attributes"]["http.route"] == expected_route
     else:
         events = capture_events()
 
