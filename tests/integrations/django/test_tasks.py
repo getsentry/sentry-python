@@ -95,6 +95,7 @@ def test_task_enqueue_returns_result(sentry_init, immediate_backend):
     sentry_init(
         integrations=[DjangoIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     result = add_numbers.enqueue(3, 5)
