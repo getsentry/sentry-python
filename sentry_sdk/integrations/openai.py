@@ -732,7 +732,7 @@ def _set_common_output_data(
                     elif output.type == "message":
                         for output_message in output.content:
                             try:
-                                output_messages["response"].append(output_message.text)
+                                output_messages["response"].append(output_message.text)  # type: ignore[union-attr]
                             except AttributeError:
                                 # Unknown output message type, just return the json
                                 output_messages["response"].append(
@@ -763,7 +763,7 @@ def _set_common_output_data(
                 elif output.type == "message":
                     for output_message in output.content:
                         try:
-                            output_messages["response"].append(output_message.text)
+                            output_messages["response"].append(output_message.text)  # type: ignore[union-attr]
                         except AttributeError:
                             # Unknown output message type, just return the json
                             output_messages["response"].append(output_message.dict())
