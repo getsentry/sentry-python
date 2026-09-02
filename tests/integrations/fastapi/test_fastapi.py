@@ -843,7 +843,7 @@ def test_transaction_name(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-def test_transaction_name_with_prefix(
+def test_http_route_with_prefix(
     sentry_init,
     capture_envelopes,
     capture_items,
