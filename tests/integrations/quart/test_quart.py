@@ -591,6 +591,8 @@ async def test_tracing_error(sentry_init, capture_items):
         response = await client.get("/error")
         assert response.status_code == 500
 
+    sentry_sdk.flush()
+
     error_event, span = [item.payload for item in items]
 
     assert span["name"] == "error"
