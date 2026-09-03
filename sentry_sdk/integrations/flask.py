@@ -19,7 +19,7 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, Union
+    from typing import Any, Callable, Dict, Optional, Union
 
     from werkzeug.datastructures import FileStorage, ImmutableMultiDict
 
@@ -151,9 +151,15 @@ def _request_started(app: "Flask", **kwargs: "Any") -> None:
 
     request = flask_request._get_current_object()
 
+    route_path: "Optional[str]" = None
+    try:
+        route_path = request.url_rule.rule
+    except Exception:
+        pass
+
     server_span = sentry_sdk.get_current_scope()._server_segment_span
     if server_span is not None:
-        server_span.set_attribute(SPANDATA.HTTP_ROUTE, request.url_rule.rule)
+        server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
 
     # Set the transaction name and source here,
     # but rely on WSGI middleware to actually start the transaction
