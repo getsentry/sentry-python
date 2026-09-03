@@ -152,7 +152,6 @@ def test_langgraph_integration_init():
     assert integration.origin == "auto.ai.langgraph"
 
 
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -165,17 +164,15 @@ def test_langgraph_integration_init():
 def test_state_graph_compile(
     sentry_init,
     capture_events,
-    capture_items,
     send_default_pii,
     include_prompts,
-    stream_gen_ai_spans,
 ):
     """Test StateGraph.compile() wrapper creates proper create_agent span."""
     sentry_init(
         integrations=[LanggraphIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
+        stream_gen_ai_spans=False,
     )
 
     graph = MockStateGraph()
@@ -183,79 +180,38 @@ def test_state_graph_compile(
     def original_compile(self, *args, **kwargs):
         return MockCompiledGraph(self.name)
 
-    if stream_gen_ai_spans:
-        items = capture_items("span")
+    events = capture_events()
 
-        with patch("sentry_sdk.integrations.langgraph.StateGraph"), start_transaction():
-            wrapped_compile = _wrap_state_graph_compile(original_compile)
-            compiled_graph = wrapped_compile(
-                graph, model="test-model", checkpointer=None
-            )
+    with patch("sentry_sdk.integrations.langgraph.StateGraph"), start_transaction():
+        wrapped_compile = _wrap_state_graph_compile(original_compile)
+        compiled_graph = wrapped_compile(graph, model="test-model", checkpointer=None)
 
-        assert compiled_graph is not None
-        assert compiled_graph.name == "test_graph"
+    assert compiled_graph is not None
+    assert compiled_graph.name == "test_graph"
 
-        spans = [item.payload for item in items]
-        agent_spans = [
-            span
-            for span in spans
-            if span["attributes"]["sentry.op"] == OP.GEN_AI_CREATE_AGENT
-        ]
-        assert len(agent_spans) == 1
-        agent_span = agent_spans[0]
+    tx = events[0]
+    assert tx["type"] == "transaction"
 
-        assert agent_span["name"] == "create_agent test_graph"
-        assert agent_span["attributes"]["sentry.origin"] == "auto.ai.langgraph"
-        assert (
-            agent_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "create_agent"
-        )
-        assert agent_span["attributes"][SPANDATA.GEN_AI_AGENT_NAME] == "test_graph"
-        assert agent_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "test-model"
-        assert SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS in agent_span["attributes"]
+    agent_spans = [span for span in tx["spans"] if span["op"] == OP.GEN_AI_CREATE_AGENT]
+    assert len(agent_spans) == 1
+    agent_span = agent_spans[0]
 
-        tools_data = agent_span["attributes"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
-        assert tools_data == ["search_tool", "calculator"]
-        assert len(tools_data) == 2
-        assert "search_tool" in tools_data
-        assert "calculator" in tools_data
-    else:
-        events = capture_events()
+    assert agent_span["description"] == "create_agent test_graph"
+    assert agent_span["origin"] == "auto.ai.langgraph"
+    assert agent_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "create_agent"
+    assert agent_span["data"][SPANDATA.GEN_AI_AGENT_NAME] == "test_graph"
+    assert agent_span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "test-model"
+    assert SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS in agent_span["data"]
 
-        with patch("sentry_sdk.integrations.langgraph.StateGraph"), start_transaction():
-            wrapped_compile = _wrap_state_graph_compile(original_compile)
-            compiled_graph = wrapped_compile(
-                graph, model="test-model", checkpointer=None
-            )
+    tools_data = agent_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
 
-        assert compiled_graph is not None
-        assert compiled_graph.name == "test_graph"
-
-        tx = events[0]
-        assert tx["type"] == "transaction"
-
-        agent_spans = [
-            span for span in tx["spans"] if span["op"] == OP.GEN_AI_CREATE_AGENT
-        ]
-        assert len(agent_spans) == 1
-        agent_span = agent_spans[0]
-
-        assert agent_span["description"] == "create_agent test_graph"
-        assert agent_span["origin"] == "auto.ai.langgraph"
-        assert agent_span["data"][SPANDATA.GEN_AI_OPERATION_NAME] == "create_agent"
-        assert agent_span["data"][SPANDATA.GEN_AI_AGENT_NAME] == "test_graph"
-        assert agent_span["data"][SPANDATA.GEN_AI_REQUEST_MODEL] == "test-model"
-        assert SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS in agent_span["data"]
-
-        tools_data = agent_span["data"][SPANDATA.GEN_AI_REQUEST_AVAILABLE_TOOLS]
-
-        assert tools_data == ["search_tool", "calculator"]
-        assert len(tools_data) == 2
-        assert "search_tool" in tools_data
-        assert "calculator" in tools_data
+    assert tools_data == ["search_tool", "calculator"]
+    assert len(tools_data) == 2
+    assert "search_tool" in tools_data
+    assert "calculator" in tools_data
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -271,7 +227,6 @@ def test_pregel_invoke(
     capture_items,
     send_default_pii,
     include_prompts,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test Pregel.invoke() wrapper creates proper invoke_agent span."""
@@ -279,8 +234,8 @@ def test_pregel_invoke(
         integrations=[LanggraphIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     test_state = {
@@ -312,7 +267,7 @@ def test_pregel_invoke(
         ]
         return {"messages": new_messages}
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with start_transaction():
@@ -433,7 +388,6 @@ def test_pregel_invoke(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -449,7 +403,6 @@ def test_pregel_ainvoke(
     capture_items,
     send_default_pii,
     include_prompts,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test Pregel.ainvoke() async wrapper creates proper invoke_agent span."""
@@ -457,8 +410,8 @@ def test_pregel_ainvoke(
         integrations=[LanggraphIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     test_state = {"messages": [MockMessage("What's the weather like?", name="user")]}
@@ -490,7 +443,7 @@ def test_pregel_ainvoke(
             result = await wrapped_ainvoke(pregel, test_state)
             return result
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         result = asyncio.run(run_test())
@@ -588,12 +541,10 @@ def test_pregel_ainvoke(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_pregel_invoke_error(
     sentry_init,
     capture_events,
     capture_items,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test error handling during graph execution."""
@@ -601,8 +552,8 @@ def test_pregel_invoke_error(
         integrations=[LanggraphIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     test_state = {"messages": [MockMessage("This will fail")]}
@@ -611,7 +562,7 @@ def test_pregel_invoke_error(
     def original_invoke(self, *args, **kwargs):
         raise Exception("Graph execution failed")
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with start_transaction(), pytest.raises(
@@ -652,12 +603,10 @@ def test_pregel_invoke_error(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_pregel_ainvoke_error(
     sentry_init,
     capture_events,
     capture_items,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test error handling during async graph execution."""
@@ -665,8 +614,8 @@ def test_pregel_ainvoke_error(
         integrations=[LanggraphIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     test_state = {"messages": [MockMessage("This will fail async")]}
@@ -682,7 +631,7 @@ def test_pregel_ainvoke_error(
             wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
             await wrapped_ainvoke(pregel, test_state)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         asyncio.run(run_error_test())
@@ -714,18 +663,15 @@ def test_pregel_ainvoke_error(
         assert invoke_span.get("tags", {}).get("status") == "internal_error"
 
 
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_span_origin(
     sentry_init,
     capture_events,
-    capture_items,
-    stream_gen_ai_spans,
 ):
     """Test that span origins are correctly set."""
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
+        stream_gen_ai_spans=False,
     )
 
     graph = MockStateGraph()
@@ -733,47 +679,28 @@ def test_span_origin(
     def original_compile(self, *args, **kwargs):
         return MockCompiledGraph(self.name)
 
-    if stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
+    events = capture_events()
 
-        with start_transaction():
-            from sentry_sdk.integrations.langgraph import _wrap_state_graph_compile
+    with start_transaction():
+        from sentry_sdk.integrations.langgraph import _wrap_state_graph_compile
 
-            wrapped_compile = _wrap_state_graph_compile(original_compile)
-            wrapped_compile(graph)
+        wrapped_compile = _wrap_state_graph_compile(original_compile)
+        wrapped_compile(graph)
 
-        tx = next(item.payload for item in items if item.type == "transaction")
-        assert tx["contexts"]["trace"]["origin"] == "manual"
+    tx = events[0]
+    assert tx["contexts"]["trace"]["origin"] == "manual"
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        for span in spans:
-            assert span["attributes"]["sentry.origin"] == "auto.ai.langgraph"
-    else:
-        events = capture_events()
-
-        with start_transaction():
-            from sentry_sdk.integrations.langgraph import _wrap_state_graph_compile
-
-            wrapped_compile = _wrap_state_graph_compile(original_compile)
-            wrapped_compile(graph)
-
-        tx = events[0]
-        assert tx["contexts"]["trace"]["origin"] == "manual"
-
-        for span in tx["spans"]:
-            assert span["origin"] == "auto.ai.langgraph"
+    for span in tx["spans"]:
+        assert span["origin"] == "auto.ai.langgraph"
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize("graph_name", ["my_graph", None, ""])
 def test_pregel_invoke_with_different_graph_names(
     sentry_init,
     capture_events,
     capture_items,
     graph_name,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test Pregel.invoke() with different graph name scenarios."""
@@ -781,8 +708,8 @@ def test_pregel_invoke_with_different_graph_names(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     pregel = MockPregelInstance(graph_name) if graph_name else MockPregelInstance()
@@ -793,7 +720,7 @@ def test_pregel_invoke_with_different_graph_names(
     def original_invoke(self, *args, **kwargs):
         return {"result": "test"}
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with start_transaction():
@@ -849,12 +776,10 @@ def test_pregel_invoke_with_different_graph_names(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_pregel_invoke_span_includes_usage_data(
     sentry_init,
     capture_events,
     capture_items,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """
@@ -864,8 +789,8 @@ def test_pregel_invoke_span_includes_usage_data(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     test_state = {
@@ -905,7 +830,7 @@ def test_pregel_invoke_span_includes_usage_data(
         ]
         return {"messages": new_messages}
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with start_transaction():
@@ -967,12 +892,10 @@ def test_pregel_invoke_span_includes_usage_data(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_pregel_ainvoke_span_includes_usage_data(
     sentry_init,
     capture_events,
     capture_items,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """
@@ -982,8 +905,8 @@ def test_pregel_ainvoke_span_includes_usage_data(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     test_state = {
@@ -1029,7 +952,7 @@ def test_pregel_ainvoke_span_includes_usage_data(
             result = await wrapped_ainvoke(pregel, test_state)
             return result
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         result = asyncio.run(run_test())
@@ -1085,12 +1008,10 @@ def test_pregel_ainvoke_span_includes_usage_data(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_pregel_invoke_multiple_llm_calls_aggregate_usage(
     sentry_init,
     capture_events,
     capture_items,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """
@@ -1100,8 +1021,8 @@ def test_pregel_invoke_multiple_llm_calls_aggregate_usage(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     test_state = {
@@ -1152,7 +1073,7 @@ def test_pregel_invoke_multiple_llm_calls_aggregate_usage(
         ]
         return {"messages": new_messages}
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with start_transaction():
@@ -1202,12 +1123,10 @@ def test_pregel_invoke_multiple_llm_calls_aggregate_usage(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_pregel_ainvoke_multiple_llm_calls_aggregate_usage(
     sentry_init,
     capture_events,
     capture_items,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """
@@ -1217,8 +1136,8 @@ def test_pregel_ainvoke_multiple_llm_calls_aggregate_usage(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     test_state = {
@@ -1275,7 +1194,7 @@ def test_pregel_ainvoke_multiple_llm_calls_aggregate_usage(
             result = await wrapped_ainvoke(pregel, test_state)
             return result
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         result = asyncio.run(run_test())
@@ -1319,12 +1238,10 @@ def test_pregel_ainvoke_multiple_llm_calls_aggregate_usage(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_pregel_invoke_span_includes_response_model(
     sentry_init,
     capture_events,
     capture_items,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """
@@ -1334,8 +1251,8 @@ def test_pregel_invoke_span_includes_response_model(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     test_state = {
@@ -1375,7 +1292,7 @@ def test_pregel_invoke_span_includes_response_model(
         ]
         return {"messages": new_messages}
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with start_transaction():
@@ -1430,12 +1347,10 @@ def test_pregel_invoke_span_includes_response_model(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_pregel_ainvoke_span_includes_response_model(
     sentry_init,
     capture_events,
     capture_items,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """
@@ -1445,8 +1360,8 @@ def test_pregel_ainvoke_span_includes_response_model(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     test_state = {
@@ -1492,7 +1407,7 @@ def test_pregel_ainvoke_span_includes_response_model(
             result = await wrapped_ainvoke(pregel, test_state)
             return result
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         result = asyncio.run(run_test())
@@ -1541,12 +1456,10 @@ def test_pregel_ainvoke_span_includes_response_model(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_pregel_invoke_span_uses_last_response_model(
     sentry_init,
     capture_events,
     capture_items,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """
@@ -1556,8 +1469,8 @@ def test_pregel_invoke_span_uses_last_response_model(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     test_state = {
@@ -1610,7 +1523,7 @@ def test_pregel_invoke_span_uses_last_response_model(
         ]
         return {"messages": new_messages}
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with start_transaction():
@@ -1663,12 +1576,10 @@ def test_pregel_invoke_span_uses_last_response_model(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_pregel_ainvoke_span_uses_last_response_model(
     sentry_init,
     capture_events,
     capture_items,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """
@@ -1678,8 +1589,8 @@ def test_pregel_ainvoke_span_uses_last_response_model(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     test_state = {
@@ -1738,7 +1649,7 @@ def test_pregel_ainvoke_span_uses_last_response_model(
             result = await wrapped_ainvoke(pregel, test_state)
             return result
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         result = asyncio.run(run_test())
@@ -1832,12 +1743,10 @@ def test_complex_message_parsing():
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_extraction_functions_complex_scenario(
     sentry_init,
     capture_events,
     capture_items,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test extraction functions with complex scenarios including multiple messages and edge cases."""
@@ -1845,8 +1754,8 @@ def test_extraction_functions_complex_scenario(
         integrations=[LanggraphIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     pregel = MockPregelInstance("complex_graph")
@@ -1882,7 +1791,7 @@ def test_extraction_functions_complex_scenario(
         ]
         return {"messages": new_messages}
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with start_transaction():
@@ -1943,12 +1852,10 @@ def test_extraction_functions_complex_scenario(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_langgraph_message_role_mapping(
     sentry_init,
     capture_events,
     capture_items,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test that Langgraph integration properly maps message roles like 'ai' to 'assistant'"""
@@ -1956,8 +1863,8 @@ def test_langgraph_message_role_mapping(
         integrations=[LanggraphIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     # Mock a langgraph message with mixed roles
@@ -1979,7 +1886,7 @@ def test_langgraph_message_role_mapping(
     compiled_graph = MockCompiledGraph("test_graph")
     pregel = MockPregelInstance(compiled_graph)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with start_transaction(name="langgraph tx"):
@@ -2192,8 +2099,8 @@ def test_pregel_invoke_gates_request_messages_on_inputs_setting(
         "integrations": [LanggraphIntegration()],
         "traces_sample_rate": 1.0,
         "send_default_pii": send_default_pii,
-        "stream_gen_ai_spans": span_streaming,
         "trace_lifecycle": "stream" if span_streaming else "static",
+        "stream_gen_ai_spans": False,
     }
     if data_collection is not None:
         init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -2283,8 +2190,8 @@ def test_pregel_invoke_gates_response_text_and_tool_calls_on_outputs_setting(
         "integrations": [LanggraphIntegration()],
         "traces_sample_rate": 1.0,
         "send_default_pii": send_default_pii,
-        "stream_gen_ai_spans": span_streaming,
         "trace_lifecycle": "stream" if span_streaming else "static",
+        "stream_gen_ai_spans": False,
     }
     if data_collection is not None:
         init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -2380,8 +2287,8 @@ def test_pregel_ainvoke_gates_inputs_and_outputs_independently(
         "integrations": [LanggraphIntegration()],
         "traces_sample_rate": 1.0,
         "send_default_pii": send_default_pii,
-        "stream_gen_ai_spans": span_streaming,
         "trace_lifecycle": "stream" if span_streaming else "static",
+        "stream_gen_ai_spans": False,
     }
     if data_collection is not None:
         init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -2447,11 +2354,11 @@ def test_pregel_invoke_message_delta_ignores_gen_ai_inputs_setting(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=span_streaming,
         trace_lifecycle="stream" if span_streaming else "static",
         _experiments={
             "data_collection": {"gen_ai": {"inputs": False, "outputs": True}}
         },
+        stream_gen_ai_spans=False,
     )
 
     prior_response = "Of course! How can I assist you?"
@@ -2521,11 +2428,11 @@ def test_pregel_ainvoke_message_delta_ignores_gen_ai_inputs_setting(
     sentry_init(
         integrations=[LanggraphIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=span_streaming,
         trace_lifecycle="stream" if span_streaming else "static",
         _experiments={
             "data_collection": {"gen_ai": {"inputs": False, "outputs": True}}
         },
+        stream_gen_ai_spans=False,
     )
 
     prior_response = "It is sunny in Berlin."
