@@ -652,7 +652,7 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
 @pytest.mark.parametrize(
     "init_kwargs, expected_query", _QUERY_PARAM_DATA_COLLECTION_CASES
 )
-def test_url_query_data_collection_span_streaming(
+def test_url_query_data_collection(
     sentry_init, app, capture_items, init_kwargs, expected_query
 ):
     init_kwargs = dict(init_kwargs)
