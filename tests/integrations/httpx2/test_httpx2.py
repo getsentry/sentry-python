@@ -201,6 +201,146 @@ async def test_crumb_capture_and_hint_async_span_streaming(
             )
 
 
+def test_crumb_capture_without_span_sync(sentry_init, capture_events, httpx2_mock):
+    httpx2_mock.add_response()
+
+    sentry_init(
+        integrations=[Httpx2Integration()],
+    )
+
+    url = "http://example.com/"
+
+    events = capture_events()
+
+    response = httpx2.Client().get(url)
+
+    assert response.status_code == 200
+    capture_message("Testing!")
+
+    (event,) = events
+
+    crumb = event["breadcrumbs"]["values"][0]
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+    assert crumb["data"] == ApproxDict(
+        {
+            "url": url,
+            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.HTTP_FRAGMENT: "",
+            SPANDATA.HTTP_QUERY: "",
+            SPANDATA.HTTP_STATUS_CODE: 200,
+            "reason": "OK",
+        }
+    )
+
+
+def test_crumb_capture_without_span_sync_span_streaming(
+    sentry_init, capture_events, httpx2_mock
+):
+    httpx2_mock.add_response()
+
+    sentry_init(
+        integrations=[Httpx2Integration()],
+        trace_lifecycle="stream",
+    )
+
+    url = "http://example.com/"
+
+    events = capture_events()
+
+    response = httpx2.Client().get(url)
+
+    assert response.status_code == 200
+    capture_message("Testing!")
+
+    sentry_sdk.flush()
+
+    (event,) = events
+
+    crumb = event["breadcrumbs"]["values"][0]
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+    assert crumb["data"] == ApproxDict(
+        {
+            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.HTTP_STATUS_CODE: 200,
+            "reason": "OK",
+        }
+    )
+
+
+@pytest.mark.asyncio
+async def test_crumb_capture_without_span_async(
+    sentry_init, capture_events, httpx2_mock
+):
+    httpx2_mock.add_response()
+
+    sentry_init(
+        integrations=[Httpx2Integration()],
+    )
+
+    url = "http://example.com/"
+
+    events = capture_events()
+
+    response = await httpx2.AsyncClient().get(url)
+
+    assert response.status_code == 200
+    capture_message("Testing!")
+
+    (event,) = events
+
+    crumb = event["breadcrumbs"]["values"][0]
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+    assert crumb["data"] == ApproxDict(
+        {
+            "url": url,
+            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.HTTP_FRAGMENT: "",
+            SPANDATA.HTTP_QUERY: "",
+            SPANDATA.HTTP_STATUS_CODE: 200,
+            "reason": "OK",
+        }
+    )
+
+
+@pytest.mark.asyncio
+async def test_crumb_capture_without_span_async_span_streaming(
+    sentry_init, capture_events, httpx2_mock
+):
+    httpx2_mock.add_response()
+
+    sentry_init(
+        integrations=[Httpx2Integration()],
+        trace_lifecycle="stream",
+    )
+
+    url = "http://example.com/"
+
+    events = capture_events()
+
+    response = await httpx2.AsyncClient().get(url)
+
+    assert response.status_code == 200
+    capture_message("Testing!")
+
+    sentry_sdk.flush()
+
+    (event,) = events
+
+    crumb = event["breadcrumbs"]["values"][0]
+    assert crumb["type"] == "http"
+    assert crumb["category"] == "httplib"
+    assert crumb["data"] == ApproxDict(
+        {
+            SPANDATA.HTTP_METHOD: "GET",
+            SPANDATA.HTTP_STATUS_CODE: 200,
+            "reason": "OK",
+        }
+    )
+
+
 @pytest.mark.parametrize(
     "status_code,level",
     [
