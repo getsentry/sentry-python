@@ -63,7 +63,6 @@ except ImportError:
 
 from unittest import mock  # python 3.3 and above
 
-from sentry_sdk import start_transaction
 from sentry_sdk.consts import OP, SPANDATA
 from sentry_sdk.integrations.openai import (
     OpenAIIntegration,
@@ -196,40 +195,39 @@ def test_chat_completion_tool_definitions(
     )
     items = capture_items("span")
 
-    with start_transaction(name="openai tx"):
-        client.chat.completions.create(
-            model="some-model",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": "hello"},
-            ],
-            tools=[
-                ChatCompletionFunctionToolParam(
-                    type="function",
-                    function=FunctionDefinition(
-                        name="name",
-                        description="description",
-                        parameters={
-                            "type": "object",
-                            "properties": {
-                                "city": {"type": "string"},
-                                "state": {"type": "string"},
-                            },
-                            "required": ["city", "state"],
-                            "additionalProperties": False,
+    client.chat.completions.create(
+        model="some-model",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "hello"},
+        ],
+        tools=[
+            ChatCompletionFunctionToolParam(
+                type="function",
+                function=FunctionDefinition(
+                    name="name",
+                    description="description",
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "city": {"type": "string"},
+                            "state": {"type": "string"},
                         },
-                        strict=True,
-                    ),
+                        "required": ["city", "state"],
+                        "additionalProperties": False,
+                    },
+                    strict=True,
                 ),
-                ChatCompletionCustomToolParam(
-                    type="custom",
-                    custom=Custom(
-                        name="name",
-                        description="description",
-                    ),
+            ),
+            ChatCompletionCustomToolParam(
+                type="custom",
+                custom=Custom(
+                    name="name",
+                    description="description",
                 ),
-            ],
-        )
+            ),
+        ],
+    )
 
     sentry_sdk.flush()
     span = next(item.payload for item in items)
@@ -296,23 +294,22 @@ def test_nonstreaming_chat_completion_no_prompts(
     )
     items = capture_items("span")
 
-    with start_transaction(name="openai tx"):
-        response = (
-            client.chat.completions.create(
-                model="some-model",
-                messages=[
-                    {"role": "system", "content": "You are a helpful assistant."},
-                    {"role": "user", "content": "hello"},
-                ],
-                max_tokens=100,
-                presence_penalty=0.1,
-                frequency_penalty=0.2,
-                temperature=0.7,
-                top_p=0.9,
-            )
-            .choices[0]
-            .message.content
+    response = (
+        client.chat.completions.create(
+            model="some-model",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "hello"},
+            ],
+            max_tokens=100,
+            presence_penalty=0.1,
+            frequency_penalty=0.2,
+            temperature=0.7,
+            top_p=0.9,
         )
+        .choices[0]
+        .message.content
+    )
 
     assert response == "the model response"
     sentry_sdk.flush()
@@ -446,20 +443,19 @@ def test_nonstreaming_chat_completion(
     )
     items = capture_items("span")
 
-    with start_transaction(name="openai tx"):
-        response = (
-            client.chat.completions.create(
-                model="some-model",
-                messages=get_messages(),
-                max_tokens=100,
-                presence_penalty=0.1,
-                frequency_penalty=0.2,
-                temperature=0.7,
-                top_p=0.9,
-            )
-            .choices[0]
-            .message.content
+    response = (
+        client.chat.completions.create(
+            model="some-model",
+            messages=get_messages(),
+            max_tokens=100,
+            presence_penalty=0.1,
+            frequency_penalty=0.2,
+            temperature=0.7,
+            top_p=0.9,
         )
+        .choices[0]
+        .message.content
+    )
 
     assert response == "the model response"
     sentry_sdk.flush()
@@ -585,8 +581,7 @@ def test_completions_api_data_collection(
     }
     items = capture_items("span")
 
-    with start_transaction(name="openai tx"):
-        client.chat.completions.create(**create_kwargs)
+    client.chat.completions.create(**create_kwargs)
 
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
@@ -685,11 +680,10 @@ def test_completions_api_data_collection_outputs(
     )
     items = capture_items("span")
 
-    with start_transaction(name="openai tx"):
-        client.chat.completions.create(
-            model="some-model",
-            messages=[{"role": "user", "content": "hello"}],
-        )
+    client.chat.completions.create(
+        model="some-model",
+        messages=[{"role": "user", "content": "hello"}],
+    )
 
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
@@ -781,11 +775,10 @@ async def test_completions_api_data_collection_outputs_async(
     )
     items = capture_items("span")
 
-    with start_transaction(name="openai tx"):
-        await client.chat.completions.create(
-            model="some-model",
-            messages=[{"role": "user", "content": "hello"}],
-        )
+    await client.chat.completions.create(
+        model="some-model",
+        messages=[{"role": "user", "content": "hello"}],
+    )
 
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
@@ -828,11 +821,10 @@ def test_completions_api_data_collection_outputs_empty_choices(
     )
     items = capture_items("span")
 
-    with start_transaction(name="openai tx"):
-        client.chat.completions.create(
-            model="some-model",
-            messages=[{"role": "user", "content": "hello"}],
-        )
+    client.chat.completions.create(
+        model="some-model",
+        messages=[{"role": "user", "content": "hello"}],
+    )
 
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
@@ -903,10 +895,8 @@ def test_streaming_chat_completion_data_collection_outputs(
     items = capture_items("span")
 
     with mock.patch.object(
-        client.chat._client._client,
-        "send",
-        return_value=returned_stream,
-    ), start_transaction(name="openai tx"):
+        client.chat._client._client, "send", return_value=returned_stream
+    ):
         response_stream = client.chat.completions.create(
             model="some-model",
             messages=[{"role": "user", "content": "hello"}],
@@ -995,7 +985,7 @@ async def test_streaming_chat_completion_data_collection_outputs_async(
         client.chat._client._client,
         "send",
         return_value=returned_stream,
-    ), start_transaction(name="openai tx"):
+    ):
         response_stream = await client.chat.completions.create(
             model="some-model",
             messages=[{"role": "user", "content": "hello"}],
@@ -1056,20 +1046,19 @@ async def test_nonstreaming_chat_completion_async_no_prompts(
     )
     items = capture_items("span")
 
-    with start_transaction(name="openai tx"):
-        response = await client.chat.completions.create(
-            model="some-model",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": "hello"},
-            ],
-            max_tokens=100,
-            presence_penalty=0.1,
-            frequency_penalty=0.2,
-            temperature=0.7,
-            top_p=0.9,
-        )
-        response = response.choices[0].message.content
+    response = await client.chat.completions.create(
+        model="some-model",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "hello"},
+        ],
+        max_tokens=100,
+        presence_penalty=0.1,
+        frequency_penalty=0.2,
+        temperature=0.7,
+        top_p=0.9,
+    )
+    response = response.choices[0].message.content
 
     assert response == "the model response"
     sentry_sdk.flush()
@@ -1204,17 +1193,16 @@ async def test_nonstreaming_chat_completion_async(
     )
     items = capture_items("span")
 
-    with start_transaction(name="openai tx"):
-        response = await client.chat.completions.create(
-            model="some-model",
-            messages=get_messages(),
-            max_tokens=100,
-            presence_penalty=0.1,
-            frequency_penalty=0.2,
-            temperature=0.7,
-            top_p=0.9,
-        )
-        response = response.choices[0].message.content
+    response = await client.chat.completions.create(
+        model="some-model",
+        messages=get_messages(),
+        max_tokens=100,
+        presence_penalty=0.1,
+        frequency_penalty=0.2,
+        temperature=0.7,
+        top_p=0.9,
+    )
+    response = response.choices[0].message.content
 
     assert response == "the model response"
     sentry_sdk.flush()
@@ -1339,7 +1327,7 @@ def test_streaming_chat_completion_no_prompts(
         client.chat._client._client,
         "send",
         return_value=returned_stream,
-    ), start_transaction(name="openai tx"):
+    ):
         response_stream = client.chat.completions.create(
             model="some-model",
             messages=[
@@ -1451,7 +1439,7 @@ def test_streaming_chat_completion_with_usage_in_stream(
         client.chat._client._client,
         "send",
         return_value=returned_stream,
-    ), start_transaction(name="openai tx"):
+    ):
         response_stream = client.chat.completions.create(
             model="some-model",
             messages=[{"role": "user", "content": "hello"}],
@@ -1514,7 +1502,7 @@ def test_streaming_chat_completion_empty_content_preserves_token_usage(
         client.chat._client._client,
         "send",
         return_value=returned_stream,
-    ), start_transaction(name="openai tx"):
+    ):
         response_stream = client.chat.completions.create(
             model="some-model",
             messages=[{"role": "user", "content": "hello"}],
@@ -1581,7 +1569,7 @@ async def test_streaming_chat_completion_empty_content_preserves_token_usage_asy
         client.chat._client._client,
         "send",
         return_value=returned_stream,
-    ), start_transaction(name="openai tx"):
+    ):
         response_stream = await client.chat.completions.create(
             model="some-model",
             messages=[{"role": "user", "content": "hello"}],
@@ -1667,7 +1655,7 @@ async def test_streaming_chat_completion_async_with_usage_in_stream(
         client.chat._client._client,
         "send",
         return_value=returned_stream,
-    ), start_transaction(name="openai tx"):
+    ):
         response_stream = await client.chat.completions.create(
             model="some-model",
             messages=[{"role": "user", "content": "hello"}],
@@ -1846,7 +1834,7 @@ def test_streaming_chat_completion(
         client.chat._client._client,
         "send",
         return_value=returned_stream,
-    ), start_transaction(name="openai tx"):
+    ):
         response_stream = client.chat.completions.create(
             model="some-model",
             messages=get_messages(),
@@ -1991,7 +1979,7 @@ async def test_streaming_chat_completion_async_no_prompts(
         client.chat._client._client,
         "send",
         return_value=returned_stream,
-    ), start_transaction(name="openai tx"):
+    ):
         response_stream = await client.chat.completions.create(
             model="some-model",
             messages=[
@@ -2207,7 +2195,7 @@ async def test_streaming_chat_completion_async(
         client.chat._client._client,
         "send",
         return_value=returned_stream,
-    ), start_transaction(name="openai tx"):
+    ):
         response_stream = await client.chat.completions.create(
             model="some-model",
             messages=get_messages(),
@@ -2308,16 +2296,15 @@ def test_span_status_error(
     )
     items = capture_items("event", "span")
 
-    with start_transaction(name="test"):
-        client = OpenAI(api_key="z")
-        client.chat.completions._post = mock.Mock(
-            side_effect=OpenAIError("API rate limit reached")
+    client = OpenAI(api_key="z")
+    client.chat.completions._post = mock.Mock(
+        side_effect=OpenAIError("API rate limit reached")
+    )
+    with pytest.raises(OpenAIError):
+        client.chat.completions.create(
+            model="some-model",
+            messages=[{"role": "system", "content": "hello"}],
         )
-        with pytest.raises(OpenAIError):
-            client.chat.completions.create(
-                model="some-model",
-                messages=[{"role": "system", "content": "hello"}],
-            )
 
     (error,) = (item.payload for item in items if item.type == "event")
     assert error["level"] == "error"
@@ -2394,10 +2381,7 @@ def test_embeddings_create_no_pii(
     client.embeddings._post = mock.Mock(return_value=returned_embedding)
     items = capture_items("span")
 
-    with start_transaction(name="openai tx"):
-        response = client.embeddings.create(
-            input="hello", model="text-embedding-3-large"
-        )
+    response = client.embeddings.create(input="hello", model="text-embedding-3-large")
 
     assert len(response.data[0].embedding) == 3
 
@@ -2511,10 +2495,9 @@ def test_embeddings_create(
     client.embeddings._post = mock.Mock(return_value=returned_embedding)
     items = capture_items("span")
 
-    with start_transaction(name="openai tx"):
-        response = client.embeddings.create(
-            input=get_input(), model="text-embedding-3-large"
-        )
+    response = client.embeddings.create(
+        input=get_input(), model="text-embedding-3-large"
+    )
 
     assert len(response.data[0].embedding) == 3
 
@@ -2536,8 +2519,7 @@ def test_embeddings_create(
 def _collect_embeddings_span_data(capture_events, capture_items, create):
     items = capture_items("span")
 
-    with start_transaction(name="openai tx"):
-        response = create()
+    response = create()
 
     assert len(response.data[0].embedding) == 3
 
@@ -2728,10 +2710,9 @@ async def test_embeddings_create_async_no_pii(
     client.embeddings._post = AsyncMock(return_value=returned_embedding)
     items = capture_items("span")
 
-    with start_transaction(name="openai tx"):
-        response = await client.embeddings.create(
-            input="hello", model="text-embedding-3-large"
-        )
+    response = await client.embeddings.create(
+        input="hello", model="text-embedding-3-large"
+    )
 
     assert len(response.data[0].embedding) == 3
 
@@ -2846,10 +2827,9 @@ async def test_embeddings_create_async(
     client.embeddings._post = AsyncMock(return_value=returned_embedding)
     items = capture_items("span")
 
-    with start_transaction(name="openai tx"):
-        response = await client.embeddings.create(
-            input=get_input(), model="text-embedding-3-large"
-        )
+    response = await client.embeddings.create(
+        input=get_input(), model="text-embedding-3-large"
+    )
 
     assert len(response.data[0].embedding) == 3
 
@@ -2934,10 +2914,9 @@ async def test_embeddings_create_async_data_collection(
     client.embeddings._post = AsyncMock(return_value=returned_embedding)
     items = capture_items("span")
 
-    with start_transaction(name="openai tx"):
-        response = await client.embeddings.create(
-            input="hello", model="text-embedding-3-large"
-        )
+    response = await client.embeddings.create(
+        input="hello", model="text-embedding-3-large"
+    )
 
     assert len(response.data[0].embedding) == 3
 
@@ -4244,8 +4223,7 @@ def _make_responses_api_response(output):
 def _collect_responses_span_data(capture_events, capture_items, create):
     items = capture_items("span")
 
-    with start_transaction(name="openai tx"):
-        create()
+    create()
 
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
@@ -4473,7 +4451,7 @@ def test_streaming_responses_api_data_collection_outputs(
         client.responses._client._client,
         "send",
         return_value=returned_stream,
-    ), start_transaction(name="openai tx"):
+    ):
         response_stream = client.responses.create(
             model="some-model",
             input="hello",
@@ -4522,12 +4500,11 @@ def test_responses_api_conversation_id(
     client.responses._post = mock.Mock(return_value=EXAMPLE_RESPONSE)
     items = capture_items("span")
 
-    with start_transaction(name="openai tx"):
-        client.responses.create(
-            model="gpt-4o",
-            input="hello",
-            conversation=conversation,
-        )
+    client.responses.create(
+        model="gpt-4o",
+        input="hello",
+        conversation=conversation,
+    )
 
     sentry_sdk.flush()
     (span,) = (item.payload for item in items)
@@ -4565,12 +4542,11 @@ def test_responses_api_reasoning_level(
     client.responses._post = mock.Mock(return_value=EXAMPLE_RESPONSE)
     items = capture_items("span")
 
-    with start_transaction(name="openai tx"):
-        client.responses.create(
-            model="gpt-4o",
-            input="hello",
-            reasoning=reasoning,
-        )
+    client.responses.create(
+        model="gpt-4o",
+        input="hello",
+        reasoning=reasoning,
+    )
 
     sentry_sdk.flush()
     span = next(item.payload for item in items if item.type == "span")
@@ -5220,7 +5196,7 @@ def test_streaming_responses_api(
         client.responses._client._client,
         "send",
         return_value=returned_stream,
-    ), start_transaction(name="openai tx"):
+    ):
         response_stream = client.responses.create(
             model="some-model",
             input="hello",
@@ -5298,7 +5274,7 @@ async def test_streaming_responses_api_async(
         client.responses._client._client,
         "send",
         return_value=returned_stream,
-    ), start_transaction(name="openai tx"):
+    ):
         response_stream = await client.responses.create(
             model="some-model",
             input="hello",
@@ -5383,12 +5359,11 @@ def test_chat_completion_reasoning_level(
     )
     items = capture_items("span")
 
-    with start_transaction(name="openai tx"):
-        client.chat.completions.create(
-            model="some-model",
-            messages=[{"role": "system", "content": "hello"}],
-            reasoning_effort=reasoning_effort,
-        )
+    client.chat.completions.create(
+        model="some-model",
+        messages=[{"role": "system", "content": "hello"}],
+        reasoning_effort=reasoning_effort,
+    )
 
     sentry_sdk.flush()
     span = next(item.payload for item in items if item.type == "span")
@@ -5452,8 +5427,7 @@ def test_openai_message_role_mapping(
     test_messages = [test_message]
     items = capture_items("span")
 
-    with start_transaction(name="openai tx"):
-        client.chat.completions.create(model="test-model", messages=test_messages)
+    client.chat.completions.create(model="test-model", messages=test_messages)
 
     # Verify that the span was created correctly
     sentry_sdk.flush()
@@ -5524,7 +5498,7 @@ def test_streaming_chat_completion_ttft(
         client.chat._client._client,
         "send",
         return_value=returned_stream,
-    ), start_transaction(name="openai tx"):
+    ):
         response_stream = client.chat.completions.create(
             model="some-model",
             messages=[{"role": "user", "content": "Say hello"}],
@@ -5607,7 +5581,7 @@ async def test_streaming_chat_completion_ttft_async(
         client.chat._client._client,
         "send",
         return_value=returned_stream,
-    ), start_transaction(name="openai tx"):
+    ):
         response_stream = await client.chat.completions.create(
             model="some-model",
             messages=[{"role": "user", "content": "Say hello"}],
@@ -5657,7 +5631,7 @@ def test_streaming_responses_api_ttft(
         client.responses._client._client,
         "send",
         return_value=returned_stream,
-    ), start_transaction(name="openai tx"):
+    ):
         response_stream = client.responses.create(
             model="some-model",
             input="hello",
@@ -5709,7 +5683,7 @@ async def test_streaming_responses_api_ttft_async(
         client.responses._client._client,
         "send",
         return_value=returned_stream,
-    ), start_transaction(name="openai tx"):
+    ):
         response_stream = await client.responses.create(
             model="some-model",
             input="hello",
