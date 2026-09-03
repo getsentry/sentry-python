@@ -41,7 +41,11 @@ def wait_for_profiler_to_stop(envelopes, timeout=1.0):
         time.sleep(0.01)
 
     assert get_profiler_id() is None, "profiler should not be running"
-    pytest.fail("profiler should have flushed a profile chunk")
+    assert any(
+        item.type == "profile_chunk"
+        for envelope in envelopes
+        for item in envelope.items
+    ), "profiler should have flushed a profile chunk"
 
 
 def get_client_options(use_top_level_profiler_mode):
