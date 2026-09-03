@@ -182,9 +182,15 @@ async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
     if has_websocket_context():
         request_websocket = websocket._get_current_object()
 
+    route_path = None
+    try:
+        route_path = request.url_rule.rule
+    except Exception:
+        pass
+
     server_span = sentry_sdk.get_current_scope()._server_segment_span
-    if server_span is not None:
-        server_span.set_attribute(SPANDATA.HTTP_ROUTE, request.url_rule.rule)
+    if server_span is not None and route_path is not None:
+        server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
 
     # Set the transaction name here, but rely on ASGI middleware
     # to actually start the transaction
