@@ -12,10 +12,12 @@ from sentry_sdk.ai._openai_completions_api import (
 )
 from sentry_sdk.ai._openai_completions_api import (
     _get_text_items,
-    _transform_system_instructions,
 )
 from sentry_sdk.ai._openai_completions_api import (
     _is_system_instruction as _is_system_instruction_completions,
+)
+from sentry_sdk.ai._openai_completions_api import (
+    _transform_system_instructions as _transform_system_instructions_completions,
 )
 from sentry_sdk.ai._openai_completions_api import (
     _transform_tool_definitions as _transform_tool_definitions_completions,
@@ -25,6 +27,9 @@ from sentry_sdk.ai._openai_responses_api import (
 )
 from sentry_sdk.ai._openai_responses_api import (
     _is_system_instruction as _is_system_instruction_responses,
+)
+from sentry_sdk.ai._openai_responses_api import (
+    _transform_system_instructions as _transform_system_instructions_responses,
 )
 from sentry_sdk.ai._openai_responses_api import (
     _transform_tool_definitions as _transform_tool_definitions_responses,
@@ -428,9 +433,9 @@ def _set_responses_api_input_data(
         )
 
     system_instructions = _get_system_instructions_responses(messages)
-    # Deliberate use of function accepting completions API type because
-    # of shared structure FOR THIS PURPOSE ONLY.
-    instructions_text_parts += _transform_system_instructions(system_instructions)
+    instructions_text_parts += _transform_system_instructions_responses(
+        system_instructions
+    )
     if len(instructions_text_parts) > 0:
         set_on_span(
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
@@ -570,7 +575,7 @@ def _set_completions_api_input_data(
     if len(system_instructions) > 0:
         set_on_span(
             SPANDATA.GEN_AI_SYSTEM_INSTRUCTIONS,
-            json.dumps(_transform_system_instructions(system_instructions)),
+            json.dumps(_transform_system_instructions_completions(system_instructions)),
         )
 
     non_system_messages = [
