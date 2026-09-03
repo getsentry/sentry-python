@@ -21,7 +21,6 @@ from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
-    should_truncate_gen_ai_input,
 )
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -558,7 +557,7 @@ def _set_common_input_data(
         scope = sentry_sdk.get_current_scope()
         messages_data = (
             truncate_and_annotate_messages(role_normalized_messages, span, scope)
-            if should_truncate_gen_ai_input(client.options)
+            if not has_span_streaming_enabled(client.options)
             else role_normalized_messages
         )
         if messages_data is not None:
