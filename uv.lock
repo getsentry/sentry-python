@@ -53,6 +53,7 @@ typing = [
     { name = "loguru" },
     { name = "mcp", specifier = ">=2.0.0b1" },
     { name = "mypy" },
+    { name = "openai", specifier = ">=3.7.0" },
     { name = "openfeature-sdk" },
     { name = "opentelemetry-distro", extras = ["otlp"] },
     { name = "pydantic", specifier = ">=2.13.4" },
@@ -1602,6 +1603,23 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/24/bf/d1bda4f6168e0b2e9e5958945e01910052158313224ada5ce1fb2e1113b8/nodeenv-1.10.0.tar.gz", hash = "sha256:996c191ad80897d076bdfba80a41994c2b47c68e224c542b48feba42ba00f8bb", size = 55611, upload-time = "2025-12-20T14:08:54.006Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/88/b2/d0896bdcdc8d28a7fc5717c305f1a861c26e18c05047949fb371034d98bd/nodeenv-1.10.0-py2.py3-none-any.whl", hash = "sha256:5bb13e3eed2923615535339b3c620e76779af4cb4c6a90deccc9e36b274d3827", size = 23438, upload-time = "2025-12-20T14:08:52.782Z" },
+]
+
+[[package]]
+name = "openai"
+version = "3.7.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "httpx2" },
+    { name = "jiter" },
+    { name = "pydantic" },
+    { name = "sniffio" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ad/ba/6d46da4232f80cb5842280e024242e6fed163418ab81bebc1c83f693bb0b/openai-3.7.0.tar.gz", hash = "sha256:e836eb7effee89df802cd0c7d1bad8de8c993976cf238c44d5b5b844f5aefd38", size = 1455615, upload-time = "2026-09-02T01:30:54.555Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d3/9d/77e0f43f04ae51a3d21bb08bd372a752856b86ee22648b1458c93a623927/openai-3.7.0-py3-none-any.whl", hash = "sha256:008fa33e0a01dc71039c27355ef8f476eed690e8e48bec18183878dcd32fb841", size = 1699594, upload-time = "2026-09-02T01:30:52.445Z" },
 ]
 
 [[package]]

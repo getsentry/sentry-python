@@ -121,8 +121,6 @@ class PydanticAIIntegration(Integration):
         _patch_agent_run()
         _patch_tool_execution()
 
-        PydanticAIIntegration.using_request_hooks = False
-
         # ModelRequestContext.model added in https://github.com/pydantic/pydantic-ai/commit/f1260dfe09907f17688eee1646daf898fc428d4c
         if PYDANTIC_AI_VERSION < (1, 73):
             _patch_graph_nodes()

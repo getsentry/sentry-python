@@ -4,6 +4,7 @@ import sys
 import weakref
 
 import sentry_sdk
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
@@ -72,6 +73,18 @@ class PyramidIntegration(Integration):
             integration = client.get_integration(PyramidIntegration)
             if integration is None:
                 return old_call_view(registry, request, *args, **kwargs)
+
+            route_path = None
+            try:
+                route_path = request.matched_route.pattern
+            except Exception:
+                pass
+
+            server_span = sentry_sdk.get_current_scope()._server_segment_span
+            if server_span is not None and route_path is not None:
+                server_span.set_attribute(
+                    SPANDATA.HTTP_ROUTE, request.matched_route.pattern
+                )
 
             _set_transaction_name_and_source(
                 sentry_sdk.get_current_scope(), integration.transaction_style, request

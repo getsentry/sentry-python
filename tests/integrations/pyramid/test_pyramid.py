@@ -10,6 +10,7 @@ from werkzeug.test import Client
 
 import sentry_sdk
 from sentry_sdk import add_breadcrumb, capture_message
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.pyramid import PyramidIntegration
 from sentry_sdk.serializer import MAX_DATABAG_BREADTH
 from sentry_sdk.traces import SpanStatus
@@ -151,6 +152,28 @@ def test_transaction_style(
     (segment,) = spans
     assert segment["name"] == expected_transaction
     assert segment["attributes"]["sentry.segment.name.source"] == expected_source
+
+
+def test_http_route(
+    sentry_init,
+    get_client,
+    capture_items,
+):
+    sentry_init(
+        integrations=[PyramidIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    items = capture_items("span")
+
+    client = get_client()
+    client.get("/message/123456")
+
+    sentry_sdk.flush()
+
+    (segment,) = [item.payload for item in items if item.payload.get("is_segment")]
+    assert segment["attributes"][SPANDATA.HTTP_ROUTE] == "/message/{message_id}"
 
 
 @pytest.mark.parametrize("max_value_length", [1024, None])

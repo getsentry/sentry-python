@@ -76,6 +76,7 @@ typing = [
     "huggingface-hub>=1.26.1",
     "anthropic>=1.2.0",
     "google-genai>=2.21.0",
+    "openai>=3.7.0",
 ]
 test = [
     "dataclasses ; python_full_version < '3.7'",
