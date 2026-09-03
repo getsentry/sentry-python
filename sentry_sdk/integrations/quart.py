@@ -5,6 +5,7 @@ from functools import wraps
 from typing import TYPE_CHECKING
 
 import sentry_sdk
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.data_collection import _apply_data_collection_filtering_to_query_string
 from sentry_sdk.integrations import DidNotEnable, Integration
 from sentry_sdk.integrations._wsgi_common import _filter_headers
@@ -180,6 +181,10 @@ async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
         request_websocket = request._get_current_object()
     if has_websocket_context():
         request_websocket = websocket._get_current_object()
+
+    server_span = sentry_sdk.get_current_scope()._server_segment_span
+    if server_span is not None:
+        server_span.set_attribute(SPANDATA.HTTP_ROUTE, request.url_rule.rule)
 
     # Set the transaction name here, but rely on ASGI middleware
     # to actually start the transaction
