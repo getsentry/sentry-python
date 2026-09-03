@@ -5,7 +5,6 @@ import sentry_sdk
 from sentry_sdk import capture_message, start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
-from tests.conftest import ApproxDict
 
 
 @pytest.mark.asyncio
@@ -35,7 +34,6 @@ async def test_async_basic(sentry_init, capture_events):
     }
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize(
     "is_transaction, send_default_pii, expected_first_ten",
     [
@@ -57,62 +55,36 @@ async def test_async_redis_pipeline(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     connection = FakeRedis()
 
-    if span_streaming:
-        items = capture_items("span")
-        with sentry_sdk.traces.start_span(name="custom parent"):
-            pipeline = connection.pipeline(transaction=is_transaction)
-            pipeline.get("foo")
-            pipeline.set("bar", 1)
-            pipeline.set("baz", 2)
-            await pipeline.execute()
-        sentry_sdk.flush()
+    items = capture_items("span")
 
-        assert len(items) == 2
-        pipeline_span, parent_span = items[0].payload, items[1].payload
+    with sentry_sdk.traces.start_span(name="custom parent"):
+        pipeline = connection.pipeline(transaction=is_transaction)
+        pipeline.get("foo")
+        pipeline.set("bar", 1)
+        pipeline.set("baz", 2)
+        await pipeline.execute()
 
-        assert parent_span["name"] == "custom parent"
-        assert pipeline_span["name"] == "redis.pipeline.execute"
-        attrs = pipeline_span["attributes"]
-        assert attrs["sentry.op"] == "db.redis"
-        assert attrs[SPANDATA.DB_SYSTEM_NAME] == "redis"
-        assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis-py"
-        assert attrs[SPANDATA.DB_NAMESPACE] == "0"
-        assert attrs[SPANDATA.SERVER_ADDRESS] == (
-            connection.connection_pool.connection_kwargs.get("host")
-        )
-        assert attrs[SPANDATA.SERVER_PORT] == 6379
-    else:
-        events = capture_events()
-        with start_transaction():
-            pipeline = connection.pipeline(transaction=is_transaction)
-            pipeline.get("foo")
-            pipeline.set("bar", 1)
-            pipeline.set("baz", 2)
-            await pipeline.execute()
+    sentry_sdk.flush()
 
-        (event,) = events
-        (span,) = event["spans"]
-        assert span["op"] == "db.redis"
-        assert span["description"] == "redis.pipeline.execute"
-        assert span["data"] == ApproxDict(
-            {
-                "redis.commands": {
-                    "count": 3,
-                    "first_ten": expected_first_ten,
-                },
-                SPANDATA.DB_SYSTEM: "redis",
-                SPANDATA.DB_NAME: "0",
-                SPANDATA.SERVER_ADDRESS: connection.connection_pool.connection_kwargs.get(
-                    "host"
-                ),
-                SPANDATA.SERVER_PORT: 6379,
-            }
-        )
+    assert len(items) == 2
+    pipeline_span, parent_span = items[0].payload, items[1].payload
+
+    assert parent_span["name"] == "custom parent"
+    assert pipeline_span["name"] == "redis.pipeline.execute"
+    attrs = pipeline_span["attributes"]
+    assert attrs["sentry.op"] == "db.redis"
+    assert attrs[SPANDATA.DB_SYSTEM_NAME] == "redis"
+    assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis-py"
+    assert attrs[SPANDATA.DB_NAMESPACE] == "0"
+    assert attrs[SPANDATA.SERVER_ADDRESS] == (
+        connection.connection_pool.connection_kwargs.get("host")
+    )
+    assert attrs[SPANDATA.SERVER_PORT] == 6379
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])

@@ -14,10 +14,7 @@ from sentry_sdk.integrations.redis.utils import (
     _extract_key,
     _get_safe_command,
     _set_client_data,
-    _set_pipeline_data,
 )
-from sentry_sdk.tracing import Span
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
@@ -34,7 +31,7 @@ def patch_redis_async_pipeline(
     pipeline_cls: "Union[type[Pipeline[Any]], type[ClusterPipeline[Any]]]",
     is_cluster: bool,
     get_command_args_fn: "Any",
-    set_db_data_fn: "Callable[[Union[Span, StreamedSpan], Any], None]",
+    set_db_data_fn: "Callable[[StreamedSpan, Any], None]",
 ) -> None:
     old_execute = pipeline_cls.execute
 
@@ -55,44 +52,20 @@ def patch_redis_async_pipeline(
             },
         )
 
-        span_streaming = has_span_streaming_enabled(client.options)
+        if sentry_sdk.traces.get_current_span() is None:
+            return await old_execute(self, *args, **kwargs)
 
-        span: "Union[Span, StreamedSpan]"
-        if span_streaming:
-            if sentry_sdk.traces.get_current_span() is None:
-                return await old_execute(self, *args, **kwargs)
-            span = sentry_sdk.traces.start_span(
-                name="redis.pipeline.execute",
-                attributes={
-                    "sentry.origin": SPAN_ORIGIN,
-                    "sentry.op": OP.DB_REDIS,
-                },
-            )
-        else:
-            span = sentry_sdk.start_span(
-                op=OP.DB_REDIS,
-                name="redis.pipeline.execute",
-                origin=SPAN_ORIGIN,
-            )
+        span = sentry_sdk.traces.start_span(
+            name="redis.pipeline.execute",
+            attributes={
+                "sentry.origin": SPAN_ORIGIN,
+                "sentry.op": OP.DB_REDIS,
+            },
+        )
 
         with span:
             with capture_internal_exceptions():
-                try:
-                    command_seq = self._execution_strategy._command_queue
-                except AttributeError:
-                    if is_cluster:
-                        command_seq = self._command_stack
-                    else:
-                        command_seq = self.command_stack
-
                 set_db_data_fn(span, self)
-                _set_pipeline_data(
-                    span,
-                    is_cluster,
-                    get_command_args_fn,
-                    False if is_cluster else self.is_transaction,
-                    command_seq,
-                )
 
             return await old_execute(self, *args, **kwargs)
 
@@ -102,7 +75,7 @@ def patch_redis_async_pipeline(
 def patch_redis_async_client(
     cls: "Union[type[Redis[Any]], type[RedisCluster[Any]]]",
     is_cluster: bool,
-    set_db_data_fn: "Callable[[Union[Span, StreamedSpan], Any], None]",
+    set_db_data_fn: "Callable[[StreamedSpan, Any], None]",
 ) -> None:
     old_execute_command = cls.execute_command
 
@@ -134,9 +107,7 @@ def patch_redis_async_client(
             data=breadcrumb_data,
         )
 
-        span_streaming = has_span_streaming_enabled(client.options)
-
-        if span_streaming and sentry_sdk.traces.get_current_span() is None:
+        if sentry_sdk.traces.get_current_span() is None:
             return await old_execute_command(self, name, *args, **kwargs)
 
         cache_properties = _compile_cache_span_properties(
@@ -152,24 +123,16 @@ def patch_redis_async_client(
                 _get_safe_command(name, args)
             )
 
-        cache_span: "Optional[Union[Span, StreamedSpan]]" = None
+        cache_span: "Optional[StreamedSpan]" = None
         if cache_properties["is_cache_key"] and cache_properties["op"] is not None:
-            if span_streaming:
-                cache_span = sentry_sdk.traces.start_span(
-                    name=cache_properties["description"],
-                    attributes={
-                        "sentry.op": cache_properties["op"],
-                        "sentry.origin": SPAN_ORIGIN,
-                        **additional_cache_span_attributes,
-                    },
-                )
-            else:
-                cache_span = sentry_sdk.start_span(
-                    op=cache_properties["op"],
-                    name=cache_properties["description"],
-                    origin=SPAN_ORIGIN,
-                )
-            cache_span.__enter__()
+            cache_span = sentry_sdk.traces.start_span(
+                name=cache_properties["description"],
+                attributes={
+                    "sentry.op": cache_properties["op"],
+                    "sentry.origin": SPAN_ORIGIN,
+                    **additional_cache_span_attributes,
+                },
+            )
 
         additional_db_span_attributes = {}
         with capture_internal_exceptions():
@@ -177,34 +140,25 @@ def patch_redis_async_client(
                 name, args
             )
 
-        db_span: "Union[Span, StreamedSpan]"
-        if span_streaming:
-            db_span = sentry_sdk.traces.start_span(
-                name=db_properties["description"],
-                attributes={
-                    "sentry.op": db_properties["op"],
-                    "sentry.origin": SPAN_ORIGIN,
-                    **additional_db_span_attributes,
-                },
-            )
-        else:
-            db_span = sentry_sdk.start_span(
-                op=db_properties["op"],
-                name=db_properties["description"],
-                origin=SPAN_ORIGIN,
-            )
-        db_span.__enter__()
+        db_span = sentry_sdk.traces.start_span(
+            name=db_properties["description"],
+            attributes={
+                "sentry.op": db_properties["op"],
+                "sentry.origin": SPAN_ORIGIN,
+                **additional_db_span_attributes,
+            },
+        )
 
         set_db_data_fn(db_span, self)
         _set_client_data(db_span, is_cluster, name, *args)
 
         value = await old_execute_command(self, name, *args, **kwargs)
 
-        db_span.__exit__(None, None, None)
+        db_span.end()
 
         if cache_span:
             _set_cache_data(cache_span, self, cache_properties, value)
-            cache_span.__exit__(None, None, None)
+            cache_span.end()
 
         return value
 

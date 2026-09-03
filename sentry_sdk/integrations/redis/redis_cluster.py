@@ -16,7 +16,7 @@ from sentry_sdk.integrations.redis.utils import _parse_rediscluster_command
 from sentry_sdk.utils import capture_internal_exceptions
 
 if TYPE_CHECKING:
-    from typing import Any, Union
+    from typing import Any
 
     from redis import RedisCluster
     from redis.asyncio.cluster import (
@@ -27,11 +27,10 @@ if TYPE_CHECKING:
     )
 
     from sentry_sdk.traces import StreamedSpan
-    from sentry_sdk.tracing import Span
 
 
 def _set_async_cluster_db_data(
-    span: "Union[Span, StreamedSpan]",
+    span: "StreamedSpan",
     async_redis_cluster_instance: "AsyncRedisCluster[Any]",
 ) -> None:
     default_node = async_redis_cluster_instance.get_default_node()
@@ -40,7 +39,7 @@ def _set_async_cluster_db_data(
 
 
 def _set_async_cluster_pipeline_db_data(
-    span: "Union[Span, StreamedSpan]",
+    span: "StreamedSpan",
     async_redis_cluster_pipeline_instance: "AsyncClusterPipeline[Any]",
 ) -> None:
     with capture_internal_exceptions():
@@ -61,7 +60,7 @@ def _set_async_cluster_pipeline_db_data(
 
 
 def _set_cluster_db_data(
-    span: "Union[Span, StreamedSpan]", redis_cluster_instance: "RedisCluster[Any]"
+    span: "StreamedSpan", redis_cluster_instance: "RedisCluster[Any]"
 ) -> None:
     default_node = redis_cluster_instance.get_default_node()
 
