@@ -13,8 +13,6 @@ from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import SOURCE_FOR_STYLE as SEGMENT_SOURCE_FOR_STYLE
 from sentry_sdk.traces import StreamedSpan, get_current_span
-from sentry_sdk.tracing import SOURCE_FOR_STYLE as TRANSACTION_SOURCE_FOR_STYLE
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
@@ -119,15 +117,10 @@ def patch_scaffold_route() -> None:
                 @wraps(old_func)
                 @ensure_integration_enabled(QuartIntegration, old_func)
                 def _sentry_func(*args: "Any", **kwargs: "Any") -> "Any":
-                    client = sentry_sdk.get_client()
-                    if has_span_streaming_enabled(client.options):
-                        span = get_current_span()
-                        if span is not None and hasattr(span, "_segment"):
-                            span._segment._update_active_thread()
-                    else:
-                        current_scope = sentry_sdk.get_current_scope()
-                        if current_scope.transaction is not None:
-                            current_scope.transaction.update_active_thread()
+                    span = get_current_span()
+
+                    if span is not None and hasattr(span, "_segment"):
+                        span._segment._update_active_thread()
 
                     return old_func(*args, **kwargs)
 
@@ -149,11 +142,7 @@ def _set_transaction_name_and_source(
             "endpoint": request.url_rule.endpoint,
         }
 
-        source = (
-            SEGMENT_SOURCE_FOR_STYLE[transaction_style]
-            if has_span_streaming_enabled(sentry_sdk.get_client().options)
-            else TRANSACTION_SOURCE_FOR_STYLE[transaction_style]
-        )
+        source = SEGMENT_SOURCE_FOR_STYLE[transaction_style]
 
         scope.set_transaction_name(
             name=name_for_style[transaction_style],
@@ -191,79 +180,50 @@ async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
 
     scope = sentry_sdk.get_isolation_scope()
 
-    if has_span_streaming_enabled(sentry_sdk.get_client().options):
-        current_span = get_current_span()
-        if type(current_span) is StreamedSpan:
-            segment = current_span._segment
+    current_span = get_current_span()
+    if type(current_span) is StreamedSpan:
+        segment = current_span._segment
 
-            segment.set_attribute("http.request.method", request_websocket.method)
-            header_attributes: "dict[str, Any]" = {}
+        segment.set_attribute("http.request.method", request_websocket.method)
+        header_attributes: "dict[str, Any]" = {}
 
-            for header, header_value in _filter_headers(
-                dict(request_websocket.headers), use_annotated_value=False
-            ).items():
-                header_attributes[f"http.request.header.{header.lower()}"] = (
-                    header_value
-                )
+        for header, header_value in _filter_headers(
+            dict(request_websocket.headers), use_annotated_value=False
+        ).items():
+            header_attributes[f"http.request.header.{header.lower()}"] = header_value
 
-            segment.set_attributes(header_attributes)
+        segment.set_attributes(header_attributes)
 
-            client_options = sentry_sdk.get_client().options
-            filtered_query_string = None
-            if has_data_collection_enabled(client_options):
-                query_string = request_websocket.query_string.decode(
-                    "utf-8", errors="replace"
-                )
-                if query_string:
-                    filtered_query_string = (
-                        _apply_data_collection_filtering_to_query_string(
-                            query_string=query_string,
-                            behaviour=client_options["data_collection"][
-                                "url_query_params"
-                            ],
-                        )
+        client_options = sentry_sdk.get_client().options
+        filtered_query_string = None
+        if has_data_collection_enabled(client_options):
+            query_string = request_websocket.query_string.decode(
+                "utf-8", errors="replace"
+            )
+            if query_string:
+                filtered_query_string = (
+                    _apply_data_collection_filtering_to_query_string(
+                        query_string=query_string,
+                        behaviour=client_options["data_collection"]["url_query_params"],
                     )
-                    if filtered_query_string:
-                        segment.set_attribute(
-                            "url.query",
-                            filtered_query_string,
-                        )
-
-                parsed_url = parse_url(request_websocket.url)
-                segment.set_attribute(
-                    "url.full",
-                    f"{parsed_url.url}?{filtered_query_string}"
-                    if filtered_query_string
-                    else parsed_url.url,
                 )
+                if filtered_query_string:
+                    segment.set_attribute(
+                        "url.query",
+                        filtered_query_string,
+                    )
 
-                if client_options["data_collection"]["user_info"]:
-                    user_properties = {}
+            parsed_url = parse_url(request_websocket.url)
+            segment.set_attribute(
+                "url.full",
+                f"{parsed_url.url}?{filtered_query_string}"
+                if filtered_query_string
+                else parsed_url.url,
+            )
 
-                    if len(request_websocket.access_route) >= 1:
-                        segment.set_attribute(
-                            "client.address", request_websocket.access_route[0]
-                        )
-                        user_properties["ip_address"] = request_websocket.access_route[
-                            0
-                        ]
-
-                    current_user_id = _get_current_user_id_from_quart()
-                    if current_user_id:
-                        user_properties["id"] = current_user_id
-
-                    if user_properties:
-                        existing_user_properties = scope._user or {}
-                        scope.set_user({**existing_user_properties, **user_properties})
-
-            elif should_send_default_pii():
-                segment.set_attribute("url.full", request_websocket.url)
-                segment.set_attribute(
-                    "url.query",
-                    request_websocket.query_string.decode("utf-8", errors="replace"),
-                )
-
+            if client_options["data_collection"]["user_info"]:
                 user_properties = {}
+
                 if len(request_websocket.access_route) >= 1:
                     segment.set_attribute(
                         "client.address", request_websocket.access_route[0]
@@ -277,6 +237,28 @@ async def _request_websocket_started(app: "Quart", **kwargs: "Any") -> None:
                 if user_properties:
                     existing_user_properties = scope._user or {}
                     scope.set_user({**existing_user_properties, **user_properties})
+
+        elif should_send_default_pii():
+            segment.set_attribute("url.full", request_websocket.url)
+            segment.set_attribute(
+                "url.query",
+                request_websocket.query_string.decode("utf-8", errors="replace"),
+            )
+
+            user_properties = {}
+            if len(request_websocket.access_route) >= 1:
+                segment.set_attribute(
+                    "client.address", request_websocket.access_route[0]
+                )
+                user_properties["ip_address"] = request_websocket.access_route[0]
+
+            current_user_id = _get_current_user_id_from_quart()
+            if current_user_id:
+                user_properties["id"] = current_user_id
+
+            if user_properties:
+                existing_user_properties = scope._user or {}
+                scope.set_user({**existing_user_properties, **user_properties})
 
     evt_processor = _make_request_event_processor(app, request_websocket, integration)
     scope.add_event_processor(evt_processor)
