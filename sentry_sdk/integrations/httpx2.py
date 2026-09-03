@@ -14,6 +14,7 @@ from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     ensure_integration_enabled,
+    nullcontext,
     parse_url,
     parse_version,
 )
@@ -66,39 +67,45 @@ def _install_httpx2_client() -> None:
 
         if is_span_streaming_enabled:
             if sentry_sdk.traces.get_current_span() is None:
-                propagate_trace_headers(client, request)
-                return real_send(self, request, **kwargs)
+                span_ctx = nullcontext()
+            else:
+                span_ctx = sentry_sdk.traces.start_span(
+                    name="%s %s"
+                    % (
+                        request.method,
+                        parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
+                    ),
+                    attributes={
+                        "sentry.op": OP.HTTP_CLIENT,
+                        "sentry.origin": Httpx2Integration.origin,
+                        "http.request.method": request.method,
+                    },
+                )
 
             url_attributes = get_url_attributes(client, parsed_url)
 
-            with sentry_sdk.traces.start_span(
-                name="%s %s"
-                % (
-                    request.method,
-                    parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
-                ),
-                attributes={
-                    "sentry.op": OP.HTTP_CLIENT,
-                    "sentry.origin": Httpx2Integration.origin,
-                    "http.request.method": request.method,
-                },
-            ) as streamed_span:
-                attributes: "Attributes" = dict(url_attributes)
-
+            with span_ctx as streamed_span:
                 propagate_trace_headers(client, request)
 
                 try:
                     rv = real_send(self, request, **kwargs)
 
-                    streamed_span.status = "error" if rv.status_code >= 400 else "ok"
-                    attributes["http.response.status_code"] = rv.status_code
+                    if streamed_span is not None:
+                        streamed_span.status = (
+                            "error" if rv.status_code >= 400 else "ok"
+                        )
+                        streamed_span.set_attribute(
+                            "http.response.status_code", rv.status_code
+                        )
                 finally:
-                    streamed_span.set_attributes(attributes)
+                    if streamed_span is not None:
+                        streamed_span.set_attributes(url_attributes)
 
-                # Needs to happen within the context manager as we want to attach the
-                # final data before the span finishes and is sent for ingesting.
-                with capture_internal_exceptions():
-                    add_http_request_source(streamed_span)
+                if streamed_span is not None:
+                    # Needs to happen within the context manager as we want to attach the
+                    # final data before the span finishes and is sent for ingesting.
+                    with capture_internal_exceptions():
+                        add_http_request_source(streamed_span)
         else:
             with sentry_sdk.start_span(
                 op=OP.HTTP_CLIENT,
@@ -143,7 +150,7 @@ def _install_httpx2_client() -> None:
             elif url_attributes:
                 breadcrumb_data.update(
                     {
-                        "url": url_attributes.get("url.full", parsed_url.url),
+                        "url": url_attributes.get("url.full", ""),
                         SPANDATA.HTTP_QUERY: url_attributes.get("url.query", ""),
                         SPANDATA.HTTP_FRAGMENT: url_attributes.get("url.fragment", ""),
                     }
@@ -175,39 +182,45 @@ def _install_httpx2_async_client() -> None:
 
         if is_span_streaming_enabled:
             if sentry_sdk.traces.get_current_span() is None:
-                propagate_trace_headers(client, request)
-                return await real_send(self, request, **kwargs)
+                span_ctx = nullcontext()
+            else:
+                span_ctx = sentry_sdk.traces.start_span(
+                    name="%s %s"
+                    % (
+                        request.method,
+                        parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
+                    ),
+                    attributes={
+                        "sentry.op": OP.HTTP_CLIENT,
+                        "sentry.origin": Httpx2Integration.origin,
+                        "http.request.method": request.method,
+                    },
+                )
 
             url_attributes = get_url_attributes(client, parsed_url)
 
-            with sentry_sdk.traces.start_span(
-                name="%s %s"
-                % (
-                    request.method,
-                    parsed_url.url if parsed_url else SENSITIVE_DATA_SUBSTITUTE,
-                ),
-                attributes={
-                    "sentry.op": OP.HTTP_CLIENT,
-                    "sentry.origin": Httpx2Integration.origin,
-                    "http.request.method": request.method,
-                },
-            ) as streamed_span:
-                attributes: "Attributes" = dict(url_attributes)
-
+            with span_ctx as streamed_span:
                 propagate_trace_headers(client, request)
 
                 try:
                     rv = await real_send(self, request, **kwargs)
 
-                    streamed_span.status = "error" if rv.status_code >= 400 else "ok"
-                    attributes["http.response.status_code"] = rv.status_code
+                    if streamed_span is not None:
+                        streamed_span.status = (
+                            "error" if rv.status_code >= 400 else "ok"
+                        )
+                        streamed_span.set_attribute(
+                            "http.response.status_code", rv.status_code
+                        )
                 finally:
-                    streamed_span.set_attributes(attributes)
+                    if streamed_span is not None:
+                        streamed_span.set_attributes(url_attributes)
 
-                # Needs to happen within the context manager as we want to attach the
-                # final data before the span finishes and is sent for ingesting.
-                with capture_internal_exceptions():
-                    add_http_request_source(streamed_span)
+                if streamed_span is not None:
+                    # Needs to happen within the context manager as we want to attach the
+                    # final data before the span finishes and is sent for ingesting.
+                    with capture_internal_exceptions():
+                        add_http_request_source(streamed_span)
         else:
             with sentry_sdk.start_span(
                 op=OP.HTTP_CLIENT,
@@ -251,7 +264,7 @@ def _install_httpx2_async_client() -> None:
             elif url_attributes:
                 breadcrumb_data.update(
                     {
-                        "url": url_attributes.get("url.full", parsed_url.url),
+                        "url": url_attributes.get("url.full", ""),
                         SPANDATA.HTTP_QUERY: url_attributes.get("url.query", ""),
                         SPANDATA.HTTP_FRAGMENT: url_attributes.get("url.fragment", ""),
                     }
