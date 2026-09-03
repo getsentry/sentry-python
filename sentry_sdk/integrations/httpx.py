@@ -1,3 +1,4 @@
+from contextlib import nullcontext
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -14,7 +15,6 @@ from sentry_sdk.utils import (
     SENSITIVE_DATA_SUBSTITUTE,
     capture_internal_exceptions,
     ensure_integration_enabled,
-    nullcontext,
     parse_url,
     parse_version,
 )
