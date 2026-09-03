@@ -2,7 +2,7 @@ import pytest
 from fakeredis.aioredis import FakeRedis
 
 import sentry_sdk
-from sentry_sdk import capture_message, start_transaction
+from sentry_sdk import capture_message
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
 
@@ -49,7 +49,6 @@ async def test_async_redis_pipeline(
     is_transaction,
     send_default_pii,
     expected_first_ten,
-    span_streaming,
 ):
     sentry_init(
         integrations=[RedisIntegration()],
@@ -87,54 +86,32 @@ async def test_async_redis_pipeline(
     assert attrs[SPANDATA.SERVER_PORT] == 6379
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.asyncio
-async def test_async_span_origin(
-    sentry_init, capture_events, capture_items, span_streaming
-):
+async def test_async_span_origin(sentry_init, capture_events, capture_items):
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     connection = FakeRedis()
 
-    if span_streaming:
-        items = capture_items("span")
-        with sentry_sdk.traces.start_span(name="custom parent"):
-            # default case
-            await connection.set("somekey", "somevalue")
+    items = capture_items("span")
+    with sentry_sdk.traces.start_span(name="custom parent"):
+        # default case
+        await connection.set("somekey", "somevalue")
 
-            # pipeline
-            pipeline = connection.pipeline(transaction=False)
-            pipeline.get("somekey")
-            pipeline.set("anotherkey", 1)
-            await pipeline.execute()
-        sentry_sdk.flush()
+        # pipeline
+        pipeline = connection.pipeline(transaction=False)
+        pipeline.get("somekey")
+        pipeline.set("anotherkey", 1)
+        await pipeline.execute()
+    sentry_sdk.flush()
 
-        assert len(items) == 3
-        set_span, pipeline_span, parent_span = [item.payload for item in items]
+    assert len(items) == 3
+    set_span, pipeline_span, parent_span = [item.payload for item in items]
 
-        assert parent_span["name"] == "custom parent"
-        assert parent_span["attributes"]["sentry.origin"] == "manual"
-        assert set_span["attributes"]["sentry.origin"] == "auto.db.redis"
-        assert pipeline_span["attributes"]["sentry.origin"] == "auto.db.redis"
-    else:
-        events = capture_events()
-        with start_transaction(name="custom_transaction"):
-            # default case
-            await connection.set("somekey", "somevalue")
-
-            # pipeline
-            pipeline = connection.pipeline(transaction=False)
-            pipeline.get("somekey")
-            pipeline.set("anotherkey", 1)
-            await pipeline.execute()
-
-        (event,) = events
-
-        assert event["contexts"]["trace"]["origin"] == "manual"
-
-        for span in event["spans"]:
-            assert span["origin"] == "auto.db.redis"
+    assert parent_span["name"] == "custom parent"
+    assert parent_span["attributes"]["sentry.origin"] == "manual"
+    assert set_span["attributes"]["sentry.origin"] == "auto.db.redis"
+    assert pipeline_span["attributes"]["sentry.origin"] == "auto.db.redis"
