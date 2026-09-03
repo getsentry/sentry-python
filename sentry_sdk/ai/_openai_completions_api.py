@@ -1,11 +1,13 @@
 from collections.abc import Iterable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
-    from typing import Union
+    from typing import TypeGuard, Union
 
     from openai.types.chat import (
         ChatCompletionContentPartParam,
+        ChatCompletionContentPartRefusalParam,
+        ChatCompletionContentPartTextParam,
         ChatCompletionMessageParam,
         ChatCompletionSystemMessageParam,
         ChatCompletionToolUnionParam,
@@ -14,13 +16,15 @@ if TYPE_CHECKING:
     from sentry_sdk._types import TextPart, ToolDefinition
 
 
-def _is_system_instruction(message: "ChatCompletionMessageParam") -> bool:
+def _is_system_instruction(
+    message: "ChatCompletionMessageParam",
+) -> "TypeGuard[ChatCompletionSystemMessageParam]":
     return isinstance(message, dict) and message.get("role") == "system"
 
 
 def _get_system_instructions(
     messages: "Iterable[ChatCompletionMessageParam]",
-) -> "list[ChatCompletionMessageParam]":
+) -> "list[ChatCompletionSystemMessageParam]":
     if not isinstance(messages, Iterable):
         return []
 
@@ -28,7 +32,7 @@ def _get_system_instructions(
 
 
 def _get_text_items(
-    content: "Union[str, Iterable[ChatCompletionContentPartParam]]",
+    content: "Union[str, Iterable[Union[ChatCompletionContentPartParam, ChatCompletionContentPartTextParam, ChatCompletionContentPartRefusalParam]]]",
 ) -> "list[str]":
     if isinstance(content, str):
         return [content]
@@ -36,10 +40,10 @@ def _get_text_items(
     if not isinstance(content, Iterable):
         return []
 
-    text_items = []
+    text_items: "list[str]" = []
     for part in content:
         if isinstance(part, dict) and part.get("type") == "text":
-            text = part.get("text", None)
+            text = cast("ChatCompletionContentPartTextParam", part).get("text", None)
             if text is not None:
                 text_items.append(text)
 

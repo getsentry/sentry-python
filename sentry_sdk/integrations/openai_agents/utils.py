@@ -155,7 +155,9 @@ def _set_input_data(
             )
 
     non_system_messages = [
-        message for message in messages if not _is_system_instruction(message)
+        message
+        for message in messages
+        if not _is_system_instruction(message)  # type: ignore[arg-type]
     ]
     for message in non_system_messages:
         if "role" in message:

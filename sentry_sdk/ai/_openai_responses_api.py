@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Iterable, cast
 
 if TYPE_CHECKING:
-    from typing import Iterable, Union
+    from typing import Iterable, TypeGuard, Union
 
     from openai.types.responses import (
         ResponseInputItemParam,
@@ -15,7 +15,9 @@ if TYPE_CHECKING:
     from sentry_sdk._types import TextPart, ToolDefinition
 
 
-def _is_system_instruction(message: "ResponseInputItemParam") -> bool:
+def _is_system_instruction(
+    message: "ResponseInputItemParam",
+) -> "TypeGuard[Union[EasyInputMessageParam, Message]]":
     if not isinstance(message, dict) or not message.get("role") == "system":
         return False
 
@@ -24,7 +26,7 @@ def _is_system_instruction(message: "ResponseInputItemParam") -> bool:
 
 def _get_system_instructions(
     messages: "Union[str, ResponseInputParam]",
-) -> "list[ResponseInputItemParam]":
+) -> "list[Union[EasyInputMessageParam, Message]]":
     if not isinstance(messages, list):
         return []
 
