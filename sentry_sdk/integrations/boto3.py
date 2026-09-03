@@ -82,7 +82,7 @@ class Boto3Integration(Integration):
         _check_minimum_version(Boto3Integration, version, "botocore")
 
         orig_init = BaseClient.__init__
-        orig_make_api_call = BaseClient._make_api_call
+        orig_make_api_call = BaseClient._make_api_call  # type: ignore
 
         def sentry_patched_init(
             self: "BaseClient", *args: "Any", **kwargs: "Any"
@@ -127,7 +127,7 @@ class Boto3Integration(Integration):
             return parsed
 
         BaseClient.__init__ = sentry_patched_init  # type: ignore
-        BaseClient._make_api_call = sentry_patched_make_api_call
+        BaseClient._make_api_call = sentry_patched_make_api_call  # type: ignore
 
 
 def _start_client_span(
@@ -143,10 +143,10 @@ def _start_client_span(
     )
 
     if has_span_streaming_enabled(client.options):
-        if sentry_sdk.traces.get_current_span() is None:  # type: ignore[attr-defined]
+        if sentry_sdk.traces.get_current_span() is None:
             return None
 
-        return sentry_sdk.traces.start_span(  # type: ignore[attr-defined]
+        return sentry_sdk.traces.start_span(
             name=description,
             attributes={
                 SPANDATA.SENTRY_OP: OP.HTTP_CLIENT,
@@ -306,7 +306,7 @@ def _sentry_request_created(
         _add_request_breadcrumb(request)
 
         if has_span_streaming_enabled(client.options):
-            span = sentry_sdk.traces.get_current_span()  # type: ignore[attr-defined]
+            span = sentry_sdk.traces.get_current_span()
         else:
             span = sentry_sdk.get_current_span()
         if span is None:
