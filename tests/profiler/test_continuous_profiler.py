@@ -27,6 +27,23 @@ except ImportError:
 requires_gevent = pytest.mark.skipif(gevent is None, reason="gevent not enabled")
 
 
+def wait_for_profiler_to_stop(envelopes, timeout=1.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        profiler_stopped = get_profiler_id() is None
+        profile_flushed = any(
+            item.type == "profile_chunk"
+            for envelope in envelopes
+            for item in envelope.items
+        )
+        if profiler_stopped and profile_flushed:
+            return
+        time.sleep(0.01)
+
+    assert get_profiler_id() is None, "profiler should not be running"
+    pytest.fail("profiler should have flushed a profile chunk")
+
+
 def get_client_options(use_top_level_profiler_mode):
     def client_options(
         mode=None, auto_start=None, profile_session_sample_rate=1.0, lifecycle="manual"
@@ -807,9 +824,7 @@ def test_continuous_profiler_auto_start_and_stop_sampled(
             assert profiler_id is not None, "profiler should be running"
             profiler_ids.add(profiler_id)
 
-        # wait at least 1 cycle for the profiler to stop
-        time.sleep(0.2)
-        assert get_profiler_id() is None, "profiler should not be running"
+        wait_for_profiler_to_stop(envelopes)
 
         assert len(profiler_ids) == 1
         all_profiler_ids.add(profiler_ids.pop())
@@ -891,9 +906,7 @@ def test_continuous_profiler_auto_start_and_stop_sampled_span_streaming(
             assert profiler_id is not None, "profiler should be running"
             profiler_ids.add(profiler_id)
 
-        # wait at least 1 cycle for the profiler to stop
-        time.sleep(0.2)
-        assert get_profiler_id() is None, "profiler should not be running"
+        wait_for_profiler_to_stop(envelopes)
 
         assert len(profiler_ids) == 1
         all_profiler_ids.add(profiler_ids.pop())
