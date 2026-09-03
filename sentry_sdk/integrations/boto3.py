@@ -1,4 +1,3 @@
-from functools import partial
 from typing import TYPE_CHECKING
 
 import sentry_sdk
@@ -20,11 +19,9 @@ from sentry_sdk.utils import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional, Type, Union
+    from typing import Any, Dict, Optional, Union
 
     from botocore.model import ServiceId
-
-    from sentry_sdk.client import BaseClient as SentryBaseClient
 
 
 try:
@@ -53,19 +50,18 @@ class Boto3Integration(Integration):
         ) -> None:
             orig_init(self, *args, **kwargs)
             meta = self.meta
-            service_id = meta.service_model.service_id
-            meta.events.register(
-                "request-created",
-                partial(_sentry_request_created, service_id=service_id),
-            )
+            meta.events.register("request-created", _sentry_request_created)
             # run after other `before-sign` handlers, allowing it to see and preserve existing baggage.
             meta.events.register_last("before-sign", _sentry_before_sign)
-            meta.events.register("after-call", _sentry_after_call)
-            meta.events.register("after-call-error", _sentry_after_call_error)
 
         def sentry_patched_make_api_call(
             self: "BaseClient", operation_name: str, api_params: "Any"
         ) -> "Any":
+            """
+            Own the client span lifecycle for one `_make_api_call()` invocation. The span covers
+            the entire client-side lifecycle, including all retries performed by botocore.
+            https://opentelemetry.io/docs/specs/semconv/rpc/rpc-spans/#rpc-client-span
+            """
             client = sentry_sdk.get_client()
             if client.get_integration(Boto3Integration) is None:
                 return orig_make_api_call(self, operation_name, api_params)
@@ -107,7 +103,7 @@ def _start_client_span(
     description = "aws.%s.%s" % (service_id.hyphenize(), operation_name)
 
     if has_span_streaming_enabled(client.options):
-        if sentry_sdk.traces.get_current_span() is not None:  # type: ignore[attr-defined]
+        if sentry_sdk.traces.get_current_span() is None:  # type: ignore[attr-defined]
             return None
 
         return sentry_sdk.traces.start_span(  # type: ignore[attr-defined]
@@ -188,6 +184,7 @@ def _finish_client_span(
 
     body.close = sentry_streaming_body_close  # type: ignore
 
+
 def _finish_client_span_with_error(
     span: "Union[Span, StreamedSpan]",
     exception: "BaseException",
@@ -207,10 +204,7 @@ def _set_request_attributes(
             parsed_url = parse_url(request.url, sanitize=False)
 
     if isinstance(span, StreamedSpan):
-        if parsed_url is not None:
-            span.set_attribute(SPANDATA.URL_FULL, parsed_url.url)
-            span.set_attribute(SPANDATA.HTTP_QUERY, parsed_url.query)
-            span.set_attribute(SPANDATA.HTTP_FRAGMENT, parsed_url.fragment)
+        span.set_attributes(get_url_attributes(client, parsed_url))
 
         if request.method is not None:
             span.set_attribute(SPANDATA.HTTP_REQUEST_METHOD, request.method)
@@ -226,15 +220,60 @@ def _set_request_attributes(
         span.set_data(SPANDATA.HTTP_METHOD, request.method)
 
 
+def _add_request_breadcrumb(request: "AWSRequest") -> None:
+    client = sentry_sdk.get_client()
+
+    parsed_url = None
+    if request.url is not None:
+        with capture_internal_exceptions():
+            parsed_url = parse_url(request.url, sanitize=False)
+
+    breadcrumb: "dict[str, Any]" = {}
+
+    if has_span_streaming_enabled(client.options):
+        breadcrumb.update(get_url_attributes(client, parsed_url))
+        if request.method is not None:
+            breadcrumb[SPANDATA.HTTP_REQUEST_METHOD] = request.method
+    else:
+        if parsed_url is not None:
+            breadcrumb.update(
+                {
+                    "aws.request.url": parsed_url.url,
+                    SPANDATA.HTTP_QUERY: parsed_url.query,
+                    SPANDATA.HTTP_FRAGMENT: parsed_url.fragment,
+                }
+            )
+
+        if request.method is not None:
+            breadcrumb[SPANDATA.HTTP_METHOD] = request.method
+
+    add_http_breadcrumb(None, breadcrumb)
+
+
 def _sentry_request_created(
-    service_id: "ServiceId", request: "AWSRequest", operation_name: str, **kwargs: "Any"
+    request: "AWSRequest", operation_name: str, **kwargs: "Any"
 ) -> None:
-    span = _start_client_span(service_id, operation_name)
+    """
+    Enrich a single `AWSRequest` attempt. Botocore creates a fresh `AWSRequest` on every retry.
+    https://github.com/boto/botocore/blob/develop/botocore/endpoint.py#L178-L202
+    """
+    client = sentry_sdk.get_client()
+    if client.get_integration(Boto3Integration) is None:
+        return
+
+    _add_request_breadcrumb(request)
+
+    if has_span_streaming_enabled(client.options):
+        span = sentry_sdk.traces.get_current_span()  # type: ignore[attr-defined]
+    else:
+        span = sentry_sdk.get_current_span()
     if span is None:
         return
+
     _set_request_attributes(span, request)
-    span.__enter__()
+    # each attempt has a fresh `request.context`; carry the active client span.
     request.context["_sentrysdk_span"] = span
+
 
 def _sentry_before_sign(
     request: "AWSRequest", signature_version: "Any", **kwargs: "Any"
@@ -288,22 +327,3 @@ def _sentry_before_sign(
             _replace_header(
                 request, BAGGAGE_HEADER_NAME, combined_baggage[BAGGAGE_HEADER_NAME]
             )
-
-
-def _sentry_after_call(
-    context: "Dict[str, Any]", parsed: "Dict[str, Any]", **kwargs: "Any"
-) -> None:
-    span: "Optional[Union[Span, StreamedSpan]]" = context.pop("_sentrysdk_span", None)
-    if span is None:
-        return
-    _finish_client_span(span, parsed)
-
-
-def _sentry_after_call_error(
-    context: "Dict[str, Any]", exception: "Type[BaseException]", **kwargs: "Any"
-) -> None:
-    span: "Optional[Union[Span, StreamedSpan]]" = context.pop("_sentrysdk_span", None)
-    # Span could be absent if the integration is disabled.
-    if span is None:
-        return
-    _finish_client_span_with_error(span, exception) # type: ignore[arg-type]
