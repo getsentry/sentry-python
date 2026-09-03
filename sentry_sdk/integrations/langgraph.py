@@ -17,7 +17,6 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
-    should_truncate_gen_ai_input,
 )
 from sentry_sdk.utils import (
     has_data_collection_enabled,
@@ -231,7 +230,7 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                             truncate_and_annotate_messages(
                                 normalized_input_messages, span, scope
                             )
-                            if should_truncate_gen_ai_input(client.options)
+                            if not has_span_streaming_enabled(client.options)
                             else normalized_input_messages
                         )
                         if messages_data is not None:
@@ -273,7 +272,7 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                             truncate_and_annotate_messages(
                                 normalized_input_messages, span, scope
                             )
-                            if should_truncate_gen_ai_input(client.options)
+                            if not has_span_streaming_enabled(client.options)
                             else normalized_input_messages
                         )
                         if messages_data is not None:
@@ -332,7 +331,7 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                             truncate_and_annotate_messages(
                                 normalized_input_messages, span, scope
                             )
-                            if should_truncate_gen_ai_input(client.options)
+                            if not has_span_streaming_enabled(client.options)
                             else normalized_input_messages
                         )
                         if messages_data is not None:
@@ -371,7 +370,7 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                         truncate_and_annotate_messages(
                             normalized_input_messages, span, scope
                         )
-                        if should_truncate_gen_ai_input(client.options)
+                        if not has_span_streaming_enabled(client.options)
                         else normalized_input_messages
                     )
                     if messages_data is not None:

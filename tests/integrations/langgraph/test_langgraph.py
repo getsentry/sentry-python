@@ -2105,6 +2105,7 @@ def test_langgraph_message_truncation(sentry_init, capture_events):
 def test_graph_bubble_up_ignored(sentry_init, capture_items):
     sentry_init(
         integrations=[LanggraphIntegration()],
+        stream_gen_ai_spans=False,
     )
 
     events = capture_items("event")
