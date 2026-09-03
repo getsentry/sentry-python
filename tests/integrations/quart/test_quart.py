@@ -14,6 +14,7 @@ from sentry_sdk import (
     set_tag,
 )
 from sentry_sdk._types import SENSITIVE_DATA_SUBSTITUTE
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.utils import parse_version
 
@@ -174,6 +175,29 @@ async def test_transaction_style(
 
     (event,) = events
     assert event["transaction"] == expected_transaction
+
+
+@pytest.mark.asyncio
+async def test_http_route(
+    sentry_init,
+    capture_items,
+):
+    sentry_init(
+        integrations=[quart_sentry.QuartIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    app = quart_app_factory()
+    items = capture_items("span")
+
+    client = app.test_client()
+    await client.get("/message/123456")
+
+    sentry_sdk.flush()
+
+    (segment,) = [item.payload for item in items if item.payload.get("is_segment")]
+    assert segment["attributes"][SPANDATA.HTTP_ROUTE] == "/message/<message_id>"
 
 
 @pytest.mark.asyncio

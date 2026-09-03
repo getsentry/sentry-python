@@ -2,10 +2,10 @@ import json
 from typing import TYPE_CHECKING
 
 import sentry_sdk
-from sentry_sdk.ai._openai_completions_api import _transform_system_instructions
 from sentry_sdk.ai._openai_responses_api import (
     _get_system_instructions,
     _is_system_instruction,
+    _transform_system_instructions,
 )
 from sentry_sdk.ai.utils import (
     GEN_AI_ALLOWED_MESSAGE_ROLES,
@@ -140,8 +140,6 @@ def _set_input_data(
 
     system_instructions = _get_system_instructions(messages)
 
-    # Deliberate use of function accepting completions API type because
-    # of shared structure FOR THIS PURPOSE ONLY.
     instructions_text_parts += _transform_system_instructions(system_instructions)
 
     if len(instructions_text_parts) > 0:
@@ -157,7 +155,9 @@ def _set_input_data(
             )
 
     non_system_messages = [
-        message for message in messages if not _is_system_instruction(message)
+        message
+        for message in messages
+        if not _is_system_instruction(message)  # type: ignore[arg-type]
     ]
     for message in non_system_messages:
         if "role" in message:

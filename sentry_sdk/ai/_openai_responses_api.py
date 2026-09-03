@@ -1,18 +1,23 @@
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING, Iterable, cast
 
 if TYPE_CHECKING:
-    from typing import Iterable, Union
+    from typing import Iterable, TypeGuard, Union
 
     from openai.types.responses import (
         ResponseInputItemParam,
         ResponseInputParam,
+        ResponseInputTextParam,
         ToolParam,
     )
+    from openai.types.responses.easy_input_message_param import EasyInputMessageParam
+    from openai.types.responses.response_input_item_param import Message
 
-    from sentry_sdk._types import ToolDefinition
+    from sentry_sdk._types import TextPart, ToolDefinition
 
 
-def _is_system_instruction(message: "ResponseInputItemParam") -> bool:
+def _is_system_instruction(
+    message: "ResponseInputItemParam",
+) -> "TypeGuard[Union[EasyInputMessageParam, Message]]":
     if not isinstance(message, dict) or not message.get("role") == "system":
         return False
 
@@ -21,11 +26,42 @@ def _is_system_instruction(message: "ResponseInputItemParam") -> bool:
 
 def _get_system_instructions(
     messages: "Union[str, ResponseInputParam]",
-) -> "list[ResponseInputItemParam]":
+) -> "list[Union[EasyInputMessageParam, Message]]":
     if not isinstance(messages, list):
         return []
 
     return [message for message in messages if _is_system_instruction(message)]
+
+
+def _transform_system_instructions(
+    system_instructions: "list[Union[EasyInputMessageParam, Message]]",
+) -> "list[TextPart]":
+    instruction_text_parts: "list[TextPart]" = []
+
+    for instruction in system_instructions:
+        if not isinstance(instruction, dict):
+            continue
+
+        content = instruction.get("content")
+        if content is None:
+            continue
+
+        if isinstance(content, str):
+            instruction_text_parts.append({"type": "text", "content": content})
+            continue
+
+        if not isinstance(content, Iterable):
+            continue
+
+        for part in content:
+            if not isinstance(part, dict) or part.get("type") != "input_text":
+                continue
+
+            text = cast("ResponseInputTextParam", part).get("text", None)
+            if text is not None:
+                instruction_text_parts.append({"type": "text", "content": text})
+
+    return instruction_text_parts
 
 
 def _transform_tool_definitions(tools: "Iterable[ToolParam]") -> "list[ToolDefinition]":
