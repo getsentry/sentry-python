@@ -21,7 +21,6 @@ from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
     _get_value,
     has_span_streaming_enabled,
-    should_truncate_gen_ai_input,
 )
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -438,7 +437,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
                 scope = sentry_sdk.get_current_scope()
                 messages_data = (
                     truncate_and_annotate_messages(normalized_messages, span, scope)
-                    if should_truncate_gen_ai_input(client.options)
+                    if not has_span_streaming_enabled(client.options)
                     else normalized_messages
                 )
                 if messages_data is not None:
@@ -551,7 +550,7 @@ class SentryLangchainCallback(BaseCallbackHandler):
                 scope = sentry_sdk.get_current_scope()
                 messages_data = (
                     truncate_and_annotate_messages(normalized_messages, span, scope)
-                    if should_truncate_gen_ai_input(client.options)
+                    if not has_span_streaming_enabled(client.options)
                     else normalized_messages
                 )
                 if messages_data is not None:
@@ -1183,7 +1182,7 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
                     scope = sentry_sdk.get_current_scope()
                     messages_data = (
                         truncate_and_annotate_messages(normalized_messages, span, scope)
-                        if should_truncate_gen_ai_input(client.options)
+                        if not has_span_streaming_enabled(client.options)
                         else normalized_messages
                     )
                     if messages_data is not None:
@@ -1225,7 +1224,7 @@ def _wrap_agent_executor_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]"
                     scope = sentry_sdk.get_current_scope()
                     messages_data = (
                         truncate_and_annotate_messages(normalized_messages, span, scope)
-                        if should_truncate_gen_ai_input(client.options)
+                        if not has_span_streaming_enabled(client.options)
                         else normalized_messages
                     )
                     if messages_data is not None:
@@ -1303,7 +1302,7 @@ def _wrap_agent_executor_stream(f: "Callable[..., Any]") -> "Callable[..., Any]"
             scope = sentry_sdk.get_current_scope()
             messages_data = (
                 truncate_and_annotate_messages(normalized_messages, span, scope)
-                if should_truncate_gen_ai_input(client.options)
+                if not has_span_streaming_enabled(client.options)
                 else normalized_messages
             )
             if messages_data is not None:
