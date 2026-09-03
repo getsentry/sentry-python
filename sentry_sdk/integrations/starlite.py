@@ -8,7 +8,6 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
@@ -153,24 +152,18 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
             return await old_call(self, scope, receive, send)
 
         middleware_name = self.__class__.__name__
-        is_span_streaming_enabled = has_span_streaming_enabled(client.options)
 
         def _start_middleware_span(op: str, name: str) -> "Any":
-            if is_span_streaming_enabled:
-                if sentry_sdk.traces.get_current_span() is None:
-                    return nullcontext()
-                return sentry_sdk.traces.start_span(
-                    name=name,
-                    attributes={
-                        "sentry.op": op,
-                        "sentry.origin": StarliteIntegration.origin,
-                        SPANDATA.MIDDLEWARE_NAME: middleware_name,
-                    },
-                )
-            return sentry_sdk.start_span(
-                op=op,
+            if sentry_sdk.traces.get_current_span() is None:
+                return nullcontext()
+
+            return sentry_sdk.traces.start_span(
                 name=name,
-                origin=StarliteIntegration.origin,
+                attributes={
+                    "sentry.op": op,
+                    "sentry.origin": StarliteIntegration.origin,
+                    SPANDATA.MIDDLEWARE_NAME: middleware_name,
+                },
             )
 
         with _start_middleware_span(op=OP.MIDDLEWARE_STARLITE, name=middleware_name):
