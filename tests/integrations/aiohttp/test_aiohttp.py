@@ -734,6 +734,7 @@ async def test_outgoing_trace_headers_append_to_baggage(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
     )
 
@@ -790,6 +791,8 @@ async def test_request_source_disabled(
 
     client = await aiohttp_client(app)
     await client.get("/")
+
+    sentry_sdk.flush()
 
     (span, segment) = [item.payload for item in items]
 
