@@ -1883,6 +1883,42 @@ async def test_transaction_style_span_streaming(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "url,expected_route",
+    [
+        ("/message", "/{var}"),
+    ],
+)
+async def test_http_route(
+    sentry_init,
+    aiohttp_client,
+    capture_items,
+    url,
+    expected_route,
+):
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    async def hello(request):
+        return web.Response(text="hello")
+
+    app = web.Application()
+    app.router.add_get(r"/{var}", hello)
+
+    items = capture_items("span")
+
+    client = await aiohttp_client(app)
+    await client.get(url)
+
+    sentry_sdk.flush()
+    (segment,) = (item.payload for item in items if item.payload.get("is_segment"))
+    assert segment["attributes"][SPANDATA.HTTP_ROUTE] == expected_route
+
+
+@pytest.mark.asyncio
 async def test_server_error_span_streaming(sentry_init, aiohttp_client, capture_items):
     sentry_init(
         integrations=[AioHttpIntegration()],
