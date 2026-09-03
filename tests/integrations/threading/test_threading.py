@@ -160,6 +160,7 @@ def test_spans_from_multiple_threads(
     sentry_sdk.flush()
 
     spans = [item.payload for item in items]
+    assert len(spans) == 11
 
     for span in spans:
         if span["name"] == "outer-seg":
