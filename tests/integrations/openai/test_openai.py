@@ -3036,14 +3036,12 @@ def test_span_origin_nonstreaming_chat(
     )
     items = capture_items("transaction", "span")
 
-    with sentry_sdk.traces.start_span(name="openai tx"):
-        client.chat.completions.create(
-            model="some-model", messages=[{"role": "system", "content": "hello"}]
-        )
+    client.chat.completions.create(
+        model="some-model", messages=[{"role": "system", "content": "hello"}]
+    )
 
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
-    assert spans[1]["attributes"]["sentry.origin"] == "manual"
     assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
 
 
@@ -3076,14 +3074,12 @@ async def test_span_origin_nonstreaming_chat_async(
     )
     items = capture_items("transaction", "span")
 
-    with sentry_sdk.traces.start_span(name="openai tx"):
-        await client.chat.completions.create(
-            model="some-model", messages=[{"role": "system", "content": "hello"}]
-        )
+    await client.chat.completions.create(
+        model="some-model", messages=[{"role": "system", "content": "hello"}]
+    )
 
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
-    assert spans[1]["attributes"]["sentry.origin"] == "manual"
     assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
 
 
@@ -3138,16 +3134,14 @@ def test_span_origin_streaming_chat(
     items = capture_items("transaction", "span")
 
     client.chat.completions._post = mock.Mock(return_value=returned_stream)
-    with sentry_sdk.traces.start_span(name="openai tx"):
-        response_stream = client.chat.completions.create(
-            model="some-model", messages=[{"role": "system", "content": "hello"}]
-        )
+    response_stream = client.chat.completions.create(
+        model="some-model", messages=[{"role": "system", "content": "hello"}]
+    )
 
-        "".join(map(lambda x: x.choices[0].delta.content, response_stream))
+    "".join(map(lambda x: x.choices[0].delta.content, response_stream))
 
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
-    assert spans[1]["attributes"]["sentry.origin"] == "manual"
     assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
 
 
@@ -3209,18 +3203,16 @@ async def test_span_origin_streaming_chat_async(
     client.chat.completions._post = AsyncMock(return_value=returned_stream)
     items = capture_items("transaction", "span")
 
-    with sentry_sdk.traces.start_span(name="openai tx"):
-        response_stream = await client.chat.completions.create(
-            model="some-model", messages=[{"role": "system", "content": "hello"}]
-        )
-        async for _ in response_stream:
-            pass
+    response_stream = await client.chat.completions.create(
+        model="some-model", messages=[{"role": "system", "content": "hello"}]
+    )
+    async for _ in response_stream:
+        pass
 
-        # "".join(map(lambda x: x.choices[0].delta.content, response_stream))
+    # "".join(map(lambda x: x.choices[0].delta.content, response_stream))
 
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
-    assert spans[1]["attributes"]["sentry.origin"] == "manual"
     assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
 
 
@@ -3250,12 +3242,10 @@ def test_span_origin_embeddings(
     client.embeddings._post = mock.Mock(return_value=returned_embedding)
     items = capture_items("transaction", "span")
 
-    with sentry_sdk.traces.start_span(name="openai tx"):
-        client.embeddings.create(input="hello", model="text-embedding-3-large")
+    client.embeddings.create(input="hello", model="text-embedding-3-large")
 
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
-    assert spans[1]["attributes"]["sentry.origin"] == "manual"
     assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
 
 
@@ -3286,12 +3276,10 @@ async def test_span_origin_embeddings_async(
     client.embeddings._post = AsyncMock(return_value=returned_embedding)
     items = capture_items("transaction", "span")
 
-    with sentry_sdk.traces.start_span(name="openai tx"):
-        await client.embeddings.create(input="hello", model="text-embedding-3-large")
+    await client.embeddings.create(input="hello", model="text-embedding-3-large")
 
     sentry_sdk.flush()
     spans = [item.payload for item in items if item.type == "span"]
-    assert spans[1]["attributes"]["sentry.origin"] == "manual"
     assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.openai"
 
 
@@ -3673,21 +3661,20 @@ def test_ai_client_span_responses_api_no_pii(
     client.responses._post = mock.Mock(return_value=EXAMPLE_RESPONSE)
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="openai tx"):
-        client.responses.create(
-            model="gpt-4o",
-            instructions="You are a coding assistant that talks like a pirate.",
-            input="How do I check if a Python object is an instance of a class?",
-            max_output_tokens=100,
-            temperature=0.7,
-            top_p=0.9,
-            reasoning={"effort": "high"},
-        )
+    client.responses.create(
+        model="gpt-4o",
+        instructions="You are a coding assistant that talks like a pirate.",
+        input="How do I check if a Python object is an instance of a class?",
+        max_output_tokens=100,
+        temperature=0.7,
+        top_p=0.9,
+        reasoning={"effort": "high"},
+    )
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
 
-    assert len(spans) == 2
+    assert len(spans) == 1
     expected_attributes = {
         "gen_ai.operation.name": "responses",
         "gen_ai.request.max_tokens": 100,
@@ -3705,7 +3692,6 @@ def test_ai_client_span_responses_api_no_pii(
         "gen_ai.usage.total_tokens": 30,
         "sentry.op": "gen_ai.responses",
         "sentry.origin": "auto.ai.openai",
-        "sentry.segment.name": "openai tx",
     }
 
     for attr, value in expected_attributes.items():
@@ -3732,30 +3718,29 @@ def test_ai_client_span_responses_tool_definitions(
     client.responses._post = mock.Mock(return_value=EXAMPLE_RESPONSE)
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="openai tx"):
-        client.responses.create(
-            model="gpt-4o",
-            input="How do I check if a Python object is an instance of a class?",
-            tools=[
-                FunctionToolParam(
-                    type="function",
-                    name="name",
-                    description="description",
-                    parameters={
-                        "type": "object",
-                        "properties": {
-                            "city": {"type": "string"},
-                            "state": {"type": "string"},
-                        },
-                        "required": ["city", "state"],
-                        "additionalProperties": False,
+    client.responses.create(
+        model="gpt-4o",
+        input="How do I check if a Python object is an instance of a class?",
+        tools=[
+            FunctionToolParam(
+                type="function",
+                name="name",
+                description="description",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "city": {"type": "string"},
+                        "state": {"type": "string"},
                     },
-                    strict=True,
-                ),
-                CustomToolParam(type="custom", name="name", description="description"),
-                WebSearchToolParam(type="web_search"),
-            ],
-        )
+                    "required": ["city", "state"],
+                    "additionalProperties": False,
+                },
+                strict=True,
+            ),
+            CustomToolParam(type="custom", name="name", description="description"),
+            WebSearchToolParam(type="web_search"),
+        ],
+    )
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -3949,21 +3934,20 @@ def test_ai_client_span_responses_api(
     client.responses._post = mock.Mock(return_value=EXAMPLE_RESPONSE)
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="openai tx"):
-        client.responses.create(
-            model="gpt-4o",
-            instructions=instructions,
-            input=input,
-            max_output_tokens=100,
-            temperature=0.7,
-            top_p=0.9,
-            reasoning={"effort": "high"},
-        )
+    client.responses.create(
+        model="gpt-4o",
+        instructions=instructions,
+        input=input,
+        max_output_tokens=100,
+        temperature=0.7,
+        top_p=0.9,
+        reasoning={"effort": "high"},
+    )
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
 
-    assert len(spans) == 2
+    assert len(spans) == 1
 
     expected_data = {
         "gen_ai.operation.name": "responses",
@@ -3984,7 +3968,6 @@ def test_ai_client_span_responses_api(
         "gen_ai.response.text": "the model response",
         "sentry.op": "gen_ai.responses",
         "sentry.origin": "auto.ai.openai",
-        "sentry.segment.name": "openai tx",
     }
 
     if expected_system_instructions is not None:
@@ -4150,13 +4133,12 @@ def test_responses_api_data_collection(
     create_kwargs.update(extra_kwargs)
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="openai tx"):
-        client.responses.create(**create_kwargs)
+    client.responses.create(**create_kwargs)
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
 
-    assert len(spans) == 2
+    assert len(spans) == 1
     span_data = spans[0]["attributes"]
 
     # Non-input data is always collected, regardless of data collection config
@@ -4579,12 +4561,11 @@ def test_error_in_responses_api(
     )
     items = capture_items("event", "span")
 
-    with sentry_sdk.traces.start_span(name="openai tx"), pytest.raises(OpenAIError):
-        client.responses.create(
-            model="gpt-4o",
-            instructions="You are a coding assistant that talks like a pirate.",
-            input="How do I check if a Python object is an instance of a class?",
-        )
+    client.responses.create(
+        model="gpt-4o",
+        instructions="You are a coding assistant that talks like a pirate.",
+        input="How do I check if a Python object is an instance of a class?",
+    )
 
     # make sure the span where the error occurred is captured
     sentry_sdk.flush()
@@ -4765,21 +4746,20 @@ async def test_ai_client_span_responses_async_api(
     client.responses._post = AsyncMock(return_value=EXAMPLE_RESPONSE)
     items = capture_items("span")
 
-    with sentry_sdk.traces.start_span(name="openai tx"):
-        await client.responses.create(
-            model="gpt-4o",
-            instructions=instructions,
-            input=input,
-            max_output_tokens=100,
-            temperature=0.7,
-            top_p=0.9,
-            reasoning={"effort": "high"},
-        )
+    await client.responses.create(
+        model="gpt-4o",
+        instructions=instructions,
+        input=input,
+        max_output_tokens=100,
+        temperature=0.7,
+        top_p=0.9,
+        reasoning={"effort": "high"},
+    )
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
 
-    assert len(spans) == 2
+    assert len(spans) == 1
 
     expected_data = {
         "gen_ai.operation.name": "responses",
@@ -4800,7 +4780,6 @@ async def test_ai_client_span_responses_async_api(
         "gen_ai.response.text": "the model response",
         "sentry.op": "gen_ai.responses",
         "sentry.origin": "auto.ai.openai",
-        "sentry.segment.name": "openai tx",
     }
 
     if expected_system_instructions is not None:
@@ -4982,12 +4961,11 @@ async def test_ai_client_span_streaming_responses_async_api(
     )
     items = capture_items("span")
 
-    ctx = sentry_sdk.traces.start_span(name="openai tx")
     with mock.patch.object(
         client.responses._client._client,
         "send",
         return_value=returned_stream,
-    ), ctx:
+    ):
         result = await client.responses.create(
             model="gpt-4o",
             instructions=instructions,
@@ -5032,7 +5010,6 @@ async def test_ai_client_span_streaming_responses_async_api(
         "sentry.environment": "production",
         "sentry.op": "gen_ai.responses",
         "sentry.origin": "auto.ai.openai",
-        "sentry.segment.name": "openai tx",
     }
 
     if expected_system_instructions is not None:
@@ -5064,12 +5041,11 @@ async def test_error_in_responses_async_api(
     )
     items = capture_items("event", "span")
 
-    with sentry_sdk.traces.start_span(name="openai tx"), pytest.raises(OpenAIError):
-        await client.responses.create(
-            model="gpt-4o",
-            instructions="You are a coding assistant that talks like a pirate.",
-            input="How do I check if a Python object is an instance of a class?",
-        )
+    await client.responses.create(
+        model="gpt-4o",
+        instructions="You are a coding assistant that talks like a pirate.",
+        input="How do I check if a Python object is an instance of a class?",
+    )
 
     # make sure the span where the error occurred is captured
     sentry_sdk.flush()
