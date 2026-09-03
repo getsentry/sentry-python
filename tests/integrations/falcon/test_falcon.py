@@ -5,6 +5,7 @@ import falcon.testing
 import pytest
 
 import sentry_sdk
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.falcon import FalconIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 
@@ -125,6 +126,27 @@ def test_transaction_style(
 
     assert event["transaction"] == expected_transaction
     assert event["transaction_info"] == {"source": expected_source}
+
+
+def test_http_route(
+    sentry_init,
+    make_client,
+    capture_items,
+):
+    sentry_init(
+        integrations=[FalconIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
+
+    client = make_client()
+    items = capture_items("span")
+
+    client.simulate_get("/message/123456")
+
+    sentry_sdk.flush()
+    (segment,) = [item.payload for item in items if item.payload.get("is_segment")]
+    assert segment["attributes"][SPANDATA.HTTP_ROUTE] == "/message/{message_id:int}"
 
 
 def test_unhandled_errors(

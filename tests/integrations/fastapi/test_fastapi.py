@@ -576,7 +576,7 @@ def test_transaction_name(
     )
 
 
-def test_transaction_name_with_prefix(
+def test_http_route_with_prefix(
     sentry_init,
     capture_items,
 ):
@@ -610,6 +610,7 @@ def test_transaction_name_with_prefix(
     segment = segments[0]
     assert segment["name"] == "/api/users/{user_id}"
     assert segment["attributes"]["sentry.segment.name.source"] == "route"
+    assert segment["attributes"]["http.route"] == "/api/users/{user_id}"
 
 
 def test_route_endpoint_equal_dependant_call(sentry_init):

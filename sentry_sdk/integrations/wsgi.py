@@ -155,6 +155,7 @@ class SentryWsgiMiddleware:
                             },
                             parent_span=None,
                         )
+                        scope.get_current_scope()._server_segment_span = span_ctx
 
                     with span_ctx as span:
                         if span is not None:

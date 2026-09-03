@@ -860,6 +860,12 @@ class SPANDATA:
     Example: GET
     """
 
+    HTTP_ROUTE = "http.route"
+    """
+    The matched route, that is, the path template used to match the request.
+    Example: /users/{id}
+    """
+
     HTTP_QUERY = "http.query"
     """
     The Query string present in the URL.

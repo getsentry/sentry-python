@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 import sentry_sdk
+from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import RequestExtractor
 from sentry_sdk.integrations.wsgi import SentryWsgiMiddleware
@@ -95,6 +96,10 @@ class SentryFalconMiddleware:
         integration = client.get_integration(FalconIntegration)
         if integration is None:
             return
+
+        server_span = sentry_sdk.get_current_scope()._server_segment_span
+        if server_span is not None:
+            server_span.set_attribute(SPANDATA.HTTP_ROUTE, req.uri_template)
 
         name_for_style = {
             "uri_template": req.uri_template,

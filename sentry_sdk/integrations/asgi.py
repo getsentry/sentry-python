@@ -263,6 +263,7 @@ class SentryAsgiMiddleware:
                                     attributes=attributes,
                                     parent_span=None,
                                 )
+                                sentry_scope.get_current_scope()._server_segment_span = segment
                         else:
                             sentry_sdk.traces.new_trace()
 
@@ -273,6 +274,9 @@ class SentryAsgiMiddleware:
                                 name=transaction_name,
                                 attributes=attributes,
                                 parent_span=None,
+                            )
+                            sentry_scope.get_current_scope()._server_segment_span = (
+                                segment
                             )
 
                         span_ctx = segment or nullcontext()

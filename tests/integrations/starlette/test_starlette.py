@@ -1441,9 +1441,7 @@ def test_active_thread_id(sentry_init, capture_items, endpoint):
 
 
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
-def test_segment_name_is_route_resolved_name_span_streaming(
-    sentry_init, capture_items, endpoint
-):
+def test_http_route_span_streaming(sentry_init, capture_items, endpoint):
     sentry_init(
         auto_enabling_integrations=False,
         integrations=[StarletteIntegration(transaction_style="url")],
@@ -1464,6 +1462,7 @@ def test_segment_name_is_route_resolved_name_span_streaming(
     assert len(segments) == 1
     assert segments[0]["name"] == endpoint
     assert segments[0]["attributes"]["sentry.segment.name.source"] == "route"
+    assert segments[0]["attributes"]["http.route"] == endpoint
 
 
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
