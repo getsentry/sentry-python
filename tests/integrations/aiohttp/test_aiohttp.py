@@ -321,6 +321,8 @@ async def test_tracing_unparseable_url(sentry_init, aiohttp_client, capture_item
 
     assert resp.status == 200
 
+    sentry_sdk.flush()
+
     (span,) = [item.payload for item in items]
 
     assert (
@@ -385,6 +387,8 @@ async def test_has_trace_if_performance_enabled(
     client = await aiohttp_client(app)
     resp = await client.get("/")
     assert resp.status == 500
+
+    sentry_sdk.flush()
 
     msg_events = [
         i.payload for i in items if i.type == "event" and "exception" not in i.payload
@@ -1002,6 +1006,8 @@ async def test_no_request_source_if_duration_too_short(
 
     client = await aiohttp_client(app)
     await client.get("/")
+
+    sentry_sdk.flush()
 
     (
         span,
