@@ -33,6 +33,45 @@ except ImportError:
     raise DidNotEnable("botocore is not installed")
 
 
+class _ClientCallContext:
+    """Inputs and client metadata for one botocore client call."""
+
+    __slots__ = (
+        "client",
+        "service_name",
+        "service_id",
+        "operation_name",
+        "region_name",
+        "endpoint_url",
+        "api_version",
+        "api_params",
+    )
+
+    def __init__(
+        self,
+        client: "BaseClient",
+        operation_name: str,
+        api_params: "Any",
+    ) -> None:
+        client_meta = client.meta
+        service_model = client_meta.service_model
+
+        self.client: "BaseClient" = client
+        # botocore's internal identifier, e.g. "apigateway".
+        self.service_name: str = service_model.service_name
+        # modeled display identity, e.g. "API gateway".
+        self.service_id: "ServiceId" = service_model.service_id
+        self.operation_name: str = operation_name
+        self.region_name: "Optional[str]" = getattr(client_meta, "region_name", None)
+        self.endpoint_url: str = client_meta.endpoint_url
+        self.api_version: str = service_model.api_version
+        # params may contain streams or arbitrary sdk objects; make shallow copy
+        # so nested values preserve original identity.
+        self.api_params: "Dict[str, Any]" = (
+            dict(api_params) if isinstance(api_params, dict) else {}
+        )
+
+
 class Boto3Integration(Integration):
     identifier = "boto3"
     origin = f"auto.http.{identifier}"
@@ -66,12 +105,11 @@ class Boto3Integration(Integration):
             if client.get_integration(Boto3Integration) is None:
                 return orig_make_api_call(self, operation_name, api_params)
 
-            service_id = self.meta.service_model.service_id
-
             span: "Optional[Union[Span, StreamedSpan]]" = None
 
             with capture_internal_exceptions():
-                span = _start_client_span(service_id, operation_name)
+                call_context = _ClientCallContext(self, operation_name, api_params)
+                span = _start_client_span(call_context)
                 if span is not None:
                     span.__enter__()
 
@@ -93,14 +131,16 @@ class Boto3Integration(Integration):
 
 
 def _start_client_span(
-    service_id: "ServiceId",
-    operation_name: str,
+    call_context: "_ClientCallContext",
 ) -> "Optional[Union[Span, StreamedSpan]]":
     client = sentry_sdk.get_client()
     if client.get_integration(Boto3Integration) is None:
         return None
 
-    description = "aws.%s.%s" % (service_id.hyphenize(), operation_name)
+    description = "aws.%s.%s" % (
+        call_context.service_id.hyphenize(),
+        call_context.operation_name,
+    )
 
     if has_span_streaming_enabled(client.options):
         if sentry_sdk.traces.get_current_span() is None:  # type: ignore[attr-defined]
@@ -111,7 +151,8 @@ def _start_client_span(
             attributes={
                 SPANDATA.SENTRY_OP: OP.HTTP_CLIENT,
                 SPANDATA.SENTRY_ORIGIN: Boto3Integration.origin,
-                SPANDATA.RPC_METHOD: "%s/%s" % (service_id, operation_name),
+                SPANDATA.RPC_METHOD: "%s/%s"
+                % (call_context.service_id, call_context.operation_name),
             },
         )
 
@@ -120,8 +161,8 @@ def _start_client_span(
         op=OP.HTTP_CLIENT,
         origin=Boto3Integration.origin,
     )
-    span.set_tag("aws.service_id", service_id.hyphenize())
-    span.set_tag("aws.operation_name", operation_name)
+    span.set_tag("aws.service_id", call_context.service_id.hyphenize())
+    span.set_tag("aws.operation_name", call_context.operation_name)
     return span
 
 
