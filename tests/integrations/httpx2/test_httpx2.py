@@ -241,6 +241,7 @@ def test_crumb_capture_without_span_sync_span_streaming(
 
     sentry_init(
         integrations=[Httpx2Integration()],
+        trace_lifecycle="stream",
     )
 
     url = "http://example.com/"
@@ -261,10 +262,7 @@ def test_crumb_capture_without_span_sync_span_streaming(
     assert crumb["category"] == "httplib"
     assert crumb["data"] == ApproxDict(
         {
-            "url": url,
             SPANDATA.HTTP_METHOD: "GET",
-            SPANDATA.HTTP_FRAGMENT: "",
-            SPANDATA.HTTP_QUERY: "",
             SPANDATA.HTTP_STATUS_CODE: 200,
             "reason": "OK",
         }
@@ -315,6 +313,7 @@ async def test_crumb_capture_without_span_async_span_streaming(
 
     sentry_init(
         integrations=[Httpx2Integration()],
+        trace_lifecycle="stream",
     )
 
     url = "http://example.com/"
@@ -335,10 +334,7 @@ async def test_crumb_capture_without_span_async_span_streaming(
     assert crumb["category"] == "httplib"
     assert crumb["data"] == ApproxDict(
         {
-            "url": url,
             SPANDATA.HTTP_METHOD: "GET",
-            SPANDATA.HTTP_FRAGMENT: "",
-            SPANDATA.HTTP_QUERY: "",
             SPANDATA.HTTP_STATUS_CODE: 200,
             "reason": "OK",
         }
