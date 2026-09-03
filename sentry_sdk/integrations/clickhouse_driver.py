@@ -15,7 +15,7 @@ from sentry_sdk.utils import capture_internal_exceptions, has_data_collection_en
 # from: https://stackoverflow.com/a/71944042/300572
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from typing import Any, Callable, ParamSpec, Union
+    from typing import Any, Callable, Optional, ParamSpec, Union
 else:
     # Fake ParamSpec
     class ParamSpec:
@@ -79,7 +79,7 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
         if client.get_integration(ClickhouseDriverIntegration) is None:
             return f(*args, **kwargs)
 
-        connection = args[0]
+        connection: "Connection" = args[0]
         query = args[1]
         query_id = args[2] if len(args) > 2 else kwargs.get("query_id")
         params = args[3] if len(args) > 3 else kwargs.get("params")
@@ -95,6 +95,16 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
                         SPANDATA.DB_QUERY_TEXT: str(query),
                     },
                 )
+
+            connection._query = query
+            connection._breadcrumb_data = {
+                SPANDATA.DB_SYSTEM: "clickhouse",
+                SPANDATA.DB_NAME: connection.database,
+                SPANDATA.DB_DRIVER_NAME: "clickhouse-driver",
+                SPANDATA.SERVER_ADDRESS: connection.host,
+                SPANDATA.SERVER_PORT: connection.port,
+                SPANDATA.DB_USER: connection.user,
+            }
         else:
             span = sentry_sdk.start_span(
                 op=OP.DB,
@@ -114,7 +124,7 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
                 elif should_send_default_pii():
                     span.set_data("db.params", params)
 
-        connection._sentry_span = span  # type: ignore[attr-defined]
+        connection._sentry_span = span
 
         if span is not None:
             _set_db_data(span, connection)
@@ -130,8 +140,31 @@ def _wrap_start(f: "Callable[P, T]") -> "Callable[P, T]":
 def _wrap_end(f: "Callable[P, T]") -> "Callable[P, T]":
     def _inner_end(*args: "P.args", **kwargs: "P.kwargs") -> "T":
         res = f(*args, **kwargs)
-        instance = args[0]
-        span = getattr(instance.connection, "_sentry_span", None)  # type: ignore[attr-defined]
+        instance: "Client" = args[0]
+
+        query = getattr(instance.connection, "_query", None)
+        breadcrumb_data: "Optional[dict[str, Any]]" = getattr(
+            instance.connection, "_breadcrumb_data", None
+        )
+
+        if query is not None and breadcrumb_data is not None:
+            client_options = sentry_sdk.get_client().options
+            if (
+                has_data_collection_enabled(client_options)
+                and client_options["data_collection"]["database_query_data"]
+            ) or (
+                not has_data_collection_enabled(client_options)
+                and should_send_default_pii()
+            ):
+                breadcrumb_data = {"db.result": res, **breadcrumb_data}
+
+            sentry_sdk.get_isolation_scope().add_breadcrumb(
+                message=query,
+                category="query",
+                data={"db.result": res, **breadcrumb_data},
+            )
+
+        span = getattr(instance.connection, "_sentry_span", None)
 
         if span is None:
             return res

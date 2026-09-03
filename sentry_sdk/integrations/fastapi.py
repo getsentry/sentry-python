@@ -12,7 +12,7 @@ from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import has_data_collection_enabled, transaction_from_function
 
 if TYPE_CHECKING:
-    from typing import Any, Awaitable, Callable, Dict
+    from typing import Any, Awaitable, Callable, Dict, Optional
 
     from sentry_sdk._types import Event
 
@@ -50,34 +50,18 @@ class FastApiIntegration(StarletteIntegration):
 
 
 def _set_transaction_name_and_source(
-    scope: "sentry_sdk.Scope", transaction_style: str, request: "Any"
+    scope: "sentry_sdk.Scope",
+    transaction_style: str,
+    endpoint: "Optional[Callable[..., Any]]",
+    route_path: "Optional[str]",
 ) -> None:
     name = ""
 
-    if transaction_style == "endpoint":
-        endpoint = request.scope.get("endpoint")
-        if endpoint:
-            name = transaction_from_function(endpoint) or ""
+    if transaction_style == "endpoint" and endpoint:
+        name = transaction_from_function(endpoint) or ""
 
-    elif transaction_style == "url":
-        route = request.scope.get("route")
-
-        if route:
-            # FastAPI >= 0.137 stores the prefix-resolved path on an
-            # effective_route_context in scope["fastapi"], while
-            # scope["route"].path holds the unprefixed original.
-            # Prefer the effective context path when available.
-            effective_route_context = request.scope.get("fastapi", {}).get(
-                "effective_route_context"
-            )
-            context_path = getattr(effective_route_context, "path", None)
-
-            if context_path:
-                name = context_path
-            else:
-                path = getattr(route, "path", None)
-                if path is not None:
-                    name = path
+    elif transaction_style == "url" and route_path is not None:
+        name = route_path
 
     if not name:
         name = _DEFAULT_TRANSACTION_NAME
@@ -103,8 +87,35 @@ async def _wrap_async_handler(
 
     request = args[0]
 
+    route = request.scope.get("route")
+
+    route_path = None
+    if route:
+        # FastAPI >= 0.137 stores the prefix-resolved path on an
+        # effective_route_context in scope["fastapi"], while
+        # scope["route"].path holds the unprefixed original.
+        # Prefer the effective context path when available.
+        effective_route_context = request.scope.get("fastapi", {}).get(
+            "effective_route_context"
+        )
+        context_path = getattr(effective_route_context, "path", None)
+
+        if context_path:
+            route_path = context_path
+        else:
+            path = getattr(route, "path", None)
+            if path is not None:
+                route_path = path
+
+    server_span = sentry_sdk.get_current_scope()._server_segment_span
+    if server_span is not None and route_path is not None:
+        server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
+
     _set_transaction_name_and_source(
-        sentry_sdk.get_current_scope(), integration.transaction_style, request
+        sentry_sdk.get_current_scope(),
+        integration.transaction_style,
+        endpoint=request.scope.get("endpoint"),
+        route_path=route_path,
     )
     sentry_scope = sentry_sdk.get_isolation_scope()
     extractor = StarletteRequestExtractor(request)
