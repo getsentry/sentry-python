@@ -6,9 +6,17 @@ import pytest
 
 import sentry_sdk
 from sentry_sdk import capture_message
-from sentry_sdk.consts import MATCH_ALL, SPANDATA
+from sentry_sdk.consts import MATCH_ALL, OP, SPANDATA
 from sentry_sdk.integrations.httpx2 import Httpx2Integration
 from tests.conftest import ApproxDict
+
+
+def _get_http_client_span(items):
+    return next(
+        item.payload
+        for item in items
+        if item.payload.get("attributes", {}).get("sentry.op") == OP.HTTP_CLIENT
+    )
 
 
 @pytest.mark.parametrize("send_default_pii", [True, False])
@@ -380,10 +388,11 @@ def test_option_trace_propagation_targets_sync(
         release="test",
         trace_propagation_targets=trace_propagation_targets,
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         integrations=[Httpx2Integration()],
     )
 
-    with sentry_sdk.start_transaction():
+    with sentry_sdk.traces.start_span(name="span"):
         httpx2.Client().get(url)
 
     request_headers = httpx2_mock.get_request().headers
@@ -458,10 +467,11 @@ async def test_option_trace_propagation_targets_async(
         release="test",
         trace_propagation_targets=trace_propagation_targets,
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         integrations=[Httpx2Integration()],
     )
 
-    with sentry_sdk.start_transaction():
+    with sentry_sdk.traces.start_span(name="span"):
         await httpx2.AsyncClient().get(url)
 
     request_headers = httpx2_mock.get_request().headers
@@ -470,40 +480,6 @@ async def test_option_trace_propagation_targets_async(
         assert "sentry-trace" in request_headers
     else:
         assert "sentry-trace" not in request_headers
-
-
-@pytest.mark.tests_internal_exceptions
-def test_omit_url_data_if_parsing_fails(sentry_init, capture_events, httpx2_mock):
-    httpx2_mock.add_response()
-
-    sentry_init(integrations=[Httpx2Integration()])
-
-    httpx2_client = httpx2.Client()
-    url = "http://example.com"
-
-    events = capture_events()
-    with mock.patch(
-        "sentry_sdk.integrations.httpx2.parse_url",
-        side_effect=ValueError,
-    ):
-        response = httpx2_client.get(url)
-
-    assert response.status_code == 200
-    capture_message("Testing!")
-
-    (event,) = events
-    assert event["breadcrumbs"]["values"][0]["data"] == ApproxDict(
-        {
-            SPANDATA.HTTP_METHOD: "GET",
-            SPANDATA.HTTP_STATUS_CODE: 200,
-            # no url related data
-            "reason": "OK",
-        }
-    )
-
-    assert "url" not in event["breadcrumbs"]["values"][0]["data"]
-    assert SPANDATA.HTTP_FRAGMENT not in event["breadcrumbs"]["values"][0]["data"]
-    assert SPANDATA.HTTP_QUERY not in event["breadcrumbs"]["values"][0]["data"]
 
 
 def test_outgoing_trace_headers_sync(sentry_init, capture_items, httpx2_mock):
@@ -886,10 +862,7 @@ def test_request_source_sync(sentry_init, capture_items, httpx2_mock):
     is_relative_path = http_span["attributes"]["code.file.path"][0] != os.sep
     assert is_relative_path
 
-    assert (
-        http_span["attributes"][SPANDATA.CODE_FUNCTION]
-        == "test_request_source_span_streaming_sync"
-    )
+    assert http_span["attributes"][SPANDATA.CODE_FUNCTION] == "test_request_source_sync"
 
 
 @pytest.mark.asyncio
@@ -934,8 +907,7 @@ async def test_request_source_async(sentry_init, capture_items, httpx2_mock):
     assert is_relative_path
 
     assert (
-        http_span["attributes"][SPANDATA.CODE_FUNCTION]
-        == "test_request_source_span_streaming_async"
+        http_span["attributes"][SPANDATA.CODE_FUNCTION] == "test_request_source_async"
     )
 
 
@@ -1651,7 +1623,7 @@ async def test_url_query_data_collection_async(
         ),
     ],
 )
-def test_url_full_reassembly_span_streaming_sync(
+def test_url_full_reassembly_sync(
     sentry_init, capture_items, httpx2_mock, init_kwargs, expected_url_full
 ):
     httpx2_mock.add_response()
@@ -1699,7 +1671,7 @@ def test_url_full_reassembly_span_streaming_sync(
         ),
     ],
 )
-async def test_url_full_reassembly_span_streaming_async(
+async def test_url_full_reassembly_async(
     sentry_init, capture_items, httpx2_mock, init_kwargs, expected_url_full
 ):
     httpx2_mock.add_response()
@@ -1754,7 +1726,7 @@ async def test_url_full_reassembly_span_streaming_async(
         ),
     ],
 )
-def test_url_query_params_off_keeps_bare_url_span_streaming_sync(
+def test_url_query_params_off_keeps_bare_url_sync(
     sentry_init, capture_items, httpx2_mock, init_kwargs, expected_url_full
 ):
     httpx2_mock.add_response()
@@ -1817,7 +1789,7 @@ def test_url_query_params_off_keeps_bare_url_span_streaming_sync(
         ),
     ],
 )
-async def test_url_query_params_off_keeps_bare_url_span_streaming_async(
+async def test_url_query_params_off_keeps_bare_url_async(
     sentry_init, capture_items, httpx2_mock, init_kwargs, expected_url_full
 ):
     httpx2_mock.add_response()
@@ -1893,7 +1865,7 @@ async def test_url_query_params_off_keeps_bare_url_span_streaming_async(
         ),
     ],
 )
-def test_crumb_url_query_data_collection_span_streaming_sync(
+def test_crumb_url_query_data_collection_sync(
     sentry_init,
     capture_events,
     httpx2_mock,
@@ -1976,7 +1948,7 @@ def test_crumb_url_query_data_collection_span_streaming_sync(
         ),
     ],
 )
-async def test_crumb_url_query_data_collection_span_streaming_async(
+async def test_crumb_url_query_data_collection_async(
     sentry_init,
     capture_events,
     httpx2_mock,
@@ -2013,96 +1985,10 @@ async def test_crumb_url_query_data_collection_span_streaming_async(
         assert crumb["data"]["url"] == expected_url
         assert crumb["data"][SPANDATA.HTTP_QUERY] == expected_query
         assert crumb["data"][SPANDATA.HTTP_FRAGMENT] == expected_fragment
-
-
-@pytest.mark.parametrize(
-    "init_kwargs",
-    [
-        pytest.param(
-            {"_experiments": {"data_collection": {}}},
-            id="data_collection_denylist_default",
-        ),
-        pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
-            id="data_collection_off",
-        ),
-    ],
-)
-def test_crumb_url_query_unfiltered_legacy_sync(
-    sentry_init, capture_events, httpx2_mock, init_kwargs
-):
-    """
-    Behaviour that existed prior to data collection and span streaming.
-    Remove when we've dropped transaction support and have fully migrated
-    to span streaming.
-    """
-    httpx2_mock.add_response()
-
-    sentry_init(integrations=[Httpx2Integration()], **init_kwargs)
-
-    url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
-
-    events = capture_events()
-
-    httpx2.Client().get(url)
-    capture_message("Testing!")
-
-    (event,) = events
-
-    crumb = event["breadcrumbs"]["values"][0]
-
-    assert crumb["data"]["url"] == "http://example.com/"
-    assert crumb["data"][SPANDATA.HTTP_QUERY] == "toy=tennisball&color=red&auth=secret"
-    assert crumb["data"][SPANDATA.HTTP_FRAGMENT] == "frag"
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "init_kwargs",
-    [
-        pytest.param(
-            {"_experiments": {"data_collection": {}}},
-            id="data_collection_denylist_default",
-        ),
-        pytest.param(
-            {
-                "_experiments": {
-                    "data_collection": {"url_query_params": {"mode": "off"}}
-                }
-            },
-            id="data_collection_off",
-        ),
-    ],
-)
-async def test_crumb_url_query_unfiltered_legacy_async(
-    sentry_init, capture_events, httpx2_mock, init_kwargs
-):
-    httpx2_mock.add_response()
-
-    sentry_init(integrations=[Httpx2Integration()], **init_kwargs)
-
-    url = "http://example.com/?toy=tennisball&color=red&auth=secret#frag"
-
-    events = capture_events()
-
-    await httpx2.AsyncClient().get(url)
-    capture_message("Testing!")
-
-    (event,) = events
-
-    crumb = event["breadcrumbs"]["values"][0]
-
-    assert crumb["data"]["url"] == "http://example.com/"
-    assert crumb["data"][SPANDATA.HTTP_QUERY] == "toy=tennisball&color=red&auth=secret"
-    assert crumb["data"][SPANDATA.HTTP_FRAGMENT] == "frag"
 
 
 @pytest.mark.tests_internal_exceptions
-def test_omit_url_data_if_parsing_fails_span_streaming(
+def test_omit_url_data_if_parsing_fails(
     sentry_init, capture_events, capture_items, httpx2_mock
 ):
     httpx2_mock.add_response()
