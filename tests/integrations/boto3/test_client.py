@@ -30,7 +30,7 @@ def client_factory(sentry_init, monkeypatch, span_streaming):
         return session.client(
             "s3",
             config=Config(
-                # `total_max_attempts` is the total number of retries, including the initial request.
+                # `total_max_attempts` includes the initial request.
                 retries={"total_max_attempts": attempt_count, "mode": "standard"}
             ),
         )
@@ -44,7 +44,7 @@ def _mock_responses(client, status_codes):
 
     def record_request(request, **kwargs):
         requests_created.append(request)
-        span = sentry_sdk.traces.get_current_span()  # type: ignore[attr-defined]
+        span = request.context.get("_sentrysdk_span")
         assert span is not None
         span_ids.append(span.span_id)
 
@@ -84,7 +84,7 @@ def _capture_client_spans(call, capture_items, span_streaming):
         span
         for span in transaction["spans"]
         if span["op"] == OP.HTTP_CLIENT
-        and span[SPANDATA.SENTRY_ORIGIN] == Boto3Integration.origin
+        and span["origin"] == Boto3Integration.origin
     ]
 
 
@@ -120,7 +120,7 @@ def test_retries_exhausted_has_one_failed_client_span(
     client_factory,
     span_streaming,
 ):
-    client = client_factory()
+    client = client_factory(attempt_count=2)
     requests_created, span_ids = _mock_responses(client, [500])
 
     def attempt_failed_head_object_call():
