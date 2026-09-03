@@ -139,24 +139,20 @@ def test_spans_from_multiple_threads(
     items = capture_items("span")
 
     def do_some_work(number):
-        with sentry_sdk.traces.start_span(
-            attributes={"sentry.op": f"inner-run-{number}"},
-            name=f"Thread: child-{number}",
-        ):
-            pass
+        with sentry_sdk.traces.start_span(name=f"inner-run-{number}") as span:
+            inner_run_spans[number] = span
 
     threads = []
+    outer_submit_spans = {}
+    inner_run_spans = {}
 
-    with sentry_sdk.traces.start_span(
-        name="root", parent_span=None, attributes={"sentry.op": "outer-trx"}
-    ):
+    with sentry_sdk.traces.start_span(name="outer-seg", parent_span=None) as outer:
         for number in range(5):
-            with sentry_sdk.traces.start_span(
-                attributes={"sentry.op": f"outer-submit-{number}"}, name="Thread: main"
-            ):
+            with sentry_sdk.traces.start_span(name=f"outer-submit-{number}") as span:
                 t = Thread(target=do_some_work, args=(number,))
                 t.start()
                 threads.append(t)
+                outer_submit_spans[number] = span
 
         for t in threads:
             t.join()
@@ -165,35 +161,29 @@ def test_spans_from_multiple_threads(
 
     spans = [item.payload for item in items]
 
+    for span in spans:
+        if span["name"] == "outer-seg":
+            assert span["is_segment"] is True
+            assert "parent_span_id" not in span
+
+        if span["name"].startswith("outer-submit-"):
+            assert span["is_segment"] is False
+            assert span["parent_span_id"] == outer.span_id
+
     # Free-threaded builds set thread_inherit_context to True, otherwise thread_inherit_context is False
     if propagate_scope or getattr(sys.flags, "thread_inherit_context", None):
-        assert render_span_tree(spans) == dedent(
-            """\
-            - sentry.op="outer-trx": name="root"
-              - sentry.op="outer-submit-0": name="Thread: main"
-                - sentry.op="inner-run-0": name="Thread: child-0"
-              - sentry.op="outer-submit-1": name="Thread: main"
-                - sentry.op="inner-run-1": name="Thread: child-1"
-              - sentry.op="outer-submit-2": name="Thread: main"
-                - sentry.op="inner-run-2": name="Thread: child-2"
-              - sentry.op="outer-submit-3": name="Thread: main"
-                - sentry.op="inner-run-3": name="Thread: child-3"
-              - sentry.op="outer-submit-4": name="Thread: main"
-                - sentry.op="inner-run-4": name="Thread: child-4"\
-"""
-        )
+        for span in spans:
+            if span["name"].startswith("inner-run-"):
+                num = int(span["name"][-1])
+                assert span["is_segment"] is False
+                assert span["parent_span_id"] == outer_submit_spans[num].span_id
 
     elif not propagate_scope:
-        assert render_span_tree(spans) == dedent(
-            """\
-            - sentry.op="outer-trx": name="root"
-              - sentry.op="outer-submit-0": name="Thread: main"
-              - sentry.op="outer-submit-1": name="Thread: main"
-              - sentry.op="outer-submit-2": name="Thread: main"
-              - sentry.op="outer-submit-3": name="Thread: main"
-              - sentry.op="outer-submit-4": name="Thread: main"\
-"""
-        )
+        for span in spans:
+            if span["name"].startswith("inner-run-"):
+                num = int(span["name"][-1])
+                assert span["is_segment"] is True
+                assert "parent_span_id" not in span
 
 
 @pytest.mark.parametrize(
