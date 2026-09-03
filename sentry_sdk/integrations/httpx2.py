@@ -145,7 +145,7 @@ def _install_httpx2_client() -> None:
             elif url_attributes:
                 breadcrumb_data.update(
                     {
-                        "url": url_attributes.get("url.full", parsed_url.url),
+                        "url": url_attributes.get("url.full", ""),
                         SPANDATA.HTTP_QUERY: url_attributes.get("url.query", ""),
                         SPANDATA.HTTP_FRAGMENT: url_attributes.get("url.fragment", ""),
                     }
@@ -259,7 +259,7 @@ def _install_httpx2_async_client() -> None:
             elif url_attributes:
                 breadcrumb_data.update(
                     {
-                        "url": url_attributes.get("url.full", parsed_url.url),
+                        "url": url_attributes.get("url.full", ""),
                         SPANDATA.HTTP_QUERY: url_attributes.get("url.query", ""),
                         SPANDATA.HTTP_FRAGMENT: url_attributes.get("url.fragment", ""),
                     }
