@@ -302,18 +302,19 @@ def _sentry_request_created(
     if client.get_integration(Boto3Integration) is None:
         return
 
-    _add_request_breadcrumb(request)
+    with capture_internal_exceptions():
+        _add_request_breadcrumb(request)
 
-    if has_span_streaming_enabled(client.options):
-        span = sentry_sdk.traces.get_current_span()  # type: ignore[attr-defined]
-    else:
-        span = sentry_sdk.get_current_span()
-    if span is None:
-        return
+        if has_span_streaming_enabled(client.options):
+            span = sentry_sdk.traces.get_current_span()  # type: ignore[attr-defined]
+        else:
+            span = sentry_sdk.get_current_span()
+        if span is None:
+            return
 
-    _set_request_attributes(span, request)
-    # each attempt has a fresh `request.context`; carry the active client span.
-    request.context["_sentrysdk_span"] = span
+        _set_request_attributes(span, request)
+        # each attempt has a fresh `request.context`; carry the active client span.
+        request.context["_sentrysdk_span"] = span
 
 
 def _sentry_before_sign(
