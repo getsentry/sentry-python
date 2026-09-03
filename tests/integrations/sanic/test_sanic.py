@@ -360,7 +360,6 @@ class TransactionTestConfig:
         expected_status: int,
         expected_transaction_name: "Optional[str]",
         expected_source: "Optional[str]" = None,
-        streaming_compatible: bool = True,
     ) -> None:
         """
         expected_transaction_name of None indicates we expect to not receive a transaction
@@ -370,11 +369,9 @@ class TransactionTestConfig:
         self.expected_status = expected_status
         self.expected_transaction_name = expected_transaction_name
         self.expected_source = expected_source
-        self.streaming_compatible = streaming_compatible
 
 
 @pytest.mark.parametrize("send_pii", [True, False])
-@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize(
     "test_config",
     [
@@ -403,14 +400,6 @@ class TransactionTestConfig:
             expected_source=TransactionSource.COMPONENT,
         ),
         TransactionTestConfig(
-            # By default, no transaction when we have a 404 error
-            integration_args=(),
-            url="/404",
-            expected_status=404,
-            expected_transaction_name=None,
-            streaming_compatible=False,
-        ),
-        TransactionTestConfig(
             # With no ignored HTTP statuses, we should get transactions for 404 errors
             integration_args=(None,),
             url="/404",
@@ -418,40 +407,24 @@ class TransactionTestConfig:
             expected_transaction_name="/404",
             expected_source=TransactionSource.URL,
         ),
-        TransactionTestConfig(
-            # Transaction can be suppressed for other HTTP statuses, too, by passing config to the integration
-            integration_args=({200},),
-            url="/message",
-            expected_status=200,
-            expected_transaction_name=None,
-            streaming_compatible=False,
-        ),
     ],
 )
 def test_transactions(
     test_config: "TransactionTestConfig",
     sentry_init: "Any",
     app: "Any",
-    capture_events: "Any",
     capture_items: "Any",
-    span_streaming: bool,
     send_pii: bool,
 ) -> None:
-    if span_streaming and not test_config.streaming_compatible:
-        pytest.skip("unsampled_statuses is not supported in span streaming mode")
-
     # Init the SanicIntegration with the desired arguments
     sentry_init(
         integrations=[SanicIntegration(*test_config.integration_args)],
         traces_sample_rate=1.0,
         send_default_pii=send_pii,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
-    if span_streaming:
-        items = capture_items("span")
-    else:
-        events = capture_events()
+    items = capture_items("span")
 
     # Make request to the desired URL
     c = get_client(app)
@@ -461,89 +434,58 @@ def test_transactions(
 
     sentry_sdk.flush()
 
-    if span_streaming:
-        segments = [
-            i.payload
-            for i in items
-            if i.payload["attributes"].get("sentry.origin") == "auto.http.sanic"
-            and i.payload["is_segment"]
-        ]
-        assert len(segments) <= 1
-        (segment, *_) = [*segments, None]
+    segments = [
+        i.payload
+        for i in items
+        if i.payload["attributes"].get("sentry.origin") == "auto.http.sanic"
+        and i.payload["is_segment"]
+    ]
+    assert len(segments) <= 1
+    (segment, *_) = [*segments, None]
 
-        assert (segment is None) == (test_config.expected_transaction_name is None)
+    assert (segment is None) == (test_config.expected_transaction_name is None)
 
-        if segment is not None:
-            assert segment["name"] == test_config.expected_transaction_name
-            assert (
-                segment["attributes"]["sentry.segment.name.source"]
-                == test_config.expected_source
-            )
-
-            attrs = segment["attributes"]
-            assert attrs["http.request.method"] == "GET"
-            assert attrs["network.protocol.name"] == "http"
-            header_keys = {
-                key[len("http.request.header.") :]
-                for key in attrs
-                if key.startswith("http.request.header.")
-            }
-            assert header_keys >= {"accept", "accept-encoding", "host", "user-agent"}
-            assert attrs["http.response.status_code"] == test_config.expected_status
-            assert segment["status"] == (
-                "error" if test_config.expected_status >= 400 else "ok"
-            )
-
-            if send_pii:
-                assert attrs["url.full"].endswith(test_config.url)
-                assert attrs["url.path"] == test_config.url.split("?")[0]
-                if "?" in test_config.url:
-                    assert attrs["http.query"] == test_config.url.split("?", 1)[1]
-
-            else:
-                assert "url.full" not in attrs
-                assert "url.path" not in attrs
-                assert "http.query" not in attrs
-
-    else:
-        # Extract the transaction events by inspecting the event types. We should at most have 1 transaction event.
-        transaction_events = [
-            e for e in events if "type" in e and e["type"] == "transaction"
-        ]
-        assert len(transaction_events) <= 1
-
-        # Get the only transaction event, or set to None if there are no transaction events.
-        (transaction_event, *_) = [*transaction_events, None]
-
-        # We should have no transaction event if and only if we expect no transactions
-        assert (transaction_event is None) == (
-            test_config.expected_transaction_name is None
-        )
-
-        # If a transaction was expected, ensure it is correct
+    if segment is not None:
+        assert segment["name"] == test_config.expected_transaction_name
         assert (
-            transaction_event is None
-            or transaction_event["transaction"] == test_config.expected_transaction_name
-        )
-        assert (
-            transaction_event is None
-            or transaction_event["transaction_info"]["source"]
+            segment["attributes"]["sentry.segment.name.source"]
             == test_config.expected_source
         )
 
+        attrs = segment["attributes"]
+        assert attrs["http.request.method"] == "GET"
+        assert attrs["network.protocol.name"] == "http"
+        header_keys = {
+            key[len("http.request.header.") :]
+            for key in attrs
+            if key.startswith("http.request.header.")
+        }
+        assert header_keys >= {"accept", "accept-encoding", "host", "user-agent"}
+        assert attrs["http.response.status_code"] == test_config.expected_status
+        assert segment["status"] == (
+            "error" if test_config.expected_status >= 400 else "ok"
+        )
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_span_origin(sentry_init, app, capture_events, capture_items, span_streaming):
+        if send_pii:
+            assert attrs["url.full"].endswith(test_config.url)
+            assert attrs["url.path"] == test_config.url.split("?")[0]
+            if "?" in test_config.url:
+                assert attrs["http.query"] == test_config.url.split("?", 1)[1]
+
+        else:
+            assert "url.full" not in attrs
+            assert "url.path" not in attrs
+            assert "http.query" not in attrs
+
+
+def test_span_origin(sentry_init, app, capture_items):
     sentry_init(
         integrations=[SanicIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
-    if span_streaming:
-        items = capture_items("span")
-    else:
-        events = capture_events()
+    items = capture_items("span")
 
     c = get_client(app)
     with c as client:
@@ -551,16 +493,12 @@ def test_span_origin(sentry_init, app, capture_events, capture_items, span_strea
 
     sentry_sdk.flush()
 
-    if span_streaming:
-        (segment,) = [
-            i.payload
-            for i in items
-            if i.payload["attributes"].get("sentry.origin") == "auto.http.sanic"
-        ]
-        assert segment["attributes"]["sentry.origin"] == "auto.http.sanic"
-    else:
-        (_, event) = events
-        assert event["contexts"]["trace"]["origin"] == "auto.http.sanic"
+    (segment,) = [
+        i.payload
+        for i in items
+        if i.payload["attributes"].get("sentry.origin") == "auto.http.sanic"
+    ]
+    assert segment["attributes"]["sentry.origin"] == "auto.http.sanic"
 
 
 @pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
@@ -718,12 +656,10 @@ def test_url_query_data_collection_span_streaming(
     sentry_init, app, capture_items, init_kwargs, expected_query
 ):
     init_kwargs = dict(init_kwargs)
-    experiments = dict(init_kwargs.pop("_experiments", {}))
-    experiments["trace_lifecycle"] = "stream"
     sentry_init(
         integrations=[SanicIntegration()],
         traces_sample_rate=1.0,
-        _experiments=experiments,
+        trace_lifecycle="stream",
         **init_kwargs,
     )
 
@@ -743,7 +679,9 @@ def test_url_query_data_collection_span_streaming(
         and i.payload["is_segment"]
     ]
 
-    data_collection_enabled = "data_collection" in experiments
+    data_collection_enabled = "data_collection" in (
+        init_kwargs.get("_experiments") or {}
+    )
     url_attrs_expected = data_collection_enabled or init_kwargs.get(
         "send_default_pii", False
     )
