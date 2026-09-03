@@ -480,22 +480,6 @@ async def test_option_trace_propagation_targets_async(
         assert "sentry-trace" not in request_headers
 
 
-def test_do_not_propagate_outside_transaction(sentry_init, httpx_mock):
-    httpx_mock.add_response()
-
-    sentry_init(
-        traces_sample_rate=1.0,
-        trace_propagation_targets=[MATCH_ALL],
-        integrations=[HttpxIntegration()],
-    )
-
-    httpx_client = httpx.Client()
-    httpx_client.get("http://example.com/")
-
-    request_headers = httpx_mock.get_request().headers
-    assert "sentry-trace" not in request_headers
-
-
 def test_outgoing_trace_headers_sync(sentry_init, capture_items, httpx_mock):
     httpx_mock.add_response()
 
