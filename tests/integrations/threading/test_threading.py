@@ -134,7 +134,6 @@ def test_spans_from_multiple_threads(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[ThreadingIntegration(propagate_scope=propagate_scope)],
-        trace_lifecycle="stream",
     )
     events = capture_events()
 
@@ -204,7 +203,6 @@ def test_spans_from_threadpool(
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[ThreadingIntegration(propagate_scope=propagate_scope)],
-        trace_lifecycle="stream",
     )
     events = capture_events()
 
