@@ -158,7 +158,7 @@ def _request_started(app: "Flask", **kwargs: "Any") -> None:
         pass
 
     server_span = sentry_sdk.get_current_scope()._server_segment_span
-    if server_span is not None:
+    if server_span is not None and route_path is not None:
         server_span.set_attribute(SPANDATA.HTTP_ROUTE, route_path)
 
     # Set the transaction name and source here,
