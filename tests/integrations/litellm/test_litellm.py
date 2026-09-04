@@ -182,13 +182,13 @@ def test_nonstreaming_chat_completion(
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         client.completions._client._client,
         "send",
         return_value=model_response,
-    ), sentry_sdk.traces.start_span(name="litellm test"):
+    ):
         litellm.completion(
             model="gpt-3.5-turbo",
             messages=messages,
@@ -198,8 +198,7 @@ def test_nonstreaming_chat_completion(
         litellm_utils.executor.shutdown(wait=True)
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
-    assert spans[2]["name"] == "litellm test"
+    spans = [item.payload for item in items]
     chat_spans = list(
         x
         for x in spans
@@ -282,13 +281,13 @@ async def test_async_nonstreaming_chat_completion(
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         client.completions._client._client,
         "send",
         return_value=model_response,
-    ), sentry_sdk.traces.start_span(name="litellm test"):
+    ):
         await litellm.acompletion(
             model="gpt-3.5-turbo",
             messages=messages,
@@ -299,8 +298,7 @@ async def test_async_nonstreaming_chat_completion(
         await asyncio.sleep(0.5)
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
-    assert spans[2]["name"] == "litellm test"
+    spans = [item.payload for item in items]
     chat_spans = list(
         x
         for x in spans
@@ -983,7 +981,7 @@ def test_span_origin(
         client.completions._client._client,
         "send",
         return_value=model_response,
-    ), sentry_sdk.traces.start_span(name="litellm test"):
+    ):
         litellm.completion(
             model="gpt-3.5-turbo",
             messages=messages,
@@ -994,8 +992,6 @@ def test_span_origin(
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
-    assert spans[2]["is_segment"] is True
-    assert spans[2]["attributes"]["sentry.origin"] == "manual"
     assert spans[1]["attributes"]["sentry.origin"] == "auto.ai.litellm"
 
 
@@ -1040,7 +1036,7 @@ def test_multiple_providers(
         openai_client.completions._client._client,
         "send",
         return_value=openai_model_response,
-    ), sentry_sdk.traces.start_span(name="test gpt-3.5-turbo"):
+    ):
         litellm.completion(
             model="gpt-3.5-turbo",
             messages=messages,
@@ -1062,7 +1058,7 @@ def test_multiple_providers(
         anthropic_client,
         "post",
         return_value=anthropic_model_response,
-    ), sentry_sdk.traces.start_span(name="test claude-3-opus-20240229"):
+    ):
         litellm.completion(
             model="claude-3-opus-20240229",
             messages=messages,
@@ -1084,7 +1080,7 @@ def test_multiple_providers(
         gemini_client,
         "post",
         return_value=gemini_model_response,
-    ), sentry_sdk.traces.start_span(name="test gemini/gemini-pro"):
+    ):
         litellm.completion(
             model="gemini/gemini-pro",
             messages=messages,
@@ -1138,13 +1134,13 @@ async def test_async_multiple_providers(
         serialize_pydantic=True,
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
-    items = capture_items("transaction", "span")
+    items = capture_items("span")
 
     with mock.patch.object(
         openai_client.completions._client._client,
         "send",
         return_value=openai_model_response,
-    ), sentry_sdk.traces.start_span(name="test gpt-3.5-turbo"):
+    ):
         await litellm.acompletion(
             model="gpt-3.5-turbo",
             messages=messages,
@@ -1167,7 +1163,7 @@ async def test_async_multiple_providers(
         anthropic_client,
         "post",
         return_value=anthropic_model_response,
-    ), sentry_sdk.traces.start_span(name="test claude-3-opus-20240229"):
+    ):
         await litellm.acompletion(
             model="claude-3-opus-20240229",
             messages=messages,
@@ -1190,7 +1186,7 @@ async def test_async_multiple_providers(
         gemini_client,
         "post",
         return_value=gemini_model_response,
-    ), sentry_sdk.traces.start_span(name="test gemini/gemini-pro"):
+    ):
         await litellm.acompletion(
             model="gemini/gemini-pro",
             messages=messages,
@@ -1202,7 +1198,7 @@ async def test_async_multiple_providers(
         await asyncio.sleep(0.5)
 
     sentry_sdk.flush()
-    spans = [item.payload for item in items if item.type == "span"]
+    spans = [item.payload for item in items]
     for span in spans:
         if span["is_segment"] is True:
             continue
