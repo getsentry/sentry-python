@@ -136,7 +136,6 @@ class MockCompletionResponse:
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -155,7 +154,6 @@ def test_nonstreaming_chat_completion(
     include_prompts,
     get_model_response,
     nonstreaming_chat_completions_model_response,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init(
@@ -163,8 +161,8 @@ def test_nonstreaming_chat_completion(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     messages = [
@@ -214,59 +212,6 @@ def test_nonstreaming_chat_completion(
             for x in spans
             if x["attributes"].get("sentry.op") == OP.GEN_AI_CHAT
             and x["attributes"].get("sentry.origin") == "auto.ai.litellm"
-        )
-        assert len(chat_spans) == 1
-        span = chat_spans[0]
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat gpt-3.5-turbo"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-
-        if send_default_pii and include_prompts:
-            assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
-                {
-                    "role": "user",
-                    "content": "Message demonstrating the absence of truncation.",
-                },
-                {"role": "user", "content": "Hello!"},
-            ]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT in span["attributes"]
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        with mock.patch.object(
-            client.completions._client._client,
-            "send",
-            return_value=model_response,
-        ), start_transaction(name="litellm test"):
-            litellm.completion(
-                model="gpt-3.5-turbo",
-                messages=messages,
-                client=client,
-            )
-
-            litellm_utils.executor.shutdown(wait=True)
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["transaction"] == "litellm test"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        chat_spans = list(
-            x
-            for x in spans
-            if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-            and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
         )
         assert len(chat_spans) == 1
         span = chat_spans[0]
@@ -344,7 +289,6 @@ def test_nonstreaming_chat_completion(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio(loop_scope="session")
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
@@ -363,7 +307,6 @@ async def test_async_nonstreaming_chat_completion(
     include_prompts,
     get_model_response,
     nonstreaming_chat_completions_model_response,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init(
@@ -371,8 +314,8 @@ async def test_async_nonstreaming_chat_completion(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     messages = [
@@ -450,60 +393,6 @@ async def test_async_nonstreaming_chat_completion(
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
         assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        with mock.patch.object(
-            client.completions._client._client,
-            "send",
-            return_value=model_response,
-        ), start_transaction(name="litellm test"):
-            await litellm.acompletion(
-                model="gpt-3.5-turbo",
-                messages=messages,
-                client=client,
-            )
-
-            await GLOBAL_LOGGING_WORKER.flush()
-            await asyncio.sleep(0.5)
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["transaction"] == "litellm test"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        chat_spans = list(
-            x
-            for x in spans
-            if x["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-            and x["attributes"]["sentry.origin"] == "auto.ai.litellm"
-        )
-        assert len(chat_spans) == 1
-        span = chat_spans[0]
-
-        assert span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert span["name"] == "chat gpt-3.5-turbo"
-        assert span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gpt-3.5-turbo"
-        assert span["attributes"][SPANDATA.GEN_AI_RESPONSE_MODEL] == "gpt-3.5-turbo"
-        assert span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "openai"
-        assert span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-
-        if send_default_pii and include_prompts:
-            assert json.loads(span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]) == [
-                {
-                    "role": "user",
-                    "content": "Message demonstrating the absence of truncation.",
-                },
-                {"role": "user", "content": "Hello!"},
-            ]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT in span["attributes"]
-        else:
-            assert SPANDATA.GEN_AI_REQUEST_MESSAGES not in span["attributes"]
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in span["attributes"]
-
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 20
-        assert span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
     else:
         events = capture_events()
 
@@ -555,7 +444,6 @@ async def test_async_nonstreaming_chat_completion(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -575,7 +463,6 @@ def test_streaming_chat_completion(
     get_model_response,
     server_side_event_chunks,
     streaming_chat_completions_model_response,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init(
@@ -583,8 +470,8 @@ def test_streaming_chat_completion(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     messages = [
@@ -602,7 +489,7 @@ def test_streaming_chat_completion(
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -670,7 +557,6 @@ def test_streaming_chat_completion(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio(loop_scope="session")
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
@@ -691,7 +577,6 @@ async def test_async_streaming_chat_completion(
     async_iterator,
     server_side_event_chunks,
     streaming_chat_completions_model_response,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init(
@@ -699,8 +584,8 @@ async def test_async_streaming_chat_completion(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     messages = [
@@ -720,7 +605,7 @@ async def test_async_streaming_chat_completion(
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -790,7 +675,6 @@ async def test_async_streaming_chat_completion(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_embeddings_create(
     sentry_init,
     capture_events,
@@ -798,7 +682,6 @@ def test_embeddings_create(
     get_model_response,
     openai_embedding_model_response,
     clear_litellm_cache,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """
@@ -812,8 +695,8 @@ def test_embeddings_create(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     client = OpenAI(api_key="test-key")
@@ -824,7 +707,7 @@ def test_embeddings_create(
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -910,7 +793,6 @@ def test_embeddings_create(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio(loop_scope="session")
 async def test_async_embeddings_create(
     sentry_init,
@@ -919,7 +801,6 @@ async def test_async_embeddings_create(
     get_model_response,
     openai_embedding_model_response,
     clear_litellm_cache,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """
@@ -933,8 +814,8 @@ async def test_async_embeddings_create(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     client = AsyncOpenAI(api_key="test-key")
@@ -945,7 +826,7 @@ async def test_async_embeddings_create(
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -1033,7 +914,6 @@ async def test_async_embeddings_create(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_embeddings_create_with_list_input(
     sentry_init,
     capture_events,
@@ -1041,7 +921,6 @@ def test_embeddings_create_with_list_input(
     get_model_response,
     openai_embedding_model_response,
     clear_litellm_cache,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test embedding with list input."""
@@ -1050,8 +929,8 @@ def test_embeddings_create_with_list_input(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     client = OpenAI(api_key="test-key")
@@ -1062,7 +941,7 @@ def test_embeddings_create_with_list_input(
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -1146,7 +1025,6 @@ def test_embeddings_create_with_list_input(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio(loop_scope="session")
 async def test_async_embeddings_create_with_list_input(
     sentry_init,
@@ -1155,7 +1033,6 @@ async def test_async_embeddings_create_with_list_input(
     get_model_response,
     openai_embedding_model_response,
     clear_litellm_cache,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test embedding with list input."""
@@ -1164,8 +1041,8 @@ async def test_async_embeddings_create_with_list_input(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     client = AsyncOpenAI(api_key="test-key")
@@ -1176,7 +1053,7 @@ async def test_async_embeddings_create_with_list_input(
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -1261,7 +1138,6 @@ async def test_async_embeddings_create_with_list_input(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_embeddings_no_pii(
     sentry_init,
     capture_events,
@@ -1269,7 +1145,6 @@ def test_embeddings_no_pii(
     get_model_response,
     openai_embedding_model_response,
     clear_litellm_cache,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test that PII is not captured when disabled."""
@@ -1278,8 +1153,8 @@ def test_embeddings_no_pii(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,  # PII disabled
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     client = OpenAI(api_key="test-key")
@@ -1290,7 +1165,7 @@ def test_embeddings_no_pii(
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -1360,7 +1235,6 @@ def test_embeddings_no_pii(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio(loop_scope="session")
 async def test_async_embeddings_no_pii(
     sentry_init,
@@ -1369,7 +1243,6 @@ async def test_async_embeddings_no_pii(
     get_model_response,
     openai_embedding_model_response,
     clear_litellm_cache,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test that PII is not captured when disabled."""
@@ -1378,8 +1251,8 @@ async def test_async_embeddings_no_pii(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=False,  # PII disabled
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     client = AsyncOpenAI(api_key="test-key")
@@ -1390,7 +1263,7 @@ async def test_async_embeddings_no_pii(
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -1462,22 +1335,20 @@ async def test_async_embeddings_no_pii(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_exception_handling(
     reset_litellm_executor,
     sentry_init,
     capture_events,
     capture_items,
     get_rate_limit_model_response,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1486,7 +1357,7 @@ def test_exception_handling(
 
     model_response = get_rate_limit_model_response()
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("event")
 
         with mock.patch.object(
@@ -1528,22 +1399,20 @@ def test_exception_handling(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio(loop_scope="session")
 async def test_async_exception_handling(
     sentry_init,
     capture_events,
     capture_items,
     get_rate_limit_model_response,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1552,7 +1421,7 @@ async def test_async_exception_handling(
 
     model_response = get_rate_limit_model_response()
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("event")
 
         with mock.patch.object(
@@ -1594,7 +1463,6 @@ async def test_async_exception_handling(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_span_origin(
     reset_litellm_executor,
     sentry_init,
@@ -1602,15 +1470,14 @@ def test_span_origin(
     capture_items,
     get_model_response,
     nonstreaming_chat_completions_model_response,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1653,28 +1520,6 @@ def test_span_origin(
         assert spans[2]["is_segment"] is True
         assert spans[2]["attributes"]["sentry.origin"] == "manual"
         assert spans[1]["attributes"]["sentry.origin"] == "auto.ai.litellm"
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        with mock.patch.object(
-            client.completions._client._client,
-            "send",
-            return_value=model_response,
-        ), start_transaction(name="litellm test"):
-            litellm.completion(
-                model="gpt-3.5-turbo",
-                messages=messages,
-                client=client,
-            )
-
-            litellm_utils.executor.shutdown(wait=True)
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["contexts"]["trace"]["origin"] == "manual"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert spans[0]["attributes"]["sentry.origin"] == "auto.ai.litellm"
     else:
         events = capture_events()
 
@@ -1698,7 +1543,6 @@ def test_span_origin(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_multiple_providers(
     reset_litellm_executor,
     sentry_init,
@@ -1708,7 +1552,6 @@ def test_multiple_providers(
     nonstreaming_chat_completions_model_response,
     nonstreaming_anthropic_model_response,
     nonstreaming_google_genai_model_response,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test that the integration correctly identifies different providers."""
@@ -1716,8 +1559,8 @@ def test_multiple_providers(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -1807,75 +1650,6 @@ def test_multiple_providers(
                 continue
             # The provider should be detected by litellm.get_llm_provider
             assert SPANDATA.GEN_AI_SYSTEM in span["attributes"]
-    elif stream_gen_ai_spans:
-        items = capture_items("span", "transaction")
-
-        with mock.patch.object(
-            openai_client.completions._client._client,
-            "send",
-            return_value=openai_model_response,
-        ), start_transaction(name="test gpt-3.5-turbo"):
-            litellm.completion(
-                model="gpt-3.5-turbo",
-                messages=messages,
-                client=openai_client,
-            )
-
-            litellm_utils.executor.shutdown(wait=True)
-
-        _reset_litellm_executor()
-
-        anthropic_client = HTTPHandler()
-        anthropic_model_response = get_model_response(
-            nonstreaming_anthropic_model_response,
-            serialize_pydantic=True,
-            request_headers={"X-Stainless-Raw-Response": "true"},
-        )
-
-        with mock.patch.object(
-            anthropic_client,
-            "post",
-            return_value=anthropic_model_response,
-        ), start_transaction(name="test claude-3-opus-20240229"):
-            litellm.completion(
-                model="claude-3-opus-20240229",
-                messages=messages,
-                client=anthropic_client,
-                api_key="test-key",
-            )
-
-            litellm_utils.executor.shutdown(wait=True)
-
-        _reset_litellm_executor()
-
-        gemini_client = HTTPHandler()
-        gemini_model_response = get_model_response(
-            nonstreaming_google_genai_model_response,
-            serialize_pydantic=True,
-        )
-
-        with mock.patch.object(
-            gemini_client,
-            "post",
-            return_value=gemini_model_response,
-        ), start_transaction(name="test gemini/gemini-pro"):
-            litellm.completion(
-                model="gemini/gemini-pro",
-                messages=messages,
-                client=gemini_client,
-                api_key="test-key",
-            )
-
-            litellm_utils.executor.shutdown(wait=True)
-
-        events = [item.payload for item in items if item.type == "transaction"]
-        assert len(events) == 3
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        for span in spans:
-            # The provider should be detected by litellm.get_llm_provider
-            assert SPANDATA.GEN_AI_SYSTEM in span["attributes"]
     else:
         events = capture_events()
 
@@ -1946,7 +1720,6 @@ def test_multiple_providers(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio(loop_scope="session")
 async def test_async_multiple_providers(
     sentry_init,
@@ -1956,7 +1729,6 @@ async def test_async_multiple_providers(
     nonstreaming_chat_completions_model_response,
     nonstreaming_anthropic_model_response,
     nonstreaming_google_genai_model_response,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test that the integration correctly identifies different providers."""
@@ -1964,8 +1736,8 @@ async def test_async_multiple_providers(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -2058,78 +1830,6 @@ async def test_async_multiple_providers(
                 continue
             # The provider should be detected by litellm.get_llm_provider
             assert SPANDATA.GEN_AI_SYSTEM in span["attributes"]
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        with mock.patch.object(
-            openai_client.completions._client._client,
-            "send",
-            return_value=openai_model_response,
-        ), start_transaction(name="test gpt-3.5-turbo"):
-            await litellm.acompletion(
-                model="gpt-3.5-turbo",
-                messages=messages,
-                client=openai_client,
-            )
-
-            await GLOBAL_LOGGING_WORKER.flush()
-            await asyncio.sleep(0.5)
-
-        _reset_litellm_executor()
-
-        anthropic_client = AsyncHTTPHandler()
-        anthropic_model_response = get_model_response(
-            nonstreaming_anthropic_model_response,
-            serialize_pydantic=True,
-            request_headers={"X-Stainless-Raw-Response": "True"},
-        )
-
-        with mock.patch.object(
-            anthropic_client,
-            "post",
-            return_value=anthropic_model_response,
-        ), start_transaction(name="test claude-3-opus-20240229"):
-            await litellm.acompletion(
-                model="claude-3-opus-20240229",
-                messages=messages,
-                client=anthropic_client,
-                api_key="test-key",
-            )
-
-            await GLOBAL_LOGGING_WORKER.flush()
-            await asyncio.sleep(0.5)
-
-        _reset_litellm_executor()
-
-        gemini_client = AsyncHTTPHandler()
-        gemini_model_response = get_model_response(
-            nonstreaming_google_genai_model_response,
-            serialize_pydantic=True,
-        )
-
-        with mock.patch.object(
-            gemini_client,
-            "post",
-            return_value=gemini_model_response,
-        ), start_transaction(name="test gemini/gemini-pro"):
-            await litellm.acompletion(
-                model="gemini/gemini-pro",
-                messages=messages,
-                client=gemini_client,
-                api_key="test-key",
-            )
-
-            await GLOBAL_LOGGING_WORKER.flush()
-            await asyncio.sleep(0.5)
-
-        events = [item.payload for item in items if item.type == "transaction"]
-        assert len(events) == 3
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        for span in spans:
-            # The provider should be detected by litellm.get_llm_provider
-            assert SPANDATA.GEN_AI_SYSTEM in span["attributes"]
     else:
         events = capture_events()
 
@@ -2203,7 +1903,6 @@ async def test_async_multiple_providers(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_additional_parameters(
     reset_litellm_executor,
     sentry_init,
@@ -2211,7 +1910,6 @@ def test_additional_parameters(
     capture_items,
     get_model_response,
     nonstreaming_chat_completions_model_response,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test that additional parameters are captured."""
@@ -2219,8 +1917,8 @@ def test_additional_parameters(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -2242,7 +1940,7 @@ def test_additional_parameters(
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -2317,7 +2015,6 @@ def test_additional_parameters(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio(loop_scope="session")
 async def test_async_additional_parameters(
     sentry_init,
@@ -2325,7 +2022,6 @@ async def test_async_additional_parameters(
     capture_items,
     get_model_response,
     nonstreaming_chat_completions_model_response,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test that additional parameters are captured."""
@@ -2333,8 +2029,8 @@ async def test_async_additional_parameters(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -2356,7 +2052,7 @@ async def test_async_additional_parameters(
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -2433,7 +2129,6 @@ async def test_async_additional_parameters(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_no_integration(
     reset_litellm_executor,
     sentry_init,
@@ -2441,15 +2136,14 @@ def test_no_integration(
     capture_items,
     get_model_response,
     nonstreaming_chat_completions_model_response,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test that when integration is not enabled, callbacks don't break."""
     sentry_init(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -2471,7 +2165,7 @@ def test_no_integration(
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -2523,7 +2217,6 @@ def test_no_integration(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio(loop_scope="session")
 async def test_async_no_integration(
     sentry_init,
@@ -2531,15 +2224,14 @@ async def test_async_no_integration(
     capture_items,
     get_model_response,
     nonstreaming_chat_completions_model_response,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test that when integration is not enabled, callbacks don't break."""
     sentry_init(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -2561,7 +2253,7 @@ async def test_async_no_integration(
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -2615,12 +2307,10 @@ async def test_async_no_integration(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_response_without_usage(
     sentry_init,
     capture_events,
     capture_items,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test handling of responses without usage information."""
@@ -2628,8 +2318,8 @@ def test_response_without_usage(
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     messages = [{"role": "user", "content": "Hello!"}]
@@ -2644,7 +2334,7 @@ def test_response_without_usage(
         },
     )()
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with start_transaction(name="litellm test"):
@@ -2698,6 +2388,7 @@ def test_integration_setup(sentry_init):
         integrations=[LiteLLMIntegration()],
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
+        stream_gen_ai_spans=False,
     )
 
     # Check that callbacks are registered
@@ -2771,7 +2462,6 @@ IMAGE_DATA_URI = f"data:image/png;base64,{IMAGE_B64}"
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_binary_content_encoding_image_url(
     reset_litellm_executor,
     sentry_init,
@@ -2779,7 +2469,6 @@ def test_binary_content_encoding_image_url(
     capture_items,
     get_model_response,
     nonstreaming_chat_completions_model_response,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init(
@@ -2787,8 +2476,8 @@ def test_binary_content_encoding_image_url(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     messages = [
@@ -2821,7 +2510,7 @@ def test_binary_content_encoding_image_url(
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -2896,7 +2585,6 @@ def test_binary_content_encoding_image_url(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio(loop_scope="session")
 async def test_async_binary_content_encoding_image_url(
     sentry_init,
@@ -2904,7 +2592,6 @@ async def test_async_binary_content_encoding_image_url(
     capture_items,
     get_model_response,
     nonstreaming_chat_completions_model_response,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init(
@@ -2912,8 +2599,8 @@ async def test_async_binary_content_encoding_image_url(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     messages = [
@@ -2946,7 +2633,7 @@ async def test_async_binary_content_encoding_image_url(
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -3023,7 +2710,6 @@ async def test_async_binary_content_encoding_image_url(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_binary_content_encoding_mixed_content(
     reset_litellm_executor,
     sentry_init,
@@ -3031,7 +2717,6 @@ def test_binary_content_encoding_mixed_content(
     capture_items,
     get_model_response,
     nonstreaming_chat_completions_model_response,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init(
@@ -3039,8 +2724,8 @@ def test_binary_content_encoding_mixed_content(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     messages = [
@@ -3074,7 +2759,7 @@ def test_binary_content_encoding_mixed_content(
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -3137,7 +2822,6 @@ def test_binary_content_encoding_mixed_content(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio(loop_scope="session")
 async def test_async_binary_content_encoding_mixed_content(
     sentry_init,
@@ -3145,7 +2829,6 @@ async def test_async_binary_content_encoding_mixed_content(
     capture_items,
     get_model_response,
     nonstreaming_chat_completions_model_response,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init(
@@ -3153,8 +2836,8 @@ async def test_async_binary_content_encoding_mixed_content(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     messages = [
@@ -3188,7 +2871,7 @@ async def test_async_binary_content_encoding_mixed_content(
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -3253,7 +2936,6 @@ async def test_async_binary_content_encoding_mixed_content(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_binary_content_encoding_uri_type(
     reset_litellm_executor,
     sentry_init,
@@ -3261,7 +2943,6 @@ def test_binary_content_encoding_uri_type(
     capture_items,
     get_model_response,
     nonstreaming_chat_completions_model_response,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init(
@@ -3269,8 +2950,8 @@ def test_binary_content_encoding_uri_type(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     messages = [
@@ -3302,7 +2983,7 @@ def test_binary_content_encoding_uri_type(
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
         with mock.patch.object(
             client.completions._client._client,
@@ -3371,7 +3052,6 @@ def test_binary_content_encoding_uri_type(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio(loop_scope="session")
 async def test_async_binary_content_encoding_uri_type(
     sentry_init,
@@ -3379,7 +3059,6 @@ async def test_async_binary_content_encoding_uri_type(
     capture_items,
     get_model_response,
     nonstreaming_chat_completions_model_response,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init(
@@ -3387,8 +3066,8 @@ async def test_async_binary_content_encoding_uri_type(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     messages = [
@@ -3420,7 +3099,7 @@ async def test_async_binary_content_encoding_uri_type(
         request_headers={"X-Stainless-Raw-Response": "true"},
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -3669,8 +3348,8 @@ def test_chat_completion_data_collection(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=False,
         trace_lifecycle="static",
+        stream_gen_ai_spans=False,
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -3796,8 +3475,8 @@ def test_embeddings_data_collection(
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=False,
         trace_lifecycle="static",
+        stream_gen_ai_spans=False,
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}

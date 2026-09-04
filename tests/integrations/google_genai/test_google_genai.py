@@ -116,7 +116,6 @@ def create_test_config(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -133,15 +132,14 @@ def test_nonstreaming_generate_content(
     send_default_pii,
     include_prompts,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     # Mock the HTTP response at the _api_client.request() level
@@ -169,79 +167,6 @@ def test_nonstreaming_generate_content(
         spans = [item.payload for item in items if item.type == "span"]
         assert len(spans) == 2
         assert spans[1]["name"] == "google_genai"
-        chat_span = next(item.payload for item in items if item.type == "span")
-
-        # Check chat span
-        assert chat_span["attributes"]["sentry.op"] == OP.GEN_AI_CHAT
-        assert chat_span["name"] == "chat gemini-1.5-flash"
-        assert chat_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "chat"
-        assert chat_span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "gcp.gemini"
-        assert (
-            chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL] == "gemini-1.5-flash"
-        )
-
-        if send_default_pii and include_prompts:
-            assert json.loads(
-                chat_span["attributes"][SPANDATA.GEN_AI_REQUEST_MESSAGES]
-            ) == [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "Message demonstrating the absence of truncation.",
-                        },
-                        {
-                            "type": "text",
-                            "text": "Tell me a joke",
-                        },
-                    ],
-                }
-            ]
-
-            # Response text is stored as a JSON array
-            response_text = chat_span["attributes"][SPANDATA.GEN_AI_RESPONSE_TEXT]
-
-            # Parse the JSON array
-            response_texts = json.loads(response_text)
-            assert response_texts == ["Hello! How can I help you today?"]
-        else:
-            assert SPANDATA.GEN_AI_RESPONSE_TEXT not in chat_span["attributes"]
-
-        # Check token usage
-        assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 10
-        # Output tokens now include reasoning tokens: candidates_token_count (20) + thoughts_token_count (3) = 23
-        assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS] == 23
-        assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_TOTAL_TOKENS] == 30
-        assert chat_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS_CACHED] == 5
-        assert (
-            chat_span["attributes"][SPANDATA.GEN_AI_USAGE_OUTPUT_TOKENS_REASONING] == 3
-        )
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        with mock.patch.object(
-            mock_genai_client._api_client,
-            "request",
-            return_value=mock_http_response,
-        ), start_transaction(name="google_genai"):
-            config = create_test_config(temperature=0.7, max_output_tokens=100)
-            mock_genai_client.models.generate_content(
-                model="gemini-1.5-flash",
-                contents=[
-                    "Message demonstrating the absence of truncation.",
-                    "Tell me a joke",
-                ],
-                config=config,
-            )
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["transaction"] == "google_genai"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 1
-        sentry_sdk.flush()
         chat_span = next(item.payload for item in items if item.type == "span")
 
         # Check chat span
@@ -338,7 +263,6 @@ def test_nonstreaming_generate_content(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize("generate_content_config", (False, True))
 @pytest.mark.parametrize(
     "system_instructions,expected_texts",
@@ -375,20 +299,19 @@ def test_generate_content_with_system_instruction(
     generate_content_config,
     system_instructions,
     expected_texts,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -457,20 +380,18 @@ def test_generate_content_with_system_instruction(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_generate_content_with_tools(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     # Create a mock tool function
@@ -516,7 +437,7 @@ def test_generate_content_with_tools(
 
     mock_http_response = create_mock_http_response(tool_response_json)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -577,20 +498,18 @@ def test_generate_content_with_tools(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_tool_execution(
     sentry_init,
     capture_events,
     capture_items,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     # Create a mock tool function
@@ -603,7 +522,7 @@ def test_tool_execution(
 
     wrapped_weather = wrapped_tool(get_weather)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         # Execute the wrapped tool
@@ -648,22 +567,20 @@ def test_tool_execution(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_error_handling(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("event")
 
         # Mock an error at the HTTP level
@@ -705,13 +622,11 @@ def test_error_handling(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_streaming_generate_content(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test streaming with generate_content_stream, verifying chunk accumulation."""
@@ -719,8 +634,8 @@ def test_streaming_generate_content(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     # Create streaming chunks - simulating a multi-chunk response
@@ -785,7 +700,7 @@ def test_streaming_generate_content(
     stream_chunks = [chunk1_json, chunk2_json, chunk3_json]
     mock_stream = create_mock_streaming_responses(stream_chunks)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -919,20 +834,18 @@ def test_streaming_generate_content(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_span_origin(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -956,24 +869,6 @@ def test_span_origin(
                 continue
 
             assert span["attributes"]["sentry.origin"] == "auto.ai.google_genai"
-    elif stream_gen_ai_spans:
-        items = capture_items("span", "transaction")
-
-        with mock.patch.object(
-            mock_genai_client._api_client, "request", return_value=mock_http_response
-        ), start_transaction(name="google_genai"):
-            config = create_test_config()
-            mock_genai_client.models.generate_content(
-                model="gemini-1.5-flash", contents="Test origin", config=config
-            )
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["contexts"]["trace"]["origin"] == "manual"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        for span in spans:
-            assert span["attributes"]["sentry.origin"] == "auto.ai.google_genai"
     else:
         events = capture_events()
 
@@ -993,21 +888,19 @@ def test_span_origin(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_response_without_usage_metadata(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test handling of responses without usage metadata"""
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     # Response without usage metadata
@@ -1025,7 +918,7 @@ def test_response_without_usage_metadata(
 
     mock_http_response = create_mock_http_response(response_json)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -1064,13 +957,11 @@ def test_response_without_usage_metadata(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_multiple_candidates(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test handling of multiple response candidates"""
@@ -1078,8 +969,8 @@ def test_multiple_candidates(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     # Response with multiple candidates
@@ -1109,7 +1000,7 @@ def test_multiple_candidates(
 
     mock_http_response = create_mock_http_response(multi_candidate_json)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -1173,26 +1064,24 @@ def test_multiple_candidates(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_all_configuration_parameters(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test that all configuration parameters are properly recorded"""
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -1259,28 +1148,26 @@ def test_all_configuration_parameters(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_empty_response(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test handling of minimal response with no content"""
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     # Minimal response with empty candidates array
     minimal_response_json = {"candidates": []}
     mock_http_response = create_mock_http_response(minimal_response_json)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -1318,21 +1205,19 @@ def test_empty_response(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_response_with_different_id_fields(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test handling of different response ID field names"""
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     # Response with response_id and model_version
@@ -1352,7 +1237,7 @@ def test_response_with_different_id_fields(
 
     mock_http_response = create_mock_http_response(response_json)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -1394,6 +1279,7 @@ def test_tool_with_async_function(sentry_init):
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
+        stream_gen_ai_spans=False,
     )
 
     # Create an async tool function
@@ -1411,13 +1297,11 @@ def test_tool_with_async_function(sentry_init):
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_contents_as_none(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test handling when contents parameter is None"""
@@ -1425,13 +1309,13 @@ def test_contents_as_none(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -1467,21 +1351,19 @@ def test_contents_as_none(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_tool_calls_extraction(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test extraction of tool/function calls from response"""
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     # Response with function calls
@@ -1521,7 +1403,7 @@ def test_tool_calls_extraction(
 
     mock_http_response = create_mock_http_response(function_call_response_json)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -1652,7 +1534,6 @@ EXAMPLE_EMBED_RESPONSE_JSON = {
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
     [
@@ -1669,15 +1550,14 @@ def test_embed_content(
     send_default_pii,
     include_prompts,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     # Mock the HTTP response at the _api_client.request() level
@@ -1732,58 +1612,6 @@ def test_embed_content(
         # Note: Only available in newer versions with ContentEmbeddingStatistics
         if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
             assert embed_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 25
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        with mock.patch.object(
-            mock_genai_client._api_client,
-            "request",
-            return_value=mock_http_response,
-        ), start_transaction(name="google_genai_embeddings"):
-            mock_genai_client.models.embed_content(
-                model="text-embedding-004",
-                contents=[
-                    "What is your name?",
-                    "What is your favorite color?",
-                ],
-            )
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-
-        assert event["transaction"] == "google_genai_embeddings"
-
-        # Should have 1 span for embeddings
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 1
-        (embed_span,) = spans
-
-        # Check embeddings span
-        assert embed_span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
-        assert embed_span["name"] == "embeddings text-embedding-004"
-        assert embed_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
-        assert embed_span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "gcp.gemini"
-        assert (
-            embed_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
-            == "text-embedding-004"
-        )
-
-        # Check input texts if PII is allowed
-        if send_default_pii and include_prompts:
-            input_texts = json.loads(
-                embed_span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
-            )
-            assert input_texts == [
-                "What is your name?",
-                "What is your favorite color?",
-            ]
-        else:
-            assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in embed_span["attributes"]
-
-        # Check usage data (sum of token counts from statistics: 10 + 15 = 25)
-        # Note: Only available in newer versions with ContentEmbeddingStatistics
-        if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
-            assert embed_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 25
     else:
         events = capture_events()
 
@@ -1836,13 +1664,11 @@ def test_embed_content(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_embed_content_string_input(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test embed_content with a single string instead of list."""
@@ -1850,8 +1676,8 @@ def test_embed_content_string_input(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     # Mock response with single embedding
@@ -1871,7 +1697,7 @@ def test_embed_content_string_input(
     }
     mock_http_response = create_mock_http_response(single_embed_response)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -1920,23 +1746,21 @@ def test_embed_content_string_input(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_embed_content_error_handling(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test error handling in embed_content."""
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("event")
 
         # Mock an error at the HTTP level
@@ -1980,21 +1804,19 @@ def test_embed_content_error_handling(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_embed_content_without_statistics(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test embed_content response without statistics (older package versions)."""
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     # Response without statistics (typical for older google-genai versions)
@@ -2011,7 +1833,7 @@ def test_embed_content_without_statistics(
     }
     mock_http_response = create_mock_http_response(old_version_response)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -2049,21 +1871,19 @@ def test_embed_content_without_statistics(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_embed_content_span_origin(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test that embed_content spans have correct origin."""
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_EMBED_RESPONSE_JSON)
@@ -2085,23 +1905,6 @@ def test_embed_content_span_origin(
                 continue
 
             assert span["attributes"]["sentry.origin"] == "auto.ai.google_genai"
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-        with mock.patch.object(
-            mock_genai_client._api_client, "request", return_value=mock_http_response
-        ), start_transaction(name="google_genai_embeddings"):
-            mock_genai_client.models.embed_content(
-                model="text-embedding-004",
-                contents=["Test origin"],
-            )
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-        assert event["contexts"]["trace"]["origin"] == "manual"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        for span in spans:
-            assert span["attributes"]["sentry.origin"] == "auto.ai.google_genai"
     else:
         events = capture_events()
         with mock.patch.object(
@@ -2120,7 +1923,6 @@ def test_embed_content_span_origin(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "send_default_pii, include_prompts",
@@ -2138,7 +1940,6 @@ async def test_async_embed_content(
     send_default_pii,
     include_prompts,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test async embed_content method."""
@@ -2146,8 +1947,8 @@ async def test_async_embed_content(
         integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     # Mock the async HTTP response
@@ -2202,58 +2003,6 @@ async def test_async_embed_content(
         # Note: Only available in newer versions with ContentEmbeddingStatistics
         if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
             assert embed_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 25
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        with mock.patch.object(
-            mock_genai_client._api_client,
-            "async_request",
-            return_value=mock_http_response,
-        ), start_transaction(name="google_genai_embeddings_async"):
-            await mock_genai_client.aio.models.embed_content(
-                model="text-embedding-004",
-                contents=[
-                    "What is your name?",
-                    "What is your favorite color?",
-                ],
-            )
-
-        (event,) = (item.payload for item in items if item.type == "transaction")
-
-        assert event["transaction"] == "google_genai_embeddings_async"
-
-        # Should have 1 span for embeddings
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        assert len(spans) == 1
-        (embed_span,) = spans
-
-        # Check embeddings span
-        assert embed_span["attributes"]["sentry.op"] == OP.GEN_AI_EMBEDDINGS
-        assert embed_span["name"] == "embeddings text-embedding-004"
-        assert embed_span["attributes"][SPANDATA.GEN_AI_OPERATION_NAME] == "embeddings"
-        assert embed_span["attributes"][SPANDATA.GEN_AI_SYSTEM] == "gcp.gemini"
-        assert (
-            embed_span["attributes"][SPANDATA.GEN_AI_REQUEST_MODEL]
-            == "text-embedding-004"
-        )
-
-        # Check input texts if PII is allowed
-        if send_default_pii and include_prompts:
-            input_texts = json.loads(
-                embed_span["attributes"][SPANDATA.GEN_AI_EMBEDDINGS_INPUT]
-            )
-            assert input_texts == [
-                "What is your name?",
-                "What is your favorite color?",
-            ]
-        else:
-            assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT not in embed_span["attributes"]
-
-        # Check usage data (sum of token counts from statistics: 10 + 15 = 25)
-        # Note: Only available in newer versions with ContentEmbeddingStatistics
-        if SPANDATA.GEN_AI_USAGE_INPUT_TOKENS in embed_span["attributes"]:
-            assert embed_span["attributes"][SPANDATA.GEN_AI_USAGE_INPUT_TOKENS] == 25
     else:
         events = capture_events()
 
@@ -2307,14 +2056,12 @@ async def test_async_embed_content(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_async_embed_content_string_input(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test async embed_content with a single string instead of list."""
@@ -2322,8 +2069,8 @@ async def test_async_embed_content_string_input(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     # Mock response with single embedding
@@ -2343,7 +2090,7 @@ async def test_async_embed_content_string_input(
     }
     mock_http_response = create_mock_http_response(single_embed_response)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -2395,25 +2142,23 @@ async def test_async_embed_content_string_input(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_async_embed_content_error_handling(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test error handling in async embed_content."""
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("event")
 
         # Mock an error at the HTTP level
@@ -2457,22 +2202,20 @@ async def test_async_embed_content_error_handling(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_async_embed_content_without_statistics(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test async embed_content response without statistics (older package versions)."""
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     # Response without statistics (typical for older google-genai versions)
@@ -2489,7 +2232,7 @@ async def test_async_embed_content_without_statistics(
     }
     mock_http_response = create_mock_http_response(old_version_response)
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -2531,22 +2274,20 @@ async def test_async_embed_content_without_statistics(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.asyncio
 async def test_async_embed_content_span_origin(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test that async embed_content spans have correct origin."""
     sentry_init(
         integrations=[GoogleGenAIIntegration()],
         traces_sample_rate=1.0,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_EMBED_RESPONSE_JSON)
@@ -2572,27 +2313,6 @@ async def test_async_embed_content_span_origin(
                 continue
 
             assert span["attributes"]["sentry.origin"] == "auto.ai.google_genai"
-
-    elif stream_gen_ai_spans:
-        items = capture_items("transaction", "span")
-
-        with mock.patch.object(
-            mock_genai_client._api_client,
-            "async_request",
-            return_value=mock_http_response,
-        ), start_transaction(name="google_genai_embeddings_async"):
-            await mock_genai_client.aio.models.embed_content(
-                model="text-embedding-004",
-                contents=["Test origin"],
-            )
-
-        (event,) = [item.payload for item in items if item.type == "transaction"]
-        assert event["contexts"]["trace"]["origin"] == "manual"
-
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        for span in spans:
-            assert span["attributes"]["sentry.origin"] == "auto.ai.google_genai"
     else:
         events = capture_events()
 
@@ -2615,13 +2335,11 @@ async def test_async_embed_content_span_origin(
 
 # Integration tests for generate_content with different input message formats
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_generate_content_with_content_object(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test generate_content with Content object input."""
@@ -2629,8 +2347,8 @@ def test_generate_content_with_content_object(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -2640,7 +2358,7 @@ def test_generate_content_with_content_object(
         role="user", parts=[genai_types.Part(text="Hello from Content object")]
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -2679,13 +2397,11 @@ def test_generate_content_with_content_object(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_generate_content_with_dict_format(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test generate_content with dict format input (ContentDict)."""
@@ -2693,8 +2409,8 @@ def test_generate_content_with_dict_format(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -2702,7 +2418,7 @@ def test_generate_content_with_dict_format(
     # Dict format content
     contents = {"role": "user", "parts": [{"text": "Hello from dict format"}]}
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -2741,13 +2457,11 @@ def test_generate_content_with_dict_format(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_generate_content_with_file_data(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test generate_content with file_data (external file reference)."""
@@ -2755,8 +2469,8 @@ def test_generate_content_with_file_data(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -2773,7 +2487,7 @@ def test_generate_content_with_file_data(
         ],
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -2818,13 +2532,11 @@ def test_generate_content_with_file_data(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_generate_content_with_inline_data(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test generate_content with inline_data (binary data)."""
@@ -2832,8 +2544,8 @@ def test_generate_content_with_inline_data(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -2849,7 +2561,7 @@ def test_generate_content_with_inline_data(
         ],
     )
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -2992,13 +2704,11 @@ def test_generate_content_with_mixed_string_and_content(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_generate_content_with_part_object_directly(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test generate_content with Part object directly (not wrapped in Content)."""
@@ -3006,8 +2716,8 @@ def test_generate_content_with_part_object_directly(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -3015,7 +2725,7 @@ def test_generate_content_with_part_object_directly(
     # Part object directly
     part = genai_types.Part(text="Direct Part object")
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -3096,13 +2806,11 @@ def test_generate_content_with_list_of_dicts(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_generate_content_with_dict_inline_data(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     """Test generate_content with dict format containing inline_data."""
@@ -3110,8 +2818,8 @@ def test_generate_content_with_dict_inline_data(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -3125,7 +2833,7 @@ def test_generate_content_with_dict_inline_data(
         ],
     }
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -3169,21 +2877,19 @@ def test_generate_content_with_dict_inline_data(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_generate_content_without_parts_property_inline_data(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -3193,7 +2899,7 @@ def test_generate_content_without_parts_property_inline_data(
         {"inline_data": {"data": b"fake_binary_data", "mime_type": "image/gif"}},
     ]
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -3239,21 +2945,19 @@ def test_generate_content_without_parts_property_inline_data(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 def test_generate_content_without_parts_property_inline_data_and_binary_data_within_string(
     sentry_init,
     capture_events,
     capture_items,
     mock_genai_client,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init(
         integrations=[GoogleGenAIIntegration(include_prompts=True)],
         traces_sample_rate=1.0,
         send_default_pii=True,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
@@ -3268,7 +2972,7 @@ def test_generate_content_without_parts_property_inline_data_and_binary_data_wit
         },
     ]
 
-    if span_streaming or stream_gen_ai_spans:
+    if span_streaming:
         items = capture_items("span")
 
         with mock.patch.object(
@@ -3651,7 +3355,6 @@ DATA_COLLECTION_EMBED_EXPECTED_VALUES = {
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
     [
@@ -3753,15 +3456,14 @@ def test_generate_content_data_collection(
     include_prompts,
     expected_present,
     expected_absent,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init_kwargs = dict(
         integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -3769,7 +3471,7 @@ def test_generate_content_data_collection(
     sentry_init(**sentry_init_kwargs)
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
-    streamed = span_streaming or stream_gen_ai_spans
+    streamed = span_streaming
     captured = capture_items("span") if streamed else capture_events()
 
     with mock.patch.object(
@@ -3816,7 +3518,6 @@ def test_generate_content_data_collection(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize(
     "data_collection,expected_present,expected_absent",
@@ -3880,15 +3581,14 @@ def test_generate_content_data_collection_tools(
     send_default_pii,
     expected_present,
     expected_absent,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init_kwargs = dict(
         integrations=[GoogleGenAIIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -3933,7 +3633,7 @@ def test_generate_content_data_collection_tools(
         }
     )
 
-    streamed = span_streaming or stream_gen_ai_spans
+    streamed = span_streaming
     captured = capture_items("span") if streamed else capture_events()
 
     with mock.patch.object(
@@ -3974,7 +3674,6 @@ def test_generate_content_data_collection_tools(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
     [
@@ -4076,15 +3775,14 @@ def test_streaming_generate_content_data_collection(
     include_prompts,
     expected_present,
     expected_absent,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init_kwargs = dict(
         integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -4128,7 +3826,7 @@ def test_streaming_generate_content_data_collection(
         ]
     )
 
-    streamed = span_streaming or stream_gen_ai_spans
+    streamed = span_streaming
     captured = capture_items("span") if streamed else capture_events()
 
     with mock.patch.object(
@@ -4170,7 +3868,6 @@ def test_streaming_generate_content_data_collection(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize("send_default_pii", [True, False])
 @pytest.mark.parametrize(
     "data_collection,expected_present,expected_absent",
@@ -4234,15 +3931,14 @@ def test_streaming_generate_content_data_collection_tools(
     send_default_pii,
     expected_present,
     expected_absent,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init_kwargs = dict(
         integrations=[GoogleGenAIIntegration(include_prompts=False)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -4292,7 +3988,7 @@ def test_streaming_generate_content_data_collection_tools(
         ]
     )
 
-    streamed = span_streaming or stream_gen_ai_spans
+    streamed = span_streaming
     captured = capture_items("span") if streamed else capture_events()
 
     with mock.patch.object(
@@ -4333,7 +4029,6 @@ def test_streaming_generate_content_data_collection_tools(
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
     [
@@ -4419,15 +4114,14 @@ def test_embed_content_data_collection(
     include_prompts,
     expected_present,
     expected_absent,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init_kwargs = dict(
         integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -4435,7 +4129,7 @@ def test_embed_content_data_collection(
     sentry_init(**sentry_init_kwargs)
 
     mock_http_response = create_mock_http_response(EXAMPLE_EMBED_RESPONSE_JSON)
-    streamed = span_streaming or stream_gen_ai_spans
+    streamed = span_streaming
     captured = capture_items("span") if streamed else capture_events()
 
     with mock.patch.object(
@@ -4471,7 +4165,6 @@ def test_embed_content_data_collection(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
     [
@@ -4573,15 +4266,14 @@ async def test_async_generate_content_data_collection(
     include_prompts,
     expected_present,
     expected_absent,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init_kwargs = dict(
         integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -4589,7 +4281,7 @@ async def test_async_generate_content_data_collection(
     sentry_init(**sentry_init_kwargs)
 
     mock_http_response = create_mock_http_response(EXAMPLE_API_RESPONSE_JSON)
-    streamed = span_streaming or stream_gen_ai_spans
+    streamed = span_streaming
     captured = capture_items("span") if streamed else capture_events()
 
     with mock.patch.object(
@@ -4628,7 +4320,6 @@ async def test_async_generate_content_data_collection(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("span_streaming", [True, False])
-@pytest.mark.parametrize("stream_gen_ai_spans", [True, False])
 @pytest.mark.parametrize(
     "data_collection,send_default_pii,include_prompts,expected_present,expected_absent",
     [
@@ -4714,15 +4405,14 @@ async def test_async_embed_content_data_collection(
     include_prompts,
     expected_present,
     expected_absent,
-    stream_gen_ai_spans,
     span_streaming,
 ):
     sentry_init_kwargs = dict(
         integrations=[GoogleGenAIIntegration(include_prompts=include_prompts)],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        stream_gen_ai_spans=stream_gen_ai_spans,
         trace_lifecycle="stream" if span_streaming else "static",
+        stream_gen_ai_spans=False,
     )
     if data_collection is not None:
         sentry_init_kwargs["_experiments"] = {"data_collection": data_collection}
@@ -4730,7 +4420,7 @@ async def test_async_embed_content_data_collection(
     sentry_init(**sentry_init_kwargs)
 
     mock_http_response = create_mock_http_response(EXAMPLE_EMBED_RESPONSE_JSON)
-    streamed = span_streaming or stream_gen_ai_spans
+    streamed = span_streaming
     captured = capture_items("span") if streamed else capture_events()
 
     with mock.patch.object(

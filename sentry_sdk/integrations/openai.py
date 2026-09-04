@@ -48,7 +48,6 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
-    should_truncate_gen_ai_input,
 )
 from sentry_sdk.utils import (
     capture_internal_exceptions,
@@ -458,7 +457,7 @@ def _set_responses_api_input_data(
         scope = sentry_sdk.get_current_scope()
         messages_data = (
             truncate_and_annotate_messages(normalized_messages, span, scope)
-            if should_truncate_gen_ai_input(client.options)
+            if not has_span_streaming_enabled(client.options)
             else normalized_messages
         )
         if messages_data is not None:
@@ -477,7 +476,7 @@ def _set_responses_api_input_data(
         scope = sentry_sdk.get_current_scope()
         messages_data = (
             truncate_and_annotate_messages(normalized_messages, span, scope)
-            if should_truncate_gen_ai_input(client.options)
+            if not has_span_streaming_enabled(client.options)
             else normalized_messages
         )
         if messages_data is not None:
@@ -564,7 +563,7 @@ def _set_completions_api_input_data(
         scope = sentry_sdk.get_current_scope()
         messages_data = (
             truncate_and_annotate_messages(normalized_messages, span, scope)
-            if should_truncate_gen_ai_input(client.options)
+            if not has_span_streaming_enabled(client.options)
             else normalized_messages
         )
         if messages_data is not None:
@@ -598,7 +597,7 @@ def _set_completions_api_input_data(
         scope = sentry_sdk.get_current_scope()
         messages_data = (
             truncate_and_annotate_messages(normalized_messages, span, scope)
-            if should_truncate_gen_ai_input(client.options)
+            if not has_span_streaming_enabled(client.options)
             else normalized_messages
         )
         if messages_data is not None:
@@ -642,7 +641,7 @@ def _set_embeddings_input_data(
         scope = sentry_sdk.get_current_scope()
         messages_data = (
             truncate_and_annotate_embedding_inputs(normalized_messages, span, scope)
-            if should_truncate_gen_ai_input(client.options)
+            if not has_span_streaming_enabled(client.options)
             else normalized_messages
         )
         if messages_data is not None:
@@ -664,7 +663,7 @@ def _set_embeddings_input_data(
         scope = sentry_sdk.get_current_scope()
         messages_data = (
             truncate_and_annotate_embedding_inputs(normalized_messages, span, scope)
-            if should_truncate_gen_ai_input(client.options)
+            if not has_span_streaming_enabled(client.options)
             else normalized_messages
         )
         if messages_data is not None:

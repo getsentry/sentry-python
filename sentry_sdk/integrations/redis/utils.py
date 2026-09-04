@@ -5,17 +5,15 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis.consts import (
     _COMMANDS_INCLUDING_SENSITIVE_DATA,
     _MAX_NUM_ARGS,
-    _MAX_NUM_COMMANDS,
     _MULTI_KEY_COMMANDS,
     _SINGLE_KEY_COMMANDS,
 )
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
-from sentry_sdk.tracing import Span
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE, has_data_collection_enabled
 
 if TYPE_CHECKING:
-    from typing import Any, Optional, Sequence, Union
+    from typing import Any, Optional, Sequence
 
 
 def _get_safe_command(name: str, args: "Sequence[Any]") -> str:
@@ -110,45 +108,15 @@ def _parse_rediscluster_command(command: "Any") -> "Sequence[Any]":
     return command.args
 
 
-def _set_pipeline_data(
-    span: "Union[Span, StreamedSpan]",
-    is_cluster: bool,
-    get_command_args_fn: "Any",
-    is_transaction: bool,
-    commands_seq: "Sequence[Any]",
-) -> None:
-    # TODO: Remove this whole function when removing transaction based tracing
-    if isinstance(span, StreamedSpan):
-        return
-
-    commands = []
-    for i, arg in enumerate(commands_seq):
-        if i >= _MAX_NUM_COMMANDS:
-            break
-
-        command = get_command_args_fn(arg)
-        commands.append(_get_safe_command(command[0], command[1:]))
-
-    span.set_data(
-        "redis.commands",
-        {
-            "count": len(commands_seq),
-            "first_ten": commands,
-        },
-    )
-
-
 def _set_client_data(
-    span: "Union[Span, StreamedSpan]", is_cluster: bool, name: str, *args: "Any"
+    span: "StreamedSpan", is_cluster: bool, name: str, *args: "Any"
 ) -> None:
-    if isinstance(span, StreamedSpan):
-        if name:
-            span.set_attribute(SPANDATA.DB_OPERATION_NAME, name)
+    if name:
+        span.set_attribute(SPANDATA.DB_OPERATION_NAME, name)
 
     key = _extract_key(name, args)
     if key is not None:
-        if isinstance(span, StreamedSpan):
-            span.set_attribute("db.redis.key", key)
+        span.set_attribute("db.redis.key", key)
 
 
 def _extract_key(name: str, args: "Any") -> "Optional[str]":

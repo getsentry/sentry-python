@@ -16,7 +16,6 @@ from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_ve
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
-    should_truncate_gen_ai_input,
 )
 from sentry_sdk.utils import (
     event_from_exception,
@@ -153,7 +152,7 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
                 )
                 messages_data = (
                     truncate_and_annotate_embedding_inputs(input_list, span, scope)
-                    if should_truncate_gen_ai_input(client.options)
+                    if not has_span_streaming_enabled(client.options)
                     else input_list
                 )
                 if messages_data is not None:
@@ -171,7 +170,7 @@ def _input_callback(kwargs: "Dict[str, Any]") -> None:
                 messages = _convert_message_parts(messages)
                 messages_data = (
                     truncate_and_annotate_messages(messages, span, scope)
-                    if should_truncate_gen_ai_input(client.options)
+                    if not has_span_streaming_enabled(client.options)
                     else messages
                 )
                 if messages_data is not None:
