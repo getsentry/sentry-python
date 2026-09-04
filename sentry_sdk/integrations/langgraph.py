@@ -9,7 +9,7 @@ from sentry_sdk.ai.utils import (
     truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 
 # This is fine because langgraph depends on langchain-base, and LangchainIntegration only imports from langchain-base.
 from sentry_sdk.integrations.langchain import LangchainIntegration
@@ -17,16 +17,19 @@ from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
-    should_truncate_gen_ai_input,
 )
-from sentry_sdk.utils import has_data_collection_enabled, safe_serialize
+from sentry_sdk.utils import (
+    has_data_collection_enabled,
+    package_version,
+    safe_serialize,
+)
 
 try:
     from langgraph.errors import GraphBubbleUp
     from langgraph.graph import StateGraph
     from langgraph.pregel import Pregel
 except ImportError:
-    raise DidNotEnable("langgraph not installed")
+    raise DidNotEnable("langgraph not installed or incompatible")
 
 
 class LanggraphIntegration(Integration):
@@ -38,6 +41,9 @@ class LanggraphIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        version = package_version("langgraph")
+        _check_minimum_version(LanggraphIntegration, version)
+
         LangchainIntegration._ignored_exceptions.add(GraphBubbleUp)
         # LangGraph lets users create agents using a StateGraph or the Functional API.
         # StateGraphs are then compiled to a CompiledStateGraph. Both CompiledStateGraph and
@@ -224,7 +230,7 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                             truncate_and_annotate_messages(
                                 normalized_input_messages, span, scope
                             )
-                            if should_truncate_gen_ai_input(client.options)
+                            if not has_span_streaming_enabled(client.options)
                             else normalized_input_messages
                         )
                         if messages_data is not None:
@@ -266,7 +272,7 @@ def _wrap_pregel_invoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                             truncate_and_annotate_messages(
                                 normalized_input_messages, span, scope
                             )
-                            if should_truncate_gen_ai_input(client.options)
+                            if not has_span_streaming_enabled(client.options)
                             else normalized_input_messages
                         )
                         if messages_data is not None:
@@ -325,7 +331,7 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                             truncate_and_annotate_messages(
                                 normalized_input_messages, span, scope
                             )
-                            if should_truncate_gen_ai_input(client.options)
+                            if not has_span_streaming_enabled(client.options)
                             else normalized_input_messages
                         )
                         if messages_data is not None:
@@ -364,7 +370,7 @@ def _wrap_pregel_ainvoke(f: "Callable[..., Any]") -> "Callable[..., Any]":
                         truncate_and_annotate_messages(
                             normalized_input_messages, span, scope
                         )
-                        if should_truncate_gen_ai_input(client.options)
+                        if not has_span_streaming_enabled(client.options)
                         else normalized_input_messages
                     )
                     if messages_data is not None:

@@ -6,7 +6,7 @@ from sentry_sdk.tracing import (
     BAGGAGE_HEADER_NAME,
     SENTRY_TRACE_HEADER_NAME,
 )
-from sentry_sdk.tracing_utils import Baggage
+from sentry_sdk.tracing_utils import Baggage, extract_sentrytrace_data
 from sentry_sdk.utils import (
     Dsn,
     capture_internal_exceptions,
@@ -15,16 +15,22 @@ from sentry_sdk.utils import (
 )
 
 try:
+    from opentelemetry import trace
     from opentelemetry.context import (
         Context,
+        create_key,
         get_current,
         get_value,
+        set_value,
     )
     from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
     from opentelemetry.propagate import set_global_textmap
     from opentelemetry.propagators.textmap import (
         CarrierT,
+        Getter,
         Setter,
+        TextMapPropagator,
+        default_getter,
         default_setter,
     )
     from opentelemetry.sdk.trace import Span, TracerProvider
@@ -32,23 +38,27 @@ try:
     from opentelemetry.trace import (
         INVALID_SPAN_ID,
         INVALID_TRACE_ID,
+        NonRecordingSpan,
         SpanContext,
+        TraceFlags,
         format_span_id,
         format_trace_id,
         get_current_span,
         get_tracer_provider,
         set_tracer_provider,
     )
-
-    from sentry_sdk.integrations.opentelemetry.consts import SENTRY_BAGGAGE_KEY
-    from sentry_sdk.integrations.opentelemetry.propagator import SentryPropagator
 except ImportError:
-    raise DidNotEnable("opentelemetry-distro[otlp] is not installed")
+    raise DidNotEnable("opentelemetry-distro[otlp] is not installed or incompatible")
+
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional, Tuple
+    from typing import Any, Dict, Optional, Set, Tuple
+
+
+SENTRY_BAGGAGE_KEY = create_key("sentry-baggage")
+SENTRY_TRACE_KEY = create_key("sentry-trace")
 
 
 def otel_propagation_context() -> "Optional[Tuple[str, str]]":
@@ -121,11 +131,8 @@ def setup_capture_exceptions() -> None:
     _sentry_patched_exception = True
 
 
-class SentryOTLPPropagator(SentryPropagator):
+class SentryOTLPPropagator(TextMapPropagator):
     """
-    We need to override the inject of the older propagator since that
-    is SpanProcessor based.
-
     !!! Note regarding baggage:
     We cannot meaningfully populate a new baggage as a head SDK
     when we are using OTLP since we don't have any sort of transaction semantic to
@@ -133,6 +140,52 @@ class SentryOTLPPropagator(SentryPropagator):
 
     For incoming baggage, we just pass it on as is so that case is correctly handled.
     """
+
+    def extract(
+        self,
+        carrier: "CarrierT",
+        context: "Optional[Context]" = None,
+        getter: "Getter[CarrierT]" = default_getter,
+    ) -> "Context":
+        if context is None:
+            context = get_current()
+
+        sentry_trace = getter.get(carrier, SENTRY_TRACE_HEADER_NAME)
+        if not sentry_trace:
+            return context
+
+        sentrytrace = extract_sentrytrace_data(sentry_trace[0])
+        if not sentrytrace:
+            return context
+
+        context = set_value(SENTRY_TRACE_KEY, sentrytrace, context)
+
+        trace_id, span_id = sentrytrace["trace_id"], sentrytrace["parent_span_id"]
+
+        span_context = SpanContext(
+            trace_id=int(trace_id, 16),  # type: ignore
+            span_id=int(span_id, 16),  # type: ignore
+            # we simulate a sampled trace on the otel side and leave the sampling to sentry
+            trace_flags=TraceFlags(TraceFlags.SAMPLED),
+            is_remote=True,
+        )
+
+        baggage_header = getter.get(carrier, BAGGAGE_HEADER_NAME)
+
+        if baggage_header:
+            baggage = Baggage.from_incoming_header(baggage_header[0])
+        else:
+            # If there's an incoming sentry-trace but no incoming baggage header,
+            # for instance in traces coming from older SDKs,
+            # baggage will be empty and frozen and won't be populated as head SDK.
+            baggage = Baggage(sentry_items={})
+
+        baggage.freeze()
+        context = set_value(SENTRY_BAGGAGE_KEY, baggage, context)
+
+        span = NonRecordingSpan(span_context)
+        modified_context = trace.set_span_in_context(span, context)
+        return modified_context
 
     def inject(
         self,
@@ -161,6 +214,10 @@ class SentryOTLPPropagator(SentryPropagator):
             baggage_data = baggage.serialize()
             if baggage_data:
                 setter.set(carrier, BAGGAGE_HEADER_NAME, baggage_data)
+
+    @property
+    def fields(self) -> "Set[str]":
+        return {SENTRY_TRACE_HEADER_NAME, BAGGAGE_HEADER_NAME}
 
 
 def _to_traceparent(span_context: "SpanContext") -> str:

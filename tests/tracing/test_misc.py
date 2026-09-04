@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 import pytest
 
 import sentry_sdk
-from sentry_sdk import set_measurement, start_span, start_transaction
+from sentry_sdk import start_span, start_transaction
 from sentry_sdk.consts import MATCH_ALL
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span, Transaction
@@ -260,90 +260,6 @@ def test_finds_non_orphan_span_on_scope_span_streaming(sentry_init):
     assert scope._span.name == "sniffing"
 
 
-def test_set_measurement(sentry_init, capture_events):
-    sentry_init(traces_sample_rate=1.0)
-
-    events = capture_events()
-
-    transaction = start_transaction(name="measuring stuff")
-
-    with pytest.raises(TypeError):
-        transaction.set_measurement()
-
-    with pytest.raises(TypeError):
-        transaction.set_measurement("metric.foo")
-
-    transaction.set_measurement("metric.foo", 123)
-    transaction.set_measurement("metric.bar", 456, unit="second")
-    transaction.set_measurement("metric.baz", 420.69, unit="custom")
-    transaction.set_measurement("metric.foobar", 12, unit="percent")
-    transaction.set_measurement("metric.foobar", 17.99, unit="percent")
-
-    transaction.finish()
-
-    (event,) = events
-    assert event["measurements"]["metric.foo"] == {"value": 123, "unit": ""}
-    assert event["measurements"]["metric.bar"] == {"value": 456, "unit": "second"}
-    assert event["measurements"]["metric.baz"] == {"value": 420.69, "unit": "custom"}
-    assert event["measurements"]["metric.foobar"] == {"value": 17.99, "unit": "percent"}
-
-
-def test_set_measurement_public_api(sentry_init, capture_events):
-    sentry_init(traces_sample_rate=1.0)
-
-    events = capture_events()
-
-    with start_transaction(name="measuring stuff"):
-        set_measurement("metric.foo", 123)
-        set_measurement("metric.bar", 456, unit="second")
-
-    (event,) = events
-    assert event["measurements"]["metric.foo"] == {"value": 123, "unit": ""}
-    assert event["measurements"]["metric.bar"] == {"value": 456, "unit": "second"}
-
-
-def test_set_measurement_deprecated(sentry_init):
-    sentry_init(traces_sample_rate=1.0)
-
-    with start_transaction(name="measuring stuff") as trx:
-        with pytest.warns(DeprecationWarning):
-            set_measurement("metric.foo", 123)
-
-        with pytest.warns(DeprecationWarning):
-            trx.set_measurement("metric.bar", 456)
-
-        with start_span(op="measuring span") as span:
-            with pytest.warns(DeprecationWarning):
-                span.set_measurement("metric.baz", 420.69, unit="custom")
-
-
-def test_set_meaurement_compared_to_set_data(sentry_init, capture_events):
-    """
-    This is just a test to see the difference
-    between measurements and data in the resulting event payload.
-    """
-    sentry_init(traces_sample_rate=1.0)
-
-    events = capture_events()
-
-    with start_transaction(name="measuring stuff") as transaction:
-        transaction.set_measurement("metric.foo", 123)
-        transaction.set_data("metric.bar", 456)
-
-        with start_span(op="measuring span") as span:
-            span.set_measurement("metric.baz", 420.69, unit="custom")
-            span.set_data("metric.qux", 789)
-
-    (event,) = events
-    assert event["measurements"]["metric.foo"] == {"value": 123, "unit": ""}
-    assert event["contexts"]["trace"]["data"]["metric.bar"] == 456
-    assert event["spans"][0]["measurements"]["metric.baz"] == {
-        "value": 420.69,
-        "unit": "custom",
-    }
-    assert event["spans"][0]["data"]["metric.qux"] == 789
-
-
 @pytest.mark.parametrize(
     "trace_propagation_targets,url,expected_propagation_decision",
     [
@@ -510,51 +426,6 @@ def test_span_set_data_update_data(sentry_init, capture_events):
         "key1": "updated-value1",
         "key2": "value2",
         "key3": "value3",
-        "thread.id": mock.ANY,
-        "thread.name": mock.ANY,
-    }
-
-
-def test_update_current_span(sentry_init, capture_events):
-    sentry_init(traces_sample_rate=1.0)
-
-    events = capture_events()
-
-    with sentry_sdk.start_transaction(name="test-transaction"):
-        with start_span(op="test-span-op", name="test-span-name"):
-            sentry_sdk.update_current_span(
-                op="updated-span-op",
-                name="updated-span-name",
-                attributes={
-                    "key0": "value0",
-                    "key1": "value1",
-                },
-            )
-
-            sentry_sdk.update_current_span(
-                op="updated-span-op-2",
-            )
-
-            sentry_sdk.update_current_span(
-                name="updated-span-name-3",
-            )
-
-            sentry_sdk.update_current_span(
-                attributes={
-                    "key1": "updated-value-4",
-                    "key2": "value2",
-                },
-            )
-
-    (event,) = events
-    span = event["spans"][0]
-
-    assert span["op"] == "updated-span-op-2"
-    assert span["description"] == "updated-span-name-3"
-    assert span["data"] == {
-        "key0": "value0",
-        "key1": "updated-value-4",
-        "key2": "value2",
         "thread.id": mock.ANY,
         "thread.name": mock.ANY,
     }

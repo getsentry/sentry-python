@@ -12,31 +12,72 @@ from sentry_sdk.integrations.loguru import LoggingLevels, LoguruIntegration
 logger.remove(0)  # don't print to console
 
 
+def test_defaults(sentry_init, capture_events):
+    """No logs, events, breadcrumbs captured by default."""
+    sentry_init()
+
+    events = capture_events()
+
+    logger.error("test")
+
+    assert not events
+
+
+def test_defaults_enabled(sentry_init, capture_items):
+    """Logs and breadcrumbs captured by default if integration is enabled."""
+    sentry_init(integrations=[LoguruIntegration()])
+
+    items = capture_items()
+
+    logger.error("test")
+    sentry_sdk.capture_message("oh no")
+
+    sentry_sdk.flush()
+
+    events = [item for item in items if item.type == "event"]
+    logs = [item for item in items if item.type == "log"]
+
+    assert len(events) == 1
+    assert events[0].payload["message"] == "oh no"
+
+    breadcrumbs = events[0].payload["breadcrumbs"]["values"]
+    assert len(breadcrumbs) == 1
+    assert breadcrumbs[0]["level"] == "error"
+    assert breadcrumbs[0]["category"] == "tests.integrations.loguru.test_loguru"
+
+    assert len(logs) == 1
+    assert logs[0].payload["body"] == "test"
+    assert logs[0].payload["level"] == "error"
+    assert logs[0].payload["attributes"]["sentry.origin"] == "auto.log.loguru"
+
+
 @pytest.mark.parametrize(
-    "level,created_event,expected_sentry_level",
+    "level,created_event,created_breadcrumb,created_log,expected_event_level,expected_log_level",
     [
-        # None - no breadcrumb
-        # False - no event
-        # True - event created
-        (LoggingLevels.TRACE, None, "debug"),
-        (LoggingLevels.DEBUG, None, "debug"),
-        (LoggingLevels.INFO, False, "info"),
-        (LoggingLevels.SUCCESS, False, "info"),
-        (LoggingLevels.WARNING, False, "warning"),
-        (LoggingLevels.ERROR, True, "error"),
-        (LoggingLevels.CRITICAL, True, "critical"),
+        (LoggingLevels.TRACE, False, False, False, "debug", "trace"),
+        (LoggingLevels.DEBUG, False, False, False, "debug", "debug"),
+        (LoggingLevels.INFO, False, True, True, "info", "info"),
+        (LoggingLevels.SUCCESS, False, True, True, "info", "info"),
+        (LoggingLevels.WARNING, False, True, True, "warning", "warn"),
+        (LoggingLevels.ERROR, True, True, True, "error", "error"),
+        (LoggingLevels.CRITICAL, True, True, True, "critical", "fatal"),
     ],
 )
 @pytest.mark.parametrize("disable_breadcrumbs", [True, False])
 @pytest.mark.parametrize("disable_events", [True, False])
-def test_just_log(
+@pytest.mark.parametrize("disable_logs", [True, False])
+def test_levels(
     sentry_init,
-    capture_events,
+    capture_items,
     level,
     created_event,
-    expected_sentry_level,
+    created_breadcrumb,
+    created_log,
+    expected_event_level,
+    expected_log_level,
     disable_breadcrumbs,
     disable_events,
+    disable_logs,
     uninstall_integration,
     request,
 ):
@@ -46,46 +87,52 @@ def test_just_log(
     sentry_init(
         integrations=[
             LoguruIntegration(
-                level=None if disable_breadcrumbs else LoggingLevels.INFO.value,
+                breadcrumb_level=None
+                if disable_breadcrumbs
+                else LoggingLevels.INFO.value,
                 event_level=None if disable_events else LoggingLevels.ERROR.value,
+                level=None if disable_logs else LoggingLevels.INFO.value,
             )
         ],
-        default_integrations=False,
     )
-    events = capture_events()
+    items = capture_items()
 
     getattr(logger, level.name.lower())("test")
+
+    sentry_sdk.flush()
 
     expected_pattern = (
         r" \| "
         + r"{:9}".format(level.name.upper())
-        + r"\| tests\.integrations\.loguru\.test_loguru:test_just_log:\d+ - test"
+        + r"\| tests\.integrations\.loguru\.test_loguru:test_levels:\d+ - test"
     )
 
-    if not created_event:
+    breadcrumbs = sentry_sdk.get_isolation_scope()._breadcrumbs
+    if not disable_breadcrumbs and created_breadcrumb:
+        (breadcrumb,) = breadcrumbs
+        assert breadcrumb["level"] == expected_event_level
+        assert breadcrumb["category"] == "tests.integrations.loguru.test_loguru"
+        assert re.fullmatch(expected_pattern, breadcrumb["message"][23:])
+    else:
+        assert not breadcrumbs
+
+    events = [item for item in items if item.type == "event"]
+    if disable_events or not created_event:
         assert not events
 
-        breadcrumbs = sentry_sdk.get_isolation_scope()._breadcrumbs
-        if (
-            not disable_breadcrumbs and created_event is not None
-        ):  # not None == not TRACE or DEBUG level
-            (breadcrumb,) = breadcrumbs
-            assert breadcrumb["level"] == expected_sentry_level
-            assert breadcrumb["category"] == "tests.integrations.loguru.test_loguru"
-            assert re.fullmatch(expected_pattern, breadcrumb["message"][23:])
-        else:
-            assert not breadcrumbs
+    logs = [item for item in items if item.type == "log"]
+    if disable_logs or not created_log:
+        assert not logs
 
-        return
+    for event in events:
+        assert event.payload["level"] == expected_event_level
+        assert event.payload["logger"] == "tests.integrations.loguru.test_loguru"
+        assert re.fullmatch(expected_pattern, event.payload["logentry"]["message"][23:])
 
-    if disable_events:
-        assert not events
-        return
-
-    (event,) = events
-    assert event["level"] == expected_sentry_level
-    assert event["logger"] == "tests.integrations.loguru.test_loguru"
-    assert re.fullmatch(expected_pattern, event["logentry"]["message"][23:])
+    for log in logs:
+        assert log.payload["level"] == expected_log_level
+        assert log.payload["body"] == "test"
+        assert log.payload["attributes"]["sentry.origin"] == "auto.log.loguru"
 
 
 def test_breadcrumb_format(sentry_init, capture_events, uninstall_integration, request):
@@ -95,12 +142,12 @@ def test_breadcrumb_format(sentry_init, capture_events, uninstall_integration, r
     sentry_init(
         integrations=[
             LoguruIntegration(
-                level=LoggingLevels.INFO.value,
-                event_level=None,
+                breadcrumb_level=LoggingLevels.INFO.value,
                 breadcrumb_format="{message}",
+                level=None,
+                event_level=None,
             )
         ],
-        default_integrations=False,
     )
 
     logger.info("test")
@@ -119,11 +166,11 @@ def test_event_format(sentry_init, capture_events, uninstall_integration, reques
         integrations=[
             LoguruIntegration(
                 level=None,
+                breadcrumb_level=None,
                 event_level=LoggingLevels.ERROR.value,
                 event_format="{message}",
             )
         ],
-        default_integrations=False,
     )
     events = capture_events()
 
@@ -140,7 +187,7 @@ def test_sentry_logs_warning(
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(integrations=[LoguruIntegration(capture_sentry_logs=True)])
+    sentry_init(integrations=[LoguruIntegration()])
     items = capture_items("log")
 
     logger.warning("this is {} a {}", "just", "template")
@@ -164,7 +211,7 @@ def test_sentry_logs_debug(
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(integrations=[LoguruIntegration(capture_sentry_logs=True)])
+    sentry_init(integrations=[LoguruIntegration()])
     envelopes = capture_envelopes()
 
     logger.debug("this is %s a template %s", "1", "2")
@@ -178,11 +225,7 @@ def test_sentry_log_levels(sentry_init, capture_items, uninstall_integration, re
     request.addfinalizer(logger.remove)
 
     sentry_init(
-        integrations=[
-            LoguruIntegration(
-                capture_sentry_logs=True, sentry_logs_level=LoggingLevels.SUCCESS
-            )
-        ],
+        integrations=[LoguruIntegration(level=LoggingLevels.SUCCESS)],
     )
     items = capture_items("log")
 
@@ -215,9 +258,7 @@ def test_disable_loguru_logs(
     request.addfinalizer(logger.remove)
 
     sentry_init(
-        integrations=[
-            LoguruIntegration(capture_sentry_logs=True, sentry_logs_level=None)
-        ],
+        integrations=[LoguruIntegration(level=None)],
     )
     items = capture_items("log")
 
@@ -256,78 +297,6 @@ def test_disable_sentry_logs_by_default(
     assert len(logs) == 0
 
 
-def test_enable_sentry_logs_if_enable_logs_is_true(
-    sentry_init, capture_items, uninstall_integration, request
-):
-    # This should be removed in the next major.
-    uninstall_integration("loguru")
-    request.addfinalizer(logger.remove)
-
-    sentry_init(enable_logs=True)
-    items = capture_items("log")
-
-    logger.trace("this is a log")
-    logger.debug("this is a log")
-    logger.info("this is a log")
-    logger.success("this is a log")
-    logger.warning("this is a log")
-    logger.error("this is a log")
-    logger.critical("this is a log")
-
-    sentry_sdk.get_client().flush()
-    logs = [item.payload for item in items]
-    assert len(logs) == 5
-
-
-def test_disable_sentry_logs_if_enable_logs_is_true_but_integration_option_is_false(
-    sentry_init, capture_items, uninstall_integration, request
-):
-    # This should be removed in the next major.
-    uninstall_integration("loguru")
-    request.addfinalizer(logger.remove)
-
-    sentry_init(
-        enable_logs=True, integrations=[LoguruIntegration(capture_sentry_logs=False)]
-    )
-    items = capture_items("log")
-
-    logger.trace("this is a log")
-    logger.debug("this is a log")
-    logger.info("this is a log")
-    logger.success("this is a log")
-    logger.warning("this is a log")
-    logger.error("this is a log")
-    logger.critical("this is a log")
-
-    sentry_sdk.get_client().flush()
-    logs = [item.payload for item in items]
-    assert not logs
-
-
-def test_disable_sentry_logs_explicitly(
-    sentry_init, capture_items, uninstall_integration, request
-):
-    uninstall_integration("loguru")
-    request.addfinalizer(logger.remove)
-
-    sentry_init(
-        integrations=[LoguruIntegration(capture_sentry_logs=False)],
-    )
-    items = capture_items("log")
-
-    logger.trace("this is a log")
-    logger.debug("this is a log")
-    logger.info("this is a log")
-    logger.success("this is a log")
-    logger.warning("this is a log")
-    logger.error("this is a log")
-    logger.critical("this is a log")
-
-    sentry_sdk.get_client().flush()
-    logs = [item.payload for item in items]
-    assert len(logs) == 0
-
-
 def test_no_log_infinite_loop(
     sentry_init, capture_envelopes, uninstall_integration, request
 ):
@@ -338,11 +307,7 @@ def test_no_log_infinite_loop(
     request.addfinalizer(logger.remove)
 
     sentry_init(
-        integrations=[
-            LoguruIntegration(
-                capture_sentry_logs=True, sentry_logs_level=LoggingLevels.DEBUG
-            )
-        ],
+        integrations=[LoguruIntegration(level=LoggingLevels.DEBUG)],
         debug=True,
     )
     envelopes = capture_envelopes()
@@ -360,7 +325,13 @@ def test_logging_errors(
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(integrations=[LoguruIntegration(capture_sentry_logs=True)])
+    sentry_init(
+        integrations=[
+            LoguruIntegration(
+                level=LoggingLevels.INFO.value, event_level=LoggingLevels.ERROR.value
+            )
+        ]
+    )
     envelopes = capture_envelopes()
     items = capture_items("log")
 
@@ -390,7 +361,7 @@ def test_log_strips_project_root(
     request.addfinalizer(logger.remove)
 
     sentry_init(
-        integrations=[LoguruIntegration(capture_sentry_logs=True)],
+        integrations=[LoguruIntegration()],
         project_root="/custom/test",
     )
     items = capture_items("log")
@@ -439,7 +410,7 @@ def test_log_keeps_full_path_if_not_in_project_root(
     request.addfinalizer(logger.remove)
 
     sentry_init(
-        integrations=[LoguruIntegration(capture_sentry_logs=True)],
+        integrations=[LoguruIntegration()],
         project_root="/custom/test",
     )
     items = capture_items("log")
@@ -487,7 +458,7 @@ def test_logger_with_all_attributes(
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(integrations=[LoguruIntegration(capture_sentry_logs=True)])
+    sentry_init(integrations=[LoguruIntegration()])
     items = capture_items("log")
 
     logger.warning("log #{}", 1)
@@ -559,7 +530,7 @@ def test_logger_capture_parameters_from_args(
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(integrations=[LoguruIntegration(capture_sentry_logs=True)])
+    sentry_init(integrations=[LoguruIntegration()])
     items = capture_items("log")
 
     logger.warning("Task ID: {}", 123)
@@ -578,7 +549,7 @@ def test_logger_capture_parameters_from_kwargs(
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(integrations=[LoguruIntegration(capture_sentry_logs=True)])
+    sentry_init(integrations=[LoguruIntegration()])
     items = capture_items("log")
 
     logger.warning("Task ID: {task_id}", task_id=123)
@@ -597,7 +568,7 @@ def test_logger_capture_parameters_from_contextualize(
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(integrations=[LoguruIntegration(capture_sentry_logs=True)])
+    sentry_init(integrations=[LoguruIntegration()])
     items = capture_items("log")
 
     with logger.contextualize(task_id=123):
@@ -617,7 +588,7 @@ def test_logger_capture_parameters_from_bind(
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(integrations=[LoguruIntegration(capture_sentry_logs=True)])
+    sentry_init(integrations=[LoguruIntegration()])
     items = capture_items("log")
 
     logger.bind(task_id=123).warning("Log")
@@ -635,7 +606,7 @@ def test_logger_capture_parameters_from_patch(
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(integrations=[LoguruIntegration(capture_sentry_logs=True)])
+    sentry_init(integrations=[LoguruIntegration()])
     items = capture_items("log")
 
     logger.patch(lambda record: record["extra"].update(task_id=123)).warning("Log")
@@ -653,7 +624,7 @@ def test_no_parameters_no_template(
     uninstall_integration("loguru")
     request.addfinalizer(logger.remove)
 
-    sentry_init(integrations=[LoguruIntegration(capture_sentry_logs=True)])
+    sentry_init(integrations=[LoguruIntegration()])
     items = capture_items("log")
 
     logger.warning("Logging a hardcoded warning")

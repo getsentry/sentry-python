@@ -23,12 +23,14 @@ accurate testing of the integration's behavior in real MCP Server scenarios.
 
 import asyncio
 import json
+import logging
 from unittest import mock
 
 import anyio
 import pytest
 
 import sentry_sdk
+from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.utils import package_version, parse_version
 
 try:
@@ -518,8 +520,10 @@ async def test_fastmcp_tool_with_error(
     span_streaming,
 ):
     """Test that FastMCP tool handler errors are captured properly"""
+    # TODO: This test doesn't capture errors via the MCP integration, but rather
+    # via logging. Might be worth another look if that's intended.
     sentry_init(
-        integrations=[MCPIntegration()],
+        integrations=[MCPIntegration(), LoggingIntegration(event_level=logging.ERROR)],
         traces_sample_rate=1.0,
         trace_lifecycle="stream" if span_streaming else "static",
     )

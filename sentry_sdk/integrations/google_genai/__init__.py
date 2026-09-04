@@ -10,12 +10,14 @@ from typing import (
 import sentry_sdk
 from sentry_sdk.ai.utils import get_start_span_function
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.traces import SpanStatus, StreamedSpan
 from sentry_sdk.tracing import SPANSTATUS
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
+from sentry_sdk.utils import parse_version
 
 try:
+    from google.genai import __version__ as GOOGLE_GENAI_VERSION
     from google.genai.models import AsyncModels, Models
 except ImportError:
     raise DidNotEnable("google-genai not installed")
@@ -46,6 +48,9 @@ class GoogleGenAIIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        version = parse_version(GOOGLE_GENAI_VERSION)
+        _check_minimum_version(GoogleGenAIIntegration, version)
+
         # Patch sync methods
         Models.generate_content = _wrap_generate_content(Models.generate_content)  # type: ignore[method-assign]
         Models.generate_content_stream = _wrap_generate_content_stream(  # type: ignore[method-assign]

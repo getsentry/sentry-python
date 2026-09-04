@@ -8,7 +8,6 @@ from sentry_sdk.transport import HttpTransport, Transport
 from sentry_sdk.api import *  # noqa # isort: skip
 
 __all__ = [  # noqa
-    "Hub",
     "Scope",
     "Client",
     "Transport",
@@ -22,7 +21,6 @@ __all__ = [  # noqa
     "capture_event",
     "capture_exception",
     "capture_message",
-    "configure_scope",
     "continue_trace",
     "flush",
     "flush_async",
@@ -37,14 +35,12 @@ __all__ = [  # noqa
     "isolation_scope",
     "last_event_id",
     "new_scope",
-    "push_scope",
     "remove_attribute",
     "set_attribute",
     "set_attributes",
     "set_context",
     "set_extra",
     "set_level",
-    "set_measurement",
     "set_tag",
     "set_tags",
     "set_user",
@@ -58,7 +54,6 @@ __all__ = [  # noqa
     "start_session",
     "end_session",
     "set_transaction_name",
-    "update_current_span",
 ]
 
 # Initialize the debug support after everything is loaded
@@ -66,6 +61,3 @@ from sentry_sdk.debug import init_debug_support
 
 init_debug_support()
 del init_debug_support
-
-# circular imports
-from sentry_sdk.hub import Hub

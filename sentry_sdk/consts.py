@@ -52,7 +52,6 @@ if TYPE_CHECKING:
         IgnoreSpansConfig,
         Log,
         Metric,
-        ProfilerMode,
         SpanJSON,
         TracesSampler,
         TransactionProcessor,
@@ -65,28 +64,16 @@ if TYPE_CHECKING:
     Experiments = TypedDict(
         "Experiments",
         {
-            "max_spans": Optional[int],
             "max_flags": Optional[int],
             "record_sql_params": Optional[bool],
             "continuous_profiling_auto_start": Optional[bool],
-            "continuous_profiling_mode": Optional[ContinuousProfilerMode],
-            "otel_powered_performance": Optional[bool],
             "transport_zlib_compression_level": Optional[int],
             "transport_compression_level": Optional[int],
             "transport_compression_algo": Optional[CompressionAlgo],
             "transport_num_pools": Optional[int],
             "transport_http2": Optional[bool],
             "transport_async": Optional[bool],
-            "enable_logs": Optional[bool],
-            "before_send_log": Optional[Callable[[Log, Hint], Optional[Log]]],
-            "enable_metrics": Optional[bool],
-            "before_send_metric": Optional[Callable[[Metric, Hint], Optional[Metric]]],
             "trace_lifecycle": Optional[Literal["static", "stream"]],
-            "ignore_spans": Optional[IgnoreSpansConfig],
-            "before_send_span": Optional[
-                Callable[[SpanJSON, Hint], Optional[SpanJSON]]
-            ],
-            "suppress_asgi_chained_exceptions": Optional[bool],
             "data_collection": Optional[DataCollectionUserOptions],
         },
         total=False,
@@ -113,11 +100,6 @@ class SPANTEMPLATE(str, Enum):
 
     def __str__(self) -> str:
         return self.value
-
-
-class INSTRUMENTER:
-    SENTRY = "sentry"
-    OTEL = "otel"
 
 
 class SPANNAME:
@@ -1310,7 +1292,7 @@ class ClientConstructor:
         in_app_exclude: "List[str]" = [],  # noqa: B006
         default_integrations: bool = True,
         dist: "Optional[str]" = None,
-        transport: "Optional[Union[sentry_sdk.transport.Transport, Type[sentry_sdk.transport.Transport], Callable[[Event], None]]]" = None,
+        transport: "Optional[Union[sentry_sdk.transport.Transport, Type[sentry_sdk.transport.Transport], None]]" = None,
         transport_queue_size: int = DEFAULT_QUEUE_SIZE,
         sample_rate: float = 1.0,
         send_default_pii: "Optional[bool]" = None,
@@ -1325,13 +1307,10 @@ class ClientConstructor:
         debug: "Optional[bool]" = None,
         attach_stacktrace: bool = False,
         ca_certs: "Optional[str]" = None,
-        propagate_traces: bool = True,
         traces_sample_rate: "Optional[float]" = None,
         trace_lifecycle: "Optional[Literal['static', 'stream']]" = None,
         traces_sampler: "Optional[TracesSampler]" = None,
-        profiles_sample_rate: "Optional[float]" = None,
-        profiles_sampler: "Optional[TracesSampler]" = None,
-        profiler_mode: "Optional[ProfilerMode]" = None,
+        profiler_mode: "Optional[ContinuousProfilerMode]" = None,
         profile_lifecycle: 'Literal["manual", "trace"]' = "manual",
         profile_session_sample_rate: "Optional[float]" = None,
         auto_enabling_integrations: bool = True,
@@ -1340,10 +1319,8 @@ class ClientConstructor:
         send_client_reports: bool = True,
         _experiments: "Experiments" = {},  # noqa: B006
         proxy_headers: "Optional[Dict[str, str]]" = None,
-        instrumenter: "Optional[str]" = INSTRUMENTER.SENTRY,
         before_send_transaction: "Optional[TransactionProcessor]" = None,
         project_root: "Optional[str]" = None,
-        enable_tracing: "Optional[bool]" = None,
         include_local_variables: "Optional[bool]" = True,
         include_source_context: "Optional[bool]" = True,
         trace_propagation_targets: "Optional[Sequence[str]]" = [  # noqa: B006
@@ -1364,10 +1341,8 @@ class ClientConstructor:
         custom_repr: "Optional[Callable[..., Optional[str]]]" = None,
         add_full_stack: bool = DEFAULT_ADD_FULL_STACK,
         max_stack_frames: "Optional[int]" = DEFAULT_MAX_STACK_FRAMES,
-        enable_logs: bool = False,
         before_send_log: "Optional[Callable[[Log, Hint], Optional[Log]]]" = None,
         trace_ignore_status_codes: "AbstractSet[int]" = frozenset(),
-        enable_metrics: bool = True,
         before_send_metric: "Optional[Callable[[Metric, Hint], Optional[Metric]]]" = None,
         before_send_span: "Optional[Callable[[SpanJSON, Hint], Optional[SpanJSON]]]" = None,
         org_id: "Optional[str]" = None,
@@ -1733,34 +1708,15 @@ class ClientConstructor:
             Return a string for that repr value to be used or `None` to continue serializing how Sentry would have
             done it anyway.
 
-        :param profiles_sample_rate: A number between `0` and `1`, controlling the percentage chance a given sampled
-            transaction will be profiled.
-
-            (`0` represents 0% while `1` represents 100%.) Applies equally to all transactions created in the app.
-
-            This is relative to the tracing sample rate - e.g. `0.5` means 50% of sampled transactions will be
-            profiled.
-
-        :param profiles_sampler:
-
         :param profiler_mode:
 
         :param profile_lifecycle:
 
         :param profile_session_sample_rate:
 
-        :param enable_tracing:
-
-        :param propagate_traces:
-
         :param auto_session_tracking:
 
         :param spotlight:
-
-        :param instrumenter:
-
-        :param enable_logs: Set `enable_logs` to True to enable the SDK to emit
-            Sentry logs. Defaults to False.
 
         :param before_send_log: An optional function to modify or filter out logs
             before they're sent to Sentry. Any modifications to the log in this

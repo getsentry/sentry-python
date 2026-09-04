@@ -39,7 +39,6 @@ from sentry_sdk.integrations import Integration
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span as SentrySpan
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 
 
@@ -206,40 +205,23 @@ class RustTracingLayer:
         else:
             sentry_span_name = "<unknown>"
 
-        span_streaming = has_span_streaming_enabled(sentry_sdk.get_client().options)
-        if span_streaming:
-            if sentry_sdk.traces.get_current_span() is None:
-                return None
+        if sentry_sdk.traces.get_current_span() is None:
+            return None
 
-            sentry_span = sentry_sdk.traces.start_span(
-                name=sentry_span_name,
-                attributes={
-                    "sentry.op": "function",
-                    "sentry.origin": self.origin,
-                },
-            )
-            fields = metadata.get("fields", [])
-            for field in fields:
-                if self._include_tracing_fields():
-                    sentry_span.set_attribute(field, attrs.get(field))
-                else:
-                    sentry_span.set_attribute(field, SENSITIVE_DATA_SUBSTITUTE)
-
-            return sentry_span
-
-        sentry_span = sentry_sdk.start_span(
-            op="function",
+        sentry_span = sentry_sdk.traces.start_span(
             name=sentry_span_name,
-            origin=self.origin,
+            attributes={
+                "sentry.op": "function",
+                "sentry.origin": self.origin,
+            },
         )
         fields = metadata.get("fields", [])
         for field in fields:
             if self._include_tracing_fields():
-                sentry_span.set_data(field, attrs.get(field))
+                sentry_span.set_attribute(field, attrs.get(field))
             else:
-                sentry_span.set_data(field, SENSITIVE_DATA_SUBSTITUTE)
+                sentry_span.set_attribute(field, SENSITIVE_DATA_SUBSTITUTE)
 
-        sentry_span.__enter__()
         return sentry_span
 
     def on_close(self, span_id: str, sentry_span: "SentrySpan") -> None:

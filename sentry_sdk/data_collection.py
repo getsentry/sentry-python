@@ -22,7 +22,6 @@ Resolution precedence (see :func:`_resolve_data_collection`):
   ``DeprecationWarning`` is emitted for ``send_default_pii``.
 """
 
-import warnings
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Union, cast
 from urllib.parse import parse_qs, urlencode
 
@@ -294,6 +293,8 @@ def _resolve_data_collection(options: "Dict[str, Any]") -> "DataCollection":
 
     ``data_collection`` must be a plain ``dict``.
     """
+    from sentry_sdk.utils import deprecation_warning
+
     user_dc = options.get("_experiments", {}).get("data_collection")
     send_default_pii = options.get("send_default_pii")
 
@@ -316,11 +317,9 @@ def _resolve_data_collection(options: "Dict[str, Any]") -> "DataCollection":
                 )
             )
         if send_default_pii is not None:
-            warnings.warn(
+            deprecation_warning(
                 "`send_default_pii` is deprecated and ignored when "
                 "`data_collection` is set.",
-                DeprecationWarning,
-                stacklevel=2,
             )
         return _resolve_explicit(
             user_dc,

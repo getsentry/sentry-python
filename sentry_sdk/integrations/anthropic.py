@@ -21,13 +21,12 @@ from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing import Span
 from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
-    should_truncate_gen_ai_input,
 )
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     has_data_collection_enabled,
-    package_version,
+    parse_version,
     reraise,
     safe_serialize,
 )
@@ -44,6 +43,7 @@ try:
         Omit = None  # type: ignore[misc,assignment]
 
     from anthropic import AsyncStream, Stream
+    from anthropic import __version__ as ANTHROPIC_VERSION
     from anthropic.lib.streaming import (
         AsyncMessageStream,
         AsyncMessageStreamManager,
@@ -63,7 +63,7 @@ try:
     if TYPE_CHECKING:
         from anthropic.types import MessageStreamEvent, TextBlockParam
 except ImportError:
-    raise DidNotEnable("Anthropic not installed")
+    raise DidNotEnable("Anthropic not installed or incompatible")
 
 if TYPE_CHECKING:
     from typing import (
@@ -227,7 +227,7 @@ class AnthropicIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
-        version = package_version("anthropic")
+        version = parse_version(ANTHROPIC_VERSION)
         _check_minimum_version(AnthropicIntegration, version)
 
         """
@@ -557,7 +557,7 @@ def _set_common_input_data(
         scope = sentry_sdk.get_current_scope()
         messages_data = (
             truncate_and_annotate_messages(role_normalized_messages, span, scope)
-            if should_truncate_gen_ai_input(client.options)
+            if not has_span_streaming_enabled(client.options)
             else role_normalized_messages
         )
         if messages_data is not None:

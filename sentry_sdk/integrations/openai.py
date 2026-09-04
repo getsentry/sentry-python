@@ -43,17 +43,17 @@ from sentry_sdk.ai.utils import (
     truncate_and_annotate_messages,
 )
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import (
     has_span_streaming_enabled,
-    should_truncate_gen_ai_input,
 )
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     has_data_collection_enabled,
+    parse_version,
     reraise,
 )
 
@@ -94,6 +94,7 @@ try:
         Omit = None  # type: ignore[misc,assignment]
 
     from openai import AsyncStream, Stream
+    from openai import __version__ as OPENAI_VERSION
     from openai.resources import AsyncEmbeddings, Embeddings
     from openai.resources.chat.completions import AsyncCompletions, Completions
     from openai.types import CreateEmbeddingResponse
@@ -105,7 +106,7 @@ try:
             ChatCompletionMessageParam,
         )
 except ImportError:
-    raise DidNotEnable("OpenAI not installed")
+    raise DidNotEnable("OpenAI not installed or incompatible")
 
 RESPONSES_API_ENABLED = True
 try:
@@ -136,6 +137,9 @@ class OpenAIIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        version = parse_version(OPENAI_VERSION)
+        _check_minimum_version(OpenAIIntegration, version)
+
         Completions.create = _wrap_chat_completion_create(Completions.create)  # type: ignore[assignment,method-assign]
         AsyncCompletions.create = _wrap_async_chat_completion_create(  # type: ignore[assignment,method-assign]
             AsyncCompletions.create
@@ -453,7 +457,7 @@ def _set_responses_api_input_data(
         scope = sentry_sdk.get_current_scope()
         messages_data = (
             truncate_and_annotate_messages(normalized_messages, span, scope)
-            if should_truncate_gen_ai_input(client.options)
+            if not has_span_streaming_enabled(client.options)
             else normalized_messages
         )
         if messages_data is not None:
@@ -472,7 +476,7 @@ def _set_responses_api_input_data(
         scope = sentry_sdk.get_current_scope()
         messages_data = (
             truncate_and_annotate_messages(normalized_messages, span, scope)
-            if should_truncate_gen_ai_input(client.options)
+            if not has_span_streaming_enabled(client.options)
             else normalized_messages
         )
         if messages_data is not None:
@@ -559,7 +563,7 @@ def _set_completions_api_input_data(
         scope = sentry_sdk.get_current_scope()
         messages_data = (
             truncate_and_annotate_messages(normalized_messages, span, scope)
-            if should_truncate_gen_ai_input(client.options)
+            if not has_span_streaming_enabled(client.options)
             else normalized_messages
         )
         if messages_data is not None:
@@ -593,7 +597,7 @@ def _set_completions_api_input_data(
         scope = sentry_sdk.get_current_scope()
         messages_data = (
             truncate_and_annotate_messages(normalized_messages, span, scope)
-            if should_truncate_gen_ai_input(client.options)
+            if not has_span_streaming_enabled(client.options)
             else normalized_messages
         )
         if messages_data is not None:
@@ -637,7 +641,7 @@ def _set_embeddings_input_data(
         scope = sentry_sdk.get_current_scope()
         messages_data = (
             truncate_and_annotate_embedding_inputs(normalized_messages, span, scope)
-            if should_truncate_gen_ai_input(client.options)
+            if not has_span_streaming_enabled(client.options)
             else normalized_messages
         )
         if messages_data is not None:
@@ -659,7 +663,7 @@ def _set_embeddings_input_data(
         scope = sentry_sdk.get_current_scope()
         messages_data = (
             truncate_and_annotate_embedding_inputs(normalized_messages, span, scope)
-            if should_truncate_gen_ai_input(client.options)
+            if not has_span_streaming_enabled(client.options)
             else normalized_messages
         )
         if messages_data is not None:

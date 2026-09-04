@@ -42,7 +42,6 @@ Performance Monitoring
 .. autofunction:: sentry_sdk.api.get_current_span
 .. autofunction:: sentry_sdk.api.start_span
 .. autofunction:: sentry_sdk.api.start_transaction
-.. autofunction:: sentry_sdk.api.update_current_span
 
 
 Distributed Tracing
@@ -61,8 +60,5 @@ Client Management
 
 Managing Scope (advanced)
 =========================
-
-.. autofunction:: sentry_sdk.api.configure_scope
-.. autofunction:: sentry_sdk.api.push_scope
 
 .. autofunction:: sentry_sdk.api.new_scope

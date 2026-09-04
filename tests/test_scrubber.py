@@ -2,6 +2,7 @@ import logging
 import sys
 
 from sentry_sdk import capture_event, capture_exception, start_span, start_transaction
+from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.scrubber import EventScrubber
 from sentry_sdk.utils import event_from_exception
 from tests.conftest import ApproxDict
@@ -154,8 +155,15 @@ def test_stack_var_scrubbing(sentry_init, capture_events):
 
 
 def test_breadcrumb_extra_scrubbing(sentry_init, capture_events):
-    sentry_init(max_breadcrumbs=2)
+    sentry_init(
+        max_breadcrumbs=2,
+        integrations=[
+            LoggingIntegration(breadcrumb_level=logging.INFO, event_level=logging.ERROR)
+        ],
+    )
+
     events = capture_events()
+
     logger.info("breadcrumb 1", extra=dict(foo=1, password="secret"))
     logger.info("breadcrumb 2", extra=dict(bar=2, auth="secret"))
     logger.info("breadcrumb 3", extra=dict(foobar=3, password="secret"))

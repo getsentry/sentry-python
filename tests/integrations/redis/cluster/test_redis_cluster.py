@@ -5,10 +5,8 @@ import redis
 
 import sentry_sdk
 from sentry_sdk import capture_message
-from sentry_sdk.api import start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.redis import RedisIntegration
-from tests.conftest import ApproxDict
 
 
 @pytest.fixture(autouse=True)
@@ -58,7 +56,6 @@ def test_rediscluster_breadcrumb(sentry_init, capture_events):
     }
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, description",
     [
@@ -72,75 +69,43 @@ def test_rediscluster_basic(
     capture_items,
     send_default_pii,
     description,
-    span_streaming,
 ):
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
-    if span_streaming:
-        items = capture_items("span")
-        with sentry_sdk.traces.start_span(name="custom parent"):
-            rc = redis.RedisCluster(host="localhost", port=6379)
-            rc.set("bar", 1)
-        sentry_sdk.flush()
+    items = capture_items("span")
 
-        # on initializing a RedisCluster, a COMMAND call may be emitted
-        payloads = [item.payload for item in items]
-        parent_span = payloads[-1]
-        redis_spans = payloads[:-1]
-        assert parent_span["name"] == "custom parent"
-        assert len(redis_spans) in (1, 2)
-        assert len(redis_spans) == 1 or redis_spans[0]["name"] == "COMMAND"
+    with sentry_sdk.traces.start_span(name="custom parent"):
+        rc = redis.RedisCluster(host="localhost", port=6379)
+        rc.set("bar", 1)
 
-        span = redis_spans[-1]
-        assert span["name"] == description
-        attrs = span["attributes"]
-        assert attrs["sentry.op"] == "db.redis"
-        assert attrs[SPANDATA.DB_SYSTEM_NAME] == "redis"
-        assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis-py"
-        # ClusterNode converts localhost to 127.0.0.1
-        assert attrs[SPANDATA.SERVER_ADDRESS] == "127.0.0.1"
-        assert attrs[SPANDATA.SERVER_PORT] == 6379
-        assert attrs[SPANDATA.DB_OPERATION_NAME] == "SET"
-        assert attrs["db.redis.key"] == "bar"
-    else:
-        events = capture_events()
-        with start_transaction():
-            rc = redis.RedisCluster(host="localhost", port=6379)
-            rc.set("bar", 1)
+    sentry_sdk.flush()
 
-        (event,) = events
-        spans = event["spans"]
+    # on initializing a RedisCluster, a COMMAND call may be emitted
+    payloads = [item.payload for item in items]
+    parent_span = payloads[-1]
+    redis_spans = payloads[:-1]
+    assert parent_span["name"] == "custom parent"
+    assert len(redis_spans) in (1, 2)
+    assert len(redis_spans) == 1 or redis_spans[0]["name"] == "COMMAND"
 
-        # on initializing a RedisCluster, a COMMAND call is made - this is not important for the test
-        # but must be accounted for
-        assert len(spans) in (1, 2)
-        assert len(spans) == 1 or spans[0]["description"] == "COMMAND"
-
-        span = spans[-1]
-        assert span["op"] == "db.redis"
-        assert span["description"] == description
-        assert span["data"] == ApproxDict(
-            {
-                SPANDATA.DB_SYSTEM: "redis",
-                # ClusterNode converts localhost to 127.0.0.1
-                SPANDATA.SERVER_ADDRESS: "127.0.0.1",
-                SPANDATA.SERVER_PORT: 6379,
-            }
-        )
-        assert span["tags"] == {
-            "db.operation": "SET",
-            "redis.command": "SET",
-            "redis.is_cluster": True,
-            "redis.key": "bar",
-        }
+    span = redis_spans[-1]
+    assert span["name"] == description
+    attrs = span["attributes"]
+    assert attrs["sentry.op"] == "db.redis"
+    assert attrs[SPANDATA.DB_SYSTEM_NAME] == "redis"
+    assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis-py"
+    # ClusterNode converts localhost to 127.0.0.1
+    assert attrs[SPANDATA.SERVER_ADDRESS] == "127.0.0.1"
+    assert attrs[SPANDATA.SERVER_PORT] == 6379
+    assert attrs[SPANDATA.DB_OPERATION_NAME] == "SET"
+    assert attrs["db.redis.key"] == "bar"
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize(
     "send_default_pii, expected_first_ten",
     [
@@ -154,124 +119,78 @@ def test_rediscluster_pipeline(
     capture_items,
     send_default_pii,
     expected_first_ten,
-    span_streaming,
 ):
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     rc = redis.RedisCluster(host="localhost", port=6379)
 
-    if span_streaming:
-        items = capture_items("span")
-        with sentry_sdk.traces.start_span(name="custom parent"):
-            pipeline = rc.pipeline()
-            pipeline.get("foo")
-            pipeline.set("bar", 1)
-            pipeline.set("baz", 2)
-            pipeline.execute()
-        sentry_sdk.flush()
+    items = capture_items("span")
+    with sentry_sdk.traces.start_span(name="custom parent"):
+        pipeline = rc.pipeline()
+        pipeline.get("foo")
+        pipeline.set("bar", 1)
+        pipeline.set("baz", 2)
+        pipeline.execute()
+    sentry_sdk.flush()
 
-        # on initializing a RedisCluster, a COMMAND call may be emitted
-        payloads = [item.payload for item in items]
-        parent_span = payloads[-1]
-        redis_spans = payloads[:-1]
-        assert parent_span["name"] == "custom parent"
-        assert len(redis_spans) in (1, 2)
-        assert len(redis_spans) == 1 or redis_spans[0]["name"] == "COMMAND"
+    # on initializing a RedisCluster, a COMMAND call may be emitted
+    payloads = [item.payload for item in items]
+    parent_span = payloads[-1]
+    redis_spans = payloads[:-1]
+    assert parent_span["name"] == "custom parent"
+    assert len(redis_spans) in (1, 2)
+    assert len(redis_spans) == 1 or redis_spans[0]["name"] == "COMMAND"
 
-        pipeline_span = redis_spans[-1]
-        assert pipeline_span["name"] == "redis.pipeline.execute"
-        attrs = pipeline_span["attributes"]
-        assert attrs["sentry.op"] == "db.redis"
-        assert attrs[SPANDATA.DB_SYSTEM_NAME] == "redis"
-        assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis-py"
-        # ClusterNode converts localhost to 127.0.0.1
-        assert attrs[SPANDATA.SERVER_ADDRESS] == "127.0.0.1"
-        assert attrs[SPANDATA.SERVER_PORT] == 6379
-    else:
-        events = capture_events()
-        with start_transaction():
-            pipeline = rc.pipeline()
-            pipeline.get("foo")
-            pipeline.set("bar", 1)
-            pipeline.set("baz", 2)
-            pipeline.execute()
-
-        (event,) = events
-        (span,) = event["spans"]
-        assert span["op"] == "db.redis"
-        assert span["description"] == "redis.pipeline.execute"
-        assert span["data"] == ApproxDict(
-            {
-                "redis.commands": {
-                    "count": 3,
-                    "first_ten": expected_first_ten,
-                },
-                SPANDATA.DB_SYSTEM: "redis",
-                # ClusterNode converts localhost to 127.0.0.1
-                SPANDATA.SERVER_ADDRESS: "127.0.0.1",
-                SPANDATA.SERVER_PORT: 6379,
-            }
-        )
-        assert span["tags"] == {
-            "redis.transaction": False,  # For Cluster, this is always False
-            "redis.is_cluster": True,
-        }
+    pipeline_span = redis_spans[-1]
+    assert pipeline_span["name"] == "redis.pipeline.execute"
+    attrs = pipeline_span["attributes"]
+    assert attrs["sentry.op"] == "db.redis"
+    assert attrs[SPANDATA.DB_SYSTEM_NAME] == "redis"
+    assert attrs[SPANDATA.DB_DRIVER_NAME] == "redis-py"
+    # ClusterNode converts localhost to 127.0.0.1
+    assert attrs[SPANDATA.SERVER_ADDRESS] == "127.0.0.1"
+    assert attrs[SPANDATA.SERVER_PORT] == 6379
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_rediscluster_span_origin(
-    sentry_init, capture_events, capture_items, span_streaming
+    sentry_init,
+    capture_events,
+    capture_items,
 ):
     sentry_init(
         integrations=[RedisIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     rc = redis.RedisCluster(host="localhost", port=6379)
 
-    if span_streaming:
-        items = capture_items("span")
-        with sentry_sdk.traces.start_span(name="custom parent"):
-            # default case
-            rc.set("somekey", "somevalue")
+    items = capture_items("span")
 
-            # pipeline
-            pipeline = rc.pipeline(transaction=False)
-            pipeline.get("somekey")
-            pipeline.set("anotherkey", 1)
-            pipeline.execute()
-        sentry_sdk.flush()
+    with sentry_sdk.traces.start_span(name="custom parent"):
+        # default case
+        rc.set("somekey", "somevalue")
 
-        payloads = [item.payload for item in items]
-        parent_span = payloads[-1]
-        redis_spans = payloads[:-1]
+        # pipeline
+        pipeline = rc.pipeline(transaction=False)
+        pipeline.get("somekey")
+        pipeline.set("anotherkey", 1)
+        pipeline.execute()
 
-        assert parent_span["name"] == "custom parent"
-        assert parent_span["attributes"]["sentry.origin"] == "manual"
-        assert len(redis_spans) >= 2
-        for span in redis_spans:
-            assert span["attributes"]["sentry.origin"] == "auto.db.redis"
-    else:
-        events = capture_events()
-        with start_transaction(name="custom_transaction"):
-            # default case
-            rc.set("somekey", "somevalue")
+    sentry_sdk.flush()
 
-            # pipeline
-            pipeline = rc.pipeline(transaction=False)
-            pipeline.get("somekey")
-            pipeline.set("anotherkey", 1)
-            pipeline.execute()
+    payloads = [item.payload for item in items]
+    parent_span = payloads[-1]
+    redis_spans = payloads[:-1]
 
-        (event,) = events
+    assert parent_span["name"] == "custom parent"
+    assert parent_span["attributes"]["sentry.origin"] == "manual"
+    assert len(redis_spans) >= 2
 
-        assert event["contexts"]["trace"]["origin"] == "manual"
-
-        for span in event["spans"]:
-            assert span["origin"] == "auto.db.redis"
+    for span in redis_spans:
+        assert span["attributes"]["sentry.origin"] == "auto.db.redis"

@@ -11,7 +11,7 @@ from sentry_sdk.ai.utils import (
     set_data_normalized,
 )
 from sentry_sdk.consts import OP, SPANDATA
-from sentry_sdk.integrations import DidNotEnable, Integration
+from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.traces import StreamedSpan
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
@@ -19,6 +19,7 @@ from sentry_sdk.utils import (
     capture_internal_exceptions,
     event_from_exception,
     has_data_collection_enabled,
+    parse_version,
     reraise,
 )
 
@@ -33,8 +34,9 @@ if TYPE_CHECKING:
 
 try:
     import huggingface_hub.inference._client
+    from huggingface_hub import __version__ as HUGGINGFACE_HUB_VERSION
 except ImportError:
-    raise DidNotEnable("Huggingface not installed")
+    raise DidNotEnable("Huggingface not installed or incompatible")
 
 
 class HuggingfaceHubIntegration(Integration):
@@ -48,6 +50,9 @@ class HuggingfaceHubIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        version = parse_version(HUGGINGFACE_HUB_VERSION)
+        _check_minimum_version(HuggingfaceHubIntegration, version)
+
         # Other tasks that can be called: https://huggingface.co/docs/huggingface_hub/guides/inference#supported-providers-and-tasks
         huggingface_hub.inference._client.InferenceClient.text_generation = (  # type: ignore[method-assign]
             _wrap_huggingface_task(

@@ -11,9 +11,7 @@ from sentry_sdk.profiler.continuous_profiler import (
     get_profiler_id,
     is_profile_session_sampled,
     setup_continuous_profiler,
-    start_profile_session,
     start_profiler,
-    stop_profile_session,
     stop_profiler,
 )
 from tests.conftest import ApproxDict
@@ -25,6 +23,19 @@ except ImportError:
 
 
 requires_gevent = pytest.mark.skipif(gevent is None, reason="gevent not enabled")
+
+
+def make_options(
+    mode=None, auto_start=None, profile_session_sample_rate=1.0, lifecycle="manual"
+):
+    return {
+        "profile_lifecycle": lifecycle,
+        "profiler_mode": mode,
+        "profile_session_sample_rate": profile_session_sample_rate,
+        "_experiments": {
+            "continuous_profiling_auto_start": auto_start,
+        },
+    }
 
 
 def wait_for_profiler_to_stop(envelopes, timeout=1.0):
@@ -48,31 +59,6 @@ def wait_for_profiler_to_stop(envelopes, timeout=1.0):
     ), "profiler should have flushed a profile chunk"
 
 
-def get_client_options(use_top_level_profiler_mode):
-    def client_options(
-        mode=None, auto_start=None, profile_session_sample_rate=1.0, lifecycle="manual"
-    ):
-        if use_top_level_profiler_mode:
-            return {
-                "profile_lifecycle": lifecycle,
-                "profiler_mode": mode,
-                "profile_session_sample_rate": profile_session_sample_rate,
-                "_experiments": {
-                    "continuous_profiling_auto_start": auto_start,
-                },
-            }
-        return {
-            "profile_lifecycle": lifecycle,
-            "profile_session_sample_rate": profile_session_sample_rate,
-            "_experiments": {
-                "continuous_profiling_auto_start": auto_start,
-                "continuous_profiling_mode": mode,
-            },
-        }
-
-    return client_options
-
-
 mock_sdk_info = {
     "name": "sentry.python",
     "version": VERSION,
@@ -80,18 +66,10 @@ mock_sdk_info = {
 }
 
 
-@pytest.mark.parametrize("mode", [pytest.param("foo")])
-@pytest.mark.parametrize(
-    "make_options",
-    [
-        pytest.param(get_client_options(True), id="non-experiment"),
-        pytest.param(get_client_options(False), id="experiment"),
-    ],
-)
-def test_continuous_profiler_invalid_mode(mode, make_options, teardown_profiling):
+def test_continuous_profiler_invalid_mode(teardown_profiling):
     with pytest.raises(ValueError):
         setup_continuous_profiler(
-            make_options(mode=mode),
+            make_options(mode="foo"),
             mock_sdk_info,
             lambda envelope: None,
         )
@@ -104,17 +82,9 @@ def test_continuous_profiler_invalid_mode(mode, make_options, teardown_profiling
         pytest.param("gevent", marks=requires_gevent),
     ],
 )
-@pytest.mark.parametrize(
-    "make_options",
-    [
-        pytest.param(get_client_options(True), id="non-experiment"),
-        pytest.param(get_client_options(False), id="experiment"),
-    ],
-)
-def test_continuous_profiler_valid_mode(mode, make_options, teardown_profiling):
-    options = make_options(mode=mode)
+def test_continuous_profiler_valid_mode(mode, teardown_profiling):
     setup_continuous_profiler(
-        options,
+        make_options(mode=mode),
         mock_sdk_info,
         lambda envelope: None,
     )
@@ -127,14 +97,7 @@ def test_continuous_profiler_valid_mode(mode, make_options, teardown_profiling):
         pytest.param("gevent", marks=requires_gevent),
     ],
 )
-@pytest.mark.parametrize(
-    "make_options",
-    [
-        pytest.param(get_client_options(True), id="non-experiment"),
-        pytest.param(get_client_options(False), id="experiment"),
-    ],
-)
-def test_continuous_profiler_setup_twice(mode, make_options, teardown_profiling):
+def test_continuous_profiler_setup_twice(mode, teardown_profiling):
     assert not is_profile_session_sampled()
 
     # setting up the first time should return True to indicate success
@@ -318,35 +281,10 @@ def assert_single_segment_without_profile_chunks(envelopes):
         pytest.param("gevent", marks=requires_gevent),
     ],
 )
-@pytest.mark.parametrize(
-    ["start_profiler_func", "stop_profiler_func"],
-    [
-        pytest.param(
-            start_profile_session,
-            stop_profile_session,
-            id="start_profile_session/stop_profile_session (deprecated)",
-        ),
-        pytest.param(
-            start_profiler,
-            stop_profiler,
-            id="start_profiler/stop_profiler",
-        ),
-    ],
-)
-@pytest.mark.parametrize(
-    "make_options",
-    [
-        pytest.param(get_client_options(True), id="non-experiment"),
-        pytest.param(get_client_options(False), id="experiment"),
-    ],
-)
 def test_continuous_profiler_auto_start_and_manual_stop(
     sentry_init,
     capture_envelopes,
     mode,
-    start_profiler_func,
-    stop_profiler_func,
-    make_options,
     teardown_profiling,
 ):
     options = make_options(mode=mode, auto_start=True)
@@ -364,7 +302,7 @@ def test_continuous_profiler_auto_start_and_manual_stop(
             pass
 
     for _ in range(3):
-        stop_profiler_func()
+        stop_profiler()
 
         assert_single_transaction_with_profile_chunks(envelopes, thread)
 
@@ -376,7 +314,7 @@ def test_continuous_profiler_auto_start_and_manual_stop(
 
         assert_single_transaction_without_profile_chunks(envelopes)
 
-        start_profiler_func()
+        start_profiler()
 
         envelopes.clear()
 
@@ -384,7 +322,7 @@ def test_continuous_profiler_auto_start_and_manual_stop(
             with sentry_sdk.start_span(op="op"):
                 pass
 
-    stop_profiler_func()
+    stop_profiler()
 
     assert_single_transaction_with_profile_chunks(envelopes, thread)
 
@@ -397,35 +335,10 @@ def test_continuous_profiler_auto_start_and_manual_stop(
         pytest.param("gevent", marks=requires_gevent),
     ],
 )
-@pytest.mark.parametrize(
-    ["start_profiler_func", "stop_profiler_func"],
-    [
-        pytest.param(
-            start_profile_session,
-            stop_profile_session,
-            id="start_profile_session/stop_profile_session (deprecated)",
-        ),
-        pytest.param(
-            start_profiler,
-            stop_profiler,
-            id="start_profiler/stop_profiler",
-        ),
-    ],
-)
-@pytest.mark.parametrize(
-    "make_options",
-    [
-        pytest.param(get_client_options(True), id="non-experiment"),
-        pytest.param(get_client_options(False), id="experiment"),
-    ],
-)
 def test_continuous_profiler_auto_start_and_manual_stop_span_streaming(
     sentry_init,
     capture_envelopes,
     mode,
-    start_profiler_func,
-    stop_profiler_func,
-    make_options,
     teardown_profiling,
 ):
     options = make_options(mode=mode, auto_start=True)
@@ -444,7 +357,7 @@ def test_continuous_profiler_auto_start_and_manual_stop_span_streaming(
             pass
 
     for _ in range(3):
-        stop_profiler_func()
+        stop_profiler()
 
         sentry_sdk.flush()
         assert_single_segment_with_profile_chunks(envelopes, thread)
@@ -458,7 +371,7 @@ def test_continuous_profiler_auto_start_and_manual_stop_span_streaming(
         sentry_sdk.flush()
         assert_single_segment_without_profile_chunks(envelopes)
 
-        start_profiler_func()
+        start_profiler()
 
         envelopes.clear()
 
@@ -466,7 +379,7 @@ def test_continuous_profiler_auto_start_and_manual_stop_span_streaming(
             with sentry_sdk.traces.start_span(name="op"):
                 pass
 
-    stop_profiler_func()
+    stop_profiler()
 
     sentry_sdk.flush()
     assert_single_segment_with_profile_chunks(envelopes, thread)
@@ -479,36 +392,11 @@ def test_continuous_profiler_auto_start_and_manual_stop_span_streaming(
         pytest.param("gevent", marks=requires_gevent),
     ],
 )
-@pytest.mark.parametrize(
-    ["start_profiler_func", "stop_profiler_func"],
-    [
-        pytest.param(
-            start_profile_session,
-            stop_profile_session,
-            id="start_profile_session/stop_profile_session  (deprecated)",
-        ),
-        pytest.param(
-            start_profiler,
-            stop_profiler,
-            id="start_profiler/stop_profiler",
-        ),
-    ],
-)
-@pytest.mark.parametrize(
-    "make_options",
-    [
-        pytest.param(get_client_options(True), id="non-experiment"),
-        pytest.param(get_client_options(False), id="experiment"),
-    ],
-)
 @mock.patch("sentry_sdk.profiler.continuous_profiler.PROFILE_BUFFER_SECONDS", 0.01)
 def test_continuous_profiler_manual_start_and_stop_sampled(
     sentry_init,
     capture_envelopes,
     mode,
-    start_profiler_func,
-    stop_profiler_func,
-    make_options,
     teardown_profiling,
 ):
     options = make_options(
@@ -524,7 +412,7 @@ def test_continuous_profiler_manual_start_and_stop_sampled(
     thread = threading.current_thread()
 
     for _ in range(3):
-        start_profiler_func()
+        start_profiler()
 
         envelopes.clear()
 
@@ -536,7 +424,7 @@ def test_continuous_profiler_manual_start_and_stop_sampled(
 
         assert get_profiler_id() is not None, "profiler should be running"
 
-        stop_profiler_func()
+        stop_profiler()
 
         assert_single_transaction_with_profile_chunks(envelopes, thread)
 
@@ -561,36 +449,11 @@ def test_continuous_profiler_manual_start_and_stop_sampled(
         pytest.param("gevent", marks=requires_gevent),
     ],
 )
-@pytest.mark.parametrize(
-    ["start_profiler_func", "stop_profiler_func"],
-    [
-        pytest.param(
-            start_profile_session,
-            stop_profile_session,
-            id="start_profile_session/stop_profile_session  (deprecated)",
-        ),
-        pytest.param(
-            start_profiler,
-            stop_profiler,
-            id="start_profiler/stop_profiler",
-        ),
-    ],
-)
-@pytest.mark.parametrize(
-    "make_options",
-    [
-        pytest.param(get_client_options(True), id="non-experiment"),
-        pytest.param(get_client_options(False), id="experiment"),
-    ],
-)
 @mock.patch("sentry_sdk.profiler.continuous_profiler.PROFILE_BUFFER_SECONDS", 0.01)
 def test_continuous_profiler_manual_start_and_stop_sampled_span_streaming(
     sentry_init,
     capture_envelopes,
     mode,
-    start_profiler_func,
-    stop_profiler_func,
-    make_options,
     teardown_profiling,
 ):
     options = make_options(
@@ -607,7 +470,7 @@ def test_continuous_profiler_manual_start_and_stop_sampled_span_streaming(
     thread = threading.current_thread()
 
     for _ in range(3):
-        start_profiler_func()
+        start_profiler()
 
         envelopes.clear()
 
@@ -619,7 +482,7 @@ def test_continuous_profiler_manual_start_and_stop_sampled_span_streaming(
 
         assert get_profiler_id() is not None, "profiler should be running"
 
-        stop_profiler_func()
+        stop_profiler()
 
         sentry_sdk.flush()
         assert_single_segment_with_profile_chunks(envelopes, thread)
@@ -646,35 +509,10 @@ def test_continuous_profiler_manual_start_and_stop_sampled_span_streaming(
         pytest.param("gevent", marks=requires_gevent),
     ],
 )
-@pytest.mark.parametrize(
-    ["start_profiler_func", "stop_profiler_func"],
-    [
-        pytest.param(
-            start_profile_session,
-            stop_profile_session,
-            id="start_profile_session/stop_profile_session (deprecated)",
-        ),
-        pytest.param(
-            start_profiler,
-            stop_profiler,
-            id="start_profiler/stop_profiler",
-        ),
-    ],
-)
-@pytest.mark.parametrize(
-    "make_options",
-    [
-        pytest.param(get_client_options(True), id="non-experiment"),
-        pytest.param(get_client_options(False), id="experiment"),
-    ],
-)
 def test_continuous_profiler_manual_start_and_stop_unsampled(
     sentry_init,
     capture_envelopes,
     mode,
-    start_profiler_func,
-    stop_profiler_func,
-    make_options,
     teardown_profiling,
 ):
     options = make_options(
@@ -687,13 +525,13 @@ def test_continuous_profiler_manual_start_and_stop_unsampled(
 
     envelopes = capture_envelopes()
 
-    start_profiler_func()
+    start_profiler()
 
     with sentry_sdk.start_transaction(name="profiling"):
         with sentry_sdk.start_span(op="op"):
             pass
 
-    stop_profiler_func()
+    stop_profiler()
 
     assert_single_transaction_without_profile_chunks(envelopes)
 
@@ -705,35 +543,10 @@ def test_continuous_profiler_manual_start_and_stop_unsampled(
         pytest.param("gevent", marks=requires_gevent),
     ],
 )
-@pytest.mark.parametrize(
-    ["start_profiler_func", "stop_profiler_func"],
-    [
-        pytest.param(
-            start_profile_session,
-            stop_profile_session,
-            id="start_profile_session/stop_profile_session (deprecated)",
-        ),
-        pytest.param(
-            start_profiler,
-            stop_profiler,
-            id="start_profiler/stop_profiler",
-        ),
-    ],
-)
-@pytest.mark.parametrize(
-    "make_options",
-    [
-        pytest.param(get_client_options(True), id="non-experiment"),
-        pytest.param(get_client_options(False), id="experiment"),
-    ],
-)
 def test_continuous_profiler_manual_start_and_stop_unsampled_span_streaming(
     sentry_init,
     capture_envelopes,
     mode,
-    start_profiler_func,
-    stop_profiler_func,
-    make_options,
     teardown_profiling,
 ):
     options = make_options(
@@ -747,13 +560,13 @@ def test_continuous_profiler_manual_start_and_stop_unsampled_span_streaming(
 
     envelopes = capture_envelopes()
 
-    start_profiler_func()
+    start_profiler()
 
     with sentry_sdk.traces.start_span(name="profiling"):
         with sentry_sdk.traces.start_span(name="op"):
             pass
 
-    stop_profiler_func()
+    stop_profiler()
 
     sentry_sdk.flush()
     assert_single_segment_without_profile_chunks(envelopes)
@@ -766,19 +579,11 @@ def test_continuous_profiler_manual_start_and_stop_unsampled_span_streaming(
         pytest.param("gevent", marks=requires_gevent),
     ],
 )
-@pytest.mark.parametrize(
-    "make_options",
-    [
-        pytest.param(get_client_options(True), id="non-experiment"),
-        pytest.param(get_client_options(False), id="experiment"),
-    ],
-)
 @mock.patch("sentry_sdk.profiler.continuous_profiler.DEFAULT_SAMPLING_FREQUENCY", 21)
 def test_continuous_profiler_auto_start_and_stop_sampled(
     sentry_init,
     capture_envelopes,
     mode,
-    make_options,
     teardown_profiling,
 ):
     options = make_options(
@@ -847,19 +652,11 @@ def test_continuous_profiler_auto_start_and_stop_sampled(
         pytest.param("gevent", marks=requires_gevent),
     ],
 )
-@pytest.mark.parametrize(
-    "make_options",
-    [
-        pytest.param(get_client_options(True), id="non-experiment"),
-        pytest.param(get_client_options(False), id="experiment"),
-    ],
-)
 @mock.patch("sentry_sdk.profiler.continuous_profiler.DEFAULT_SAMPLING_FREQUENCY", 21)
 def test_continuous_profiler_auto_start_and_stop_sampled_span_streaming(
     sentry_init,
     capture_envelopes,
     mode,
-    make_options,
     teardown_profiling,
 ):
     options = make_options(
@@ -930,19 +727,11 @@ def test_continuous_profiler_auto_start_and_stop_sampled_span_streaming(
         pytest.param("gevent", marks=requires_gevent),
     ],
 )
-@pytest.mark.parametrize(
-    "make_options",
-    [
-        pytest.param(get_client_options(True), id="non-experiment"),
-        pytest.param(get_client_options(False), id="experiment"),
-    ],
-)
 @mock.patch("sentry_sdk.profiler.continuous_profiler.PROFILE_BUFFER_SECONDS", 0.01)
 def test_continuous_profiler_auto_start_and_stop_unsampled(
     sentry_init,
     capture_envelopes,
     mode,
-    make_options,
     teardown_profiling,
 ):
     options = make_options(
@@ -975,19 +764,11 @@ def test_continuous_profiler_auto_start_and_stop_unsampled(
         pytest.param("gevent", marks=requires_gevent),
     ],
 )
-@pytest.mark.parametrize(
-    "make_options",
-    [
-        pytest.param(get_client_options(True), id="non-experiment"),
-        pytest.param(get_client_options(False), id="experiment"),
-    ],
-)
 @mock.patch("sentry_sdk.profiler.continuous_profiler.PROFILE_BUFFER_SECONDS", 0.01)
 def test_continuous_profiler_auto_start_and_stop_unsampled_span_streaming(
     sentry_init,
     capture_envelopes,
     mode,
-    make_options,
     teardown_profiling,
 ):
     options = make_options(
@@ -1027,35 +808,10 @@ def test_continuous_profiler_auto_start_and_stop_unsampled_span_streaming(
         ),
     ],
 )
-@pytest.mark.parametrize(
-    ["start_profiler_func", "stop_profiler_func"],
-    [
-        pytest.param(
-            start_profile_session,
-            stop_profile_session,
-            id="start_profile_session/stop_profile_session (deprecated)",
-        ),
-        pytest.param(
-            start_profiler,
-            stop_profiler,
-            id="start_profiler/stop_profiler",
-        ),
-    ],
-)
-@pytest.mark.parametrize(
-    "make_options",
-    [
-        pytest.param(get_client_options(True), id="non-experiment"),
-        pytest.param(get_client_options(False), id="experiment"),
-    ],
-)
 def test_continuous_profiler_manual_start_and_stop_noop_when_using_trace_lifecyle(
     sentry_init,
     mode,
-    start_profiler_func,
-    stop_profiler_func,
     class_name,
-    make_options,
     teardown_profiling,
 ):
     options = make_options(
@@ -1069,13 +825,13 @@ def test_continuous_profiler_manual_start_and_stop_noop_when_using_trace_lifecyl
     with mock.patch(
         f"sentry_sdk.profiler.continuous_profiler.{class_name}.ensure_running"
     ) as mock_ensure_running:
-        start_profiler_func()
+        start_profiler()
         mock_ensure_running.assert_not_called()
 
     with mock.patch(
         f"sentry_sdk.profiler.continuous_profiler.{class_name}.teardown"
     ) as mock_teardown:
-        stop_profiler_func()
+        stop_profiler()
         mock_teardown.assert_not_called()
 
 
@@ -1090,35 +846,10 @@ def test_continuous_profiler_manual_start_and_stop_noop_when_using_trace_lifecyl
         ),
     ],
 )
-@pytest.mark.parametrize(
-    ["start_profiler_func", "stop_profiler_func"],
-    [
-        pytest.param(
-            start_profile_session,
-            stop_profile_session,
-            id="start_profile_session/stop_profile_session (deprecated)",
-        ),
-        pytest.param(
-            start_profiler,
-            stop_profiler,
-            id="start_profiler/stop_profiler",
-        ),
-    ],
-)
-@pytest.mark.parametrize(
-    "make_options",
-    [
-        pytest.param(get_client_options(True), id="non-experiment"),
-        pytest.param(get_client_options(False), id="experiment"),
-    ],
-)
 def test_continuous_profiler_manual_start_and_stop_noop_when_using_trace_lifecyle_span_streaming(
     sentry_init,
     mode,
-    start_profiler_func,
-    stop_profiler_func,
     class_name,
-    make_options,
     teardown_profiling,
 ):
     options = make_options(
@@ -1133,13 +864,13 @@ def test_continuous_profiler_manual_start_and_stop_noop_when_using_trace_lifecyl
     with mock.patch(
         f"sentry_sdk.profiler.continuous_profiler.{class_name}.ensure_running"
     ) as mock_ensure_running:
-        start_profiler_func()
+        start_profiler()
         mock_ensure_running.assert_not_called()
 
     with mock.patch(
         f"sentry_sdk.profiler.continuous_profiler.{class_name}.teardown"
     ) as mock_teardown:
-        stop_profiler_func()
+        stop_profiler()
         mock_teardown.assert_not_called()
 
 
@@ -1163,7 +894,7 @@ def test_continuous_profiler_run_does_not_null_buffer(
     """
     from sentry_sdk.profiler import continuous_profiler as cp
 
-    options = get_client_options(True)(
+    options = make_options(
         mode="thread", profile_session_sample_rate=1.0, lifecycle="manual"
     )
     sentry_init(traces_sample_rate=1.0, **options)
@@ -1227,7 +958,7 @@ def test_continuous_profiler_run_does_not_null_buffer_span_streaming(
     """
     from sentry_sdk.profiler import continuous_profiler as cp
 
-    options = get_client_options(True)(
+    options = make_options(
         mode="thread", profile_session_sample_rate=1.0, lifecycle="manual"
     )
     sentry_init(

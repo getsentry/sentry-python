@@ -4,7 +4,6 @@ import logging
 import os
 import threading
 import warnings
-from unittest import mock
 
 import fastapi
 import pytest
@@ -28,6 +27,7 @@ from sentry_sdk.consts import SPANDATA
 from sentry_sdk.feature_flags import add_feature_flag
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
 from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.logging import LoggingIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
 from sentry_sdk.utils import parse_version
 
@@ -57,7 +57,6 @@ PARSED_FORM = starlette.datastructures.FormData(
 )
 
 from tests.integrations.conftest import parametrize_test_configurable_status_codes
-from tests.integrations.starlette import test_starlette
 
 
 def fastapi_app_factory():
@@ -126,238 +125,146 @@ def fastapi_app_factory():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("span_streaming", [True, False])
-async def test_request_info_json_body(
-    sentry_init, capture_events, capture_items, span_streaming
-):
+async def test_request_info_json_body(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=True,
         integrations=[StarletteIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     app = fastapi_app_factory()
     client = TestClient(app)
 
-    if span_streaming:
-        items = capture_items("event", "span")
+    items = capture_items("event", "span")
 
-        client.post(
-            "/body/json",
-            json=BODY_JSON,
-            headers={
-                "cookie": "yummy_cookie=choco; tasty_cookie=strawberry",
-            },
-        )
+    client.post(
+        "/body/json",
+        json=BODY_JSON,
+        headers={
+            "cookie": "yummy_cookie=choco; tasty_cookie=strawberry",
+        },
+    )
 
-        (event,) = (item.payload for item in items if item.type == "event")
-        assert event["request"]["cookies"] == {
-            "tasty_cookie": "strawberry",
-            "yummy_cookie": "choco",
-        }
-        assert event["request"]["data"] == BODY_JSON
+    (event,) = (item.payload for item in items if item.type == "event")
+    assert event["request"]["cookies"] == {
+        "tasty_cookie": "strawberry",
+        "yummy_cookie": "choco",
+    }
+    assert event["request"]["data"] == BODY_JSON
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        server_span = next(
-            span for span in spans if span["attributes"]["sentry.op"] == "http.server"
-        )
+    sentry_sdk.flush()
+    spans = [item.payload for item in items if item.type == "span"]
+    server_span = next(
+        span for span in spans if span["attributes"]["sentry.op"] == "http.server"
+    )
 
-        assert json.loads(
-            server_span["attributes"][SPANDATA.HTTP_REQUEST_BODY_DATA]
-        ) == {"some": "json", "for": "testing", "nested": {"numbers": 123}}
-    else:
-        events = capture_events()
-
-        client.post(
-            "/body/json",
-            json=BODY_JSON,
-            headers={
-                "cookie": "yummy_cookie=choco; tasty_cookie=strawberry",
-            },
-        )
-
-        (event, transaction_event) = events
-
-        assert event["request"]["cookies"] == {
-            "tasty_cookie": "strawberry",
-            "yummy_cookie": "choco",
-        }
-        assert event["request"]["data"] == BODY_JSON
-
-        assert transaction_event["request"]["cookies"] == {
-            "tasty_cookie": "strawberry",
-            "yummy_cookie": "choco",
-        }
-        assert transaction_event["request"]["data"] == BODY_JSON
+    assert json.loads(server_span["attributes"][SPANDATA.HTTP_REQUEST_BODY_DATA]) == {
+        "some": "json",
+        "for": "testing",
+        "nested": {"numbers": 123},
+    }
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("span_streaming", [True, False])
-async def test_formdata_request_body(
-    sentry_init, capture_events, capture_items, span_streaming
-):
+async def test_formdata_request_body(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=True,
         max_request_body_size="always",
         integrations=[StarletteIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     app = fastapi_app_factory()
     client = TestClient(app)
 
-    if span_streaming:
-        items = capture_items("event", "span")
+    items = capture_items("event", "span")
 
-        client.post(
-            "/body/form",
-            data=BODY_FORM.encode("utf-8"),
-            headers={
-                "content-type": "multipart/form-data; boundary=fd721ef49ea403a6",
-            },
-        )
+    client.post(
+        "/body/form",
+        data=BODY_FORM.encode("utf-8"),
+        headers={
+            "content-type": "multipart/form-data; boundary=fd721ef49ea403a6",
+        },
+    )
 
-        (event,) = (item.payload for item in items if item.type == "event")
-        assert event["request"]["data"].keys() == PARSED_FORM.keys()
-        assert event["request"]["data"]["username"] == PARSED_FORM["username"]
-        assert event["request"]["data"]["password"] == "[Filtered]"
-        assert event["request"]["data"]["photo"] == ""
+    (event,) = (item.payload for item in items if item.type == "event")
+    assert event["request"]["data"].keys() == PARSED_FORM.keys()
+    assert event["request"]["data"]["username"] == PARSED_FORM["username"]
+    assert event["request"]["data"]["password"] == "[Filtered]"
+    assert event["request"]["data"]["photo"] == ""
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        server_span = next(
-            span for span in spans if span["attributes"]["sentry.op"] == "http.server"
-        )
+    sentry_sdk.flush()
+    spans = [item.payload for item in items if item.type == "span"]
+    server_span = next(
+        span for span in spans if span["attributes"]["sentry.op"] == "http.server"
+    )
 
-        # Going forward, the sanitization of data will need to happen within the `before_send_span` hooks
-        # See https://sentry.slack.com/archives/C09RR0KD2N7/p1776951331206129?thread_ts=1776951227.440659&cid=C09RR0KD2N7
-        parsed_form_attribute = json.loads(
-            server_span["attributes"][SPANDATA.HTTP_REQUEST_BODY_DATA]
-        )
-        assert parsed_form_attribute.keys() == PARSED_FORM.keys()
-        assert parsed_form_attribute["username"] == PARSED_FORM["username"]
-        assert parsed_form_attribute["password"] == "hello123"
-        assert parsed_form_attribute["photo"] == "[Unparsable]"
-    else:
-        events = capture_events()
-
-        client.post(
-            "/body/form",
-            data=BODY_FORM.encode("utf-8"),
-            headers={
-                "content-type": "multipart/form-data; boundary=fd721ef49ea403a6",
-            },
-        )
-
-        (event, transaction_event) = events
-        assert event["request"]["data"].keys() == PARSED_FORM.keys()
-        assert event["request"]["data"]["username"] == PARSED_FORM["username"]
-        assert event["request"]["data"]["password"] == "[Filtered]"
-        assert event["request"]["data"]["photo"] == ""
-        assert event["_meta"]["request"]["data"]["photo"] == {
-            "": {"rem": [["!raw", "x"]]}
-        }
-
-        assert transaction_event["request"]["data"].keys() == PARSED_FORM.keys()
-        assert (
-            transaction_event["request"]["data"]["username"] == PARSED_FORM["username"]
-        )
-        assert transaction_event["request"]["data"]["password"] == "[Filtered]"
-        assert transaction_event["request"]["data"]["photo"] == ""
-        assert transaction_event["_meta"]["request"]["data"]["photo"] == {
-            "": {"rem": [["!raw", "x"]]}
-        }
+    # Going forward, the sanitization of data will need to happen within the `before_send_span` hooks
+    # See https://sentry.slack.com/archives/C09RR0KD2N7/p1776951331206129?thread_ts=1776951227.440659&cid=C09RR0KD2N7
+    parsed_form_attribute = json.loads(
+        server_span["attributes"][SPANDATA.HTTP_REQUEST_BODY_DATA]
+    )
+    assert parsed_form_attribute.keys() == PARSED_FORM.keys()
+    assert parsed_form_attribute["username"] == PARSED_FORM["username"]
+    assert parsed_form_attribute["password"] == "hello123"
+    assert parsed_form_attribute["photo"] == "[Unparsable]"
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("span_streaming", [True, False])
-async def test_request_body_too_big(
-    sentry_init, capture_events, capture_items, span_streaming
-):
+async def test_request_body_too_big(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=True,
         integrations=[StarletteIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     app = fastapi_app_factory()
     client = TestClient(app)
 
-    if span_streaming:
-        items = capture_items("event", "span")
+    items = capture_items("event", "span")
 
-        client.post(
-            "/body/form",
-            data=BODY_FORM.encode("utf-8"),
-            headers={
-                "content-type": "multipart/form-data; boundary=fd721ef49ea403a6",
-                "cookie": "yummy_cookie=choco; tasty_cookie=strawberry",
-            },
-        )
+    client.post(
+        "/body/form",
+        data=BODY_FORM.encode("utf-8"),
+        headers={
+            "content-type": "multipart/form-data; boundary=fd721ef49ea403a6",
+            "cookie": "yummy_cookie=choco; tasty_cookie=strawberry",
+        },
+    )
 
-        (event,) = (item.payload for item in items if item.type == "event")
-        assert event["request"]["cookies"] == {
-            "tasty_cookie": "strawberry",
-            "yummy_cookie": "choco",
-        }
-        # Because request is too big only the AnnotatedValue is extracted.
-        assert event["_meta"]["request"]["data"] == {"": {"rem": [["!config", "x"]]}}
+    (event,) = (item.payload for item in items if item.type == "event")
+    assert event["request"]["cookies"] == {
+        "tasty_cookie": "strawberry",
+        "yummy_cookie": "choco",
+    }
+    # Because request is too big only the AnnotatedValue is extracted.
+    assert event["_meta"]["request"]["data"] == {"": {"rem": [["!config", "x"]]}}
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        server_span = next(
-            span for span in spans if span["attributes"]["sentry.op"] == "http.server"
-        )
+    sentry_sdk.flush()
+    spans = [item.payload for item in items if item.type == "span"]
+    server_span = next(
+        span for span in spans if span["attributes"]["sentry.op"] == "http.server"
+    )
 
-        # Because request is too big only the AnnotatedValue is extracted.
-        assert (
-            server_span["attributes"][SPANDATA.HTTP_REQUEST_BODY_DATA]
-            == "[Exceeds maximum size]"
-        )
-    else:
-        events = capture_events()
-
-        client.post(
-            "/body/form",
-            data=BODY_FORM.encode("utf-8"),
-            headers={
-                "content-type": "multipart/form-data; boundary=fd721ef49ea403a6",
-                "cookie": "yummy_cookie=choco; tasty_cookie=strawberry",
-            },
-        )
-
-        (event, transaction_event) = events
-        assert event["request"]["cookies"] == {
-            "tasty_cookie": "strawberry",
-            "yummy_cookie": "choco",
-        }
-        # Because request is too big only the AnnotatedValue is extracted.
-        assert event["_meta"]["request"]["data"] == {"": {"rem": [["!config", "x"]]}}
-
-        assert transaction_event["request"]["cookies"] == {
-            "tasty_cookie": "strawberry",
-            "yummy_cookie": "choco",
-        }
-        # Because request is too big only the AnnotatedValue is extracted.
-        assert transaction_event["_meta"]["request"]["data"] == {
-            "": {"rem": [["!config", "x"]]}
-        }
+    # Because request is too big only the AnnotatedValue is extracted.
+    assert (
+        server_span["attributes"][SPANDATA.HTTP_REQUEST_BODY_DATA]
+        == "[Exceeds maximum size]"
+    )
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("span_streaming", [True, False])
 async def test_formdata_request_body_data_collection_http_bodies_empty(
-    sentry_init, capture_events, capture_items, span_streaming
+    sentry_init, capture_items
 ):
     sentry_init(
         traces_sample_rate=1.0,
         max_request_body_size="always",
         integrations=[StarletteIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
         _experiments={"data_collection": {"http_bodies": []}},
     )
 
@@ -366,31 +273,22 @@ async def test_formdata_request_body_data_collection_http_bodies_empty(
 
     headers = {"content-type": "multipart/form-data; boundary=fd721ef49ea403a6"}
 
-    if span_streaming:
-        items = capture_items("event", "span")
+    items = capture_items("event", "span")
 
-        client.post("/body/form", data=BODY_FORM.encode("utf-8"), headers=headers)
+    client.post("/body/form", data=BODY_FORM.encode("utf-8"), headers=headers)
 
-        (event,) = (item.payload for item in items if item.type == "event")
-        assert "data" not in event["request"]
+    (event,) = (item.payload for item in items if item.type == "event")
+    assert "data" not in event["request"]
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        server_span = next(
-            span for span in spans if span["attributes"]["sentry.op"] == "http.server"
-        )
-        assert SPANDATA.HTTP_REQUEST_BODY_DATA not in server_span["attributes"]
-    else:
-        events = capture_events()
-
-        client.post("/body/form", data=BODY_FORM.encode("utf-8"), headers=headers)
-
-        (event, _) = events
-        assert "data" not in event["request"]
+    sentry_sdk.flush()
+    spans = [item.payload for item in items if item.type == "span"]
+    server_span = next(
+        span for span in spans if span["attributes"]["sentry.op"] == "http.server"
+    )
+    assert SPANDATA.HTTP_REQUEST_BODY_DATA not in server_span["attributes"]
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize(
     "data_collection, expect_body",
     [
@@ -408,16 +306,14 @@ async def test_formdata_request_body_data_collection_http_bodies_empty(
 )
 async def test_request_body_data_collection(
     sentry_init,
-    capture_events,
     capture_items,
-    span_streaming,
     data_collection,
     expect_body,
 ):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
         _experiments=(
             {} if data_collection is None else {"data_collection": data_collection}
         ),
@@ -426,50 +322,36 @@ async def test_request_body_data_collection(
     app = fastapi_app_factory()
     client = TestClient(app)
 
-    if span_streaming:
-        items = capture_items("event", "span")
+    items = capture_items("event", "span")
 
-        client.post("/body/json", json=BODY_JSON)
+    client.post("/body/json", json=BODY_JSON)
 
-        (event,) = (item.payload for item in items if item.type == "event")
+    (event,) = (item.payload for item in items if item.type == "event")
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        server_span = next(
-            span for span in spans if span["attributes"]["sentry.op"] == "http.server"
+    sentry_sdk.flush()
+    spans = [item.payload for item in items if item.type == "span"]
+    server_span = next(
+        span for span in spans if span["attributes"]["sentry.op"] == "http.server"
+    )
+
+    if expect_body:
+        assert event["request"]["data"] == BODY_JSON
+        assert (
+            json.loads(server_span["attributes"][SPANDATA.HTTP_REQUEST_BODY_DATA])
+            == BODY_JSON
         )
-
-        if expect_body:
-            assert event["request"]["data"] == BODY_JSON
-            assert (
-                json.loads(server_span["attributes"][SPANDATA.HTTP_REQUEST_BODY_DATA])
-                == BODY_JSON
-            )
-        else:
-            assert "data" not in event["request"]
-            assert SPANDATA.HTTP_REQUEST_BODY_DATA not in server_span["attributes"]
     else:
-        events = capture_events()
-
-        client.post("/body/json", json=BODY_JSON)
-
-        (event, _) = events
-
-        if expect_body:
-            assert event["request"]["data"] == BODY_JSON
-        else:
-            assert "data" not in event["request"]
+        assert "data" not in event["request"]
+        assert SPANDATA.HTTP_REQUEST_BODY_DATA not in server_span["attributes"]
 
 
 @pytest.mark.asyncio
 async def test_response(sentry_init, capture_events):
-    # FastAPI is heavily based on Starlette so we also need
-    # to enable StarletteIntegration.
-    # In the future this will be auto enabled.
     sentry_init(
         integrations=[StarletteIntegration(), FastApiIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        trace_lifecycle="stream",
     )
 
     app = fastapi_app_factory()
@@ -481,11 +363,11 @@ async def test_response(sentry_init, capture_events):
 
     assert response.json() == {"message": "Hi"}
 
-    assert len(events) == 2
+    assert len(events) == 1
 
-    (message_event, transaction_event) = events
+    (message_event,) = events
     assert message_event["message"] == "Hi"
-    assert transaction_event["transaction"] == "/message"
+    assert message_event["transaction"] == "/message"
 
 
 @pytest.mark.parametrize(
@@ -572,45 +454,7 @@ def test_legacy_setup(
 
 
 @pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
-@mock.patch("sentry_sdk.profiler.transaction_profiler.PROFILE_MINIMUM_SAMPLES", 0)
-def test_active_thread_id(sentry_init, capture_envelopes, teardown_profiling, endpoint):
-    sentry_init(
-        traces_sample_rate=1.0,
-        profiles_sample_rate=1.0,
-    )
-    app = fastapi_app_factory()
-    asgi_app = SentryAsgiMiddleware(app)
-
-    envelopes = capture_envelopes()
-
-    client = TestClient(asgi_app)
-    response = client.get(endpoint)
-    assert response.status_code == 200
-
-    data = json.loads(response.content)
-
-    envelopes = [envelope for envelope in envelopes]
-    assert len(envelopes) == 1
-
-    profiles = [item for item in envelopes[0].items if item.type == "profile"]
-    assert len(profiles) == 1
-
-    for item in profiles:
-        transactions = item.payload.json["transactions"]
-        assert len(transactions) == 1
-        assert str(data["active"]) == transactions[0]["active_thread_id"]
-
-    transactions = [item for item in envelopes[0].items if item.type == "transaction"]
-    assert len(transactions) == 1
-
-    for item in transactions:
-        transaction = item.payload.json
-        trace_context = transaction["contexts"]["trace"]
-        assert str(data["active"]) == trace_context["data"]["thread.id"]
-
-
-@pytest.mark.parametrize("endpoint", ["/sync/thread_ids", "/async/thread_ids"])
-def test_active_thread_id_span_streaming(sentry_init, capture_items, endpoint):
+def test_active_thread_id(sentry_init, capture_items, endpoint):
     sentry_init(
         auto_enabling_integrations=False,  # Ensure httpx is not auto-enabled; its legacy start_span interferes with streaming mode
         integrations=[StarletteIntegration(), FastApiIntegration()],
@@ -634,16 +478,17 @@ def test_active_thread_id_span_streaming(sentry_init, capture_items, endpoint):
     assert str(data["active"]) == segments[0]["attributes"]["thread.id"]
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.asyncio
-async def test_original_request_not_scrubbed(
-    sentry_init, capture_events, span_streaming
-):
+async def test_original_request_not_scrubbed(sentry_init, capture_events):
     sentry_init(
         auto_enabling_integrations=False,  # Ensure httpx is not auto-enabled; its legacy start_span interferes with streaming mode
-        integrations=[StarletteIntegration(), FastApiIntegration()],
+        integrations=[
+            StarletteIntegration(),
+            FastApiIntegration(),
+            LoggingIntegration(event_level=logging.ERROR),
+        ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     app = FastAPI()
@@ -675,102 +520,6 @@ async def test_original_request_not_scrubbed(
     assert event["request"]["headers"]["proxy-authorization"] == "[Filtered]"
 
 
-def test_response_status_code_ok_in_transaction_context(sentry_init, capture_envelopes):
-    """
-    Tests that the response status code is added to the transaction "response" context.
-    """
-    sentry_init(
-        integrations=[StarletteIntegration(), FastApiIntegration()],
-        traces_sample_rate=1.0,
-        release="demo-release",
-    )
-
-    envelopes = capture_envelopes()
-
-    app = fastapi_app_factory()
-
-    client = TestClient(app)
-    client.get("/message")
-
-    (_, transaction_envelope) = envelopes
-    transaction = transaction_envelope.get_transaction_event()
-
-    assert transaction["type"] == "transaction"
-    assert len(transaction["contexts"]) > 0
-    assert "response" in transaction["contexts"].keys(), (
-        "Response context not found in transaction"
-    )
-    assert transaction["contexts"]["response"]["status_code"] == 200
-
-
-def test_response_status_code_error_in_transaction_context(
-    sentry_init,
-    capture_envelopes,
-):
-    """
-    Tests that the response status code is added to the transaction "response" context.
-    """
-    sentry_init(
-        integrations=[StarletteIntegration(), FastApiIntegration()],
-        traces_sample_rate=1.0,
-        release="demo-release",
-    )
-
-    envelopes = capture_envelopes()
-
-    app = fastapi_app_factory()
-
-    client = TestClient(app)
-    with pytest.raises(ZeroDivisionError):
-        client.get("/error")
-
-    (
-        _,
-        _,
-        transaction_envelope,
-    ) = envelopes
-    transaction = transaction_envelope.get_transaction_event()
-
-    assert transaction["type"] == "transaction"
-    assert len(transaction["contexts"]) > 0
-    assert "response" in transaction["contexts"].keys(), (
-        "Response context not found in transaction"
-    )
-    assert transaction["contexts"]["response"]["status_code"] == 500
-
-
-def test_response_status_code_not_found_in_transaction_context(
-    sentry_init,
-    capture_envelopes,
-):
-    """
-    Tests that the response status code is added to the transaction "response" context.
-    """
-    sentry_init(
-        integrations=[StarletteIntegration(), FastApiIntegration()],
-        traces_sample_rate=1.0,
-        release="demo-release",
-    )
-
-    envelopes = capture_envelopes()
-
-    app = fastapi_app_factory()
-
-    client = TestClient(app)
-    client.get("/non-existing-route-123")
-
-    (transaction_envelope,) = envelopes
-    transaction = transaction_envelope.get_transaction_event()
-
-    assert transaction["type"] == "transaction"
-    assert len(transaction["contexts"]) > 0
-    assert "response" in transaction["contexts"].keys(), (
-        "Response context not found in transaction"
-    )
-    assert transaction["contexts"]["response"]["status_code"] == 404
-
-
-@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize(
     "request_url,transaction_style,expected_transaction_name,expected_transaction_source",
     [
@@ -794,9 +543,7 @@ def test_transaction_name(
     transaction_style,
     expected_transaction_name,
     expected_transaction_source,
-    capture_envelopes,
     capture_items,
-    span_streaming,
 ):
     """
     Tests that the transaction name is something meaningful.
@@ -808,46 +555,30 @@ def test_transaction_name(
             FastApiIntegration(transaction_style=transaction_style),
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
-    if span_streaming:
-        items = capture_items("span")
-    else:
-        envelopes = capture_envelopes()
+    items = capture_items("span")
 
     app = fastapi_app_factory()
 
     client = TestClient(app)
     client.get(request_url)
 
-    if span_streaming:
-        sentry_sdk.flush()
-        segments = [item.payload for item in items if item.payload.get("is_segment")]
-        assert len(segments) == 1
-        segment = segments[0]
-        assert segment["name"] == expected_transaction_name
-        assert (
-            segment["attributes"]["sentry.segment.name.source"]
-            == expected_transaction_source
-        )
-    else:
-        (_, transaction_envelope) = envelopes
-        transaction_event = transaction_envelope.get_transaction_event()
-
-        assert transaction_event["transaction"] == expected_transaction_name
-        assert (
-            transaction_event["transaction_info"]["source"]
-            == expected_transaction_source
-        )
+    sentry_sdk.flush()
+    segments = [item.payload for item in items if item.payload.get("is_segment")]
+    assert len(segments) == 1
+    segment = segments[0]
+    assert segment["name"] == expected_transaction_name
+    assert (
+        segment["attributes"]["sentry.segment.name.source"]
+        == expected_transaction_source
+    )
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_http_route_with_prefix(
     sentry_init,
-    capture_envelopes,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         auto_enabling_integrations=False,
@@ -856,13 +587,10 @@ def test_http_route_with_prefix(
             FastApiIntegration(transaction_style="url"),
         ],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
-    if span_streaming:
-        items = capture_items("span")
-    else:
-        envelopes = capture_envelopes()
+    items = capture_items("span")
 
     app = FastAPI()
     router = APIRouter()
@@ -876,19 +604,13 @@ def test_http_route_with_prefix(
     client = TestClient(app)
     client.get("/api/users/123")
 
-    if span_streaming:
-        sentry_sdk.flush()
-        segments = [item.payload for item in items if item.payload.get("is_segment")]
-        assert len(segments) == 1
-        segment = segments[0]
-        assert segment["name"] == "/api/users/{user_id}"
-        assert segment["attributes"]["sentry.segment.name.source"] == "route"
-        assert segment["attributes"]["http.route"] == "/api/users/{user_id}"
-    else:
-        (transaction_envelope,) = envelopes
-        transaction_event = transaction_envelope.get_transaction_event()
-        assert transaction_event["transaction"] == "/api/users/{user_id}"
-        assert transaction_event["transaction_info"]["source"] == "route"
+    sentry_sdk.flush()
+    segments = [item.payload for item in items if item.payload.get("is_segment")]
+    assert len(segments) == 1
+    segment = segments[0]
+    assert segment["name"] == "/api/users/{user_id}"
+    assert segment["attributes"]["sentry.segment.name.source"] == "route"
+    assert segment["attributes"]["http.route"] == "/api/users/{user_id}"
 
 
 def test_route_endpoint_equal_dependant_call(sentry_init):
@@ -902,6 +624,7 @@ def test_route_endpoint_equal_dependant_call(sentry_init):
             FastApiIntegration(),
         ],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     app = fastapi_app_factory()
@@ -955,6 +678,7 @@ def test_transaction_name_in_traces_sampler(
         integrations=[StarletteIntegration(transaction_style=transaction_style)],
         traces_sampler=dummy_traces_sampler,
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
     app = fastapi_app_factory()
@@ -988,7 +712,7 @@ def test_transaction_name_in_middleware(
     transaction_style,
     expected_transaction_name,
     expected_transaction_source,
-    capture_envelopes,
+    capture_items,
 ):
     """
     Tests that the transaction name is something meaningful.
@@ -1004,9 +728,10 @@ def test_transaction_name_in_middleware(
             ),
         ],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
     )
 
-    envelopes = capture_envelopes()
+    items = capture_items("span")
 
     app = fastapi_app_factory()
 
@@ -1020,102 +745,57 @@ def test_transaction_name_in_middleware(
     client = TestClient(app)
     client.get(request_url)
 
-    (transaction_envelope,) = envelopes
-    transaction_event = transaction_envelope.get_transaction_event()
-
-    assert transaction_event["contexts"]["response"]["status_code"] == 400
-    assert transaction_event["transaction"] == expected_transaction_name
+    sentry_sdk.flush()
+    segments = [item.payload for item in items if item.payload.get("is_segment")]
+    assert len(segments) == 1
+    segment = segments[0]
+    assert segment["name"] == expected_transaction_name
     assert (
-        transaction_event["transaction_info"]["source"] == expected_transaction_source
+        segment["attributes"]["sentry.segment.name.source"]
+        == expected_transaction_source
     )
-
-
-@test_starlette.parametrize_test_configurable_status_codes_deprecated
-def test_configurable_status_codes_deprecated(
-    sentry_init,
-    capture_events,
-    failed_request_status_codes,
-    status_code,
-    expected_error,
-):
-    with pytest.warns(DeprecationWarning):
-        starlette_integration = StarletteIntegration(
-            failed_request_status_codes=failed_request_status_codes
-        )
-
-    with pytest.warns(DeprecationWarning):
-        fast_api_integration = FastApiIntegration(
-            failed_request_status_codes=failed_request_status_codes
-        )
-
-    sentry_init(
-        integrations=[
-            starlette_integration,
-            fast_api_integration,
-        ]
-    )
-
-    events = capture_events()
-
-    app = FastAPI()
-
-    @app.get("/error")
-    async def _error():
-        raise HTTPException(status_code)
-
-    client = TestClient(app)
-    client.get("/error")
-
-    if expected_error:
-        assert len(events) == 1
-    else:
-        assert not events
 
 
 @pytest.mark.skipif(
     FASTAPI_VERSION < (0, 80),
     reason="Requires FastAPI >= 0.80, because earlier versions do not support HTTP 'HEAD' requests",
 )
-def test_transaction_http_method_default(sentry_init, capture_events):
+def test_transaction_http_method_default(sentry_init, capture_items):
     """
-    By default OPTIONS and HEAD requests do not create a transaction.
+    By default OPTIONS and HEAD requests do not create a span.
     """
-    # FastAPI is heavily based on Starlette so we also need
-    # to enable StarletteIntegration.
-    # In the future this will be auto enabled.
     sentry_init(
+        auto_enabling_integrations=False,
         traces_sample_rate=1.0,
         integrations=[
             StarletteIntegration(),
             FastApiIntegration(),
         ],
+        trace_lifecycle="stream",
     )
 
     app = fastapi_app_factory()
 
-    events = capture_events()
+    items = capture_items("span")
 
     client = TestClient(app)
     client.get("/nomessage")
     client.options("/nomessage")
     client.head("/nomessage")
 
-    assert len(events) == 1
-
-    (event,) = events
-
-    assert event["request"]["method"] == "GET"
+    sentry_sdk.flush()
+    segments = [item.payload for item in items if item.payload.get("is_segment")]
+    assert len(segments) == 1
+    assert segments[0]["attributes"]["http.request.method"] == "GET"
 
 
 @pytest.mark.skipif(
     FASTAPI_VERSION < (0, 80),
     reason="Requires FastAPI >= 0.80, because earlier versions do not support HTTP 'HEAD' requests",
 )
-def test_transaction_http_method_custom(sentry_init, capture_events):
-    # FastAPI is heavily based on Starlette so we also need
-    # to enable StarletteIntegration.
-    # In the future this will be auto enabled.
+def test_transaction_http_method_custom(sentry_init, capture_items):
     sentry_init(
+        auto_enabling_integrations=False,
         traces_sample_rate=1.0,
         integrations=[
             StarletteIntegration(
@@ -1131,63 +811,53 @@ def test_transaction_http_method_custom(sentry_init, capture_events):
                 ),  # capitalization does not matter
             ),
         ],
+        trace_lifecycle="stream",
     )
 
     app = fastapi_app_factory()
 
-    events = capture_events()
+    items = capture_items("span")
 
     client = TestClient(app)
     client.get("/nomessage")
     client.options("/nomessage")
     client.head("/nomessage")
 
-    assert len(events) == 2
+    sentry_sdk.flush()
+    segments = [item.payload for item in items if item.payload.get("is_segment")]
+    assert len(segments) == 2
 
-    (event1, event2) = events
-
-    assert event1["request"]["method"] == "OPTIONS"
-    assert event2["request"]["method"] == "HEAD"
+    assert segments[0]["attributes"]["http.request.method"] == "OPTIONS"
+    assert segments[1]["attributes"]["http.request.method"] == "HEAD"
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_request_url(sentry_init, capture_events, capture_items, span_streaming):
+def test_request_url(sentry_init, capture_items):
     sentry_init(
         traces_sample_rate=1.0,
         send_default_pii=True,
         integrations=[
             StarletteIntegration(),
         ],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     starlette_app = fastapi_app_factory()
 
     client = TestClient(starlette_app)
 
-    if span_streaming:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        client.get("/root/nomessage")
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
+    client.get("/root/nomessage")
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
 
-        (server_span,) = (
-            span
-            for span in spans
-            if span["attributes"].get("sentry.op") == "http.server"
-        )
-        assert server_span["attributes"][SPANDATA.URL_FULL] == (
-            "http://testserver/root/nomessage"
-        )
-        assert server_span["attributes"][SPANDATA.URL_PATH] == "/root/nomessage"
-    else:
-        events = capture_events()
-
-        client.get("/root/nomessage")
-
-        (event,) = events
-        assert event["request"]["url"] == "http://testserver/root/nomessage"
+    (server_span,) = (
+        span for span in spans if span["attributes"].get("sentry.op") == "http.server"
+    )
+    assert server_span["attributes"][SPANDATA.URL_FULL] == (
+        "http://testserver/root/nomessage"
+    )
+    assert server_span["attributes"][SPANDATA.URL_PATH] == "/root/nomessage"
 
 
 @parametrize_test_configurable_status_codes
@@ -1224,13 +894,14 @@ def test_configurable_status_codes(
 
 
 @pytest.mark.parametrize("transaction_style", ["endpoint", "url"])
-def test_app_host(sentry_init, capture_events, transaction_style):
+def test_app_host(sentry_init, capture_items, transaction_style):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[
             StarletteIntegration(transaction_style=transaction_style),
             FastApiIntegration(transaction_style=transaction_style),
         ],
+        trace_lifecycle="stream",
     )
 
     app = FastAPI()
@@ -1242,20 +913,20 @@ def test_app_host(sentry_init, capture_events, transaction_style):
 
     app.host("subapp", subapp)
 
-    events = capture_events()
+    items = capture_items("span")
 
     client = TestClient(app)
     client.get("/subapp", headers={"Host": "subapp"})
 
-    assert len(events) == 1
-
-    (event,) = events
-    assert "transaction" in event
+    sentry_sdk.flush()
+    segments = [item.payload for item in items if item.payload.get("is_segment")]
+    assert len(segments) == 1
+    segment = segments[0]
 
     if transaction_style == "url":
-        assert event["transaction"] == "/subapp"
+        assert segment["name"] == "/subapp"
     else:
-        assert event["transaction"].endswith("subapp_route")
+        assert segment["name"].endswith("subapp_route")
 
 
 @pytest.mark.asyncio
@@ -1263,6 +934,7 @@ async def test_feature_flags(sentry_init, capture_events):
     sentry_init(
         traces_sample_rate=1.0,
         integrations=[StarletteIntegration(), FastApiIntegration()],
+        trace_lifecycle="stream",
     )
 
     events = capture_events()
@@ -1273,8 +945,8 @@ async def test_feature_flags(sentry_init, capture_events):
     async def _error():
         add_feature_flag("hello", False)
 
-        with sentry_sdk.start_span(name="test-span"):
-            with sentry_sdk.start_span(name="test-span-2"):
+        with sentry_sdk.traces.start_span(name="test-span"):
+            with sentry_sdk.traces.start_span(name="test-span-2"):
                 raise ValueError("something is wrong!")
 
     try:

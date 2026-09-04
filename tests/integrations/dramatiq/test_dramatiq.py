@@ -9,10 +9,10 @@ import sentry_sdk
 from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA, SPANSTATUS
 from sentry_sdk.integrations.dramatiq import DramatiqIntegration
-from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.tracing import Transaction, TransactionSource
 
-ignore_logger("dramatiq.worker.WorkerThread")
+ignore_logger_for_events("dramatiq.worker.WorkerThread")
 
 
 @pytest.fixture(scope="function")

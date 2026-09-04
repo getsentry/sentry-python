@@ -1,14 +1,14 @@
 import uuid
-import warnings
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import TYPE_CHECKING, cast
 
 import sentry_sdk
-from sentry_sdk.consts import INSTRUMENTER, SPANDATA, SPANSTATUS, SPANTEMPLATE
+from sentry_sdk.consts import SPANDATA, SPANSTATUS, SPANTEMPLATE
 from sentry_sdk.profiler.continuous_profiler import get_profiler_id
 from sentry_sdk.utils import (
     capture_internal_exceptions,
+    deprecation_warning,
     get_current_thread_meta,
     is_valid_sample_rate,
     logger,
@@ -38,12 +38,9 @@ if TYPE_CHECKING:
 
     from sentry_sdk._types import (
         Event,
-        MeasurementUnit,
-        MeasurementValue,
         SamplingContext,
     )
     from sentry_sdk.profiler.continuous_profiler import ContinuousProfile
-    from sentry_sdk.profiler.transaction_profiler import Profile
 
     class SpanKwargs(TypedDict, total=False):
         trace_id: str
@@ -75,9 +72,6 @@ if TYPE_CHECKING:
 
         description: str
         """A description of what operation is being performed within the span. This argument is DEPRECATED. Please use the `name` parameter, instead."""
-
-        hub: "Optional[sentry_sdk.Hub]"
-        """The hub to use for this span. This argument is DEPRECATED. Please use the `scope` parameter, instead."""
 
         status: str
         """The span's status. Possible values are listed at https://develop.sentry.dev/sdk/event-payloads/span/"""
@@ -240,7 +234,6 @@ class Span:
         .. deprecated:: 2.15.0
             Please use the `name` parameter, instead.
     :param name: A string describing what operation is being performed within the span.
-    :param hub: The hub to use for this span.
 
         .. deprecated:: 2.0.0
             Please use the `scope` parameter, instead.
@@ -260,7 +253,6 @@ class Span:
         "sampled",
         "op",
         "description",
-        "_measurements",
         "start_timestamp",
         "_start_timestamp_monotonic_ns",
         "status",
@@ -268,7 +260,6 @@ class Span:
         "_tags",
         "_data",
         "_span_recorder",
-        "hub",
         "_context_manager_state",
         "_containing_transaction",
         "scope",
@@ -287,7 +278,6 @@ class Span:
         sampled: "Optional[bool]" = None,
         op: "Optional[str]" = None,
         description: "Optional[str]" = None,
-        hub: "Optional[sentry_sdk.Hub]" = None,  # deprecated
         status: "Optional[str]" = None,
         containing_transaction: "Optional[Transaction]" = None,
         start_timestamp: "Optional[Union[datetime, float]]" = None,
@@ -303,24 +293,13 @@ class Span:
         self.op = op
         self.description = name or description
         self.status = status
-        self.hub = hub  # backwards compatibility
         self.scope = scope
         self.origin = origin
-        self._measurements: "Dict[str, MeasurementValue]" = {}
         self._tags: "MutableMapping[str, str]" = {}
         self._data: "Dict[str, Any]" = {}
         self._containing_transaction = containing_transaction
         self._flags: "Dict[str, bool]" = {}
         self._flags_capacity = 10
-
-        if hub is not None:
-            warnings.warn(
-                "The `hub` parameter is deprecated. Please use `scope` instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
-            self.scope = self.scope or hub.scope
 
         if start_timestamp is None:
             start_timestamp = datetime.now(timezone.utc)
@@ -429,31 +408,18 @@ class Span:
         # referencing themselves)
         return self._containing_transaction
 
-    def start_child(
-        self, instrumenter: str = INSTRUMENTER.SENTRY, **kwargs: "Any"
-    ) -> "Span":
+    def start_child(self, **kwargs: "Any") -> "Span":
         """
         Start a sub-span from the current span or transaction.
 
         Takes the same arguments as the initializer of :py:class:`Span`. The
         trace id, sampling decision, transaction pointer, and span recorder are
         inherited from the current span/transaction.
-
-        The instrumenter parameter is deprecated for user code, and it will
-        be removed in the next major version. Going forward, it should only
-        be used by the SDK itself.
         """
         if kwargs.get("description") is not None:
-            warnings.warn(
+            deprecation_warning(
                 "The `description` parameter is deprecated. Please use `name` instead.",
-                DeprecationWarning,
-                stacklevel=2,
             )
-
-        configuration_instrumenter = sentry_sdk.get_client().options["instrumenter"]
-
-        if instrumenter != configuration_instrumenter:
-            return NoOpSpan()
 
         kwargs.setdefault("sampled", self.sampled)
 
@@ -614,21 +580,6 @@ class Span:
     def set_status(self, value: str) -> None:
         self.status = value
 
-    def set_measurement(
-        self, name: str, value: float, unit: "MeasurementUnit" = ""
-    ) -> None:
-        """
-        .. deprecated:: 2.28.0
-            This function is deprecated and will be removed in the next major release.
-        """
-
-        warnings.warn(
-            "`set_measurement()` is deprecated and will be removed in the next major version. Please use `set_data()` instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        self._measurements[name] = {"value": value, "unit": unit}
-
     def set_thread(
         self, thread_id: "Optional[int]", thread_name: "Optional[str]"
     ) -> None:
@@ -722,9 +673,6 @@ class Span:
             # TODO-neel remove redundant tag in major
             self._tags["status"] = self.status
 
-        if len(self._measurements) > 0:
-            rv["measurements"] = self._measurements
-
         tags = self._tags
         if tags:
             rv["tags"] = tags
@@ -813,9 +761,7 @@ class Transaction(Span):
         "parent_sampled",
         # used to create baggage value for head SDKs in dynamic sampling
         "sample_rate",
-        "_measurements",
         "_contexts",
-        "_profile",
         "_continuous_profile",
         "_baggage",
         "_sample_rand",
@@ -835,9 +781,7 @@ class Transaction(Span):
         self.source = source
         self.sample_rate: "Optional[float]" = None
         self.parent_sampled = parent_sampled
-        self._measurements: "Dict[str, MeasurementValue]" = {}
         self._contexts: "Dict[str, Any]" = {}
-        self._profile: "Optional[Profile]" = None
         self._continuous_profile: "Optional[ContinuousProfile]" = None
         self._baggage = baggage
 
@@ -886,17 +830,11 @@ class Transaction(Span):
 
         super().__enter__()
 
-        if self._profile is not None:
-            self._profile.__enter__()
-
         return self
 
     def __exit__(
         self, ty: "Optional[Any]", value: "Optional[Any]", tb: "Optional[Any]"
     ) -> None:
-        if self._profile is not None:
-            self._profile.__exit__(ty, value, tb)
-
         if self._continuous_profile is not None:
             self._continuous_profile.stop()
 
@@ -913,38 +851,6 @@ class Transaction(Span):
         # reference.
         return self
 
-    def _get_scope_from_finish_args(
-        self,
-        scope_arg: "Optional[Union[sentry_sdk.Scope, sentry_sdk.Hub]]",
-        hub_arg: "Optional[Union[sentry_sdk.Scope, sentry_sdk.Hub]]",
-    ) -> "Optional[sentry_sdk.Scope]":
-        """
-        Logic to get the scope from the arguments passed to finish. This
-        function exists for backwards compatibility with the old finish.
-
-        TODO: Remove this function in the next major version.
-        """
-        scope_or_hub = scope_arg
-        if hub_arg is not None:
-            warnings.warn(
-                "The `hub` parameter is deprecated. Please use the `scope` parameter, instead.",
-                DeprecationWarning,
-                stacklevel=3,
-            )
-
-            scope_or_hub = hub_arg
-
-        if isinstance(scope_or_hub, sentry_sdk.Hub):
-            warnings.warn(
-                "Passing a Hub to finish is deprecated. Please pass a Scope, instead.",
-                DeprecationWarning,
-                stacklevel=3,
-            )
-
-            return scope_or_hub.scope
-
-        return scope_or_hub
-
     def _get_log_representation(self) -> str:
         return "{op}transaction <{name}>".format(
             op=("<" + self.op + "> " if self.op else ""), name=self.name
@@ -954,8 +860,6 @@ class Transaction(Span):
         self,
         scope: "Optional[sentry_sdk.Scope]" = None,
         end_timestamp: "Optional[Union[float, datetime]]" = None,
-        *,
-        hub: "Optional[sentry_sdk.Hub]" = None,
     ) -> "Optional[str]":
         """Finishes the transaction and sends it to Sentry.
         All finished spans in the transaction will also be sent to Sentry.
@@ -964,9 +868,6 @@ class Transaction(Span):
             If not provided, the current Scope will be used.
         :param end_timestamp: Optional timestamp that should
             be used as timestamp instead of the current time.
-        :param hub: The hub to use for this transaction.
-            This argument is DEPRECATED. Please use the `scope`
-            parameter, instead.
 
         :return: The event ID if the transaction was sent to Sentry,
             otherwise None.
@@ -974,10 +875,6 @@ class Transaction(Span):
         if self.timestamp is not None:
             # This transaction is already finished, ignore.
             return None
-
-        # For backwards compatibility, we must handle the case where `scope`
-        # or `hub` could both either be a `Scope` or a `Hub`.
-        scope = self._get_scope_from_finish_args(scope, hub)
 
         scope = scope or self.scope or sentry_sdk.get_current_scope()
         client = sentry_sdk.get_client()
@@ -1103,28 +1000,7 @@ class Transaction(Span):
         if has_gen_ai_span:
             event["_has_gen_ai_span"] = True
 
-        if self._profile is not None and self._profile.valid():
-            event["profile"] = self._profile
-            self._profile = None
-
-        event["measurements"] = self._measurements
-
         return scope.capture_event(event)
-
-    def set_measurement(
-        self, name: str, value: float, unit: "MeasurementUnit" = ""
-    ) -> None:
-        """
-        .. deprecated:: 2.28.0
-            This function is deprecated and will be removed in the next major release.
-        """
-
-        warnings.warn(
-            "`set_measurement()` is deprecated and will be removed in the next major version. Please use `set_data()` instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        self._measurements[name] = {"value": value, "unit": unit}
 
     def set_context(self, key: str, value: "dict[str, Any]") -> None:
         """Sets a context. Transactions can have multiple contexts
@@ -1295,9 +1171,7 @@ class NoOpSpan(Span):
     def containing_transaction(self) -> "Optional[Transaction]":
         return None
 
-    def start_child(
-        self, instrumenter: str = INSTRUMENTER.SENTRY, **kwargs: "Any"
-    ) -> "NoOpSpan":
+    def start_child(self, **kwargs: "Any") -> "NoOpSpan":
         return NoOpSpan()
 
     def to_traceparent(self) -> str:
@@ -1343,17 +1217,7 @@ class NoOpSpan(Span):
         self,
         scope: "Optional[sentry_sdk.Scope]" = None,
         end_timestamp: "Optional[Union[float, datetime]]" = None,
-        *,
-        hub: "Optional[sentry_sdk.Hub]" = None,
     ) -> "Optional[str]":
-        """
-        The `hub` parameter is deprecated. Please use the `scope` parameter, instead.
-        """
-        pass
-
-    def set_measurement(
-        self, name: str, value: float, unit: "MeasurementUnit" = ""
-    ) -> None:
         pass
 
     def set_context(self, key: str, value: "dict[str, Any]") -> None:

@@ -6,6 +6,8 @@ Based on Tom Christie's `sentry-asgi <https://github.com/encode/sentry-asgi>`.
 
 import inspect
 import sys
+from contextlib import nullcontext
+from contextvars import ContextVar
 from copy import deepcopy
 from functools import partial
 from typing import TYPE_CHECKING
@@ -41,15 +43,11 @@ from sentry_sdk.tracing import (
 )
 from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
-    CONTEXTVARS_ERROR_MESSAGE,
-    HAS_REAL_CONTEXTVARS,
-    ContextVar,
     _get_installed_modules,
     capture_internal_exceptions,
     event_from_exception,
     has_data_collection_enabled,
     logger,
-    nullcontext,
     qualname_from_function,
     reraise,
     transaction_from_function,
@@ -62,7 +60,9 @@ if TYPE_CHECKING:
     from sentry_sdk.tracing import Span
 
 
-_asgi_middleware_applied = ContextVar("sentry_asgi_middleware_applied")
+_asgi_middleware_applied: "ContextVar[bool]" = ContextVar(
+    "sentry_asgi_middleware_applied"
+)
 
 _DEFAULT_TRANSACTION_NAME = "generic ASGI request"
 
@@ -114,7 +114,6 @@ class SentryAsgiMiddleware:
     def __init__(
         self,
         app: "Any",
-        unsafe_context_data: bool = False,
         transaction_style: str = "endpoint",
         mechanism_type: str = "asgi",
         span_origin: str = "manual",
@@ -127,15 +126,7 @@ class SentryAsgiMiddleware:
         data to sent events and basic handling for exceptions bubbling up
         through the middleware.
 
-        :param unsafe_context_data: Disable errors when a proper contextvars installation could not be found. We do not recommend changing this from the default.
         """
-        if not unsafe_context_data and not HAS_REAL_CONTEXTVARS:
-            # We better have contextvars or we're going to leak state between
-            # requests.
-            raise RuntimeError(
-                "The ASGI middleware for Sentry requires Python 3.7+ "
-                "or the aiocontextvars package." + CONTEXTVARS_ERROR_MESSAGE
-            )
         if transaction_style not in TRANSACTION_STYLE_VALUES:
             raise ValueError(
                 "Invalid value for transaction_style: %s (must be in %s)"
@@ -206,15 +197,6 @@ class SentryAsgiMiddleware:
                     return await self.app(scope, receive, send)
 
             except Exception as exc:
-                suppress_chained_exceptions = (
-                    sentry_sdk.get_client()
-                    .options.get("_experiments", {})
-                    .get("suppress_asgi_chained_exceptions", True)
-                )
-                if suppress_chained_exceptions:
-                    self._capture_lifespan_exception(exc)
-                    raise exc from None
-
                 exc_info = sys.exc_info()
                 with capture_internal_exceptions():
                     self._capture_lifespan_exception(exc)
@@ -321,9 +303,6 @@ class SentryAsgiMiddleware:
                                 origin=self.span_origin,
                             )
 
-                        if transaction:
-                            transaction.set_tag("asgi.type", ty)
-
                         span_ctx = (
                             sentry_sdk.start_transaction(
                                 transaction,
@@ -377,15 +356,6 @@ class SentryAsgiMiddleware:
                                 )
 
                         except Exception as exc:
-                            suppress_chained_exceptions = (
-                                sentry_sdk.get_client()
-                                .options.get("_experiments", {})
-                                .get("suppress_asgi_chained_exceptions", True)
-                            )
-                            if suppress_chained_exceptions:
-                                self._capture_request_exception(exc)
-                                raise exc from None
-
                             exc_info = sys.exc_info()
                             with capture_internal_exceptions():
                                 self._capture_request_exception(exc)

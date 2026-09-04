@@ -42,12 +42,12 @@ try:
     )
     from markupsafe import Markup
 except ImportError:
-    raise DidNotEnable("Flask is not installed")
+    raise DidNotEnable("Flask is not installed or incompatible")
 
 try:
     import blinker  # noqa
 except ImportError:
-    raise DidNotEnable("blinker is not installed")
+    raise DidNotEnable("blinker is not installed or incompatible")
 
 TRANSACTION_STYLE_VALUES = ("endpoint", "url")
 

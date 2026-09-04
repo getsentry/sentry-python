@@ -4,7 +4,6 @@ import os
 import subprocess
 import sys
 import time
-import warnings
 from collections import Counter, defaultdict
 from collections.abc import Mapping
 from textwrap import dedent
@@ -15,12 +14,10 @@ import pytest
 import sentry_sdk
 from sentry_sdk import (
     Client,
-    Hub,
     add_breadcrumb,
     capture_event,
     capture_exception,
     capture_message,
-    configure_scope,
     set_tag,
     start_transaction,
 )
@@ -395,13 +392,6 @@ def test_socks_proxy(testcase, http2):
     )
 
 
-def test_simple_transport(sentry_init):
-    events = []
-    sentry_init(transport=events.append)
-    capture_message("Hello World!")
-    assert events[0]["message"] == "Hello World!"
-
-
 def test_ignore_errors(sentry_init, capture_events):
     sentry_init(ignore_errors=[ZeroDivisionError])
     events = capture_events()
@@ -633,31 +623,6 @@ def test_atexit(tmpdir, monkeypatch, num_messages, http2):
     assert int(end - start) >= num_messages / 10
 
     assert output.count(b"HI") == num_messages
-
-
-def test_configure_scope_available(
-    sentry_init, request, monkeypatch, suppress_deprecation_warnings
-):
-    """
-    Test that scope is configured if client is configured
-
-    This test can be removed once configure_scope and the Hub are removed.
-    """
-    sentry_init()
-
-    with configure_scope() as scope:
-        assert scope is Hub.current.scope
-        scope.set_tag("foo", "bar")
-
-    calls = []
-
-    def callback(scope):
-        calls.append(scope)
-        scope.set_tag("foo", "bar")
-
-    assert configure_scope(callback) is None
-    assert len(calls) == 1
-    assert calls[0] is Hub.current.scope
 
 
 @pytest.mark.tests_internal_exceptions
@@ -1307,18 +1272,19 @@ def test_error_sampler(_, sentry_init, capture_events, test_config):
         [{"py-call-uwsgi-fork-hooks": True}, ["--enable-threads"]],
     ],
 )
-def test_uwsgi_warnings(sentry_init, recwarn, opt, missing_flags):
+def test_uwsgi_warnings(sentry_init, opt, missing_flags):
     uwsgi = mock.MagicMock()
     uwsgi.opt = opt
-    with mock.patch.dict("sys.modules", uwsgi=uwsgi):
-        sentry_init(profiles_sample_rate=1.0)
-        if missing_flags:
-            assert len(recwarn) == 1
-            record = recwarn.pop()
-            for flag in missing_flags:
-                assert flag in str(record.message)
-        else:
-            assert not recwarn
+    with mock.patch("sentry_sdk.utils.logger") as mock_logger:
+        with mock.patch.dict("sys.modules", uwsgi=uwsgi):
+            sentry_init()
+            if missing_flags:
+                assert mock_logger.warning.call_count == 1
+                message = mock_logger.warning.call_args[0][0]
+                for flag in missing_flags:
+                    assert flag in message
+            else:
+                mock_logger.warning.assert_not_called()
 
 
 class TestSpanClientReports:
@@ -1479,15 +1445,12 @@ def test_dropped_transaction(sentry_init, capture_record_lost_event_calls, test_
     test_config.run(sentry_init, capture_record_lost_event_calls)
 
 
-@pytest.mark.parametrize("enable_tracing", [True, False])
-def test_enable_tracing_deprecated(sentry_init, enable_tracing):
-    with pytest.warns(DeprecationWarning):
-        sentry_init(enable_tracing=enable_tracing)
-
-
 def test_ignore_spans_warns_without_streaming(sentry_init):
-    with pytest.warns(UserWarning, match=r"`ignore_spans` parameter only works"):
+    with mock.patch("sentry_sdk.client.logger") as mock_logger:
         sentry_init(ignore_spans=["/health"], trace_lifecycle="static")
+        mock_logger.warning.assert_any_call(
+            "The `ignore_spans` parameter only works when `trace_lifecycle` is set to `stream`.",
+        )
 
 
 @pytest.mark.parametrize(
@@ -1499,11 +1462,12 @@ def test_ignore_spans_warns_without_streaming(sentry_init):
     ],
 )
 def test_ignore_spans_does_not_warn(sentry_init, options):
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
+    with mock.patch("sentry_sdk.client.logger") as mock_logger:
         sentry_init(**options)
 
-    ignore_spans_warnings = [w for w in caught if "ignore_spans" in str(w.message)]
+    ignore_spans_warnings = [
+        c for c in mock_logger.warning.call_args_list if "ignore_spans" in str(c)
+    ]
     assert ignore_spans_warnings == []
 
 
@@ -1629,8 +1593,6 @@ async def test_async_proxy(monkeypatch, testcase):
 @pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
 async def test_close_with_async_transport_warns():
     """Test close() with AsyncHttpTransport emits a warning."""
-    import warnings as _warnings
-
     client = Client(
         "https://foo@sentry.io/123",
         _experiments={"transport_async": True},
@@ -1638,10 +1600,11 @@ async def test_close_with_async_transport_warns():
     )
     assert isinstance(client.transport, AsyncHttpTransport)
 
-    with _warnings.catch_warnings(record=True) as w:
-        _warnings.simplefilter("always")
+    with mock.patch("sentry_sdk.client.logger") as mock_logger:
         client.close()
-        assert any("close_async()" in str(warning.message) for warning in w)
+        assert any(
+            "close_async()" in str(c) for c in mock_logger.warning.call_args_list
+        )
 
 
 @skip_under_gevent
@@ -1694,8 +1657,6 @@ async def test_close_async_no_transport():
 @pytest.mark.skipif(not PY38, reason="Async client methods require Python 3.8+")
 async def test_flush_with_async_transport_warns():
     """Test flush() with AsyncHttpTransport emits a warning and returns."""
-    import warnings as _warnings
-
     client = Client(
         "https://foo@sentry.io/123",
         _experiments={"transport_async": True},
@@ -1703,10 +1664,11 @@ async def test_flush_with_async_transport_warns():
     )
     assert isinstance(client.transport, AsyncHttpTransport)
 
-    with _warnings.catch_warnings(record=True) as w:
-        _warnings.simplefilter("always")
+    with mock.patch("sentry_sdk.client.logger") as mock_logger:
         client.flush(timeout=1.0)
-        assert any("flush_async()" in str(warning.message) for warning in w)
+        assert any(
+            "flush_async()" in str(c) for c in mock_logger.warning.call_args_list
+        )
     await client.close_async()
 
 

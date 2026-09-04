@@ -2,10 +2,9 @@ from unittest import mock
 
 import pytest
 import rq
-from fakeredis import FakeStrictRedis
+from fakeredis import FakeRedis
 
 import sentry_sdk
-from sentry_sdk import start_transaction
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.rq import RqIntegration
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE, parse_version
@@ -49,48 +48,30 @@ def do_trick(dog, trick):
 
 
 @pytest.mark.parametrize("send_default_pii", [True, False])
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_basic(
     sentry_init,
-    capture_events,
     capture_items,
     send_default_pii,
-    span_streaming,
 ):
     sentry_init(
         integrations=[RqIntegration()],
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
-    queue = rq.Queue(connection=FakeStrictRedis())
+    queue = rq.Queue(connection=FakeRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
+    items = capture_items("event")
 
-    if span_streaming:
-        items = capture_items("event")
+    queue.enqueue(crashing_job, foo=42)
+    worker.work(burst=True)
 
-        queue.enqueue(crashing_job, foo=42)
-        worker.work(burst=True)
+    (event,) = (item.payload for item in items)
 
-        (event,) = (item.payload for item in items)
-
-        (exception,) = event["exception"]["values"]
-        assert exception["type"] == "ZeroDivisionError"
-        assert exception["mechanism"]["type"] == "rq"
-        assert exception["stacktrace"]["frames"][-1]["vars"]["foo"] == "42"
-    else:
-        events = capture_events()
-
-        queue.enqueue(crashing_job, foo=42)
-        worker.work(burst=True)
-
-        (event,) = events
-
-        (exception,) = event["exception"]["values"]
-        assert exception["type"] == "ZeroDivisionError"
-        assert exception["mechanism"]["type"] == "rq"
-        assert exception["stacktrace"]["frames"][-1]["vars"]["foo"] == "42"
-        assert event["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
+    (exception,) = event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
+    assert exception["mechanism"]["type"] == "rq"
+    assert exception["stacktrace"]["frames"][-1]["vars"]["foo"] == "42"
 
     extra = event["extra"]["rq-job"]
     if send_default_pii:
@@ -113,39 +94,27 @@ def test_basic(
     "init_kwargs,expected_args,expected_kwargs",
     DATA_COLLECTION_QUEUES_CASES,
 )
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_job_args_kwargs_data_collection(
     sentry_init,
-    capture_events,
     capture_items,
-    span_streaming,
     init_kwargs,
     expected_args,
     expected_kwargs,
 ):
     sentry_init(
         integrations=[RqIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
         **init_kwargs,
     )
 
-    queue = rq.Queue(connection=FakeStrictRedis())
+    queue = rq.Queue(connection=FakeRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
+    items = capture_items("event")
 
-    if span_streaming:
-        items = capture_items("event")
+    queue.enqueue(crashing_job, 1, b=0)
+    worker.work(burst=True)
 
-        queue.enqueue(crashing_job, 1, b=0)
-        worker.work(burst=True)
-
-        (event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
-
-        queue.enqueue(crashing_job, 1, b=0)
-        worker.work(burst=True)
-
-        (event,) = events
+    (event,) = (item.payload for item in items)
 
     rq_job = event["extra"]["rq-job"]
 
@@ -157,359 +126,207 @@ def test_job_args_kwargs_data_collection(
         assert rq_job["kwargs"] == expected_kwargs
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_transport_shutdown(
-    sentry_init, capture_events_forksafe, capture_items_forksafe, span_streaming
+    sentry_init,
+    capture_items_forksafe,
 ):
     sentry_init(
         integrations=[RqIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
-    queue = rq.Queue(connection=FakeStrictRedis())
+    queue = rq.Queue(connection=FakeRedis())
     worker = rq.Worker([queue], connection=queue.connection)
+    items = capture_items_forksafe("event")
 
-    if span_streaming:
-        items = capture_items_forksafe("event")
+    queue.enqueue(crashing_job, foo=42)
+    worker.work(burst=True)
 
-        queue.enqueue(crashing_job, foo=42)
-        worker.work(burst=True)
+    captured_items = items.read_event()
+    items.read_flush()
 
-        captured_items = items.read_event()
-        items.read_flush()
-
-        event = next(item["payload"] for item in captured_items)
-        (exception,) = event["exception"]["values"]
-        assert exception["type"] == "ZeroDivisionError"
-    else:
-        events = capture_events_forksafe()
-
-        queue.enqueue(crashing_job, foo=42)
-        worker.work(burst=True)
-
-        event = events.read_event()
-        events.read_flush()
-
-        (exception,) = event["exception"]["values"]
-        assert exception["type"] == "ZeroDivisionError"
+    event = next(item["payload"] for item in captured_items)
+    (exception,) = event["exception"]["values"]
+    assert exception["type"] == "ZeroDivisionError"
 
 
 @pytest.mark.parametrize("send_default_pii", [True, False])
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_transaction_with_error(
+def test_worker_span_with_error(
     sentry_init,
-    capture_events,
     capture_items,
-    DictionaryContaining,
     send_default_pii,
-    span_streaming,
 ):
     sentry_init(
         integrations=[RqIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
-    queue = rq.Queue(connection=FakeStrictRedis())
+    queue = rq.Queue(connection=FakeRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
+    items = capture_items("event", "span")
 
-    if span_streaming:
-        items = capture_items("event", "span")
+    queue.enqueue(chew_up_shoes, "Charlie", "Katie", shoes="flip-flops")
+    worker.work(burst=True)
 
-        queue.enqueue(chew_up_shoes, "Charlie", "Katie", shoes="flip-flops")
-        worker.work(burst=True)
+    (error_event,) = (item.payload for item in items if item.type == "event")
 
-        (error_event,) = (item.payload for item in items if item.type == "event")
+    assert error_event["transaction"] == "tests.integrations.rq.test_rq.chew_up_shoes"
+    assert error_event["contexts"]["trace"]["op"] == "queue.task.rq"
+    assert error_event["exception"]["values"][0]["type"] == "Exception"
+    assert (
+        error_event["exception"]["values"][0]["value"]
+        == "Charlie!! Why did you eat Katie's flip-flops??"
+    )
 
-        assert (
-            error_event["transaction"] == "tests.integrations.rq.test_rq.chew_up_shoes"
-        )
-        assert error_event["contexts"]["trace"]["op"] == "queue.task.rq"
-        assert error_event["exception"]["values"][0]["type"] == "Exception"
-        assert (
-            error_event["exception"]["values"][0]["value"]
-            == "Charlie!! Why did you eat Katie's flip-flops??"
-        )
+    sentry_sdk.flush()
+    spans = [item.payload for item in items if item.type == "span"]
+    (span,) = (
+        span for span in spans if span["attributes"].get("sentry.op") == "queue.task.rq"
+    )
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        (span,) = (
-            span
-            for span in spans
-            if span["attributes"].get("sentry.op") == "queue.task.rq"
-        )
-
-        assert span["trace_id"] == error_event["contexts"]["trace"]["trace_id"]
-        assert span["span_id"] == error_event["contexts"]["trace"]["span_id"]
-        assert span["attributes"]["sentry.op"] == error_event["contexts"]["trace"]["op"]
-        assert (
-            span["attributes"]["sentry.origin"]
-            == error_event["contexts"]["trace"]["origin"]
-        )
-        assert (
-            span["attributes"][SPANDATA.CODE_FUNCTION_NAME]
-            == "tests.integrations.rq.test_rq.chew_up_shoes"
-        )
-    else:
-        events = capture_events()
-
-        queue.enqueue(chew_up_shoes, "Charlie", "Katie", shoes="flip-flops")
-        worker.work(burst=True)
-
-        error_event, envelope = events
-
-        assert (
-            error_event["transaction"] == "tests.integrations.rq.test_rq.chew_up_shoes"
-        )
-        assert error_event["contexts"]["trace"]["op"] == "queue.task.rq"
-        assert error_event["exception"]["values"][0]["type"] == "Exception"
-        assert (
-            error_event["exception"]["values"][0]["value"]
-            == "Charlie!! Why did you eat Katie's flip-flops??"
-        )
-
-        assert envelope["type"] == "transaction"
-        assert envelope["contexts"]["trace"] == error_event["contexts"]["trace"]
-        assert envelope["transaction"] == error_event["transaction"]
-        assert envelope["extra"]["rq-job"] == DictionaryContaining(
-            {
-                "args": (
-                    ["Charlie", "Katie"]
-                    if send_default_pii
-                    else SENSITIVE_DATA_SUBSTITUTE
-                ),
-                "kwargs": (
-                    {"shoes": "flip-flops"}
-                    if send_default_pii
-                    else SENSITIVE_DATA_SUBSTITUTE
-                ),
-                "func": "tests.integrations.rq.test_rq.chew_up_shoes",
-                "description": "tests.integrations.rq.test_rq.chew_up_shoes('Charlie', 'Katie', shoes='flip-flops')",
-            }
-        )
+    assert span["trace_id"] == error_event["contexts"]["trace"]["trace_id"]
+    assert span["span_id"] == error_event["contexts"]["trace"]["span_id"]
+    assert span["attributes"]["sentry.op"] == error_event["contexts"]["trace"]["op"]
+    assert (
+        span["attributes"]["sentry.origin"]
+        == error_event["contexts"]["trace"]["origin"]
+    )
+    assert (
+        span["attributes"][SPANDATA.CODE_FUNCTION_NAME]
+        == "tests.integrations.rq.test_rq.chew_up_shoes"
+    )
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_error_has_trace_context_if_tracing_disabled(
     sentry_init,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[RqIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
-    queue = rq.Queue(connection=FakeStrictRedis())
+    queue = rq.Queue(connection=FakeRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
+    items = capture_items("event")
 
-    if span_streaming:
-        items = capture_items("event")
+    queue.enqueue(crashing_job, foo=None)
+    worker.work(burst=True)
 
-        queue.enqueue(crashing_job, foo=None)
-        worker.work(burst=True)
-
-        (error_event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
-
-        queue.enqueue(crashing_job, foo=None)
-        worker.work(burst=True)
-
-        (error_event,) = events
+    (error_event,) = (item.payload for item in items)
 
     assert error_event["contexts"]["trace"]
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_tracing_enabled(
     sentry_init,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[RqIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
-    queue = rq.Queue(connection=FakeStrictRedis())
+    queue = rq.Queue(connection=FakeRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
+    items = capture_items("event", "span")
 
-    if span_streaming:
-        items = capture_items("event", "span")
+    with sentry_sdk.traces.start_span(
+        name="custom parent",
+        attributes={
+            "sentry.op": "rq transaction",
+        },
+    ) as span:
+        queue.enqueue(crashing_job, foo=None)
+        worker.work(burst=True)
 
-        with sentry_sdk.traces.start_span(
-            name="custom parent",
-            attributes={
-                "sentry.op": "rq transaction",
-            },
-        ) as span:
-            queue.enqueue(crashing_job, foo=None)
-            worker.work(burst=True)
+    (error_event,) = (item.payload for item in items if item.type == "event")
 
-        (error_event,) = (item.payload for item in items if item.type == "event")
+    assert error_event["contexts"]["trace"]["trace_id"] == span.trace_id
 
-        assert error_event["contexts"]["trace"]["trace_id"] == span.trace_id
+    sentry_sdk.flush()
+    spans = [item.payload for item in items if item.type == "span"]
+    (span,) = (
+        span for span in spans if span["attributes"].get("sentry.op") == "queue.task.rq"
+    )
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items if item.type == "span"]
-        (span,) = (
-            span
-            for span in spans
-            if span["attributes"].get("sentry.op") == "queue.task.rq"
-        )
-
-        assert span["trace_id"] == error_event["contexts"]["trace"]["trace_id"]
-        assert span["span_id"] == error_event["contexts"]["trace"]["span_id"]
-        assert span["attributes"]["sentry.op"] == error_event["contexts"]["trace"]["op"]
-        assert (
-            span["attributes"]["sentry.origin"]
-            == error_event["contexts"]["trace"]["origin"]
-        )
-    else:
-        events = capture_events()
-
-        with start_transaction(op="rq transaction") as transaction:
-            queue.enqueue(crashing_job, foo=None)
-            worker.work(burst=True)
-
-        error_event, envelope, _ = events
-
-        assert (
-            error_event["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
-        )
-        assert error_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
-
-        assert envelope["contexts"]["trace"] == error_event["contexts"]["trace"]
+    assert span["trace_id"] == error_event["contexts"]["trace"]["trace_id"]
+    assert span["span_id"] == error_event["contexts"]["trace"]["span_id"]
+    assert span["attributes"]["sentry.op"] == error_event["contexts"]["trace"]["op"]
+    assert (
+        span["attributes"]["sentry.origin"]
+        == error_event["contexts"]["trace"]["origin"]
+    )
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_tracing_disabled(
     sentry_init,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[RqIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
-    queue = rq.Queue(connection=FakeStrictRedis())
+    queue = rq.Queue(connection=FakeRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
+    items = capture_items("event")
 
-    if span_streaming:
-        items = capture_items("event")
+    queue.enqueue(crashing_job, foo=None)
+    worker.work(burst=True)
 
-        queue.enqueue(crashing_job, foo=None)
-        worker.work(burst=True)
+    (error_event,) = (item.payload for item in items)
 
-        (error_event,) = (item.payload for item in items)
-
-        assert error_event["contexts"]["trace"]["trace_id"]
-    else:
-        events = capture_events()
-
-        scope = sentry_sdk.get_isolation_scope()
-        queue.enqueue(crashing_job, foo=None)
-        worker.work(burst=True)
-
-        (error_event,) = events
-
-        assert (
-            error_event["transaction"] == "tests.integrations.rq.test_rq.crashing_job"
-        )
-        assert (
-            error_event["contexts"]["trace"]["trace_id"]
-            == scope._propagation_context.trace_id
-        )
+    assert error_event["contexts"]["trace"]["trace_id"]
 
 
 @pytest.mark.parametrize("send_default_pii", [True, False])
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_transaction_no_error(
+def test_worker_span_no_error(
     sentry_init,
-    capture_events,
     capture_items,
-    DictionaryContaining,
     send_default_pii,
-    span_streaming,
 ):
     sentry_init(
         integrations=[RqIntegration()],
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
-    queue = rq.Queue(connection=FakeStrictRedis())
+    queue = rq.Queue(connection=FakeRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("span")
+    queue.enqueue(do_trick, "Maisey", trick="kangaroo")
+    worker.work(burst=True)
 
-        queue.enqueue(do_trick, "Maisey", trick="kangaroo")
-        worker.work(burst=True)
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = (
+        span for span in spans if span["attributes"].get("sentry.op") == "queue.task.rq"
+    )
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-        (span,) = (
-            span
-            for span in spans
-            if span["attributes"].get("sentry.op") == "queue.task.rq"
-        )
-
-        assert span["attributes"]["sentry.op"] == "queue.task.rq"
-        assert span["name"] == "tests.integrations.rq.test_rq.do_trick"
-        assert span["attributes"][SPANDATA.MESSAGING_DESTINATION_NAME] == queue.name
-    else:
-        events = capture_events()
-
-        queue.enqueue(do_trick, "Maisey", trick="kangaroo")
-        worker.work(burst=True)
-
-        envelope = events[0]
-
-        assert envelope["type"] == "transaction"
-        assert envelope["contexts"]["trace"]["op"] == "queue.task.rq"
-        assert envelope["transaction"] == "tests.integrations.rq.test_rq.do_trick"
-        assert (
-            envelope["contexts"]["trace"]["data"][SPANDATA.MESSAGING_DESTINATION_NAME]
-            == queue.name
-        )
-        assert envelope["extra"]["rq-job"] == DictionaryContaining(
-            {
-                "args": ["Maisey"] if send_default_pii else SENSITIVE_DATA_SUBSTITUTE,
-                "kwargs": (
-                    {"trick": "kangaroo"}
-                    if send_default_pii
-                    else SENSITIVE_DATA_SUBSTITUTE
-                ),
-                "func": "tests.integrations.rq.test_rq.do_trick",
-                "description": "tests.integrations.rq.test_rq.do_trick('Maisey', trick='kangaroo')",
-            }
-        )
+    assert span["attributes"]["sentry.op"] == "queue.task.rq"
+    assert span["name"] == "tests.integrations.rq.test_rq.do_trick"
+    assert span["attributes"][SPANDATA.MESSAGING_DESTINATION_NAME] == queue.name
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_traces_sampler_gets_correct_values_in_sampling_context(
     sentry_init,
     DictionaryContaining,
     ObjectDescribedBy,
-    span_streaming,  # noqa:N803
 ):
     traces_sampler = mock.Mock(return_value=True)
     sentry_init(
         integrations=[RqIntegration()],
         traces_sampler=traces_sampler,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
-    queue = rq.Queue(connection=FakeStrictRedis())
+    queue = rq.Queue(connection=FakeRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
 
     queue.enqueue(do_trick, "Bodhi", trick="roll over")
@@ -536,73 +353,47 @@ def test_traces_sampler_gets_correct_values_in_sampling_context(
 @pytest.mark.skipif(
     parse_version(rq.__version__) < (1, 5), reason="At least rq-1.5 required"
 )
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_job_with_retries(
     sentry_init,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[RqIntegration()],
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
-    queue = rq.Queue(connection=FakeStrictRedis())
+    queue = rq.Queue(connection=FakeRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
+    items = capture_items("event")
 
-    if span_streaming:
-        items = capture_items("event")
-
-        queue.enqueue(crashing_job, foo=42, retry=rq.Retry(max=1))
-        worker.work(burst=True)
-        events = [item.payload for item in items]
-    else:
-        events = capture_events()
-
-        queue.enqueue(crashing_job, foo=42, retry=rq.Retry(max=1))
-        worker.work(burst=True)
+    queue.enqueue(crashing_job, foo=42, retry=rq.Retry(max=1))
+    worker.work(burst=True)
+    events = [item.payload for item in items]
 
     assert len(events) == 1
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_span_origin(
     sentry_init,
-    capture_events,
     capture_items,
-    span_streaming,
 ):
     sentry_init(
         integrations=[RqIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
-    queue = rq.Queue(connection=FakeStrictRedis())
+    queue = rq.Queue(connection=FakeRedis())
     worker = rq.SimpleWorker([queue], connection=queue.connection)
+    items = capture_items("span")
 
-    if span_streaming:
-        items = capture_items("span")
+    queue.enqueue(do_trick, "Maisey", trick="kangaroo")
+    worker.work(burst=True)
 
-        queue.enqueue(do_trick, "Maisey", trick="kangaroo")
-        worker.work(burst=True)
+    sentry_sdk.flush()
+    spans = [item.payload for item in items]
+    (span,) = (
+        span for span in spans if span["attributes"].get("sentry.op") == "queue.task.rq"
+    )
 
-        sentry_sdk.flush()
-        spans = [item.payload for item in items]
-        (span,) = (
-            span
-            for span in spans
-            if span["attributes"].get("sentry.op") == "queue.task.rq"
-        )
-
-        assert span["attributes"]["sentry.origin"] == "auto.queue.rq"
-    else:
-        events = capture_events()
-
-        queue.enqueue(do_trick, "Maisey", trick="kangaroo")
-        worker.work(burst=True)
-
-        (event,) = events
-
-        assert event["contexts"]["trace"]["origin"] == "auto.queue.rq"
+    assert span["attributes"]["sentry.origin"] == "auto.queue.rq"

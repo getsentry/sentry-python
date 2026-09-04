@@ -8,16 +8,17 @@ from sentry_sdk.integrations import (
     _DEFAULT_FAILED_REQUEST_STATUS_CODES,
     DidNotEnable,
     Integration,
+    _check_minimum_version,
 )
 from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
-from sentry_sdk.integrations.logging import ignore_logger
+from sentry_sdk.integrations.logging import ignore_logger_for_events
 from sentry_sdk.scope import should_send_default_pii
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
 from sentry_sdk.utils import (
     ensure_integration_enabled,
     event_from_exception,
     has_data_collection_enabled,
+    package_version,
     transaction_from_function,
 )
 
@@ -29,7 +30,7 @@ try:
     from litestar.middleware import DefineMiddleware  # type: ignore
     from litestar.routes.http import HTTPRoute  # type: ignore
 except ImportError:
-    raise DidNotEnable("Litestar is not installed")
+    raise DidNotEnable("Litestar is not installed or incompatible")
 
 from typing import TYPE_CHECKING
 
@@ -68,6 +69,9 @@ class LitestarIntegration(Integration):
 
     @staticmethod
     def setup_once() -> None:
+        version = package_version("litestar")
+        _check_minimum_version(LitestarIntegration, version)
+
         patch_app_init()
         patch_middlewares()
         patch_http_route_handle()
@@ -80,7 +84,7 @@ class LitestarIntegration(Integration):
         # The `LitestarIntegration`` provides an after_exception hook (see `patch_app_init` below) to create a Sentry event
         # from an exception, which ends up being called during step 2 above. However, the Sentry `LoggingIntegration` will
         # by default create a Sentry event from error logs made in step 1 if we do not prevent it from doing so.
-        ignore_logger("litestar")
+        ignore_logger_for_events("litestar")
 
 
 class SentryLitestarASGIMiddleware(SentryAsgiMiddleware):
@@ -89,7 +93,6 @@ class SentryLitestarASGIMiddleware(SentryAsgiMiddleware):
     ) -> None:
         super().__init__(
             app=app,
-            unsafe_context_data=False,
             transaction_style="endpoint",
             mechanism_type="asgi",
             span_origin=span_origin,
@@ -165,104 +168,60 @@ def enable_span_for_middleware(middleware: "Middleware") -> "Middleware":
             return await old_call(self, scope, receive, send)
 
         middleware_name = self.__class__.__name__
-        if has_span_streaming_enabled(client.options):
-            if sentry_sdk.traces.get_current_span() is None:
-                return await old_call(self, scope, receive, send)
-            with sentry_sdk.traces.start_span(
-                name=middleware_name,
-                attributes={
-                    "sentry.op": OP.MIDDLEWARE_LITESTAR,
-                    "sentry.origin": LitestarIntegration.origin,
-                },
-            ) as middleware_span:
-                middleware_span.set_attribute(SPANDATA.MIDDLEWARE_NAME, middleware_name)
+        if sentry_sdk.traces.get_current_span() is None:
+            return await old_call(self, scope, receive, send)
+        with sentry_sdk.traces.start_span(
+            name=middleware_name,
+            attributes={
+                "sentry.op": OP.MIDDLEWARE_LITESTAR,
+                "sentry.origin": LitestarIntegration.origin,
+            },
+        ) as middleware_span:
+            middleware_span.set_attribute(SPANDATA.MIDDLEWARE_NAME, middleware_name)
 
-                # Creating spans for the "receive" callback
-                async def _sentry_receive(
-                    *args: "Any", **kwargs: "Any"
-                ) -> "Union[HTTPReceiveMessage, WebSocketReceiveMessage]":
-                    if client.get_integration(LitestarIntegration) is None:
-                        return await receive(*args, **kwargs)
-                    if sentry_sdk.traces.get_current_span() is None:
-                        return await receive(*args, **kwargs)
-                    with sentry_sdk.traces.start_span(
-                        name=getattr(receive, "__qualname__", str(receive)),
-                        attributes={
-                            "sentry.op": OP.MIDDLEWARE_LITESTAR_RECEIVE,
-                            "sentry.origin": LitestarIntegration.origin,
-                        },
-                    ) as span:
-                        span.set_attribute(SPANDATA.MIDDLEWARE_NAME, middleware_name)
-                        return await receive(*args, **kwargs)
+            # Creating spans for the "receive" callback
+            async def _sentry_receive(
+                *args: "Any", **kwargs: "Any"
+            ) -> "Union[HTTPReceiveMessage, WebSocketReceiveMessage]":
+                if client.get_integration(LitestarIntegration) is None:
+                    return await receive(*args, **kwargs)
+                if sentry_sdk.traces.get_current_span() is None:
+                    return await receive(*args, **kwargs)
+                with sentry_sdk.traces.start_span(
+                    name=getattr(receive, "__qualname__", str(receive)),
+                    attributes={
+                        "sentry.op": OP.MIDDLEWARE_LITESTAR_RECEIVE,
+                        "sentry.origin": LitestarIntegration.origin,
+                    },
+                ) as span:
+                    span.set_attribute(SPANDATA.MIDDLEWARE_NAME, middleware_name)
+                    return await receive(*args, **kwargs)
 
-                receive_name = getattr(receive, "__name__", str(receive))
-                receive_patched = receive_name == "_sentry_receive"
-                new_receive = _sentry_receive if not receive_patched else receive
+            receive_name = getattr(receive, "__name__", str(receive))
+            receive_patched = receive_name == "_sentry_receive"
+            new_receive = _sentry_receive if not receive_patched else receive
 
-                # Creating spans for the "send" callback
-                async def _sentry_send(message: "Message") -> None:
-                    if client.get_integration(LitestarIntegration) is None:
-                        return await send(message)
-                    if sentry_sdk.traces.get_current_span() is None:
-                        return await send(message)
-                    with sentry_sdk.traces.start_span(
-                        name=getattr(send, "__qualname__", str(send)),
-                        attributes={
-                            "sentry.op": OP.MIDDLEWARE_LITESTAR_SEND,
-                            "sentry.origin": LitestarIntegration.origin,
-                        },
-                    ) as span:
-                        span.set_attribute(SPANDATA.MIDDLEWARE_NAME, middleware_name)
-                        return await send(message)
+            # Creating spans for the "send" callback
+            async def _sentry_send(message: "Message") -> None:
+                if client.get_integration(LitestarIntegration) is None:
+                    return await send(message)
+                if sentry_sdk.traces.get_current_span() is None:
+                    return await send(message)
+                with sentry_sdk.traces.start_span(
+                    name=getattr(send, "__qualname__", str(send)),
+                    attributes={
+                        "sentry.op": OP.MIDDLEWARE_LITESTAR_SEND,
+                        "sentry.origin": LitestarIntegration.origin,
+                    },
+                ) as span:
+                    span.set_attribute(SPANDATA.MIDDLEWARE_NAME, middleware_name)
+                    return await send(message)
 
-                send_name = getattr(send, "__name__", str(send))
-                send_patched = send_name == "_sentry_send"
-                new_send = _sentry_send if not send_patched else send
+            send_name = getattr(send, "__name__", str(send))
+            send_patched = send_name == "_sentry_send"
+            new_send = _sentry_send if not send_patched else send
 
-                return await old_call(self, scope, new_receive, new_send)
-        else:
-            with sentry_sdk.start_span(
-                op=OP.MIDDLEWARE_LITESTAR,
-                name=middleware_name,
-                origin=LitestarIntegration.origin,
-            ) as middleware_span:
-                middleware_span.set_tag("litestar.middleware_name", middleware_name)
-
-                # Creating spans for the "receive" callback
-                async def _sentry_receive(
-                    *args: "Any", **kwargs: "Any"
-                ) -> "Union[HTTPReceiveMessage, WebSocketReceiveMessage]":
-                    if client.get_integration(LitestarIntegration) is None:
-                        return await receive(*args, **kwargs)
-                    with sentry_sdk.start_span(
-                        op=OP.MIDDLEWARE_LITESTAR_RECEIVE,
-                        name=getattr(receive, "__qualname__", str(receive)),
-                        origin=LitestarIntegration.origin,
-                    ) as span:
-                        span.set_tag("litestar.middleware_name", middleware_name)
-                        return await receive(*args, **kwargs)
-
-                receive_name = getattr(receive, "__name__", str(receive))
-                receive_patched = receive_name == "_sentry_receive"
-                new_receive = _sentry_receive if not receive_patched else receive
-
-                # Creating spans for the "send" callback
-                async def _sentry_send(message: "Message") -> None:
-                    if client.get_integration(LitestarIntegration) is None:
-                        return await send(message)
-                    with sentry_sdk.start_span(
-                        op=OP.MIDDLEWARE_LITESTAR_SEND,
-                        name=getattr(send, "__qualname__", str(send)),
-                        origin=LitestarIntegration.origin,
-                    ) as span:
-                        span.set_tag("litestar.middleware_name", middleware_name)
-                        return await send(message)
-
-                send_name = getattr(send, "__name__", str(send))
-                send_patched = send_name == "_sentry_send"
-                new_send = _sentry_send if not send_patched else send
-
-                return await old_call(self, scope, new_receive, new_send)
+            return await old_call(self, scope, new_receive, new_send)
 
     not_yet_patched = old_call.__name__ not in ["_create_span_call"]
 

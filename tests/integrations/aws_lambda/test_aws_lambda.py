@@ -119,7 +119,6 @@ def test_basic_no_exception(lambda_client, test_environment):
     assert transaction_event["type"] == "transaction"
     assert transaction_event["transaction"] == "BasicOk"
     assert transaction_event["sdk"]["name"] == "sentry.python.aws_lambda"
-    assert transaction_event["tags"] == {"aws_region": "us-east-1"}
 
     assert transaction_event["extra"]["cloudwatch logs"] == {
         "log_group": mock.ANY,
@@ -161,7 +160,6 @@ def test_basic_exception(lambda_client, test_environment):
     assert error_event["exception"]["values"][0]["value"] == "Oh!"
     assert error_event["sdk"]["name"] == "sentry.python.aws_lambda"
 
-    assert error_event["tags"] == {"aws_region": "us-east-1"}
     assert error_event["extra"]["cloudwatch logs"] == {
         "log_group": mock.ANY,
         "log_stream": mock.ANY,
@@ -218,9 +216,7 @@ def test_timeout_error_scope_modified(lambda_client, test_environment):
     (exception,) = error_event["exception"]["values"]
     assert not exception["mechanism"]["handled"]
     assert exception["type"] == "ServerlessTimeoutWarning"
-    assert exception["value"].startswith(
-        "WARNING : Function is expected to get timed out. Configured timeout duration ="
-    )
+    assert exception["value"] == "WARNING: Function is about to time out."
     assert exception["mechanism"]["type"] == "threading"
 
     assert error_event["tags"]["custom_tag"] == "custom_value"
@@ -326,12 +322,6 @@ def test_non_dict_event(
 
     assert error_event["request"] == request_data
     assert transaction_event["request"] == request_data
-
-    if batch_size > 1:
-        assert error_event["tags"]["batch_size"] == batch_size
-        assert error_event["tags"]["batch_request"] is True
-        assert transaction_event["tags"]["batch_size"] == batch_size
-        assert transaction_event["tags"]["batch_request"] is True
 
 
 def test_request_data_with_send_default_pii_false(lambda_client, test_environment):

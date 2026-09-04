@@ -1,5 +1,4 @@
 import asyncio
-import datetime
 import json
 import os
 from contextlib import suppress
@@ -18,12 +17,11 @@ from aiohttp.web_exceptions import (
 from aiohttp.web_request import Request
 
 import sentry_sdk
-from sentry_sdk import capture_message, start_transaction
+from sentry_sdk import capture_message
 from sentry_sdk._types import OVER_SIZE_LIMIT_SUBSTITUTE
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.aiohttp import (
     AioHttpIntegration,
-    create_trace_config,
 )
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
 from tests.conftest import ApproxDict
@@ -298,86 +296,14 @@ async def test_half_initialized(sentry_init, aiohttp_client, capture_events):
     assert events == []
 
 
-@pytest.mark.asyncio
-async def test_tracing(sentry_init, aiohttp_client, capture_events):
-    sentry_init(integrations=[AioHttpIntegration()], traces_sample_rate=1.0)
-
-    async def hello(request):
-        return web.Response(text="hello")
-
-    app = web.Application()
-    app.router.add_get("/", hello)
-
-    events = capture_events()
-
-    client = await aiohttp_client(app)
-    resp = await client.get("/")
-    assert resp.status == 200
-
-    (event,) = events
-
-    assert event["type"] == "transaction"
-    assert (
-        event["transaction"]
-        == "tests.integrations.aiohttp.test_aiohttp.test_tracing.<locals>.hello"
-    )
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "url,transaction_style,expected_transaction,expected_source",
-    [
-        (
-            "/message",
-            "handler_name",
-            "tests.integrations.aiohttp.test_aiohttp.test_transaction_style.<locals>.hello",
-            "component",
-        ),
-        (
-            "/message",
-            "method_and_path_pattern",
-            "GET /{var}",
-            "route",
-        ),
-    ],
-)
-async def test_transaction_style(
-    sentry_init,
-    aiohttp_client,
-    capture_events,
-    url,
-    transaction_style,
-    expected_transaction,
-    expected_source,
-):
-    sentry_init(
-        integrations=[AioHttpIntegration(transaction_style=transaction_style)],
-        traces_sample_rate=1.0,
-    )
-
-    async def hello(request):
-        return web.Response(text="hello")
-
-    app = web.Application()
-    app.router.add_get(r"/{var}", hello)
-
-    events = capture_events()
-
-    client = await aiohttp_client(app)
-    resp = await client.get(url)
-    assert resp.status == 200
-
-    (event,) = events
-
-    assert event["type"] == "transaction"
-    assert event["transaction"] == expected_transaction
-    assert event["transaction_info"] == {"source": expected_source}
-
-
 @pytest.mark.tests_internal_exceptions
 @pytest.mark.asyncio
-async def test_tracing_unparseable_url(sentry_init, aiohttp_client, capture_events):
-    sentry_init(integrations=[AioHttpIntegration()], traces_sample_rate=1.0)
+async def test_tracing_unparseable_url(sentry_init, aiohttp_client, capture_items):
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
 
     async def hello(request):
         return web.Response(text="hello")
@@ -385,7 +311,7 @@ async def test_tracing_unparseable_url(sentry_init, aiohttp_client, capture_even
     app = web.Application()
     app.router.add_get("/", hello)
 
-    events = capture_events()
+    items = capture_items("span")
 
     client = await aiohttp_client(app)
     with mock.patch(
@@ -395,11 +321,12 @@ async def test_tracing_unparseable_url(sentry_init, aiohttp_client, capture_even
 
     assert resp.status == 200
 
-    (event,) = events
+    sentry_sdk.flush()
 
-    assert event["type"] == "transaction"
+    (span,) = [item.payload for item in items]
+
     assert (
-        event["transaction"]
+        span["name"]
         == "tests.integrations.aiohttp.test_aiohttp.test_tracing_unparseable_url.<locals>.hello"
     )
 
@@ -414,6 +341,7 @@ async def test_traces_sampler_gets_request_object_in_sampling_context(
     traces_sampler = mock.Mock()
     sentry_init(
         integrations=[AioHttpIntegration()],
+        trace_lifecycle="stream",
         traces_sampler=traces_sampler,
     )
 
@@ -439,9 +367,13 @@ async def test_traces_sampler_gets_request_object_in_sampling_context(
 
 @pytest.mark.asyncio
 async def test_has_trace_if_performance_enabled(
-    sentry_init, aiohttp_client, capture_events
+    sentry_init, aiohttp_client, capture_items
 ):
-    sentry_init(integrations=[AioHttpIntegration()], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
 
     async def hello(request):
         capture_message("It's a good day to try dividing by 0")
@@ -450,13 +382,29 @@ async def test_has_trace_if_performance_enabled(
     app = web.Application()
     app.router.add_get("/", hello)
 
-    events = capture_events()
+    items = capture_items("event", "span")
 
     client = await aiohttp_client(app)
     resp = await client.get("/")
     assert resp.status == 500
 
-    msg_event, error_event, transaction_event = events
+    sentry_sdk.flush()
+
+    msg_events = [
+        i.payload for i in items if i.type == "event" and "exception" not in i.payload
+    ]
+    error_events = [
+        i.payload for i in items if i.type == "event" and "exception" in i.payload
+    ]
+    spans = [i.payload for i in items if i.type == "span"]
+
+    assert len(msg_events) == 1
+    assert len(error_events) == 1
+    assert len(spans) == 1
+
+    (msg_event,) = msg_events
+    (error_event,) = error_events
+    (span,) = spans
 
     assert msg_event["contexts"]["trace"]
     assert "trace_id" in msg_event["contexts"]["trace"]
@@ -464,12 +412,9 @@ async def test_has_trace_if_performance_enabled(
     assert error_event["contexts"]["trace"]
     assert "trace_id" in error_event["contexts"]["trace"]
 
-    assert transaction_event["contexts"]["trace"]
-    assert "trace_id" in transaction_event["contexts"]["trace"]
-
     assert (
         error_event["contexts"]["trace"]["trace_id"]
-        == transaction_event["contexts"]["trace"]["trace_id"]
+        == span["trace_id"]
         == msg_event["contexts"]["trace"]["trace_id"]
     )
 
@@ -478,7 +423,7 @@ async def test_has_trace_if_performance_enabled(
 async def test_has_trace_if_performance_disabled(
     sentry_init, aiohttp_client, capture_events
 ):
-    sentry_init(integrations=[AioHttpIntegration()])
+    sentry_init(integrations=[AioHttpIntegration()], trace_lifecycle="stream")
 
     async def hello(request):
         capture_message("It's a good day to try dividing by 0")
@@ -509,9 +454,13 @@ async def test_has_trace_if_performance_disabled(
 
 @pytest.mark.asyncio
 async def test_trace_from_headers_if_performance_enabled(
-    sentry_init, aiohttp_client, capture_events
+    sentry_init, aiohttp_client, capture_items
 ):
-    sentry_init(integrations=[AioHttpIntegration()], traces_sample_rate=1.0)
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+    )
 
     async def hello(request):
         capture_message("It's a good day to try dividing by 0")
@@ -520,22 +469,33 @@ async def test_trace_from_headers_if_performance_enabled(
     app = web.Application()
     app.router.add_get("/", hello)
 
-    events = capture_events()
+    items = capture_items("event", "span")
 
-    # The aiohttp_client is instrumented so will generate the sentry-trace header and add request.
-    # Get the sentry-trace header from the request so we can later compare with transaction events.
     client = await aiohttp_client(app)
-    with start_transaction():
-        # Headers are only added to the span if there is an active transaction
-        resp = await client.get("/")
+    resp = await client.get("/")
 
     sentry_trace_header = resp.request_info.headers.get("sentry-trace")
     trace_id = sentry_trace_header.split("-")[0]
 
     assert resp.status == 500
 
-    # Last item is the custom transaction event wrapping `client.get("/")`
-    msg_event, error_event, transaction_event, _ = events
+    sentry_sdk.flush()
+
+    msg_events = [
+        i.payload for i in items if i.type == "event" and "exception" not in i.payload
+    ]
+    error_events = [
+        i.payload for i in items if i.type == "event" and "exception" in i.payload
+    ]
+    spans = [i.payload for i in items if i.type == "span"]
+
+    assert len(msg_events) == 1
+    assert len(error_events) == 1
+    assert len(spans) == 1
+
+    (msg_event,) = msg_events
+    (error_event,) = error_events
+    (span,) = spans
 
     assert msg_event["contexts"]["trace"]
     assert "trace_id" in msg_event["contexts"]["trace"]
@@ -543,12 +503,10 @@ async def test_trace_from_headers_if_performance_enabled(
     assert error_event["contexts"]["trace"]
     assert "trace_id" in error_event["contexts"]["trace"]
 
-    assert transaction_event["contexts"]["trace"]
-    assert "trace_id" in transaction_event["contexts"]["trace"]
-
     assert msg_event["contexts"]["trace"]["trace_id"] == trace_id
     assert error_event["contexts"]["trace"]["trace_id"] == trace_id
-    assert transaction_event["contexts"]["trace"]["trace_id"] == trace_id
+
+    assert span["trace_id"] == trace_id
 
 
 @pytest.mark.asyncio
@@ -588,53 +546,6 @@ async def test_trace_from_headers_if_performance_disabled(
 
 
 @pytest.mark.asyncio
-async def test_crumb_capture(
-    sentry_init,
-    aiohttp_raw_server,
-    aiohttp_client,
-    capture_events,
-):
-    def before_breadcrumb(crumb, hint):
-        crumb["data"]["extra"] = "foo"
-        return crumb
-
-    sentry_init(
-        integrations=[AioHttpIntegration()],
-        before_breadcrumb=before_breadcrumb,
-    )
-
-    async def handler(request):
-        return web.Response(text="OK")
-
-    raw_server = await aiohttp_raw_server(handler)
-
-    with start_transaction():
-        events = capture_events()
-
-        client = await aiohttp_client(raw_server)
-        resp = await client.get("/")
-        assert resp.status == 200
-        capture_message("Testing!")
-
-        (event,) = events
-
-        crumb = event["breadcrumbs"]["values"][0]
-        assert crumb["type"] == "http"
-        assert crumb["category"] == "httplib"
-        assert crumb["data"] == ApproxDict(
-            {
-                "url": "http://127.0.0.1:{}/".format(raw_server.port),
-                "http.fragment": "",
-                "http.method": "GET",
-                "http.query": "",
-                "http.response.status_code": 200,
-                "reason": "OK",
-                "extra": "foo",
-            }
-        )
-
-
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "pii_options,url_expected,query_expected",
     [
@@ -665,7 +576,7 @@ async def test_crumb_capture(
         ),
     ],
 )
-async def test_crumb_capture_span_streaming(
+async def test_crumb_capture(
     sentry_init,
     aiohttp_raw_server,
     aiohttp_client,
@@ -723,60 +634,6 @@ async def test_crumb_capture_span_streaming(
 
 
 @pytest.mark.parametrize(
-    "status_code,level",
-    [
-        (200, None),
-        (301, None),
-        (403, "warning"),
-        (405, "warning"),
-        (500, "error"),
-    ],
-)
-@pytest.mark.asyncio
-async def test_crumb_capture_client_error(
-    sentry_init,
-    aiohttp_raw_server,
-    aiohttp_client,
-    capture_events,
-    status_code,
-    level,
-):
-    sentry_init(integrations=[AioHttpIntegration()])
-
-    async def handler(request):
-        return web.Response(status=status_code)
-
-    raw_server = await aiohttp_raw_server(handler)
-
-    with start_transaction():
-        events = capture_events()
-
-        client = await aiohttp_client(raw_server)
-        resp = await client.get("/")
-        assert resp.status == status_code
-        capture_message("Testing!")
-
-        (event,) = events
-
-        crumb = event["breadcrumbs"]["values"][0]
-        assert crumb["type"] == "http"
-        if level is None:
-            assert "level" not in crumb
-        else:
-            assert crumb["level"] == level
-        assert crumb["category"] == "httplib"
-        assert crumb["data"] == ApproxDict(
-            {
-                "url": "http://127.0.0.1:{}/".format(raw_server.port),
-                "http.fragment": "",
-                "http.method": "GET",
-                "http.query": "",
-                "http.response.status_code": status_code,
-            }
-        )
-
-
-@pytest.mark.parametrize(
     "status_code,level,reason",
     [
         (200, None, "OK"),
@@ -817,7 +674,7 @@ async def test_crumb_capture_client_error(
     ],
 )
 @pytest.mark.asyncio
-async def test_crumb_capture_client_error_span_streaming(
+async def test_crumb_capture_client_error(
     sentry_init,
     aiohttp_raw_server,
     aiohttp_client,
@@ -875,43 +732,13 @@ async def test_crumb_capture_client_error_span_streaming(
 
 
 @pytest.mark.asyncio
-async def test_outgoing_trace_headers(sentry_init, aiohttp_raw_server, aiohttp_client):
-    sentry_init(
-        integrations=[AioHttpIntegration()],
-        traces_sample_rate=1.0,
-    )
-
-    async def handler(request):
-        return web.Response(text="OK")
-
-    raw_server = await aiohttp_raw_server(handler)
-
-    with start_transaction(
-        name="/interactions/other-dogs/new-dog",
-        op="greeting.sniff",
-        # make trace_id difference between transactions
-        trace_id="0123456789012345678901234567890",
-    ) as transaction:
-        client = await aiohttp_client(raw_server)
-        resp = await client.get("/")
-        request_span = transaction._span_recorder.spans[-1]
-
-        assert resp.request_info.headers[
-            "sentry-trace"
-        ] == "{trace_id}-{parent_span_id}-{sampled}".format(
-            trace_id=transaction.trace_id,
-            parent_span_id=request_span.span_id,
-            sampled=1,
-        )
-
-
-@pytest.mark.asyncio
 async def test_outgoing_trace_headers_append_to_baggage(
     sentry_init, aiohttp_raw_server, aiohttp_client
 ):
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         release="d08ebdb9309e1b004c6f52202de58a09c2268e42",
     )
 
@@ -921,18 +748,16 @@ async def test_outgoing_trace_headers_append_to_baggage(
     raw_server = await aiohttp_raw_server(handler)
 
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=500000):
-        with start_transaction(
+        with sentry_sdk.traces.start_span(
             name="/interactions/other-dogs/new-dog",
-            op="greeting.sniff",
-            trace_id="0123456789012345678901234567890",
         ):
             client = await aiohttp_client(raw_server)
             resp = await client.get("/", headers={"bagGage": "custom=value"})
 
-            assert (
-                resp.request_info.headers["baggage"]
-                == "custom=value,sentry-trace_id=0123456789012345678901234567890,sentry-sample_rand=0.500000,sentry-environment=production,sentry-release=d08ebdb9309e1b004c6f52202de58a09c2268e42,sentry-transaction=/interactions/other-dogs/new-dog,sentry-sample_rate=1.0,sentry-sampled=true"
-            )
+            baggage = resp.request_info.headers["baggage"]
+            assert baggage.startswith("custom=value,")
+            assert "sentry-sample_rand=0.500000" in baggage
+            assert "sentry-sampled=true" in baggage
 
 
 @pytest.mark.asyncio
@@ -940,16 +765,15 @@ async def test_request_source_disabled(
     sentry_init,
     aiohttp_raw_server,
     aiohttp_client,
-    capture_events,
+    capture_items,
 ):
-    sentry_options = {
-        "integrations": [AioHttpIntegration()],
-        "traces_sample_rate": 1.0,
-        "enable_http_request_source": False,
-        "http_request_source_threshold_ms": 0,
-    }
-
-    sentry_init(**sentry_options)
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        enable_http_request_source=False,
+        http_request_source_threshold_ms=0,
+    )
 
     # server for making span request
     async def handler(request):
@@ -965,22 +789,21 @@ async def test_request_source_disabled(
     app = web.Application()
     app.router.add_get(r"/", hello)
 
-    events = capture_events()
+    items = capture_items("span")
 
     client = await aiohttp_client(app)
     await client.get("/")
 
-    (event,) = events
+    sentry_sdk.flush()
 
-    span = event["spans"][-1]
-    assert span["description"].startswith("GET")
+    (span, segment) = [item.payload for item in items]
 
-    data = span.get("data", {})
+    assert span["name"].startswith("GET")
 
-    assert SPANDATA.CODE_LINENO not in data
-    assert SPANDATA.CODE_NAMESPACE not in data
-    assert SPANDATA.CODE_FILEPATH not in data
-    assert SPANDATA.CODE_FUNCTION not in data
+    assert SPANDATA.CODE_LINENO not in span["attributes"]
+    assert SPANDATA.CODE_NAMESPACE not in span["attributes"]
+    assert SPANDATA.CODE_FILEPATH not in span["attributes"]
+    assert SPANDATA.CODE_FUNCTION not in span["attributes"]
 
 
 @pytest.mark.asyncio
@@ -989,18 +812,20 @@ async def test_request_source_enabled(
     sentry_init,
     aiohttp_raw_server,
     aiohttp_client,
-    capture_events,
+    capture_items,
     enable_http_request_source,
 ):
-    sentry_options = {
-        "integrations": [AioHttpIntegration()],
-        "traces_sample_rate": 1.0,
-        "http_request_source_threshold_ms": 0,
-    }
+    extra_options = {}
     if enable_http_request_source is not None:
-        sentry_options["enable_http_request_source"] = enable_http_request_source
+        extra_options["enable_http_request_source"] = enable_http_request_source
 
-    sentry_init(**sentry_options)
+    sentry_init(
+        integrations=[AioHttpIntegration()],
+        traces_sample_rate=1.0,
+        trace_lifecycle="stream",
+        http_request_source_threshold_ms=0,
+        **extra_options,
+    )
 
     # server for making span request
     async def handler(request):
@@ -1016,31 +841,31 @@ async def test_request_source_enabled(
     app = web.Application()
     app.router.add_get(r"/", hello)
 
-    events = capture_events()
+    items = capture_items("span")
 
     client = await aiohttp_client(app)
     await client.get("/")
 
-    (event,) = events
+    sentry_sdk.flush()
 
-    span = event["spans"][-1]
-    assert span["description"].startswith("GET")
+    (span, segment) = [item.payload for item in items]
 
-    data = span.get("data", {})
+    assert span["name"].startswith("GET")
 
-    assert SPANDATA.CODE_LINENO in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FILEPATH in data
-    assert SPANDATA.CODE_FUNCTION in data
+    assert "code.line.number" in span["attributes"]
+    assert "code.namespace" in span["attributes"]
+    assert "code.file.path" in span["attributes"]
+    assert "code.function" in span["attributes"]
 
 
 @pytest.mark.asyncio
 async def test_request_source(
-    sentry_init, aiohttp_raw_server, aiohttp_client, capture_events
+    sentry_init, aiohttp_raw_server, aiohttp_client, capture_items
 ):
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
     )
@@ -1059,41 +884,41 @@ async def test_request_source(
     app = web.Application()
     app.router.add_get(r"/", handler_with_outgoing_request)
 
-    events = capture_events()
+    items = capture_items("span")
 
     client = await aiohttp_client(app)
     await client.get("/")
 
-    (event,) = events
+    sentry_sdk.flush()
 
-    span = event["spans"][-1]
-    assert span["description"].startswith("GET")
+    (span, segment) = [item.payload for item in items]
 
-    data = span.get("data", {})
+    assert span["name"].startswith("GET")
 
-    assert SPANDATA.CODE_LINENO in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FILEPATH in data
-    assert SPANDATA.CODE_FUNCTION in data
+    assert "code.line.number" in span["attributes"]
+    assert "code.namespace" in span["attributes"]
+    assert "code.file.path" in span["attributes"]
+    assert "code.function" in span["attributes"]
 
-    assert type(data.get(SPANDATA.CODE_LINENO)) == int
-    assert data.get(SPANDATA.CODE_LINENO) > 0
+    assert type(span["attributes"]["code.line.number"]) == int
+    assert span["attributes"]["code.line.number"] > 0
     assert (
-        data.get(SPANDATA.CODE_NAMESPACE) == "tests.integrations.aiohttp.test_aiohttp"
+        span["attributes"]["code.namespace"]
+        == "tests.integrations.aiohttp.test_aiohttp"
     )
-    assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+    assert span["attributes"]["code.file.path"].endswith(
         "tests/integrations/aiohttp/test_aiohttp.py"
     )
 
-    is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+    is_relative_path = span["attributes"]["code.file.path"][0] != os.sep
     assert is_relative_path
 
-    assert data.get(SPANDATA.CODE_FUNCTION) == "handler_with_outgoing_request"
+    assert span["attributes"]["code.function"] == "handler_with_outgoing_request"
 
 
 @pytest.mark.asyncio
 async def test_request_source_with_module_in_search_path(
-    sentry_init, aiohttp_raw_server, aiohttp_client, capture_events
+    sentry_init, aiohttp_raw_server, aiohttp_client, capture_items
 ):
     """
     Test that request source is relative to the path of the module it ran in
@@ -1101,6 +926,7 @@ async def test_request_source_with_module_in_search_path(
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         enable_http_request_source=True,
         http_request_source_threshold_ms=0,
     )
@@ -1121,43 +947,43 @@ async def test_request_source_with_module_in_search_path(
     app = web.Application()
     app.router.add_get(r"/", handler_with_outgoing_request)
 
-    events = capture_events()
+    items = capture_items("span")
 
     client = await aiohttp_client(app)
     await client.get("/")
 
-    (event,) = events
+    sentry_sdk.flush()
 
-    span = event["spans"][-1]
-    assert span["description"].startswith("GET")
+    (span, segment) = [item.payload for item in items]
 
-    data = span.get("data", {})
+    assert span["name"].startswith("GET")
 
-    assert SPANDATA.CODE_LINENO in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FILEPATH in data
-    assert SPANDATA.CODE_FUNCTION in data
+    assert "code.line.number" in span["attributes"]
+    assert "code.namespace" in span["attributes"]
+    assert "code.file.path" in span["attributes"]
+    assert "code.function" in span["attributes"]
 
-    assert type(data.get(SPANDATA.CODE_LINENO)) == int
-    assert data.get(SPANDATA.CODE_LINENO) > 0
-    assert data.get(SPANDATA.CODE_NAMESPACE) == "aiohttp_helpers.helpers"
-    assert data.get(SPANDATA.CODE_FILEPATH) == "aiohttp_helpers/helpers.py"
+    assert type(span["attributes"]["code.line.number"]) == int
+    assert span["attributes"]["code.line.number"] > 0
+    assert span["attributes"]["code.namespace"] == "aiohttp_helpers.helpers"
+    assert span["attributes"]["code.file.path"] == "aiohttp_helpers/helpers.py"
 
-    is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+    is_relative_path = span["attributes"]["code.file.path"][0] != os.sep
     assert is_relative_path
 
-    assert data.get(SPANDATA.CODE_FUNCTION) == "get_request_with_client"
+    assert span["attributes"]["code.function"] == "get_request_with_client"
 
 
 @pytest.mark.asyncio
 async def test_no_request_source_if_duration_too_short(
-    sentry_init, aiohttp_raw_server, aiohttp_client, capture_events
+    sentry_init, aiohttp_raw_server, aiohttp_client, capture_items
 ):
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         enable_http_request_source=True,
-        http_request_source_threshold_ms=100,
+        http_request_source_threshold_ms=10**10,
     )
 
     # server for making span request
@@ -1174,49 +1000,36 @@ async def test_no_request_source_if_duration_too_short(
     app = web.Application()
     app.router.add_get(r"/", handler_with_outgoing_request)
 
-    events = capture_events()
+    items = capture_items("span")
 
-    def fake_create_trace_context(*args, **kwargs):
-        trace_context = create_trace_config()
+    client = await aiohttp_client(app)
+    await client.get("/")
 
-        async def overwrite_timestamps(session, trace_config_ctx, params):
-            span = trace_config_ctx._sentry_span
-            span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
-            span.timestamp = datetime.datetime(2024, 1, 1, microsecond=99999)
+    sentry_sdk.flush()
 
-        trace_context.on_request_end.insert(0, overwrite_timestamps)
+    (
+        span,
+        segment,
+    ) = [item.payload for item in items]
 
-        return trace_context
+    assert span["name"].startswith("GET")
 
-    with mock.patch(
-        "sentry_sdk.integrations.aiohttp.create_trace_config",
-        fake_create_trace_context,
-    ):
-        client = await aiohttp_client(app)
-        await client.get("/")
-
-    (event,) = events
-
-    span = event["spans"][-1]
-    assert span["description"].startswith("GET")
-
-    data = span.get("data", {})
-
-    assert SPANDATA.CODE_LINENO not in data
-    assert SPANDATA.CODE_NAMESPACE not in data
-    assert SPANDATA.CODE_FILEPATH not in data
-    assert SPANDATA.CODE_FUNCTION not in data
+    assert SPANDATA.CODE_LINENO not in span["attributes"]
+    assert SPANDATA.CODE_NAMESPACE not in span["attributes"]
+    assert SPANDATA.CODE_FILEPATH not in span["attributes"]
+    assert SPANDATA.CODE_FUNCTION not in span["attributes"]
 
 
 @pytest.mark.asyncio
 async def test_request_source_if_duration_over_threshold(
-    sentry_init, aiohttp_raw_server, aiohttp_client, capture_events
+    sentry_init, aiohttp_raw_server, aiohttp_client, capture_items
 ):
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
+        trace_lifecycle="stream",
         enable_http_request_source=True,
-        http_request_source_threshold_ms=100,
+        http_request_source_threshold_ms=0,
     )
 
     # server for making span request
@@ -1233,52 +1046,36 @@ async def test_request_source_if_duration_over_threshold(
     app = web.Application()
     app.router.add_get(r"/", handler_with_outgoing_request)
 
-    events = capture_events()
+    items = capture_items("span")
 
-    def fake_create_trace_context(*args, **kwargs):
-        trace_context = create_trace_config()
+    client = await aiohttp_client(app)
+    await client.get("/")
 
-        async def overwrite_timestamps(session, trace_config_ctx, params):
-            span = trace_config_ctx._sentry_span
-            span.start_timestamp = datetime.datetime(2024, 1, 1, microsecond=0)
-            span.timestamp = datetime.datetime(2024, 1, 1, microsecond=100001)
+    sentry_sdk.flush()
 
-        trace_context.on_request_end.insert(0, overwrite_timestamps)
+    (span, segment) = [item.payload for item in items]
 
-        return trace_context
+    assert span["name"].startswith("GET")
 
-    with mock.patch(
-        "sentry_sdk.integrations.aiohttp.create_trace_config",
-        fake_create_trace_context,
-    ):
-        client = await aiohttp_client(app)
-        await client.get("/")
+    assert "code.line.number" in span["attributes"]
+    assert "code.namespace" in span["attributes"]
+    assert "code.file.path" in span["attributes"]
+    assert "code.function" in span["attributes"]
 
-    (event,) = events
-
-    span = event["spans"][-1]
-    assert span["description"].startswith("GET")
-
-    data = span.get("data", {})
-
-    assert SPANDATA.CODE_LINENO in data
-    assert SPANDATA.CODE_NAMESPACE in data
-    assert SPANDATA.CODE_FILEPATH in data
-    assert SPANDATA.CODE_FUNCTION in data
-
-    assert type(data.get(SPANDATA.CODE_LINENO)) == int
-    assert data.get(SPANDATA.CODE_LINENO) > 0
+    assert type(span["attributes"]["code.line.number"]) == int
+    assert span["attributes"]["code.line.number"] > 0
     assert (
-        data.get(SPANDATA.CODE_NAMESPACE) == "tests.integrations.aiohttp.test_aiohttp"
+        span["attributes"]["code.namespace"]
+        == "tests.integrations.aiohttp.test_aiohttp"
     )
-    assert data.get(SPANDATA.CODE_FILEPATH).endswith(
+    assert span["attributes"]["code.file.path"].endswith(
         "tests/integrations/aiohttp/test_aiohttp.py"
     )
 
-    is_relative_path = data.get(SPANDATA.CODE_FILEPATH)[0] != os.sep
+    is_relative_path = span["attributes"]["code.file.path"][0] != os.sep
     assert is_relative_path
 
-    assert data.get(SPANDATA.CODE_FUNCTION) == "handler_with_outgoing_request"
+    assert span["attributes"]["code.function"] == "handler_with_outgoing_request"
 
 
 @pytest.mark.asyncio
@@ -1286,10 +1083,11 @@ async def test_span_origin(
     sentry_init,
     aiohttp_raw_server,
     aiohttp_client,
-    capture_events,
+    capture_items,
 ):
     sentry_init(
         integrations=[AioHttpIntegration()],
+        trace_lifecycle="stream",
         traces_sample_rate=1.0,
     )
 
@@ -1307,14 +1105,16 @@ async def test_span_origin(
     app = web.Application()
     app.router.add_get(r"/", hello)
 
-    events = capture_events()
+    items = capture_items("span")
 
     client = await aiohttp_client(app)
     await client.get("/")
 
-    (event,) = events
-    assert event["contexts"]["trace"]["origin"] == "auto.http.aiohttp"
-    assert event["spans"][0]["origin"] == "auto.http.aiohttp"
+    sentry_sdk.flush()
+
+    (span, segment) = [item.payload for item in items]
+    assert span["attributes"]["sentry.origin"] == "auto.http.aiohttp"
+    assert segment["attributes"]["sentry.origin"] == "auto.http.aiohttp"
 
 
 @pytest.mark.parametrize(
@@ -1434,9 +1234,7 @@ async def test_failed_request_status_codes_non_http_exception(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("send_pii", [True, False])
-async def test_tracing_span_streaming(
-    sentry_init, aiohttp_client, capture_items, send_pii
-):
+async def test_tracing(sentry_init, aiohttp_client, capture_items, send_pii):
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
@@ -1468,7 +1266,7 @@ async def test_tracing_span_streaming(
     assert server_span["is_segment"] is True
     assert (
         server_span["name"]
-        == "tests.integrations.aiohttp.test_aiohttp.test_tracing_span_streaming.<locals>.hello"
+        == "tests.integrations.aiohttp.test_aiohttp.test_tracing.<locals>.hello"
     )
     assert server_span["attributes"]["sentry.op"] == "http.server"
     assert server_span["attributes"]["sentry.origin"] == "auto.http.aiohttp"
@@ -1506,7 +1304,7 @@ async def test_tracing_span_streaming(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("init_kwargs, expect_ip", DATA_COLLECTION_USER_INFO_CASES)
-async def test_user_address_with_data_collection_and_span_streaming(
+async def test_user_address_with_data_collection(
     sentry_init, aiohttp_client, capture_items, init_kwargs, expect_ip
 ):
     sentry_init(
@@ -1542,9 +1340,7 @@ async def test_user_address_with_data_collection_and_span_streaming(
 
 
 @pytest.mark.asyncio
-async def test_sensitive_header_scrubbing_span_streaming(
-    sentry_init, aiohttp_client, capture_items
-):
+async def test_sensitive_header_scrubbing(sentry_init, aiohttp_client, capture_items):
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
@@ -1701,7 +1497,7 @@ async def test_sensitive_header_scrubbing_span_streaming(
     ],
 )
 @pytest.mark.asyncio
-async def test_sensitive_header_passthrough_with_pii_span_streaming(
+async def test_sensitive_header_passthrough_with_pii(
     sentry_init, aiohttp_client, capture_items, options, expected, request
 ):
     sentry_init(
@@ -1755,7 +1551,7 @@ async def test_sensitive_header_passthrough_with_pii_span_streaming(
 
 
 @pytest.mark.asyncio
-async def test_sensitive_header_passthrough_with_pii_span_streaming_without_data_collection(
+async def test_sensitive_header_passthrough_with_pii_without_data_collection(
     sentry_init, aiohttp_client, capture_items
 ):
     sentry_init(
@@ -1793,7 +1589,7 @@ async def test_sensitive_header_passthrough_with_pii_span_streaming_without_data
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("send_pii", [True, False])
-async def test_url_query_attribute_span_streaming(
+async def test_url_query_attribute(
     sentry_init, aiohttp_client, capture_items, send_pii
 ):
     sentry_init(
@@ -1834,7 +1630,7 @@ async def test_url_query_attribute_span_streaming(
             "/message",
             "handler_name",
             "tests.integrations.aiohttp.test_aiohttp."
-            "test_transaction_style_span_streaming.<locals>.hello",
+            "test_transaction_style.<locals>.hello",
             "component",
         ),
         (
@@ -1845,7 +1641,7 @@ async def test_url_query_attribute_span_streaming(
         ),
     ],
 )
-async def test_transaction_style_span_streaming(
+async def test_transaction_style(
     sentry_init,
     aiohttp_client,
     capture_items,
@@ -1919,7 +1715,7 @@ async def test_http_route(
 
 
 @pytest.mark.asyncio
-async def test_server_error_span_streaming(sentry_init, aiohttp_client, capture_items):
+async def test_server_error(sentry_init, aiohttp_client, capture_items):
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
@@ -1958,9 +1754,7 @@ async def test_server_error_span_streaming(sentry_init, aiohttp_client, capture_
 
 
 @pytest.mark.asyncio
-async def test_http_exception_span_streaming(
-    sentry_init, aiohttp_client, capture_items
-):
+async def test_http_exception(sentry_init, aiohttp_client, capture_items):
     sentry_init(
         integrations=[AioHttpIntegration()],
         traces_sample_rate=1.0,
@@ -1990,7 +1784,7 @@ async def test_http_exception_span_streaming(
 
 
 @pytest.mark.asyncio
-async def test_http_exception_ok_status_not_overridden_span_streaming(
+async def test_http_exception_ok_status_not_overridden(
     sentry_init, aiohttp_client, capture_items
 ):
     sentry_init(
@@ -2023,7 +1817,7 @@ async def test_http_exception_ok_status_not_overridden_span_streaming(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("send_pii", [True, False])
-async def test_outgoing_client_span_span_streaming(
+async def test_outgoing_client_span(
     sentry_init, aiohttp_raw_server, aiohttp_client, capture_items, send_pii
 ):
     sentry_init(
@@ -2083,7 +1877,7 @@ async def test_outgoing_client_span_span_streaming(
 
 
 @pytest.mark.asyncio
-async def test_outgoing_trace_headers_span_streaming(
+async def test_outgoing_trace_headers(
     sentry_init, aiohttp_raw_server, aiohttp_client, capture_items
 ):
     sentry_init(
@@ -2228,7 +2022,7 @@ _QUERY_PARAM_DATA_COLLECTION_CASES = [
 @pytest.mark.parametrize(
     "init_kwargs, expected_query", _QUERY_PARAM_DATA_COLLECTION_CASES
 )
-async def test_server_url_query_data_collection_span_streaming(
+async def test_server_url_query_data_collection(
     sentry_init, aiohttp_client, capture_items, init_kwargs, expected_query
 ):
     init_kwargs = dict(init_kwargs)
@@ -2265,7 +2059,7 @@ async def test_server_url_query_data_collection_span_streaming(
 @pytest.mark.parametrize(
     "init_kwargs, expected_query", _QUERY_PARAM_DATA_COLLECTION_CASES
 )
-async def test_client_url_query_data_collection_span_streaming(
+async def test_client_url_query_data_collection(
     sentry_init,
     aiohttp_raw_server,
     aiohttp_client,

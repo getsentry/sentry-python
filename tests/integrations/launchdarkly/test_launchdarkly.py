@@ -1,43 +1,28 @@
 import concurrent.futures as cf
-import sys
 
 import ldclient
 import pytest
-from ldclient import LDClient
 from ldclient.config import Config
 from ldclient.context import Context
 from ldclient.integrations.test_data import TestData
 
 import sentry_sdk
-from sentry_sdk import start_span, start_transaction
 from sentry_sdk.integrations import DidNotEnable
 from sentry_sdk.integrations.launchdarkly import LaunchDarklyIntegration
-from tests.conftest import ApproxDict
 
 
-@pytest.mark.parametrize(
-    "use_global_client",
-    (False, True),
-)
-def test_launchdarkly_integration(
-    sentry_init, use_global_client, capture_events, uninstall_integration
-):
+def test_launchdarkly_integration(sentry_init, capture_events, uninstall_integration):
     td = TestData.data_source()
     td.update(td.flag("hello").variation_for_all(True))
     td.update(td.flag("world").variation_for_all(True))
-    # Disable background requests as we aren't using a server.
     config = Config(
         "sdk-key", update_processor_class=td, diagnostic_opt_out=True, send_events=False
     )
 
     uninstall_integration(LaunchDarklyIntegration.identifier)
-    if use_global_client:
-        ldclient.set_config(config)
-        sentry_init(integrations=[LaunchDarklyIntegration()])
-        client = ldclient.get()
-    else:
-        client = LDClient(config=config)
-        sentry_init(integrations=[LaunchDarklyIntegration(ld_client=client)])
+    ldclient.set_config(config)
+    sentry_init(integrations=[LaunchDarklyIntegration()])
+    client = ldclient.get()
 
     # Evaluate
     client.variation("hello", Context.create("my-org", "organization"), False)
@@ -63,18 +48,18 @@ def test_launchdarkly_integration_threaded(
     td = TestData.data_source()
     td.update(td.flag("hello").variation_for_all(True))
     td.update(td.flag("world").variation_for_all(True))
-    client = LDClient(
-        config=Config(
-            "sdk-key",
-            update_processor_class=td,
-            diagnostic_opt_out=True,  # Disable background requests as we aren't using a server.
-            send_events=False,
-        )
+    config = Config(
+        "sdk-key",
+        update_processor_class=td,
+        diagnostic_opt_out=True,  # Disable background requests as we aren't using a server.
+        send_events=False,
     )
+    ldclient.set_config(config)
+    client = ldclient.get()
     context = Context.create("user1")
 
     uninstall_integration(LaunchDarklyIntegration.identifier)
-    sentry_init(integrations=[LaunchDarklyIntegration(ld_client=client)])
+    sentry_init(integrations=[LaunchDarklyIntegration()])
     events = capture_events()
 
     def task(flag_key):
@@ -118,29 +103,29 @@ def test_launchdarkly_integration_threaded(
     }
 
 
-@pytest.mark.skipif(sys.version_info < (3, 7), reason="requires python3.7 or higher")
 def test_launchdarkly_integration_asyncio(
     sentry_init, capture_events, uninstall_integration
 ):
     """Assert concurrently evaluated flags do not pollute one another."""
+
+    uninstall_integration(LaunchDarklyIntegration.identifier)
 
     asyncio = pytest.importorskip("asyncio")
 
     td = TestData.data_source()
     td.update(td.flag("hello").variation_for_all(True))
     td.update(td.flag("world").variation_for_all(True))
-    client = LDClient(
-        config=Config(
-            "sdk-key",
-            update_processor_class=td,
-            diagnostic_opt_out=True,  # Disable background requests as we aren't using a server.
-            send_events=False,
-        )
+    config = Config(
+        "sdk-key",
+        update_processor_class=td,
+        diagnostic_opt_out=True,  # Disable background requests as we aren't using a server.
+        send_events=False,
     )
+    ldclient.set_config(config)
+    client = ldclient.get()
     context = Context.create("user1")
 
-    uninstall_integration(LaunchDarklyIntegration.identifier)
-    sentry_init(integrations=[LaunchDarklyIntegration(ld_client=client)])
+    sentry_init(integrations=[LaunchDarklyIntegration()])
     events = capture_events()
 
     async def task(flag_key):
@@ -184,10 +169,8 @@ def test_launchdarkly_integration_asyncio(
     }
 
 
-def test_launchdarkly_integration_did_not_enable(monkeypatch):
-    # Client is not passed in and set_config wasn't called.
-    # TODO: Bad practice to access internals like this. We can skip this test, or remove this
-    #  case entirely (force user to pass in a client instance).
+def test_launchdarkly_integration_did_not_enable(uninstall_integration):
+    # set_config wasn't called.
     ldclient._reset_client()
     try:
         ldclient.__lock.lock()
@@ -195,89 +178,44 @@ def test_launchdarkly_integration_did_not_enable(monkeypatch):
     finally:
         ldclient.__lock.unlock()
 
+    uninstall_integration(LaunchDarklyIntegration.identifier)
+
     with pytest.raises(DidNotEnable):
-        LaunchDarklyIntegration()
-
-    td = TestData.data_source()
-    # Disable background requests as we aren't using a server.
-    # Required because we corrupt the internal state above.
-    config = Config(
-        "sdk-key", update_processor_class=td, diagnostic_opt_out=True, send_events=False
-    )
-    # Client not initialized.
-    client = LDClient(config=config)
-    monkeypatch.setattr(client, "is_initialized", lambda: False)
-    with pytest.raises(DidNotEnable):
-        LaunchDarklyIntegration(ld_client=client)
+        sentry_sdk.init(
+            integrations=[LaunchDarklyIntegration()],
+        )
 
 
-@pytest.mark.parametrize(
-    "use_global_client",
-    (False, True),
-)
-@pytest.mark.parametrize(
-    "span_streaming",
-    [True, False],
-)
 def test_launchdarkly_span_integration(
     sentry_init,
-    use_global_client,
     capture_events,
     capture_items,
     uninstall_integration,
-    span_streaming,
 ):
     td = TestData.data_source()
     td.update(td.flag("hello").variation_for_all(True))
-    # Disable background requests as we aren't using a server.
     config = Config(
         "sdk-key", update_processor_class=td, diagnostic_opt_out=True, send_events=False
     )
 
     uninstall_integration(LaunchDarklyIntegration.identifier)
-    if use_global_client:
-        ldclient.set_config(config)
-        sentry_init(
-            traces_sample_rate=1.0,
-            integrations=[LaunchDarklyIntegration()],
-            trace_lifecycle="stream" if span_streaming else "static",
-        )
-        client = ldclient.get()
-    else:
-        client = LDClient(config=config)
-        sentry_init(
-            traces_sample_rate=1.0,
-            integrations=[LaunchDarklyIntegration(ld_client=client)],
-            trace_lifecycle="stream" if span_streaming else "static",
-        )
+    ldclient.set_config(config)
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[LaunchDarklyIntegration()],
+        trace_lifecycle="stream",
+    )
+    client = ldclient.get()
 
-    if span_streaming:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        with sentry_sdk.traces.start_span(name="bar"):
-            client.variation("hello", Context.create("my-org", "organization"), False)
-            client.variation("other", Context.create("my-org", "organization"), False)
+    with sentry_sdk.traces.start_span(name="bar"):
+        client.variation("hello", Context.create("my-org", "organization"), False)
+        client.variation("other", Context.create("my-org", "organization"), False)
 
-        sentry_sdk.flush()
+    sentry_sdk.flush()
 
-        assert len(items) == 1
-        span = items[0].payload
-        assert span["attributes"]["flag.evaluation.hello"] is True
-        assert span["attributes"]["flag.evaluation.other"] is False
-
-    else:
-        events = capture_events()
-
-        with start_transaction(name="hi"):
-            with start_span(op="foo", name="bar"):
-                client.variation(
-                    "hello", Context.create("my-org", "organization"), False
-                )
-                client.variation(
-                    "other", Context.create("my-org", "organization"), False
-                )
-
-        (event,) = events
-        assert event["spans"][0]["data"] == ApproxDict(
-            {"flag.evaluation.hello": True, "flag.evaluation.other": False}
-        )
+    assert len(items) == 1
+    span = items[0].payload
+    assert span["attributes"]["flag.evaluation.hello"] is True
+    assert span["attributes"]["flag.evaluation.other"] is False

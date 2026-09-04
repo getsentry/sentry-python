@@ -5,11 +5,14 @@ from typing import TYPE_CHECKING
 
 import sentry_sdk
 from sentry_sdk.consts import SPANDATA
-from sentry_sdk.integrations import DidNotEnable
+from sentry_sdk.integrations import DidNotEnable, _check_minimum_version
 from sentry_sdk.traces import StreamedSpan, get_current_span
 from sentry_sdk.tracing import SOURCE_FOR_STYLE, TransactionSource
-from sentry_sdk.tracing_utils import has_span_streaming_enabled
-from sentry_sdk.utils import has_data_collection_enabled, transaction_from_function
+from sentry_sdk.utils import (
+    has_data_collection_enabled,
+    parse_version,
+    transaction_from_function,
+)
 
 if TYPE_CHECKING:
     from typing import Any, Awaitable, Callable, Dict, Optional
@@ -23,12 +26,13 @@ try:
         _get_cached_request_body_attribute,
     )
 except DidNotEnable:
-    raise DidNotEnable("Starlette is not installed")
+    raise DidNotEnable("Starlette is not installed or incompatible")
 
 try:
     import fastapi  # type: ignore
+    from fastapi import __version__ as FASTAPI_VERSION
 except ImportError:
-    raise DidNotEnable("FastAPI is not installed")
+    raise DidNotEnable("FastAPI is not installed or incompatible")
 
 
 _DEFAULT_TRANSACTION_NAME = "generic FastAPI request"
@@ -46,6 +50,9 @@ class FastApiIntegration(StarletteIntegration):
 
     @staticmethod
     def setup_once() -> None:
+        version = parse_version(FASTAPI_VERSION)
+        _check_minimum_version(FastApiIntegration, version)
+
         patch_get_request_handler()
 
 
@@ -195,22 +202,11 @@ def patch_get_request_handler() -> None:
 
             @wraps(old_call)
             def _sentry_call(*args: "Any", **kwargs: "Any") -> "Any":
-                current_scope = sentry_sdk.get_current_scope()
+                current_span = sentry_sdk.traces.get_current_span()
 
-                client = sentry_sdk.get_client()
-                if has_span_streaming_enabled(client.options):
-                    current_span = current_scope.streamed_span
-
-                    if type(current_span) is StreamedSpan:
-                        segment = current_span._segment
-                        segment._update_active_thread()
-
-                elif current_scope.transaction is not None:
-                    current_scope.transaction.update_active_thread()
-
-                sentry_scope = sentry_sdk.get_isolation_scope()
-                if sentry_scope.profile is not None:
-                    sentry_scope.profile.update_active_thread_id()
+                if type(current_span) is StreamedSpan:
+                    segment = current_span._segment
+                    segment._update_active_thread()
 
                 return old_call(*args, **kwargs)
 
