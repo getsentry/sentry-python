@@ -259,57 +259,6 @@ def _extract_text_from_content_blocks(content_blocks: "Any") -> "Any":
     return " ".join(texts) if texts else content_blocks
 
 
-def _extract_handler_data_from_args(
-    handler_type: str,
-    original_args: "tuple[Any, ...]",
-    original_kwargs: "Optional[dict[str, Any]]" = None,
-) -> "tuple[str, dict[str, Any]]":
-    """
-    Extract handler name and arguments from v1 positional args.
-
-    In MCP SDK v1, handlers receive positional args:
-    - Tool: (tool_name, arguments)
-    - Prompt: (name, arguments)
-    - Resource: (uri,)
-    """
-    original_kwargs = original_kwargs or {}
-
-    if handler_type == "tool":
-        if original_args:
-            handler_name = original_args[0]
-        elif original_kwargs.get("name"):
-            handler_name = original_kwargs["name"]
-
-        arguments = {}
-        if len(original_args) > 1:
-            arguments = original_args[1]
-        elif original_kwargs.get("arguments"):
-            arguments = original_kwargs["arguments"]
-
-    elif handler_type == "prompt":
-        if original_args:
-            handler_name = original_args[0]
-        elif original_kwargs.get("name"):
-            handler_name = original_kwargs["name"]
-
-        arguments = {}
-        if len(original_args) > 1:
-            arguments = original_args[1]
-        elif original_kwargs.get("arguments"):
-            arguments = original_kwargs["arguments"]
-
-    else:  # resource
-        handler_name = "unknown"
-        if original_args:
-            handler_name = str(original_args[0])
-        elif original_kwargs.get("uri"):
-            handler_name = str(original_kwargs["uri"])
-
-        arguments = {}
-
-    return handler_name, arguments
-
-
 async def _tool_handler_wrapper(
     func: "Callable[..., Awaitable[Union[CallToolResult, InputRequiredResult]]]",
     original_args: "tuple[Any, ...]",
@@ -329,12 +278,18 @@ async def _tool_handler_wrapper(
     """
     client = sentry_sdk.get_client()
 
-    if original_kwargs is None:
-        original_kwargs = {}
+    original_kwargs = original_kwargs or {}
 
-    handler_name, arguments = _extract_handler_data_from_args(
-        "tool", original_args, original_kwargs
-    )
+    if original_args:
+        handler_name = original_args[0]
+    elif original_kwargs.get("name"):
+        handler_name = original_kwargs["name"]
+
+    arguments = {}
+    if len(original_args) > 1:
+        arguments = original_args[1]
+    elif original_kwargs.get("arguments"):
+        arguments = original_kwargs["arguments"]
 
     if has_data_collection_enabled(client.options):
         if not client.options["data_collection"]["gen_ai"]["inputs"]:
@@ -549,13 +504,20 @@ async def _prompt_handler_wrapper(
         original_kwargs: Original keyword arguments passed to the handler
         self: Optional instance for bound methods
     """
-    if original_kwargs is None:
-        original_kwargs = {}
-
     client = sentry_sdk.get_client()
-    handler_name, arguments = _extract_handler_data_from_args(
-        "prompt", original_args, original_kwargs
-    )
+
+    original_kwargs = original_kwargs or {}
+
+    if original_args:
+        handler_name = original_args[0]
+    elif original_kwargs.get("name"):
+        handler_name = original_kwargs["name"]
+
+    arguments = {}
+    if len(original_args) > 1:
+        arguments = original_args[1]
+    elif original_kwargs.get("arguments"):
+        arguments = original_kwargs["arguments"]
 
     if has_data_collection_enabled(client.options):
         if not client.options["data_collection"]["gen_ai"]["inputs"]:
@@ -847,12 +809,15 @@ async def _resource_handler_wrapper(
         original_kwargs: Original keyword arguments passed to the handler
         self: Optional instance for bound methods
     """
-    if original_kwargs is None:
-        original_kwargs = {}
+    original_kwargs = original_kwargs or {}
 
-    handler_name, arguments = _extract_handler_data_from_args(
-        "resource", original_args, original_kwargs
-    )
+    handler_name = "unknown"
+    if original_args:
+        handler_name = str(original_args[0])
+    elif original_kwargs.get("uri"):
+        handler_name = str(original_kwargs["uri"])
+
+    arguments = {}
 
     ctx = None
     try:
