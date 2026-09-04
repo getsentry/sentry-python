@@ -138,7 +138,6 @@ class CommandTracer(monitoring.CommandListener):
 
             collection_name = command.get(event.command_name)
             operation_name = event.command_name
-            db_name = event.database_name
 
             if has_data_collection_enabled(client.options):
                 if not client.options["data_collection"]["database_query_data"]:
@@ -149,7 +148,6 @@ class CommandTracer(monitoring.CommandListener):
             query = json.dumps(command, default=str)
 
             data = {
-                "db.namespace": db_name,
                 "db.operation.name": operation_name,
                 "db.collection.name": collection_name,
                 SPANDATA.DB_QUERY_TEXT: query,

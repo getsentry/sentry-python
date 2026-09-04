@@ -82,6 +82,7 @@ def test_segment(sentry_init, capture_items, mongo_server, with_pii):
             pytest.fail("Request should raise")
         except Exception:
             pass
+
     sentry_sdk.flush()
 
     spans = [item.payload for item in items]
