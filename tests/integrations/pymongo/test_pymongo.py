@@ -3,7 +3,7 @@ from mockupdb import MockupDB, OpQuery
 from pymongo import MongoClient
 
 import sentry_sdk
-from sentry_sdk import capture_message, start_transaction
+from sentry_sdk import capture_message
 from sentry_sdk.consts import SPANDATA
 from sentry_sdk.integrations.pymongo import PyMongoIntegration, _strip_pii
 
@@ -23,81 +23,6 @@ def mongo_server():
     server.autoresponds({"insert": "erroneous"}, ok=0, errmsg="test error")
     yield server
     server.stop()
-
-
-@pytest.mark.parametrize("with_pii", [False, True])
-def test_transactions(sentry_init, capture_events, mongo_server, with_pii):
-    sentry_init(
-        integrations=[PyMongoIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=with_pii,
-    )
-    events = capture_events()
-
-    connection = MongoClient(mongo_server.uri)
-
-    with start_transaction():
-        list(
-            connection["test_db"]["test_collection"].find({"foobar": 1})
-        )  # force query execution
-        connection["test_db"]["test_collection"].insert_one({"foo": 2})
-        try:
-            connection["test_db"]["erroneous"].insert_many([{"bar": 3}, {"baz": 4}])
-            pytest.fail("Request should raise")
-        except Exception:
-            pass
-
-    (event,) = events
-    (find, insert_success, insert_fail) = event["spans"]
-
-    common_tags = {
-        "db.name": "test_db",
-        "db.system": "mongodb",
-        "db.driver.name": "pymongo",
-        "net.peer.name": mongo_server.host,
-        "net.peer.port": str(mongo_server.port),
-    }
-    for span in find, insert_success, insert_fail:
-        assert span["data"][SPANDATA.DB_SYSTEM] == "mongodb"
-        assert span["data"][SPANDATA.DB_DRIVER_NAME] == "pymongo"
-        assert span["data"][SPANDATA.DB_NAME] == "test_db"
-        assert span["data"][SPANDATA.SERVER_ADDRESS] == "localhost"
-        assert span["data"][SPANDATA.SERVER_PORT] == mongo_server.port
-        for field, value in common_tags.items():
-            assert span["data"][field] == value
-
-    assert find["op"] == "db"
-    assert insert_success["op"] == "db"
-    assert insert_fail["op"] == "db"
-
-    assert find["data"]["db.operation"] == "find"
-    assert insert_success["data"]["db.operation"] == "insert"
-    assert insert_fail["data"]["db.operation"] == "insert"
-
-    assert find["description"].startswith('{"find')
-    assert insert_success["description"].startswith('{"insert')
-    assert insert_fail["description"].startswith('{"insert')
-
-    assert find["data"][SPANDATA.DB_MONGODB_COLLECTION] == "test_collection"
-    assert insert_success["data"][SPANDATA.DB_MONGODB_COLLECTION] == "test_collection"
-    assert insert_fail["data"][SPANDATA.DB_MONGODB_COLLECTION] == "erroneous"
-    if with_pii:
-        assert "1" in find["description"]
-        assert "2" in insert_success["description"]
-        assert "3" in insert_fail["description"] and "4" in insert_fail["description"]
-    else:
-        # All values in filter replaced by "%s"
-        assert "1" not in find["description"]
-        # All keys below top level replaced by "%s"
-        assert "2" not in insert_success["description"]
-        assert (
-            "3" not in insert_fail["description"]
-            and "4" not in insert_fail["description"]
-        )
-
-    assert find["status"] == "ok"
-    assert insert_success["status"] == "ok"
-    assert insert_fail["status"] == "internal_error"
 
 
 DATA_COLLECTION_DATABASE_QUERY_DATA_USE_CASES = [
@@ -135,54 +60,8 @@ DATA_COLLECTION_DATABASE_QUERY_DATA_USE_CASES = [
 ]
 
 
-@pytest.mark.parametrize(
-    "init_kwargs,expect_query_values", DATA_COLLECTION_DATABASE_QUERY_DATA_USE_CASES
-)
-def test_transactions_with_data_collection(
-    sentry_init, capture_events, mongo_server, init_kwargs, expect_query_values
-):
-    sentry_init(
-        integrations=[PyMongoIntegration()],
-        traces_sample_rate=1.0,
-        **init_kwargs,
-    )
-    events = capture_events()
-
-    connection = MongoClient(mongo_server.uri)
-
-    with start_transaction():
-        list(
-            connection["test_db"]["test_collection"].find({"foobar": 1})
-        )  # force query execution
-        connection["test_db"]["test_collection"].insert_one({"foo": 2})
-        try:
-            connection["test_db"]["erroneous"].insert_many([{"bar": 3}, {"baz": 4}])
-            pytest.fail("Request should raise")
-        except Exception:
-            pass
-
-    (event,) = events
-    (find, insert_success, insert_fail) = event["spans"]
-
-    assert find["description"].startswith('{"find')
-    assert insert_success["description"].startswith('{"insert')
-    assert insert_fail["description"].startswith('{"insert')
-
-    if expect_query_values:
-        assert "1" in find["description"]
-        assert "2" in insert_success["description"]
-        assert "3" in insert_fail["description"] and "4" in insert_fail["description"]
-    else:
-        assert "1" not in find["description"]
-        assert "2" not in insert_success["description"]
-        assert (
-            "3" not in insert_fail["description"]
-            and "4" not in insert_fail["description"]
-        )
-
-
 @pytest.mark.parametrize("with_pii", [False, True])
-def test_segment_span_streaming(sentry_init, capture_items, mongo_server, with_pii):
+def test_segment(sentry_init, capture_items, mongo_server, with_pii):
     sentry_init(
         integrations=[PyMongoIntegration()],
         traces_sample_rate=1.0,
@@ -253,7 +132,7 @@ def test_segment_span_streaming(sentry_init, capture_items, mongo_server, with_p
 @pytest.mark.parametrize(
     "init_kwargs,expect_query_values", DATA_COLLECTION_DATABASE_QUERY_DATA_USE_CASES
 )
-def test_segment_span_streaming_with_data_collection(
+def test_segment_with_data_collection(
     sentry_init, capture_items, mongo_server, init_kwargs, expect_query_values
 ):
     sentry_init(
@@ -302,76 +181,7 @@ def test_segment_span_streaming_with_data_collection(
 
 
 @pytest.mark.parametrize("with_pii", [False, True])
-def test_breadcrumbs(sentry_init, capture_events, mongo_server, with_pii):
-    sentry_init(
-        integrations=[PyMongoIntegration()],
-        traces_sample_rate=1.0,
-        send_default_pii=with_pii,
-    )
-    events = capture_events()
-
-    connection = MongoClient(mongo_server.uri)
-
-    list(
-        connection["test_db"]["test_collection"].find({"foobar": 1})
-    )  # force query execution
-    capture_message("hi")
-
-    (event,) = events
-    (crumb,) = event["breadcrumbs"]["values"]
-
-    assert crumb["category"] == "query"
-    assert crumb["message"].startswith('{"find')
-    if with_pii:
-        assert "1" in crumb["message"]
-    else:
-        assert "1" not in crumb["message"]
-    assert crumb["type"] == "db"
-    assert crumb["data"] == {
-        "db.name": "test_db",
-        "db.system": "mongodb",
-        "db.driver.name": "pymongo",
-        "db.operation": "find",
-        "net.peer.name": mongo_server.host,
-        "net.peer.port": str(mongo_server.port),
-        "db.mongodb.collection": "test_collection",
-    }
-
-
-@pytest.mark.parametrize(
-    "init_kwargs,expect_query_values", DATA_COLLECTION_DATABASE_QUERY_DATA_USE_CASES
-)
-def test_breadcrumbs_with_data_collection(
-    sentry_init, capture_events, mongo_server, init_kwargs, expect_query_values
-):
-    sentry_init(
-        integrations=[PyMongoIntegration()],
-        traces_sample_rate=1.0,
-        **init_kwargs,
-    )
-    events = capture_events()
-
-    connection = MongoClient(mongo_server.uri)
-
-    list(
-        connection["test_db"]["test_collection"].find({"foobar": 1})
-    )  # force query execution
-    capture_message("hi")
-
-    (event,) = events
-    (crumb,) = event["breadcrumbs"]["values"]
-
-    assert crumb["category"] == "query"
-    assert crumb["message"].startswith('{"find')
-    if expect_query_values:
-        assert "1" in crumb["message"]
-    else:
-        assert "1" not in crumb["message"]
-    assert crumb["type"] == "db"
-
-
-@pytest.mark.parametrize("with_pii", [False, True])
-def test_breadcrumbs_span_streaming(sentry_init, capture_items, mongo_server, with_pii):
+def test_breadcrumbs(sentry_init, capture_items, mongo_server, with_pii):
     sentry_init(
         integrations=[PyMongoIntegration()],
         traces_sample_rate=1.0,
@@ -414,7 +224,7 @@ def test_breadcrumbs_span_streaming(sentry_init, capture_items, mongo_server, wi
 @pytest.mark.parametrize(
     "init_kwargs,expect_query_values", DATA_COLLECTION_DATABASE_QUERY_DATA_USE_CASES
 )
-def test_breadcrumbs_span_streaming_with_data_collection(
+def test_breadcrumbs_with_data_collection(
     sentry_init, capture_items, mongo_server, init_kwargs, expect_query_values
 ):
     sentry_init(
@@ -741,27 +551,7 @@ def test_strip_pii(testcase):
     assert _strip_pii(testcase["command"]) == testcase["command_stripped"]
 
 
-def test_span_origin(sentry_init, capture_events, mongo_server):
-    sentry_init(
-        integrations=[PyMongoIntegration()],
-        traces_sample_rate=1.0,
-    )
-    events = capture_events()
-
-    connection = MongoClient(mongo_server.uri)
-
-    with start_transaction():
-        list(
-            connection["test_db"]["test_collection"].find({"foobar": 1})
-        )  # force query execution
-
-    (event,) = events
-
-    assert event["contexts"]["trace"]["origin"] == "manual"
-    assert event["spans"][0]["origin"] == "auto.db.pymongo"
-
-
-def test_span_origin_span_streaming(sentry_init, capture_items, mongo_server):
+def test_span_origin(sentry_init, capture_items, mongo_server):
     sentry_init(
         integrations=[PyMongoIntegration()],
         traces_sample_rate=1.0,
@@ -784,7 +574,7 @@ def test_span_origin_span_streaming(sentry_init, capture_items, mongo_server):
     assert db_span["attributes"]["sentry.origin"] == "auto.db.pymongo"
 
 
-def test_span_streaming_status_on_success(sentry_init, capture_items, mongo_server):
+def test_status_on_success(sentry_init, capture_items, mongo_server):
     sentry_init(
         integrations=[PyMongoIntegration()],
         traces_sample_rate=1.0,
@@ -805,7 +595,7 @@ def test_span_streaming_status_on_success(sentry_init, capture_items, mongo_serv
     assert db_span["status"] == "ok"
 
 
-def test_span_streaming_status_on_failure(sentry_init, capture_items, mongo_server):
+def test_status_on_failure(sentry_init, capture_items, mongo_server):
     sentry_init(
         integrations=[PyMongoIntegration()],
         traces_sample_rate=1.0,
