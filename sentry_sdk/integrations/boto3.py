@@ -118,9 +118,8 @@ def _get_server_attributes(endpoint_url: "Optional[str]") -> "Dict[str, Any]":
 def _get_client_span_attributes(
     call_context: "_ClientCallContext",
 ) -> "Dict[str, Any]":
-    # AWS SDK conventions define the operation as `rpc.method` and `aws-api` as
-    # the RPC system.
-    # https://opentelemetry.io/docs/specs/semconv/cloud-providers/aws-sdk/#aws-sdk-spans
+    # AWS keeps service and operation separate, so `rpc.method` is only the
+    # operation. https://opentelemetry.io/docs/specs/semconv/cloud-providers/aws-sdk/#aws-sdk-spans
     attributes = {
         SPANDATA.RPC_METHOD: call_context.operation_name,
         SPANDATA.RPC_SYSTEM_NAME: _AWS_RPC_SYSTEM_NAME,
@@ -253,7 +252,7 @@ def _start_client_span(
     if client.get_integration(Boto3Integration) is None:
         return None
 
-    # use format `Service.Operation`, e.g. `DynamoDB.GetItem`.
+    # AWS client spans use `Service.Operation`, e.g. `DynamoDB.GetItem`.
     # https://opentelemetry.io/docs/specs/semconv/cloud-providers/aws-sdk/#aws-sdk-spans
     span_name = "%s.%s" % (call_context.service_id, call_context.operation_name)
     attributes = _get_client_span_attributes(call_context)
