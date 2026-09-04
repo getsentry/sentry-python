@@ -268,7 +268,7 @@ def test_concurrency(sentry_init, app):
             "headers": {},
             "version": "1.1",
             "method": "GET",
-            "transport": None,
+            "transport": Mock(spec=["get_extra_info"]),
         }
 
         if SANIC_VERSION >= (19,):
