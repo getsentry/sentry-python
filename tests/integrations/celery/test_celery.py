@@ -8,15 +8,12 @@ from celery import VERSION, Celery
 from celery.bin import worker
 
 import sentry_sdk
-import sentry_sdk.traces
-from sentry_sdk import get_current_span, start_transaction
 from sentry_sdk.integrations.celery import (
     CeleryIntegration,
     _wrap_task_run,
 )
 from sentry_sdk.integrations.celery.beat import _get_headers
 from sentry_sdk.utils import SENSITIVE_DATA_SUBSTITUTE
-from tests.conftest import ApproxDict
 
 
 @pytest.fixture
@@ -121,20 +118,17 @@ def celery_invocation(request):
     return request.param
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("send_default_pii", [True, False])
 def test_simple_with_performance(
-    capture_events,
     capture_items,
     init_celery,
     celery_invocation,
-    span_streaming,
     send_default_pii,
 ):
     celery = init_celery(
         traces_sample_rate=1.0,
         send_default_pii=send_default_pii,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     @celery.task(name="dummy_task")
@@ -142,30 +136,18 @@ def test_simple_with_performance(
         foo = 42  # noqa
         return x / y
 
-    if span_streaming:
-        items = capture_items("event", "span")
+    items = capture_items("event", "span")
 
-        with sentry_sdk.traces.start_span(name="span") as span:
-            celery_invocation(dummy_task, 1, 2)
-            _, expected_context = celery_invocation(dummy_task, 1, 0)
+    with sentry_sdk.traces.start_span(name="span") as span:
+        celery_invocation(dummy_task, 1, 2)
+        _, expected_context = celery_invocation(dummy_task, 1, 0)
 
-        sentry_sdk.flush()
+    sentry_sdk.flush()
 
-        error_event = next(item.payload for item in items if item.type == "event")
+    error_event = next(item.payload for item in items if item.type == "event")
 
-        assert error_event["contexts"]["trace"]["trace_id"] == span.trace_id
-        assert error_event["contexts"]["trace"]["span_id"] != span.span_id
-    else:
-        events = capture_events()
-
-        with start_transaction(op="unit test transaction") as transaction:
-            celery_invocation(dummy_task, 1, 2)
-            _, expected_context = celery_invocation(dummy_task, 1, 0)
-
-        (_, error_event, _, _) = events
-
-        assert error_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
-        assert error_event["contexts"]["trace"]["span_id"] != transaction.span_id
+    assert error_event["contexts"]["trace"]["trace_id"] == span.trace_id
+    assert error_event["contexts"]["trace"]["span_id"] != span.span_id
 
     assert error_event["transaction"] == "dummy_task"
     assert "celery_task_id" in error_event["tags"]
@@ -286,12 +268,9 @@ def test_simple_without_performance(
         pytest.param("keyword", [], {"x": 1, "y": 0}, id="keyword_args"),
     ],
 )
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_task_args_kwargs_data_collection(
-    capture_events,
     capture_items,
     init_celery,
-    span_streaming,
     invocation_style,
     task_args,
     task_kwargs,
@@ -301,7 +280,7 @@ def test_task_args_kwargs_data_collection(
 ):
     init_dict = {"send_default_pii": True, **init_kwargs}
     celery = init_celery(
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
         **init_dict,
     )
 
@@ -314,15 +293,10 @@ def test_task_args_kwargs_data_collection(
     else:
         invoke = lambda: dummy_task.apply_async(kwargs=dict(x=1, y=0))
 
-    if span_streaming:
-        items = capture_items("event")
-        invoke()
-        sentry_sdk.flush()
-        (error_event,) = (item.payload for item in items)
-    else:
-        events = capture_events()
-        invoke()
-        (error_event,) = events
+    items = capture_items("event")
+    invoke()
+    sentry_sdk.flush()
+    (error_event,) = (item.payload for item in items)
 
     celery_job = error_event["extra"]["celery-job"]
 
@@ -337,19 +311,16 @@ def test_task_args_kwargs_data_collection(
         assert celery_job["kwargs"] == SENSITIVE_DATA_SUBSTITUTE
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("task_fails", [True, False], ids=["error", "success"])
 def test_transaction_events(
-    capture_events,
     capture_items,
     init_celery,
     celery_invocation,
     task_fails,
-    span_streaming,
 ):
     celery = init_celery(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     @celery.task(name="dummy_task")
@@ -360,100 +331,44 @@ def test_transaction_events(
     celery_invocation(dummy_task, 1, 1)
     sentry_sdk.flush()
 
-    if span_streaming:
-        items = capture_items("event", "span")
+    items = capture_items("event", "span")
 
-        with sentry_sdk.traces.start_span(name="submission") as span:
-            celery_invocation(dummy_task, 1, 0 if task_fails else 1)
+    with sentry_sdk.traces.start_span(name="submission") as span:
+        celery_invocation(dummy_task, 1, 0 if task_fails else 1)
 
-        sentry_sdk.flush()
+    sentry_sdk.flush()
 
-        if task_fails:
-            error_event = items.pop(0).payload
-            assert error_event["contexts"]["trace"]["trace_id"] == span.trace_id
-            assert error_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
+    if task_fails:
+        error_event = items.pop(0).payload
+        assert error_event["contexts"]["trace"]["trace_id"] == span.trace_id
+        assert error_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
 
-        process_span, execution_span, submit_span, submission_span = [
-            item.payload for item in items
-        ]
+    process_span, execution_span, submit_span, submission_span = [
+        item.payload for item in items
+    ]
 
-        assert execution_span["name"] == "dummy_task"
-        assert execution_span["is_segment"] is True
-        assert execution_span["attributes"]["sentry.segment.name.source"] == "task"
-        assert execution_span["trace_id"] == span.trace_id
-        if task_fails:
-            assert execution_span["status"] == "error"
-        else:
-            assert execution_span["status"] == "ok"
-
-        assert process_span["name"] == "dummy_task"
-        assert process_span["trace_id"] == span.trace_id
-        assert process_span["attributes"]["sentry.op"] == "queue.process"
-        assert process_span["parent_span_id"] == execution_span["span_id"]
-
-        assert submission_span["name"] == "submission"
-        assert submission_span["is_segment"] is True
-
-        assert submit_span["name"] == "dummy_task"
-        assert submit_span["attributes"]["sentry.op"] == "queue.submit.celery"
-        assert submit_span["attributes"]["sentry.origin"] == "auto.queue.celery"
-        assert (
-            submit_span["parent_span_id"] == submission_span["span_id"] == span.span_id
-        )
-        assert submit_span["trace_id"] == span.trace_id
-
+    assert execution_span["name"] == "dummy_task"
+    assert execution_span["is_segment"] is True
+    assert execution_span["attributes"]["sentry.segment.name.source"] == "task"
+    assert execution_span["trace_id"] == span.trace_id
+    if task_fails:
+        assert execution_span["status"] == "error"
     else:
-        events = capture_events()
+        assert execution_span["status"] == "ok"
 
-        with start_transaction(name="submission") as transaction:
-            celery_invocation(dummy_task, 1, 0 if task_fails else 1)
+    assert process_span["name"] == "dummy_task"
+    assert process_span["trace_id"] == span.trace_id
+    assert process_span["attributes"]["sentry.op"] == "queue.process"
+    assert process_span["parent_span_id"] == execution_span["span_id"]
 
-        if task_fails:
-            error_event = events.pop(0)
-            assert error_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
-            assert error_event["exception"]["values"][0]["type"] == "ZeroDivisionError"
+    assert submission_span["name"] == "submission"
+    assert submission_span["is_segment"] is True
 
-        execution_event, submission_event = events
-        assert execution_event["transaction"] == "dummy_task"
-        assert execution_event["transaction_info"] == {"source": "task"}
-
-        assert submission_event["transaction"] == "submission"
-        assert submission_event["transaction_info"] == {"source": "custom"}
-
-        assert execution_event["type"] == submission_event["type"] == "transaction"
-        assert execution_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
-        assert submission_event["contexts"]["trace"]["trace_id"] == transaction.trace_id
-
-        if task_fails:
-            assert execution_event["contexts"]["trace"]["status"] == "internal_error"
-        else:
-            assert execution_event["contexts"]["trace"]["status"] == "ok"
-
-        assert len(execution_event["spans"]) == 1
-        assert (
-            execution_event["spans"][0].items()
-            >= {
-                "trace_id": str(transaction.trace_id),
-                "same_process_as_parent": True,
-                "op": "queue.process",
-                "description": "dummy_task",
-                "data": ApproxDict(),
-            }.items()
-        )
-        assert submission_event["spans"] == [
-            {
-                "data": ApproxDict(),
-                "description": "dummy_task",
-                "op": "queue.submit.celery",
-                "origin": "auto.queue.celery",
-                "parent_span_id": submission_event["contexts"]["trace"]["span_id"],
-                "same_process_as_parent": True,
-                "span_id": submission_event["spans"][0]["span_id"],
-                "start_timestamp": submission_event["spans"][0]["start_timestamp"],
-                "timestamp": submission_event["spans"][0]["timestamp"],
-                "trace_id": str(transaction.trace_id),
-            }
-        ]
+    assert submit_span["name"] == "dummy_task"
+    assert submit_span["attributes"]["sentry.op"] == "queue.submit.celery"
+    assert submit_span["attributes"]["sentry.origin"] == "auto.queue.celery"
+    assert submit_span["parent_span_id"] == submission_span["span_id"] == span.span_id
+    assert submit_span["trace_id"] == span.trace_id
 
 
 def test_no_double_patching(celery):
@@ -494,7 +409,7 @@ def test_simple_no_propagation(capture_events, init_celery):
     def dummy_task():
         1 / 0
 
-    with start_transaction() as transaction:
+    with sentry_sdk.start_transaction() as transaction:
         dummy_task.delay()
 
     (event,) = events
@@ -569,7 +484,7 @@ def test_redis_backend_trace_propagation(init_celery, capture_events_forksafe):
         runs.append(1)
         1 / 0
 
-    with start_transaction(name="submit_celery"):
+    with sentry_sdk.start_transaction(name="submit_celery"):
         # Curious: Cannot use delay() here or py2.7-celery-4.2 crashes
         res = dummy_task.apply_async()
 
@@ -648,9 +563,7 @@ def test_newrelic_interference(init_celery, newrelic_order, celery_invocation):
     assert celery_invocation(dummy_task, 1, 1)[0].wait() == 1
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 def test_traces_sampler_gets_task_info_in_sampling_context(
-    span_streaming,
     init_celery,
     celery_invocation,
     DictionaryContaining,  # noqa:N803
@@ -658,7 +571,7 @@ def test_traces_sampler_gets_task_info_in_sampling_context(
     traces_sampler = mock.Mock(return_value=1.0)
     celery = init_celery(
         traces_sampler=traces_sampler,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     @celery.task(name="dog_walk")
@@ -694,7 +607,7 @@ def test_abstract_task(capture_events, celery, celery_invocation):
     def dummy_task(x, y):
         return x / y
 
-    with start_transaction():
+    with sentry_sdk.start_transaction():
         celery_invocation(dummy_task, 1, 0)
 
     assert not events
@@ -737,7 +650,7 @@ def test_baggage_propagation(init_celery):
 
     # patch random.randrange to return a predictable sample_rand value
     with mock.patch("sentry_sdk.tracing_utils.Random.randrange", return_value=500000):
-        with start_transaction() as transaction:
+        with sentry_sdk.start_transaction() as transaction:
             result = dummy_task.apply_async(
                 args=(1, 0),
                 headers={"baggage": "custom=value"},
@@ -756,8 +669,7 @@ def test_baggage_propagation(init_celery):
             )
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_sentry_propagate_traces_override(span_streaming, init_celery):
+def test_sentry_propagate_traces_override(init_celery):
     """
     Test if the `sentry-propagate-traces` header given to `apply_async`
     overrides the `propagate_traces` parameter in the integration constructor.
@@ -766,50 +678,29 @@ def test_sentry_propagate_traces_override(span_streaming, init_celery):
         propagate_traces=True,
         traces_sample_rate=1.0,
         release="abcdef",
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     @celery.task(name="dummy_task", bind=True)
     def dummy_task(self, message):
-        trace_id = (
-            sentry_sdk.traces.get_current_span().trace_id
-            if span_streaming
-            else get_current_span().trace_id
-        )
+        trace_id = sentry_sdk.traces.get_current_span().trace_id
         return trace_id
 
-    if span_streaming:
-        with sentry_sdk.traces.start_span(name="parent") as span:
-            parent_trace_id = span.trace_id
+    with sentry_sdk.traces.start_span(name="parent") as span:
+        parent_trace_id = span.trace_id
 
-            # should propagate trace
-            task_trace_id = dummy_task.apply_async(
-                args=("some message",),
-            ).get()
-            assert parent_trace_id == task_trace_id
+        # should propagate trace
+        task_trace_id = dummy_task.apply_async(
+            args=("some message",),
+        ).get()
+        assert parent_trace_id == task_trace_id
 
-            # should NOT propagate trace
-            task_trace_id = dummy_task.apply_async(
-                args=("another message",),
-                headers={"sentry-propagate-traces": False},
-            ).get()
-            assert parent_trace_id != task_trace_id
-    else:
-        with start_transaction() as transaction:
-            transaction_trace_id = transaction.trace_id
-
-            # should propagate trace
-            task_trace_id = dummy_task.apply_async(
-                args=("some message",),
-            ).get()
-            assert transaction_trace_id == task_trace_id
-
-            # should NOT propagate trace
-            task_trace_id = dummy_task.apply_async(
-                args=("another message",),
-                headers={"sentry-propagate-traces": False},
-            ).get()
-            assert transaction_trace_id != task_trace_id
+        # should NOT propagate trace
+        task_trace_id = dummy_task.apply_async(
+            args=("another message",),
+            headers={"sentry-propagate-traces": False},
+        ).get()
+        assert parent_trace_id != task_trace_id
 
 
 def test_apply_async_manually_span(sentry_init):
@@ -841,47 +732,35 @@ def test_apply_async_no_args(init_celery):
     assert result.get() == "success"
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("routing_key", ("celery", "custom"))
 @mock.patch("celery.app.task.Task.request")
 def test_messaging_destination_name_default_exchange(
     mock_request,
     routing_key,
-    span_streaming,
     init_celery,
-    capture_events,
     capture_items,
 ):
     celery_app = init_celery(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
     mock_request.delivery_info = {"routing_key": routing_key, "exchange": ""}
 
     @celery_app.task()
     def task(): ...
 
-    if span_streaming:
-        items = capture_items("span")
-        task.apply_async()
-        sentry_sdk.flush()
-        process_span, _execution_span = items
-        assert (
-            process_span.payload["attributes"]["messaging.destination.name"]
-            == routing_key
-        )
-    else:
-        events = capture_events()
-        task.apply_async()
-        (event,) = events
-        (span,) = event["spans"]
-        assert span["data"]["messaging.destination.name"] == routing_key
+    items = capture_items("span")
+    task.apply_async()
+    sentry_sdk.flush()
+    process_span, _execution_span = items
+    assert (
+        process_span.payload["attributes"]["messaging.destination.name"] == routing_key
+    )
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 @mock.patch("celery.app.task.Task.request")
 def test_messaging_destination_name_nondefault_exchange(
-    mock_request, span_streaming, init_celery, capture_events, capture_items
+    mock_request, init_celery, capture_items
 ):
     """
     Currently, we only capture the routing key as the messaging.destination.name when
@@ -891,112 +770,76 @@ def test_messaging_destination_name_nondefault_exchange(
     """
     celery_app = init_celery(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
     mock_request.delivery_info = {"routing_key": "celery", "exchange": "custom"}
 
     @celery_app.task()
     def task(): ...
 
-    if span_streaming:
-        items = capture_items("span")
-        task.apply_async()
-        sentry_sdk.flush()
-        process_span, _execution_span = items
-        assert "messaging.destination.name" not in process_span.payload["attributes"]
-    else:
-        events = capture_events()
-        task.apply_async()
-        (event,) = events
-        (span,) = event["spans"]
-        assert "messaging.destination.name" not in span["data"]
+    items = capture_items("span")
+    task.apply_async()
+    sentry_sdk.flush()
+    process_span, _execution_span = items
+    assert "messaging.destination.name" not in process_span.payload["attributes"]
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_messaging_id(span_streaming, init_celery, capture_events, capture_items):
+def test_messaging_id(init_celery, capture_items):
     celery = init_celery(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     @celery.task
     def example_task(): ...
 
-    if span_streaming:
-        items = capture_items("span")
-        example_task.apply_async()
-        sentry_sdk.flush()
-        process_span, _execution_span = items
-        assert "messaging.message.id" in process_span.payload["attributes"]
-    else:
-        events = capture_events()
-        example_task.apply_async()
-        (event,) = events
-        (span,) = event["spans"]
-        assert "messaging.message.id" in span["data"]
+    items = capture_items("span")
+    example_task.apply_async()
+    sentry_sdk.flush()
+    process_span, _execution_span = items
+    assert "messaging.message.id" in process_span.payload["attributes"]
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_retry_count_zero(span_streaming, init_celery, capture_events, capture_items):
+def test_retry_count_zero(init_celery, capture_items):
     celery = init_celery(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     @celery.task()
     def task(): ...
 
-    if span_streaming:
-        items = capture_items("span")
-        task.apply_async()
-        sentry_sdk.flush()
-        process_span, _execution_span = items
-        assert process_span.payload["attributes"]["messaging.message.retry.count"] == 0
-    else:
-        events = capture_events()
-        task.apply_async()
-        (event,) = events
-        (span,) = event["spans"]
-        assert span["data"]["messaging.message.retry.count"] == 0
+    items = capture_items("span")
+    task.apply_async()
+    sentry_sdk.flush()
+    process_span, _execution_span = items
+    assert process_span.payload["attributes"]["messaging.message.retry.count"] == 0
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 @mock.patch("celery.app.task.Task.request")
-def test_retry_count_nonzero(
-    mock_request, span_streaming, init_celery, capture_events, capture_items
-):
+def test_retry_count_nonzero(mock_request, init_celery, capture_items):
     mock_request.retries = 3
 
     celery = init_celery(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     @celery.task()
     def task(): ...
 
-    if span_streaming:
-        items = capture_items("span")
-        task.apply_async()
-        sentry_sdk.flush()
-        process_span, _execution_span = items
-        assert process_span.payload["attributes"]["messaging.message.retry.count"] == 3
-    else:
-        events = capture_events()
-        task.apply_async()
-        (event,) = events
-        (span,) = event["spans"]
-        assert span["data"]["messaging.message.retry.count"] == 3
+    items = capture_items("span")
+    task.apply_async()
+    sentry_sdk.flush()
+    process_span, _execution_span = items
+    assert process_span.payload["attributes"]["messaging.message.retry.count"] == 3
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("system", ("redis", "amqp"))
-def test_messaging_system(
-    system, span_streaming, init_celery, capture_events, capture_items
-):
+def test_messaging_system(system, init_celery, capture_items):
     celery = init_celery(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     # Does not need to be a real URL, since we use always eager
@@ -1005,25 +848,15 @@ def test_messaging_system(
     @celery.task()
     def task(): ...
 
-    if span_streaming:
-        items = capture_items("span")
-        task.apply_async()
-        sentry_sdk.flush()
-        process_span, _execution_span = items
-        assert process_span.payload["attributes"]["messaging.system"] == system
-    else:
-        events = capture_events()
-        task.apply_async()
-        (event,) = events
-        (span,) = event["spans"]
-        assert span["data"]["messaging.system"] == system
+    items = capture_items("span")
+    task.apply_async()
+    sentry_sdk.flush()
+    process_span, _execution_span = items
+    assert process_span.payload["attributes"]["messaging.system"] == system
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.parametrize("system", ("amqp", "redis"))
-def test_producer_span_data(
-    system, span_streaming, monkeypatch, sentry_init, capture_events, capture_items
-):
+def test_producer_span_data(system, monkeypatch, sentry_init, capture_items):
     old_publish = kombu.messaging.Producer._publish
 
     def publish(*args, **kwargs):
@@ -1034,111 +867,69 @@ def test_producer_span_data(
     sentry_init(
         integrations=[CeleryIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
     celery = Celery(__name__, broker=f"{system}://example.com")  # noqa: E231
 
     @celery.task()
     def task(): ...
 
-    if span_streaming:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        with sentry_sdk.traces.start_span(name="producer test"):
-            task.apply_async()
+    with sentry_sdk.traces.start_span(name="producer test"):
+        task.apply_async()
 
-        sentry_sdk.flush()
+    sentry_sdk.flush()
 
-        span_items = [item.payload for item in items]
-        publish_span = next(
-            s for s in span_items if s["attributes"].get("sentry.op") == "queue.publish"
-        )
+    span_items = [item.payload for item in items]
+    publish_span = next(
+        s for s in span_items if s["attributes"].get("sentry.op") == "queue.publish"
+    )
 
-        assert publish_span["attributes"]["messaging.system"] == system
-        assert publish_span["attributes"]["messaging.destination.name"] == "celery"
-        assert "messaging.message.id" in publish_span["attributes"]
-        assert publish_span["attributes"]["messaging.message.retry.count"] == 0
-    else:
-        events = capture_events()
-
-        with start_transaction():
-            task.apply_async()
-
-        (event,) = events
-        span = next(span for span in event["spans"] if span["op"] == "queue.publish")
-
-        assert span["data"]["messaging.system"] == system
-        assert span["data"]["messaging.destination.name"] == "celery"
-        assert "messaging.message.id" in span["data"]
-        assert span["data"]["messaging.message.retry.count"] == 0
+    assert publish_span["attributes"]["messaging.system"] == system
+    assert publish_span["attributes"]["messaging.destination.name"] == "celery"
+    assert "messaging.message.id" in publish_span["attributes"]
+    assert publish_span["attributes"]["messaging.message.retry.count"] == 0
 
     monkeypatch.setattr(kombu.messaging.Producer, "_publish", old_publish)
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_receive_latency(span_streaming, init_celery, capture_events, capture_items):
+def test_receive_latency(init_celery, capture_items):
     celery = init_celery(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     @celery.task()
     def task(): ...
 
-    if span_streaming:
-        items = capture_items("span")
-        task.apply_async()
-        sentry_sdk.flush()
-        process_span, _execution_span = items
-        assert "messaging.message.receive.latency" in process_span.payload["attributes"]
-        assert (
-            process_span.payload["attributes"]["messaging.message.receive.latency"] > 0
-        )
-    else:
-        events = capture_events()
-        task.apply_async()
-        (event,) = events
-        (span,) = event["spans"]
-        assert "messaging.message.receive.latency" in span["data"]
-        assert span["data"]["messaging.message.receive.latency"] > 0
+    items = capture_items("span")
+    task.apply_async()
+    sentry_sdk.flush()
+    process_span, _execution_span = items
+    assert "messaging.message.receive.latency" in process_span.payload["attributes"]
+    assert process_span.payload["attributes"]["messaging.message.receive.latency"] > 0
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def tests_span_origin_consumer(
-    span_streaming, init_celery, capture_events, capture_items
-):
+def tests_span_origin_consumer(init_celery, capture_items):
     celery = init_celery(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
     celery.conf.broker_url = "redis://example.com"  # noqa: E231
 
     @celery.task()
     def task(): ...
 
-    if span_streaming:
-        items = capture_items("span")
-        task.apply_async()
-        sentry_sdk.flush()
-        process_span, execution_span = items
-        assert (
-            execution_span.payload["attributes"]["sentry.origin"] == "auto.queue.celery"
-        )
-        assert (
-            process_span.payload["attributes"]["sentry.origin"] == "auto.queue.celery"
-        )
-    else:
-        events = capture_events()
-        task.apply_async()
-        (event,) = events
-        assert event["contexts"]["trace"]["origin"] == "auto.queue.celery"
-        assert event["spans"][0]["origin"] == "auto.queue.celery"
+    items = capture_items("span")
+    task.apply_async()
+    sentry_sdk.flush()
+    process_span, execution_span = items
+    assert execution_span.payload["attributes"]["sentry.origin"] == "auto.queue.celery"
+    assert process_span.payload["attributes"]["sentry.origin"] == "auto.queue.celery"
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def tests_span_origin_producer(
-    span_streaming, monkeypatch, sentry_init, capture_events, capture_items
-):
+def tests_span_origin_producer(monkeypatch, sentry_init, capture_items):
     old_publish = kombu.messaging.Producer._publish
 
     def publish(*args, **kwargs):
@@ -1149,74 +940,49 @@ def tests_span_origin_producer(
     sentry_init(
         integrations=[CeleryIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
     celery = Celery(__name__, broker="redis://example.com")  # noqa: E231
 
     @celery.task()
     def task(): ...
 
-    if span_streaming:
-        items = capture_items("span")
+    items = capture_items("span")
 
-        with sentry_sdk.traces.start_span(name="custom parent"):
-            task.apply_async()
+    with sentry_sdk.traces.start_span(name="custom parent"):
+        task.apply_async()
 
-        sentry_sdk.flush()
+    sentry_sdk.flush()
 
-        parent = items.pop(-1).payload
-        assert parent["name"] == "custom parent"
-        assert parent["attributes"]["sentry.origin"] == "manual"
+    parent = items.pop(-1).payload
+    assert parent["name"] == "custom parent"
+    assert parent["attributes"]["sentry.origin"] == "manual"
 
-        for item in items:
-            assert item.payload["attributes"]["sentry.origin"] == "auto.queue.celery"
-    else:
-        events = capture_events()
-
-        with start_transaction(name="custom_transaction"):
-            task.apply_async()
-
-        (event,) = events
-
-        assert event["contexts"]["trace"]["origin"] == "manual"
-
-        for span in event["spans"]:
-            assert span["origin"] == "auto.queue.celery"
+    for item in items:
+        assert item.payload["attributes"]["sentry.origin"] == "auto.queue.celery"
 
     monkeypatch.setattr(kombu.messaging.Producer, "_publish", old_publish)
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
 @pytest.mark.forked
 @mock.patch("celery.Celery.send_task")
 def test_send_task_wrapped(
     patched_send_task,
-    span_streaming,
     sentry_init,
-    capture_events,
     capture_items,
     reset_integrations,
 ):
     sentry_init(
         integrations=[CeleryIntegration()],
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
     celery = Celery(__name__, broker="redis://example.com")  # noqa: E231
 
-    if span_streaming:
-        items = capture_items("span")
-        with sentry_sdk.traces.start_span(name="custom parent") as outer_span:
-            celery.send_task(
-                "very_creative_task_name", args=(1, 2), kwargs={"foo": "bar"}
-            )
-        sentry_sdk.flush()
-    else:
-        events = capture_events()
-        with sentry_sdk.start_transaction(name="custom_transaction"):
-            celery.send_task(
-                "very_creative_task_name", args=(1, 2), kwargs={"foo": "bar"}
-            )
+    items = capture_items("span")
+    with sentry_sdk.traces.start_span(name="custom parent") as outer_span:
+        celery.send_task("very_creative_task_name", args=(1, 2), kwargs={"foo": "bar"})
+    sentry_sdk.flush()
 
     (call,) = patched_send_task.call_args_list  # We should have exactly one call
     (args, kwargs) = call
@@ -1240,32 +1006,18 @@ def test_send_task_wrapped(
         == kwargs["headers"]["headers"]["sentry-trace"]
     )
 
-    if span_streaming:
-        submit_span, outer = [item.payload for item in items]
+    submit_span, outer = [item.payload for item in items]
 
-        assert outer["name"] == "custom parent"
-        assert outer["is_segment"] is True
+    assert outer["name"] == "custom parent"
+    assert outer["is_segment"] is True
 
-        assert submit_span["name"] == "very_creative_task_name"
-        assert submit_span["attributes"]["sentry.op"] == "queue.submit.celery"
-        assert submit_span["trace_id"] == outer_span.trace_id
-        assert (
-            submit_span["trace_id"] == kwargs["headers"]["sentry-trace"].split("-")[0]
-        )
-
-    else:
-        (event,) = events
-        assert event["type"] == "transaction"
-        assert event["transaction"] == "custom_transaction"
-
-        (span,) = event["spans"]
-        assert span["description"] == "very_creative_task_name"
-        assert span["op"] == "queue.submit.celery"
-        assert span["trace_id"] == kwargs["headers"]["sentry-trace"].split("-")[0]
+    assert submit_span["name"] == "very_creative_task_name"
+    assert submit_span["attributes"]["sentry.op"] == "queue.submit.celery"
+    assert submit_span["trace_id"] == outer_span.trace_id
+    assert submit_span["trace_id"] == kwargs["headers"]["sentry-trace"].split("-")[0]
 
 
-@pytest.mark.parametrize("span_streaming", [True, False])
-def test_user_custom_headers_accessible_in_task(span_streaming, init_celery):
+def test_user_custom_headers_accessible_in_task(init_celery):
     """
     Regression test for https://github.com/getsentry/sentry-python/issues/5566
 
@@ -1274,7 +1026,7 @@ def test_user_custom_headers_accessible_in_task(span_streaming, init_celery):
     """
     celery = init_celery(
         traces_sample_rate=1.0,
-        trace_lifecycle="stream" if span_streaming else "static",
+        trace_lifecycle="stream",
     )
 
     @celery.task(name="custom_headers_task", bind=True)
@@ -1287,12 +1039,8 @@ def test_user_custom_headers_accessible_in_task(span_streaming, init_celery):
         "tenant_id": "tenant-42",
     }
 
-    if span_streaming:
-        with sentry_sdk.traces.start_span(name="test"):
-            result = custom_headers_task.apply_async(headers=custom_headers)
-    else:
-        with start_transaction(name="test"):
-            result = custom_headers_task.apply_async(headers=custom_headers)
+    with sentry_sdk.traces.start_span(name="test"):
+        result = custom_headers_task.apply_async(headers=custom_headers)
 
     received_headers = result.get()
     for key, value in custom_headers.items():
