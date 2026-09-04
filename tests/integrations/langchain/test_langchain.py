@@ -29,7 +29,6 @@ except ImportError:
     google = None
 
 import sentry_sdk
-from sentry_sdk import start_transaction
 from sentry_sdk.integrations.langchain import (
     LangchainIntegration,
     SentryLangchainCallback,
@@ -411,7 +410,7 @@ def test_langchain_chat_with_run_name(
         llm.client._client._client,
         "send",
         return_value=model_response,
-    ) as _, start_transaction():
+    ):
         llm.invoke(
             "How many letters in the word eudca",
             config={"run_name": "my-snazzy-pipeline"},
@@ -464,7 +463,7 @@ def test_langchain_multi_choice_response(
         llm.client._api_client._httpx_client,
         "send",
         return_value=model_response,
-    ) as _, start_transaction():
+    ):
         llm.invoke(
             "How many letters in the word eudca",
         )
@@ -500,11 +499,10 @@ def test_langchain_tool_call_with_run_name(
     )
     items = capture_items("span")
 
-    with start_transaction():
-        get_word_length.invoke(
-            {"word": "eudca"},
-            config={"run_name": "my-snazzy-pipeline"},
-        )
+    get_word_length.invoke(
+        {"word": "eudca"},
+        config={"run_name": "my-snazzy-pipeline"},
+    )
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -1886,7 +1884,7 @@ def test_langchain_error(
     agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
     items = capture_items("event")
 
-    with start_transaction(), pytest.raises(ValueError):
+    with pytest.raises(ValueError):
         list(agent_executor.stream({"input": "How many letters in the word eudca"}))
 
     (error,) = (item.payload for item in items)
@@ -1922,30 +1920,27 @@ def test_span_status_error(
     )
     items = capture_items("event", "transaction", "span")
 
-    with start_transaction(name="test"):
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    "You are very powerful assistant, but don't know current events",
-                ),
-                ("user", "{input}"),
-                MessagesPlaceholder(variable_name="agent_scratchpad"),
-            ]
-        )
-        llm = MockOpenAI(
-            model_name="gpt-3.5-turbo",
-            temperature=0,
-            openai_api_key="badkey",
-        )
-        agent = create_openai_tools_agent(llm, [get_word_length], prompt)
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                "You are very powerful assistant, but don't know current events",
+            ),
+            ("user", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ]
+    )
+    llm = MockOpenAI(
+        model_name="gpt-3.5-turbo",
+        temperature=0,
+        openai_api_key="badkey",
+    )
+    agent = create_openai_tools_agent(llm, [get_word_length], prompt)
 
-        agent_executor = AgentExecutor(
-            agent=agent, tools=[get_word_length], verbose=True
-        )
+    agent_executor = AgentExecutor(agent=agent, tools=[get_word_length], verbose=True)
 
-        with pytest.raises(ValueError):
-            list(agent_executor.stream({"input": "How many letters in the word eudca"}))
+    with pytest.raises(ValueError):
+        list(agent_executor.stream({"input": "How many letters in the word eudca"}))
 
     (error,) = (item.payload for item in items if item.type == "event")
     assert error["level"] == "error"
@@ -2231,8 +2226,7 @@ def test_langchain_message_role_mapping(
     message_data_found = False
     items = capture_items("span")
 
-    with start_transaction():
-        list(agent_executor.stream({"input": test_input}))
+    list(agent_executor.stream({"input": test_input}))
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -2369,9 +2363,8 @@ def test_langchain_embeddings_sync(
         # Force setup to re-run to ensure our mock is wrapped
         LangchainIntegration.setup_once()
 
-        with start_transaction(name="test_embeddings"):
-            # Test embed_documents
-            result = embeddings.embed_documents(["Hello world", "Test document"])
+        # Test embed_documents
+        result = embeddings.embed_documents(["Hello world", "Test document"])
 
         assert len(result) == 2
         mock_embed_documents.assert_called_once()
@@ -2454,8 +2447,7 @@ def test_langchain_embeddings_embed_query(
         # Force setup to re-run to ensure our mock is wrapped
         LangchainIntegration.setup_once()
 
-        with start_transaction(name="test_embeddings_query"):
-            result = embeddings.embed_query("What is the capital of France?")
+        result = embeddings.embed_query("What is the capital of France?")
 
         assert len(result) == 3
         mock_embed_query.assert_called_once()
@@ -2539,10 +2531,9 @@ async def test_langchain_embeddings_async(
         # Force setup to re-run to ensure our mock is wrapped
         LangchainIntegration.setup_once()
 
-        with start_transaction(name="test_async_embeddings"):
-            result = await embeddings.aembed_documents(
-                ["Async hello", "Async test document"]
-            )
+        result = await embeddings.aembed_documents(
+            ["Async hello", "Async test document"]
+        )
 
         assert len(result) == 2
         mock_aembed.assert_called_once()
@@ -2619,8 +2610,7 @@ async def test_langchain_embeddings_aembed_query(
         # Force setup to re-run to ensure our mock is wrapped
         LangchainIntegration.setup_once()
 
-        with start_transaction(name="test_async_embeddings_query"):
-            result = await embeddings.aembed_query("Async query test")
+        result = await embeddings.aembed_query("Async query test")
 
         assert len(result) == 3
         mock_aembed.assert_called_once()
@@ -2686,8 +2676,7 @@ def test_langchain_embeddings_no_model_name(
         # Force setup to re-run to ensure our mock is wrapped
         LangchainIntegration.setup_once()
 
-        with start_transaction(name="test_embeddings_no_model"):
-            embeddings.embed_documents(["Test"])
+        embeddings.embed_documents(["Test"])
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -2735,8 +2724,7 @@ def test_langchain_embeddings_integration_disabled(
             model="text-embedding-ada-002", openai_api_key="test-key"
         )
 
-        with start_transaction(name="test_embeddings_disabled"):
-            embeddings.embed_documents(["Test"])
+        embeddings.embed_documents(["Test"])
 
     # Check that no embeddings spans were created
     sentry_sdk.flush()
@@ -2791,9 +2779,8 @@ def test_langchain_embeddings_multiple_providers(
         # Force setup to re-run
         LangchainIntegration.setup_once()
 
-        with start_transaction(name="test_multiple_providers"):
-            openai_embeddings.embed_documents(["OpenAI test"])
-            azure_embeddings.embed_documents(["Azure test"])
+        openai_embeddings.embed_documents(["OpenAI test"])
+        azure_embeddings.embed_documents(["Azure test"])
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -2813,7 +2800,7 @@ def test_langchain_embeddings_multiple_providers(
         assert SPANDATA.GEN_AI_EMBEDDINGS_INPUT in span["attributes"]
 
 
-def test_langchain_embeddings_error_handling(sentry_init, capture_events):
+def test_langchain_embeddings_error_handling(sentry_init, capture_items):
     """Test that errors in embeddings are properly captured."""
     try:
         from langchain_openai import OpenAIEmbeddings
@@ -2825,8 +2812,9 @@ def test_langchain_embeddings_error_handling(sentry_init, capture_events):
         disabled_integrations=[StdlibIntegration],
         traces_sample_rate=1.0,
         send_default_pii=True,
+        trace_lifecycle="stream",
     )
-    events = capture_events()
+    events = capture_items("event")
 
     # Mock the API call to raise an error
     with mock.patch.object(
@@ -2841,7 +2829,7 @@ def test_langchain_embeddings_error_handling(sentry_init, capture_events):
         # Force setup to re-run
         LangchainIntegration.setup_once()
 
-        with start_transaction(name="test_embeddings_error"), pytest.raises(ValueError):
+        with pytest.raises(ValueError):
             embeddings.embed_documents(["Test"])
 
     # The error should be captured
@@ -2888,13 +2876,12 @@ def test_langchain_embeddings_multiple_calls(
         # Force setup to re-run
         LangchainIntegration.setup_once()
 
-        with start_transaction(name="test_multiple_embeddings"):
-            # Call embed_documents
-            embeddings.embed_documents(["First batch", "Second batch"])
-            # Call embed_query
-            embeddings.embed_query("Single query")
-            # Call embed_documents again
-            embeddings.embed_documents(["Third batch"])
+        # Call embed_documents
+        embeddings.embed_documents(["First batch", "Second batch"])
+        # Call embed_query
+        embeddings.embed_query("Single query")
+        # Call embed_documents again
+        embeddings.embed_documents(["Third batch"])
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -3022,11 +3009,10 @@ def test_langchain_embeddings_with_list_and_string_inputs(
         # Force setup to re-run
         LangchainIntegration.setup_once()
 
-        with start_transaction(name="test_input_types"):
-            # embed_documents takes a list
-            embeddings.embed_documents(["List item 1", "List item 2", "List item 3"])
-            # embed_query takes a string
-            embeddings.embed_query("Single string query")
+        # embed_documents takes a list
+        embeddings.embed_documents(["List item 1", "List item 2", "List item 3"])
+        # embed_query takes a string
+        embeddings.embed_query("Single string query")
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -3325,17 +3311,16 @@ def test_langchain_ai_system_detection(
     prompts = ["Test prompt"]
     items = capture_items("span")
 
-    with start_transaction():
-        callback.on_llm_start(
-            serialized=serialized,
-            prompts=prompts,
-            run_id=run_id,
-            invocation_params={"_type": ai_type, "model": "test-model"},
-        )
+    callback.on_llm_start(
+        serialized=serialized,
+        prompts=prompts,
+        run_id=run_id,
+        invocation_params={"_type": ai_type, "model": "test-model"},
+    )
 
-        generation = Mock(text="Test response", message=None)
-        response = Mock(generations=[[generation]])
-        callback.on_llm_end(response=response, run_id=run_id)
+    generation = Mock(text="Test response", message=None)
+    response = Mock(generations=[[generation]])
+    callback.on_llm_end(response=response, run_id=run_id)
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -3630,7 +3615,7 @@ def test_langchain_chat_data_collection(
         llm.client._client._client,
         "send",
         return_value=model_response,
-    ) as _, start_transaction():
+    ):
         llm.invoke(
             [
                 SystemMessage(content="You are a helpful assistant."),
@@ -3827,7 +3812,7 @@ def test_langchain_text_completion_data_collection(
         model.client._client._client,
         "send",
         return_value=model_response,
-    ) as _, start_transaction():
+    ):
         model.invoke("What is the capital of France?")
 
     sentry_sdk.flush()
@@ -3997,7 +3982,7 @@ def test_langchain_data_collection_tools(
         llm.client._client._client,
         "send",
         side_effect=[tool_response, final_response],
-    ) as _, start_transaction():
+    ):
         agent_executor.invoke({"input": "How many letters in the word eudca"})
 
     sentry_sdk.flush()
@@ -4083,20 +4068,19 @@ def test_langchain_data_collection_request_tool_call_params(
 
     captured = capture_items("span")
 
-    with start_transaction():
-        callback.on_chat_model_start(
-            serialized={},
-            messages=[[HumanMessage(content="How many letters in the word eudca")]],
-            run_id="test-request-tool-calls-uuid",
-            invocation_params={
-                "model": "gpt-3.5-turbo",
-                "function_call": {"name": "get_word_length"},
-            },
-        )
-        callback.on_llm_end(
-            response=LLMResult(generations=[[]]),
-            run_id="test-request-tool-calls-uuid",
-        )
+    callback.on_chat_model_start(
+        serialized={},
+        messages=[[HumanMessage(content="How many letters in the word eudca")]],
+        run_id="test-request-tool-calls-uuid",
+        invocation_params={
+            "model": "gpt-3.5-turbo",
+            "function_call": {"name": "get_word_length"},
+        },
+    )
+    callback.on_llm_end(
+        response=LLMResult(generations=[[]]),
+        run_id="test-request-tool-calls-uuid",
+    )
 
     sentry_sdk.flush()
     spans = [item.payload for item in captured]
@@ -4244,7 +4228,7 @@ def test_langchain_tool_execution_data_collection(
         llm.client._client._client,
         "send",
         side_effect=[tool_response, final_response],
-    ) as _, start_transaction():
+    ):
         agent_executor.invoke({"input": "How many letters in the word eudca"})
 
     sentry_sdk.flush()
@@ -4407,7 +4391,7 @@ def test_langchain_agent_executor_data_collection(
         llm.client._client._client,
         "send",
         side_effect=[tool_response, final_response],
-    ) as _, start_transaction():
+    ):
         if agent_method == "invoke":
             agent_executor.invoke({"input": "How many letters in the word eudca"})
         else:
@@ -4553,11 +4537,10 @@ async def test_langchain_embeddings_data_collection(
         # Force setup to re-run to ensure our mock is wrapped
         LangchainIntegration.setup_once()
 
-        with start_transaction(name="test_embeddings_data_collection"):
-            if method.startswith("a"):
-                await getattr(embeddings, method)(embeddings_input)
-            else:
-                getattr(embeddings, method)(embeddings_input)
+        if method.startswith("a"):
+            await getattr(embeddings, method)(embeddings_input)
+        else:
+            getattr(embeddings, method)(embeddings_input)
 
     sentry_sdk.flush()
     spans = [item.payload for item in captured]
