@@ -137,7 +137,7 @@ def _get_response_span_attributes(
     parsed: "Mapping[str, Any]",
 ) -> "Dict[str, Any]":
     metadata = parsed.get("ResponseMetadata")
-    if not isinstance(metadata, Mapping):
+    if not isinstance(metadata, dict):
         return {}
 
     attributes = {}
@@ -147,7 +147,7 @@ def _get_response_span_attributes(
         attributes[SPANDATA.HTTP_STATUS_CODE] = status_code
 
     headers = metadata.get("HTTPHeaders")
-    if not isinstance(headers, Mapping):
+    if not isinstance(headers, dict):
         headers = {}
 
     request_id = metadata.get("RequestId")
