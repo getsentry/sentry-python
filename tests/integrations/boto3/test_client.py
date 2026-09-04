@@ -3,6 +3,7 @@ import pytest
 from botocore.awsrequest import AWSResponse
 from botocore.config import Config
 from botocore.exceptions import ClientError, EndpointConnectionError
+from botocore.stub import Stubber
 
 import sentry_sdk
 from sentry_sdk.consts import OP, SPANDATA
@@ -22,17 +23,20 @@ def client_factory(sentry_init, monkeypatch, span_streaming):
         traces_sample_rate=1.0,
         integrations=[Boto3Integration()],
         trace_lifecycle="stream" if span_streaming else "static",
+        # avoid SDK's machine hostname being used as server name.
+        server_name="",
     )
     # remove retry delay to speed up tests
     monkeypatch.setattr("botocore.endpoint.time.sleep", lambda delay: None)
 
-    def make_client(attempt_count=1):
+    def make_client(service_name="s3", attempt_count=1, **client_kwargs):
         return session.client(
-            "s3",
+            service_name,
             config=Config(
                 # `total_max_attempts` includes the initial request.
                 retries={"total_max_attempts": attempt_count, "mode": "standard"}
             ),
+            **client_kwargs,
         )
 
     return make_client
@@ -100,7 +104,237 @@ def _assert_span_finished(span, span_streaming):
 def _assert_one_failed_span(spans, span_streaming):
     assert len(spans) == 1
     assert spans[0]["status"] in ("error", "internal_error")
+    attributes = spans[0]["attributes"] if span_streaming else spans[0]["data"]
+    assert attributes[SPANDATA.ERROR_TYPE]
     _assert_span_finished(spans[0], span_streaming)
+
+
+def _capture_stubbed_client_span(
+    client,
+    method_name,
+    api_params,
+    capture_items,
+    span_streaming,
+    response=None,
+):
+    with Stubber(client) as stubber:
+        stubber.add_response(method_name, response or {}, api_params)
+        spans_by_op = _capture_boto3_spans_by_op(
+            lambda: getattr(client, method_name)(**api_params),
+            capture_items,
+            span_streaming,
+        )
+
+    client_spans = spans_by_op.get(OP.HTTP_CLIENT, [])
+    assert len(client_spans) == 1
+    return client_spans[0]
+
+
+def _span_attributes(span, span_streaming):
+    return span["attributes"] if span_streaming else span["data"]
+
+
+@pytest.mark.parametrize(
+    (
+        "service_name",
+        "method_name",
+        "api_params",
+        "span_name",
+        "rpc_method",
+        "server_address",
+    ),
+    [
+        (
+            "s3",
+            "head_object",
+            {"Bucket": "bucket", "Key": "foo"},
+            "S3.HeadObject",
+            "HeadObject",
+            "s3.eu-north-1.amazonaws.com",
+        ),
+        (
+            "sqs",
+            "list_queues",
+            {},
+            "SQS.ListQueues",
+            "ListQueues",
+            "sqs.eu-north-1.amazonaws.com",
+        ),
+    ],
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_client_call_has_common_attributes(
+    capture_items,
+    client_factory,
+    span_streaming,
+    service_name,
+    method_name,
+    api_params,
+    span_name,
+    rpc_method,
+    server_address,
+):
+    client = client_factory(service_name=service_name)
+    span = _capture_stubbed_client_span(
+        client,
+        method_name,
+        api_params,
+        capture_items,
+        span_streaming,
+    )
+    attributes = _span_attributes(span, span_streaming)
+
+    assert span["name" if span_streaming else "description"] == span_name
+    assert attributes[SPANDATA.RPC_METHOD] == rpc_method
+    assert attributes[SPANDATA.RPC_SYSTEM_NAME] == "aws-api"
+    assert attributes[SPANDATA.CLOUD_REGION] == "eu-north-1"
+    assert attributes[SPANDATA.SERVER_ADDRESS] == server_address
+    assert attributes[SPANDATA.SERVER_PORT] == 443
+
+
+def test_client_call_attributes_are_available_at_span_creation(
+    sentry_init, capture_items
+):
+    # attribute-based filtering happens during span creation, at the same boundary
+    # where creation attributes are made available for sampling decisions.
+    sentry_init(
+        traces_sample_rate=1.0,
+        integrations=[Boto3Integration()],
+        trace_lifecycle="stream",
+        ignore_spans=[
+            {
+                "attributes": {
+                    SPANDATA.RPC_METHOD: "HeadObject",
+                    SPANDATA.RPC_SYSTEM_NAME: "aws-api",
+                    SPANDATA.SERVER_ADDRESS: "s3.eu-north-1.amazonaws.com",
+                    SPANDATA.SERVER_PORT: 443,
+                }
+            }
+        ],
+    )
+    client = session.client("s3")
+    items = capture_items("span")
+
+    with Stubber(client) as stubber:
+        stubber.add_response("head_object", {}, {"Bucket": "bucket", "Key": "foo"})
+        with sentry_sdk.traces.start_span(name="parent"):
+            client.head_object(Bucket="bucket", Key="foo")
+
+    sentry_sdk.flush()
+    client_spans = [
+        item.payload
+        for item in items
+        if item.payload["attributes"].get(SPANDATA.SENTRY_ORIGIN)
+        == Boto3Integration.origin
+    ]
+    assert client_spans == []
+
+
+@pytest.mark.parametrize(
+    ("endpoint_url", "server_address", "server_port"),
+    [
+        ("http://localhost:4566", "localhost", 4566),
+        ("https://aws.example.test:8443", "aws.example.test", 8443),
+        ("https://[2001:db8::1]:9443", "2001:db8::1", 9443),
+    ],
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_client_call_uses_custom_endpoint_attributes(
+    capture_items,
+    client_factory,
+    span_streaming,
+    endpoint_url,
+    server_address,
+    server_port,
+):
+    client = client_factory(endpoint_url=endpoint_url)
+    span = _capture_stubbed_client_span(
+        client,
+        "head_object",
+        {"Bucket": "bucket", "Key": "foo"},
+        capture_items,
+        span_streaming,
+    )
+    attributes = _span_attributes(span, span_streaming)
+
+    assert attributes[SPANDATA.SERVER_ADDRESS] == server_address
+    assert attributes[SPANDATA.SERVER_PORT] == server_port
+
+
+@pytest.mark.parametrize(
+    "endpoint_url", [None, "not-an-endpoint", "https://example.com:not-a-port"]
+)
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_client_call_omits_invalid_endpoint_metadata(
+    capture_items,
+    client_factory,
+    monkeypatch,
+    span_streaming,
+    endpoint_url,
+):
+    client = client_factory()
+    monkeypatch.setattr(client.meta, "_endpoint_url", endpoint_url)
+
+    span = _capture_stubbed_client_span(
+        client,
+        "head_object",
+        {"Bucket": "bucket", "Key": "foo"},
+        capture_items,
+        span_streaming,
+    )
+    attributes = _span_attributes(span, span_streaming)
+
+    assert SPANDATA.SERVER_ADDRESS not in attributes
+    assert SPANDATA.SERVER_PORT not in attributes
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_client_call_omits_missing_region(
+    capture_items,
+    client_factory,
+    monkeypatch,
+    span_streaming,
+):
+    client = client_factory()
+    monkeypatch.setattr(client.meta.config, "region_name", None)
+
+    span = _capture_stubbed_client_span(
+        client,
+        "head_object",
+        {"Bucket": "bucket", "Key": "foo"},
+        capture_items,
+        span_streaming,
+    )
+
+    assert SPANDATA.CLOUD_REGION not in _span_attributes(span, span_streaming)
+
+
+@pytest.mark.parametrize("span_streaming", [True, False])
+def test_client_call_has_response_attributes(
+    capture_items,
+    client_factory,
+    span_streaming,
+):
+    client = client_factory()
+    span = _capture_stubbed_client_span(
+        client,
+        "head_object",
+        {"Bucket": "bucket", "Key": "foo"},
+        capture_items,
+        span_streaming,
+        response={
+            "ResponseMetadata": {
+                "HTTPStatusCode": 200,
+                "RequestId": "request-id",
+                "HostId": "extended-request-id",
+            }
+        },
+    )
+    attributes = _span_attributes(span, span_streaming)
+
+    assert attributes[SPANDATA.HTTP_STATUS_CODE] == 200
+    assert attributes[SPANDATA.AWS_REQUEST_ID] == "request-id"
+    assert attributes[SPANDATA.AWS_EXTENDED_REQUEST_ID] == "extended-request-id"
 
 
 @pytest.mark.parametrize("attempt_count", [2, 3])
@@ -185,7 +419,16 @@ def test_client_call_exception_is_unchanged_and_finishes_span(
     spans_by_op = _capture_boto3_spans_by_op(
         invoke_failing_client_method, capture_items, span_streaming
     )
-    _assert_one_failed_span(spans_by_op.get(OP.HTTP_CLIENT, []), span_streaming)
+    client_spans = spans_by_op.get(OP.HTTP_CLIENT, [])
+    _assert_one_failed_span(client_spans, span_streaming)
+
+    attributes = _span_attributes(client_spans[0], span_streaming)
+    expected_error_type = (
+        "botocore.exceptions.EndpointConnectionError"
+        if event_name == "before-send"
+        else "ValueError"
+    )
+    assert attributes[SPANDATA.ERROR_TYPE] == expected_error_type
 
 
 @pytest.mark.parametrize("span_streaming", [True, False])
@@ -228,5 +471,6 @@ def test_streaming_body_read_failure_finishes_stream_span(
     stream_spans = spans_by_op.get(OP.HTTP_CLIENT_STREAM, [])
 
     assert len(client_spans) == 1
-    assert len(stream_spans) == 1
-    _assert_span_finished(stream_spans[0], span_streaming)
+    _assert_one_failed_span(stream_spans, span_streaming)
+    attributes = _span_attributes(stream_spans[0], span_streaming)
+    assert attributes[SPANDATA.ERROR_TYPE] == "OSError"
