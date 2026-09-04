@@ -10,7 +10,6 @@ from langchain_core.outputs import ChatResult
 from langgraph.errors import GraphBubbleUp
 
 import sentry_sdk
-from sentry_sdk import start_transaction
 from sentry_sdk.consts import OP, SPANDATA
 
 
@@ -205,9 +204,8 @@ def test_pregel_invoke(
 
     items = capture_items("span")
 
-    with start_transaction():
-        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
-        result = wrapped_invoke(pregel, test_state)
+    wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+    result = wrapped_invoke(pregel, test_state)
 
     assert result is not None
 
@@ -306,10 +304,9 @@ def test_pregel_ainvoke(
         return {"messages": new_messages}
 
     async def run_test():
-        with start_transaction():
-            wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
-            result = await wrapped_ainvoke(pregel, test_state)
-            return result
+        wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
+        result = await wrapped_ainvoke(pregel, test_state)
+        return result
 
     items = capture_items("span")
 
@@ -376,7 +373,7 @@ def test_pregel_invoke_error(
 
     items = capture_items("span")
 
-    with start_transaction(), pytest.raises(Exception, match="Graph execution failed"):
+    with pytest.raises(Exception, match="Graph execution failed"):
         wrapped_invoke = _wrap_pregel_invoke(original_invoke)
         wrapped_invoke(pregel, test_state)
 
@@ -412,9 +409,7 @@ def test_pregel_ainvoke_error(
         raise Exception("Async graph execution failed")
 
     async def run_error_test():
-        with start_transaction(), pytest.raises(
-            Exception, match="Async graph execution failed"
-        ):
+        with pytest.raises(Exception, match="Async graph execution failed"):
             wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
             await wrapped_ainvoke(pregel, test_state)
 
@@ -459,9 +454,8 @@ def test_pregel_invoke_with_different_graph_names(
 
     items = capture_items("span")
 
-    with start_transaction():
-        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
-        wrapped_invoke(pregel, {"messages": []})
+    wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+    wrapped_invoke(pregel, {"messages": []})
 
     sentry_sdk.flush()
     spans = [item.payload for item in items]
@@ -537,9 +531,8 @@ def test_pregel_invoke_span_includes_usage_data(
 
     items = capture_items("span")
 
-    with start_transaction():
-        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
-        result = wrapped_invoke(pregel, test_state)
+    wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+    result = wrapped_invoke(pregel, test_state)
 
     assert result is not None
 
@@ -618,10 +611,9 @@ def test_pregel_ainvoke_span_includes_usage_data(
         return {"messages": new_messages}
 
     async def run_test():
-        with start_transaction():
-            wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
-            result = await wrapped_ainvoke(pregel, test_state)
-            return result
+        wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
+        result = await wrapped_ainvoke(pregel, test_state)
+        return result
 
     items = capture_items("span")
 
@@ -715,9 +707,8 @@ def test_pregel_invoke_multiple_llm_calls_aggregate_usage(
 
     items = capture_items("span")
 
-    with start_transaction():
-        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
-        result = wrapped_invoke(pregel, test_state)
+    wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+    result = wrapped_invoke(pregel, test_state)
 
     assert result is not None
 
@@ -801,10 +792,9 @@ def test_pregel_ainvoke_multiple_llm_calls_aggregate_usage(
         return {"messages": new_messages}
 
     async def run_test():
-        with start_transaction():
-            wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
-            result = await wrapped_ainvoke(pregel, test_state)
-            return result
+        wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
+        result = await wrapped_ainvoke(pregel, test_state)
+        return result
 
     items = capture_items("span")
 
@@ -881,9 +871,8 @@ def test_pregel_invoke_span_includes_response_model(
 
     items = capture_items("span")
 
-    with start_transaction():
-        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
-        result = wrapped_invoke(pregel, test_state)
+    wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+    result = wrapped_invoke(pregel, test_state)
 
     assert result is not None
 
@@ -958,10 +947,9 @@ def test_pregel_ainvoke_span_includes_response_model(
         return {"messages": new_messages}
 
     async def run_test():
-        with start_transaction():
-            wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
-            result = await wrapped_ainvoke(pregel, test_state)
-            return result
+        wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
+        result = await wrapped_ainvoke(pregel, test_state)
+        return result
 
     items = capture_items("span")
 
@@ -1053,9 +1041,8 @@ def test_pregel_invoke_span_uses_last_response_model(
 
     items = capture_items("span")
 
-    with start_transaction():
-        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
-        result = wrapped_invoke(pregel, test_state)
+    wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+    result = wrapped_invoke(pregel, test_state)
 
     assert result is not None
 
@@ -1142,10 +1129,9 @@ def test_pregel_ainvoke_span_uses_last_response_model(
         return {"messages": new_messages}
 
     async def run_test():
-        with start_transaction():
-            wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
-            result = await wrapped_ainvoke(pregel, test_state)
-            return result
+        wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
+        result = await wrapped_ainvoke(pregel, test_state)
+        return result
 
     items = capture_items("span")
 
@@ -1264,9 +1250,8 @@ def test_extraction_functions_complex_scenario(
 
     items = capture_items("span")
 
-    with start_transaction():
-        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
-        result = wrapped_invoke(pregel, test_state)
+    wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+    result = wrapped_invoke(pregel, test_state)
 
     assert result is not None
 
@@ -1330,14 +1315,11 @@ def test_langgraph_message_role_mapping(
     pregel = MockPregelInstance(compiled_graph)
     items = capture_items("span")
 
-    with start_transaction(name="langgraph tx"):
-        # Use the wrapped invoke function directly
-        from sentry_sdk.integrations.langgraph import _wrap_pregel_invoke
+    # Use the wrapped invoke function directly
+    from sentry_sdk.integrations.langgraph import _wrap_pregel_invoke
 
-        wrapped_invoke = _wrap_pregel_invoke(
-            lambda self, state_data: {"result": "success"}
-        )
-        wrapped_invoke(pregel, state_data)
+    wrapped_invoke = _wrap_pregel_invoke(lambda self, state_data: {"result": "success"})
+    wrapped_invoke(pregel, state_data)
 
     sentry_sdk.flush()
     span = next(item.payload for item in items)
@@ -1474,9 +1456,8 @@ def test_pregel_invoke_gates_request_messages_on_inputs_setting(
 
     captured = capture_items("span")
 
-    with start_transaction():
-        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
-        wrapped_invoke(pregel, test_state)
+    wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+    wrapped_invoke(pregel, test_state)
 
     data = _invoke_span_data(captured)
 
@@ -1570,9 +1551,8 @@ def test_pregel_invoke_gates_response_text_and_tool_calls_on_outputs_setting(
 
     captured = capture_items("span")
 
-    with start_transaction():
-        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
-        wrapped_invoke(pregel, test_state)
+    wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+    wrapped_invoke(pregel, test_state)
 
     data = _invoke_span_data(captured)
 
@@ -1662,9 +1642,8 @@ def test_pregel_ainvoke_gates_inputs_and_outputs_independently(
         }
 
     async def run_test():
-        with start_transaction():
-            wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
-            return await wrapped_ainvoke(pregel, test_state)
+        wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
+        return await wrapped_ainvoke(pregel, test_state)
 
     captured = capture_items("span")
 
@@ -1742,9 +1721,8 @@ def test_pregel_invoke_message_delta_ignores_gen_ai_inputs_setting(
 
     captured = capture_items("span")
 
-    with start_transaction():
-        wrapped_invoke = _wrap_pregel_invoke(original_invoke)
-        wrapped_invoke(pregel, test_state)
+    wrapped_invoke = _wrap_pregel_invoke(original_invoke)
+    wrapped_invoke(pregel, test_state)
 
     data = _invoke_span_data(captured)
 
@@ -1811,9 +1789,8 @@ def test_pregel_ainvoke_message_delta_ignores_gen_ai_inputs_setting(
         }
 
     async def run_test():
-        with start_transaction():
-            wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
-            return await wrapped_ainvoke(pregel, test_state)
+        wrapped_ainvoke = _wrap_pregel_ainvoke(original_ainvoke)
+        return await wrapped_ainvoke(pregel, test_state)
 
     captured = capture_items("span")
 
