@@ -149,6 +149,7 @@ Looking to upgrade from Sentry SDK 2.x to 3.x? Here's a comprehensive list of wh
 - `Scope.iter_headers` was removed.
 - The SDK won't set any tags on its own anymore.
 - The `update_current_span` API was removed.
+- `SanicIntegration` no longer accepts `unsampled_statuses`.
 
 
 ## Deprecated

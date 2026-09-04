@@ -12,20 +12,18 @@ from sentry_sdk.data_collection import (
 from sentry_sdk.integrations import DidNotEnable, Integration, _check_minimum_version
 from sentry_sdk.integrations._wsgi_common import RequestExtractor, _filter_headers
 from sentry_sdk.scope import should_send_default_pii
-from sentry_sdk.traces import SegmentNameSource, StreamedSpan
+from sentry_sdk.traces import SegmentNameSource
 from sentry_sdk.tracing import TransactionSource
 from sentry_sdk.utils import (
     capture_internal_exceptions,
     ensure_integration_enabled,
     event_from_exception,
     has_data_collection_enabled,
-    logger,
     parse_version,
     reraise,
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Container
     from typing import Any, Callable, Dict, Optional, Union
 
     from sanic.request import Request, RequestParameters
@@ -58,17 +56,6 @@ class SanicIntegration(Integration):
     identifier = "sanic"
     origin = f"auto.http.{identifier}"
     version: "Optional[tuple[int, ...]]" = None
-
-    def __init__(
-        self, unsampled_statuses: "Optional[Container[int]]" = frozenset({404})
-    ) -> None:
-        """
-        The unsampled_statuses parameter can be used to specify for which HTTP statuses the
-        transactions should not be sent to Sentry. By default, transactions are sent for all
-        HTTP statuses, except 404. Set unsampled_statuses to None to send transactions for all
-        HTTP statuses, including 404.
-        """
-        self._unsampled_statuses = unsampled_statuses or set()
 
     @staticmethod
     def setup_once() -> None:
@@ -146,12 +133,6 @@ async def _context_enter(request: "Request") -> None:
     scope.clear_breadcrumbs()
     scope.add_event_processor(_make_request_processor(weak_request))
 
-    integration = client.get_integration(SanicIntegration)
-    if isinstance(integration, SanicIntegration) and integration._unsampled_statuses:
-        logger.warning(
-            "The `unsampled_statuses` option of SanicIntegration has no effect when span streaming is enabled.",
-        )
-
     sentry_sdk.traces.continue_trace(dict(request.headers))
     scope.set_custom_sampling_context({"sanic_request": request})
 
@@ -183,32 +164,22 @@ async def _context_exit(
         if not request.ctx._sentry_do_integration:
             return
 
-        integration = sentry_sdk.get_client().get_integration(SanicIntegration)
-
         response_status = None if response is None else response.status
 
         # This capture_internal_exceptions block has been intentionally nested here, so that in case an exception
         # happens while trying to end the transaction, we still attempt to exit the scope.
         with capture_internal_exceptions():
             span = request.ctx._sentry_root_span
-            if isinstance(span, StreamedSpan):
-                with capture_internal_exceptions():
-                    for attr, value in _get_request_attributes(request).items():
-                        span.set_attribute(attr, value)
-                if response_status is not None:
-                    span.set_attribute(SPANDATA.HTTP_STATUS_CODE, response_status)
-                    span.status = "error" if response_status >= 400 else "ok"
 
-                span.end()
+            with capture_internal_exceptions():
+                for attr, value in _get_request_attributes(request).items():
+                    span.set_attribute(attr, value)
 
-            else:
-                span.set_http_status(response_status)
-                span.sampled &= (
-                    isinstance(integration, SanicIntegration)
-                    and response_status not in integration._unsampled_statuses
-                )
+            if response_status is not None:
+                span.set_attribute(SPANDATA.HTTP_STATUS_CODE, response_status)
+                span.status = "error" if response_status >= 400 else "ok"
 
-                span.__exit__(None, None, None)
+            span.end()
 
         request.ctx._sentry_scope.__exit__(None, None, None)
 
